@@ -51,7 +51,7 @@ import type {
   ResolveSessionActorContextApiRequest,
   ResolveSessionActorContextApiResponse,
 } from "@shared/contracts/identity/IdentityTransportContracts";
-import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
+import type { IdentityAuthClient, IdentityAuthRequestOptions } from "@ui/shared/identity/IdentityAuthClient";
 
 export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClient {
   public constructor(
@@ -108,8 +108,9 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
 
   public resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.innerClient.resolveAuthenticatedSession(sessionToken);
+    return this.innerClient.resolveAuthenticatedSession(sessionToken, options);
   }
 
   public listIdentitySessions(
@@ -121,8 +122,9 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
 
   public resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
-    return this.innerClient.resolveSessionActorContext(request);
+    return this.innerClient.resolveSessionActorContext(request, options);
   }
 
   public logoutAuthenticatedSession(

@@ -49,8 +49,10 @@ import type {
   ResolveSessionActorContextApiRequest,
   ResolveSessionActorContextApiResponse,
 } from "@shared/contracts/identity/IdentityTransportContracts";
-import { HttpIdentityAuthClient, type IdentityAuthClient } from "@shared/identity/IdentityAuthClient";
+import { HttpIdentityAuthClient, type IdentityAuthClient, type IdentityAuthRequestOptions } from "@shared/identity/IdentityAuthClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
+
+const DefaultIdentityApiTimeoutMs = 10_000;
 
 export class IdentityAuthService {
   private readonly client: IdentityAuthClient;
@@ -77,8 +79,9 @@ export class IdentityAuthService {
 
   public resolveAuthenticatedSession(
     request: ResolveAuthenticatedSessionApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.client.resolveAuthenticatedSession(request.sessionToken);
+    return this.client.resolveAuthenticatedSession(request.sessionToken, options);
   }
 
   public listIdentitySessions(
@@ -90,8 +93,9 @@ export class IdentityAuthService {
 
   public resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
-    return this.client.resolveSessionActorContext(request);
+    return this.client.resolveSessionActorContext(request, options);
   }
 
   public logoutAuthenticatedSession(
@@ -217,7 +221,9 @@ function createDefaultIdentityAuthClient(): IdentityAuthClient {
   const desktopBaseUrl = resolveDesktopIdentityApiBaseUrl();
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new DesktopTrustedDeviceIdentityAuthClient(
-    new HttpIdentityAuthClient(baseUrl),
+    new HttpIdentityAuthClient(baseUrl, {
+      defaultTimeoutMs: DefaultIdentityApiTimeoutMs,
+    }),
   );
 }
 

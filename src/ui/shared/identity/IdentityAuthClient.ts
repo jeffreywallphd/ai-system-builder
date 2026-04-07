@@ -49,7 +49,12 @@ import {
   appendSharedApiQueryValue,
   toSharedApiQuerySuffix,
 } from "@shared/contracts/api/SharedApiQueryConventions";
-import { SharedApiClient } from "../api/SharedApiClient";
+import { SharedApiClient, type SharedApiRetryPolicy } from "../api/SharedApiClient";
+
+export interface IdentityAuthRequestOptions {
+  readonly timeoutMs?: number;
+  readonly retryPolicy?: SharedApiRetryPolicy;
+}
 
 export interface IdentityAuthClient {
   registerLocalAccount(
@@ -61,6 +66,7 @@ export interface IdentityAuthClient {
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
   resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>>;
   listIdentitySessions(
     request: ListIdentitySessionsApiRequest,
@@ -68,6 +74,7 @@ export interface IdentityAuthClient {
   ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>>;
   resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>>;
   logoutAuthenticatedSession(
     sessionToken: string,
@@ -169,8 +176,9 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
 
   public async resolveAuthenticatedSession(
     sessionToken: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
-    return this.get("/api/v1/identity/session", sessionToken);
+    return this.get("/api/v1/identity/session", sessionToken, options);
   }
 
   public async listIdentitySessions(
@@ -192,11 +200,12 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
 
   public async resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
     const query = new URLSearchParams();
     appendSharedApiQueryValue(query, "workspaceId", request.workspaceId);
     const suffix = toSharedApiQuerySuffix(query);
-    return this.get(`/api/v1/identity/session/context${suffix}`, request.sessionToken);
+    return this.get(`/api/v1/identity/session/context${suffix}`, request.sessionToken, options);
   }
 
   public async logoutAuthenticatedSession(
@@ -422,23 +431,29 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     path: string,
     body: Readonly<Record<string, unknown>>,
     sessionToken?: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<TResponse>> {
     return await this.apiClient.requestJson<IdentityAuthApiResponse<TResponse>>({
       method: "POST",
       path,
       body,
       sessionToken,
+      timeoutMs: options?.timeoutMs,
+      retryPolicy: options?.retryPolicy,
     });
   }
 
   private async get<TResponse>(
     path: string,
     sessionToken?: string,
+    options?: IdentityAuthRequestOptions,
   ): Promise<IdentityAuthApiResponse<TResponse>> {
     return await this.apiClient.requestJson<IdentityAuthApiResponse<TResponse>>({
       method: "GET",
       path,
       sessionToken,
+      timeoutMs: options?.timeoutMs,
+      retryPolicy: options?.retryPolicy,
     });
   }
 }

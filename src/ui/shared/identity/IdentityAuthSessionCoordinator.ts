@@ -1,6 +1,10 @@
 import { IdentityAuthApiErrorCodes, type IdentityAuthApiErrorCode } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import type { IdentityAuthService } from "../../services/IdentityAuthService";
 import {
+  AppInitializationStageIds,
+  type AppInitializationProgressUpdate,
+} from "../initialization/AppInitializationProgress";
+import {
   toPersistedIdentitySession,
   type IdentityAuthPersistedSession,
   type IdentityAuthSessionStore,
@@ -23,6 +27,7 @@ export const IdentitySessionBootstrapErrorCodes = Object.freeze({
   identityContextUnavailable: "identity-context-unavailable",
   identityContextInvalid: "identity-context-invalid",
   transportUnavailable: "transport-unavailable",
+  timeout: "timeout",
 } as const);
 
 export interface IdentitySessionBootstrapError {
@@ -44,7 +49,16 @@ export type IdentitySessionBootstrapResult =
 
 export interface IdentitySessionBootstrapOptions {
   readonly workspaceId?: string;
+  readonly onProgress?: (update: AppInitializationProgressUpdate) => void;
+  readonly sessionValidationTimeoutMs?: number;
+  readonly actorContextTimeoutMs?: number;
 }
+
+const DefaultSessionValidationTimeoutMs = 4_000;
+const DefaultActorContextTimeoutMs = 5_000;
+const BootstrapRequestRetryPolicy = Object.freeze({
+  maxAttempts: 1,
+});
 
 export class IdentityAuthSessionCoordinator {
   private readonly now: () => Date;
@@ -58,7 +72,13 @@ export class IdentityAuthSessionCoordinator {
   }
 
   public async bootstrap(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
-    return this.resolveActiveSession(options);
+    const startedAt = Date.now();
+    console.info("[ai-loom][init] renderer-session-bootstrap:start");
+    try {
+      return await this.resolveActiveSession(options);
+    } finally {
+      console.info(`[ai-loom][init] renderer-session-bootstrap:end durationMs=${Date.now() - startedAt}`);
+    }
   }
 
   public async refreshIfAuthenticated(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
@@ -72,8 +92,15 @@ export class IdentityAuthSessionCoordinator {
   }
 
   private async resolveActiveSession(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
+    this.publishProgress(options, {
+      stageId: AppInitializationStageIds.loadingSavedSession,
+    });
     const session = this.sessionStore.getSession();
     if (!session) {
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.readyForSignIn,
+        detail: "No saved sign-in was found on this device.",
+      });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
         reason: IdentitySessionUnauthenticatedReason.missingSession,
@@ -82,6 +109,10 @@ export class IdentityAuthSessionCoordinator {
 
     if (this.sessionStore.isSessionExpired(session, this.now())) {
       this.sessionStore.clearSession();
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.readyForSignIn,
+        detail: "Your saved sign-in has expired.",
+      });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
         reason: IdentitySessionUnauthenticatedReason.expiredSession,
@@ -89,11 +120,21 @@ export class IdentityAuthSessionCoordinator {
     }
 
     try {
-      const resolvedSession = await this.authService.resolveAuthenticatedSession({
-        sessionToken: session.sessionToken,
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.validatingSession,
       });
+
+      const resolvedSession = await this.resolveAuthenticatedSessionWithTiming({
+        sessionToken: session.sessionToken,
+      }, options);
       if (!resolvedSession.ok || !resolvedSession.data) {
         this.sessionStore.clearSession();
+        this.publishProgress(options, {
+          stageId: AppInitializationStageIds.readyForSignIn,
+          detail: resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
+            ? "Your saved sign-in is no longer valid."
+            : "Saved sign-in could not be verified.",
+        });
         return Object.freeze({
           status: IdentitySessionBootstrapStatus.unauthenticated,
           reason: resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
@@ -102,33 +143,49 @@ export class IdentityAuthSessionCoordinator {
           error: toBootstrapError(
             resolvedSession.error?.code,
             resolvedSession.error?.message ?? "Session validation failed.",
+            resolvedSession.error,
           ),
         });
       }
 
-      const actorContext = await this.authService.resolveSessionActorContext({
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.loadingWorkspaceContext,
+      });
+      const actorContext = await this.resolveSessionActorContextWithTiming({
         sessionToken: session.sessionToken,
         workspaceId: normalizeWorkspaceId(options?.workspaceId),
-      });
+      }, options);
       if (!actorContext.ok || !actorContext.data) {
         if (actorContext.error?.code === IdentityAuthApiErrorCodes.authenticationFailed) {
           this.sessionStore.clearSession();
+          this.publishProgress(options, {
+            stageId: AppInitializationStageIds.readyForSignIn,
+            detail: "Your saved sign-in is no longer valid.",
+          });
           return Object.freeze({
             status: IdentitySessionBootstrapStatus.unauthenticated,
             reason: IdentitySessionUnauthenticatedReason.invalidSession,
             error: toBootstrapError(
               actorContext.error?.code,
               actorContext.error?.message ?? "Session is no longer valid.",
+              actorContext.error,
             ),
           });
         }
 
+        this.publishProgress(options, {
+          stageId: AppInitializationStageIds.readyForSignIn,
+          detail: isTimeoutIdentityError(actorContext.error)
+            ? "Sign-in check took too long. You can sign in again."
+            : "Workspace access could not be loaded from the server.",
+        });
         return Object.freeze({
           status: IdentitySessionBootstrapStatus.unauthenticated,
           reason: IdentitySessionUnauthenticatedReason.contextUnavailable,
           error: toBootstrapError(
             actorContext.error?.code,
             actorContext.error?.message ?? "Session context could not be loaded.",
+            actorContext.error,
           ),
         });
       }
@@ -158,11 +215,18 @@ export class IdentityAuthSessionCoordinator {
         initialCapabilityState: deriveInitialCapabilityState(actorContext.data),
       });
       this.sessionStore.saveSession(hydratedSession);
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.ready,
+      });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.authenticated,
         session: hydratedSession,
       });
     } catch {
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.readyForSignIn,
+        detail: "Unable to reach sign-in services right now.",
+      });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
         reason: IdentitySessionUnauthenticatedReason.contextUnavailable,
@@ -172,6 +236,49 @@ export class IdentityAuthSessionCoordinator {
           retryable: true,
         }),
       });
+    }
+  }
+
+  private publishProgress(
+    options: IdentitySessionBootstrapOptions | undefined,
+    update: AppInitializationProgressUpdate,
+  ): void {
+    options?.onProgress?.(Object.freeze({
+      stageId: update.stageId,
+      detail: update.detail,
+    }));
+  }
+
+  private async resolveAuthenticatedSessionWithTiming(
+    request: { readonly sessionToken: string },
+    options?: IdentitySessionBootstrapOptions,
+  ): Promise<Awaited<ReturnType<IdentityAuthService["resolveAuthenticatedSession"]>>> {
+    const startedAt = Date.now();
+    try {
+      return await this.authService.resolveAuthenticatedSession(request, {
+        timeoutMs: normalizeTimeoutMs(options?.sessionValidationTimeoutMs, DefaultSessionValidationTimeoutMs),
+        retryPolicy: BootstrapRequestRetryPolicy,
+      });
+    } finally {
+      console.info(`[ai-loom][init] resolveAuthenticatedSession:end durationMs=${Date.now() - startedAt}`);
+    }
+  }
+
+  private async resolveSessionActorContextWithTiming(
+    request: {
+      readonly sessionToken: string;
+      readonly workspaceId?: string;
+    },
+    options?: IdentitySessionBootstrapOptions,
+  ): Promise<Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>>> {
+    const startedAt = Date.now();
+    try {
+      return await this.authService.resolveSessionActorContext(request, {
+        timeoutMs: normalizeTimeoutMs(options?.actorContextTimeoutMs, DefaultActorContextTimeoutMs),
+        retryPolicy: BootstrapRequestRetryPolicy,
+      });
+    } finally {
+      console.info(`[ai-loom][init] resolveSessionActorContext:end durationMs=${Date.now() - startedAt}`);
     }
   }
 }
@@ -207,20 +314,56 @@ function deriveInitialCapabilityState(
 }
 
 function toBootstrapError(
-  code: IdentityAuthApiErrorCode | undefined,
+  errorCode: IdentityAuthApiErrorCode | undefined,
   message: string,
+  error?: unknown,
 ): IdentitySessionBootstrapError {
-  if (code === IdentityAuthApiErrorCodes.authenticationFailed) {
+  if (errorCode === IdentityAuthApiErrorCodes.authenticationFailed) {
     return Object.freeze({
       code: IdentitySessionBootstrapErrorCodes.identityContextInvalid,
       message,
       retryable: false,
     });
   }
+  if (isTimeoutIdentityError(error)) {
+    return Object.freeze({
+      code: IdentitySessionBootstrapErrorCodes.timeout,
+      message,
+      retryable: true,
+    });
+  }
 
   return Object.freeze({
     code: IdentitySessionBootstrapErrorCodes.identityContextUnavailable,
     message,
-    retryable: code === IdentityAuthApiErrorCodes.internal,
+    retryable: errorCode === IdentityAuthApiErrorCodes.internal,
   });
+}
+
+function normalizeTimeoutMs(value: number | undefined, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function isTimeoutIdentityError(error: unknown): boolean {
+  if (!isRecord(error)) {
+    return false;
+  }
+  const domainCode = readOptionalString(error, "domainCode");
+  if (domainCode === "request-timeout") {
+    return true;
+  }
+  const message = readOptionalString(error, "message");
+  return Boolean(message && /timed?\s*out/i.test(message));
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null;
+}
+
+function readOptionalString(record: Readonly<Record<string, unknown>>, key: string): string | undefined {
+  const value = record[key];
+  return typeof value === "string" ? value : undefined;
 }

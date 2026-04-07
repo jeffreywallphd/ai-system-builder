@@ -61,7 +61,7 @@ export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
   readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
   readonly onLogout?: () => Promise<void> | void;
-  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable";
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
 }
 
 export default function AppRouter({
