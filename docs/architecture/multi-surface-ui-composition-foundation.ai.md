@@ -115,3 +115,25 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
   - queue visibility and approved launch controls now expose sticky mobile wrappers in shared operational styling,
   - result review now includes explicit two-step mobile guidance while preserving desktop/tablet component reuse.
 - Long identifier readability/truncation behavior is now centralized in shared operational presentation classes so narrow surfaces and desktop remain architecture-aligned.
+
+## Story 15.2.8 update
+- Cross-surface operational hardening now includes representative shared regression coverage in `src/ui/shared/tests/OperationalSurfaceFlowRegression.test.tsx` spanning:
+  - dashboard visibility,
+  - run monitoring,
+  - queue visibility/detail,
+  - approved run initiation,
+  - result/output review,
+  - realtime connectivity state rendering.
+- Dashboard queue controls are now descriptor-driven and permission-aware in `src/ui/shared/operations/OperationalWorkspaceDashboard.tsx`, so dashboard actions align with run/queue panel permission semantics on desktop and thin-client surfaces.
+- Run-list row actions now respect shared responsive action layout conventions in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx` by using sheet/list actions on mobile-thin surfaces instead of menu-only rendering.
+- Current implemented production operational screen set for Epic 15.2 is explicit:
+  - workspace operational dashboard,
+  - run list + run detail/status,
+  - queue visibility + queue detail,
+  - approved run initiation,
+  - result review with protected asset actions,
+  - connectivity banner + realtime status indicators.
+- Explicit deferred work (intentional):
+  - live-runtime browser E2E automation for the operational surfaces,
+  - broader analytics/reporting UX beyond operational monitoring needs,
+  - additional admin-authoring expansion outside the prioritized Epic 15.2 operational scope.

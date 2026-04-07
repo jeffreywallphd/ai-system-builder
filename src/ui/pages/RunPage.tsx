@@ -736,6 +736,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         recentOutputsError={recentOutputsError}
         realtimeConnectionState={runtimeRealtimeConnectionState}
         responsiveProfile={responsiveProfile}
+        actorPermissionIds={actorPermissionIds}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
         onRefreshQueue={() => {
           void refreshRuntimeQueue();
         }}

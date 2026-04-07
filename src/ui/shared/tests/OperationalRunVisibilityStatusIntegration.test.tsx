@@ -85,6 +85,39 @@ describe("Operational run visibility and status rendering", () => {
     expect(html).toContain("data-label=\"Actions\"");
   });
 
+  it("uses sheet/list row actions for thin-client mobile run list", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(OperationalRunListPanel, {
+        queueItems: Object.freeze([
+          Object.freeze({
+            queueItemId: "queue:mobile:1",
+            executionId: "run:mobile:queued",
+            systemId: "system:mobile",
+            status: "queued",
+            enqueuedAt: "2026-04-07T12:00:00.000Z",
+          }),
+        ]),
+        recentRuns: Object.freeze([]),
+        selectedExecutionId: "run:mobile:queued",
+        isQueueLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
+        responsiveProfile: createSurfaceResponsiveProfile({ viewportWidthPx: 430 }),
+        actorPermissionIds: Object.freeze(["runtime.run.inspect", "runtime.run.cancel", "runtime.queue.manage"]),
+        surface: "thin-client",
+        onRefreshQueue: () => undefined,
+        onInspectRun: () => undefined,
+        onCancelRun: () => undefined,
+        onDequeue: () => undefined,
+      }),
+    );
+
+    expect(html).toContain("Inspect run");
+    expect(html).toContain("Cancel run");
+    expect(html).toContain("Dequeue");
+    expect(html).toContain("ui-action-list");
+    expect(html).not.toContain("Row actions");
+  });
+
   it("renders status changes in the run detail panel", () => {
     const responsiveProfile = createSurfaceResponsiveProfile({ viewportWidthPx: 800 });
 

@@ -87,6 +87,8 @@ describe("OperationalWorkspaceDashboard", () => {
         isRecentOutputsLoading: false,
         realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
         responsiveProfile: createSurfaceResponsiveProfile({ viewportWidthPx: 1200 }),
+        actorPermissionIds: Object.freeze(["runtime.queue.refresh", "runtime.run.inspect", "runtime.run.cancel", "runtime.queue.manage"]),
+        surface: "desktop",
         onRefreshQueue: () => undefined,
         onInspectRun: () => undefined,
         onCancelRun: () => undefined,
@@ -102,5 +104,50 @@ describe("OperationalWorkspaceDashboard", () => {
     expect(html).toContain("Recent outputs");
     expect(html).toContain("Node availability");
     expect(html).toContain("ui-operational-truncate");
+    expect(html).toContain("Queue item actions");
+  });
+
+  it("keeps dashboard queue actions permission-aware on thin-client/mobile", () => {
+    const queueItems = Object.freeze([
+      Object.freeze({
+        queueItemId: "queue:thin",
+        executionId: "run:thin",
+        systemId: "system:thin",
+        status: "queued",
+        enqueuedAt: "2026-04-07T10:02:00.000Z",
+      }),
+    ]);
+    const model = buildOperationalWorkspaceDashboardModel({
+      queueItems,
+      recentRuns: Object.freeze([]),
+      recentOutputs: Object.freeze([]),
+      nodeInventory: Object.freeze([]),
+      realtime: Object.freeze({ state: "connected", stale: false }),
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(OperationalWorkspaceDashboard, {
+        model,
+        queueItems,
+        recentRuns: Object.freeze([]),
+        recentOutputs: Object.freeze([]),
+        isQueueLoading: false,
+        isRecentOutputsLoading: false,
+        realtimeConnectionState: Object.freeze({ state: "connected", stale: false }),
+        responsiveProfile: createSurfaceResponsiveProfile({ viewportWidthPx: 430 }),
+        actorPermissionIds: Object.freeze(["runtime.queue.refresh", "runtime.run.inspect"]),
+        surface: "thin-client",
+        onRefreshQueue: () => undefined,
+        onInspectRun: () => undefined,
+        onCancelRun: () => undefined,
+        onDequeue: () => undefined,
+        onOpenNodeInventory: () => undefined,
+      }),
+    );
+
+    expect(html).toContain("Inspect run");
+    expect(html).not.toContain("Cancel run");
+    expect(html).not.toContain("Dequeue");
+    expect(html).toContain("ui-action-list");
   });
 });
