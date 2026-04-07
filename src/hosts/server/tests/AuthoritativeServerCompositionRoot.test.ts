@@ -210,6 +210,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedRouteFamilyIds).toContain("identity-auth");
     expect(observedRouteFamilyIds).toContain("workspace-administration");
     expect(observedRouteFamilyIds).toContain("node-trust");
+    expect(observedRouteFamilyIds).toContain("run-submission");
     await runtime.stop();
   });
 

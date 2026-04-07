@@ -20,6 +20,7 @@ export const AuthoritativeServerRequiredRouteFamilyIds = Object.freeze([
   "security-secret-metadata",
   "storage-management",
   "asset-management",
+  "run-submission",
 ]);
 
 export function composeAuthoritativeServerApiRouteRegistrationPlan(): AuthoritativeApiRouteRegistrationPlan {
@@ -35,6 +36,7 @@ export function composeAuthoritativeServerApiRouteRegistrationPlan(): Authoritat
       [AuthoritativeApiRouteBackendKeys.storageManagement]: true,
       [AuthoritativeApiRouteBackendKeys.assetManagement]: true,
       [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+      [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
     }),
   });
 }
