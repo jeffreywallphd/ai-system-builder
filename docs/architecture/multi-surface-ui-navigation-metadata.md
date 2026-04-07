@@ -90,3 +90,14 @@ Route metadata changes should verify:
 - Admin-lite navigation remains metadata-first and intentionally bounded to thin-safe routes, with entry composition in `src/ui/pages/AdminLiteEntryPage.tsx` now presenting only lightweight workflow intents (approval, status review, limited membership, policy inspection, trusted-device review).
 - Desktop-only administration capabilities remain excluded from admin-lite route discovery and are now called out explicitly in entry UX escalation guidance (security policy, identity/storage/secret admin, node trust revocation, and full membership role/member mutation flows).
 - Route-level strict gating in `SurfaceProtectedRoute` remains unchanged and authoritative; this update refines workflow clarity and explicit surface boundaries without widening route eligibility.
+
+## Story 15.3.8 update
+
+- Final administration regression coverage now includes explicit route/surface/role checks for prioritized admin flows:
+  - `src/ui/routes/tests/SurfaceRouteMetadataCatalog.test.ts`
+  - `src/ui/routes/tests/SurfaceRouteAccessPolicy.test.ts`
+- Access hardening now prevents elevated route access from unrelated workspace roles when no active workspace context is resolved (`src/ui/routes/SurfaceRouteAccessPolicy.ts`).
+- Final admin/admin-lite boundary expectations:
+  - desktop admin: `admin-shell`, `workspace-admin`, `security-policy`, `identity-admin`, `governance-review`
+  - thin/admin-lite: `admin-lite-shell`, `workspace-thin-membership`, `trusted-devices`, `governance-review-thin`, `node-inventory`
+  - node approval actions (`node-enrollment-review`) remain owner/admin-gated across surfaces.

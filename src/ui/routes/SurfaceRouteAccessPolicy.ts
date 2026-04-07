@@ -141,15 +141,6 @@ function deriveRoleKeys(session: IdentityAuthPersistedSession | undefined): Read
     ...(resolvedWorkspace?.effectiveRoles ?? []),
     ...(session.initialCapabilityState?.effectiveRoles ?? []),
   ]);
-  if (roles.size > 0) {
-    return Object.freeze([...roles]);
-  }
-
-  for (const workspace of session.workspaceContext?.workspaces ?? []) {
-    for (const role of workspace.effectiveRoles) {
-      roles.add(role);
-    }
-  }
 
   return Object.freeze([...roles]);
 }

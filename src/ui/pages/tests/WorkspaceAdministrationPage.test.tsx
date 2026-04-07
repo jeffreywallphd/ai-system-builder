@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import WorkspaceAdministrationPage from "../WorkspaceAdministrationPage";
+import WorkspaceAdministrationPage, { parseInvitationRoleCsv } from "../WorkspaceAdministrationPage";
 import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 describe("WorkspaceAdministrationPage", () => {
@@ -43,5 +43,21 @@ describe("WorkspaceAdministrationPage", () => {
     expect(html).toContain("Workspace context");
     expect(html).toContain("Membership administration");
     expect(html).toContain("Role assignment state");
+  });
+});
+
+describe("parseInvitationRoleCsv", () => {
+  it("deduplicates and normalizes supported roles", () => {
+    expect(parseInvitationRoleCsv(" admin,member,admin ")).toEqual({
+      ok: true,
+      roles: ["admin", "member"],
+    });
+  });
+
+  it("rejects unsupported role values", () => {
+    expect(parseInvitationRoleCsv("member,owner")).toEqual({
+      ok: false,
+      message: "Unsupported role values: owner.",
+    });
   });
 });

@@ -350,7 +350,7 @@ export default function WorkspaceAdministrationPage(props: WorkspaceAdministrati
   );
 }
 
-function parseInvitationRoleCsv(
+export function parseInvitationRoleCsv(
   value: string,
 ): { readonly ok: true; readonly roles: ReadonlyArray<WorkspaceAssignableRole> } | { readonly ok: false; readonly message: string } {
   const roles = [...new Set(value.split(",").map((entry) => entry.trim().toLowerCase()).filter((entry) => entry.length > 0))];

@@ -10,15 +10,21 @@ import type {
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 import {
   SessionOversightPanel,
   TrustedDeviceOversightPanel,
   formatDisplayDate,
 } from "@shared/identity/IdentityTrustOversightPanels";
 
-export default function TrustedDevicesPage(): JSX.Element {
-  const authService = useMemo(() => new IdentityAuthService(), []);
-  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+interface TrustedDevicesPageProps {
+  readonly authService?: IdentityAuthService;
+  readonly sessionStore?: IdentityAuthSessionStoreContract;
+}
+
+export default function TrustedDevicesPage(props: TrustedDevicesPageProps = {}): JSX.Element {
+  const authService = useMemo(() => props.authService ?? new IdentityAuthService(), [props.authService]);
+  const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
   const [session] = useState(() => sessionStore.getSession());
   const [devices, setDevices] = useState<ReadonlyArray<TrustedDeviceSummaryApiResponse>>(Object.freeze([]));
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>();
@@ -44,6 +50,10 @@ export default function TrustedDevicesPage(): JSX.Element {
 
   const sessionToken = session?.sessionToken;
   const userIdentityId = session?.userIdentityId;
+  const hasAdministrativeRole = useMemo(
+    () => resolveSessionRoleKeys(session).some((role) => role === "owner" || role === "admin"),
+    [session],
+  );
 
   const pairingCandidates = devices.filter((device) => device.trustStatus === "pending-pairing");
   const canCompletePairing = validationResult?.outcome === "valid";
@@ -277,6 +287,10 @@ export default function TrustedDevicesPage(): JSX.Element {
     if (!sessionToken) {
       return;
     }
+    if (!canManageTrustedDeviceTarget(session, device)) {
+      setActionError("Your current session can only revoke trusted devices for your own identity.");
+      return;
+    }
     if (!window.confirm(`Revoke trust for "${device.displayName}"? Existing trusted sessions on this device may be invalidated.`)) {
       return;
     }
@@ -307,6 +321,10 @@ export default function TrustedDevicesPage(): JSX.Element {
 
   const revokeSession = async (targetSession: IdentitySessionSummaryApiResponse): Promise<void> => {
     if (!sessionToken) {
+      return;
+    }
+    if (!canManageIdentitySessionTarget(session, targetSession)) {
+      setActionError("Your current session can only end sessions for your own identity.");
       return;
     }
     if (!window.confirm("End this session? The user will need to sign in again on that client.")) {
@@ -381,6 +399,11 @@ export default function TrustedDevicesPage(): JSX.Element {
       {sessionsError ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--error" role="alert">{sessionsError}</p> : null}
       {actionError ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--error" role="alert">{actionError}</p> : null}
       {actionStatus ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--success" role="status">{actionStatus}</p> : null}
+      {!hasAdministrativeRole ? (
+        <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--warning" role="status">
+          Admin-lite boundary: this session can only revoke trusted devices and sessions associated with your own identity.
+        </p>
+      ) : null}
 
       <div className="ui-trusted-devices-page__grid">
         <section className="ui-card">
@@ -565,5 +588,46 @@ function getValidationOutcomeMessage(response: ValidateTrustedDevicePairingApiRe
     default:
       return "Unable to validate the pairing artifact.";
   }
+}
+
+export function canManageTrustedDeviceTarget(
+  session: ReturnType<IdentityAuthSessionStore["getSession"]>,
+  targetDevice: Pick<TrustedDeviceSummaryApiResponse, "userIdentityId">,
+): boolean {
+  if (!session?.userIdentityId) {
+    return false;
+  }
+  if (resolveSessionRoleKeys(session).some((role) => role === "owner" || role === "admin")) {
+    return true;
+  }
+  return session.userIdentityId === targetDevice.userIdentityId;
+}
+
+export function canManageIdentitySessionTarget(
+  session: ReturnType<IdentityAuthSessionStore["getSession"]>,
+  targetSession: Pick<IdentitySessionSummaryApiResponse, "userIdentityId">,
+): boolean {
+  if (!session?.userIdentityId) {
+    return false;
+  }
+  if (resolveSessionRoleKeys(session).some((role) => role === "owner" || role === "admin")) {
+    return true;
+  }
+  return session.userIdentityId === targetSession.userIdentityId;
+}
+
+function resolveSessionRoleKeys(
+  session: ReturnType<IdentityAuthSessionStore["getSession"]>,
+): ReadonlyArray<"owner" | "admin" | "member" | "viewer"> {
+  if (!session) {
+    return Object.freeze([]);
+  }
+  const workspaceId = session.workspaceContext?.resolvedWorkspaceId
+    ?? session.workspaceContext?.requestedWorkspaceId
+    ?? session.initialCapabilityState?.workspaceId;
+  const workspaceRoles = workspaceId
+    ? session.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId === workspaceId)?.effectiveRoles
+    : undefined;
+  return workspaceRoles ?? session.initialCapabilityState?.effectiveRoles ?? Object.freeze([]);
 }
 
