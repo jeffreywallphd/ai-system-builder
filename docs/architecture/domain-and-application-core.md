@@ -1834,3 +1834,18 @@ This slice intentionally keeps identity/credential/session concerns separate so 
 - Added foundation tests in:
   - `src/domain/security/tests/SecretDomain.test.ts`,
   - `src/application/security/tests/SecretServiceContracts.test.ts`.
+
+## Direction 19 update: Offline local-mode authority boundaries (story 19.1.1)
+
+- Added a canonical offline authority domain catalog in `src/domain/platform/OfflineLocalModeBoundaries.ts` with:
+  - explicit offline-capable resource classes,
+  - authoritative vs local draft vs local ephemeral ownership scope,
+  - cache/view/edit/queue/execute capability matrices,
+  - default storage bucket placement (`offline-cache`, `local-draft-state`, `mutation-queue`, `local-ephemeral-state`, `server-authoritative-only`),
+  - prohibited divergence patterns and queued mutation envelope invariants.
+- Added application-layer reconnect reconciliation policy in `src/application/common/OfflineLocalModeResynchronization.ts` for deterministic queued mutation outcomes (`apply-to-authoritative`, `conflict-requires-review`, `reject-not-allowed`) with explicit no-silent-divergence guardrails.
+- Added desktop host authority profile binding in `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts` to preserve control-plane client posture while enabling bounded offline resource handling.
+- Added focused coverage in:
+  - `src/domain/platform/tests/OfflineLocalModeBoundaries.test.ts`
+  - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
+  - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`

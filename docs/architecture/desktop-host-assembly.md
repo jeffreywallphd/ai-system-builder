@@ -22,6 +22,7 @@ Desktop host composition explicitly wires:
 - desktop shell startup and renderer window creation
 - preload/IPC transport registration
 - local cache/persistence bootstrapping
+- offline local-mode boundaries (cache vs local draft vs queued sync intent vs local-ephemeral runtime state)
 - runtime supervisor/bootstrap dependencies for workstation execution
 - authoring and administration bridge surfaces as control-plane client behavior
 

@@ -181,6 +181,19 @@ The most natural next architectural steps are:
 - Model-file operations currently expose a broad host capability surface through the preload bridge. If the product evolves toward stronger trust boundaries, this area may need tighter scoping and policy controls.
 - Runtime/bootstrap composition is split between the Electron host and the renderer composition; the long-term architecture would benefit from a clearer statement of what must be host-owned versus renderer-owned.
 
+## Offline local-mode authority boundary update (Feature 19 / Story 19.1.1)
+
+- Desktop offline behavior now has an explicit authority model and resource boundary catalog:
+  - `src/domain/platform/OfflineLocalModeBoundaries.ts`
+  - `src/application/common/OfflineLocalModeResynchronization.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- Canonical architecture note:
+  - `docs/architecture/offline-local-mode-authority-boundaries.md`
+- Core posture:
+  - desktop can cache/view/edit selected resources and queue explicit mutation envelopes while disconnected,
+  - authoritative control-plane truth remains server-owned,
+  - reconnect requires explicit apply/conflict/reject reconciliation outcomes and prohibits silent global divergence.
+
 Direction 3 trust updates now also use local-first persistence seams for MCP governance: tool credential records prefer the desktop secure-storage bridge (Electron `safeStorage`) and fall back to encrypted local storage when unavailable; execution-policy audit decisions remain local-storage-backed, and ordinary installed-tool/read-model paths continue to avoid returning raw secret values.
 
 ## AI Loom image manipulation update: runtime launch window contract and host flow (stories 8.1-8.2)
