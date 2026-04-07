@@ -131,6 +131,15 @@ const SchedulingNodePolicyInputSchema = z.object({
   enabledCapabilities: z.array(NodeCapabilitySchema).max(64),
   usageMode: SchedulingNodeUsageModeSchema,
   localInteractiveOwnerUserIdentityId: IdentifierSchema.optional(),
+  hybridLocalUseProtection: z.object({
+    reservedLocalCapacityUnits: z.number().int().min(0).optional(),
+    activeRemoteAssignmentCount: z.number().int().min(0).optional(),
+    protectedLocalUserWindow: z.object({
+      startsAt: TimestampSchema,
+      endsAt: TimestampSchema,
+      protectedUserIdentityId: IdentifierSchema.optional(),
+    }).strict().optional(),
+  }).strict().optional(),
   reservationOwner: IdentifierSchema.optional(),
   deploymentProfileId: IdentifierSchema.optional(),
 }).strict();

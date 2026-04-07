@@ -45,11 +45,21 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
         supportsRemoteScheduling: true,
         enabledCapabilities: ["executor"],
         usageMode: "idle",
+        hybridLocalUseProtection: {
+          reservedLocalCapacityUnits: 1,
+          activeRemoteAssignmentCount: 0,
+          protectedLocalUserWindow: {
+            startsAt: "2026-04-07T17:00:00.000Z",
+            endsAt: "2026-04-07T18:30:00.000Z",
+            protectedUserIdentityId: "user:desktop-owner",
+          },
+        },
       }],
     });
 
     expect(snapshot.runs[0]?.runId).toBe("run:1");
     expect(snapshot.nodes[0]?.usageMode).toBe("idle");
+    expect(snapshot.nodes[0]?.hybridLocalUseProtection?.reservedLocalCapacityUnits).toBe(1);
   });
 
   it("parses policy evaluation results with candidate reasoning summaries", () => {
