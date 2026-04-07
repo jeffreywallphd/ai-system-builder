@@ -105,3 +105,15 @@ These can remain implementation details as long as protected business actions fl
   - validates normalized context-unavailable bootstrap handling
 - `src/ui/shared/identity/tests/IdentityAuthSessionStore.test.ts`
   - validates persistence/rehydration of normalized workspace/capability bootstrap state
+
+## Story 14.3.2 migration note: thin-client bootstrap and workspace context convergence
+
+- Thin web/mobile-responsive pages now rehydrate session actor context through the shared `IdentityAuthSessionCoordinator` path before protected thin-client operations.
+- Thin-client workspace context bootstrap and switching now pass requested workspace ids to `GET /api/v1/identity/session/context` through shared identity client contracts.
+- Focused thin-client pages (sharing review, workspace invitations, workspace memberships) now consume authoritative session/workspace context hydration rather than only trusting stale locally persisted context fields.
+- Thin-client workspace switching now updates URL workspace scope and refreshes authoritative context before loading scoped workspace data.
+
+### Story 14.3.2 tests
+
+- `src/ui/shared/identity/tests/IdentityAuthSessionCoordinator.test.ts`
+  - validates workspace-id forwarding for bootstrap and authenticated refresh flows

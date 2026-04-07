@@ -203,6 +203,61 @@ describe("IdentityAuthSessionCoordinator", () => {
     }
     expect(store.hasSession()).toBeTrue();
   });
+
+  it("passes requested workspace context through bootstrap and refresh", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    const seenWorkspaceIds: Array<string | undefined> = [];
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveAuthenticatedSession: async () => ({
+        ok: true,
+        data: {
+          principal: {
+            userIdentityId: "user-1",
+            username: "alice",
+          },
+          session: {
+            sessionId: "identity-session:1",
+            providerId: "provider:local-password",
+            providerSubject: "alice",
+            accessChannel: "thin-client",
+            issuedAt: "2026-04-04T20:00:00.000Z",
+            expiresAt: "2026-04-05T20:00:00.000Z",
+          },
+        },
+      }),
+      resolveSessionActorContext: async (request) => {
+        seenWorkspaceIds.push(request.workspaceId);
+        return {
+          ok: true,
+          data: {
+            actor: {
+              userIdentityId: "user-1",
+              username: "alice",
+            },
+            session: {
+              sessionId: "identity-session:1",
+              providerId: "provider:local-password",
+              accessChannel: "thin-client",
+              issuedAt: "2026-04-04T20:00:00.000Z",
+              expiresAt: "2026-04-05T20:00:00.000Z",
+              assuranceLevel: "authenticated-untrusted",
+              trustState: "untrusted",
+            },
+            workspaceContext: {
+              requestedWorkspaceId: request.workspaceId,
+              resolvedWorkspaceId: request.workspaceId,
+              workspaces: [],
+            },
+          },
+        };
+      },
+    });
+
+    await coordinator.bootstrap({ workspaceId: "workspace:alpha" });
+    await coordinator.refreshIfAuthenticated({ workspaceId: "  " });
+    expect(seenWorkspaceIds).toEqual(["workspace:alpha", undefined]);
+  });
 });
 
 function createSession(overrides: Partial<ReturnType<typeof buildSession>> = {}) {
