@@ -29,10 +29,13 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/security/certificates/:serialNumber/renew` (authenticated, trusted session required)
 - `POST /api/v1/assets/register` (authenticated)
 - `POST /api/v1/assets/:assetId/uploads/initiate` (authenticated)
+- `POST /api/v1/runtime/runs/start` (authenticated, workspace-scoped)
+- `POST /api/v1/runtime/runs/:executionId/cancel` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/runs/:executionId/status` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/runs/:executionId/result` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/runs/:executionId/trace` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/queue` (authenticated, workspace-scoped)
+- `POST /api/v1/runtime/queue/:queueItemId/dequeue` (authenticated, workspace-scoped)
 
 Implemented transport and host composition:
 
@@ -188,11 +191,50 @@ Trusted-device transport contracts are defined in `src/infrastructure/api/identi
 - The guard first resolves authenticated session context, then resolves workspace context, then enters route handlers.
 - Guard-provided context includes shared actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so handlers and backend calls avoid repeated session/workspace parsing.
 - Storage and asset converged routes now run through this shared pipeline and preserve shared failure semantics:
-- Runtime run-read and queue-read converged routes now run through this shared pipeline and preserve shared failure semantics:
+- Runtime run-control, queue-control, and run-read routes now run through this shared pipeline and preserve shared failure semantics:
   - unauthenticated requests fail with `401` + `authentication-failed`
   - authenticated requests missing required workspace scope fail with `400` + `invalid-request`
 
-### Runtime read/list requests
+### Runtime mutation/read requests
+
+`POST /api/v1/runtime/runs/start`
+
+Request body:
+
+```json
+{
+  "systemId": "string",
+  "versionId": "string",
+  "executionId": "string (optional)",
+  "async": "boolean (optional, if provided must be true)",
+  "tenantId": "string (optional)",
+  "idempotencyKey": "string (optional)"
+}
+```
+
+`POST /api/v1/runtime/runs/:executionId/cancel`
+
+Request body:
+
+```json
+{
+  "reason": "string (optional)",
+  "cancelledAt": "string (optional, ISO-8601 with offset)",
+  "idempotencyKey": "string (optional)"
+}
+```
+
+`POST /api/v1/runtime/queue/:queueItemId/dequeue`
+
+Request body:
+
+```json
+{
+  "reason": "string (optional)",
+  "dequeuedAt": "string (optional, ISO-8601 with offset)",
+  "idempotencyKey": "string (optional)"
+}
+```
 
 `GET /api/v1/runtime/runs/:executionId/status`
 

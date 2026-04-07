@@ -10,10 +10,12 @@ import type {
   RuntimeSdkStartExecutionRequest,
   RuntimeSdkStartExecutionResponse,
 } from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
+import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
 export type * from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
 
 export const SystemRuntimeTransportRoutes = Object.freeze({
   startRun: "/api/v1/runtime/runs/start",
+  cancelRun: "/api/v1/runtime/runs/:executionId/cancel",
   getRunStatus: "/api/v1/runtime/runs/:executionId/status",
   getRunResult: "/api/v1/runtime/runs/:executionId/result",
   getRunTrace: "/api/v1/runtime/runs/:executionId/trace",
@@ -62,17 +64,37 @@ export interface RuntimeDequeueRequest {
   readonly queueItemId: string;
   readonly reason?: string;
   readonly dequeuedAt?: string;
+  readonly idempotencyKey?: string;
 }
 
 export interface RuntimeDequeueResponse {
   readonly queueItemId: string;
-  readonly changed: boolean;
+  readonly executionId: string;
+  readonly status: RuntimeQueueItemStatus;
+  readonly mutation: SharedApiMutationResult;
+}
+
+export interface RuntimeCancelRunRequest {
+  readonly executionId: string;
+  readonly reason?: string;
+  readonly cancelledAt?: string;
+  readonly idempotencyKey?: string;
+}
+
+export interface RuntimeCancelRunResponse {
+  readonly executionId: string;
+  readonly status: RuntimeSdkExecutionStatusResponse["status"];
+  readonly mutation: SharedApiMutationResult;
 }
 
 export interface SystemRuntimeTransportContract {
   readonly startRun: {
     readonly request: RuntimeSdkStartExecutionRequest;
     readonly response: RuntimeSdkResponse<RuntimeSdkStartExecutionResponse>;
+  };
+  readonly cancelRun: {
+    readonly request: RuntimeCancelRunRequest;
+    readonly response: RuntimeSdkResponse<RuntimeCancelRunResponse>;
   };
   readonly getRunStatus: {
     readonly request: RuntimeSdkExecutionStatusRequest;

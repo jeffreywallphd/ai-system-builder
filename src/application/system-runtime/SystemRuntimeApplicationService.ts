@@ -25,6 +25,7 @@ import {
   ExecutionNodeStatusKinds,
   ExecutionStatusKinds,
   ExecutionTraceEventKinds,
+  transitionSystemExecutionStatus,
   type ExecutionContext,
   type ExecutionProgressSnapshot,
   type ExecutionStatusKind,
@@ -661,6 +662,28 @@ export class SystemRuntimeApplicationService {
     const execution = this.requireExecution(executionId);
     const tenantId = execution.context.metadata?.tenantId;
     return typeof tenantId === "string" ? tenantId : undefined;
+  }
+
+  public cancelExecution(input: {
+    readonly executionId: string;
+    readonly cancelledAt?: string;
+  }): RuntimeExecutionStatusReadModel {
+    const execution = this.requireExecution(input.executionId);
+    if (execution.status === ExecutionStatusKinds.succeeded
+      || execution.status === ExecutionStatusKinds.failed
+      || execution.status === ExecutionStatusKinds.cancelled) {
+      return this.getExecutionStatus(execution.executionId);
+    }
+
+    const updatedAt = input.cancelledAt?.trim() || new Date().toISOString();
+    const transitioned = transitionSystemExecutionStatus({
+      execution,
+      nextStatus: ExecutionStatusKinds.cancelled,
+      updatedAt,
+      completedAt: updatedAt,
+    });
+    this.executionStore.saveExecutionRecord(this.createExecutionRecord(transitioned));
+    return this.getExecutionStatus(transitioned.executionId);
   }
 
   private requireExecution(executionId: string): SystemExecution {

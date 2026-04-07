@@ -114,7 +114,10 @@ import {
   type RegisterGeneratedOutputApiRequest,
   type ResolveAssetPreviewApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
-import { RuntimeQueueItemStatuses } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import {
+  RuntimeQueueItemStatuses,
+  SystemRuntimeTransportRoutes,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
@@ -183,6 +186,12 @@ import {
   SharedApiQuerySchemaValidationError,
   parseSharedApiListQueryConventions,
 } from "@shared/schemas/api/SharedApiQuerySchemaContracts";
+import {
+  SystemRuntimeTransportSchemaValidationError,
+  parseRuntimeCancelRunRequest,
+  parseRuntimeDequeueRequest,
+  parseRuntimeStartRunRequest,
+} from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
@@ -4265,6 +4274,180 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       }
       if (
         options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path === SystemRuntimeTransportRoutes.startRun
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeStartRunMutationRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.startExecutionAsync({
+              ...parsedRequest.data,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              systemId: parsedRequest.data.systemId,
+              versionId: parsedRequest.data.versionId,
+              executionId: parsedRequest.data.executionId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/cancel")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/cancel");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeCancelRunMutationRequest(executionId, parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.cancelExecution({
+              ...parsedRequest.data,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/queue/")
+        && path.endsWith("/dequeue")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const queueItemId = decodePathTail(path, "/api/v1/runtime/queue/", "/dequeue");
+            if (!queueItemId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and queueItemId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                queueItemId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedBody.body);
+              return;
+            }
+            const parsedRequest = parseAndValidateRuntimeDequeueMutationRequest(queueItemId, parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                queueItemId,
+                workspaceId: context.workspace.workspaceId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context, "mutation");
+            const apiResponse = await options.systemRuntimeBackendApi.dequeueQueueItem({
+              ...parsedRequest.data,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              queueItemId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
         && request.method === "GET"
         && path.startsWith("/api/v1/runtime/runs/")
         && path.endsWith("/status")
@@ -8179,6 +8362,148 @@ function parseAndValidateRuntimeQueueListRequest(input: {
   };
 }
 
+async function parseAndValidateRuntimeMutationBody(
+  request: IncomingMessage,
+  maxBodyBytes: number,
+  allowEmptyBody = false,
+): Promise<
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    if (allowEmptyBody && parsedBody.error === "Request body is required.") {
+      return {
+        ok: true,
+        value: Object.freeze({}),
+      };
+    }
+    return {
+      ok: false,
+      body: buildRuntimeInvalidRequestResponse(parsedBody.error),
+    };
+  }
+  return {
+    ok: true,
+    value: parsedBody.value,
+  };
+}
+
+function parseAndValidateRuntimeStartRunMutationRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly systemId: string;
+      readonly versionId: string;
+      readonly executionId?: string;
+      readonly tenantId?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    const parsed = parseRuntimeStartRunRequest(payload);
+    if (parsed.async === false) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("async must be true when provided."),
+      };
+    }
+    return {
+      ok: true,
+      data: Object.freeze({
+        systemId: parsed.systemId,
+        versionId: parsed.versionId,
+        executionId: parsed.executionId,
+        tenantId: parsed.tenantId,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime start payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateRuntimeCancelRunMutationRequest(executionId: string, payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly executionId: string;
+      readonly reason?: string;
+      readonly cancelledAt?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    const parsed = parseRuntimeCancelRunRequest({
+      ...bodyRecord,
+      executionId,
+    });
+    return {
+      ok: true,
+      data: Object.freeze({
+        executionId: parsed.executionId,
+        reason: parsed.reason,
+        cancelledAt: parsed.cancelledAt,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime cancellation payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateRuntimeDequeueMutationRequest(queueItemId: string, payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly queueItemId: string;
+      readonly reason?: string;
+      readonly dequeuedAt?: string;
+      readonly idempotencyKey?: string;
+    };
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    const parsed = parseRuntimeDequeueRequest({
+      ...bodyRecord,
+      queueItemId,
+    });
+    return {
+      ok: true,
+      data: Object.freeze({
+        queueItemId: parsed.queueItemId,
+        reason: parsed.reason,
+        dequeuedAt: parsed.dequeuedAt,
+        idempotencyKey: parsed.idempotencyKey,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof SystemRuntimeTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Runtime dequeue payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
 function parseAndValidateAssetPreviewRequest(
   actorUserIdentityId: string,
   workspaceId: string,
@@ -8747,12 +9072,17 @@ function parseSharedListPaginationFromQuery(
   }
 }
 
-function buildRuntimeApiRequestContext(context: AuthenticatedWorkspaceRequestContext) {
+function buildRuntimeApiRequestContext(
+  context: AuthenticatedWorkspaceRequestContext,
+  operation: "read" | "mutation" = "read",
+) {
   return Object.freeze({
     trustedInternal: true,
     trustedInternalAuthorization: Object.freeze({
       actorMode: "propagate-caller" as const,
-      systemActionId: "identity-http-authoritative-runtime-read",
+      systemActionId: operation === "mutation"
+        ? "identity-http-authoritative-runtime-mutation"
+        : "identity-http-authoritative-runtime-read",
     }),
     accessContext: Object.freeze({
       callerKind: "user" as const,

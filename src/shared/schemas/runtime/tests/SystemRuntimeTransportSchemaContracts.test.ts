@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
+  parseRuntimeCancelRunRequest,
+  parseRuntimeCancelRunResponse,
+  parseRuntimeDequeueRequest,
+  parseRuntimeDequeueResponse,
   parseRuntimeQueueListRequest,
   parseRuntimeQueueListResponse,
   parseRuntimeStartRunRequest,
@@ -50,5 +54,49 @@ describe("SystemRuntimeTransportSchemaContracts", () => {
       workspaceId: "workspace:alpha",
       limit: -1,
     })).toThrow(SystemRuntimeTransportSchemaValidationError);
+  });
+
+  it("parses runtime mutation payloads", () => {
+    const cancel = parseRuntimeCancelRunRequest({
+      executionId: "exec:1",
+      reason: "cancel requested",
+      idempotencyKey: "mut:cancel:1",
+    });
+    expect(cancel.executionId).toBe("exec:1");
+
+    const dequeue = parseRuntimeDequeueRequest({
+      queueItemId: "runtime-queue:exec:1",
+      dequeuedAt: "2026-04-07T12:00:00.000Z",
+      idempotencyKey: "mut:dequeue:1",
+    });
+    expect(dequeue.queueItemId).toBe("runtime-queue:exec:1");
+
+    const cancelResponse = parseRuntimeCancelRunResponse({
+      ok: true,
+      data: {
+        executionId: "exec:1",
+        status: "cancelled",
+        mutation: {
+          changed: true,
+          mutationId: "runtime-cancel:exec:1:mut:cancel:1",
+          occurredAt: "2026-04-07T12:00:00.000Z",
+        },
+      },
+    });
+    expect(cancelResponse.data?.status).toBe("cancelled");
+
+    const dequeueResponse = parseRuntimeDequeueResponse({
+      ok: true,
+      data: {
+        queueItemId: "runtime-queue:exec:1",
+        executionId: "exec:1",
+        status: "cancelled",
+        mutation: {
+          changed: false,
+          occurredAt: "2026-04-07T12:00:00.000Z",
+        },
+      },
+    });
+    expect(dequeueResponse.data?.executionId).toBe("exec:1");
   });
 });

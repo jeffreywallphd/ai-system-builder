@@ -41,6 +41,27 @@ export const RuntimeStartRunRequestSchema = z.object({
   idempotencyKey: IdentifierSchema.optional(),
 }).strict();
 
+const RuntimeExecutionStatusSchema = z.enum([
+  "pending",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
+
+const RuntimeMutationResultSchema = z.object({
+  changed: z.boolean(),
+  mutationId: IdentifierSchema.optional(),
+  occurredAt: TimestampSchema.optional(),
+}).strict();
+
+export const RuntimeCancelRunRequestSchema = z.object({
+  executionId: IdentifierSchema,
+  reason: z.string().trim().min(1).max(512).optional(),
+  cancelledAt: TimestampSchema.optional(),
+  idempotencyKey: IdentifierSchema.optional(),
+}).strict();
+
 export const RuntimeQueueListRequestSchema = z.object({
   workspaceId: IdentifierSchema,
   systemId: IdentifierSchema.optional(),
@@ -71,9 +92,47 @@ export const RuntimeQueueListResponseSchema = z.object({
   }).strict().optional(),
 }).strict();
 
+export const RuntimeCancelRunResponseSchema = z.object({
+  ok: z.boolean(),
+  data: z.object({
+    executionId: IdentifierSchema,
+    status: RuntimeExecutionStatusSchema,
+    mutation: RuntimeMutationResultSchema,
+  }).strict().optional(),
+  error: z.object({
+    code: z.string().trim().min(1),
+    message: z.string().trim().min(1),
+  }).strict().optional(),
+}).strict();
+
+export const RuntimeDequeueRequestSchema = z.object({
+  queueItemId: IdentifierSchema,
+  reason: z.string().trim().min(1).max(512).optional(),
+  dequeuedAt: TimestampSchema.optional(),
+  idempotencyKey: IdentifierSchema.optional(),
+}).strict();
+
+export const RuntimeDequeueResponseSchema = z.object({
+  ok: z.boolean(),
+  data: z.object({
+    queueItemId: IdentifierSchema,
+    executionId: IdentifierSchema,
+    status: QueueItemStatusSchema,
+    mutation: RuntimeMutationResultSchema,
+  }).strict().optional(),
+  error: z.object({
+    code: z.string().trim().min(1),
+    message: z.string().trim().min(1),
+  }).strict().optional(),
+}).strict();
+
 export type RuntimeStartRunRequestPayload = z.infer<typeof RuntimeStartRunRequestSchema>;
+export type RuntimeCancelRunRequestPayload = z.infer<typeof RuntimeCancelRunRequestSchema>;
 export type RuntimeQueueListRequestPayload = z.infer<typeof RuntimeQueueListRequestSchema>;
 export type RuntimeQueueListResponsePayload = z.infer<typeof RuntimeQueueListResponseSchema>;
+export type RuntimeCancelRunResponsePayload = z.infer<typeof RuntimeCancelRunResponseSchema>;
+export type RuntimeDequeueRequestPayload = z.infer<typeof RuntimeDequeueRequestSchema>;
+export type RuntimeDequeueResponsePayload = z.infer<typeof RuntimeDequeueResponseSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -103,10 +162,26 @@ export function parseRuntimeStartRunRequest(payload: unknown): RuntimeStartRunRe
   return parseRuntimeSchema("RuntimeStartRunRequest", RuntimeStartRunRequestSchema, payload);
 }
 
+export function parseRuntimeCancelRunRequest(payload: unknown): RuntimeCancelRunRequestPayload {
+  return parseRuntimeSchema("RuntimeCancelRunRequest", RuntimeCancelRunRequestSchema, payload);
+}
+
 export function parseRuntimeQueueListRequest(payload: unknown): RuntimeQueueListRequestPayload {
   return parseRuntimeSchema("RuntimeQueueListRequest", RuntimeQueueListRequestSchema, payload);
 }
 
 export function parseRuntimeQueueListResponse(payload: unknown): RuntimeQueueListResponsePayload {
   return parseRuntimeSchema("RuntimeQueueListResponse", RuntimeQueueListResponseSchema, payload);
+}
+
+export function parseRuntimeCancelRunResponse(payload: unknown): RuntimeCancelRunResponsePayload {
+  return parseRuntimeSchema("RuntimeCancelRunResponse", RuntimeCancelRunResponseSchema, payload);
+}
+
+export function parseRuntimeDequeueRequest(payload: unknown): RuntimeDequeueRequestPayload {
+  return parseRuntimeSchema("RuntimeDequeueRequest", RuntimeDequeueRequestSchema, payload);
+}
+
+export function parseRuntimeDequeueResponse(payload: unknown): RuntimeDequeueResponsePayload {
+  return parseRuntimeSchema("RuntimeDequeueResponse", RuntimeDequeueResponseSchema, payload);
 }
