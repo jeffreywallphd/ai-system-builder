@@ -19,6 +19,7 @@ import type {
   WorkspaceAdministrationApiResponse,
   WorkspaceInvitationApiResponse,
 } from "@shared/contracts/workspaces/WorkspaceTransportContracts";
+import { SharedApiClient } from "../api/SharedApiClient";
 
 /* MIGRATION NOTE: request DTOs in this client still include inline compatibility shapes.
  * New features should consume request/response contracts directly from src/shared/contracts/workspaces.
@@ -194,11 +195,16 @@ export interface WorkspaceAdministrationClient {
 }
 
 export class HttpWorkspaceAdministrationClient implements WorkspaceAdministrationClient {
-  private readonly baseUrl: string;
+  private readonly apiClient: SharedApiClient;
 
-  public constructor(baseUrl: string) {
-    const normalized = baseUrl.trim();
-    this.baseUrl = normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  public constructor(
+    baseUrl: string,
+    options: Omit<ConstructorParameters<typeof SharedApiClient>[0], "baseUrl"> = {},
+  ) {
+    this.apiClient = new SharedApiClient({
+      baseUrl,
+      ...options,
+    });
   }
 
   public async listWorkspaces(
@@ -586,11 +592,11 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     );
   }
 
-  private async get<TResponse>(path: string, sessionToken: string): Promise<TResponse> {
+  private async get<TResponse extends { readonly ok: boolean }>(path: string, sessionToken: string): Promise<TResponse> {
     return this.request<TResponse>("GET", path, sessionToken);
   }
 
-  private async post<TResponse>(
+  private async post<TResponse extends { readonly ok: boolean }>(
     path: string,
     body: Readonly<Record<string, unknown>>,
     sessionToken: string,
@@ -598,7 +604,7 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     return this.request<TResponse>("POST", path, sessionToken, body);
   }
 
-  private async patch<TResponse>(
+  private async patch<TResponse extends { readonly ok: boolean }>(
     path: string,
     body: Readonly<Record<string, unknown>>,
     sessionToken: string,
@@ -606,25 +612,22 @@ export class HttpWorkspaceAdministrationClient implements WorkspaceAdministratio
     return this.request<TResponse>("PATCH", path, sessionToken, body);
   }
 
-  private async delete<TResponse>(path: string, sessionToken: string): Promise<TResponse> {
+  private async delete<TResponse extends { readonly ok: boolean }>(path: string, sessionToken: string): Promise<TResponse> {
     return this.request<TResponse>("DELETE", path, sessionToken);
   }
 
-  private async request<TResponse>(
+  private async request<TResponse extends { readonly ok: boolean }>(
     method: "GET" | "POST" | "PATCH" | "DELETE",
     path: string,
     sessionToken: string,
     body?: Readonly<Record<string, unknown>>,
   ): Promise<TResponse> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    return await this.apiClient.requestJson<TResponse>({
       method,
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${sessionToken}`,
-      },
-      body: body ? JSON.stringify(body) : undefined,
+      path,
+      sessionToken,
+      body,
     });
-    return await response.json() as TResponse;
   }
 }
 
