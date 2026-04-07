@@ -35,4 +35,18 @@ Related architecture baseline: `docs/architecture/audit-ledger-persistence-query
 ## Tests
 
 - `src/application/audit/tests/AuditTaxonomyExtensionDocumentation.test.ts`
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+## Story 18.3.6 hardening note
+
+Final production-readiness hardening now keeps one cross-layer regression suite as the authoritative lifecycle guard:
+
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+It covers capture -> persistence -> query/access-control -> realtime publication and startup reconciliation follow-up behavior.
+
+Deferred boundaries remain unchanged:
+
+- retention remains metadata-only (no destructive delete/archive jobs)
+- external notarization/compliance export workflows remain future governance stories
 

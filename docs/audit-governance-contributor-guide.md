@@ -109,3 +109,22 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 6. Are `.md` and `.ai.md` docs updated together?
 7. Are tests updated for contracts/service/adapters/docs?
 
+## Story 18.3.6 regression baseline
+
+Production hardening for Feature 18 now includes a representative end-to-end audit ledger regression suite:
+
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+This suite is the cross-layer guardrail for:
+
+- authoritative capture through source adapters and recording service
+- append-oriented replay behavior and immutable-enough write posture
+- role-safe list/detail retrieval with user-safe versus admin visibility
+- realtime audit-governance event publication contract stability
+- startup reconciliation signaling for orphaned replay anomalies
+
+Deferred edges remain unchanged:
+
+- destructive retention delete/archive workflows are out of scope (`metadata-only` retention posture remains)
+- external notarization/off-box attestation and compliance export workflows remain future governance work
+

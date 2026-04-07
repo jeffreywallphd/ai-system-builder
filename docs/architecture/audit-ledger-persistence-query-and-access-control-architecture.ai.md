@@ -60,4 +60,19 @@ Related hardening note: `docs/architecture/audit-observability-failure-handling-
 - `src/infrastructure/persistence/audit/tests/SqliteAuditLedgerRepository.test.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
 - `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+## Story 18.3.6 hardening delta
+
+Final production-readiness regression now includes integrated lifecycle coverage for:
+
+- authoritative capture -> durable append -> query/access-control -> realtime publication
+- append replay invariants and immutable-enough update/delete rejection
+- permission-safe detail/list shaping (`user-safe` vs `admin`)
+- startup reconciliation follow-up signaling for orphaned replay anomalies
+
+Deferred edges are unchanged:
+
+- retention remains metadata-only (destructive jobs disabled)
+- external notarization/compliance export remains future scope
 
