@@ -16,6 +16,10 @@
   - `start:web-host`
   - `start:worker-host`
 - Combined control-plane + worker local mode now runs both host assemblies concurrently.
+- Desktop dev startup now routes preflight and Electron Forge CLI through Node symlink-preservation flags:
+  - `dev:desktop:prepare` -> `node --preserve-symlinks-main dev/prepare-electron-forge-dev.cjs`
+  - `dev:desktop:start` -> `node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start`
+  - `dev:desktop` chains `prepare` then `start`.
 
 ## Test harness updates
 - Server integration harness in `hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
@@ -24,6 +28,7 @@
 ## Startup script guardrails
 - Added `dev/tests/HostDevelopmentStartupScripts.test.ts` to enforce:
   - default dev path remains `dev:desktop`
+  - desktop startup scripts keep symlink-preservation Node flags in place for Windows-safe script resolution
   - host startup scripts target host entrypoint assemblies
   - host aliases and combined mode are present
   - no package script defaults to direct `IdentityServerHost.ts` startup
