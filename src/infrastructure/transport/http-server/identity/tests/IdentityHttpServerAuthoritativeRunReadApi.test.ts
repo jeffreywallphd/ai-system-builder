@@ -23,6 +23,7 @@ class StubAuthoritativeRunQueryBackendApi {
   public lastListRequest: Readonly<Record<string, unknown>> | undefined;
   public lastDetailRequest: Readonly<Record<string, unknown>> | undefined;
   public lastStatusRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastQueueRequest: Readonly<Record<string, unknown>> | undefined;
 
   public async listRuns(request: Readonly<Record<string, unknown>>) {
     this.lastListRequest = request;
@@ -101,6 +102,44 @@ class StubAuthoritativeRunQueryBackendApi {
           attempt: 1,
           maxAttempts: 1,
         },
+      },
+    };
+  }
+
+  public async listQueueStatus(request: Readonly<Record<string, unknown>>) {
+    this.lastQueueRequest = request;
+    return {
+      ok: true as const,
+      data: {
+        items: [{
+          runId: "run:1",
+          workflowId: "workflow:1",
+          workspaceId: "workspace-alpha",
+          state: "queued",
+          queue: {
+            queueId: "queue:default",
+            enteredAt: "2026-04-07T10:00:00.000Z",
+            position: 1,
+            positionAsOf: "2026-04-07T10:01:00.000Z",
+          },
+          assignmentStatus: "unassigned",
+          executionOutcome: "none",
+          updatedAt: "2026-04-07T10:01:00.000Z",
+          actionAvailability: {
+            cancel: {
+              allowed: true,
+            },
+            retry: {
+              allowed: false,
+              reason: "Retry is available only for failed or cancelled runs.",
+            },
+            dequeue: {
+              allowed: true,
+            },
+          },
+        }],
+        totalCount: 1,
+        asOf: "2026-04-07T10:01:00.000Z",
       },
     };
   }
@@ -223,6 +262,20 @@ describe("IdentityHttpServer authoritative run read routes", () => {
     expect(statusBody.ok).toBe(true);
     expect(statusBody.data.runId).toBe("run:1");
     expect(statusBody.data.submission).toBeUndefined();
+
+    const queueResponse = await fetch(
+      `${baseUrl}/api/v1/runtime/queue?workspaceId=workspace-alpha&status=queued`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(queueResponse.status).toBe(200);
+    const queueBody = await queueResponse.json();
+    expect(queueBody.ok).toBe(true);
+    expect(queueBody.data.items[0].runId).toBe("run:1");
+    expect(backend.lastQueueRequest?.workspaceId).toBe("workspace-alpha");
   });
 
   it("maps non-leaky run detail misses to canonical not-found", async () => {

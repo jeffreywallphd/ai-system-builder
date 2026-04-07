@@ -35,6 +35,7 @@ import {
 } from "@application/runs/use-cases/RunCreationPersistenceMapper";
 import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
+import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { AuthoritativeRunQueryBackendApi } from "../AuthoritativeRunQueryBackendApi";
 
@@ -84,6 +85,29 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
       record: persisted,
     });
   }
+}
+
+function createQueueStatusUseCase(runRepository: InMemoryRunRepository): ListAuthoritativeRunQueueStatusUseCase {
+  return new ListAuthoritativeRunQueueStatusUseCase({
+    runRepository,
+    queueRepository: {
+      getQueueEntryByRunId: async () => undefined,
+      enqueueRunForAssignment: async () => {
+        throw new Error("Not implemented.");
+      },
+      listAssignmentReadyRuns: async () => Object.freeze([]),
+      claimAssignmentReadyRuns: async () => Object.freeze([]),
+      releaseRunClaim: async () => false,
+      claimQueuedRunForNodeDispatch: async () => {
+        throw new Error("Not implemented.");
+      },
+      recordDispatchAttemptResult: async () => false,
+      finalizeRunQueueEntry: async () => false,
+      listDispatchAttemptsByRunId: async () => Object.freeze([]),
+      listQueueEntries: async () => Object.freeze([]),
+    },
+    now: () => new Date("2026-04-07T10:00:00.000Z"),
+  });
 }
 
 class InMemoryAuthorizationRepositories
@@ -318,6 +342,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     });
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       authorizationDecisionEvaluator: evaluator,
@@ -378,6 +403,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     });
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       authorizationDecisionEvaluator: evaluator,
@@ -413,6 +439,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
 
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
     });
@@ -430,6 +457,73 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(response.data?.runId).toBe("run:status");
     expect(response.data?.state).toBe("running");
     expect((response.data as Record<string, unknown> | undefined)?.submission).toBeUndefined();
+    expect(response.data?.statusTimeline?.length).toBeGreaterThan(0);
+  });
+
+  it("returns queue-status read projections for operational control surfaces", async () => {
+    const runRepository = new InMemoryRunRepository();
+    await runRepository.createRun(createRunRecord({
+      runId: "run:queue",
+      workspaceId: "workspace-alpha",
+      workflowId: "workflow-alpha",
+      state: RunLifecycleStates.queued,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-07T09:00:00.000Z",
+      updatedAt: "2026-04-07T09:05:00.000Z",
+    }), {
+      operationKey: "seed:queue",
+      actorId: "system:test",
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: new ListAuthoritativeRunQueueStatusUseCase({
+        runRepository,
+        queueRepository: {
+          getQueueEntryByRunId: async () => undefined,
+          enqueueRunForAssignment: async () => {
+            throw new Error("Not implemented.");
+          },
+          listAssignmentReadyRuns: async () => Object.freeze([]),
+          claimAssignmentReadyRuns: async () => Object.freeze([]),
+          releaseRunClaim: async () => false,
+          claimQueuedRunForNodeDispatch: async () => {
+            throw new Error("Not implemented.");
+          },
+          recordDispatchAttemptResult: async () => false,
+          finalizeRunQueueEntry: async () => false,
+          listDispatchAttemptsByRunId: async () => Object.freeze([]),
+          listQueueEntries: async () => Object.freeze([{
+            runId: "run:queue",
+            queueId: "queue:default",
+            workspaceId: "workspace-alpha",
+            lifecycleState: RunLifecycleStates.queued,
+            enteredAt: "2026-04-07T09:00:00.000Z",
+            orderKey: "001",
+            eligibilityMarker: "ready",
+            eligibleAt: "2026-04-07T09:00:00.000Z",
+            updatedAt: "2026-04-07T09:05:00.000Z",
+            revision: 1,
+          }]),
+        },
+        now: () => new Date("2026-04-07T10:00:00.000Z"),
+      }),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+    });
+
+    const response = await api.listQueueStatus({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-owner",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(response.data?.items).toHaveLength(1);
+    expect(response.data?.items[0]?.runId).toBe("run:queue");
+    expect(response.data?.items[0]?.actionAvailability?.cancel.allowed).toBeTrue();
   });
 });
 

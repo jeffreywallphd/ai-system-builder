@@ -21,6 +21,7 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(RunOrchestrationTransportContractVersions.v1).toBe("run-orchestration-transport/v1");
     expect(RunOrchestrationTransportRoutes.submitRun).toBe("/api/v1/runtime/runs/start");
     expect(RunOrchestrationTransportRoutes.listRuns).toBe("/api/v1/runtime/runs");
+    expect(RunOrchestrationTransportRoutes.listQueueStatus).toBe("/api/v1/runtime/queue");
     expect(RunOrchestrationTransportRoutes.retryRun).toBe("/api/v1/runtime/runs/:runId/retry");
     expect(RunOrchestrationTransportRoutes.updateLifecycle).toBe("/api/v1/runtime/runs/:runId/lifecycle");
   });
@@ -71,10 +72,12 @@ describe("RunOrchestrationTransportContracts", () => {
     const summary = toRunSummary(run);
     expect(summary.runId).toBe("run-1");
     expect(summary.state).toBe(RunLifecycleStates.running);
+    expect(summary.actionAvailability?.cancel.allowed).toBeTrue();
 
     const detail = toRunDetail(run);
     expect(detail.assignment.assignedNodeId).toBe("node-1");
     expect(detail.execution.startedAt).toBe("2026-04-07T10:00:06.000Z");
+    expect(detail.statusTimeline?.length).toBe(1);
 
     const status = toRunStatusEnvelope(run);
     expect(status.assignmentStatus).toBe(RunAssignmentStatuses.assigned);
@@ -82,6 +85,7 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(status.execution?.heartbeatAt).toBe("2026-04-07T10:00:09.000Z");
     expect(status.execution?.progress?.percent).toBe(47);
     expect(status.finalization).toBeUndefined();
+    expect(status.actionAvailability?.retry.allowed).toBeFalse();
   });
 
   it("normalizes optional submission source and lifecycle state", () => {

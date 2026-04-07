@@ -214,6 +214,7 @@ import {
   parseRunCancellationRequest,
   parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
+  parseRunQueueStatusReadRequest,
   parseRunRetryRequest,
   parseRunSubmissionRequest,
 } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
@@ -5247,6 +5248,58 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
       if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path === RunOrchestrationTransportRoutes.listQueueStatus
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateAuthoritativeRunQueueStatusReadRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+            const apiResponse = await options.authoritativeRunQueryBackendApi.listQueueStatus({
+              ...parsedRequest.data,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
         options.systemRuntimeBackendApi
         && request.method === "GET"
         && path === "/api/v1/runtime/queue"
@@ -9557,6 +9610,61 @@ function parseAndValidateAuthoritativeRunListReadRequest(input: {
       ok: false,
       statusCode: 400,
       body: buildRuntimeInvalidRequestResponse("Run list request is invalid."),
+    };
+  }
+}
+
+function parseAndValidateAuthoritativeRunQueueStatusReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunQueueStatusReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const statuses = input.searchParams.getAll("status")
+    .map((value) => resolveRunLifecycleState(value))
+    .filter((value): value is string => Boolean(value));
+  if (statuses.length !== input.searchParams.getAll("status").length) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("status values are invalid."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      data: parseRunQueueStatusReadRequest({
+        workspaceId: input.workspaceId,
+        statuses: statuses.length > 0 ? Object.freeze(statuses) : undefined,
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run queue request is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run queue request is invalid."),
     };
   }
 }

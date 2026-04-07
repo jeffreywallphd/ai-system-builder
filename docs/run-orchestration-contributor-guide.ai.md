@@ -5,6 +5,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 
 ## Human doc
 - `docs/run-orchestration-contributor-guide.md`
+- `docs/architecture/run-orchestration-operational-visibility-projections.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.

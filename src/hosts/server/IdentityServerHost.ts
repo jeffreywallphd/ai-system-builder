@@ -139,6 +139,7 @@ import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization
 import { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
 import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
+import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
@@ -972,10 +973,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(
       persistentPlatformServices.platformPersistenceRepository,
     ),
+    listAuthoritativeRunQueueStatusUseCase: new ListAuthoritativeRunQueueStatusUseCase({
+      runRepository: persistentPlatformServices.platformPersistenceRepository,
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }),
     getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
       persistentPlatformServices.platformPersistenceRepository,
     ),
     runRepository: persistentPlatformServices.platformPersistenceRepository,
+    auditEventRepository: persistentPlatformServices.platformPersistenceRepository,
     authorizationDecisionEvaluator,
     now: () => workspaceClock.now(),
   });

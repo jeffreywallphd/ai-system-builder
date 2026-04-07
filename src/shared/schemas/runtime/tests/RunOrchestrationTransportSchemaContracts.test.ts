@@ -88,10 +88,16 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
         executionOutcome: "none",
         submittedAt: "2026-04-07T10:00:00.000Z",
         updatedAt: "2026-04-07T10:00:05.000Z",
+        actionAvailability: {
+          cancel: { allowed: true },
+          retry: { allowed: false, reason: "Retry is available only for failed or cancelled runs." },
+          dequeue: { allowed: true },
+        },
       }],
       totalCount: 1,
     });
     expect(response.items[0]?.runId).toBe("run-1");
+    expect(response.items[0]?.actionAvailability?.cancel.allowed).toBeTrue();
   });
 
   it("parses run lifecycle event envelopes", () => {
