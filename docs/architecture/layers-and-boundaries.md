@@ -153,6 +153,7 @@ If a change needs data from the outside world, prefer adding or using an **appli
 
 - `src/` is the canonical architecture root for domain, application, infrastructure, hosts, shared, and ui layers.
 - Cross-layer imports should use configured aliases (`@application/*`, `@domain/*`, `@hosts/*`, `@infrastructure/*`, `@shared/*`, `@ui/*`, and `@src/*`) instead of fragile deep relative traversal.
+- Legacy renderer/shared contract imports that still target `@shared/*` are kept stable through compatibility re-export seams under `src/shared/*`, forwarding to canonical modules in `src/ui/shared/*` or `src/infrastructure/nodes/shared/*` as appropriate.
 
 ## Direction 4 boundary note (Phase 1)
 - Agent business meaning is now in `domain/agents/` (goals, policies, asset-backed memory configuration, execution sessions with validated lifecycle transitions).
