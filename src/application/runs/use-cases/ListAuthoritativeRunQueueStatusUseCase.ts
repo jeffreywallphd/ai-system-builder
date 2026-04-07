@@ -6,6 +6,7 @@ import {
   type RunQueueStatusItem,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import { mapPlatformRunRecordToCanonicalRun } from "./RunCreationPersistenceMapper";
+import { buildRunSchedulingVisibilityProjection } from "./RunSchedulingVisibilityProjection";
 
 export interface ListAuthoritativeRunQueueStatusRequest {
   readonly workspaceId: string;
@@ -51,6 +52,10 @@ export class ListAuthoritativeRunQueueStatusUseCase {
 
       const run = mapPlatformRunRecordToCanonicalRun(runRecord);
       const summary = toRunSummary(run);
+      const scheduling = buildRunSchedulingVisibilityProjection({
+        runRecord,
+        queueEntry,
+      });
       queueItems.push(Object.freeze({
         runId: summary.runId,
         workflowId: summary.workflowId,
@@ -68,6 +73,7 @@ export class ListAuthoritativeRunQueueStatusUseCase {
         updatedAt: summary.updatedAt,
         actionAvailability: summary.actionAvailability,
         failureSummary: summary.failureSummary,
+        scheduling,
       }));
     }
 

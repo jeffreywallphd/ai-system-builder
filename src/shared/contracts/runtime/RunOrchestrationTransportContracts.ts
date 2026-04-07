@@ -140,6 +140,78 @@ export interface RunStatusTimelineEntry {
   readonly message?: string;
 }
 
+export const RunSchedulingPriorityBands = Object.freeze({
+  critical: "critical",
+  high: "high",
+  normal: "normal",
+  low: "low",
+} as const);
+
+export type RunSchedulingPriorityBand =
+  typeof RunSchedulingPriorityBands[keyof typeof RunSchedulingPriorityBands];
+
+export interface RunSchedulingEffectivePriority {
+  readonly priorityBand: RunSchedulingPriorityBand;
+  readonly rolePriorityScore: number;
+  readonly queueAgeSeconds?: number;
+  readonly asOf: string;
+}
+
+export interface RunSchedulingCandidateConstraints {
+  readonly requiredCapabilities: ReadonlyArray<string>;
+  readonly requiresRemoteScheduling: boolean;
+}
+
+export interface RunSchedulingDeferStatus {
+  readonly eligibilityMarker: "ready" | "deferred" | "blocked";
+  readonly deferCount: number;
+  readonly nextEligibleAt: string;
+  readonly reasonCodes: ReadonlyArray<string>;
+  readonly reasonMessage?: string;
+  readonly decisionId?: string;
+  readonly recordedAt?: string;
+}
+
+export interface RunSchedulingPlacementOutcome {
+  readonly outcome: "assignment-recommended" | "deferred" | "no-placement" | "not-applicable";
+  readonly selectedNodeId?: string;
+  readonly dispatchAttemptNodeId?: string;
+  readonly reasonCodes: ReadonlyArray<string>;
+  readonly reasonMessage?: string;
+  readonly decisionId?: string;
+}
+
+export interface RunSchedulingAdminDiagnostics {
+  readonly requiresAdministrativeAttention: boolean;
+  readonly noPlacementCategory?: string;
+  readonly reasonCodes: ReadonlyArray<string>;
+  readonly decisionReasonCodes: ReadonlyArray<string>;
+  readonly exclusionReasonCodes: ReadonlyArray<string>;
+}
+
+export interface RunSchedulingVisibilityProjection {
+  readonly effectivePriority?: RunSchedulingEffectivePriority;
+  readonly candidateConstraints?: RunSchedulingCandidateConstraints;
+  readonly defer?: RunSchedulingDeferStatus;
+  readonly placement: RunSchedulingPlacementOutcome;
+  readonly admin?: RunSchedulingAdminDiagnostics;
+}
+
+export interface RunQueueSchedulingAdminSummaryCodeCount {
+  readonly code: string;
+  readonly count: number;
+}
+
+export interface RunQueueSchedulingAdminSummary {
+  readonly asOf: string;
+  readonly totalRuns: number;
+  readonly deferredRuns: number;
+  readonly requiresAdministrativeAttentionRuns: number;
+  readonly reasonCodes: ReadonlyArray<RunQueueSchedulingAdminSummaryCodeCount>;
+  readonly decisionReasonCodes: ReadonlyArray<RunQueueSchedulingAdminSummaryCodeCount>;
+  readonly exclusionReasonCodes: ReadonlyArray<RunQueueSchedulingAdminSummaryCodeCount>;
+}
+
 export interface RunSummary {
   readonly contractVersion: RunOrchestrationTransportContractVersion;
   readonly runId: string;
@@ -154,6 +226,7 @@ export interface RunSummary {
   readonly queue?: RunQueueStatusSnapshot;
   readonly actionAvailability?: RunActionAvailability;
   readonly failureSummary?: RunFailureSummary;
+  readonly scheduling?: RunSchedulingVisibilityProjection;
 }
 
 export interface RunDetail extends RunSummary {
@@ -227,6 +300,7 @@ export interface RunStatusEnvelope {
   readonly actionAvailability?: RunActionAvailability;
   readonly failureSummary?: RunFailureSummary;
   readonly statusTimeline?: ReadonlyArray<RunStatusTimelineEntry>;
+  readonly scheduling?: RunSchedulingVisibilityProjection;
 }
 
 export interface RunExecutionProgressSnapshot {
@@ -290,12 +364,14 @@ export interface RunQueueStatusItem {
   readonly updatedAt: string;
   readonly actionAvailability?: RunActionAvailability;
   readonly failureSummary?: RunFailureSummary;
+  readonly scheduling?: RunSchedulingVisibilityProjection;
 }
 
 export interface RunQueueStatusReadResponse {
   readonly items: ReadonlyArray<RunQueueStatusItem>;
   readonly totalCount: number;
   readonly asOf: string;
+  readonly schedulingAdminSummary?: RunQueueSchedulingAdminSummary;
 }
 
 export interface RunCancellationRequest {

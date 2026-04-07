@@ -261,5 +261,7 @@ describe("ListAuthoritativeRunQueueStatusUseCase", () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.queue.position).toBe(1);
     expect(result.items[0]?.actionAvailability?.cancel.allowed).toBeTrue();
+    expect(result.items[0]?.scheduling?.candidateConstraints?.requiresRemoteScheduling).toBeTrue();
+    expect(result.items[0]?.scheduling?.placement.outcome).toBe("not-applicable");
   });
 });

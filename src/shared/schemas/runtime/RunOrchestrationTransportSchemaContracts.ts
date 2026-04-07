@@ -3,6 +3,7 @@ import {
   RunLifecycleEventKinds,
   RunMutationActions,
   RunOrchestrationTransportContractVersions,
+  RunSchedulingPriorityBands,
   RunResultOutputReferenceKinds,
   resolveRunSubmissionSource,
   type RunSubmissionRequest,
@@ -142,6 +143,60 @@ const RunStatusTimelineEntrySchema = z.object({
   message: z.string().trim().min(1).max(1024).optional(),
 }).strict();
 
+const RunSchedulingPriorityBandSchema = z.enum([
+  RunSchedulingPriorityBands.critical,
+  RunSchedulingPriorityBands.high,
+  RunSchedulingPriorityBands.normal,
+  RunSchedulingPriorityBands.low,
+]);
+
+const RunSchedulingEffectivePrioritySchema = z.object({
+  priorityBand: RunSchedulingPriorityBandSchema,
+  rolePriorityScore: z.number(),
+  queueAgeSeconds: z.number().int().min(0).optional(),
+  asOf: TimestampSchema,
+}).strict();
+
+const RunSchedulingCandidateConstraintsSchema = z.object({
+  requiredCapabilities: z.array(IdentifierSchema).max(128),
+  requiresRemoteScheduling: z.boolean(),
+}).strict();
+
+const RunSchedulingDeferStatusSchema = z.object({
+  eligibilityMarker: z.enum(["ready", "deferred", "blocked"]),
+  deferCount: z.number().int().min(0),
+  nextEligibleAt: TimestampSchema,
+  reasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+  reasonMessage: z.string().trim().min(1).max(1024).optional(),
+  decisionId: IdentifierSchema.optional(),
+  recordedAt: TimestampSchema.optional(),
+}).strict();
+
+const RunSchedulingPlacementOutcomeSchema = z.object({
+  outcome: z.enum(["assignment-recommended", "deferred", "no-placement", "not-applicable"]),
+  selectedNodeId: IdentifierSchema.optional(),
+  dispatchAttemptNodeId: IdentifierSchema.optional(),
+  reasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+  reasonMessage: z.string().trim().min(1).max(1024).optional(),
+  decisionId: IdentifierSchema.optional(),
+}).strict();
+
+const RunSchedulingAdminDiagnosticsSchema = z.object({
+  requiresAdministrativeAttention: z.boolean(),
+  noPlacementCategory: z.string().trim().min(1).max(128).optional(),
+  reasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+  decisionReasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+  exclusionReasonCodes: z.array(z.string().trim().min(1).max(128)).max(64),
+}).strict();
+
+const RunSchedulingVisibilityProjectionSchema = z.object({
+  effectivePriority: RunSchedulingEffectivePrioritySchema.optional(),
+  candidateConstraints: RunSchedulingCandidateConstraintsSchema.optional(),
+  defer: RunSchedulingDeferStatusSchema.optional(),
+  placement: RunSchedulingPlacementOutcomeSchema,
+  admin: RunSchedulingAdminDiagnosticsSchema.optional(),
+}).strict();
+
 const RuntimeTargetSchema = z.object({
   systemId: IdentifierSchema,
   versionId: IdentifierSchema,
@@ -199,6 +254,7 @@ const RunSummarySchema = z.object({
   queue: RunQueueStatusSnapshotSchema.optional(),
   actionAvailability: RunActionAvailabilitySchema.optional(),
   failureSummary: RunFailureSummarySchema.optional(),
+  scheduling: RunSchedulingVisibilityProjectionSchema.optional(),
 }).strict();
 
 const RunSubmissionMetadataSchema = z.object({
@@ -369,12 +425,33 @@ const RunQueueStatusItemSchema = z.object({
   updatedAt: TimestampSchema,
   actionAvailability: RunActionAvailabilitySchema.optional(),
   failureSummary: RunFailureSummarySchema.optional(),
+  scheduling: RunSchedulingVisibilityProjectionSchema.optional(),
+}).strict();
+
+const RunQueueSchedulingAdminSummarySchema = z.object({
+  asOf: TimestampSchema,
+  totalRuns: z.number().int().min(0),
+  deferredRuns: z.number().int().min(0),
+  requiresAdministrativeAttentionRuns: z.number().int().min(0),
+  reasonCodes: z.array(z.object({
+    code: z.string().trim().min(1).max(128),
+    count: z.number().int().min(1),
+  }).strict()).max(128),
+  decisionReasonCodes: z.array(z.object({
+    code: z.string().trim().min(1).max(128),
+    count: z.number().int().min(1),
+  }).strict()).max(128),
+  exclusionReasonCodes: z.array(z.object({
+    code: z.string().trim().min(1).max(128),
+    count: z.number().int().min(1),
+  }).strict()).max(128),
 }).strict();
 
 export const RunQueueStatusReadResponseSchema = z.object({
   items: z.array(RunQueueStatusItemSchema),
   totalCount: z.number().int().min(0),
   asOf: TimestampSchema,
+  schedulingAdminSummary: RunQueueSchedulingAdminSummarySchema.optional(),
 }).strict();
 
 export const RunCancellationRequestSchema = z.object({
