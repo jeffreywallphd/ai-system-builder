@@ -460,3 +460,18 @@ Coverage updates:
   - worker decryption deny posture,
   - stream-open deny when policy changes after grant issuance,
   - rejected decryption-gate audit event emission.
+
+## Story 14.2.5 protected upload/download/preview endpoint seams
+
+- Shared client-safe transfer route constants now exist in:
+  - `src/shared/contracts/assets/AssetWorkflowClientContracts.ts` (`AssetWorkflowTransportRoutes`)
+- Converged upload/download/preview transfer path helpers now remain server-mediated and token/session scoped:
+  - `buildAssetUploadSessionContentPath(...)`
+  - `buildAuthorizedAssetDownloadPath(...)`
+- Shared workflow client seam now includes upload-content transfer as a first-class protected operation:
+  - `HttpAssetWorkflowClient.uploadContent(...)`
+  - `AssetWorkflowService.uploadContent(...)`
+- External upload-initiation and preview-resolution response DTOs are now tightened to avoid storage-structure leakage:
+  - upload responses omit `storageInstanceId` and `objectKey`
+  - preview responses omit `previewStorageInstanceId` and `previewObjectKey`
+- Download/preview content retrieval remains policy-checked through tokenized server routes (`/downloads/authorize` + `/downloads/content`) with no raw filesystem path exposure.

@@ -114,8 +114,6 @@ export interface AssetPreviewResolutionDto {
   readonly previewAssetId?: string;
   readonly previewVersionId?: string;
   readonly previewMimeType?: string;
-  readonly previewStorageInstanceId?: string;
-  readonly previewObjectKey?: string;
 }
 
 export interface AssetAuditEventPayloadDto {
@@ -141,19 +139,6 @@ function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {
     throw new AssetTransportContractError(`${field} is required.`);
-  }
-  return normalized;
-}
-
-function assertPathSafeObjectKey(value: string, field: string): string {
-  const normalized = normalizeRequired(value, field);
-  if (
-    normalized.startsWith("/")
-    || normalized.includes("\\")
-    || /^[a-zA-Z]:\//.test(normalized)
-    || normalized.split("/").some((segment) => !segment || segment === "." || segment === "..")
-  ) {
-    throw new AssetTransportContractError(`${field} must be a logical object key, not a filesystem path.`);
   }
   return normalized;
 }
@@ -321,10 +306,6 @@ export function toAssetPreviewResolutionDto(resolution: AssetPreviewResolution):
     previewAssetId: resolution.previewAssetId?.trim() || undefined,
     previewVersionId: resolution.previewVersionId?.trim() || undefined,
     previewMimeType: resolution.previewMimeType?.trim().toLowerCase() || undefined,
-    previewStorageInstanceId: resolution.previewStorageInstanceId?.trim() || undefined,
-    previewObjectKey: resolution.previewObjectKey
-      ? assertPathSafeObjectKey(resolution.previewObjectKey, "previewObjectKey")
-      : undefined,
   });
 }
 

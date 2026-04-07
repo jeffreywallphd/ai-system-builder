@@ -19,6 +19,16 @@ export const AssetWorkflowClientContractVersions = Object.freeze({
 export type AssetWorkflowClientContractVersion =
   typeof AssetWorkflowClientContractVersions[keyof typeof AssetWorkflowClientContractVersions];
 
+export const AssetWorkflowTransportRoutes = Object.freeze({
+  listAssets: "/api/v1/assets",
+  getAssetDetail: "/api/v1/assets/:assetId",
+  initiateUpload: "/api/v1/assets/:assetId/uploads/initiate",
+  uploadSessionContent: "/api/v1/assets/upload-sessions/:uploadSessionId/content",
+  authorizeDownload: "/api/v1/assets/:assetId/downloads/authorize",
+  downloadContent: "/api/v1/assets/:assetId/downloads/content",
+  resolvePreview: "/api/v1/assets/:assetId/preview",
+} as const);
+
 export interface AssetWorkflowUploadInitiationRequest {
   readonly contractVersion: AssetWorkflowClientContractVersion;
   readonly workspaceId: string;
@@ -38,8 +48,6 @@ export interface AssetWorkflowUploadInitiationResponse {
     readonly uploadSessionId: string;
     readonly assetId: string;
     readonly workspaceId: string;
-    readonly storageInstanceId: string;
-    readonly objectKey: string;
     readonly area: "input" | "output" | "reference";
     readonly uploadEndpoint: string;
     readonly uploadMethod: "POST";
@@ -120,6 +128,29 @@ export interface AssetWorkflowPreviewResponse {
   readonly preview: AssetPreviewResolutionDto;
 }
 
+export interface AssetWorkflowUploadContentRequest {
+  readonly contractVersion: AssetWorkflowClientContractVersion;
+  readonly workspaceId: string;
+  readonly uploadSessionId: string;
+  readonly contentType?: string;
+}
+
+export interface AssetWorkflowUploadContentResponse {
+  readonly contractVersion: AssetWorkflowClientContractVersion;
+  readonly asset: AssetDetailDto;
+  readonly uploadSessionId: string;
+  readonly finalizedVersionId: string;
+  readonly content: {
+    readonly mimeType: string;
+    readonly sizeBytes: number;
+    readonly checksum: {
+      readonly algorithm: "sha256";
+      readonly digest: string;
+    };
+    readonly originalFileName?: string;
+  };
+}
+
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {
@@ -190,5 +221,14 @@ export function buildAuthorizedAssetDownloadPath(params: {
   const workspaceId = encodeURIComponent(normalizeRequired(params.workspaceId, "workspaceId"));
   const assetId = encodeURIComponent(normalizeRequired(params.assetId, "assetId"));
   const contentToken = encodeURIComponent(normalizeRequired(params.contentToken, "contentToken"));
-  return `/api/v1/assets/${assetId}/downloads/content?workspaceId=${workspaceId}&contentToken=${contentToken}`;
+  return `${AssetWorkflowTransportRoutes.downloadContent.replace(":assetId", assetId)}?workspaceId=${workspaceId}&contentToken=${contentToken}`;
+}
+
+export function buildAssetUploadSessionContentPath(params: {
+  readonly workspaceId: string;
+  readonly uploadSessionId: string;
+}): string {
+  const workspaceId = encodeURIComponent(normalizeRequired(params.workspaceId, "workspaceId"));
+  const uploadSessionId = encodeURIComponent(normalizeRequired(params.uploadSessionId, "uploadSessionId"));
+  return `${AssetWorkflowTransportRoutes.uploadSessionContent.replace(":uploadSessionId", uploadSessionId)}?workspaceId=${workspaceId}`;
 }

@@ -15,6 +15,7 @@ import {
   toAssetAuditEventPayloadDto,
   toAssetDetailDto,
   toAssetDownloadAuthorizationDto,
+  toAssetPreviewResolutionDto,
 } from "../AssetTransportContracts";
 
 describe("AssetTransportContracts", () => {
@@ -117,6 +118,23 @@ describe("AssetTransportContracts", () => {
     expect((dto as Record<string, unknown>).storageInstanceId).toBeUndefined();
     expect((dto as Record<string, unknown>).objectKey).toBeUndefined();
     expect((dto as Record<string, unknown>).objectVersionId).toBeUndefined();
+  });
+
+  it("projects preview resolution payloads without storage path leakage", () => {
+    const dto = toAssetPreviewResolutionDto({
+      assetId: "asset-contract-001",
+      versionId: "asset-contract-001:v1",
+      previewAssetId: "asset-preview-001",
+      previewVersionId: "asset-preview-001:v1",
+      previewMimeType: "image/webp",
+      previewStorageInstanceId: "storage-alpha",
+      previewObjectKey: "workspaces/workspace-a/assets/asset-preview-001/preview/v1/image.webp",
+    });
+
+    expect(dto.previewAssetId).toBe("asset-preview-001");
+    expect(dto.previewMimeType).toBe("image/webp");
+    expect((dto as Record<string, unknown>).previewStorageInstanceId).toBeUndefined();
+    expect((dto as Record<string, unknown>).previewObjectKey).toBeUndefined();
   });
 
   it("projects audit events as stable event payload DTOs", () => {
