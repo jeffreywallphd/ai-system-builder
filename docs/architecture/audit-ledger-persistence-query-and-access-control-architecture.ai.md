@@ -23,6 +23,7 @@ Related hardening note: `docs/architecture/audit-observability-failure-handling-
   - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 - Governance/admin projection shaping:
   - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
+  - supports projection-policy injection seams for deployment-profile shaping, broader governance facet logic, and future compliance/export explanatory notes
 - Authoritative retrieval APIs:
   - `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
   - `src/infrastructure/transport/http-server/authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
@@ -31,6 +32,7 @@ Related hardening note: `docs/architecture/audit-observability-failure-handling-
   - `src/shared/dto/audit/AuditEventDtos.ts`
 - Retention config seam:
   - `src/infrastructure/config/AuditRetentionLifecycleConfig.ts`
+  - supports profile-scoped retention default resolution with global fallback
 
 ## Required behavior reminders
 

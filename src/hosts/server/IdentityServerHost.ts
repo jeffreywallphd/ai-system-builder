@@ -135,6 +135,7 @@ import {
   type InitializeCertificateAuthorityUseCaseResult,
   type CertificateAuthorityInitializationAuditEvent,
 } from "@application/security/use-cases/InitializeCertificateAuthorityUseCase";
+import type { HostDeploymentProfile } from "@hosts/bootstrap/HostBootstrapPipeline";
 import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
@@ -244,6 +245,7 @@ export interface IdentityServerHostOptions {
   readonly databasePath: string;
   readonly port?: number;
   readonly host?: string;
+  readonly deploymentProfile?: HostDeploymentProfile;
   readonly cors?: {
     readonly enabled?: boolean;
     readonly allowedOrigins?: ReadonlyArray<string>;
@@ -371,7 +373,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   let secretService: ServerComposedSecretService | undefined;
   try {
-    const auditRetentionLifecycleConfig = resolveAuditRetentionLifecycleConfig({ env });
+    const auditRetentionLifecycleConfig = resolveAuditRetentionLifecycleConfig({
+      env,
+      deploymentProfile: options.deploymentProfile
+        ? {
+          profileId: options.deploymentProfile.profileId,
+        }
+        : undefined,
+    });
     const auditLedgerObservability = new AuditLedgerObservability({
       logger: createAuditLedgerOperationalLogger(options.logger),
     });

@@ -61,6 +61,7 @@ The durable ledger now includes explicit non-destructive seams for future retent
 
 - canonical event-level retention metadata (`retentionMetadata`) is supported in domain/contracts/schemas;
 - authoritative recording can apply default retention metadata policy seams from environment configuration;
+- retention defaults can resolve profile-scoped overrides (for `home`, `classroom`, `organization`, and future canonical deployment profiles) before falling back to global keys;
 - persistence stores indexed retention/lifecycle selector columns to avoid future schema redesign for archival workflows;
 - list query filters support retention/lifecycle selectors (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`).
 
@@ -70,6 +71,7 @@ Current supported behavior is intentionally limited:
 - retention/lifecycle fields are metadata and query seams only;
 - no destructive retention worker/job/delete pathway is implemented in this story;
 - configuration explicitly rejects enabling destructive retention actions.
+- host startup wiring passes resolved deployment profile context into audit retention configuration so future policy differences are additive instead of composition-breaking.
 
 ## Story 18.2.3 query service workflows
 

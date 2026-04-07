@@ -51,11 +51,13 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
   - `GET /api/v1/audit/events/:eventId`
   - request parsing from shared audit query contracts/schemas and canonical status mapping for invalid/forbidden/not-found outcomes.
 - Added retention/lifecycle policy seams without destructive behavior:
-  - canonical `retentionMetadata` fields in domain/shared contracts/schemas,
-  - indexed retention columns in SQLite persistence,
-  - retention/lifecycle list filters (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`),
-  - environment-backed metadata defaults for authoritative recording (`AI_LOOM_AUDIT_RETENTION_*`),
-  - explicit guardrail that destructive retention actions are rejected by configuration.
+- canonical `retentionMetadata` fields in domain/shared contracts/schemas,
+- indexed retention columns in SQLite persistence,
+- retention/lifecycle list filters (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`),
+- environment-backed metadata defaults for authoritative recording (`AI_LOOM_AUDIT_RETENTION_*`),
+- deployment-profile-scoped retention default resolution (`*_HOME`, `*_CLASSROOM`, `*_ORGANIZATION`) with fallback to global defaults,
+- host startup wiring that passes resolved deployment profile context into audit retention configuration,
+- explicit guardrail that destructive retention actions are rejected by configuration.
 - Added interrupted-write recovery and startup reconciliation seams:
   - `resolveAppendOutcome(...)` for post-failure commit-state verification (`committed` / `not-committed` / `ambiguous`),
   - replay-metadata repair when event row exists but replay row was missing,

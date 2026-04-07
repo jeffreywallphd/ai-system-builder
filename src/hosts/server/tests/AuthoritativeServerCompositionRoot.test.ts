@@ -299,17 +299,21 @@ describe("AuthoritativeServerCompositionRoot", () => {
     let observedProfileId: string | undefined;
     let observedEnvironmentName: string | undefined;
     let observedCapabilities: ReadonlyArray<string> | undefined;
+    let observedRuntimeProfileId: string | undefined;
     const root = createAuthoritativeServerCompositionRoot({
       hostOptions: {
         databasePath: "test.sqlite",
       },
-      startHost: async () => ({
-        port: 5500,
-        address: "127.0.0.1:5500",
-        secretService: {} as never,
-        platformSecretConsumers: {} as never,
-        close: async () => {},
-      }),
+      startHost: async (options) => {
+        observedRuntimeProfileId = options.deploymentProfile?.profileId;
+        return {
+          port: 5500,
+          address: "127.0.0.1:5500",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        };
+      },
       bootstrap: {
         stageHandlers: {
           [HostBootstrapStageIds.configuration]: (context) => {
@@ -336,6 +340,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedProfileId).toBe(HostDeploymentProfileIds.organization);
     expect(observedEnvironmentName).toBe("production");
     expect(observedCapabilities).toContain(HostCapabilityFlags.controlPlaneAuthority);
+    expect(observedRuntimeProfileId).toBe(HostDeploymentProfileIds.organization);
     await runtime.stop();
   });
 
