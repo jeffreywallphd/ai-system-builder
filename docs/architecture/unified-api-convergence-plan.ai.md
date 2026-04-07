@@ -42,3 +42,5 @@
 ## Canonical doc
 
 - `docs/architecture/unified-api-convergence-plan.md`
+- Follow-on rules for production extension/migration governance: `docs/architecture/unified-api-authoritative-surface.md`
+- Contributor checklist: `docs/unified-api-contributor-guide.md`

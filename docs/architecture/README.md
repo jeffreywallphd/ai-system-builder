@@ -216,6 +216,8 @@ The runtime is not a single path. The system currently supports multiple executi
 - For contributor extension rules and integration regression expectations for persistent platform services, read [`persistent-platform-service-extension-guidance.md`](./persistent-platform-service-extension-guidance.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
 - For Feature 14 / Epic 14.1 Story 14.1.1 client-surface inventory, migration calls, and shared contract-home convergence mapping across desktop/thin-client/API surfaces, read [`unified-api-convergence-plan.md`](./unified-api-convergence-plan.md).
+- For Feature 14 / Epic 14.1 Story 14.1.8 authoritative API surface rules, prohibited pattern guardrails, extension workflow, and migration rules for remaining non-converged pathways, read [`unified-api-authoritative-surface.md`](./unified-api-authoritative-surface.md).
+- For contributor workflow on where to add shared contracts, schemas, transport adapters, and client integrations for converged API work, read [`../unified-api-contributor-guide.md`](../unified-api-contributor-guide.md).
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

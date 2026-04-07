@@ -140,6 +140,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 4 final production baseline and extension checklist: `docs/architecture/authorization-feature-4-final-baseline.md`
 - Admin/user sharing-management and access-review operations guide: `docs/authorization-sharing-management-and-access-review.md`
 - Feature 14 / Epic 14.1 Story 14.1.1 convergence inventory and migration plan across desktop IPC, thin-client HTTP/WSS, and shared contract homes: `docs/architecture/unified-api-convergence-plan.md`
+- Feature 14 / Epic 14.1 Story 14.1.8 authoritative API surface baseline, prohibited pattern rules, extension workflow, and legacy-path migration guidance: `docs/architecture/unified-api-authoritative-surface.md`
+- Contributor implementation checklist for converged API additions (shared contracts/schemas/backend/transport/client wiring): `docs/unified-api-contributor-guide.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
