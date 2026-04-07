@@ -4,7 +4,7 @@
 
 - Feature 16: Run Submission and Orchestration Core
 - Epic 16.3: Implement Operational Control, Recovery Behavior, and Cross-Surface Orchestration Visibility
-- Story 16.3.3: Implement operational visibility endpoints and projections for queue/run control surfaces
+- Story 16.3.5: Implement run history, status timeline, and failure-summary presentation data
 
 ## Purpose
 
@@ -36,8 +36,18 @@ The authoritative run projections now include:
   - each action includes `allowed` + optional `reason`.
 - `failureSummary`:
   - user-safe failure code/message + retryable flag.
+  - optional admin diagnostics summary when `run.manage` visibility is permitted.
 - `statusTimeline`:
-  - lifecycle timeline entries (`occurredAt`, `state`, `source`, optional `message`).
+  - lifecycle timeline/history entries (`occurredAt`, `state`, `source`, `kind`, optional `message`).
+
+Timeline/history now derives from authoritative orchestration signals, including:
+
+- lifecycle transitions
+- dispatch attempts and dispatch outcomes
+- execution progress markers and heartbeat ingestion
+- cancellation request outcomes
+- retry request lineage actions
+- terminal completion/failure state finalization
 
 Queue visibility projections (`GET /api/v1/runtime/queue`) now return queue-focused run rows with:
 
@@ -49,8 +59,9 @@ Queue visibility projections (`GET /api/v1/runtime/queue`) now return queue-focu
 ## User-safe vs internal diagnostics posture
 
 - User-facing operational reads expose only safe run/failure fields and action eligibility.
-- Internal diagnostics remain in internal run metadata telemetry and are not surfaced through run list/detail/status/queue projections.
-- Status timelines are built from authoritative run state plus audit events, without exposing raw internal diagnostic payloads.
+- Internal diagnostics remain in internal run metadata telemetry and are not surfaced through run list/detail/status/queue projections for standard read audiences.
+- Status timelines are built from authoritative run state plus audit events and dispatch-attempt records, without exposing raw internal diagnostic payloads.
+- Admin-visible failure diagnostics (when permitted) expose bounded diagnostic summaries (codes, key-level telemetry metadata), not raw backend logs/payload dumps.
 
 ## Endpoint posture
 
@@ -67,6 +78,7 @@ Queue visibility projections (`GET /api/v1/runtime/queue`) now return queue-focu
 
 - Action eligibility must be derived from authoritative lifecycle/queue state only.
 - Queue position must be derived from authoritative queue ordering, not client-side reconstruction.
+- Timeline/history must be derived from authoritative transitions and orchestration events, not reconstructed in UI.
 - Internal diagnostics must not leak into user-facing operational projection fields.
 - Run/queue reads remain workspace-scoped and policy-evaluated through existing authorization seams.
 

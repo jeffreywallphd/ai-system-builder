@@ -26,11 +26,15 @@ describe("run operational visibility documentation", () => {
     expect(existsSync(aiDocPath)).toBeTrue();
   });
 
-  it("documents queue position, action eligibility, and user-safe summary boundaries", () => {
+  it("documents queue position, timeline history derivation, and redaction boundaries", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("queue position");
     expect(doc).toContain("action eligibility");
     expect(doc).toContain("user-safe failure");
+    expect(doc).toContain("timeline/history");
+    expect(doc).toContain("dispatch attempts");
+    expect(doc).toContain("progress markers");
+    expect(doc).toContain("admin diagnostics");
     expect(doc).toContain("internal diagnostics");
   });
 

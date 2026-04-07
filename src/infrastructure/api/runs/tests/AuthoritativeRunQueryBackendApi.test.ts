@@ -22,8 +22,11 @@ import {
 } from "@domain/authorization/AuthorizationDomain";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
+  type IPlatformAuditEventRepository,
   PlatformRunStatuses,
   type PlatformPersistenceMutationContext,
+  type PlatformAuditEventListQuery,
+  type PlatformAuditEventRecord,
   type PlatformRunListQuery,
   type PlatformRunMutationResult,
   type PlatformRunRecord,
@@ -33,7 +36,15 @@ import {
   mapLifecycleStateToPlatformRunStatus,
   type RunAuthoritativeMetadata,
 } from "@application/runs/use-cases/RunCreationPersistenceMapper";
-import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  AuthoritativeRunDispatchAttemptRecord,
+  AuthoritativeRunDispatchAttemptResult,
+  AuthoritativeRunNodeClaimResult,
+  AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunQueueMutationResult,
+  IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationQueuePersistenceRepository,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
@@ -84,6 +95,96 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
       wasReplay: false,
       record: persisted,
     });
+  }
+}
+
+class InMemoryRunQueueReadRepository implements IRunOrchestrationQueuePersistenceRepository {
+  public readonly dispatchAttempts = new Map<string, ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>();
+
+  public async getQueueEntryByRunId(_runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    return undefined;
+  }
+
+  public async enqueueRunForAssignment(
+    _record: Omit<AuthoritativeRunQueueEntryRecord, "claimToken" | "claimedBy" | "claimedAt" | "claimExpiresAt" | "dequeuedAt" | "revision">,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<AuthoritativeRunQueueMutationResult> {
+    throw new Error("Not implemented.");
+  }
+
+  public async listAssignmentReadyRuns(_query: {
+    readonly asOf: string;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([]);
+  }
+
+  public async claimAssignmentReadyRuns(_input: {
+    readonly asOf: string;
+    readonly reservationOwner: string;
+    readonly reservationTtlSeconds: number;
+    readonly limit: number;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return Object.freeze([]);
+  }
+
+  public async releaseRunClaim(_input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async claimQueuedRunForNodeDispatch(_input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult> {
+    throw new Error("Not implemented.");
+  }
+
+  public async recordDispatchAttemptResult(_input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async finalizeRunQueueEntry(_input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: typeof RunLifecycleStates[keyof typeof RunLifecycleStates];
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
+    return this.dispatchAttempts.get(runId) ?? Object.freeze([]);
+  }
+}
+
+class InMemoryAuditEventRepository implements IPlatformAuditEventRepository {
+  public readonly byTargetRef = new Map<string, ReadonlyArray<PlatformAuditEventRecord>>();
+
+  public async appendAuditEvent(
+    _event: PlatformAuditEventRecord,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<{ readonly changed: boolean; readonly wasReplay: boolean; readonly record: PlatformAuditEventRecord; }> {
+    throw new Error("Not implemented.");
+  }
+
+  public async listAuditEvents(query: PlatformAuditEventListQuery): Promise<ReadonlyArray<PlatformAuditEventRecord>> {
+    return this.byTargetRef.get(query.targetRef ?? "") ?? Object.freeze([]);
   }
 }
 
@@ -524,6 +625,169 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(response.data?.items).toHaveLength(1);
     expect(response.data?.items[0]?.runId).toBe("run:queue");
     expect(response.data?.items[0]?.actionAvailability?.cancel.allowed).toBeTrue();
+  });
+
+  it("keeps diagnostics redacted for readers and exposes admin diagnostics for run.manage audiences", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const runQueueRepository = new InMemoryRunQueueReadRepository();
+    const auditEventRepository = new InMemoryAuditEventRepository();
+
+    const failedRun = createRunRecord({
+      runId: "run:failed",
+      workspaceId: "workspace-alpha",
+      workflowId: "workflow-alpha",
+      state: RunLifecycleStates.failed,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-07T09:00:00.000Z",
+      updatedAt: "2026-04-07T09:05:00.000Z",
+    });
+
+    await runRepository.createRun(Object.freeze({
+      ...failedRun,
+      metadata: Object.freeze({
+        ...(failedRun.metadata as Record<string, unknown>),
+        canonicalRun: Object.freeze({
+          ...((failedRun.metadata as RunAuthoritativeMetadata).canonicalRun),
+          execution: Object.freeze({
+            ...((failedRun.metadata as RunAuthoritativeMetadata).canonicalRun.execution),
+            outcome: "failed",
+            errorCode: "dispatch-failed-to-start",
+            errorMessage: "Run failed to start on backend.",
+            finishedAt: "2026-04-07T09:05:00.000Z",
+          }),
+        }),
+        executionTelemetry: Object.freeze({
+          lastInternalUpdate: Object.freeze({
+            updatedAt: "2026-04-07T09:04:40.000Z",
+            senderNodeId: "node:trusted-1",
+            senderBackendKind: "local-worker",
+            senderBackendRunId: "backend-run-1",
+            diagnostics: Object.freeze({
+              workerPid: 4242,
+            }),
+          }),
+        }),
+      }),
+    }), {
+      operationKey: "seed:failed",
+      actorId: "system:test",
+    });
+
+    runQueueRepository.dispatchAttempts.set("run:failed", Object.freeze([Object.freeze({
+      attemptId: "dispatch-attempt:1",
+      runId: "run:failed",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      nodeId: "node:trusted-1",
+      reservationOwner: "orchestrator:1",
+      claimToken: "claim:1",
+      preparedAt: "2026-04-07T09:04:10.000Z",
+      dispatchMetadata: Object.freeze({}),
+      dispatchResult: Object.freeze({
+        status: "failed-to-start",
+        recordedAt: "2026-04-07T09:04:12.000Z",
+        failure: Object.freeze({
+          safeCode: "dispatch-failed-to-start",
+          safeMessage: "Run failed to start on backend.",
+          internalCode: "adapter-timeout",
+        }),
+      }),
+    })]));
+    auditEventRepository.byTargetRef.set("run:run:failed", Object.freeze([Object.freeze({
+      eventId: "audit:progress",
+      eventKind: "runs",
+      action: "run.execution-update.ingested",
+      actorId: "node:trusted-1",
+      targetRef: "run:run:failed",
+      outcome: "succeeded",
+      occurredAt: "2026-04-07T09:04:30.000Z",
+      details: Object.freeze({
+        toState: "running",
+        hadProgress: true,
+        hadHeartbeat: true,
+      }),
+    })]));
+
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    authRepositories.resourceMetadata.set(toResourceKey("authoritative-run", "run:failed"), Object.freeze({
+      resourceFamily: AuthorizationResourceFamilies.run,
+      resourceType: "authoritative-run",
+      resourceId: "run:failed",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-alpha",
+      visibility: ResourceVisibilities.workspace,
+      sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+      allowResharing: false,
+      isPublishedCapable: false,
+    }));
+
+    authRepositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-viewer",
+          actorUserIdentityId: "user-viewer",
+          roleKey: "viewer",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+        createRoleAssignment({
+          id: "role-admin",
+          actorUserIdentityId: "user-admin",
+          roleKey: "admin",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-07T10:00:00.000Z") },
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      queueRepository: runQueueRepository,
+      auditEventRepository,
+      authorizationDecisionEvaluator: evaluator,
+      now: () => new Date("2026-04-07T10:00:00.000Z"),
+    });
+
+    const viewer = await api.getRunStatus({
+      runId: "run:failed",
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(viewer.ok).toBeTrue();
+    expect(viewer.data?.statusTimeline?.some((entry) => entry.kind === "dispatch-attempt")).toBeTrue();
+    expect(viewer.data?.failureSummary?.diagnostics).toBeUndefined();
+
+    const admin = await api.getRunStatus({
+      runId: "run:failed",
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-admin",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(admin.ok).toBeTrue();
+    expect(admin.data?.failureSummary?.diagnostics?.visibility).toBe("admin");
+    expect(admin.data?.failureSummary?.diagnostics?.latestDispatchFailure?.internalCode).toBe("adapter-timeout");
+    expect(admin.data?.failureSummary?.diagnostics?.latestExecutionTelemetry?.diagnosticKeys).toEqual(["workerPid"]);
   });
 });
 

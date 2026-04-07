@@ -100,12 +100,43 @@ export interface RunFailureSummary {
   readonly message: string;
   readonly retryable: boolean;
   readonly occurredAt?: string;
+  readonly diagnostics?: RunFailureDiagnostics;
+}
+
+export interface RunFailureDiagnostics {
+  readonly visibility: "admin";
+  readonly latestDispatchFailure?: {
+    readonly attemptId: string;
+    readonly recordedAt: string;
+    readonly nodeId: string;
+    readonly safeCode: string;
+    readonly safeMessage: string;
+    readonly internalCode?: string;
+    readonly retryable?: boolean;
+    readonly detailKeys?: ReadonlyArray<string>;
+  };
+  readonly latestExecutionTelemetry?: {
+    readonly updatedAt?: string;
+    readonly senderNodeId?: string;
+    readonly senderBackendKind?: string;
+    readonly senderBackendRunId?: string;
+    readonly diagnosticKeys?: ReadonlyArray<string>;
+    readonly finalizationDiagnosticKeys?: ReadonlyArray<string>;
+    readonly registrationDiagnosticKeys?: ReadonlyArray<string>;
+  };
 }
 
 export interface RunStatusTimelineEntry {
   readonly occurredAt: string;
   readonly state: RunLifecycleState;
   readonly source: "run-state" | "audit";
+  readonly kind?:
+    | "submission"
+    | "lifecycle-transition"
+    | "dispatch-attempt"
+    | "progress"
+    | "cancellation"
+    | "retry";
   readonly message?: string;
 }
 
@@ -400,6 +431,7 @@ export function toRunDetail(run: CanonicalRunRecord): RunDetail {
       occurredAt: run.updatedAt,
       state: run.state,
       source: "run-state" as const,
+      kind: "lifecycle-transition" as const,
     })]),
   });
 }
@@ -436,6 +468,7 @@ export function toRunStatusEnvelope(run: CanonicalRunRecord): RunStatusEnvelope 
       occurredAt: run.updatedAt,
       state: run.state,
       source: "run-state" as const,
+      kind: "lifecycle-transition" as const,
     })]),
   });
 }

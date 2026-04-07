@@ -11,6 +11,7 @@ import type { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/Get
 import type { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import {
   buildOperationalRunStatusTimeline,
+  OperationalVisibilityAudiences,
   mergeOperationalDetailProjection,
   mergeOperationalStatusProjection,
 } from "@application/runs/use-cases/RunOperationalVisibilityProjection";
@@ -18,7 +19,10 @@ import {
   mapPlatformRunRecordToCanonicalRun,
   toRunStatusEnvelopeFromPlatformRecord,
 } from "@application/runs/use-cases/RunCreationPersistenceMapper";
-import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationQueuePersistenceRepository,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   RunDetail,
@@ -75,6 +79,7 @@ export interface AuthoritativeRunQueryBackendApiDependencies {
   readonly listAuthoritativeRunQueueStatusUseCase: ListAuthoritativeRunQueueStatusUseCase;
   readonly getAuthoritativeRunUseCase: GetAuthoritativeRunUseCase;
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
+  readonly queueRepository?: IRunOrchestrationQueuePersistenceRepository;
   readonly auditEventRepository?: IPlatformAuditEventRepository;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
   readonly now?: () => Date;
@@ -197,7 +202,9 @@ export class AuthoritativeRunQueryBackendApi {
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
-    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record);
+    const audience = await this.resolveOperationalAudience(request.authorization, runId);
+    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
+    const dispatchAttempts = await this.getDispatchAttempts(runId);
 
     return Object.freeze({
       ok: true,
@@ -205,6 +212,9 @@ export class AuthoritativeRunQueryBackendApi {
         detail,
         run: mapPlatformRunRecordToCanonicalRun(record),
         timeline,
+        metadata: record.metadata,
+        dispatchAttempts,
+        audience,
       }),
     });
   }
@@ -231,13 +241,18 @@ export class AuthoritativeRunQueryBackendApi {
     }
 
     const status = toRunStatusEnvelopeFromPlatformRecord(record);
-    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record);
+    const audience = await this.resolveOperationalAudience(request.authorization, runId);
+    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
+    const dispatchAttempts = await this.getDispatchAttempts(runId);
     return Object.freeze({
       ok: true,
       data: mergeOperationalStatusProjection({
         status,
         run: mapPlatformRunRecordToCanonicalRun(record),
         timeline,
+        metadata: record.metadata,
+        dispatchAttempts,
+        audience,
       }),
     });
   }
@@ -246,12 +261,16 @@ export class AuthoritativeRunQueryBackendApi {
     runId: string,
     workspaceId: string,
     record: PlatformRunRecord,
+    audience: typeof OperationalVisibilityAudiences[keyof typeof OperationalVisibilityAudiences],
   ) {
     const canonicalRun = mapPlatformRunRecordToCanonicalRun(record);
+    const dispatchAttempts = await this.getDispatchAttempts(runId);
     if (!this.dependencies.auditEventRepository) {
       return buildOperationalRunStatusTimeline({
         run: canonicalRun,
         auditEvents: Object.freeze([]),
+        dispatchAttempts,
+        audience,
       });
     }
 
@@ -266,7 +285,17 @@ export class AuthoritativeRunQueryBackendApi {
     return buildOperationalRunStatusTimeline({
       run: canonicalRun,
       auditEvents: events,
+      dispatchAttempts,
+      audience,
     });
+  }
+
+  private async getDispatchAttempts(runId: string) {
+    if (!this.dependencies.queueRepository) {
+      return Object.freeze([]);
+    }
+    const attempts = await this.dependencies.queueRepository.listDispatchAttemptsByRunId(runId);
+    return Object.freeze([...attempts]);
   }
 
   private async isRunReadAllowed(input: {
@@ -298,6 +327,42 @@ export class AuthoritativeRunQueryBackendApi {
       asOf: this.now().toISOString(),
     });
     return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
+  }
+
+  private async resolveOperationalAudience(
+    authorization: AuthoritativeRunQueryAuthorizationContext,
+    runId: string,
+  ): Promise<typeof OperationalVisibilityAudiences[keyof typeof OperationalVisibilityAudiences]> {
+    if (!this.dependencies.authorizationDecisionEvaluator) {
+      return OperationalVisibilityAudiences.user;
+    }
+
+    const actorUserIdentityId = authorization.actorUserIdentityId.trim();
+    if (!actorUserIdentityId) {
+      return OperationalVisibilityAudiences.user;
+    }
+
+    const decision = await this.dependencies.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: authorization.activeWorkspaceId.trim() || undefined,
+        authenticatedAt: authorization.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "run.manage",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.resourceInstance,
+        resource: Object.freeze({
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: AuthoritativeRunResourceType,
+          resourceId: runId.trim(),
+        }),
+      }),
+      asOf: this.now().toISOString(),
+    });
+
+    return deriveAuthorizationResponseAccessLevel(decision.decision) === AuthorizationResponseAccessLevels.deny
+      ? OperationalVisibilityAudiences.user
+      : OperationalVisibilityAudiences.admin;
   }
 
   private invalidRequest(message: string): SharedApiResponseEnvelope<never> {
