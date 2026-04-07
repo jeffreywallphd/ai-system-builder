@@ -74,3 +74,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared responsive tokens, breakpoints, and interaction profile helpers now live in `src/ui/shared/responsive/*` and are documented in `docs/architecture/multi-surface-ui-responsive-conventions.md`.
 - Shared responsive wrappers for table/form/status/action container conventions now live in `src/ui/shared/components/shell/SurfaceResponsiveConventions.tsx`.
 - Shell and action primitives now accept shared responsive profiles so desktop and thin-client compositions can apply one density/stacking/navigation behavior model across viewport classes.
+
+## Story 15.1.7 update
+- Shared accessibility/focus foundations now live in `src/ui/shared/accessibility/*` and are documented in `docs/architecture/multi-surface-ui-accessibility-foundations.md`.
+- Route-level focus/announcement behavior and skip-link baseline are now applied in `src/ui/layout/AppLayout.tsx`.
+- Shared shell/action seams now carry landmark/live-region/menu keyboard semantics so accessibility behavior is standardized before page-specific UI work.

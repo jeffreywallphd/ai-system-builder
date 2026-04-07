@@ -33,3 +33,10 @@ Story 15.1.5 introduces one shared action semantic model for page, row, and bulk
 ## Tests
 - `src/ui/shared/tests/SurfaceActionModel.test.ts`
 - `src/ui/shared/tests/SurfaceActionComponents.test.tsx`
+
+## Story 15.1.7 update
+- Action wrappers now include baseline accessibility behavior:
+  - strips/lists expose toolbar semantics
+  - menus expose `aria-haspopup` + `role="menu"` + `role="menuitem"`
+  - menus support Escape close and directional keyboard traversal (`ArrowUp`, `ArrowDown`, `Home`, `End`)
+- New admin/operational pages should consume this shared menu behavior instead of custom menu keyboard wiring.

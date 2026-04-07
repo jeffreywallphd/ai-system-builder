@@ -156,3 +156,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Responsive design tokens and interaction conventions now live in `src/ui/shared/responsive/*` with canonical docs in `docs/architecture/multi-surface-ui-responsive-conventions.md`.
 - Shared responsive wrappers for tables, forms, status cards, and action menu containers now live in `src/ui/shared/components/shell/SurfaceResponsiveConventions.tsx`.
 - Shell region layout and action wrappers now accept shared responsive profiles so desktop and thin-client surfaces can adapt density, stacking, touch-target, and menu behavior through one foundational rule set instead of page-local breakpoint logic.
+
+## Story 15.1.7 update
+
+- Shared accessibility and focus-management primitives now live in `src/ui/shared/accessibility/*` with canonical docs in `docs/architecture/multi-surface-ui-accessibility-foundations.md`.
+- App shell route transitions now use a shared route-focus + announcement seam and skip-link baseline through `src/ui/layout/AppLayout.tsx`.
+- Shared shell/action primitives now include landmark, live-status, and keyboard-menu semantics so first admin/operational shells expose usable accessibility behavior without per-page ad hoc wiring.

@@ -45,3 +45,11 @@ Each action descriptor is declarative and host-neutral:
 - Use `confirmation` on dangerous operations; do not re-implement ad hoc confirm prompts per page.
 - Use telemetry metadata (`eventName`, optional `auditCategory`) so future instrumentation can be attached without refactoring page actions.
 - Prefer one descriptor set per operation domain and reuse that set across desktop/thin wrappers where possible.
+
+## Story 15.1.7 update
+
+- Shared action wrappers now expose baseline accessibility semantics:
+- action strips/lists expose toolbar semantics
+- action menus expose `aria-haspopup`, `role="menu"`, and `role="menuitem"` semantics
+- action menus now include Escape-close handling and arrow/home/end keyboard traversal for menu items
+- This keyboard and semantics baseline should be reused rather than reimplemented per page.

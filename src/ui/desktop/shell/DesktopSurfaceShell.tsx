@@ -14,7 +14,7 @@ export default function DesktopSurfaceShell({
   className,
 }: DesktopSurfaceShellProps): JSX.Element {
   return (
-    <SurfaceFrame surface="desktop" className={className}>
+    <SurfaceFrame surface="desktop" className={className} ariaLabel={`${title} desktop surface`}>
       <SurfaceHeaderBar title={title} subtitle={subtitle} actions={actions} />
       {children}
     </SurfaceFrame>

@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useId, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { SurfaceResponsiveProfile } from "@ui/shared/responsive";
 import {
   invokeSurfaceAction,
@@ -65,6 +65,21 @@ function runSurfaceAction<
   void invokeSurfaceAction(action, context, execution);
 }
 
+function moveFocusToMenuAction(
+  refs: ReadonlyArray<HTMLButtonElement | null>,
+  startIndex: number,
+): void {
+  for (let index = 0; index < refs.length; index += 1) {
+    const candidate = refs[(startIndex + index) % refs.length];
+    if (!candidate || candidate.disabled) {
+      continue;
+    }
+
+    candidate.focus();
+    return;
+  }
+}
+
 export function SurfaceActionButtonStrip<
   TResource = unknown,
   TSelection = unknown,
@@ -85,6 +100,8 @@ export function SurfaceActionButtonStrip<
         props.responsiveProfile ? `ui-action-strip--density-${props.responsiveProfile.density}` : undefined,
         props.className,
       )}
+      role="toolbar"
+      aria-label="Surface actions"
       data-action-layout={props.responsiveProfile?.actionMenuLayout}
     >
       {actions.map((action) => (
@@ -122,26 +139,98 @@ export function SurfaceActionMenu<
   if (actions.length < 1) {
     return null;
   }
+  const [isOpen, setIsOpen] = useState(false);
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
+  const summaryRef = useRef<HTMLElement | null>(null);
+  const actionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  actionButtonRefs.current.length = actions.length;
+  const menuId = useId();
+  const menuLabel = props.triggerLabel ?? "Actions";
+
+  const onDetailsKeyDown = (event: ReactKeyboardEvent<HTMLDetailsElement>): void => {
+    if (event.key !== "Escape") {
+      return;
+    }
+
+    if (!detailsRef.current?.open) {
+      return;
+    }
+
+    event.preventDefault();
+    detailsRef.current.open = false;
+    setIsOpen(false);
+    summaryRef.current?.focus();
+  };
+
+  const onMenuItemKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number): void => {
+    const focusTargetByOffset = (offset: number): void => {
+      if (actions.length < 1) {
+        return;
+      }
+
+      moveFocusToMenuAction(actionButtonRefs.current, (index + offset + actions.length) % actions.length);
+    };
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusTargetByOffset(1);
+      return;
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusTargetByOffset(-1);
+      return;
+    }
+
+    if (event.key === "Home") {
+      event.preventDefault();
+      moveFocusToMenuAction(actionButtonRefs.current, 0);
+      return;
+    }
+
+    if (event.key === "End") {
+      event.preventDefault();
+      moveFocusToMenuAction(actionButtonRefs.current, actions.length - 1);
+    }
+  };
 
   return (
     <details
+      ref={detailsRef}
       className={joinClasses(
         "ui-action-menu",
         props.responsiveProfile ? `ui-action-menu--layout-${props.responsiveProfile.actionMenuLayout}` : undefined,
         props.responsiveProfile ? `ui-action-menu--interaction-${props.responsiveProfile.interactionMode}` : undefined,
         props.className,
       )}
+      onToggle={() => setIsOpen(Boolean(detailsRef.current?.open))}
+      onKeyDown={onDetailsKeyDown}
       data-action-layout={props.responsiveProfile?.actionMenuLayout}
     >
-      <summary className="ui-button ui-button--ghost ui-button--sm">{props.triggerLabel ?? "Actions"}</summary>
-      <ul className="ui-action-menu__list">
-        {actions.map((action) => (
+      <summary
+        ref={summaryRef}
+        className="ui-button ui-button--ghost ui-button--sm"
+        aria-haspopup="menu"
+        aria-controls={menuId}
+        aria-expanded={isOpen}
+      >
+        {menuLabel}
+      </summary>
+      <ul id={menuId} className="ui-action-menu__list" role="menu" aria-label={menuLabel}>
+        {actions.map((action, index) => (
           <li key={action.id} className="ui-action-menu__item">
             <button
+              ref={(element) => {
+                actionButtonRefs.current[index] = element;
+              }}
               type="button"
               className={joinClasses("ui-button ui-button--sm ui-action-menu__button", toActionToneClass(action))}
+              role="menuitem"
+              aria-disabled={action.visibility === "disabled"}
               title={action.disabledReason}
               disabled={action.visibility === "disabled"}
+              onKeyDown={(event) => onMenuItemKeyDown(event, index)}
               onClick={() => runSurfaceAction(action, props.context, props.execution)}
             >
               {action.label}
@@ -173,6 +262,8 @@ export function SurfaceActionList<
         props.responsiveProfile ? `ui-action-list--density-${props.responsiveProfile.density}` : undefined,
         props.className,
       )}
+      role="toolbar"
+      aria-label="Surface actions"
       data-action-layout={props.responsiveProfile?.actionMenuLayout}
     >
       {actions.map((action) => (

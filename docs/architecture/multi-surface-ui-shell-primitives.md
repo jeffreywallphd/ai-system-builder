@@ -64,3 +64,11 @@ Responsive layout is explicit in `shell.css`:
 - Canonical states now include `loading`, `empty`, `not-found`, `disconnected`, `error`, and `permission-denied`.
 - Shared state boundaries (`SurfaceStateBoundary`) and panels (`SurfaceStatePanel`) are the preferred page-level rendering pattern for converged admin/operational list/detail surfaces.
 - API error mapping now aligns with shared envelope semantics through `toSurfacePresentationStateFromApiError`, including `forbidden`/`authentication-failed` -> permission denied, `not-found` -> not-found, and transport/temporarily unavailable classes -> disconnected.
+
+## Story 15.1.7 update
+
+- Shell primitives now include landmark and status semantics by default:
+- navigation regions render as `nav`
+- detail regions render as `aside`
+- status regions expose `role`/`aria-live` behavior tuned by tone
+- Header action groups now expose toolbar semantics and shell frames support accessible labels for composed surface wrappers.
