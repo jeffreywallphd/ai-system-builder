@@ -35,5 +35,6 @@
 ## Canonical docs
 
 - `docs/architecture/unified-api-authoritative-surface.md`
+- `docs/architecture/unified-api-endpoint-reference.md`
 - `docs/architecture/unified-api-convergence-plan.md`
 - `docs/architecture/shared-api-contract-package.md`
