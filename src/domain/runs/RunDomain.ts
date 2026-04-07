@@ -83,6 +83,14 @@ export interface RunExecutionState {
   readonly outcome: RunExecutionOutcomeKind;
   readonly errorCode?: string;
   readonly errorMessage?: string;
+  readonly progress?: RunExecutionProgressState;
+}
+
+export interface RunExecutionProgressState {
+  readonly updatedAt: string;
+  readonly percent?: number;
+  readonly stage?: string;
+  readonly message?: string;
 }
 
 export interface RunCancellationState {
@@ -320,12 +328,19 @@ function normalizeExecutionState(value?: RunExecutionState): RunExecutionState {
   const heartbeatAt = value?.heartbeatAt ? normalizeIsoTimestamp(value.heartbeatAt, "Run execution heartbeatAt") : undefined;
   const finishedAt = value?.finishedAt ? normalizeIsoTimestamp(value.finishedAt, "Run execution finishedAt") : undefined;
   const outcome = normalizeOutcomeKind(value?.outcome ?? RunExecutionOutcomeKinds.none);
+  const progress = normalizeExecutionProgressState(value?.progress);
 
   if (startedAt && heartbeatAt && Date.parse(heartbeatAt) < Date.parse(startedAt)) {
     throw new RunDomainError("Run execution heartbeatAt cannot be earlier than startedAt.");
   }
   if (startedAt && finishedAt && Date.parse(finishedAt) < Date.parse(startedAt)) {
     throw new RunDomainError("Run execution finishedAt cannot be earlier than startedAt.");
+  }
+  if (progress && startedAt && Date.parse(progress.updatedAt) < Date.parse(startedAt)) {
+    throw new RunDomainError("Run execution progress updatedAt cannot be earlier than startedAt.");
+  }
+  if (progress && finishedAt && Date.parse(progress.updatedAt) > Date.parse(finishedAt)) {
+    throw new RunDomainError("Run execution progress updatedAt cannot be later than finishedAt.");
   }
 
   const errorCode = normalizeOptional(value?.errorCode);
@@ -347,6 +362,35 @@ function normalizeExecutionState(value?: RunExecutionState): RunExecutionState {
     outcome,
     errorCode,
     errorMessage,
+    progress,
+  });
+}
+
+function normalizeExecutionProgressState(value?: RunExecutionProgressState): RunExecutionProgressState | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const updatedAt = normalizeIsoTimestamp(value.updatedAt, "Run execution progress updatedAt");
+  const percent = value.percent;
+  if (percent !== undefined && (!Number.isFinite(percent) || percent < 0 || percent > 100)) {
+    throw new RunDomainError("Run execution progress percent must be between 0 and 100.");
+  }
+
+  const stage = normalizeOptional(value.stage);
+  const message = normalizeOptional(value.message);
+  if (stage && stage.length > 256) {
+    throw new RunDomainError("Run execution progress stage must be at most 256 characters.");
+  }
+  if (message && message.length > 1024) {
+    throw new RunDomainError("Run execution progress message must be at most 1024 characters.");
+  }
+
+  return Object.freeze({
+    updatedAt,
+    percent: percent === undefined ? undefined : Number(percent),
+    stage,
+    message,
   });
 }
 

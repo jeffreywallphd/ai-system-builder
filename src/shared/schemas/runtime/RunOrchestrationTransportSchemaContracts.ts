@@ -167,6 +167,12 @@ const RunExecutionSchema = z.object({
   outcome: RunExecutionOutcomeSchema,
   errorCode: IdentifierSchema.optional(),
   errorMessage: z.string().trim().min(1).max(2000).optional(),
+  progress: z.object({
+    updatedAt: TimestampSchema,
+    percent: z.number().min(0).max(100).optional(),
+    stage: z.string().trim().min(1).max(256).optional(),
+    message: z.string().trim().min(1).max(1024).optional(),
+  }).strict().optional(),
 }).strict();
 
 const RunCancellationSchema = z.object({
@@ -233,6 +239,17 @@ export const RunStatusEnvelopeSchema = z.object({
   queue: RunQueueStatusSnapshotSchema.optional(),
   assignmentStatus: RunAssignmentStatusSchema,
   executionOutcome: RunExecutionOutcomeSchema,
+  execution: z.object({
+    startedAt: TimestampSchema.optional(),
+    heartbeatAt: TimestampSchema.optional(),
+    finishedAt: TimestampSchema.optional(),
+    progress: z.object({
+      updatedAt: TimestampSchema,
+      percent: z.number().min(0).max(100).optional(),
+      stage: z.string().trim().min(1).max(256).optional(),
+      message: z.string().trim().min(1).max(1024).optional(),
+    }).strict().optional(),
+  }).strict().optional(),
   retry: z.object({
     attempt: z.number().int().min(1),
     maxAttempts: z.number().int().min(1),
@@ -282,11 +299,22 @@ export const RunRetryRequestSchema = z.object({
 
 export const RunLifecycleUpdateRequestSchema = z.object({
   runId: IdentifierSchema,
-  toState: RunLifecycleStateSchema,
+  toState: RunLifecycleStateSchema.optional(),
   occurredAt: TimestampSchema.optional(),
   reason: OptionalReasonSchema,
   actorId: IdentifierSchema.optional(),
   idempotencyKey: IdentifierSchema.optional(),
+  senderNodeId: IdentifierSchema.optional(),
+  senderBackendKind: IdentifierSchema.optional(),
+  senderBackendRunId: IdentifierSchema.optional(),
+  heartbeatAt: TimestampSchema.optional(),
+  progress: z.object({
+    updatedAt: TimestampSchema,
+    percent: z.number().min(0).max(100).optional(),
+    stage: z.string().trim().min(1).max(256).optional(),
+    message: z.string().trim().min(1).max(1024).optional(),
+  }).strict().optional(),
+  internalDiagnostics: z.record(z.string(), z.unknown()).optional(),
   queue: RunQueueStatusSnapshotSchema.optional(),
   assignment: RunAssignmentSchema.optional(),
   execution: RunExecutionSchema.optional(),

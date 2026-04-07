@@ -248,4 +248,58 @@ describe("RunDomain", () => {
       occurredAt: "2026-04-07T12:10:01.000Z",
     })).toThrow(RunLifecycleTransitionError);
   });
+
+  it("validates execution progress bounds and chronology", () => {
+    const running = createCanonicalRunRecord({
+      identity: {
+        runId: "run:story-16-005",
+        workflowId: "workflow:progress",
+      },
+      submission: {
+        source: RunSubmissionSources.api,
+        submittedAt: "2026-04-07T12:20:00.000Z",
+      },
+      state: RunLifecycleStates.running,
+      queue: {
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T12:19:00.000Z",
+        position: null,
+        positionAsOf: "2026-04-07T12:20:00.000Z",
+        dequeuedAt: "2026-04-07T12:20:00.000Z",
+      },
+      assignment: {
+        status: RunAssignmentStatuses.assigned,
+        assignedNodeId: "node:gpu-01",
+        assignedAt: "2026-04-07T12:20:00.000Z",
+      },
+      execution: {
+        startedAt: "2026-04-07T12:20:00.000Z",
+        heartbeatAt: "2026-04-07T12:20:10.000Z",
+        progress: {
+          updatedAt: "2026-04-07T12:20:10.000Z",
+          percent: 22,
+          stage: "sampling",
+          message: "node pass 3/14",
+        },
+        outcome: RunExecutionOutcomeKinds.none,
+      },
+    });
+
+    expect(running.execution.progress?.percent).toBe(22);
+
+    expect(() => createCanonicalRunRecord({
+      identity: running.identity,
+      submission: running.submission,
+      state: running.state,
+      queue: running.queue,
+      assignment: running.assignment,
+      execution: {
+        ...running.execution,
+        progress: {
+          updatedAt: "2026-04-07T12:20:10.000Z",
+          percent: 101,
+        },
+      },
+    })).toThrow("between 0 and 100");
+  });
 });

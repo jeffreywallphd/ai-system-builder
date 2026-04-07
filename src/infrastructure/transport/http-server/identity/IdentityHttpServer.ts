@@ -22,6 +22,7 @@ import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/
 import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
 import type { AuthoritativeRunSubmissionBackendApi } from "../../../api/runs/AuthoritativeRunSubmissionBackendApi";
 import type { AuthoritativeRunQueryBackendApi } from "../../../api/runs/AuthoritativeRunQueryBackendApi";
+import type { AuthoritativeRunExecutionUpdateBackendApi } from "../../../api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
@@ -209,6 +210,7 @@ import {
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import {
   RunOrchestrationTransportSchemaValidationError,
+  parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
   parseRunSubmissionRequest,
 } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
@@ -882,6 +884,7 @@ export interface IdentityHttpServerOptions {
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
   readonly authoritativeRunQueryBackendApi?: AuthoritativeRunQueryBackendApi;
+  readonly authoritativeRunExecutionUpdateBackendApi?: AuthoritativeRunExecutionUpdateBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -4604,6 +4607,65 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               workspaceId: context.workspace.workspaceId,
               actorUserIdentityId: context.actor.userIdentityId,
               query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunExecutionUpdateBackendApi
+        && options.nodeTrustBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/lifecycle")
+      ) {
+        const runId = decodePathTail(path, "/api/v1/runtime/runs/", "/lifecycle");
+        if (!runId) {
+          const invalid = buildRuntimeInvalidRequestResponse("runId is required.");
+          writeJson(response, 400, invalid);
+          logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+          return;
+        }
+
+        const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+        if (!parsedBody.ok) {
+          writeJson(response, 400, parsedBody.body);
+          logResponse(logger, requestId, request, 400, Object.freeze({ runId }), parsedBody.body);
+          return;
+        }
+        const parsedRequest = parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest({
+          payload: parsedBody.value,
+          runId,
+        });
+        if (!parsedRequest.ok) {
+          writeJson(response, 400, parsedRequest.body);
+          logResponse(logger, requestId, request, 400, Object.freeze({ runId }), parsedRequest.body);
+          return;
+        }
+
+        await requireAuthenticatedNodeTransport(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          options.nodeTrustBackendApi,
+          logger,
+          options.transportTrust,
+          parsedRequest.data.senderNodeId,
+          async (context) => {
+            const apiResponse = await options.authoritativeRunExecutionUpdateBackendApi.ingestExecutionUpdate({
+              runId,
+              senderNodeId: context.nodeId,
+              update: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              runId,
+              senderNodeId: context.nodeId,
+              toState: parsedRequest.data.toState,
+              hasProgress: Boolean(parsedRequest.data.progress),
+              hasHeartbeat: Boolean(parsedRequest.data.heartbeatAt || parsedRequest.data.execution?.heartbeatAt),
             }), apiResponse);
           },
         );
@@ -9488,6 +9550,47 @@ function parseAndValidateAuthoritativeRunSubmissionMutationRequest(input: {
   }
 }
 
+function parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunLifecycleUpdateRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunLifecycleUpdateRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (!parsed.senderNodeId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("senderNodeId is required."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run execution update payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
 function parseAndValidateRuntimeCancelRunMutationRequest(executionId: string, payload: unknown):
   | {
     readonly ok: true;
@@ -10009,6 +10112,8 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
     [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
     [AuthoritativeApiRouteBackendKeys.runRead]: Boolean(options.authoritativeRunQueryBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]:
+      Boolean(options.authoritativeRunExecutionUpdateBackendApi && options.nodeTrustBackendApi),
   });
 }
 

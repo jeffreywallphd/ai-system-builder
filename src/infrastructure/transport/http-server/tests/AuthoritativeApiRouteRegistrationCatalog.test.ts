@@ -14,7 +14,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: true,
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: true,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: true,
-        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: true,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
         [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
         [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
@@ -22,6 +22,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.systemRuntime]: true,
         [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
         [AuthoritativeApiRouteBackendKeys.runRead]: true,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: true,
       }),
     });
 
@@ -35,6 +36,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(selectedRouteFamilyIds.has("system-runtime")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-submission")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-read")).toBeTrue();
+    expect(selectedRouteFamilyIds.has("run-execution-update")).toBeTrue();
     expect(selectedRouteFamilyIds.has("node-trust")).toBeFalse();
     expect(selectedDomains.has("identity")).toBeTrue();
     expect(selectedDomains.has("workspaces")).toBeTrue();
@@ -60,6 +62,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
         [AuthoritativeApiRouteBackendKeys.runSubmission]: false,
         [AuthoritativeApiRouteBackendKeys.runRead]: false,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
       }),
     });
 

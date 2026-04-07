@@ -53,6 +53,13 @@ describe("RunOrchestrationTransportContracts", () => {
       execution: {
         outcome: RunExecutionOutcomeKinds.none,
         startedAt: "2026-04-07T10:00:06.000Z",
+        heartbeatAt: "2026-04-07T10:00:09.000Z",
+        progress: {
+          updatedAt: "2026-04-07T10:00:09.000Z",
+          percent: 47,
+          stage: "sampler",
+          message: "sampling step 19/40",
+        },
       },
       retry: {
         attempt: 1,
@@ -72,6 +79,8 @@ describe("RunOrchestrationTransportContracts", () => {
     const status = toRunStatusEnvelope(run);
     expect(status.assignmentStatus).toBe(RunAssignmentStatuses.assigned);
     expect(status.queue?.queueId).toBe("queue-1");
+    expect(status.execution?.heartbeatAt).toBe("2026-04-07T10:00:09.000Z");
+    expect(status.execution?.progress?.percent).toBe(47);
   });
 
   it("normalizes optional submission source and lifecycle state", () => {
