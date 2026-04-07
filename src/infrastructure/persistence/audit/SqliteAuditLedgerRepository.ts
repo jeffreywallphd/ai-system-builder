@@ -160,82 +160,7 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
   }
 
   public async listAuditEvents(query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>> {
-    const where = createSqliteWhereBuilder();
-    const normalizedFilters = query.filters;
-
-    where.addEquals("actor_id", query.actorId);
-    where.addEquals("category", query.category);
-    where.addEquals("event_type", query.eventType);
-
-    const normalizedActionPrefix = normalizeOptional(query.actionPrefix) ?? normalizeOptional(normalizedFilters?.actionPrefix);
-    if (normalizedActionPrefix) {
-      where.add("action LIKE ?", `${normalizedActionPrefix}%`);
-    }
-
-    const actionFilters = normalizedFilters?.actions;
-    if (actionFilters && actionFilters.length > 0) {
-      where.addIn("action", actionFilters);
-    }
-
-    const categories = normalizedFilters?.categories ?? (query.category ? [query.category] : undefined);
-    if (categories && categories.length > 0) {
-      where.addIn("category", categories);
-    }
-
-    if (normalizedFilters?.includeThinSafeOnly) {
-      where.addIn("category", AuditEventThinSafeCategories);
-    }
-
-    if (normalizedFilters?.outcomes && normalizedFilters.outcomes.length > 0) {
-      where.addIn("outcome", normalizedFilters.outcomes);
-    }
-
-    const eventTypes = normalizedFilters?.eventTypes ?? (query.eventType ? [query.eventType] : undefined);
-    if (eventTypes && eventTypes.length > 0) {
-      where.addIn("event_type", eventTypes);
-    }
-
-    if (normalizedFilters?.actorIds && normalizedFilters.actorIds.length > 0) {
-      where.addIn("actor_id", normalizedFilters.actorIds);
-    }
-
-    const workspaceId = normalizeOptional(query.workspaceId);
-    if (workspaceId) {
-      where.add("scope_workspace_id = ?", workspaceId);
-    }
-
-    if (normalizedFilters?.workspaceIds && normalizedFilters.workspaceIds.length > 0) {
-      where.addIn("scope_workspace_id", normalizedFilters.workspaceIds);
-    }
-
-    if (normalizedFilters?.resourceTypes && normalizedFilters.resourceTypes.length > 0) {
-      where.addIn("resource_type", normalizedFilters.resourceTypes);
-    }
-
-    if (normalizedFilters?.resourceIds && normalizedFilters.resourceIds.length > 0) {
-      where.addIn("resource_id", normalizedFilters.resourceIds);
-    }
-
-    if (typeof normalizedFilters?.hasProtectedData === "boolean") {
-      where.add("payload_has_protected_data = ?", normalizedFilters.hasProtectedData ? 1 : 0);
-    }
-
-    const occurredAfter = normalizeOptional(query.occurredAfter) ?? normalizeOptional(normalizedFilters?.occurredAfter);
-    const occurredBefore = normalizeOptional(query.occurredBefore) ?? normalizeOptional(normalizedFilters?.occurredBefore);
-    if (occurredAfter) {
-      where.add("occurred_at >= ?", occurredAfter);
-    }
-    if (occurredBefore) {
-      where.add("occurred_at <= ?", occurredBefore);
-    }
-
-    const search = normalizeOptional(query.search);
-    if (search) {
-      const pattern = `%${search}%`;
-      where.add("(event_type LIKE ? OR action LIKE ? OR actor_id LIKE ? OR resource_ref LIKE ?)", pattern, pattern, pattern, pattern);
-    }
-
-    const whereClause = where.build();
+    const whereClause = this.buildAuditEventsWhereClause(query);
     const limit = query.limit ?? query.pagination?.limit;
     const offset = query.offset ?? query.pagination?.offset;
     const paging = this.buildPagingClause(limit, offset);
@@ -258,6 +183,16 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
     `).all(...whereClause.params, ...paging.params) as AuditLedgerEventRow[];
 
     return Object.freeze(rows.map((row) => parseCanonicalAuditEventRow(row)));
+  }
+
+  public async countAuditEvents(query: AuditLedgerQuery): Promise<number> {
+    const whereClause = this.buildAuditEventsWhereClause(query);
+    const row = this.getDatabase().prepare(`
+      SELECT COUNT(1) AS total_count
+      FROM authoritative_audit_ledger_events
+      ${whereClause.sql}
+    `).get(...whereClause.params) as { total_count?: number } | undefined;
+    return typeof row?.total_count === "number" ? row.total_count : 0;
   }
 
   public dispose(): void {
@@ -418,6 +353,85 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
       input.context.occurredAt ?? new Date().toISOString(),
       new Date().toISOString(),
     ));
+  }
+
+  private buildAuditEventsWhereClause(query: AuditLedgerQuery): { readonly sql: string; readonly params: readonly unknown[] } {
+    const where = createSqliteWhereBuilder();
+    const normalizedFilters = query.filters;
+
+    where.addEquals("actor_id", query.actorId);
+    where.addEquals("category", query.category);
+    where.addEquals("event_type", query.eventType);
+
+    const normalizedActionPrefix = normalizeOptional(query.actionPrefix) ?? normalizeOptional(normalizedFilters?.actionPrefix);
+    if (normalizedActionPrefix) {
+      where.add("action LIKE ?", `${normalizedActionPrefix}%`);
+    }
+
+    const actionFilters = normalizedFilters?.actions;
+    if (actionFilters && actionFilters.length > 0) {
+      where.addIn("action", actionFilters);
+    }
+
+    const categories = normalizedFilters?.categories ?? (query.category ? [query.category] : undefined);
+    if (categories && categories.length > 0) {
+      where.addIn("category", categories);
+    }
+
+    if (normalizedFilters?.includeThinSafeOnly) {
+      where.addIn("category", AuditEventThinSafeCategories);
+    }
+
+    if (normalizedFilters?.outcomes && normalizedFilters.outcomes.length > 0) {
+      where.addIn("outcome", normalizedFilters.outcomes);
+    }
+
+    const eventTypes = normalizedFilters?.eventTypes ?? (query.eventType ? [query.eventType] : undefined);
+    if (eventTypes && eventTypes.length > 0) {
+      where.addIn("event_type", eventTypes);
+    }
+
+    if (normalizedFilters?.actorIds && normalizedFilters.actorIds.length > 0) {
+      where.addIn("actor_id", normalizedFilters.actorIds);
+    }
+
+    const workspaceId = normalizeOptional(query.workspaceId);
+    if (workspaceId) {
+      where.add("scope_workspace_id = ?", workspaceId);
+    }
+
+    if (normalizedFilters?.workspaceIds && normalizedFilters.workspaceIds.length > 0) {
+      where.addIn("scope_workspace_id", normalizedFilters.workspaceIds);
+    }
+
+    if (normalizedFilters?.resourceTypes && normalizedFilters.resourceTypes.length > 0) {
+      where.addIn("resource_type", normalizedFilters.resourceTypes);
+    }
+
+    if (normalizedFilters?.resourceIds && normalizedFilters.resourceIds.length > 0) {
+      where.addIn("resource_id", normalizedFilters.resourceIds);
+    }
+
+    if (typeof normalizedFilters?.hasProtectedData === "boolean") {
+      where.add("payload_has_protected_data = ?", normalizedFilters.hasProtectedData ? 1 : 0);
+    }
+
+    const occurredAfter = normalizeOptional(query.occurredAfter) ?? normalizeOptional(normalizedFilters?.occurredAfter);
+    const occurredBefore = normalizeOptional(query.occurredBefore) ?? normalizeOptional(normalizedFilters?.occurredBefore);
+    if (occurredAfter) {
+      where.add("occurred_at >= ?", occurredAfter);
+    }
+    if (occurredBefore) {
+      where.add("occurred_at <= ?", occurredBefore);
+    }
+
+    const search = normalizeOptional(query.search);
+    if (search) {
+      const pattern = `%${search}%`;
+      where.add("(event_type LIKE ? OR action LIKE ? OR actor_id LIKE ? OR resource_ref LIKE ?)", pattern, pattern, pattern, pattern);
+    }
+
+    return where.build();
   }
 }
 

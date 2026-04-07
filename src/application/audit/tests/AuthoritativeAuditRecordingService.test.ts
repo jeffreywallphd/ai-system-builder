@@ -43,6 +43,10 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public async listAuditEvents(_query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>> {
     return this.events;
   }
+
+  public async countAuditEvents(_query: AuditLedgerQuery): Promise<number> {
+    return this.events.length;
+  }
 }
 
 function buildInput(overrides?: Partial<AuthoritativeAuditRecordEventInput>): AuthoritativeAuditRecordEventInput {

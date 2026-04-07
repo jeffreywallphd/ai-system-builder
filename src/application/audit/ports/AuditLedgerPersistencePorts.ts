@@ -27,6 +27,7 @@ export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
 export interface IAuditLedgerRepository {
   appendAuditEvent(event: CanonicalAuditEvent, context: AuditLedgerAppendContext): Promise<AuditLedgerAppendResult>;
   listAuditEvents(query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>>;
+  countAuditEvents(query: AuditLedgerQuery): Promise<number>;
 }
 
 export function normalizeAuditLedgerOperationKey(operationKey: string): string {
