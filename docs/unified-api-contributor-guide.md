@@ -64,3 +64,18 @@ Contributors adding or modifying protected client-facing operations for desktop,
 5. Validate with tests that cover correlation metadata and redaction behavior.
 
 Reference: `docs/unified-api-observability-troubleshooting.md`
+
+## Story 14.3.8 hardening verification baseline
+
+Cross-surface convergence hardening for desktop and thin-client now includes explicit regression and drift checks:
+
+1. Cross-surface parity regression:
+   - `src/ui/shared/tests/UnifiedApiCrossSurfaceRegression.test.ts`
+   - validates parity for bootstrap/session hydration, representative read+mutation routes, runtime realtime subscription handshake/topics, authorization denials, and transport failure normalization.
+2. Authoritative route and client drift verification:
+   - `src/infrastructure/transport/http-server/tests/UnifiedApiContractDriftVerification.test.ts`
+   - verifies converged shared clients stay aligned to authoritative route-family registration prefixes and convergence domain contracts.
+3. Existing route-family coverage remains required:
+   - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
+
+When touching converged identity/workspace/runtime flows, update these suites in the same PR to preserve desktop and thin-client behavioral parity.

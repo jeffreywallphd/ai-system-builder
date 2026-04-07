@@ -62,3 +62,12 @@ The hook receives the same sanitized `IdentityHttpServerLogEvent` shape that the
 2. Websocket error frames include `error.correlationId`.
 3. Sensitive payload fields and tokens are redacted from logs and hooks.
 4. Route and websocket failure paths return safe, normalized error messages.
+
+## Cross-surface production-readiness verification
+
+Feature 14 final hardening validates that these observability and failure semantics stay consistent for desktop and thin-client clients through shared authoritative APIs:
+
+1. `src/ui/shared/tests/UnifiedApiCrossSurfaceRegression.test.ts`
+   - exercises representative bootstrap, read, mutation, realtime subscribe, authorization denial, and transport-failure flows across both client channels.
+2. `src/infrastructure/transport/http-server/tests/UnifiedApiContractDriftVerification.test.ts`
+   - guards against route-prefix and contract drift between converged shared clients and authoritative route registration.
