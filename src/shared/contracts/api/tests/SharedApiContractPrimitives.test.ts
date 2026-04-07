@@ -10,6 +10,7 @@ describe("SharedApiContractPrimitives", () => {
   it("defines canonical versions and core error codes", () => {
     expect(SharedApiContractVersions.v1).toBe("shared-api/v1");
     expect(SharedApiErrorCodes.invalidRequest).toBe("invalid-request");
+    expect(SharedApiErrorCodes.temporarilyUnavailable).toBe("temporarily-unavailable");
     expect(SharedApiErrorCodes.internal).toBe("internal");
   });
 

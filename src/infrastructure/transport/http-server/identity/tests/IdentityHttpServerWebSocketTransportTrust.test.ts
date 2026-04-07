@@ -301,6 +301,10 @@ function parseUpgradeResponse(response: string): {
     readonly ok: boolean;
     readonly error?: {
       readonly code?: string;
+      readonly sharedCode?: string;
+      readonly domainCode?: string;
+      readonly userMessage?: string;
+      readonly retryable?: boolean;
       readonly closeCode?: number;
     };
   };
@@ -324,6 +328,10 @@ function parseUpgradeResponse(response: string): {
       readonly ok: boolean;
       readonly error?: {
         readonly code?: string;
+        readonly sharedCode?: string;
+        readonly domainCode?: string;
+        readonly userMessage?: string;
+        readonly retryable?: boolean;
         readonly closeCode?: number;
       };
     },
@@ -356,6 +364,8 @@ describe("IdentityHttpServer websocket transport trust", () => {
     const parsed = parseUpgradeResponse(response);
     expect(parsed.statusCode).toBe(403);
     expect(parsed.body?.error?.code).toBe("secure-transport-required");
+    expect(parsed.body?.error?.sharedCode).toBe("forbidden");
+    expect(parsed.body?.error?.retryable).toBe(false);
   });
 
   it("rejects websocket upgrades without an authenticated session token", async () => {
@@ -378,6 +388,8 @@ describe("IdentityHttpServer websocket transport trust", () => {
     const parsed = parseUpgradeResponse(response);
     expect(parsed.statusCode).toBe(401);
     expect(parsed.body?.error?.code).toBe("authentication-failed");
+    expect(parsed.body?.error?.sharedCode).toBe("authentication-failed");
+    expect(parsed.body?.error?.retryable).toBe(false);
     expect(parsed.body?.error?.closeCode).toBe(4401);
   });
 
@@ -408,6 +420,8 @@ describe("IdentityHttpServer websocket transport trust", () => {
     const parsed = parseUpgradeResponse(response);
     expect(parsed.statusCode).toBe(403);
     expect(parsed.body?.error?.code).toBe("transport-trust-rejected");
+    expect(parsed.body?.error?.sharedCode).toBe("forbidden");
+    expect(parsed.body?.error?.retryable).toBe(false);
     expect(parsed.body?.error?.closeCode).toBe(4403);
   });
 
@@ -433,6 +447,8 @@ describe("IdentityHttpServer websocket transport trust", () => {
     const parsed = parseUpgradeResponse(response);
     expect(parsed.statusCode).toBe(403);
     expect(parsed.body?.error?.code).toBe("unsupported-channel-purpose");
+    expect(parsed.body?.error?.sharedCode).toBe("forbidden");
+    expect(parsed.body?.error?.retryable).toBe(false);
     expect(parsed.body?.error?.closeCode).toBe(4403);
   });
 
@@ -458,6 +474,8 @@ describe("IdentityHttpServer websocket transport trust", () => {
     const parsed = parseUpgradeResponse(response);
     expect(parsed.statusCode).toBe(403);
     expect(parsed.body?.error?.code).toBe("origin-not-allowed");
+    expect(parsed.body?.error?.sharedCode).toBe("forbidden");
+    expect(parsed.body?.error?.retryable).toBe(false);
     expect(parsed.body?.error?.closeCode).toBe(4403);
   });
 

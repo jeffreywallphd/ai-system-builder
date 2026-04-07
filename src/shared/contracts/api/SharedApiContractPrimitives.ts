@@ -12,6 +12,7 @@ export const SharedApiErrorCodes = Object.freeze({
   notFound: "not-found",
   conflict: "conflict",
   rateLimited: "rate-limited",
+  temporarilyUnavailable: "temporarily-unavailable",
   internal: "internal",
 } as const);
 
@@ -26,6 +27,10 @@ export interface SharedApiValidationIssue {
 export interface SharedApiErrorShape {
   readonly code: SharedApiErrorCode;
   readonly message: string;
+  readonly userMessage?: string;
+  readonly retryable?: boolean;
+  readonly sharedCode?: SharedApiErrorCode;
+  readonly domainCode?: string;
   readonly validationErrors?: ReadonlyArray<SharedApiValidationIssue>;
 }
 
