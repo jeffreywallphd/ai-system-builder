@@ -42,6 +42,7 @@ import {
 import {
   PlatformAuditEventKinds,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import { createCanonicalAuditEvent, AuditEventCategories, AuditActorKinds, AuditScopeKinds } from "@domain/audit/AuditDomain";
 import {
   createAuthoritativePersistentPlatformServices,
 } from "../AuthoritativePersistenceComposition";
@@ -312,6 +313,50 @@ describe("PersistentPlatformServices integration", () => {
         correlationId: "corr:story-13.4.3:run",
       });
       expect(appendedAudit.changed).toBeTrue();
+
+      const canonicalAudit = createCanonicalAuditEvent({
+        eventId: "audit:canonical:story-13.4.3",
+        eventType: "run-submission-accepted",
+        category: AuditEventCategories.orchestration,
+        action: "run.submission.accepted",
+        outcome: "succeeded",
+        occurredAt: "2026-04-06T12:08:02.000Z",
+        actor: {
+          actorId: "system:orchestrator",
+          actorKind: AuditActorKinds.service,
+          actorServiceId: "system:orchestrator",
+        },
+        scope: {
+          kind: AuditScopeKinds.workspace,
+          workspaceId: workspace.id,
+        },
+        protectedResource: {
+          resourceType: "run",
+          resourceId: "run:story-13.4.3",
+          resourceRef: "run:story-13.4.3",
+          sensitivityClass: "sensitive",
+          workspaceId: workspace.id,
+        },
+        payload: {
+          userSafeDetails: {
+            runId: "run:story-13.4.3",
+          },
+          hasProtectedData: false,
+          redactionReasons: [],
+        },
+        integrity: {
+          schemaVersion: "1.0",
+          hashAlgorithm: "sha-256",
+        },
+      });
+      const appendCanonicalAudit = await services.auditLedgerRepository.appendAuditEvent(canonicalAudit, {
+        operationKey: "op:story-13.4.3:audit:canonical:append",
+        actorId: "system:orchestrator",
+        occurredAt: "2026-04-06T12:08:02.000Z",
+        correlationId: "corr:story-13.4.3:run",
+      });
+      expect(appendCanonicalAudit.changed).toBeTrue();
+      expect(appendCanonicalAudit.sequence).toBe(1);
     } finally {
       services.dispose();
     }
@@ -348,6 +393,13 @@ describe("PersistentPlatformServices integration", () => {
       });
       expect(auditEvents).toHaveLength(1);
       expect(auditEvents[0]?.eventId).toBe("audit:story-13.4.3");
+
+      const canonicalAuditEvents = await reloadedServices.auditLedgerRepository.listAuditEvents({
+        category: AuditEventCategories.orchestration,
+        workspaceId: "workspace:story-13.4.3",
+      });
+      expect(canonicalAuditEvents).toHaveLength(1);
+      expect(canonicalAuditEvents[0]?.eventId).toBe("audit:canonical:story-13.4.3");
     } finally {
       reloadedServices.dispose();
     }

@@ -130,6 +130,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Shared actor/workspace/resource/session/device/node reference normalization and authoritative recording integration: `docs/architecture/audit-reference-normalization-layer.md`
 - Authoritative application-layer audit recording service behavior, source-oriented recording ports, and baseline cross-feature adapter wiring: `docs/architecture/audit-authoritative-recording-service-and-ports.md`
 - Audit taxonomy extension workflow, capture boundaries, prohibited patterns, and prohibited ledger-content rules: `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- Durable canonical audit ledger persistence schema/repository behavior and append-oriented replay-safe query indexing posture: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 - Contributor workflow for adding/extending canonical audit events: `docs/audit-governance-contributor-guide.md`
 - Cross-domain authoritative aggregate boundaries and repository target baseline for Feature 13: `docs/architecture/persistent-platform-domain-boundaries.md`
 - Contributor extension rules and integration-regression expectations for Feature 13 persistent platform services: `docs/architecture/persistent-platform-service-extension-guidance.md`

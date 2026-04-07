@@ -366,7 +366,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   let secretService: ServerComposedSecretService | undefined;
   try {
     const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
-      repository: persistentPlatformServices.platformPersistenceRepository,
+      repository: persistentPlatformServices.auditLedgerRepository,
     });
     const legacySecretAccessAuditHook = createSecretAccessAuditHook(options.logger);
     const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);

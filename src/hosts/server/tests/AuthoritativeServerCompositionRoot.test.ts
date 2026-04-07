@@ -424,6 +424,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
       assetAuditRecorder: {} as never,
       assetUploadSessionRepository: {} as never,
       platformPersistenceRepository: {} as never,
+      auditLedgerRepository: {} as never,
       dispose: () => {
         calls.push("persistent-services-dispose");
       },
