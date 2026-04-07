@@ -15,7 +15,10 @@ Contributors adding or modifying protected client-facing operations for desktop,
 1. Transport DTOs and route constants: `src/shared/contracts/<domain>/`
 2. Schema validation/parsers: `src/shared/schemas/<domain>/`
 3. API orchestration: `src/infrastructure/api/<domain>/`
-4. Authoritative server transport routes: `src/infrastructure/transport/http-server/`
+4. Authoritative server transport routes:
+   - route-family registration catalog: `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
+   - domain route-family modules: `src/infrastructure/transport/http-server/authoritative-route-families/*`
+   - HTTP runtime handler assembly: `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 5. Cross-client shared clients: `src/ui/shared/<domain>/`
 
 ## Implementation rules
@@ -42,5 +45,6 @@ Contributors adding or modifying protected client-facing operations for desktop,
 
 1. Shared contract + schema changes are present and referenced by both backend and clients.
 2. Transport handlers enforce authoritative session and policy checks.
-3. No prohibited pattern was introduced.
-4. Docs were updated (both `.md` and `.ai.md` where applicable).
+3. Route-family registration remains domain-oriented (not client-surface-oriented) and is wired from authoritative host composition.
+4. No prohibited pattern was introduced.
+5. Docs were updated (both `.md` and `.ai.md` where applicable).

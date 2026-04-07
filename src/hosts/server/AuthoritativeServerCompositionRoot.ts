@@ -30,6 +30,11 @@ import {
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "./IdentityServerHost";
+import {
+  AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+  assertAuthoritativeServerApiRouteRegistrationCoverage,
+  composeAuthoritativeServerApiRouteRegistrationPlan,
+} from "./AuthoritativeServerApiRouteComposition";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 import {
@@ -42,6 +47,7 @@ import {
   createAuthoritativePersistentPlatformServices,
   type AuthoritativePersistentPlatformServices,
 } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
+import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -76,6 +82,8 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly hostConfiguration: IdentityServerHostOptions;
       readonly environment: Readonly<Record<string, string | undefined>>;
     }) => AuthoritativePersistentPlatformServices;
+    readonly composeApiRouteRegistrationPlan?: () => AuthoritativeApiRouteRegistrationPlan;
+    readonly assertApiRouteRegistrationCoverage?: (plan: AuthoritativeApiRouteRegistrationPlan) => void;
   };
 }
 
@@ -187,7 +195,15 @@ export function createAuthoritativeServerCompositionRoot(
                 requiredStartupDependencyIds: composedBoot.requiredDependencyIds,
               }));
             const plan = composePlan(context.boot);
+            const apiRouteRegistrationPlan = (
+              input.bootstrap?.composeApiRouteRegistrationPlan
+              ?? composeAuthoritativeServerApiRouteRegistrationPlan
+            )();
             context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
+            context.setArtifact(
+              AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+              apiRouteRegistrationPlan,
+            );
           },
           [HostBootstrapStageIds.persistence]: async (context) => {
             persistenceRuntime = (
@@ -235,10 +251,19 @@ export function createAuthoritativeServerCompositionRoot(
                 "Authoritative server startup requires composed persistent platform services before runtime feature registration.",
               );
             }
+            const apiRouteRegistrationPlan = context.getArtifact<AuthoritativeApiRouteRegistrationPlan>(
+              AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+            );
+            if (!apiRouteRegistrationPlan) {
+              throw new Error("Authoritative server startup requires a composed API route registration plan.");
+            }
             (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
+            (input.bootstrap?.assertApiRouteRegistrationCoverage
+              ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
             const composedHost = await startHost({
               ...(context.hostConfiguration as IdentityServerHostOptions),
               persistentPlatformServices: composedPersistentServices,
+              routeRegistrationPlan: apiRouteRegistrationPlan,
             });
             context.setArtifact(StartedHostArtifactKey, composedHost);
           },

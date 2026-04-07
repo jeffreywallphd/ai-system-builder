@@ -37,6 +37,16 @@ The authoritative host composition explicitly wires control-plane coverage for:
 
 The host validates startup dependency coverage and authoritative service coverage before starting runtime transport.
 
+## Authoritative API route composition
+
+- Host-level route composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
+- Shared transport route registration catalog:
+  - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistration.ts`
+  - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
+  - domain route family modules in `src/infrastructure/transport/http-server/authoritative-route-families/*`
+
+During authoritative startup, the `dependencies` stage composes an API route registration plan artifact and the `feature-registration` stage validates required route-family coverage before runtime host transport starts.
+
 ## Startup expectations
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
@@ -87,3 +97,4 @@ In addition to the direct server script entrypoint above, runtime startup consum
 Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
+- `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`

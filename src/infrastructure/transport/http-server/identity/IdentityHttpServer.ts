@@ -225,6 +225,12 @@ import {
   mapToSharedApiErrorCode,
   normalizeSharedApiErrorEnvelope,
 } from "./IdentityHttpServerErrorTranslation";
+import {
+  AuthoritativeApiRouteBackendKeys,
+  type AuthoritativeApiRouteBackendKey,
+  type AuthoritativeApiRouteRegistrationPlan,
+} from "../AuthoritativeApiRouteRegistration";
+import { composeAuthoritativeApiRouteRegistrationPlan } from "../AuthoritativeApiRouteRegistrationCatalog";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -824,6 +830,7 @@ export interface IdentityHttpServerOptions {
   readonly cors?: IdentityHttpServerCorsOptions;
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
+  readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
   readonly development?: {
     readonly enableDevLoginRoute?: boolean;
   };
@@ -929,6 +936,17 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
   const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
   const channelRegistry = options.webSocket?.channelRegistry ?? new InMemoryWebSocketChannelRegistry();
   const corsPolicy = resolveApiCorsPolicy(options.cors);
+  const routeRegistrationPlan = options.routeRegistrationPlan ?? composeAuthoritativeApiRouteRegistrationPlan({
+    backendAvailability: resolveRouteBackendAvailability(options),
+  });
+  logger.info(Object.freeze({
+    event: "identity-http.route-families.composed",
+    requestId: "startup-route-composition",
+    details: Object.freeze({
+      routeFamilyIds: routeRegistrationPlan.registeredRouteFamilies.map((family) => family.routeFamilyId),
+      routePrefixes: routeRegistrationPlan.registeredRoutePrefixes,
+    }),
+  }));
 
   const server = serverFactory(async (request, response) => {
     const requestId = randomUUID();
@@ -8199,6 +8217,22 @@ function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unkno
     default:
       return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
+}
+
+function resolveRouteBackendAvailability(
+  options: IdentityHttpServerOptions,
+): Readonly<Record<AuthoritativeApiRouteBackendKey, boolean>> {
+  return Object.freeze({
+    [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+    [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: Boolean(options.workspaceBackendApi),
+    [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: Boolean(options.workspaceAdministrationBackendApi),
+    [AuthoritativeApiRouteBackendKeys.authorizationManagement]: Boolean(options.authorizationManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.nodeTrust]: Boolean(options.nodeTrustBackendApi),
+    [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),
+    [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
+    [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(options.assetManagementBackendApi),
+  });
 }
 
 function parseOptionalInteger(value: string | null): number | undefined {

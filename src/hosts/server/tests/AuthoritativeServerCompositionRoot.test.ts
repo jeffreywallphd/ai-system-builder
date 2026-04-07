@@ -18,12 +18,14 @@ import {
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "../AuthoritativeServerCompositionRoot";
+import { AuthoritativeServerApiRouteRegistrationPlanArtifactKey } from "../AuthoritativeServerApiRouteComposition";
 import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
 } from "@infrastructure/config/HostStartupConfiguration";
 import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
+import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -168,6 +170,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
   it("runs default dependencies composition before custom dependency-stage handlers", async () => {
     let observedPlanHostId: string | undefined;
+    let observedRouteFamilyIds: ReadonlyArray<string> | undefined;
     const root = createAuthoritativeServerCompositionRoot({
       hostOptions: {
         databasePath: "test.sqlite",
@@ -186,6 +189,10 @@ describe("AuthoritativeServerCompositionRoot", () => {
               AuthoritativeServerServiceRegistrationPlanArtifactKey,
             );
             observedPlanHostId = plan?.hostId;
+            const routePlan = context.getArtifact<AuthoritativeApiRouteRegistrationPlan>(
+              AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+            );
+            observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId);
           },
         },
       },
@@ -200,6 +207,9 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(observedPlanHostId).toBe(AuthoritativeServerHostRuntime.hostId);
+    expect(observedRouteFamilyIds).toContain("identity-auth");
+    expect(observedRouteFamilyIds).toContain("workspace-administration");
+    expect(observedRouteFamilyIds).toContain("node-trust");
     await runtime.stop();
   });
 
@@ -243,6 +253,40 @@ describe("AuthoritativeServerCompositionRoot", () => {
     });
 
     await expect(root.compose(boot)).rejects.toThrow(HostServiceRegistrationError);
+    expect(started).toBeFalse();
+  });
+
+  it("fails compose when authoritative API route coverage assertions fail", async () => {
+    let started = false;
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => {
+        started = true;
+        return {
+          port: 5410,
+          address: "127.0.0.1:5410",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        };
+      },
+      bootstrap: {
+        assertApiRouteRegistrationCoverage: () => {
+          throw new Error("missing required API route families");
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-missing-route-coverage-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow("missing required API route families");
     expect(started).toBeFalse();
   });
 
