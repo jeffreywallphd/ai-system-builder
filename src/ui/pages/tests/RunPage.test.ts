@@ -26,5 +26,6 @@ describe("RunPage", () => {
     expect(source).toContain("subscribeOperationalUpdates");
     expect(source).toContain("Realtime channel:");
     expect(source).toContain("stale data fallback active");
+    expect(source).toContain("Thin-client lifecycle resume handling");
   });
 });

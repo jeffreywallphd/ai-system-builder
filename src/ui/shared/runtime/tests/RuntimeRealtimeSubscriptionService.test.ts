@@ -1,6 +1,8 @@
 import { describe, expect, it, mock } from "bun:test";
 import {
   RuntimeRealtimeSubscriptionService,
+  type RuntimeRealtimeDocumentLifecycleTarget,
+  type RuntimeRealtimeWindowLifecycleTarget,
   type RuntimeRealtimeSocket,
   type RuntimeRealtimeSocketCloseEvent,
   type RuntimeRealtimeSocketEvent,
@@ -31,6 +33,52 @@ class FakeRuntimeRealtimeSocket implements RuntimeRealtimeSocket {
 
   public emitClose(event: RuntimeRealtimeSocketCloseEvent): void {
     this.onclose?.(event);
+  }
+}
+
+class FakeDocumentLifecycleTarget implements RuntimeRealtimeDocumentLifecycleTarget {
+  private readonly listeners = new Set<() => void>();
+  public visibilityState: "hidden" | "visible" | "prerender" = "visible";
+
+  public addEventListener(_type: "visibilitychange", listener: () => void): void {
+    this.listeners.add(listener);
+  }
+
+  public removeEventListener(_type: "visibilitychange", listener: () => void): void {
+    this.listeners.delete(listener);
+  }
+
+  public emitVisibilityChange(state: "hidden" | "visible" | "prerender"): void {
+    this.visibilityState = state;
+    for (const listener of this.listeners) {
+      listener();
+    }
+  }
+}
+
+class FakeWindowLifecycleTarget implements RuntimeRealtimeWindowLifecycleTarget {
+  private readonly listeners = new Map<"online" | "focus" | "pageshow", Set<() => void>>([
+    ["online", new Set()],
+    ["focus", new Set()],
+    ["pageshow", new Set()],
+  ]);
+
+  public addEventListener(type: "online" | "focus" | "pageshow", listener: () => void): void {
+    this.listeners.get(type)?.add(listener);
+  }
+
+  public removeEventListener(type: "online" | "focus" | "pageshow", listener: () => void): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  public emit(type: "online" | "focus" | "pageshow"): void {
+    const listeners = this.listeners.get(type);
+    if (!listeners) {
+      return;
+    }
+    for (const listener of listeners) {
+      listener();
+    }
   }
 }
 
@@ -271,5 +319,77 @@ describe("RuntimeRealtimeSubscriptionService", () => {
 
     service.subscribeOperationalUpdates({ onError });
     expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("forces reconnect and refresh on browser lifecycle resume while stale", () => {
+    const sockets: FakeRuntimeRealtimeSocket[] = [];
+    const fallbackRefresh = mock(async () => undefined);
+    const lifecycleDocument = new FakeDocumentLifecycleTarget();
+    const lifecycleWindow = new FakeWindowLifecycleTarget();
+    const service = new RuntimeRealtimeSubscriptionService({
+      sessionStore: {
+        getSession: () => Object.freeze({
+          userIdentityId: "user-1",
+          username: "user",
+          providerId: "local",
+          sessionId: "session-1",
+          sessionToken: "token-1",
+          sessionTokenType: "Bearer" as const,
+          sessionIssuedAt: "2026-04-07T11:00:00.000Z",
+          sessionExpiresAt: "2026-04-07T23:00:00.000Z",
+          sessionAccessChannel: "thin-client" as const,
+          workspaceContext: Object.freeze({
+            requestedWorkspaceId: "workspace-requested",
+            resolvedWorkspaceId: "workspace-resolved",
+            workspaces: Object.freeze([]),
+          }),
+        }),
+        isSessionExpired: () => false,
+      },
+      lifecycleBindings: {
+        document: lifecycleDocument,
+        window: lifecycleWindow,
+      },
+      socketFactory: (_url, _protocols) => {
+        const socket = new FakeRuntimeRealtimeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+      reconnectDelayMs: 10_000,
+      fallbackRefreshIntervalMs: 0,
+    });
+
+    const subscription = service.subscribeOperationalUpdates({
+      fallbackRefresh,
+    });
+
+    const firstSocket = sockets[0]!;
+    firstSocket.emitOpen();
+    firstSocket.emitMessage({
+      type: "runtime-realtime.subscription-ack",
+      subscriptionId: "sub-1",
+      acceptedAt: "2026-04-07T12:00:00.000Z",
+      mode: "live-only",
+      topics: [{ topic: "runtime.queue", workspaceId: "workspace-resolved" }],
+    });
+    firstSocket.emitClose({ code: 1006, reason: "connection lost" });
+
+    lifecycleWindow.emit("online");
+
+    expect(sockets).toHaveLength(2);
+    expect(fallbackRefresh).toHaveBeenCalled();
+    const reconnectSocket = sockets[1]!;
+    reconnectSocket.emitOpen();
+    const reconnectSubscribe = JSON.parse(reconnectSocket.sent[0] ?? "{}") as {
+      readonly action: string;
+    };
+    expect(reconnectSubscribe.action).toBe("runtime-realtime.subscribe");
+
+    lifecycleDocument.emitVisibilityChange("hidden");
+    const socketCountBeforeHiddenResume = sockets.length;
+    lifecycleWindow.emit("focus");
+    expect(sockets).toHaveLength(socketCountBeforeHiddenResume);
+
+    subscription.unsubscribe();
   });
 });
