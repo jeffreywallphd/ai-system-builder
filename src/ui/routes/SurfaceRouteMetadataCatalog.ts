@@ -95,7 +95,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       shellSection: ShellSectionKeys.run,
     }),
   }),
-  dataset-studio: Object.freeze({
+  "dataset-studio": Object.freeze({
     group: UiRouteGroupKeys.studio,
     navigation: Object.freeze({
       showInCommandPalette: true,
