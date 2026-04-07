@@ -10,6 +10,7 @@ import type {
   PlatformRunMutationResult,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
 import { normalizePlatformPersistenceOperationKey } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
@@ -35,17 +36,20 @@ import {
   PLATFORM_PERSISTENCE_MIGRATIONS,
   PLATFORM_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqlitePlatformPersistenceMigrations";
+import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
 
 export class SqlitePlatformPersistenceAdapter
   extends SafeSqliteRepositoryBase
-  implements IPlatformRunRecordRepository, IPlatformAuditEventRepository {
+  implements IPlatformRunRecordRepository, IPlatformAuditEventRepository, IPlatformTransactionManager {
   private database?: SqliteCompatDatabase;
   private initialized = false;
+  private readonly transactionCoordinator: SqliteTransactionCoordinator;
 
   public constructor(private readonly databasePath: string) {
     super("Platform");
+    this.transactionCoordinator = new SqliteTransactionCoordinator(() => this.getDatabase());
   }
 
   public async findRunById(runId: string): Promise<PlatformRunRecord | undefined> {
@@ -266,6 +270,10 @@ export class SqlitePlatformPersistenceAdapter
     this.database?.close();
     this.database = undefined;
     this.initialized = false;
+  }
+
+  public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
+    return this.transactionCoordinator.runInTransaction(operation);
   }
 
   private persistRunMutation(
