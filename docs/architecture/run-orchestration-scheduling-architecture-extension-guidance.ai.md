@@ -44,3 +44,13 @@ Story 17.1.8 documents the production scheduling architecture baseline, current 
 ## Non-negotiable prohibitions
 - Embedding policy in UI or backend adapters is prohibited.
 - Writing dispatch attempts directly from scheduling modules is prohibited.
+
+## Story 17.3.7 hardening notes
+- Production hardening explicitly verifies deterministic arbitration, no-placement/defer handling, reservation/admin intervention auditability, realtime/admin visibility contracts, and recovery seams.
+- Assignment gateway hardening suppresses duplicate run/node intents before claim materialization and emits governance conflict events for suppressed intents.
+- Scheduling admin API response shapes are now schema-validated in backend API tests to reduce cross-layer contract drift risk.
+
+## Deferred edges (remain explicit)
+- Multi-intent batch scheduling is deferred; current policy still recommends at most one placement per pass.
+- Quotas, reservation calendars/windows, and richer resource arbitration remain deferred policy layers.
+- Deployment-profile governance variants remain seam-only.

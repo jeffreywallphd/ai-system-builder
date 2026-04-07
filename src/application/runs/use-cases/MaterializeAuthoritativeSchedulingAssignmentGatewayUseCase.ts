@@ -14,6 +14,7 @@ import type {
   IRunNodePlacementHoldRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { SchedulingDecisionOutcomes } from "@domain/scheduling/SchedulingDomain";
 import { SchedulingPolicyEvaluationReasonCodes } from "@shared/contracts/runtime/SchedulingPolicyEvaluationContracts";
 import {
@@ -53,8 +54,11 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
   public async materializeAssignmentIntents(input: {
     readonly decisionBundle: SchedulingDecisionBundle;
   }): Promise<ReadonlyArray<SchedulingAssignmentIntent>> {
+    const normalizedAssignmentIntents = await this.normalizeAssignmentIntents({
+      decisionBundle: input.decisionBundle,
+    });
     const noPlacementByRunId = toNoPlacementByRunId(input.decisionBundle);
-    const selectedRunIds = new Set(input.decisionBundle.assignmentIntents.map((intent) => intent.runId));
+    const selectedRunIds = new Set(normalizedAssignmentIntents.map((intent) => intent.runId));
     for (const lease of input.decisionBundle.snapshot.queueLeases) {
       if (selectedRunIds.has(lease.runId)) {
         continue;
@@ -103,7 +107,7 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
     }
 
     const materialized: SchedulingAssignmentIntent[] = [];
-    for (const intent of input.decisionBundle.assignmentIntents) {
+    for (const intent of normalizedAssignmentIntents) {
       const holdToken = this.idGenerator.nextId("node-placement-hold");
       const heldAt = this.now().toISOString();
       const expiresAt = new Date(Date.parse(heldAt) + (this.placementHoldTtlSeconds * 1000)).toISOString();
@@ -197,6 +201,53 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
     }
 
     return Object.freeze(materialized);
+  }
+
+  private async normalizeAssignmentIntents(input: {
+    readonly decisionBundle: SchedulingDecisionBundle;
+  }): Promise<ReadonlyArray<SchedulingAssignmentIntent>> {
+    const selected = input.decisionBundle.decision.selected;
+    const ordered = [...input.decisionBundle.assignmentIntents].sort((left, right) => (
+      Number(!isDecisionSelectedIntent(selected, left)) - Number(!isDecisionSelectedIntent(selected, right))
+      || left.decidedAt.localeCompare(right.decidedAt)
+      || left.runId.localeCompare(right.runId)
+      || left.nodeId.localeCompare(right.nodeId)
+      || left.queueId.localeCompare(right.queueId)
+      || left.claimToken.localeCompare(right.claimToken)
+    ));
+
+    const normalized: SchedulingAssignmentIntent[] = [];
+    const reservedRunIds = new Set<string>();
+    const reservedNodeIds = new Set<string>();
+    for (const intent of ordered) {
+      if (!reservedRunIds.has(intent.runId) && !reservedNodeIds.has(intent.nodeId)) {
+        normalized.push(intent);
+        reservedRunIds.add(intent.runId);
+        reservedNodeIds.add(intent.nodeId);
+        continue;
+      }
+
+      const isDuplicateRunIntent = reservedRunIds.has(intent.runId);
+      await this.publishEventPair({
+        type: SchedulingGovernanceEventTypes.assignmentMaterializationConflict,
+        outcome: "conflict",
+        occurredAt: this.now().toISOString(),
+        decisionId: intent.decisionId,
+        reservationOwner: intent.reservationOwner,
+        actorServiceId: intent.reservationOwner,
+        workspaceId: resolveRunWorkspaceId(input.decisionBundle, intent.runId),
+        runId: intent.runId,
+        nodeId: intent.nodeId,
+        queueId: intent.queueId,
+        details: Object.freeze({
+          conflictReason: isDuplicateRunIntent
+            ? "duplicate-run-intent"
+            : "duplicate-node-intent",
+          conflictMessage: "Scheduling assignment intent suppressed due to duplicate run/node arbitration outcome.",
+        }),
+      });
+    }
+    return Object.freeze(normalized);
   }
 
   private async publishEventPair(event: {
@@ -321,4 +372,14 @@ function resolveRunWorkspaceId(decisionBundle: SchedulingDecisionBundle, runId: 
   const run = decisionBundle.snapshot.runs.find((candidate) => candidate.runId === runId);
   const normalized = run?.workspaceId?.trim();
   return normalized ? normalized : undefined;
+}
+
+function isDecisionSelectedIntent(
+  selected: SchedulingDecisionBundle["decision"]["selected"] | undefined,
+  intent: SchedulingAssignmentIntent,
+): boolean {
+  if (!selected) {
+    return false;
+  }
+  return selected.runId === intent.runId && selected.nodeId === intent.nodeId;
 }

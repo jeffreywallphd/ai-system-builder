@@ -163,3 +163,10 @@ Provide an implementation checklist for contributors extending the authoritative
 7. Are `.md` and `.ai.md` docs updated together for orchestration changes?
 8. Are relevant tests updated across application, infrastructure, transport, and persistence seams?
 9. Does regression coverage still pass for integrated lifecycle hardening in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`?
+10. For scheduling hardening changes, do tests also cover duplicate-intent suppression, no-placement defer metadata, and scheduling-admin schema validation?
+
+## Current deferred scheduling edges
+
+- Assignment evaluation still returns at most one assignment recommendation per pass.
+- Quota and reservation-window policy enforcement remain deferred to future scheduling policy layers.
+- Rich resource arbitration and deployment-profile governance variants remain deferred beyond current role-priority + hybrid-local protections.
