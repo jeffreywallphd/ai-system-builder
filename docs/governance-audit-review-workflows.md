@@ -53,6 +53,10 @@ The governance review surface aggregates prioritized governance and security eve
   - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
 - Aggregation service:
   - `src/ui/services/GovernanceAuditReviewService.ts`
+- Authoritative audit API seam for converged admin/governance surfaces:
+  - `GET /api/v1/audit/events`
+  - `GET /api/v1/audit/events/:eventId`
+  - backend entrypoint: `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
 
 Filtering and pagination align to shared list query conventions (`workspaceId`, `search`, `limit`, `offset`, `sortBy`, `sortDirection`) with event/outcome filters layered on top.
 

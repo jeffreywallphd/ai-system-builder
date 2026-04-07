@@ -20,6 +20,8 @@ For canonical audit taxonomy/capture extension guidance, also reference:
 - `src/ui/routes/SurfaceRouteMetadataCatalog.ts`
 - `src/ui/routes/AppRouter.tsx`
 - `src/ui/pages/AdminLiteEntryPage.tsx`
+- `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuditLedger.test.ts`
 
 ## UX contract
 
@@ -29,6 +31,7 @@ For canonical audit taxonomy/capture extension guidance, also reference:
 - Thin route is compact and filtered to thin-safe event classes
 - Event detail always displays redacted payload values
 - Coverage includes identity/trust events, authorization mutation events, storage configuration events, protected asset access events, and secret governance events
+- Authoritative retrieval seam for converged admin/governance consumers is `/api/v1/audit/events*` (list + detail).
 
 ## Access control contract
 

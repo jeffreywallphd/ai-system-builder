@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, and Story 18.2.4 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, and Story 18.2.5 for Feature 18 / Epic 18.2.
 
 ## Purpose
 
@@ -11,8 +11,13 @@ Introduce the durable persistence model and repository implementation for canoni
 - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
 - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
+- `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
+- `src/infrastructure/api/audit/sdk/PublicAuditLedgerApiContract.ts`
+- `src/infrastructure/transport/http-server/authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
 - `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
+- `src/infrastructure/api/audit/tests/AuditLedgerBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuditLedger.test.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -78,6 +83,24 @@ Repository query support now includes:
 - `listAuditEvents(...)` for filtered/sorted/paged event retrieval;
 - `countAuditEvents(...)` for filter-consistent total counts used by application query responses.
 - `getAuditEventById(...)` for permission-aware detail retrieval.
+
+## Story 18.2.5 authoritative audit APIs for admin/governance consumers
+
+Audit retrieval is now exposed through authoritative server APIs rather than backend-only seams:
+
+- `GET /api/v1/audit/events`
+- `GET /api/v1/audit/events/:eventId`
+
+Key transport behavior:
+
+- routes are part of authoritative route-family registration (`audit-ledger`);
+- authenticated workspace context is required (`workspaceId` query);
+- list query parsing uses shared audit schema contracts (`parseAuditEventListQueryFromSearchParams`);
+- responses preserve canonical pagination and shared error semantics:
+  - invalid request -> `400 invalid-request`
+  - permission denial -> `403 forbidden`
+  - non-visible detail/not found -> `404 not-found`
+- detail visibility remains role-aware and centralized in audit application services (`user-safe` vs `admin`).
 
 ## Append semantics
 

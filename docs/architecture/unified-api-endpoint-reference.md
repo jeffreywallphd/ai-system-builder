@@ -30,6 +30,7 @@ Canonical family modules:
 - `src/infrastructure/transport/http-server/authoritative-route-families/IdentityAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/WorkspaceAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/AuthorizationAuthoritativeApiRoutes.ts`
+- `src/infrastructure/transport/http-server/authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/NodeTrustAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/SecurityAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/StorageAuthoritativeApiRoutes.ts`
@@ -43,6 +44,7 @@ Canonical family modules:
 | `identity-auth` | `/api/v1/identity` | `src/infrastructure/api/identity/IdentityAuthBackendApi.ts` | `src/shared/contracts/identity/IdentityTransportContracts.ts` + `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts` | `src/ui/shared/identity/IdentityAuthClient.ts` |
 | `workspace-invitations` + `workspace-administration` | `/api/v1/workspaces/invitations`, `/api/v1/workspaces/onboarding`, `/api/v1/workspaces` | `src/infrastructure/api/workspaces/WorkspaceInvitationBackendApi.ts`, `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts` | `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts` + `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts` | `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts` |
 | `authorization-management` | `/api/v1/authorization` | `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts` | `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`, `src/shared/contracts/authorization/ResourceVisibilitySharingContracts.ts`, `src/shared/schemas/authorization/AuthorizationSchemaContracts.ts` | `src/ui/shared/authorization/AuthorizationManagementClient.ts` |
+| `audit-ledger` | `/api/v1/audit/events` | `src/infrastructure/api/audit/AuditLedgerBackendApi.ts` | `src/shared/contracts/audit/AuditEventContracts.ts`, `src/shared/dto/audit/AuditEventDtos.ts`, `src/shared/schemas/audit/AuditEventSchemaContracts.ts` | `src/ui/shared/api/SharedApiClient.ts` (authoritative admin/governance retrieval clients) |
 | `node-trust` | `/api/v1/nodes` | `src/infrastructure/api/nodes/NodeTrustBackendApi.ts` | `src/shared/contracts/nodes/NodeTrustApiContracts.ts` + `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts` | `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`, `src/ui/shared/nodes/NodeInventoryClient.ts` |
 | `security-certificate-operations` + `security-secret-metadata` | `/api/v1/security/certificates`, `/api/v1/security/secrets` | `src/infrastructure/api/security/CertificateOperationsBackendApi.ts`, `src/infrastructure/api/security/SecretMetadataBackendApi.ts` | `src/shared/contracts/security/SecretTransportContracts.ts`, `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`, `src/shared/schemas/security/SecretApiSchemaContracts.ts` | `src/ui/shared/security/SecretMetadataManagementClient.ts` |
 | `storage-management` | `/api/v1/storage` | `src/infrastructure/api/storage/StorageManagementBackendApi.ts` | `src/shared/schemas/storage/StorageTransportSchemaContracts.ts` (plus DTO contracts via `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`) | `src/ui/shared/storage/StorageAdministrationClient.ts` |
@@ -96,6 +98,22 @@ Authoritative policy expectations:
 
 - bearer session required
 - policy decisions are evaluated server-side from actor + resource context
+
+### Audit ledger read/query (`/api/v1/audit/events*`)
+
+- list/read:
+  - `GET /api/v1/audit/events`
+  - `GET /api/v1/audit/events/:eventId`
+- shared query/filter contract is parsed from URL search params using audit schema contracts.
+- pagination and error semantics follow shared canonical API conventions.
+
+Authoritative policy expectations:
+
+- bearer session required
+- workspace scope required (`workspaceId` query parameter)
+- permission-aware projection enforced by audit query authorizer:
+  - admin audiences can read protected-data detail (`visibility: admin`)
+  - non-admin audiences are thin-safe and user-safe redacted (`visibility: user-safe`)
 
 ### Node trust (`/api/v1/nodes/*`)
 

@@ -12,6 +12,7 @@ import { URL } from "node:url";
 import { z } from "zod";
 import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthBackendApi";
 import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
+import type { AuditLedgerBackendApi } from "../../../api/audit/AuditLedgerBackendApi";
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
@@ -61,6 +62,10 @@ import {
   AuthorizationManagementApiErrorCodes,
   type AuthorizationManagementApiResponse,
 } from "../../../api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import {
+  AuditLedgerApiErrorCodes,
+  type AuditLedgerApiResponse,
+} from "../../../api/audit/sdk/PublicAuditLedgerApiContract";
 import {
   WorkspaceInvitationApiErrorCodes,
   type AcceptWorkspaceInvitationOnboardingApiRequest,
@@ -203,6 +208,10 @@ import {
   SharedApiQuerySchemaValidationError,
   parseSharedApiListQueryConventions,
 } from "@shared/schemas/api/SharedApiQuerySchemaContracts";
+import {
+  AuditEventSchemaValidationError,
+  parseAuditEventListQueryFromSearchParams,
+} from "@shared/schemas/audit/AuditEventSchemaContracts";
 import {
   SystemRuntimeTransportSchemaValidationError,
   parseRuntimeCancelRunRequest,
@@ -894,6 +903,7 @@ export interface IdentityHttpServerOptions {
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
+  readonly auditLedgerBackendApi?: AuditLedgerBackendApi;
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
   readonly authoritativeRunQueryBackendApi?: AuthoritativeRunQueryBackendApi;
@@ -4516,6 +4526,94 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               uploadSessionId: parsedRequest.uploadSessionId,
               contentType: parsedRequest.contentType,
             }, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.auditLedgerBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/audit/events"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildAuditLedgerInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedQuery = parseAndValidateAuditLedgerListQuery(searchParams);
+            if (!parsedQuery.ok) {
+              writeJson(response, parsedQuery.statusCode, parsedQuery.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedQuery.statusCode,
+                Object.freeze({ query: Object.fromEntries(searchParams.entries()) }),
+                parsedQuery.body,
+              );
+              return;
+            }
+
+            const apiResponse = await options.auditLedgerBackendApi.listAuditEvents(Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              query: parsedQuery.data,
+            }));
+            const statusCode = mapAuditLedgerStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              query: parsedQuery.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.auditLedgerBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/audit/events/")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and eventId are required.",
+            buildInvalidResponse: buildAuditLedgerInvalidRequestResponse,
+          },
+          async (context) => {
+            const eventId = decodePathTail(path, "/api/v1/audit/events/");
+            if (!eventId || eventId.includes("/")) {
+              const invalid = buildAuditLedgerInvalidRequestResponse("workspaceId and eventId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.auditLedgerBackendApi.getAuditEventDetail(Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              eventId,
+            }));
+            const statusCode = mapAuditLedgerStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              eventId,
+            }), apiResponse);
           },
         );
         return;
@@ -9961,6 +10059,48 @@ function parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest(
   }
 }
 
+function parseAndValidateAuditLedgerListQuery(searchParams: URLSearchParams):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseAuditEventListQueryFromSearchParams>;
+  }
+  | {
+    readonly ok: false;
+    readonly statusCode: number;
+    readonly body: AuditLedgerApiResponse<never>;
+  } {
+  try {
+    return {
+      ok: true,
+      data: parseAuditEventListQueryFromSearchParams(searchParams),
+    };
+  } catch (error) {
+    if (error instanceof AuditEventSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: AuditLedgerApiErrorCodes.invalidRequest,
+            message: "Audit list query is invalid.",
+            validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+              path: issue.path,
+              code: issue.code,
+              message: issue.message,
+            }))),
+          }),
+        }),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAuditLedgerInvalidRequestResponse("Audit list query is invalid."),
+    };
+  }
+}
+
 async function parseAndValidateRuntimeMutationBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -10700,6 +10840,25 @@ function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unkno
   }
 }
 
+function mapAuditLedgerStatusCode(response: AuditLedgerApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case AuditLedgerApiErrorCodes.invalidRequest:
+      return 400;
+    case AuditLedgerApiErrorCodes.authenticationFailed:
+      return 401;
+    case AuditLedgerApiErrorCodes.forbidden:
+      return 403;
+    case AuditLedgerApiErrorCodes.notFound:
+      return 404;
+    default:
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
+  }
+}
+
 function mapSystemRuntimeStatusCode(response: { readonly ok: boolean; readonly error?: { readonly code?: string } }): number {
   if (response.ok) {
     return 200;
@@ -10738,6 +10897,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: Boolean(options.workspaceBackendApi),
     [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: Boolean(options.workspaceAdministrationBackendApi),
     [AuthoritativeApiRouteBackendKeys.authorizationManagement]: Boolean(options.authorizationManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.auditLedger]: Boolean(options.auditLedgerBackendApi),
     [AuthoritativeApiRouteBackendKeys.nodeTrust]: Boolean(options.nodeTrustBackendApi),
     [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),
     [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
@@ -11135,6 +11295,16 @@ function buildAssetManagementInvalidRequestResponse(message: string): AssetManag
     ok: false,
     error: {
       code: AssetManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildAuditLedgerInvalidRequestResponse(message: string): AuditLedgerApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: AuditLedgerApiErrorCodes.invalidRequest,
       message,
     },
   });

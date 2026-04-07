@@ -4,6 +4,7 @@ import {
   type AuthoritativeApiRouteRegistrationPlan,
 } from "./AuthoritativeApiRouteRegistration";
 import { AssetManagementAuthoritativeApiRouteFamily } from "./authoritative-route-families/AssetAuthoritativeApiRoutes";
+import { AuditLedgerAuthoritativeApiRouteFamily } from "./authoritative-route-families/AuditAuthoritativeApiRoutes";
 import { AuthorizationAuthoritativeApiRouteFamily } from "./authoritative-route-families/AuthorizationAuthoritativeApiRoutes";
 import { IdentityAuthoritativeApiRouteFamily } from "./authoritative-route-families/IdentityAuthoritativeApiRoutes";
 import { NodeTrustAuthoritativeApiRouteFamily } from "./authoritative-route-families/NodeTrustAuthoritativeApiRoutes";
@@ -31,6 +32,7 @@ const RouteFamilies = Object.freeze<ReadonlyArray<AuthoritativeApiRouteFamilyReg
   WorkspaceInvitationAuthoritativeApiRouteFamily,
   WorkspaceAdministrationAuthoritativeApiRouteFamily,
   AuthorizationAuthoritativeApiRouteFamily,
+  AuditLedgerAuthoritativeApiRouteFamily,
   NodeTrustAuthoritativeApiRouteFamily,
   SecurityCertificateAuthoritativeApiRouteFamily,
   SecuritySecretMetadataAuthoritativeApiRouteFamily,

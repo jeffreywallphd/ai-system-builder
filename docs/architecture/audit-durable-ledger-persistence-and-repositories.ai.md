@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 18.2.1, Story 18.2.2, Story 18.2.3, and Story 18.2.4 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards for authoritative audit persistence.
+Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, and Story 18.2.5 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards and authoritative server APIs.
 
 Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
@@ -11,8 +11,13 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
 - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
+- `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
+- `src/infrastructure/api/audit/sdk/PublicAuditLedgerApiContract.ts`
+- `src/infrastructure/transport/http-server/authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
 - `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
+- `src/infrastructure/api/audit/tests/AuditLedgerBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuditLedger.test.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -38,6 +43,10 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - Added application-layer `AuditLedgerQueryService` to provide authorization-aware retrieval over shared query contracts with deterministic pagination/sorting defaults and logical scope filtering.
 - Added `WorkspaceAuditLedgerReadAuthorizer` to centralize workspace-role/sensitivity-driven read scope decisions for list and detail retrieval.
 - Added permission-aware detail retrieval (`getAuditEventDetail(...)`) with user-safe vs admin detail projection.
+- Added authoritative audit query/read APIs:
+  - `GET /api/v1/audit/events`
+  - `GET /api/v1/audit/events/:eventId`
+  - request parsing from shared audit query contracts/schemas and canonical status mapping for invalid/forbidden/not-found outcomes.
 
 ## Behavior summary
 
