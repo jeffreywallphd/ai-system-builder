@@ -1046,6 +1046,57 @@ export class SqlitePlatformPersistenceAdapter
     return true;
   }
 
+  public async releaseExpiredNodePlacementHolds(input: {
+    readonly asOf: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunNodePlacementHoldRecord>> {
+    const asOf = input.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const limit = Math.max(1, Math.min(1000, input.limit ?? 200));
+
+    const releasedRows = this.getDatabase().transaction(() => {
+      const rows = this.getDatabase().prepare(`
+        SELECT
+          node_id,
+          hold_token,
+          run_id,
+          queue_id,
+          reservation_owner,
+          claim_token,
+          decision_id,
+          held_at,
+          expires_at,
+          updated_at,
+          created_at
+        FROM platform_run_node_placement_holds
+        WHERE expires_at <= ?
+        ORDER BY expires_at ASC, node_id ASC
+        LIMIT ?
+      `).all(asOf, limit) as PlatformRunNodePlacementHoldRow[];
+      if (rows.length === 0) {
+        return Object.freeze([] as ReadonlyArray<PlatformRunNodePlacementHoldRow>);
+      }
+
+      const deleteStatement = this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND hold_token = ?
+      `);
+      const released: PlatformRunNodePlacementHoldRow[] = [];
+      for (const row of rows) {
+        const result = deleteStatement.run(row.node_id, row.hold_token);
+        if (result.changes === 1) {
+          released.push(row);
+        }
+      }
+      return Object.freeze(released);
+    })();
+
+    return Object.freeze(releasedRows.map((row) => this.mapNodePlacementHoldRowToRecord(row)));
+  }
+
   public async claimQueuedRunForNodeDispatch(input: {
     readonly runId: string;
     readonly nodeId: string;

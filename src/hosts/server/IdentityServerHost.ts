@@ -1042,6 +1042,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const runStartupRecovery = await new RecoverRunOrchestrationStartupStateUseCase({
     runRepository: persistentPlatformServices.platformPersistenceRepository,
     queueRepository: persistentPlatformServices.platformPersistenceRepository,
+    placementHoldRepository: persistentPlatformServices.platformPersistenceRepository,
     orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
     now: () => workspaceClock.now(),

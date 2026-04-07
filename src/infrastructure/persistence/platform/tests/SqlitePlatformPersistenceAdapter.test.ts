@@ -957,6 +957,50 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     adapter.dispose();
   });
 
+  it("releases expired node placement holds for startup recovery reconciliation", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-hold-recovery-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    const acquired = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:startup-expired",
+      runId: "run-hold-recovery-1",
+      queueId: "queue:default",
+      nodeId: "node:trusted-recovery",
+      reservationOwner: "scheduler:startup",
+      claimToken: "claim:startup",
+      heldAt: "2026-04-06T12:00:00.000Z",
+      expiresAt: "2026-04-06T12:00:10.000Z",
+    });
+    expect(acquired.outcome).toBe("acquired");
+
+    const noneReleased = await adapter.releaseExpiredNodePlacementHolds?.({
+      asOf: "2026-04-06T12:00:09.000Z",
+    });
+    expect(noneReleased).toEqual([]);
+
+    const released = await adapter.releaseExpiredNodePlacementHolds?.({
+      asOf: "2026-04-06T12:00:10.000Z",
+      limit: 10,
+    });
+    expect(released).toHaveLength(1);
+    expect(released?.[0]?.holdToken).toBe("node-hold:startup-expired");
+
+    const reacquired = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:startup-next",
+      runId: "run-hold-recovery-2",
+      queueId: "queue:default",
+      nodeId: "node:trusted-recovery",
+      reservationOwner: "scheduler:startup",
+      claimToken: "claim:startup-next",
+      heldAt: "2026-04-06T12:00:11.000Z",
+      expiresAt: "2026-04-06T12:00:30.000Z",
+    });
+    expect(reacquired.outcome).toBe("acquired");
+
+    adapter.dispose();
+  });
+
   it("supports node placement hold conflict and expiry lifecycle semantics", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-node-holds-"));
     createdRoots.push(root);
