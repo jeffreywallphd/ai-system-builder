@@ -152,6 +152,18 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
           preparedAt: intent.decidedAt,
         });
         materialized.push(intent);
+        await this.publishEventPair({
+          type: SchedulingGovernanceEventTypes.assignmentMaterialized,
+          outcome: "succeeded",
+          occurredAt: this.now().toISOString(),
+          decisionId: intent.decisionId,
+          reservationOwner: intent.reservationOwner,
+          actorServiceId: intent.reservationOwner,
+          workspaceId: resolveRunWorkspaceId(input.decisionBundle, intent.runId),
+          runId: intent.runId,
+          nodeId: intent.nodeId,
+          queueId: intent.queueId,
+        });
       } catch (error) {
         if (!(error instanceof RunNodeDispatchClaimConflictError)) {
           throw error;

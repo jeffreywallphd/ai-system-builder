@@ -77,6 +77,9 @@ describe("SystemRuntimeRealtimeEventContracts", () => {
     expect(RuntimeRealtimeWebSocketMessageTypes.error).toBe("runtime-realtime.error");
     expect(RuntimeRealtimeOrchestrationEventKinds.submissionAccepted).toBe("submission-accepted");
     expect(RuntimeRealtimeOrchestrationEventKinds.queueEnqueued).toBe("queue-enqueued");
+    expect(RuntimeRealtimeOrchestrationEventKinds.schedulingPriorityPlacementSelected).toBe("scheduling-priority-placement-selected");
+    expect(RuntimeRealtimeOrchestrationEventKinds.schedulingAssignmentMaterializationConflict).toBe("scheduling-assignment-materialization-conflict");
+    expect(RuntimeRealtimeOrchestrationEventKinds.schedulingRequeued).toBe("scheduling-requeued");
     expect(RuntimeRealtimeOrchestrationEventKinds.progressUpdated).toBe("progress-updated");
   });
 });

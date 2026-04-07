@@ -534,6 +534,41 @@ export class AuthoritativeRunMutationBackendApi {
         reason: request.reevaluate.reason,
         limit: request.reevaluate.limit,
       });
+      await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
+        for (const runId of reevaluated.runIds) {
+          const normalizedRunId = runId.trim();
+          if (!normalizedRunId) {
+            continue;
+          }
+          this.dependencies.realtimePublisher?.publishQueueMovement({
+            actorUserIdentityId,
+            workspaceId,
+            payload: Object.freeze({
+              queueItemId: `runtime-queue:${normalizedRunId}`,
+              executionId: normalizedRunId,
+              runId: normalizedRunId,
+              queueId: request.reevaluate.queueId?.trim() || undefined,
+              status: "queued",
+              lifecycleState: "queued",
+              eventKind: "scheduling-requeued",
+              changedAt: reevaluated.requestedAt,
+            }),
+          });
+          this.dependencies.realtimePublisher?.publishRunStatus({
+            actorUserIdentityId,
+            workspaceId,
+            payload: Object.freeze({
+              executionId: normalizedRunId,
+              status: "queued",
+              runId: normalizedRunId,
+              queueId: request.reevaluate.queueId?.trim() || undefined,
+              lifecycleState: "queued",
+              eventKind: "scheduling-requeued",
+              changedAt: reevaluated.requestedAt,
+            }),
+          });
+        }
+      });
       await this.recordObservability({
         event: "run.orchestration.mutation.scheduling-admin.reevaluate-deferred.completed",
         operation: "mutation.scheduling-admin.reevaluate-deferred",

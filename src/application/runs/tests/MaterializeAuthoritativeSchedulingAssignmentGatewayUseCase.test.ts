@@ -223,11 +223,13 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
   it("acquires and releases node placement holds while materializing selected assignment intent", async () => {
     const queueRepository = new RecordingQueueRepository();
     const placementHoldRepository = new RecordingPlacementHoldRepository();
+    const governanceSink = new RecordingGovernanceEventSink();
     const claimed: string[] = [];
 
     const useCase = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
       queueRepository,
       placementHoldRepository,
+      governanceEventSink: governanceSink,
       claimRunForNodeDispatchPreparationUseCase: {
         execute: async (input) => {
           claimed.push(`${input.runId}:${input.nodeId}:${input.claimToken}`);
@@ -252,6 +254,8 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     expect(placementHoldRepository.releases).toHaveLength(1);
     expect(placementHoldRepository.releases[0]?.holdToken).toBe("node-hold:1");
     expect(queueRepository.releases).toHaveLength(0);
+    expect(governanceSink.events).toHaveLength(2);
+    expect(governanceSink.events.every((event) => event.type === "scheduling-assignment-materialized")).toBeTrue();
   });
 
   it("releases queue claim and skips claim materialization when node hold acquisition conflicts", async () => {

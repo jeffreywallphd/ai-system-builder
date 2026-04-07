@@ -5,6 +5,7 @@ import type {
   PlatformAuditEventRecord,
   PlatformPersistenceMutationContext,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 import { PlatformSchedulingGovernanceEventSink } from "../PlatformSchedulingGovernanceEventSink";
 
 class InMemoryPlatformAuditRepository implements IPlatformAuditEventRepository {
@@ -77,5 +78,45 @@ describe("PlatformSchedulingGovernanceEventSink", () => {
     expect(repository.events[0]?.action).toBe("run.scheduling.reservation.conflict");
     expect(repository.events[0]?.targetRef).toBe("node:1");
     expect(repository.events[0]?.outcome).toBe("failed");
+  });
+
+  it("publishes operational scheduling governance events to runtime realtime queue/run topics", async () => {
+    const repository = new InMemoryPlatformAuditRepository();
+    const published: Array<{ readonly stream: "run" | "queue"; readonly payload: Record<string, unknown> }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        published.push({ stream: "run", payload: input.payload as Record<string, unknown> });
+      },
+      publishQueueMovement: (input) => {
+        published.push({ stream: "queue", payload: input.payload as Record<string, unknown> });
+      },
+    });
+    const sink = new PlatformSchedulingGovernanceEventSink(repository, realtimePublisher);
+
+    await sink.recordSchedulingGovernanceEvent(Object.freeze({
+      channel: "operational",
+      type: "scheduling-assignment-materialized",
+      occurredAt: "2026-04-07T23:06:00.000Z",
+      outcome: "succeeded",
+      runId: "run:42",
+      queueId: "queue:default",
+      workspaceId: "workspace-a",
+    }));
+
+    expect(repository.events).toHaveLength(0);
+    expect(published).toHaveLength(2);
+    expect(published.map((entry) => entry.stream).sort()).toEqual(["queue", "run"]);
+    expect(published.find((entry) => entry.stream === "queue")?.payload).toMatchObject({
+      executionId: "run:42",
+      queueItemId: "runtime-queue:run:42",
+      eventKind: "scheduling-assignment-materialized",
+      status: "running",
+    });
+    expect(published.find((entry) => entry.stream === "run")?.payload).toMatchObject({
+      executionId: "run:42",
+      runId: "run:42",
+      eventKind: "scheduling-assignment-materialized",
+      status: "assignment-pending",
+    });
   });
 });

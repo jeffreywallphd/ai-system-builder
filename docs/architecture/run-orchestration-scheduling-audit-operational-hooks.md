@@ -5,6 +5,8 @@
 - Feature 17: Policy-Aware Scheduling and Hybrid Node Arbitration
 - Epic 17.2: Integrate Scheduling Decisions with Queue Processing, Node Arbitration, and Reservation Controls
 - Story 17.2.7: Implement audit and operational event hooks for scheduling decisions and overrides
+- Epic 17.3: Deliver Scheduling Visibility, Admin Controls, and Production Hardening
+- Story 17.3.3: Implement real-time scheduling and queue-arbitration event publication
 
 ## Purpose
 
@@ -15,6 +17,7 @@ This story adds:
 - scheduling governance event contracts and sink port
 - application-layer event emission from scheduling decision and queue-assignment integration seams
 - infrastructure adapter for mapping audit-channel scheduling events into platform audit records
+- infrastructure bridge for mapping operational-channel scheduling events into shared runtime realtime run/queue publication
 
 ## Canonical implementation map
 
@@ -26,6 +29,7 @@ This story adds:
   - `src/application/runs/use-cases/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.ts`
 - Platform audit sink mapping:
   - `src/infrastructure/api/runs/PlatformSchedulingGovernanceEventSink.ts`
+  - operational scheduling event -> runtime realtime mapping for `runtime.run.status` and `runtime.queue`
 
 ## Emitted event model
 
@@ -34,6 +38,7 @@ This story adds:
 - `scheduling-priority-placement-selected`
 - `scheduling-deferred-no-placement`
 - `scheduling-reservation-conflict`
+- `scheduling-assignment-materialized`
 - `scheduling-assignment-materialization-conflict`
 
 Each event is emitted for both channels:
@@ -78,3 +83,4 @@ This story therefore records supported scheduler and queue-integration behavior 
 - `src/application/scheduling/tests/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.test.ts`
 - `src/application/runs/tests/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/PlatformSchedulingGovernanceEventSink.test.ts`
+- `src/infrastructure/api/runs/tests/AuthoritativeRunMutationBackendApi.test.ts`
