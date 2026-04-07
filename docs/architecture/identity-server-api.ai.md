@@ -161,6 +161,7 @@ Persisted session records now intentionally exclude:
   - `accessChannel` (`desktop` or `thin-client`; default `thin-client`)
   - `sessionTrustRequirement` (`allow-untrusted` | `allow-pairing` | `require-trusted`)
   - optional `client` context (`userAgent`, `ipAddress`, `deviceId`, `trustedDeviceBindingId`, `trustMarker`)
+- Development login (`POST /api/v1/identity/dev-login`) now accepts the same optional session-context fields (`accessChannel`, `sessionTrustRequirement`, and `client`) and forwards them into issuance for the fixed dev account bootstrap flow.
 - Login success now includes issued-session fields:
   - `sessionId`
   - `sessionToken`

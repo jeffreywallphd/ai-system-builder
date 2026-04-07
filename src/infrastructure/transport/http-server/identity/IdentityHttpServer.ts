@@ -349,6 +349,12 @@ const LoginRequestSchema: z.ZodType<LoginLocalIdentityApiRequest> = z.object({
   }).strict(),
 }).strict();
 
+const DevLoginRequestSchema = z.object({
+  accessChannel: z.enum(["desktop", "thin-client"]).optional(),
+  sessionTrustRequirement: z.enum(["allow-untrusted", "allow-pairing", "require-trusted"]).optional(),
+  client: LoginRequestSchema.shape.client,
+}).strict();
+
 const RevokeSessionRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "sessionId" | "reason">> = z.object({
   sessionId: z.string().min(1),
   reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
@@ -1097,7 +1103,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
       if (request.method === "POST" && path === "/api/v1/identity/dev-login" && options.development?.enableDevLoginRoute) {
-        await handleDevLogin(request, response, requestId, options.backendApi, logger);
+        await handleDevLogin(request, response, requestId, options.backendApi, logger, maxBodyBytes);
         return;
       }
       if (request.method === "GET" && path === "/api/v1/identity/session") {
@@ -7894,7 +7900,20 @@ async function handleDevLogin(
   requestId: string,
   backendApi: IdentityAuthBackendApi,
   logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
 ): Promise<void> {
+  const parsedRequest = await parseAndValidateRequest(
+    request,
+    DevLoginRequestSchema,
+    requestId,
+    logger,
+    maxBodyBytes,
+  );
+  if (!parsedRequest.ok) {
+    writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+    return;
+  }
+
   const registerResponse = await backendApi.registerLocalAccount({
     username: DEV_LOGIN_DEFAULT_USERNAME,
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
@@ -7916,6 +7935,9 @@ async function handleDevLogin(
   const loginResponse = await backendApi.loginLocalAccount({
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
     providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
+    accessChannel: parsedRequest.data.accessChannel,
+    sessionTrustRequirement: parsedRequest.data.sessionTrustRequirement,
+    client: parsedRequest.data.client,
     credential: {
       candidate: DEV_LOGIN_DEFAULT_PASSWORD,
     },

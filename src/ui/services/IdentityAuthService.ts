@@ -3,6 +3,7 @@
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
   CompleteTrustedDevicePairingApiResponse,
+  DevelopmentLoginIdentityApiRequest,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   GetTrustedDeviceApiRequest,
@@ -74,8 +75,10 @@ export class IdentityAuthService {
     return this.client.loginLocalAccount(request);
   }
 
-  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.client.loginDevelopmentAccount();
+  public loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.client.loginDevelopmentAccount(request);
   }
 
   public resolveAuthenticatedSession(

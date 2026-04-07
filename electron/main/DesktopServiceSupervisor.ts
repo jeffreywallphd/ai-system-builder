@@ -38,6 +38,7 @@ export class DesktopServiceSupervisor {
 
     const env = {
       ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: this.options.isPackaged ? "production" : "development",
       SERVICE_SUPERVISOR_HOST: this.host,
       SERVICE_SUPERVISOR_PORT: String(this.port),

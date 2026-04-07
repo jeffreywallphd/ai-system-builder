@@ -3,6 +3,7 @@ import type {
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
   CompleteTrustedDevicePairingApiResponse,
+  DevelopmentLoginIdentityApiRequest,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   GetTrustedDeviceApiRequest,
@@ -60,7 +61,9 @@ export interface IdentityAuthClient {
   registerLocalAccount(
     request: RegisterLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<RegisterLocalIdentityApiResponse>>;
-  loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
+  loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
   loginLocalAccount(
     request: LoginLocalIdentityApiRequest,
   ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>>;
@@ -164,8 +167,10 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return this.post("/api/v1/identity/register", request);
   }
 
-  public async loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.post("/api/v1/identity/dev-login", {});
+  public async loginDevelopmentAccount(
+    request: DevelopmentLoginIdentityApiRequest = {},
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.post("/api/v1/identity/dev-login", request);
   }
 
   public async loginLocalAccount(

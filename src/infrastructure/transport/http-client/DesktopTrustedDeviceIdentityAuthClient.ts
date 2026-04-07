@@ -4,6 +4,7 @@
   type ChangeLocalPasswordCredentialApiResponse,
   type CompleteTrustedDevicePairingApiRequest,
   type CompleteTrustedDevicePairingApiResponse,
+  type DevelopmentLoginIdentityApiRequest,
   type GetIdentityAdminAccountStatusApiRequest,
   type GetIdentityAdminAccountStatusApiResponse,
   type GetTrustedDeviceApiRequest,
@@ -65,8 +66,10 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
     return this.innerClient.registerLocalAccount(request);
   }
 
-  public loginDevelopmentAccount(): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
-    return this.innerClient.loginDevelopmentAccount();
+  public loginDevelopmentAccount(
+    request?: DevelopmentLoginIdentityApiRequest,
+  ): Promise<IdentityAuthApiResponse<LoginLocalIdentityApiResponse>> {
+    return this.innerClient.loginDevelopmentAccount(request);
   }
 
   public async loginLocalAccount(

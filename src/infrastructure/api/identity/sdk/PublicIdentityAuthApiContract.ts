@@ -80,6 +80,12 @@ export interface LoginLocalIdentityApiRequest {
   };
 }
 
+export interface DevelopmentLoginIdentityApiRequest {
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly sessionTrustRequirement?: "allow-untrusted" | "allow-pairing" | "require-trusted";
+  readonly client?: LoginLocalIdentityApiRequest["client"];
+}
+
 export type IdentitySessionAssuranceLevel =
   | "authenticated-untrusted"
   | "authenticated-trusted"
