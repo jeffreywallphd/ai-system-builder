@@ -8,6 +8,7 @@
 @import "./components/inputs.css";
 @import "./components/panels.css";
 @import "./components/toolbar.css";
+@import "./components/actions.css";
 @import "./components/model-browser.css";
 @import "./components/mcp-browser.css";
 @import "./components/assets.css";
@@ -1438,5 +1439,7 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
 
 

@@ -143,3 +143,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Converged admin/operational pages should render loading/empty/not-found/disconnected/error/permission-denied states through shared `SurfaceStateBoundary` and `SurfaceStatePanel` seams.
 - Error-to-state projection should use `toSurfacePresentationStateFromApiError` so client rendering aligns with shared API error semantics instead of page-local error-code branching.
 
+
+## Story 15.1.5 update
+
+- Shared action modeling now lives in `src/ui/shared/actions/*` with canonical docs in `docs/architecture/multi-surface-ui-action-model.md`.
+- Converged admin/operational screens should define page/row/bulk operations as structured descriptors and render through shared action wrappers (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) instead of page-local ad hoc action markup and guard logic.
+- Permission-aware hidden/disabled action states, surface-capability gating, and confirmation/telemetry seams should be expressed in action descriptors so desktop and thin-client surfaces can reuse the same operation semantics with different wrappers.

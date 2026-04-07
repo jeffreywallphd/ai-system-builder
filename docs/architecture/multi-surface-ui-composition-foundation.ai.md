@@ -64,3 +64,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Converged page-state rendering should use `SurfaceStateBoundary`/`SurfaceStatePanel` for `loading`, `empty`, `not-found`, `disconnected`, `error`, and `permission-denied`.
 - API error semantics should map through `toSurfacePresentationStateFromApiError` instead of page-local code checks.
 
+
+## Story 15.1.5 update
+- Shared action semantics now live in `src/ui/shared/actions/*` and are documented in `docs/architecture/multi-surface-ui-action-model.md`.
+- New admin/operational page actions should be descriptor-driven and rendered via shared wrappers (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) rather than page-local action branching.
+- Permission, surface-capability, confirmation, and telemetry behavior should be declared in action descriptors so desktop/thin surfaces reuse one operation model.

@@ -41,6 +41,8 @@ describe("NodeInventoryPage", () => {
     );
 
     expect(html).toContain("Trusted node inventory");
+    expect(html).toContain("Back to settings");
+    expect(html).toContain("Refresh");
     expect(html).toContain("Filters");
     expect(html).toContain("Inventory");
     expect(html).toContain("Node detail");
