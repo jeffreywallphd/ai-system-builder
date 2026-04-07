@@ -31,6 +31,13 @@ export default defineConfig(async ({ mode }) => {
     resolve: {
       alias: runtimeProfile.hostKind === "browser"
         ? [
+            {
+              find: /^@infrastructure\/execution\/createExecutionInfrastructure$/,
+              replacement: path.resolve(
+                REPOSITORY_ROOT,
+                "src/infrastructure/execution/createExecutionInfrastructure.browser.ts",
+              ),
+            },
             ...srcAliases,
             {
               find: "./modelManagementDependencies",

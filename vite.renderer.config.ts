@@ -18,6 +18,13 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      {
+        find: /^@infrastructure\/execution\/createExecutionInfrastructure$/,
+        replacement: path.resolve(
+          REPOSITORY_ROOT,
+          "src/infrastructure/execution/createExecutionInfrastructure.browser.ts",
+        ),
+      },
       ...srcAliases,
       {
         find: "./modelManagementDependencies",
