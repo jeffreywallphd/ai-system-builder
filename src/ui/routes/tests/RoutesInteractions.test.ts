@@ -24,6 +24,7 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowConversation");
     expect(appRouterSource).toContain("<BuildPage />");
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.settings}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.securityPolicy}>");
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.workspaceAdmin}>");
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>");
     expect(appRouterSource).toContain("<DesktopAdministrationShellPage />");

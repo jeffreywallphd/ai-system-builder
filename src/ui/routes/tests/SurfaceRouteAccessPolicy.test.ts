@@ -23,6 +23,9 @@ describe("SurfaceRouteAccessPolicy", () => {
     expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.identityAdmin, session, { strict: true }),
     ).toBeTrue();
+    expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.securityPolicy, session, { strict: true }),
+    ).toBeTrue();
   });
 
   it("allows only lightweight admin-lite routes for thin member sessions", () => {
@@ -42,6 +45,9 @@ describe("SurfaceRouteAccessPolicy", () => {
     ).toBeFalse();
     expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.identityAdmin, session, { strict: true }),
+    ).toBeFalse();
+    expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.securityPolicy, session, { strict: true }),
     ).toBeFalse();
   });
 

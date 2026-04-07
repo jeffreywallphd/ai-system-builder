@@ -16,6 +16,7 @@ import SettingsPage from "../pages/SettingsPage";
 import AuthorizationSharingManagementPage from "../pages/AuthorizationSharingManagementPage";
 import AuthorizationSharingThinClientPage from "../pages/AuthorizationSharingThinClientPage";
 import AuthorizationReportingPage from "../pages/AuthorizationReportingPage";
+import SecurityPolicyConfigurationPage from "../pages/SecurityPolicyConfigurationPage";
 import StorageAdministrationPage from "../pages/StorageAdministrationPage";
 import WorkflowStudioPage from "../pages/WorkflowStudioPage";
 import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
@@ -189,6 +190,14 @@ export default function AppRouter({
             element: (
               <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationReporting}>
                 <AuthorizationReportingPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.securityPolicy,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.securityPolicy}>
+                <SecurityPolicyConfigurationPage />
               </SurfaceProtectedRoute>
             ),
           },

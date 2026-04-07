@@ -24,6 +24,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "admin-shell"');
     expect(source).toContain('key: "admin-lite-shell"');
     expect(source).toContain('key: "authorization-reporting"');
+    expect(source).toContain('key: "security-policy"');
     expect(source).toContain('key: "workspace-admin"');
     expect(source).toContain('key: "node-enrollment-review"');
     expect(source).toContain('key: "workspace-thin-membership"');
@@ -53,6 +54,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('adminLiteShell: "/settings/admin-lite"');
     expect(source).toContain('nodeEnrollmentReview: "/settings/node-enrollments"');
     expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');
+    expect(source).toContain('securityPolicy: "/settings/security-policy"');
     expect(source).toContain('workspaceThinMembership: "/settings/workspaces/thin"');
     expect(source).toContain('workspaceInvitationAccept: "/workspaces/:workspaceId/invitations/:invitationToken/accept"');
     expect(source).toContain('identityAdmin: "/settings/identity-admin"');
@@ -100,6 +102,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.adminShell");
     expect(source).toContain("path: ROUTE_PATHS.adminLiteShell");
     expect(source).toContain("path: ROUTE_PATHS.authorizationReporting");
+    expect(source).toContain("path: ROUTE_PATHS.securityPolicy");
     expect(source).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(source).toContain("path: ROUTE_PATHS.nodeEnrollmentReview");
     expect(source).toContain("path: ROUTE_PATHS.workspaceThinMembership");
