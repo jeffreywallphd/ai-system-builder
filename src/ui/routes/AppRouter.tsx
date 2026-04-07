@@ -53,9 +53,9 @@ import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
 
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
-  readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => void;
+  readonly onAuthenticated?: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
   readonly onLogout?: () => Promise<void> | void;
-  readonly authNotice?: "session-expired" | "session-invalid";
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable";
 }
 
 export default function AppRouter({
@@ -64,7 +64,7 @@ export default function AppRouter({
   onLogout,
   authNotice,
 }: AppRouterProps): JSX.Element {
-  const handleAuthenticated = onAuthenticated ?? (() => undefined);
+  const handleAuthenticated = onAuthenticated ?? (() => true);
   const handleLogout = onLogout ?? (() => undefined);
   const devLoginEnabled = useMemo(() => new DevLoginFeatureFlag().isEnabled(), []);
   const routes = useMemo<ReadonlyArray<RouteObject>>(

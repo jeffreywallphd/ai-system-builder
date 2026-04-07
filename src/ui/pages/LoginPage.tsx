@@ -10,8 +10,8 @@ import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "@sha
 import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
 
 export interface LoginPageProps {
-  readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => void;
-  readonly authNotice?: "session-expired" | "session-invalid";
+  readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable";
   readonly devLoginEnabled?: boolean;
 }
 
@@ -57,7 +57,10 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
 
-      onAuthenticated(response.data);
+      const initialized = await onAuthenticated(response.data);
+      if (!initialized) {
+        return;
+      }
       navigate(fromPath, { replace: true });
     } catch {
       setErrorMessage("Login request failed. Verify the identity API is reachable and try again.");
@@ -76,7 +79,10 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
 
-      onAuthenticated(response.data);
+      const initialized = await onAuthenticated(response.data);
+      if (!initialized) {
+        return;
+      }
       navigate(fromPath, { replace: true });
     } catch {
       setErrorMessage("Dev login request failed. Verify the identity API is reachable and try again.");
@@ -138,6 +144,9 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
           ) : null}
           {authNotice === "session-invalid" ? (
             <p className="ui-auth-page__error" role="status">Your session was revoked or is no longer valid. Sign in again.</p>
+          ) : null}
+          {authNotice === "session-context-unavailable" ? (
+            <p className="ui-auth-page__error" role="status">Session context could not be initialized from the server. Verify API connectivity and sign in again.</p>
           ) : null}
 
           <div className="ui-page__actions">
