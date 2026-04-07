@@ -16,6 +16,7 @@
 - `src/shared/contracts/identity/IdentityTransportContracts.ts`
 - `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts`
 - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
+- `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
 - `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`
 - `src/shared/contracts/deployment/DeploymentTransportContracts.ts`
 - `src/ui/shared/api/SharedApiClient.ts`
@@ -38,6 +39,7 @@
 - `src/shared/schemas/api/SharedApiQuerySchemaContracts.ts`
 - `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`
+- `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`
 - `src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts`
 

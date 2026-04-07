@@ -11,15 +11,27 @@ import type {
   RuntimeSdkStartExecutionResponse,
 } from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
 import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
+import {
+  RunOrchestrationTransportRoutes,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+
+/*
+  Migration note (Story 16.1.2):
+  Canonical run submission/mutation/status contracts now live in
+  `RunOrchestrationTransportContracts.ts`. This module remains the compatibility
+  facade for existing runtime-sdk consumers until endpoint migration completes.
+*/
+
 export type * from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
+export type * from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 export const SystemRuntimeTransportRoutes = Object.freeze({
-  startRun: "/api/v1/runtime/runs/start",
-  cancelRun: "/api/v1/runtime/runs/:executionId/cancel",
-  getRunStatus: "/api/v1/runtime/runs/:executionId/status",
+  startRun: RunOrchestrationTransportRoutes.submitRun,
+  cancelRun: RunOrchestrationTransportRoutes.cancelRun,
+  getRunStatus: RunOrchestrationTransportRoutes.getRunStatus,
   getRunResult: "/api/v1/runtime/runs/:executionId/result",
   getRunTrace: "/api/v1/runtime/runs/:executionId/trace",
-  listQueueItems: "/api/v1/runtime/queue",
+  listQueueItems: RunOrchestrationTransportRoutes.listQueueStatus,
   dequeueQueueItem: "/api/v1/runtime/queue/:queueItemId/dequeue",
   subscribeRealtime: "/api/v1/runtime/realtime",
 } as const);
@@ -74,6 +86,10 @@ export interface RuntimeDequeueResponse {
   readonly mutation: SharedApiMutationResult;
 }
 
+/*
+  Deprecated compatibility DTO: prefer RunCancellationRequest from
+  RunOrchestrationTransportContracts.
+*/
 export interface RuntimeCancelRunRequest {
   readonly executionId: string;
   readonly reason?: string;

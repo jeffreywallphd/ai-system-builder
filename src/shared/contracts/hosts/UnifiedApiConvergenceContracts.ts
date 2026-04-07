@@ -138,7 +138,15 @@ export const UnifiedApiDomainConvergenceContracts: ReadonlyArray<UnifiedApiDomai
         status: UnifiedApiContractHomeStatuses.existing,
       }),
       Object.freeze({
+        path: "src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts",
+        status: UnifiedApiContractHomeStatuses.existing,
+      }),
+      Object.freeze({
         path: "src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts",
+        status: UnifiedApiContractHomeStatuses.existing,
+      }),
+      Object.freeze({
+        path: "src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts",
         status: UnifiedApiContractHomeStatuses.existing,
       }),
     ]),
