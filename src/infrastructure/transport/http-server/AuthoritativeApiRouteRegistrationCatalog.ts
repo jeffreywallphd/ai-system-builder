@@ -13,6 +13,7 @@ import {
 } from "./authoritative-route-families/SecurityAuthoritativeApiRoutes";
 import { StorageManagementAuthoritativeApiRouteFamily } from "./authoritative-route-families/StorageAuthoritativeApiRoutes";
 import {
+  RunReadAuthoritativeApiRouteFamily,
   RunSubmissionAuthoritativeApiRouteFamily,
   RuntimeAuthoritativeApiRouteFamily,
 } from "./authoritative-route-families/RuntimeAuthoritativeApiRoutes";
@@ -34,6 +35,7 @@ const RouteFamilies = Object.freeze<ReadonlyArray<AuthoritativeApiRouteFamilyReg
   StorageManagementAuthoritativeApiRouteFamily,
   AssetManagementAuthoritativeApiRouteFamily,
   RunSubmissionAuthoritativeApiRouteFamily,
+  RunReadAuthoritativeApiRouteFamily,
   RuntimeAuthoritativeApiRouteFamily,
 ]);
 

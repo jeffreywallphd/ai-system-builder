@@ -1,5 +1,6 @@
 import type {
   PlatformAuditEventRecord,
+  PlatformRunListQuery,
   PlatformPersistenceMutationContext,
   PlatformRunMutationResult,
   PlatformRunRecord,
@@ -9,6 +10,7 @@ export type AuthoritativeRunPersistenceMutationContext = PlatformPersistenceMuta
 
 export interface IAuthoritativeRunPersistenceRepository {
   findRunById(runId: string): Promise<PlatformRunRecord | undefined>;
+  listRuns(query: PlatformRunListQuery): Promise<ReadonlyArray<PlatformRunRecord>>;
   createRun(
     record: PlatformRunRecord,
     mutation: AuthoritativeRunPersistenceMutationContext,

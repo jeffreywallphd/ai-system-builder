@@ -23,6 +23,7 @@ export type RunOrchestrationTransportContractVersion =
 
 export const RunOrchestrationTransportRoutes = Object.freeze({
   submitRun: "/api/v1/runtime/runs/start",
+  listRuns: "/api/v1/runtime/runs",
   getRunDetail: "/api/v1/runtime/runs/:runId",
   getRunStatus: "/api/v1/runtime/runs/:runId/status",
   cancelRun: "/api/v1/runtime/runs/:runId/cancel",
@@ -120,6 +121,22 @@ export interface RunDetailReadRequest {
   readonly workspaceId?: string;
 }
 
+export interface RunListReadRequest {
+  readonly workspaceId: string;
+  readonly states?: ReadonlyArray<RunLifecycleState>;
+  readonly sources?: ReadonlyArray<RunSubmissionSource>;
+  readonly search?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly sortBy?: "submittedAt" | "updatedAt" | "state";
+  readonly sortDirection?: "asc" | "desc";
+}
+
+export interface RunListReadResponse {
+  readonly items: ReadonlyArray<RunSummary>;
+  readonly totalCount: number;
+}
+
 export interface RunStatusReadRequest {
   readonly runId: string;
   readonly workspaceId?: string;
@@ -214,6 +231,10 @@ export interface RunOrchestrationTransportContract {
   readonly getRunDetail: {
     readonly request: RunDetailReadRequest;
     readonly response: SharedApiResponseEnvelope<RunDetail>;
+  };
+  readonly listRuns: {
+    readonly request: RunListReadRequest;
+    readonly response: SharedApiResponseEnvelope<RunListReadResponse>;
   };
   readonly getRunStatus: {
     readonly request: RunStatusReadRequest;

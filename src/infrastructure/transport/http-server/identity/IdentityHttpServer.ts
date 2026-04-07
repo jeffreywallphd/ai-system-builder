@@ -21,6 +21,7 @@ import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/Work
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
 import type { AuthoritativeRunSubmissionBackendApi } from "../../../api/runs/AuthoritativeRunSubmissionBackendApi";
+import type { AuthoritativeRunQueryBackendApi } from "../../../api/runs/AuthoritativeRunQueryBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
@@ -120,6 +121,11 @@ import {
   SystemRuntimeTransportRoutes,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import {
+  RunOrchestrationTransportRoutes,
+  resolveRunLifecycleState,
+  resolveRunSubmissionSource,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import {
   RuntimeRealtimeSubscriptionModes,
   RuntimeRealtimeTopics,
   RuntimeRealtimeWebSocketActions,
@@ -203,6 +209,7 @@ import {
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import {
   RunOrchestrationTransportSchemaValidationError,
+  parseRunListReadRequest,
   parseRunSubmissionRequest,
 } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import {
@@ -874,6 +881,7 @@ export interface IdentityHttpServerOptions {
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
+  readonly authoritativeRunQueryBackendApi?: AuthoritativeRunQueryBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -4554,6 +4562,106 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
       if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path === RunOrchestrationTransportRoutes.listRuns
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateAuthoritativeRunListReadRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+            const apiResponse = await options.authoritativeRunQueryBackendApi.listRuns({
+              ...parsedRequest.data,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && !path.endsWith("/status")
+        && !path.endsWith("/result")
+        && !path.endsWith("/trace")
+        && !path.endsWith("/cancel")
+        && !path.endsWith("/retry")
+        && !path.endsWith("/lifecycle")
+        && !path.endsWith("/start")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/runtime/runs/");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunQueryBackendApi.getRunDetail({
+              runId,
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              runId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
         options.systemRuntimeBackendApi
         && request.method === "POST"
         && path === SystemRuntimeTransportRoutes.startRun
@@ -4720,6 +4828,52 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
               queueItemId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/status")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/runtime/runs/", "/status");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunQueryBackendApi.getRunStatus({
+              runId,
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              runId,
               workspaceId: context.workspace.workspaceId,
               actorUserIdentityId: context.actor.userIdentityId,
             }), apiResponse);
@@ -9113,6 +9267,90 @@ function parseAndValidateRuntimeQueueListRequest(input: {
   };
 }
 
+function parseAndValidateAuthoritativeRunListReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunListReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  let parsedConventions: ReturnType<typeof parseSharedApiListQueryConventions>;
+  try {
+    parsedConventions = parseSharedApiListQueryConventions(input.searchParams);
+  } catch (error) {
+    if (error instanceof SharedApiQuerySchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run list query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run list query is invalid."),
+    };
+  }
+
+  const states = input.searchParams.getAll("state")
+    .map((value) => resolveRunLifecycleState(value))
+    .filter((value): value is string => Boolean(value));
+  if (states.length !== input.searchParams.getAll("state").length) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("state values are invalid."),
+    };
+  }
+  const sources = input.searchParams.getAll("source")
+    .map((value) => resolveRunSubmissionSource(value));
+  if (
+    input.searchParams.getAll("source").some((value) => {
+      const normalized = value.trim();
+      return normalized.length > 0 && resolveRunSubmissionSource(normalized) !== normalized;
+    })
+  ) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("source values are invalid."),
+    };
+  }
+
+  const request = {
+    workspaceId: input.workspaceId,
+    states: states.length > 0 ? Object.freeze(states) : undefined,
+    sources: sources.length > 0 ? Object.freeze(sources) : undefined,
+    search: parsedConventions.search,
+    limit: parsedConventions.pagination?.limit,
+    offset: parsedConventions.pagination?.offset,
+    sortBy: parsedConventions.sorting?.sortBy as "submittedAt" | "updatedAt" | "state" | undefined,
+    sortDirection: parsedConventions.sorting?.sortDirection as "asc" | "desc" | undefined,
+  };
+
+  try {
+    return {
+      ok: true,
+      data: parseRunListReadRequest(request),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run list request is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Run list request is invalid."),
+    };
+  }
+}
+
 async function parseAndValidateRuntimeMutationBody(
   request: IncomingMessage,
   maxBodyBytes: number,
@@ -9770,6 +10008,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(options.assetManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
     [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runRead]: Boolean(options.authoritativeRunQueryBackendApi),
   });
 }
 

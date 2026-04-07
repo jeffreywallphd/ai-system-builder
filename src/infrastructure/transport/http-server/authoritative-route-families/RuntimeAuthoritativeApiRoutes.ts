@@ -27,3 +27,15 @@ export const RunSubmissionAuthoritativeApiRouteFamily = Object.freeze({
     AuthoritativeApiRouteBackendKeys.runSubmission,
   ]),
 }) satisfies AuthoritativeApiRouteFamilyRegistration;
+
+export const RunReadAuthoritativeApiRouteFamily = Object.freeze({
+  routeFamilyId: "run-read",
+  domain: AuthoritativeApiRouteDomains.runtime,
+  description: "Authoritative run read endpoints for list/detail/lifecycle visibility.",
+  routePrefixes: Object.freeze([
+    "/api/v1/runtime/runs",
+  ]),
+  requiredBackendKeys: Object.freeze([
+    AuthoritativeApiRouteBackendKeys.runRead,
+  ]),
+}) satisfies AuthoritativeApiRouteFamilyRegistration;

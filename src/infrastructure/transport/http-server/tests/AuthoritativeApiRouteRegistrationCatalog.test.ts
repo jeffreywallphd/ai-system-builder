@@ -21,6 +21,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
         [AuthoritativeApiRouteBackendKeys.systemRuntime]: true,
         [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
+        [AuthoritativeApiRouteBackendKeys.runRead]: true,
       }),
     });
 
@@ -33,6 +34,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(selectedRouteFamilyIds.has("authorization-management")).toBeTrue();
     expect(selectedRouteFamilyIds.has("system-runtime")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-submission")).toBeTrue();
+    expect(selectedRouteFamilyIds.has("run-read")).toBeTrue();
     expect(selectedRouteFamilyIds.has("node-trust")).toBeFalse();
     expect(selectedDomains.has("identity")).toBeTrue();
     expect(selectedDomains.has("workspaces")).toBeTrue();
@@ -57,6 +59,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
         [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
         [AuthoritativeApiRouteBackendKeys.runSubmission]: false,
+        [AuthoritativeApiRouteBackendKeys.runRead]: false,
       }),
     });
 
