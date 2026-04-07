@@ -35,6 +35,9 @@ describe("SurfaceRouteAccessPolicy", () => {
       isRoutePathAccessibleForSession(ROUTE_PATHS.workspaceThinMembership, session, { strict: true }),
     ).toBeTrue();
     expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.trustedDevices, session, { strict: true }),
+    ).toBeTrue();
+    expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.workspaceAdmin, session, { strict: true }),
     ).toBeFalse();
     expect(

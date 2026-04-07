@@ -3,6 +3,8 @@
   ChangeLocalPasswordCredentialApiResponse,
   GetIdentityAdminAccountStatusApiResponse,
   InitiateTrustedDevicePairingApiResponse,
+  IdentitySessionSummaryApiResponse,
+  ListIdentitySessionsApiResponse,
   ListIdentityAdminAccountsApiResponse,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiResponse,
@@ -162,6 +164,48 @@ export function serializeListTrustedDevicesResponse(
 ): ListTrustedDevicesApiResponse {
   return Object.freeze({
     devices: Object.freeze(value.map((device) => serializeTrustedDeviceSummary(device))),
+  });
+}
+
+export function serializeListIdentitySessionsResponse(
+  value: ReadonlyArray<IdentitySessionSummaryApiResponse>,
+): ListIdentitySessionsApiResponse {
+  return Object.freeze({
+    sessions: Object.freeze(value.map((session) => serializeIdentitySessionSummary(session))),
+  });
+}
+
+export function serializeIdentitySessionSummary(
+  value: IdentitySessionSummaryApiResponse,
+): IdentitySessionSummaryApiResponse {
+  return Object.freeze({
+    sessionId: value.sessionId,
+    userIdentityId: value.userIdentityId,
+    providerId: value.providerId,
+    providerSubject: value.providerSubject,
+    status: value.status,
+    issuedAt: value.issuedAt,
+    expiresAt: value.expiresAt,
+    accessChannel: value.accessChannel,
+    deviceId: value.deviceId,
+    trust: value.trust
+      ? Object.freeze({
+          trustedDeviceId: value.trust.trustedDeviceId,
+          sessionAssuranceLevel: value.trust.sessionAssuranceLevel,
+          trustState: value.trust.trustState,
+          trustEvaluatedAt: value.trust.trustEvaluatedAt,
+          issuedOnTrustedDevice: value.trust.issuedOnTrustedDevice,
+          invalidationReasons: value.trust.invalidationReasons
+            ? Object.freeze([...value.trust.invalidationReasons])
+            : undefined,
+        })
+      : undefined,
+    revocation: value.revocation
+      ? Object.freeze({
+          reason: value.revocation.reason,
+          revokedAt: value.revocation.revokedAt,
+        })
+      : undefined,
   });
 }
 

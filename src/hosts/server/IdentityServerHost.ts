@@ -491,6 +491,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       pairingService: trustedDevicePairingService,
     }),
     identityLookupRepository: repository,
+    sessionRepository: repository,
     authenticatedSessionService,
     sessionTrustService,
     featurePolicies: {

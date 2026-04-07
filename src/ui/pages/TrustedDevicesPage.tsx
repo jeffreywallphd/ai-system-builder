@@ -1,15 +1,20 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
+  IdentitySessionSummaryApiResponse,
   InitiateTrustedDevicePairingApiResponse,
   TrustedDevicePairingArtifactType,
   TrustedDeviceSummaryApiResponse,
   ValidateTrustedDevicePairingApiResponse,
-  TrustedDeviceTrustStatus,
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import {
+  SessionOversightPanel,
+  TrustedDeviceOversightPanel,
+  formatDisplayDate,
+} from "@shared/identity/IdentityTrustOversightPanels";
 
 export default function TrustedDevicesPage(): JSX.Element {
   const authService = useMemo(() => new IdentityAuthService(), []);
@@ -31,12 +36,16 @@ export default function TrustedDevicesPage(): JSX.Element {
   const [isValidating, setIsValidating] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [revokingDeviceId, setRevokingDeviceId] = useState<string>();
+  const [sessions, setSessions] = useState<ReadonlyArray<IdentitySessionSummaryApiResponse>>(Object.freeze([]));
+  const [selectedSessionId, setSelectedSessionId] = useState<string>();
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string>();
+  const [revokingSessionId, setRevokingSessionId] = useState<string>();
 
   const sessionToken = session?.sessionToken;
   const userIdentityId = session?.userIdentityId;
 
   const pairingCandidates = devices.filter((device) => device.trustStatus === "pending-pairing");
-  const selectedDevice = devices.find((device) => device.trustedDeviceId === selectedDeviceId);
   const canCompletePairing = validationResult?.outcome === "valid";
 
   const loadDevices = async (preferredSelectionId?: string): Promise<void> => {
@@ -80,11 +89,49 @@ export default function TrustedDevicesPage(): JSX.Element {
     }
   };
 
+  const loadSessions = async (preferredSelectionId?: string): Promise<void> => {
+    if (!sessionToken) {
+      return;
+    }
+
+    setIsLoadingSessions(true);
+    setSessionsError(undefined);
+    try {
+      const response = await authService.listIdentitySessions({
+        includeStatuses: ["active", "revoked", "expired"],
+        limit: 200,
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setSessions(Object.freeze([]));
+        setSessionsError(response.error?.message ?? "Unable to load session oversight.");
+        return;
+      }
+
+      const nextSessions = response.data.sessions;
+      setSessions(nextSessions);
+      if (nextSessions.length < 1) {
+        setSelectedSessionId(undefined);
+        return;
+      }
+
+      const nextSelected = preferredSelectionId && nextSessions.some((session) => session.sessionId === preferredSelectionId)
+        ? preferredSelectionId
+        : nextSessions[0]?.sessionId;
+      setSelectedSessionId(nextSelected);
+    } catch {
+      setSessions(Object.freeze([]));
+      setSessionsError("Session oversight request failed. Verify the identity API is reachable and try again.");
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
   useEffect(() => {
     if (!sessionToken || !userIdentityId) {
       return;
     }
     void loadDevices();
+    void loadSessions();
   }, [sessionToken, userIdentityId]);
 
   useEffect(() => {
@@ -258,6 +305,36 @@ export default function TrustedDevicesPage(): JSX.Element {
     }
   };
 
+  const revokeSession = async (targetSession: IdentitySessionSummaryApiResponse): Promise<void> => {
+    if (!sessionToken) {
+      return;
+    }
+    if (!window.confirm("End this session? The user will need to sign in again on that client.")) {
+      return;
+    }
+
+    setRevokingSessionId(targetSession.sessionId);
+    setActionError(undefined);
+    setActionStatus(undefined);
+    try {
+      const response = await authService.revokeIdentitySession({
+        sessionId: targetSession.sessionId,
+        reason: "security",
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setActionError(response.error?.message ?? "Unable to end session.");
+        return;
+      }
+
+      setActionStatus("Session ended.");
+      await loadSessions(targetSession.sessionId);
+    } catch {
+      setActionError("Session revocation failed.");
+    } finally {
+      setRevokingSessionId(undefined);
+    }
+  };
+
   if (!sessionToken || !userIdentityId || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-trusted-devices-page">
@@ -291,8 +368,9 @@ export default function TrustedDevicesPage(): JSX.Element {
             className="ui-button ui-button--secondary ui-button--sm"
             onClick={() => {
               void loadDevices(selectedDeviceId);
+              void loadSessions(selectedSessionId);
             }}
-            disabled={isLoadingDevices}
+            disabled={isLoadingDevices || isLoadingSessions}
           >
             Refresh
           </button>
@@ -300,6 +378,7 @@ export default function TrustedDevicesPage(): JSX.Element {
       </div>
 
       {devicesError ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--error" role="alert">{devicesError}</p> : null}
+      {sessionsError ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--error" role="alert">{sessionsError}</p> : null}
       {actionError ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--error" role="alert">{actionError}</p> : null}
       {actionStatus ? <p className="ui-trusted-devices-page__alert ui-trusted-devices-page__alert--success" role="status">{actionStatus}</p> : null}
 
@@ -378,7 +457,7 @@ export default function TrustedDevicesPage(): JSX.Element {
                   </div>
                   <div className="ui-meta-item">
                     <span className="ui-meta-label">Expires</span>
-                    <span className="ui-meta-value">{formatDate(activePairing.pairingToken.expiresAt)}</span>
+                    <span className="ui-meta-value">{formatDisplayDate(activePairing.pairingToken.expiresAt)}</span>
                   </div>
                   <div className="ui-meta-item">
                     <span className="ui-meta-label">Attempts left</span>
@@ -434,112 +513,37 @@ export default function TrustedDevicesPage(): JSX.Element {
           </div>
         </section>
 
-        <section className="ui-card">
-          <div className="ui-card__header">
-            <h2 className="ui-card__title">Trusted device management</h2>
-            <p className="ui-card__subtitle">Review trust state, registration timing, and recent device activity.</p>
-          </div>
-          <div className="ui-card__body ui-stack ui-stack--md">
-            {isLoadingDevices ? <p className="ui-text-secondary">Loading trusted devices...</p> : null}
-            {!isLoadingDevices && devices.length === 0 ? (
-              <p className="ui-text-secondary">No trusted devices are registered for this account.</p>
-            ) : null}
+        <TrustedDeviceOversightPanel
+          title="Trusted device management"
+          subtitle="Review trust state, registration timing, and recent device activity."
+          devices={devices}
+          isLoading={isLoadingDevices}
+          selectedTrustedDeviceId={selectedDeviceId}
+          revokingTrustedDeviceId={revokingDeviceId}
+          emptyMessage="No trusted devices are registered for this account."
+          onSelectTrustedDevice={setSelectedDeviceId}
+          onRevokeTrustedDevice={(device) => {
+            void revokeDevice(device);
+          }}
+        />
 
-            {devices.length > 0 ? (
-              <div className="ui-table-wrapper">
-                <table className="ui-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Device</th>
-                      <th scope="col">Trust</th>
-                      <th scope="col">Created</th>
-                      <th scope="col">Last seen</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {devices.map((device) => (
-                      <tr
-                        key={device.trustedDeviceId}
-                        className={device.trustedDeviceId === selectedDeviceId ? "ui-trusted-devices-page__table-row--selected" : undefined}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            className="ui-button ui-button--ghost ui-button--sm ui-trusted-devices-page__device-select"
-                            onClick={() => setSelectedDeviceId(device.trustedDeviceId)}
-                          >
-                            {device.displayName}
-                          </button>
-                        </td>
-                        <td><span className={`ui-badge ${statusBadgeClass(device.trustStatus)}`}>{device.trustStatus}</span></td>
-                        <td>{formatDate(device.registeredAt)}</td>
-                        <td>{device.lastSeenAt ? formatDate(device.lastSeenAt) : "Never"}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="ui-button ui-button--danger ui-button--sm"
-                            disabled={device.trustStatus === "revoked" || revokingDeviceId === device.trustedDeviceId}
-                            onClick={() => {
-                              void revokeDevice(device);
-                            }}
-                          >
-                            {revokingDeviceId === device.trustedDeviceId ? "Revoking..." : "Revoke"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
-
-            {selectedDevice ? (
-              <div className="ui-meta-grid">
-                <div className="ui-meta-item">
-                  <span className="ui-meta-label">Selected device</span>
-                  <span className="ui-meta-value">{selectedDevice.displayName}</span>
-                </div>
-                <div className="ui-meta-item">
-                  <span className="ui-meta-label">Pairing method</span>
-                  <span className="ui-meta-value">{selectedDevice.pairingMethod}</span>
-                </div>
-                <div className="ui-meta-item">
-                  <span className="ui-meta-label">Paired at</span>
-                  <span className="ui-meta-value">{selectedDevice.pairedAt ? formatDate(selectedDevice.pairedAt) : "Not paired"}</span>
-                </div>
-                <div className="ui-meta-item">
-                  <span className="ui-meta-label">Platform</span>
-                  <span className="ui-meta-value">{selectedDevice.metadata.platform ?? "Unknown"}</span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </section>
+        <SessionOversightPanel
+          title="Active session oversight"
+          subtitle="Review current and historical sessions and end sessions that should no longer be active."
+          sessions={sessions}
+          isLoading={isLoadingSessions}
+          selectedSessionId={selectedSessionId}
+          currentSessionId={session.sessionId}
+          revokingSessionId={revokingSessionId}
+          emptyMessage="No sessions are available for this account."
+          onSelectSession={setSelectedSessionId}
+          onRevokeSession={(targetSession) => {
+            void revokeSession(targetSession);
+          }}
+        />
       </div>
     </section>
   );
-}
-
-function statusBadgeClass(status: TrustedDeviceTrustStatus): string {
-  switch (status) {
-    case "trusted":
-      return "ui-badge--success";
-    case "pending-pairing":
-      return "ui-badge--warning";
-    case "revoked":
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-function formatDate(value: string): string {
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) {
-    return value;
-  }
-  return new Date(parsed).toLocaleString();
 }
 
 function getValidationOutcomeMessage(response: ValidateTrustedDevicePairingApiResponse): string {

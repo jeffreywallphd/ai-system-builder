@@ -33,6 +33,7 @@ describe("Surface route metadata catalog", () => {
     expect(routes.some((route) => route.key === "admin-lite-shell")).toBeTrue();
     expect(routes.some((route) => route.key === "authorization-sharing-thin")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-thin-membership")).toBeTrue();
+    expect(routes.some((route) => route.key === "trusted-devices")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "identity-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "secrets-admin")).toBeFalse();

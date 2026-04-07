@@ -336,12 +336,26 @@ const RevokeSessionRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest
   reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
 }).strict();
 
+const RevokeSessionByPathRequestSchema: z.ZodType<Pick<RevokeIdentitySessionApiRequest, "reason">> = z.object({
+  reason: z.enum(["logout", "security", "rotation", "admin"]).optional(),
+}).strict();
+
 const AdminAccountStatusValues = z.enum([
   "pending-activation",
   "active",
   "suspended",
   "locked",
   "deactivated",
+]);
+const IdentitySessionStatusValues = z.enum([
+  "active",
+  "rotated",
+  "expired",
+  "revoked",
+]);
+const IdentitySessionAccessChannelValues = z.enum([
+  "desktop",
+  "thin-client",
 ]);
 
 const SetAdminAccountStatusRequestSchema: z.ZodType<Pick<SetIdentityAdminAccountStatusApiRequest, "action" | "providerId">> = z.object({
@@ -1245,6 +1259,61 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         );
         return;
       }
+      if (request.method === "GET" && path === "/api/v1/identity/sessions") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const includeStatuses = url.searchParams.getAll("status");
+            const includeAccessChannels = url.searchParams.getAll("accessChannel");
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const validationError = buildQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+            const statusValidation = z.array(IdentitySessionStatusValues).safeParse(includeStatuses);
+            if (!statusValidation.success) {
+              const validationError = buildQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+            const accessChannelValidation = z.array(IdentitySessionAccessChannelValues).safeParse(includeAccessChannels);
+            if (!accessChannelValidation.success) {
+              const validationError = buildQueryValidationError("accessChannel", "accessChannel values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.listIdentitySessions({
+              userIdentityId: context.principal.userIdentityId,
+              includeStatuses: statusValidation.data,
+              includeAccessChannels: accessChannelValidation.data,
+              limit: pagination.limit,
+              offset: pagination.offset,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              userIdentityId: context.principal.userIdentityId,
+              includeStatuses: statusValidation.data,
+              includeAccessChannels: accessChannelValidation.data,
+              limit: pagination.limit,
+              offset: pagination.offset,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
       if (request.method === "POST" && path === "/api/v1/identity/credential/change") {
         await requireAuthenticatedSession(
           request,
@@ -1417,6 +1486,125 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             logResponse(logger, requestId, request, statusCode, Object.freeze({
               context: buildAdminContext(context.principal.userIdentityId),
               userIdentityId,
+              ...parsedRequest.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (request.method === "GET" && path === "/api/v1/identity/admin/sessions") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const userIdentityId = normalizeOptionalString(url.searchParams.get("userIdentityId"));
+            if (!userIdentityId) {
+              const invalid = buildInvalidRequestResponse("userIdentityId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const includeStatuses = url.searchParams.getAll("status");
+            const includeAccessChannels = url.searchParams.getAll("accessChannel");
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const validationError = buildQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+            const statusValidation = z.array(IdentitySessionStatusValues).safeParse(includeStatuses);
+            if (!statusValidation.success) {
+              const validationError = buildQueryValidationError("status", "status values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+            const accessChannelValidation = z.array(IdentitySessionAccessChannelValues).safeParse(includeAccessChannels);
+            if (!accessChannelValidation.success) {
+              const validationError = buildQueryValidationError("accessChannel", "accessChannel values are invalid.");
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.listIdentityAdminSessions({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              includeStatuses: statusValidation.data,
+              includeAccessChannels: accessChannelValidation.data,
+              limit: pagination.limit,
+              offset: pagination.offset,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              userIdentityId,
+              includeStatuses: statusValidation.data,
+              includeAccessChannels: accessChannelValidation.data,
+              limit: pagination.limit,
+              offset: pagination.offset,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+
+      if (
+        request.method === "POST"
+        && path.endsWith("/revoke")
+        && path.startsWith("/api/v1/identity/admin/sessions/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            minimumAssuranceLevel: "authenticated-trusted",
+          },
+          async (context) => {
+            const sessionId = decodePathTail(path, "/api/v1/identity/admin/sessions/", "/revoke");
+            if (!sessionId) {
+              const invalid = buildInvalidRequestResponse("sessionId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const parsedRequest = await parseAndValidateRequest(
+              request,
+              RevokeSessionByPathRequestSchema,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.backendApi.revokeIdentityAdminSession({
+              context: buildAdminContext(context.principal.userIdentityId),
+              sessionId,
+              reason: parsedRequest.data.reason,
+            });
+            const statusCode = mapStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              context: buildAdminContext(context.principal.userIdentityId),
+              sessionId,
               ...parsedRequest.data,
             }), apiResponse);
           },

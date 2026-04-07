@@ -12,8 +12,12 @@
   InitiateTrustedDevicePairingApiResponse,
   ListIdentityAdminAccountsApiRequest,
   ListIdentityAdminAccountsApiResponse,
+  ListIdentityAdminSessionsApiRequest,
+  ListIdentityAdminSessionsApiResponse,
   ListIdentityAdminTrustedDevicesApiRequest,
   ListIdentityAdminTrustedDevicesApiResponse,
+  ListIdentitySessionsApiRequest,
+  ListIdentitySessionsApiResponse,
   ListTrustedDevicesApiRequest,
   ListTrustedDevicesApiResponse,
   LoginLocalIdentityApiRequest,
@@ -24,6 +28,8 @@
   RevokeTrustedDeviceApiResponse,
   RevokeIdentityAdminTrustedDeviceApiRequest,
   RevokeIdentityAdminTrustedDeviceApiResponse,
+  RevokeIdentityAdminSessionApiRequest,
+  RevokeIdentityAdminSessionApiResponse,
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiRequest,
@@ -75,6 +81,13 @@ export class IdentityAuthService {
     return this.client.resolveAuthenticatedSession(request.sessionToken);
   }
 
+  public listIdentitySessions(
+    request: ListIdentitySessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    return this.client.listIdentitySessions(request, sessionToken);
+  }
+
   public resolveSessionActorContext(
     request: ResolveSessionActorContextApiRequest,
   ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
@@ -113,6 +126,20 @@ export class IdentityAuthService {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<SetIdentityAdminAccountStatusApiResponse>> {
     return this.client.setIdentityAdminAccountStatus(request, sessionToken);
+  }
+
+  public listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    return this.client.listIdentityAdminSessions(request, sessionToken);
+  }
+
+  public revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+    sessionToken: string,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    return this.client.revokeIdentityAdminSession(request, sessionToken);
   }
 
   public listIdentityAdminTrustedDevices(

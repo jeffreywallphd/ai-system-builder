@@ -1,5 +1,6 @@
 ﻿import { IdentityErrorCodes } from "@application/contracts/IdentityApplicationContracts";
 import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
 import type {
   ChangeLocalPasswordCredentialUseCase,
   ChangeLocalPasswordCredentialErrorCode,
@@ -53,7 +54,7 @@ import type {
   ValidateTrustedDevicePairingErrorCode,
 } from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
 import type { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
-import type { IdentitySessionAccessChannel } from "@domain/identity/IdentityDomain";
+import type { IdentitySessionAccessChannel, Session } from "@domain/identity/IdentityDomain";
 import type {
   RegisterLocalAccountUseCase,
   RegisterLocalAccountErrorCode,
@@ -68,8 +69,12 @@ import {
   type GetIdentityAdminAccountStatusApiResponse,
   type ListIdentityAdminAccountsApiRequest,
   type ListIdentityAdminAccountsApiResponse,
+  type ListIdentityAdminSessionsApiRequest,
+  type ListIdentityAdminSessionsApiResponse,
   type ListIdentityAdminTrustedDevicesApiRequest,
   type ListIdentityAdminTrustedDevicesApiResponse,
+  type ListIdentitySessionsApiRequest,
+  type ListIdentitySessionsApiResponse,
   type ListTrustedDevicesApiRequest,
   type ListTrustedDevicesApiResponse,
   type LoginLocalIdentityApiRequest,
@@ -84,6 +89,8 @@ import {
   type InitiateTrustedDevicePairingApiResponse,
   type RevokeIdentitySessionApiRequest,
   type RevokeIdentitySessionApiResponse,
+  type RevokeIdentityAdminSessionApiRequest,
+  type RevokeIdentityAdminSessionApiResponse,
   type RevokeTrustedDeviceApiRequest,
   type RevokeTrustedDeviceApiResponse,
   type RevokeIdentityAdminTrustedDeviceApiRequest,
@@ -118,6 +125,7 @@ import {
   serializeGetIdentityAdminAccountStatusResponse,
   serializeInitiateTrustedDevicePairingResponse,
   serializeListIdentityAdminAccountsResponse,
+  serializeListIdentitySessionsResponse,
   serializeListTrustedDevicesResponse,
   serializeLoginLocalIdentityResponse,
   serializeLogoutAuthenticatedSessionResponse,
@@ -147,6 +155,7 @@ interface IdentityAuthBackendApiDependencies {
   readonly validateTrustedDevicePairingUseCase: ValidateTrustedDevicePairingUseCase;
   readonly completeTrustedDevicePairingUseCase: CompleteTrustedDevicePairingUseCase;
   readonly identityLookupRepository: IIdentityLookupRepository;
+  readonly sessionRepository: IIdentitySessionRepository;
   readonly authenticatedSessionService: IdentityAuthenticatedSessionService;
   readonly sessionTrustService?: IIdentitySessionTrustService;
   readonly observability?: IdentityAuthObservabilityOptions;
@@ -606,6 +615,149 @@ export class IdentityAuthBackendApi {
       response,
     });
     return response;
+  }
+
+  public async listIdentitySessions(
+    request: ListIdentitySessionsApiRequest & { readonly userIdentityId: string },
+  ): Promise<IdentityAuthApiResponse<ListIdentitySessionsApiResponse>> {
+    try {
+      const sessions = await listSessionsForUser(this.dependencies.sessionRepository, {
+        userIdentityId: request.userIdentityId,
+        includeStatuses: request.includeStatuses,
+      });
+      const filtered = filterSessionsByAccessChannels(sessions, request.includeAccessChannels);
+      const paged = applyPagination(filtered, request.limit, request.offset);
+      const response = Object.freeze({
+        ok: true,
+        data: serializeListIdentitySessionsResponse(toIdentitySessionSummaries(paged)),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "session-list",
+        request,
+        response,
+      });
+      return response;
+    } catch {
+      const response = Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected identity session list error.",
+        },
+      });
+      await this.observability.recordApiOutcome({
+        flow: "session-list",
+        request,
+        response,
+      });
+      return response;
+    }
+  }
+
+  public async listIdentityAdminSessions(
+    request: ListIdentityAdminSessionsApiRequest,
+  ): Promise<IdentityAuthApiResponse<ListIdentityAdminSessionsApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
+    const decision = this.trustedDeviceAdministrationPolicy.evaluate({
+      action: TrustedDeviceAdministrativeActions.listSessions,
+      context: request.context,
+      targetUserIdentityId: request.userIdentityId,
+    });
+    if (!decision.allowed) {
+      const response = this.adminAuthorizationDeniedResponse<ListIdentityAdminSessionsApiResponse>(
+        decision.message ?? "Session administrative access denied.",
+      );
+      await this.observability.recordApiOutcome({
+        flow: "admin-session.list",
+        request,
+        response,
+      });
+      return response;
+    }
+
+    try {
+      const sessions = await listSessionsForUser(this.dependencies.sessionRepository, {
+        userIdentityId: request.userIdentityId,
+        includeStatuses: request.includeStatuses,
+      });
+      const filtered = filterSessionsByAccessChannels(sessions, request.includeAccessChannels);
+      const paged = applyPagination(filtered, request.limit, request.offset);
+      const response = Object.freeze({
+        ok: true,
+        data: serializeListIdentitySessionsResponse(toIdentitySessionSummaries(paged)),
+      });
+      await this.observability.recordApiOutcome({
+        flow: "admin-session.list",
+        request,
+        response,
+      });
+      return response;
+    } catch {
+      const response = Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.internal,
+          message: "Unexpected administrative session list error.",
+        },
+      });
+      await this.observability.recordApiOutcome({
+        flow: "admin-session.list",
+        request,
+        response,
+      });
+      return response;
+    }
+  }
+
+  public async revokeIdentityAdminSession(
+    request: RevokeIdentityAdminSessionApiRequest,
+  ): Promise<IdentityAuthApiResponse<RevokeIdentityAdminSessionApiResponse>> {
+    if (!this.featurePolicies.allowLocalAdministration) {
+      return this.adminOperationsDisabledResponse();
+    }
+
+    const targetSession = await this.dependencies.sessionRepository.getSessionById(request.sessionId);
+    if (!targetSession) {
+      return Object.freeze({
+        ok: false,
+        error: {
+          code: IdentityAuthApiErrorCodes.notFound,
+          message: "The requested session was not found.",
+        },
+      });
+    }
+
+    const decision = this.trustedDeviceAdministrationPolicy.evaluate({
+      action: TrustedDeviceAdministrativeActions.revokeSession,
+      context: request.context,
+      targetUserIdentityId: targetSession.userIdentityId,
+    });
+    if (!decision.allowed) {
+      const response = this.adminAuthorizationDeniedResponse<RevokeIdentityAdminSessionApiResponse>(
+        decision.message ?? "Session administrative access denied.",
+      );
+      await this.observability.recordApiOutcome({
+        flow: "admin-session.revoke",
+        request,
+        response,
+      });
+      return response;
+    }
+
+    const revokeResponse = await this.revokeIdentitySession({
+      sessionId: request.sessionId,
+      reason: request.reason,
+    });
+    await this.observability.recordApiOutcome({
+      flow: "admin-session.revoke",
+      request,
+      response: revokeResponse,
+      errorCode: revokeResponse.ok ? undefined : revokeResponse.error?.code,
+    });
+    return revokeResponse;
   }
 
   public async listIdentityAdminAccounts(
@@ -1377,6 +1529,108 @@ function extractTrustFailure(
     reason,
     invalidationReasons: invalidationReasons.length > 0 ? Object.freeze([...invalidationReasons]) : undefined,
   });
+}
+
+function toIdentitySessionSummaries(
+  sessions: ReadonlyArray<Session>,
+): ReadonlyArray<{
+  readonly sessionId: string;
+  readonly userIdentityId: string;
+  readonly providerId: string;
+  readonly providerSubject: string;
+  readonly status: "active" | "rotated" | "expired" | "revoked";
+  readonly issuedAt: string;
+  readonly expiresAt: string;
+  readonly accessChannel?: "desktop" | "thin-client";
+  readonly deviceId?: string;
+  readonly trust?: {
+    readonly trustedDeviceId?: string;
+    readonly sessionAssuranceLevel?: "authenticated-untrusted" | "authenticated-trusted" | "authenticated-restricted";
+    readonly trustState?: "unknown" | "untrusted" | "trusted" | "pending-pairing" | "revoked" | "expired";
+    readonly trustEvaluatedAt?: string;
+    readonly issuedOnTrustedDevice?: boolean;
+    readonly invalidationReasons?: ReadonlyArray<"trusted-device-revoked" | "trusted-device-trust-lost" | "trusted-device-expired" | "trusted-device-mismatch">;
+  };
+  readonly revocation?: {
+    readonly reason: "logout" | "security" | "rotation" | "admin";
+    readonly revokedAt: string;
+  };
+}> {
+  return Object.freeze(
+    sessions.map((session) => Object.freeze({
+      sessionId: session.id,
+      userIdentityId: session.userIdentityId,
+      providerId: session.providerId,
+      providerSubject: session.providerSubject,
+      status: session.status,
+      issuedAt: session.issuedAt,
+      expiresAt: session.expiresAt,
+      accessChannel: session.client?.accessChannel,
+      deviceId: session.client?.deviceId,
+      trust: session.client?.deviceTrust
+        ? Object.freeze({
+            trustedDeviceId: session.client.deviceTrust.trustedDeviceId
+              ?? session.client.deviceTrust.trustedDeviceBindingId,
+            sessionAssuranceLevel: session.client.deviceTrust.sessionAssuranceLevel,
+            trustState: session.client.deviceTrust.snapshot?.state,
+            trustEvaluatedAt: session.client.deviceTrust.snapshot?.evaluatedAt,
+            issuedOnTrustedDevice: session.client.deviceTrust.issuedOnTrustedDevice,
+            invalidationReasons: session.client.deviceTrust.invalidationReasons,
+          })
+        : undefined,
+      revocation: session.revocation
+        ? Object.freeze({
+            reason: session.revocation.reason,
+            revokedAt: session.revocation.revokedAt,
+          })
+        : undefined,
+    })),
+  );
+}
+
+function filterSessionsByAccessChannels(
+  sessions: ReadonlyArray<Session>,
+  includeAccessChannels: ReadonlyArray<"desktop" | "thin-client"> | undefined,
+): ReadonlyArray<Session> {
+  if (!includeAccessChannels || includeAccessChannels.length < 1) {
+    return sessions;
+  }
+  const allowed = new Set(includeAccessChannels);
+  return Object.freeze(
+    sessions.filter((session) => {
+      const accessChannel = session.client?.accessChannel;
+      return accessChannel ? allowed.has(accessChannel) : false;
+    }),
+  );
+}
+
+function applyPagination<T>(
+  items: ReadonlyArray<T>,
+  limit: number | undefined,
+  offset: number | undefined,
+): ReadonlyArray<T> {
+  const normalizedOffset = Number.isInteger(offset) && (offset ?? -1) >= 0 ? offset as number : 0;
+  const normalizedLimit = Number.isInteger(limit) && (limit ?? 0) > 0 ? limit as number : items.length;
+  return Object.freeze(items.slice(normalizedOffset, normalizedOffset + normalizedLimit));
+}
+
+async function listSessionsForUser(
+  sessionRepository: IIdentitySessionRepository,
+  query: {
+    readonly userIdentityId: string;
+    readonly includeStatuses?: ReadonlyArray<"active" | "rotated" | "expired" | "revoked">;
+  },
+): Promise<ReadonlyArray<Session>> {
+  const legacyRepository = sessionRepository as IIdentitySessionRepository & {
+    listSessionsByUserIdentityId?: (legacyQuery: {
+      readonly userIdentityId: string;
+      readonly includeStatuses?: ReadonlyArray<"active" | "rotated" | "expired" | "revoked">;
+    }) => Promise<ReadonlyArray<Session>>;
+  };
+  if (typeof legacyRepository.listSessionsByUserIdentityId === "function") {
+    return await legacyRepository.listSessionsByUserIdentityId(query);
+  }
+  return await sessionRepository.listSessions(query);
 }
 
 function isIdentitySessionTrustInvalidationReason(value: unknown): value is IdentitySessionTrustInvalidationReason {

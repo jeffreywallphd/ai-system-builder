@@ -3,6 +3,8 @@ import type { IdentityAdministrativeActionContext } from "./IdentityAdministrati
 export const TrustedDeviceAdministrativeActions = Object.freeze({
   listTrustedDevices: "list-trusted-devices",
   revokeTrustedDevice: "revoke-trusted-device",
+  listSessions: "list-sessions",
+  revokeSession: "revoke-session",
 });
 
 export type TrustedDeviceAdministrativeAction =

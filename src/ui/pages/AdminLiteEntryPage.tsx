@@ -13,6 +13,7 @@ const adminLiteRouteKeys = new Set([
   "workspace-thin-membership",
   "node-enrollment-review",
   "node-inventory",
+  "trusted-devices",
 ]);
 
 export default function AdminLiteEntryPage(): JSX.Element {

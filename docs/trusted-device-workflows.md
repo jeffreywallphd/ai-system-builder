@@ -7,6 +7,8 @@ This document describes the user-facing trusted-device flows available in the re
 - Settings -> **Trusted devices**
 - Identity administration -> **Trusted devices**
 - Identity administration -> **Trusted device oversight**
+- Trusted devices -> **Session oversight**
+- Identity administration -> **Session oversight**
 
 Route: `src/ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.trustedDevices` (`/settings/trusted-devices`)
 Route: `src/ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.identityAdmin` (`/settings/identity-admin`)
@@ -49,6 +51,20 @@ The management table surfaces, per device:
 
 Revocation requires user confirmation and calls the authenticated trusted-device revoke API.
 
+## Session oversight workflow
+
+Trusted-device UI now includes active session visibility and revocation controls:
+
+1. Open **Trusted devices**.
+2. Load session records for the authenticated account (`active`, `revoked`, `expired`).
+3. Select a session to view channel, trust state, assurance, issue/expiry, and redacted device/trust binding identifiers.
+4. End a selected session with explicit confirmation when the session should no longer remain valid.
+
+API paths used by self-service session oversight:
+
+- `GET /api/v1/identity/sessions?status=<optional>&accessChannel=<optional>`
+- `POST /api/v1/identity/session/revoke`
+
 ## Admin trusted-device oversight workflow
 
 The identity administration page now includes a trusted-device oversight section:
@@ -62,12 +78,15 @@ API paths used by admin oversight:
 
 - `GET /api/v1/identity/admin/trusted-devices?userIdentityId=<id>&workspaceId=<optional>&status=<optional>`
 - `POST /api/v1/identity/admin/trusted-devices/:trustedDeviceId/revoke`
+- `GET /api/v1/identity/admin/sessions?userIdentityId=<id>&status=<optional>&accessChannel=<optional>`
+- `POST /api/v1/identity/admin/sessions/:sessionId/revoke`
 
 Authorization posture:
 
 - self-service trusted-device routes remain user-scoped.
 - admin oversight routes evaluate centralized administrative trusted-device authorization policy in the backend.
 - bootstrap admin identities can be configured through `IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS`.
+- trusted-devices settings route is now available to thin-client/admin-lite sessions for self-service trust/session oversight, while identity-admin remains admin-scoped.
 
 ## API usage boundary
 
@@ -75,6 +94,7 @@ The trusted-device page uses the shared renderer identity API seam:
 
 - `src/ui/services/IdentityAuthService.ts`
 - `src/ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/shared/identity/IdentityTrustOversightPanels.tsx`
 
 No local-only trust shortcuts are used for pairing or revocation state transitions.
 
@@ -94,6 +114,7 @@ Audit payloads include actor/target linkage where available (`userIdentityId`, `
 ## Tests
 
 - `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/shared/identity/tests/IdentityTrustOversightPanels.test.tsx`
 - `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
