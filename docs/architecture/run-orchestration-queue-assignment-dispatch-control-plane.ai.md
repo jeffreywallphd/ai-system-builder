@@ -38,3 +38,13 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 - Calling backend adapters without canonical execution-command building is prohibited.
 - Applying lifecycle/progress updates outside `IngestRunExecutionUpdateUseCase` validation is prohibited.
 - Re-defining lifecycle transition legality outside `RunDomain` is prohibited.
+
+## Story 16.3.8 hardening baseline
+- Integration regression coverage: `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`.
+- Covered flow includes submission, queue admission, assignment selection, node claim, dispatch, progress ingestion, completion finalization, cancellation/retry policy checks, startup recovery, and run-query contract parsing.
+- Duplicate assignment remains conflict-first (`already-assigned`) and is explicitly asserted.
+
+## Deferred edges
+- Advanced scheduler scoring/prioritization policy is deferred; reservation-backed queue semantics are the current stability boundary.
+- Recovery automation remains intentionally guarded to safe deterministic cases; manual follow-up paths are explicit and auditable.
+- Operator-only realtime event expansion beyond user-safe orchestration events is deferred until policy/audience expansion work.

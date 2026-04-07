@@ -54,3 +54,6 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Bypassing execution-update ingestion validation for lifecycle/progress writes is prohibited.
 - Bypassing authoritative submission validation + creation for retried runs is prohibited.
 - Emitting unsanitized prompts/secrets/raw paths/backend payloads in orchestration diagnostics is prohibited.
+
+## Regression hardening check
+- Keep integrated lifecycle regression coverage healthy in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts` to catch cross-seam drift across submission, queueing, assignment, dispatch, progress, completion, cancellation/retry checks, recovery, and visibility contracts.
