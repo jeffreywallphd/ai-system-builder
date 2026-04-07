@@ -24,6 +24,7 @@ Story 17.1.1 defines canonical scheduling domain concepts and the authoritative 
 - Adds baseline policy helpers for:
   - role-priority (`owner/admin/member/viewer` precedence)
   - hybrid node local interactive-use protection
+- Decision outcomes now include explicit `no-placement` semantics alongside `deferred` to distinguish queue-empty deferral from evaluated-but-unplaceable work.
 - Adds explicit application-layer scheduling decision-pipeline contracts that separate:
   - policy evaluation from
   - assignment materialization and dispatch execution

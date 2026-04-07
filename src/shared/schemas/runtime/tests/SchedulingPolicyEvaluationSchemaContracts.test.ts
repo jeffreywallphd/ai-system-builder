@@ -140,11 +140,11 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
       decision: {
         decisionId: "decision:2",
         occurredAt: "2026-04-07T19:00:01.000Z",
-        outcome: "deferred",
+        outcome: "no-placement",
         evaluatedCandidates: [],
         reasons: [{
-          code: "queue-empty",
-          message: "No queued runs were available.",
+          code: "no-placement",
+          message: "No placement was available for the queued runs.",
         }],
         policySources: ["run-submission"],
       },
@@ -156,7 +156,7 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
           occurredAt: "2026-04-07T19:00:01.000Z",
           policySources: ["run-submission"],
         },
-        outcome: "deferred",
+        outcome: "no-placement",
         summary: {
           queueLeaseCount: 0,
           runCount: 0,
@@ -167,24 +167,24 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
         },
         queueEvaluation: [],
         reasonSummary: {
-          decisionReasonCodes: ["queue-empty"],
+          decisionReasonCodes: ["no-placement"],
           decisionReasonCatalog: [{
-            code: "queue-empty",
+            code: "no-placement",
             count: 1,
-            sampleMessage: "No queued runs were available.",
+            sampleMessage: "No placement was available for the queued runs.",
           }],
           exclusionReasonCodes: [],
           exclusionReasonCatalog: [],
           exclusionSamples: [],
         },
         reasons: [{
-          code: "queue-empty",
-          message: "No queued runs were available.",
+          code: "no-placement",
+          message: "No placement was available for the queued runs.",
         }],
       },
     });
 
-    expect(parsed.decision.outcome).toBe("deferred");
+    expect(parsed.decision.outcome).toBe("no-placement");
     expect(parsed.evaluation.summary.candidateCount).toBe(0);
   });
 

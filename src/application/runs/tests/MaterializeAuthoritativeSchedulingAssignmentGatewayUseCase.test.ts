@@ -10,7 +10,9 @@ import { RunNodeDispatchClaimConflictError } from "@application/runs/use-cases/C
 import { MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase } from "@application/runs/use-cases/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase";
 import {
   createSchedulingDecisionBundle,
+  createSchedulingOutcomeReason,
   type SchedulingDecisionBundle,
+  SchedulingPolicyEvaluationReasonCodes,
 } from "@shared/contracts/runtime/SchedulingPolicyEvaluationContracts";
 import {
   SchedulingDecisionOutcomes,
@@ -18,8 +20,21 @@ import {
   createSchedulingPolicyDecision,
 } from "@domain/scheduling/SchedulingDomain";
 
-class RecordingQueueRepository implements Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim"> {
+class RecordingQueueRepository implements Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim" | "deferRunClaimForNoPlacement"> {
   public readonly releases: Array<{ readonly runId: string; readonly claimToken: string; readonly releasedAt: string }> = [];
+  public readonly deferred: Array<{
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }> = [];
 
   public async releaseRunClaim(input: {
     readonly runId: string;
@@ -28,6 +43,36 @@ class RecordingQueueRepository implements Pick<IRunOrchestrationQueuePersistence
   }): Promise<boolean> {
     this.releases.push(input);
     return true;
+  }
+
+  public async deferRunClaimForNoPlacement(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly deferredAt: string;
+    readonly reasonCategory: string;
+    readonly reasonCodes: ReadonlyArray<string>;
+    readonly reasonMessage: string;
+    readonly decisionId?: string;
+    readonly requiresAdministrativeAttention?: boolean;
+    readonly initialDelaySeconds?: number;
+    readonly maxDelaySeconds?: number;
+    readonly multiplier?: number;
+  }) {
+    this.deferred.push(input);
+    return Object.freeze({
+      changed: true,
+      record: Object.freeze({
+        runId: input.runId,
+        queueId: "queue:default",
+        lifecycleState: "queued",
+        enteredAt: "2026-04-07T12:00:00.000Z",
+        orderKey: "2026-04-07T12:00:00.000Z:run",
+        eligibilityMarker: "deferred",
+        eligibleAt: "2026-04-07T12:00:30.000Z",
+        updatedAt: input.deferredAt,
+        revision: 2,
+      }),
+    });
   }
 }
 
@@ -122,6 +167,43 @@ function createDecisionBundle(): SchedulingDecisionBundle {
       decisionId: "decision:1",
       decidedAt: "2026-04-07T12:05:00.000Z",
     })]),
+  });
+}
+
+function createNoPlacementDecisionBundle(): SchedulingDecisionBundle {
+  const snapshot = Object.freeze({
+    asOf: "2026-04-07T12:05:00.000Z",
+    queueLeases: Object.freeze([Object.freeze({
+      runId: "run:2",
+      queueId: "queue:default",
+      enteredAt: "2026-04-07T12:00:00.000Z",
+      eligibleAt: "2026-04-07T12:00:00.000Z",
+      claimToken: "claim:2",
+      claimOwner: "scheduler:alpha",
+      claimExpiresAt: "2026-04-07T12:06:00.000Z",
+    })]),
+    runs: Object.freeze([]),
+    nodes: Object.freeze([]),
+  });
+  const decision = createSchedulingPolicyDecision({
+    decisionId: "decision:no-placement",
+    occurredAt: "2026-04-07T12:05:00.000Z",
+    outcome: SchedulingDecisionOutcomes.noPlacement,
+    selected: undefined,
+    evaluatedCandidates: Object.freeze([]),
+    reasons: Object.freeze([
+      createSchedulingOutcomeReason(
+        SchedulingPolicyEvaluationReasonCodes.noPlacement,
+        "Queued runs could not be evaluated against any eligible nodes.",
+      ),
+    ]),
+    policySources: [SchedulingPolicySourceKinds.activeReservations],
+  });
+
+  return createSchedulingDecisionBundle({
+    snapshot,
+    decision,
+    assignmentIntents: Object.freeze([]),
   });
 }
 
@@ -238,5 +320,28 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     expect(result).toHaveLength(0);
     expect(placementHoldRepository.releases).toHaveLength(1);
     expect(placementHoldRepository.releases[0]?.holdToken).toBe("node-hold:2");
+  });
+
+  it("defers non-selected queue leases with no-placement metadata instead of immediate release", async () => {
+    const queueRepository = new RecordingQueueRepository();
+    const placementHoldRepository = new RecordingPlacementHoldRepository();
+    const useCase = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
+      queueRepository,
+      placementHoldRepository,
+      claimRunForNodeDispatchPreparationUseCase: {
+        execute: async () => Promise.resolve(undefined as never),
+      },
+      now: () => new Date("2026-04-07T12:05:00.000Z"),
+    });
+
+    const result = await useCase.materializeAssignmentIntents({
+      decisionBundle: createNoPlacementDecisionBundle(),
+    });
+
+    expect(result).toEqual([]);
+    expect(queueRepository.releases).toEqual([]);
+    expect(queueRepository.deferred).toHaveLength(1);
+    expect(queueRepository.deferred[0]?.runId).toBe("run:2");
+    expect(queueRepository.deferred[0]?.reasonCodes).toContain("no-placement");
   });
 });

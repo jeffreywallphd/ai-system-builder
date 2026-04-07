@@ -90,14 +90,20 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
     }
 
     let outcome = SchedulingDecisionOutcomes.assignmentRecommended;
-    if (orderedEvaluatedCandidates.length === 0) {
+    if (snapshot.queueLeases.length === 0 || snapshot.runs.length === 0) {
       outcome = SchedulingDecisionOutcomes.deferred;
       reasons.push(createSchedulingOutcomeReason(
         SchedulingPolicyEvaluationReasonCodes.queueEmpty,
         "No scheduling candidates were available for evaluation.",
       ));
+    } else if (orderedEvaluatedCandidates.length === 0) {
+      outcome = SchedulingDecisionOutcomes.noPlacement;
+      reasons.push(createSchedulingOutcomeReason(
+        SchedulingPolicyEvaluationReasonCodes.noPlacement,
+        "Queued runs could not be evaluated against any eligible nodes.",
+      ));
     } else if (!selected) {
-      outcome = SchedulingDecisionOutcomes.deferred;
+      outcome = SchedulingDecisionOutcomes.noPlacement;
       reasons.push(createSchedulingOutcomeReason(
         SchedulingPolicyEvaluationReasonCodes.noEligibleCandidates,
         "Scheduling candidates were evaluated, but none were eligible for assignment.",

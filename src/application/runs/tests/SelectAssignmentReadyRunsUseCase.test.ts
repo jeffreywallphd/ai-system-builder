@@ -91,7 +91,7 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     const asOf = query.asOf;
     const ready = [...this.queue.values()]
       .filter((entry) => !entry.dequeuedAt)
-      .filter((entry) => entry.eligibilityMarker === "ready")
+      .filter((entry) => entry.eligibilityMarker === "ready" || entry.eligibilityMarker === "deferred")
       .filter((entry) => entry.eligibleAt <= asOf)
       .filter((entry) => !query.queueId || entry.queueId === query.queueId)
       .filter((entry) => !query.workspaceId || entry.workspaceId === query.workspaceId)
@@ -406,7 +406,7 @@ describe("SelectAssignmentReadyRunsUseCase", () => {
     expect(result.items[1]?.queue.claimToken).toBe("claim:run-a");
   });
 
-  it("excludes deferred or future-eligible queue entries from assignment selection", async () => {
+  it("excludes queue entries that are not yet eligible even when marked deferred", async () => {
     const runRepository = new InMemoryRunRepository();
     const queueRepository = new InMemoryQueueRepository();
 
@@ -450,7 +450,7 @@ describe("SelectAssignmentReadyRunsUseCase", () => {
       runId: "run-deferred",
       queueId: "queue:default",
       enteredAt: "2026-04-07T09:00:00.000Z",
-      eligibleAt: "2026-04-07T09:00:30.000Z",
+      eligibleAt: "2026-04-07T10:00:30.000Z",
       orderKey: "2026-04-07T09:00:00.000Z:run-deferred",
       eligibilityMarker: "deferred",
     }));

@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 5;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 6;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -192,5 +192,14 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
       ON platform_run_node_placement_holds(expires_at ASC, node_id ASC);
     CREATE INDEX IF NOT EXISTS platform_run_node_placement_holds_owner_idx
       ON platform_run_node_placement_holds(reservation_owner, expires_at ASC, node_id ASC);
+  `],
+  [6, `
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN defer_count INTEGER NOT NULL DEFAULT 0 CHECK (defer_count >= 0);
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_category TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_reason_codes_json TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_reason_message TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_decision_id TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_recorded_at TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_admin_attention INTEGER NOT NULL DEFAULT 0 CHECK (last_no_placement_admin_attention IN (0, 1));
   `],
 ]);

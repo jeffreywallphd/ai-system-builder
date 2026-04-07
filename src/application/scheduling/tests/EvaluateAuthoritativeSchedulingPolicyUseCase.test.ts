@@ -198,7 +198,7 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     }));
   });
 
-  it("returns deferred outcomes when there are no candidates or no eligible candidates", async () => {
+  it("returns deferred queue-empty outcomes and no-placement outcomes for evaluated-but-unschedulable queues", async () => {
     const queueEmptyUseCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
       now: () => new Date("2026-04-07T20:00:01.000Z"),
       decisionIdFactory: () => "decision:queue-empty",
@@ -225,7 +225,7 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     });
     const noEligible = await noEligibleUseCase.evaluate(createSnapshot());
 
-    expect(noEligible.decision.outcome).toBe("deferred");
+    expect(noEligible.decision.outcome).toBe("no-placement");
     expect(noEligible.decision.selected).toBeUndefined();
     expect(noEligible.assignmentIntents).toEqual([]);
     expect(noEligible.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
@@ -622,7 +622,7 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
       ]),
     }));
 
-    expect(bundle.decision.outcome).toBe("deferred");
+    expect(bundle.decision.outcome).toBe("no-placement");
     expect(bundle.decision.selected).toBeUndefined();
     expect(bundle.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
     expect(bundle.decision.evaluatedCandidates.every((candidate) => !candidate.eligible)).toBeTrue();

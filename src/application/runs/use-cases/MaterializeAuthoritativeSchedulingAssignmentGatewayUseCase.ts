@@ -8,13 +8,15 @@ import type {
   IRunNodePlacementHoldRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import { SchedulingDecisionOutcomes } from "@domain/scheduling/SchedulingDomain";
+import { SchedulingPolicyEvaluationReasonCodes } from "@shared/contracts/runtime/SchedulingPolicyEvaluationContracts";
 import {
   ClaimRunForNodeDispatchPreparationUseCase,
   RunNodeDispatchClaimConflictError,
 } from "./ClaimRunForNodeDispatchPreparationUseCase";
 
 interface MaterializeAuthoritativeSchedulingAssignmentGatewayUseCaseDependencies {
-  readonly queueRepository: Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim">;
+  readonly queueRepository: Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim" | "deferRunClaimForNoPlacement">;
   readonly placementHoldRepository: IRunNodePlacementHoldRepository;
   readonly claimRunForNodeDispatchPreparationUseCase: Pick<ClaimRunForNodeDispatchPreparationUseCase, "execute">;
   readonly now?: () => Date;
@@ -44,15 +46,33 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
   public async materializeAssignmentIntents(input: {
     readonly decisionBundle: SchedulingDecisionBundle;
   }): Promise<ReadonlyArray<SchedulingAssignmentIntent>> {
+    const noPlacementByRunId = toNoPlacementByRunId(input.decisionBundle);
     const selectedRunIds = new Set(input.decisionBundle.assignmentIntents.map((intent) => intent.runId));
     for (const lease of input.decisionBundle.snapshot.queueLeases) {
       if (selectedRunIds.has(lease.runId)) {
         continue;
       }
-      await this.dependencies.queueRepository.releaseRunClaim({
+      const noPlacement = noPlacementByRunId.get(lease.runId);
+      if (!noPlacement || !this.dependencies.queueRepository.deferRunClaimForNoPlacement) {
+        await this.dependencies.queueRepository.releaseRunClaim({
+          runId: lease.runId,
+          claimToken: lease.claimToken,
+          releasedAt: this.now().toISOString(),
+        });
+        continue;
+      }
+      await this.dependencies.queueRepository.deferRunClaimForNoPlacement({
         runId: lease.runId,
         claimToken: lease.claimToken,
-        releasedAt: this.now().toISOString(),
+        deferredAt: this.now().toISOString(),
+        reasonCategory: noPlacement.reasonCategory,
+        reasonCodes: noPlacement.reasonCodes,
+        reasonMessage: noPlacement.reasonMessage,
+        decisionId: input.decisionBundle.decision.decisionId,
+        requiresAdministrativeAttention: noPlacement.requiresAdministrativeAttention,
+        initialDelaySeconds: noPlacement.backoff.initialDelaySeconds,
+        maxDelaySeconds: noPlacement.backoff.maxDelaySeconds,
+        multiplier: noPlacement.backoff.multiplier,
       });
     }
 
@@ -105,4 +125,98 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
 
     return Object.freeze(materialized);
   }
+}
+
+interface NoPlacementBackoffPolicy {
+  readonly initialDelaySeconds: number;
+  readonly multiplier: number;
+  readonly maxDelaySeconds: number;
+}
+
+interface NoPlacementDisposition {
+  readonly reasonCategory: string;
+  readonly reasonCodes: ReadonlyArray<string>;
+  readonly reasonMessage: string;
+  readonly requiresAdministrativeAttention: boolean;
+  readonly backoff: NoPlacementBackoffPolicy;
+}
+
+function toNoPlacementByRunId(decisionBundle: SchedulingDecisionBundle): ReadonlyMap<string, NoPlacementDisposition> {
+  const selectedRunIds = new Set(decisionBundle.assignmentIntents.map((intent) => intent.runId));
+  const runIds = [...new Set(decisionBundle.snapshot.queueLeases.map((lease) => lease.runId))]
+    .filter((runId) => !selectedRunIds.has(runId));
+  const result = new Map<string, NoPlacementDisposition>();
+  for (const runId of runIds) {
+    const runCandidates = decisionBundle.decision.evaluatedCandidates.filter((candidate) => candidate.runId === runId);
+    result.set(runId, buildRunNoPlacementDisposition({
+      decisionBundle,
+      runId,
+      runCandidates,
+    }));
+  }
+  return result;
+}
+
+function buildRunNoPlacementDisposition(input: {
+  readonly decisionBundle: SchedulingDecisionBundle;
+  readonly runId: string;
+  readonly runCandidates: ReadonlyArray<SchedulingDecisionBundle["decision"]["evaluatedCandidates"][number]>;
+}): NoPlacementDisposition {
+  if (input.runCandidates.length === 0) {
+    return Object.freeze({
+      reasonCategory: "missing-run-or-node-candidate",
+      reasonCodes: Object.freeze([SchedulingPolicyEvaluationReasonCodes.noPlacement]),
+      reasonMessage: `Run '${input.runId}' had no scheduling candidates for the current evaluation.`,
+      requiresAdministrativeAttention: true,
+      backoff: Object.freeze({
+        initialDelaySeconds: 120,
+        multiplier: 2,
+        maxDelaySeconds: 900,
+      }),
+    });
+  }
+
+  const hasEligibleCandidate = input.runCandidates.some((candidate) => candidate.eligible);
+  if (hasEligibleCandidate) {
+    return Object.freeze({
+      reasonCategory: "role-priority-preempted",
+      reasonCodes: Object.freeze([SchedulingPolicyEvaluationReasonCodes.rolePriorityPreempted]),
+      reasonMessage: `Run '${input.runId}' was preempted by higher-priority arbitration for this scheduling cycle.`,
+      requiresAdministrativeAttention: false,
+      backoff: Object.freeze({
+        initialDelaySeconds: 5,
+        multiplier: 2,
+        maxDelaySeconds: 60,
+      }),
+    });
+  }
+
+  const denialCodes = [...new Set(
+    input.runCandidates.flatMap((candidate) => candidate.denialReasons.map((reason) => reason.code)),
+  )];
+  const reasonCodes = denialCodes.length > 0
+    ? denialCodes
+    : [SchedulingPolicyEvaluationReasonCodes.noEligibleCandidates];
+  const adminAttention = denialCodes.includes("node-missing-capability")
+    || denialCodes.includes("remote-scheduling-unsupported");
+  const reasonCategory = adminAttention
+    ? "capability-coverage-missing"
+    : "policy-blocked";
+  const reasonMessage = adminAttention
+    ? `Run '${input.runId}' could not be scheduled because no eligible node satisfies required capabilities.`
+    : `Run '${input.runId}' could not be scheduled due to current policy and node availability constraints.`;
+
+  const decisionOutcome = input.decisionBundle.decision.outcome;
+  const noPlacementOutcome = decisionOutcome === SchedulingDecisionOutcomes.noPlacement;
+  return Object.freeze({
+    reasonCategory,
+    reasonCodes: Object.freeze(reasonCodes),
+    reasonMessage,
+    requiresAdministrativeAttention: adminAttention,
+    backoff: Object.freeze({
+      initialDelaySeconds: noPlacementOutcome ? 30 : 15,
+      multiplier: 2,
+      maxDelaySeconds: noPlacementOutcome ? 300 : 120,
+    }),
+  });
 }
