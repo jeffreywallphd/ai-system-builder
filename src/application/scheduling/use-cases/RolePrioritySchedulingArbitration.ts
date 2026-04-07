@@ -11,6 +11,28 @@ export const RolePrioritySchedulingTieBreakOrder = Object.freeze([
   "node-id",
 ]);
 
+export function compareRolePrioritySchedulingCandidates(
+  left: SchedulingCandidateDecision,
+  right: SchedulingCandidateDecision,
+): number {
+  if (left.scorecard.rolePriorityScore !== right.scorecard.rolePriorityScore) {
+    return right.scorecard.rolePriorityScore - left.scorecard.rolePriorityScore;
+  }
+  if (left.scorecard.queueAgeSeconds !== right.scorecard.queueAgeSeconds) {
+    return right.scorecard.queueAgeSeconds - left.scorecard.queueAgeSeconds;
+  }
+  if (left.runId !== right.runId) {
+    return left.runId.localeCompare(right.runId);
+  }
+  return left.nodeId.localeCompare(right.nodeId);
+}
+
+export function orderRolePrioritySchedulingCandidates(
+  candidates: ReadonlyArray<SchedulingCandidateDecision>,
+): ReadonlyArray<SchedulingCandidateDecision> {
+  return Object.freeze([...candidates].sort(compareRolePrioritySchedulingCandidates));
+}
+
 export interface RolePrioritySchedulingSelection {
   readonly candidate: SchedulingCandidateDecision;
   readonly run: SchedulingRunPolicyInput;
@@ -34,18 +56,9 @@ export function selectRolePrioritySchedulingCandidate(input: {
     return undefined;
   }
 
-  const sorted = [...eligibleWithRun].sort((left, right) => {
-    if (left.candidate.scorecard.rolePriorityScore !== right.candidate.scorecard.rolePriorityScore) {
-      return right.candidate.scorecard.rolePriorityScore - left.candidate.scorecard.rolePriorityScore;
-    }
-    if (left.candidate.scorecard.queueAgeSeconds !== right.candidate.scorecard.queueAgeSeconds) {
-      return right.candidate.scorecard.queueAgeSeconds - left.candidate.scorecard.queueAgeSeconds;
-    }
-    if (left.candidate.runId !== right.candidate.runId) {
-      return left.candidate.runId.localeCompare(right.candidate.runId);
-    }
-    return left.candidate.nodeId.localeCompare(right.candidate.nodeId);
-  });
+  const sorted = [...eligibleWithRun].sort((left, right) => (
+    compareRolePrioritySchedulingCandidates(left.candidate, right.candidate)
+  ));
 
   const winner = sorted[0];
   if (!winner) {
@@ -61,13 +74,24 @@ export function selectRolePrioritySchedulingCandidate(input: {
 export function createRolePrioritySchedulingArbitrationReason(input: {
   readonly selected: RolePrioritySchedulingSelection;
   readonly eligibleCandidateCount: number;
+  readonly rankedCandidates: ReadonlyArray<SchedulingCandidateDecision>;
 }): SchedulingPolicyReason {
+  const topRankedCandidates = input.rankedCandidates.slice(0, 3).map((candidate) => Object.freeze({
+    runId: candidate.runId,
+    nodeId: candidate.nodeId,
+    rolePriorityScore: candidate.scorecard.rolePriorityScore,
+    queueAgeSeconds: candidate.scorecard.queueAgeSeconds,
+  }));
+  const decisiveTieBreakStage = resolveDecisiveTieBreakStage(input.rankedCandidates);
+
   return Object.freeze({
     code: "role-priority-arbitration",
     message: "Role-priority scheduling arbitration selected the highest-ranked eligible candidate.",
     details: Object.freeze({
       tieBreakOrder: RolePrioritySchedulingTieBreakOrder,
       eligibleCandidateCount: input.eligibleCandidateCount,
+      decisiveTieBreakStage,
+      topRankedCandidates: Object.freeze(topRankedCandidates),
       selected: Object.freeze({
         runId: input.selected.run.runId,
         nodeId: input.selected.candidate.nodeId,
@@ -78,4 +102,29 @@ export function createRolePrioritySchedulingArbitrationReason(input: {
       }),
     }),
   });
+}
+
+function resolveDecisiveTieBreakStage(
+  rankedCandidates: ReadonlyArray<SchedulingCandidateDecision>,
+): string {
+  const winner = rankedCandidates[0];
+  const runnerUp = rankedCandidates[1];
+  if (!winner || !runnerUp) {
+    return "single-candidate";
+  }
+
+  if (winner.scorecard.rolePriorityScore !== runnerUp.scorecard.rolePriorityScore) {
+    return "role-priority-score";
+  }
+  if (winner.scorecard.queueAgeSeconds !== runnerUp.scorecard.queueAgeSeconds) {
+    return "queue-age-seconds";
+  }
+  if (winner.runId !== runnerUp.runId) {
+    return "run-id";
+  }
+  if (winner.nodeId !== runnerUp.nodeId) {
+    return "node-id";
+  }
+
+  return "exact-match";
 }

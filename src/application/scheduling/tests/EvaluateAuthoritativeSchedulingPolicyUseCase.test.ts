@@ -121,6 +121,21 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
         "node-id",
       ]),
       eligibleCandidateCount: 2,
+      decisiveTieBreakStage: "role-priority-score",
+      topRankedCandidates: Object.freeze([
+        Object.freeze({
+          runId: "run:owner",
+          nodeId: "node:compute:1",
+          rolePriorityScore: 4,
+          queueAgeSeconds: 40,
+        }),
+        Object.freeze({
+          runId: "run:viewer",
+          nodeId: "node:compute:1",
+          rolePriorityScore: 1,
+          queueAgeSeconds: 280,
+        }),
+      ]),
       selected: Object.freeze({
         runId: "run:owner",
         nodeId: "node:compute:1",
@@ -301,6 +316,110 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
 
     expect(bundle.decision.selected?.runId).toBe("run:a");
     expect(bundle.decision.selected?.nodeId).toBe("node:a");
+  });
+
+  it("keeps arbitration deterministic when run and node input order changes", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:ordering-deterministic",
+    });
+    const baseSnapshot = Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: Object.freeze([
+        Object.freeze({
+          runId: "run:b",
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:55:20.000Z",
+          eligibleAt: "2026-04-07T19:55:20.000Z",
+          claimToken: "claim:b",
+          claimOwner: "scheduler:alpha",
+          claimExpiresAt: "2026-04-07T20:01:00.000Z",
+        }),
+        Object.freeze({
+          runId: "run:a",
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:55:20.000Z",
+          eligibleAt: "2026-04-07T19:55:20.000Z",
+          claimToken: "claim:a",
+          claimOwner: "scheduler:alpha",
+          claimExpiresAt: "2026-04-07T20:01:00.000Z",
+        }),
+      ]),
+      runs: Object.freeze([
+        Object.freeze({
+          runId: "run:b",
+          workspaceId: "workspace:1",
+          submittedByUserIdentityId: "user:b",
+          workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+          requirements: Object.freeze({
+            requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+            requiresRemoteScheduling: true,
+          }),
+          queue: Object.freeze({
+            queueId: "queue:default",
+            enteredAt: "2026-04-07T19:55:20.000Z",
+            eligibleAt: "2026-04-07T19:55:20.000Z",
+            claimToken: "claim:b",
+            claimOwner: "scheduler:alpha",
+          }),
+        }),
+        Object.freeze({
+          runId: "run:a",
+          workspaceId: "workspace:1",
+          submittedByUserIdentityId: "user:a",
+          workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+          requirements: Object.freeze({
+            requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+            requiresRemoteScheduling: true,
+          }),
+          queue: Object.freeze({
+            queueId: "queue:default",
+            enteredAt: "2026-04-07T19:55:20.000Z",
+            eligibleAt: "2026-04-07T19:55:20.000Z",
+            claimToken: "claim:a",
+            claimOwner: "scheduler:alpha",
+          }),
+        }),
+      ]),
+      nodes: Object.freeze([
+        Object.freeze({
+          nodeId: "node:z",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+        Object.freeze({
+          nodeId: "node:a",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+      ]),
+    });
+
+    const reversedSnapshot = Object.freeze({
+      ...baseSnapshot,
+      runs: Object.freeze([...baseSnapshot.runs].reverse()),
+      nodes: Object.freeze([...baseSnapshot.nodes].reverse()),
+    });
+    const [baseBundle, reversedBundle] = await Promise.all([
+      useCase.evaluate(baseSnapshot),
+      useCase.evaluate(reversedSnapshot),
+    ]);
+
+    expect(baseBundle.decision.selected).toEqual(reversedBundle.decision.selected);
+    expect(baseBundle.assignmentIntents).toEqual(reversedBundle.assignmentIntents);
+    expect(baseBundle.decision.evaluatedCandidates).toEqual(reversedBundle.decision.evaluatedCandidates);
+    expect(baseBundle.decision.evaluatedCandidates.map((candidate) => `${candidate.runId}:${candidate.nodeId}`)).toEqual([
+      "run:a:node:a",
+      "run:a:node:z",
+      "run:b:node:a",
+      "run:b:node:z",
+    ]);
   });
 
   it("excludes capability-ineligible nodes and applies placement affinity preference when eligible matches exist", async () => {

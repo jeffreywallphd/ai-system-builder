@@ -4,6 +4,7 @@ import { SchedulingRunPriorityBands, type SchedulingCandidateDecision } from "@d
 import {
   RolePrioritySchedulingTieBreakOrder,
   createRolePrioritySchedulingArbitrationReason,
+  orderRolePrioritySchedulingCandidates,
   selectRolePrioritySchedulingCandidate,
 } from "@application/scheduling/use-cases/RolePrioritySchedulingArbitration";
 
@@ -176,12 +177,37 @@ describe("RolePrioritySchedulingArbitration", () => {
     const reason = createRolePrioritySchedulingArbitrationReason({
       selected,
       eligibleCandidateCount: 2,
+      rankedCandidates: orderRolePrioritySchedulingCandidates(Object.freeze([
+        selected.candidate,
+        createCandidate({
+          runId: "run:member",
+          nodeId: "node:2",
+          priorityBand: "normal",
+          rolePriorityScore: 2,
+          queueAgeSeconds: 60,
+        }),
+      ])),
     });
 
     expect(reason.code).toBe("role-priority-arbitration");
     expect(reason.details).toEqual(Object.freeze({
       tieBreakOrder: RolePrioritySchedulingTieBreakOrder,
       eligibleCandidateCount: 2,
+      decisiveTieBreakStage: "role-priority-score",
+      topRankedCandidates: Object.freeze([
+        Object.freeze({
+          runId: "run:owner",
+          nodeId: "node:1",
+          rolePriorityScore: 4,
+          queueAgeSeconds: 30,
+        }),
+        Object.freeze({
+          runId: "run:member",
+          nodeId: "node:2",
+          rolePriorityScore: 2,
+          queueAgeSeconds: 60,
+        }),
+      ]),
       selected: Object.freeze({
         runId: "run:owner",
         nodeId: "node:1",

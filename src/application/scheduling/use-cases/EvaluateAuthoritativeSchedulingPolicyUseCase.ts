@@ -21,7 +21,9 @@ import {
 } from "./SchedulingPolicyRulePipeline";
 import { applyBasicPlacementAffinityPreference } from "./SchedulingPlacementAffinityPreference";
 import {
+  compareRolePrioritySchedulingCandidates,
   createRolePrioritySchedulingArbitrationReason,
+  orderRolePrioritySchedulingCandidates,
   selectRolePrioritySchedulingCandidate,
 } from "./RolePrioritySchedulingArbitration";
 import type {
@@ -53,14 +55,16 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
   public async evaluate(snapshot: SchedulingEvaluationSnapshot): Promise<SchedulingDecisionBundle> {
     const occurredAt = this.now().toISOString();
     const evaluatedCandidates = await this.evaluateCandidates(snapshot);
-    const eligibleCandidates = evaluatedCandidates.filter((candidate) => candidate.eligible);
+    const orderedEvaluatedCandidates = orderRolePrioritySchedulingCandidates(evaluatedCandidates);
+    const eligibleCandidates = orderedEvaluatedCandidates.filter((candidate) => candidate.eligible);
     const affinityPreference = applyBasicPlacementAffinityPreference({
       eligibleCandidates,
       runs: snapshot.runs,
       nodes: snapshot.nodes,
     });
+    const rankedCandidates = orderRolePrioritySchedulingCandidates(affinityPreference.eligibleCandidates);
     const selected = selectRolePrioritySchedulingCandidate({
-      eligibleCandidates: affinityPreference.eligibleCandidates,
+      eligibleCandidates: rankedCandidates,
       runs: snapshot.runs,
     });
 
@@ -70,9 +74,9 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
         message: "Scheduling policy rules were evaluated in configured order.",
         details: Object.freeze({
           ruleOrder: this.rulePipeline.getRuleOrder(),
-          candidateCount: evaluatedCandidates.length,
+          candidateCount: orderedEvaluatedCandidates.length,
           eligibleCandidateCount: eligibleCandidates.length,
-          affinityPreferredCandidateCount: affinityPreference.eligibleCandidates.length,
+          affinityPreferredCandidateCount: rankedCandidates.length,
         }),
       }),
     ];
@@ -80,12 +84,13 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
     if (selected) {
       reasons.push(createRolePrioritySchedulingArbitrationReason({
         selected,
-        eligibleCandidateCount: affinityPreference.eligibleCandidates.length,
+        eligibleCandidateCount: rankedCandidates.length,
+        rankedCandidates,
       }));
     }
 
     let outcome = SchedulingDecisionOutcomes.assignmentRecommended;
-    if (evaluatedCandidates.length === 0) {
+    if (orderedEvaluatedCandidates.length === 0) {
       outcome = SchedulingDecisionOutcomes.deferred;
       reasons.push(createSchedulingOutcomeReason(
         SchedulingPolicyEvaluationReasonCodes.queueEmpty,
@@ -119,7 +124,7 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
           reservationOwner: selected.run.queue.claimOwner,
         })
         : undefined,
-      evaluatedCandidates,
+      evaluatedCandidates: orderedEvaluatedCandidates,
       reasons,
       policySources,
     });
@@ -145,8 +150,11 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
 
   private async evaluateCandidates(snapshot: SchedulingEvaluationSnapshot): Promise<ReadonlyArray<SchedulingCandidateDecision>> {
     const results: SchedulingCandidateDecision[] = [];
-    for (const run of snapshot.runs) {
-      for (const node of snapshot.nodes) {
+    const orderedRuns = [...snapshot.runs].sort((left, right) => left.runId.localeCompare(right.runId));
+    const orderedNodes = [...snapshot.nodes].sort((left, right) => left.nodeId.localeCompare(right.nodeId));
+
+    for (const run of orderedRuns) {
+      for (const node of orderedNodes) {
         const evaluated = await this.rulePipeline.evaluateCandidate({
           asOf: snapshot.asOf,
           run,
@@ -156,6 +164,6 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
       }
     }
 
-    return Object.freeze(results);
+    return Object.freeze(results.sort(compareRolePrioritySchedulingCandidates));
   }
 }
