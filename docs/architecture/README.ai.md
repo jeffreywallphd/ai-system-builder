@@ -125,6 +125,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Story 12.4.2 development/test startup migration notes (local scripts and harnesses now running through host assemblies): `docs/architecture/development-host-startup-model-12.4.2.md`
 - Story 12.4.3 host extension guardrails (architecture tests + contributor host/layer workflow): `docs/architecture/host-composition-extension-guardrails-12.4.3.md`
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
+- Canonical audit domain model/event taxonomy/invariants and audit-vs-operational boundary guidance: `docs/architecture/audit-domain-foundation.md`
 - Cross-domain authoritative aggregate boundaries and repository target baseline for Feature 13: `docs/architecture/persistent-platform-domain-boundaries.md`
 - Contributor extension rules and integration-regression expectations for Feature 13 persistent platform services: `docs/architecture/persistent-platform-service-extension-guidance.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
@@ -286,6 +287,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
 - Runtime-facing service-to-service secret consumption adapters now expose workspace/user/server credential retrieval through formal retrieval use cases in `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-consumption-adapters.md`.
+
 
 
 

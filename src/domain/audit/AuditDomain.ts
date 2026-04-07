@@ -1,0 +1,418 @@
+export class AuditDomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuditDomainError";
+  }
+}
+
+export const AuditRecordKinds = Object.freeze({
+  auditRecord: "audit-record",
+  operationalLog: "operational-log",
+});
+
+export type AuditRecordKind = typeof AuditRecordKinds[keyof typeof AuditRecordKinds];
+
+export const AuditEventCategories = Object.freeze({
+  securitySensitive: "security-sensitive",
+  administrative: "administrative",
+  sharing: "sharing",
+  policy: "policy",
+  orchestration: "orchestration",
+  protectedData: "protected-data",
+});
+
+export type AuditEventCategory = typeof AuditEventCategories[keyof typeof AuditEventCategories];
+
+export const AuditEventOutcomes = Object.freeze({
+  succeeded: "succeeded",
+  denied: "denied",
+  failed: "failed",
+  rejected: "rejected",
+});
+
+export type AuditEventOutcome = typeof AuditEventOutcomes[keyof typeof AuditEventOutcomes];
+
+export const AuditActorKinds = Object.freeze({
+  user: "user",
+  service: "service",
+  system: "system",
+});
+
+export type AuditActorKind = typeof AuditActorKinds[keyof typeof AuditActorKinds];
+
+export const AuditScopeKinds = Object.freeze({
+  global: "global",
+  workspace: "workspace",
+});
+
+export type AuditScopeKind = typeof AuditScopeKinds[keyof typeof AuditScopeKinds];
+
+export const AuditResourceSensitivityClasses = Object.freeze({
+  standard: "standard",
+  sensitive: "sensitive",
+  protected: "protected",
+});
+
+export type AuditResourceSensitivityClass =
+  typeof AuditResourceSensitivityClasses[keyof typeof AuditResourceSensitivityClasses];
+
+export const AuditRetentionPostures = Object.freeze({
+  operational: "operational",
+  governance: "governance",
+  legalHold: "legal-hold",
+});
+
+export type AuditRetentionPosture = typeof AuditRetentionPostures[keyof typeof AuditRetentionPostures];
+
+export const AuditImmutabilityPostures = Object.freeze({
+  appendOnly: "append-only",
+  appendOnlyHashChained: "append-only-hash-chained",
+});
+
+export type AuditImmutabilityPosture =
+  typeof AuditImmutabilityPostures[keyof typeof AuditImmutabilityPostures];
+
+export const AuditRedactionReasons = Object.freeze({
+  secretMaterial: "secret-material",
+  token: "token",
+  credential: "credential",
+  personalData: "personal-data",
+  internalOnlyDiagnostic: "internal-only-diagnostic",
+});
+
+export type AuditRedactionReason = typeof AuditRedactionReasons[keyof typeof AuditRedactionReasons];
+
+export interface AuditActorIdentity {
+  readonly actorId: string;
+  readonly actorKind: AuditActorKind;
+  readonly actorUserIdentityId?: string;
+  readonly actorServiceId?: string;
+  readonly actorSessionId?: string;
+}
+
+export interface AuditScope {
+  readonly kind: AuditScopeKind;
+  readonly workspaceId?: string;
+}
+
+export interface AuditProtectedResourceReference {
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly resourceRef: string;
+  readonly sensitivityClass: AuditResourceSensitivityClass;
+  readonly workspaceId?: string;
+}
+
+export interface AuditIntegrityEvidence {
+  readonly schemaVersion: string;
+  readonly hashAlgorithm: string;
+  readonly eventDigest?: string;
+  readonly previousEventDigest?: string;
+}
+
+export interface AuditEventPayloadBoundary {
+  readonly userSafeDetails?: Readonly<Record<string, unknown>>;
+  readonly adminOnlyDetails?: Readonly<Record<string, unknown>>;
+  readonly hasProtectedData: boolean;
+  readonly redactionReasons: ReadonlyArray<AuditRedactionReason>;
+}
+
+export interface CanonicalAuditEvent {
+  readonly recordKind: typeof AuditRecordKinds.auditRecord;
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly category: AuditEventCategory;
+  readonly action: string;
+  readonly outcome: AuditEventOutcome;
+  readonly occurredAt: string;
+  readonly recordedAt: string;
+  readonly actor: AuditActorIdentity;
+  readonly scope: AuditScope;
+  readonly protectedResource?: AuditProtectedResourceReference;
+  readonly payload: AuditEventPayloadBoundary;
+  readonly integrity: AuditIntegrityEvidence;
+  readonly retention: AuditRetentionPosture;
+  readonly immutability: AuditImmutabilityPosture;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+}
+
+export interface UserSafeAuditEventView {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly category: AuditEventCategory;
+  readonly action: string;
+  readonly outcome: AuditEventOutcome;
+  readonly occurredAt: string;
+  readonly recordedAt: string;
+  readonly actorId: string;
+  readonly actorKind: AuditActorKind;
+  readonly scope: AuditScope;
+  readonly protectedResource?: AuditProtectedResourceReference;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+function normalizeRequired(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new AuditDomainError(`${field} is required.`);
+  }
+  return normalized;
+}
+
+function normalizeOptional(value?: string | null): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeTimestamp(value: string | Date, field: string): string {
+  const iso = value instanceof Date ? value.toISOString() : value.trim();
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    throw new AuditDomainError(`${field} must be a valid timestamp.`);
+  }
+  return date.toISOString();
+}
+
+function freezeRecord(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+  return Object.freeze({ ...input });
+}
+
+function isKnownValue<TValue extends string>(
+  dictionary: Readonly<Record<string, TValue>>,
+  value: string,
+): value is TValue {
+  return Object.values(dictionary).includes(value as TValue);
+}
+
+export function createAuditActorIdentity(input: AuditActorIdentity): AuditActorIdentity {
+  const actorKind = input.actorKind;
+  if (!isKnownValue(AuditActorKinds, actorKind)) {
+    throw new AuditDomainError(`Audit actor kind '${String(actorKind)}' is invalid.`);
+  }
+
+  const actorId = normalizeRequired(input.actorId, "Audit actorId");
+  const actorUserIdentityId = normalizeOptional(input.actorUserIdentityId);
+  const actorServiceId = normalizeOptional(input.actorServiceId);
+  const actorSessionId = normalizeOptional(input.actorSessionId);
+
+  if (actorKind === AuditActorKinds.user && !actorUserIdentityId) {
+    throw new AuditDomainError("User audit actor kind requires actorUserIdentityId.");
+  }
+  if (actorKind === AuditActorKinds.service && !actorServiceId) {
+    throw new AuditDomainError("Service audit actor kind requires actorServiceId.");
+  }
+
+  if (!actorUserIdentityId && !actorServiceId && actorKind !== AuditActorKinds.system) {
+    throw new AuditDomainError("Audit actor identity requires actorUserIdentityId or actorServiceId.");
+  }
+
+  return Object.freeze({
+    actorId,
+    actorKind,
+    actorUserIdentityId,
+    actorServiceId,
+    actorSessionId,
+  });
+}
+
+export function createAuditScope(input: AuditScope): AuditScope {
+  const kind = input.kind;
+  if (!isKnownValue(AuditScopeKinds, kind)) {
+    throw new AuditDomainError(`Audit scope kind '${String(kind)}' is invalid.`);
+  }
+
+  const workspaceId = normalizeOptional(input.workspaceId);
+  if (kind === AuditScopeKinds.workspace && !workspaceId) {
+    throw new AuditDomainError("Workspace audit scope requires workspaceId.");
+  }
+  if (kind === AuditScopeKinds.global && workspaceId) {
+    throw new AuditDomainError("Global audit scope cannot include workspaceId.");
+  }
+
+  return Object.freeze({
+    kind,
+    workspaceId,
+  });
+}
+
+export function createAuditProtectedResourceReference(
+  input: AuditProtectedResourceReference,
+): AuditProtectedResourceReference {
+  const sensitivityClass = input.sensitivityClass;
+  if (!isKnownValue(AuditResourceSensitivityClasses, sensitivityClass)) {
+    throw new AuditDomainError(`Audit sensitivity class '${String(sensitivityClass)}' is invalid.`);
+  }
+
+  return Object.freeze({
+    resourceType: normalizeRequired(input.resourceType, "Audit protected resource type"),
+    resourceId: normalizeRequired(input.resourceId, "Audit protected resource id"),
+    resourceRef: normalizeRequired(input.resourceRef, "Audit protected resource ref"),
+    sensitivityClass,
+    workspaceId: normalizeOptional(input.workspaceId),
+  });
+}
+
+export function createAuditIntegrityEvidence(input: AuditIntegrityEvidence): AuditIntegrityEvidence {
+  return Object.freeze({
+    schemaVersion: normalizeRequired(input.schemaVersion, "Audit integrity schemaVersion"),
+    hashAlgorithm: normalizeRequired(input.hashAlgorithm, "Audit integrity hashAlgorithm"),
+    eventDigest: normalizeOptional(input.eventDigest),
+    previousEventDigest: normalizeOptional(input.previousEventDigest),
+  });
+}
+
+export function createAuditEventPayloadBoundary(input?: {
+  readonly userSafeDetails?: Readonly<Record<string, unknown>>;
+  readonly adminOnlyDetails?: Readonly<Record<string, unknown>>;
+  readonly hasProtectedData?: boolean;
+  readonly redactionReasons?: ReadonlyArray<AuditRedactionReason>;
+}): AuditEventPayloadBoundary {
+  const userSafeDetails = input?.userSafeDetails ? freezeRecord(input.userSafeDetails) : undefined;
+  const adminOnlyDetails = input?.adminOnlyDetails ? freezeRecord(input.adminOnlyDetails) : undefined;
+
+  const duplicateKeys = new Set<string>();
+  if (userSafeDetails && adminOnlyDetails) {
+    for (const key of Object.keys(userSafeDetails)) {
+      if (Object.prototype.hasOwnProperty.call(adminOnlyDetails, key)) {
+        duplicateKeys.add(key);
+      }
+    }
+  }
+
+  if (duplicateKeys.size > 0) {
+    throw new AuditDomainError(
+      `Audit payload boundaries cannot reuse keys between userSafeDetails and adminOnlyDetails: ${[...duplicateKeys].join(", ")}`,
+    );
+  }
+
+  const redactionReasons = (input?.redactionReasons ?? [])
+    .map((reason) => reason)
+    .filter((reason, index, values) => values.indexOf(reason) === index);
+
+  for (const reason of redactionReasons) {
+    if (!isKnownValue(AuditRedactionReasons, reason)) {
+      throw new AuditDomainError(`Audit redaction reason '${String(reason)}' is invalid.`);
+    }
+  }
+
+  const hasProtectedData = input?.hasProtectedData ?? Boolean(adminOnlyDetails && Object.keys(adminOnlyDetails).length > 0);
+  if (hasProtectedData && redactionReasons.length === 0) {
+    throw new AuditDomainError("Audit payload with protected data requires at least one redaction reason.");
+  }
+
+  return Object.freeze({
+    userSafeDetails,
+    adminOnlyDetails,
+    hasProtectedData,
+    redactionReasons: Object.freeze(redactionReasons),
+  });
+}
+
+export function createCanonicalAuditEvent(input: {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly category: AuditEventCategory;
+  readonly action: string;
+  readonly outcome: AuditEventOutcome;
+  readonly occurredAt: string | Date;
+  readonly recordedAt?: string | Date;
+  readonly actor: AuditActorIdentity;
+  readonly scope: AuditScope;
+  readonly protectedResource?: AuditProtectedResourceReference;
+  readonly payload?: {
+    readonly userSafeDetails?: Readonly<Record<string, unknown>>;
+    readonly adminOnlyDetails?: Readonly<Record<string, unknown>>;
+    readonly hasProtectedData?: boolean;
+    readonly redactionReasons?: ReadonlyArray<AuditRedactionReason>;
+  };
+  readonly integrity: AuditIntegrityEvidence;
+  readonly retention?: AuditRetentionPosture;
+  readonly immutability?: AuditImmutabilityPosture;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+}): CanonicalAuditEvent {
+  const category = input.category;
+  if (!isKnownValue(AuditEventCategories, category)) {
+    throw new AuditDomainError(`Audit category '${String(category)}' is invalid.`);
+  }
+
+  const outcome = input.outcome;
+  if (!isKnownValue(AuditEventOutcomes, outcome)) {
+    throw new AuditDomainError(`Audit outcome '${String(outcome)}' is invalid.`);
+  }
+
+  const occurredAt = normalizeTimestamp(input.occurredAt, "Audit occurredAt");
+  const recordedAt = normalizeTimestamp(input.recordedAt ?? occurredAt, "Audit recordedAt");
+  if (Date.parse(recordedAt) < Date.parse(occurredAt)) {
+    throw new AuditDomainError("Audit recordedAt cannot be earlier than occurredAt.");
+  }
+
+  const scope = createAuditScope(input.scope);
+  const actor = createAuditActorIdentity(input.actor);
+  const protectedResource = input.protectedResource
+    ? createAuditProtectedResourceReference(input.protectedResource)
+    : undefined;
+
+  if (
+    protectedResource?.workspaceId
+    && scope.kind === AuditScopeKinds.workspace
+    && protectedResource.workspaceId !== scope.workspaceId
+  ) {
+    throw new AuditDomainError("Audit protected resource workspaceId must match event scope workspaceId.");
+  }
+
+  const payload = createAuditEventPayloadBoundary(input.payload);
+  const integrity = createAuditIntegrityEvidence(input.integrity);
+
+  const retention = input.retention ?? AuditRetentionPostures.governance;
+  if (!isKnownValue(AuditRetentionPostures, retention)) {
+    throw new AuditDomainError(`Audit retention posture '${String(retention)}' is invalid.`);
+  }
+
+  const immutability = input.immutability ?? AuditImmutabilityPostures.appendOnly;
+  if (!isKnownValue(AuditImmutabilityPostures, immutability)) {
+    throw new AuditDomainError(`Audit immutability posture '${String(immutability)}' is invalid.`);
+  }
+
+  return Object.freeze({
+    recordKind: AuditRecordKinds.auditRecord,
+    eventId: normalizeRequired(input.eventId, "Audit eventId"),
+    eventType: normalizeRequired(input.eventType, "Audit eventType"),
+    category,
+    action: normalizeRequired(input.action, "Audit action"),
+    outcome,
+    occurredAt,
+    recordedAt,
+    actor,
+    scope,
+    protectedResource,
+    payload,
+    integrity,
+    retention,
+    immutability,
+    correlationId: normalizeOptional(input.correlationId),
+    requestId: normalizeOptional(input.requestId),
+  });
+}
+
+export function toUserSafeAuditEventView(event: CanonicalAuditEvent): UserSafeAuditEventView {
+  return Object.freeze({
+    eventId: event.eventId,
+    eventType: event.eventType,
+    category: event.category,
+    action: event.action,
+    outcome: event.outcome,
+    occurredAt: event.occurredAt,
+    recordedAt: event.recordedAt,
+    actorId: event.actor.actorId,
+    actorKind: event.actor.actorKind,
+    scope: event.scope,
+    protectedResource: event.protectedResource,
+    details: event.payload.userSafeDetails,
+  });
+}
+
+export function isCanonicalAuditRecordKind(value: string): value is typeof AuditRecordKinds.auditRecord {
+  return value === AuditRecordKinds.auditRecord;
+}

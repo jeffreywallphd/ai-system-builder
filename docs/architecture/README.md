@@ -250,6 +250,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the consolidated Feature 4 production baseline and extension checklist, read [`authorization-feature-4-final-baseline.md`](./authorization-feature-4-final-baseline.md).
 - For admin/user sharing-management and access-review operations guidance, read [`../authorization-sharing-management-and-access-review.md`](../authorization-sharing-management-and-access-review.md).
 - For workspace administration audit hook seams and integration boundaries, read [`workspace-administration-audit-hooks.md`](./workspace-administration-audit-hooks.md).
+- For the canonical audit domain model, event taxonomy, invariants, and audit-vs-operational boundary guidance, read [`audit-domain-foundation.md`](./audit-domain-foundation.md).
 - For cross-domain authoritative aggregate boundaries, write-vs-read persistence model ownership, and repository target baseline for Feature 13 foundation work, read [`persistent-platform-domain-boundaries.md`](./persistent-platform-domain-boundaries.md).
 - For contributor extension rules and integration regression expectations for persistent platform services, read [`persistent-platform-service-extension-guidance.md`](./persistent-platform-service-extension-guidance.md).
 - For Feature 1 completion baseline and downstream dependency notes (trusted device, workspace membership, authorization), read [`identity-feature-1-final-baseline.md`](./identity-feature-1-final-baseline.md).
@@ -361,5 +362,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `src/application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `src/application/system-studio/tests/*` and `src/infrastructure/api/studio-shell/tests/*`.
+
+
 
 
