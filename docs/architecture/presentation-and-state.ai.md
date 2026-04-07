@@ -954,3 +954,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - `src/ui/pages/RunThinClientOperationalDashboardPage.tsx`
 - Dashboard content is API-driven from existing authoritative contracts/services (runtime queue + run inspection + execution history + trusted node inventory) and realtime status updates via `RuntimeRealtimeSubscriptionService`.
 - The foundation now provides a coherent workspace-level operational entry point for queue state, recent run/output review, node availability summary, actionable alerts, and approved run initiation controls.
+
+## Approved operational run launch update (story 15.2.4)
+
+- `RunPage` now composes approved run launch UX through a shared panel (`src/ui/shared/operations/OperationalApprovedRunLaunchPanel.tsx`) instead of page-local JSON textarea handling.
+- The shared panel provides reusable section structure for target identifiers, allowed parameter adjustments, input payload JSON, submission actions, and immediate submission-state feedback.
+- Allowed parameter handling is now bounded through explicit field definitions and deterministic validation (`validateOperationalApprovedRunLaunchDraft`) before API submission, while authoritative API responses remain source-of-truth for validation/denial outcomes.
+- Submission feedback now maps authoritative runtime response semantics into converged launch states (`accepted`, `validation-error`, `denied`, `failed`) through `mapRuntimeStartResponseToSubmissionState`.
+- Desktop and thin-client layouts now share this same launch component using responsive form conventions (`SurfaceResponsiveFormLayout`) with surface-appropriate copy and behavior.

@@ -14,7 +14,8 @@ describe("RunPage", () => {
     expect(source).toContain("OperationalQueueVisibilityPanel");
     expect(source).toContain("OperationalQueueDetailPanel");
     expect(source).toContain("resolveQueueVisibilityStatuses");
-    expect(source).toContain("Launch allowed run");
+    expect(source).toContain("OperationalApprovedRunLaunchPanel");
+    expect(source).toContain("launchApprovedRun");
     expect(source).toContain("runtimeOperationsService.listQueueItems");
     expect(source).toContain("runtimeOperationsService.inspectRun");
     expect(source).toContain("runtimeOperationsService.startRun");
