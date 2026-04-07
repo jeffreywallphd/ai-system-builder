@@ -290,5 +290,56 @@ describe("SqlitePlatformPersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("rolls back run and audit writes when a transaction fails", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-tx-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await expect(adapter.runInTransaction(async () => {
+      await adapter.createRun({
+        runId: "run-tx-001",
+        runKind: "workflow",
+        status: "pending",
+        workspaceId: "workspace-alpha",
+        userIdentityId: "user-owner",
+        sourceAggregateRef: "workflow:tx",
+        initiatedAt: "2026-04-06T12:30:00.000Z",
+        revision: 0,
+      }, {
+        operationKey: "op-run-tx-001-create",
+        actorId: "user-owner",
+        occurredAt: "2026-04-06T12:30:00.000Z",
+      });
+
+      await adapter.appendAuditEvent({
+        eventId: "audit-tx-001",
+        eventKind: PlatformAuditEventKinds.runs,
+        action: "run.accepted",
+        actorId: "user-owner",
+        workspaceId: "workspace-alpha",
+        userIdentityId: "user-owner",
+        targetRef: "run:run-tx-001",
+        outcome: "succeeded",
+        occurredAt: "2026-04-06T12:30:01.000Z",
+      }, {
+        operationKey: "op-audit-tx-001",
+        actorId: "user-owner",
+        occurredAt: "2026-04-06T12:30:01.000Z",
+      });
+
+      throw new Error("force rollback");
+    })).rejects.toThrow("force rollback");
+
+    const run = await adapter.findRunById("run-tx-001");
+    expect(run).toBeUndefined();
+
+    const events = await adapter.listAuditEvents({
+      targetRef: "run:run-tx-001",
+    });
+    expect(events).toHaveLength(0);
+
+    adapter.dispose();
+  });
 });
 
