@@ -6,6 +6,7 @@ import {
   createCanonicalAuditEvent,
 } from "@domain/audit/AuditDomain";
 import {
+  AuditLedgerWriteResolutionStatuses,
   resolveAuditCategoryForAction,
   type AuditLedgerAppendResult,
 } from "../AuditApplicationContracts";
@@ -165,6 +166,16 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
         correlationId: event.correlationId,
       });
     } catch (error) {
+      const recoveredOutcome = await this.resolveInterruptedAppendOutcome({
+        source,
+        event,
+        operationKey,
+        appendError: error,
+      });
+      if (recoveredOutcome) {
+        return recoveredOutcome;
+      }
+
       await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
         event: "audit-ledger.write.failed",
         source,
@@ -226,6 +237,117 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
     }
 
     return appendResult;
+  }
+
+  private async resolveInterruptedAppendOutcome(input: {
+    readonly source: AuthoritativeAuditEventSource;
+    readonly event: CanonicalAuditEvent;
+    readonly operationKey: string;
+    readonly appendError: unknown;
+  }): Promise<AuditLedgerAppendResult | undefined> {
+    const resolver = this.dependencies.repository.resolveAppendOutcome;
+    if (!resolver) {
+      return undefined;
+    }
+
+    let resolution:
+      | Awaited<ReturnType<NonNullable<typeof resolver>>>
+      | undefined;
+    try {
+      resolution = await resolver.call(this.dependencies.repository, {
+        eventId: input.event.eventId,
+        context: {
+          operationKey: input.operationKey,
+          actorId: input.event.actor.actorId,
+          occurredAt: input.event.occurredAt,
+          correlationId: input.event.correlationId,
+        },
+      });
+    } catch (resolutionError) {
+      await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+        event: "audit-ledger.write.failed",
+        source: input.source,
+        outcome: "failure",
+        severity: "error",
+        occurredAt: this.now().toISOString(),
+        operationKey: input.operationKey,
+        action: input.event.action,
+        eventType: input.event.eventType,
+        eventId: input.event.eventId,
+        actorId: input.event.actor.actorId,
+        workspaceId: input.event.scope.workspaceId,
+        correlationId: input.event.correlationId,
+        requestId: input.event.requestId,
+        details: Object.freeze({
+          message: redactAuditOperationalErrorMessage(resolutionError),
+          appendError: redactAuditOperationalErrorMessage(input.appendError),
+          phase: "append-outcome-resolution",
+        }),
+      }));
+      throw new AuditDomainError("Authoritative audit append outcome resolution failed.");
+    }
+
+    if (!resolution || resolution.status === AuditLedgerWriteResolutionStatuses.notCommitted) {
+      return undefined;
+    }
+
+    if (resolution.status === AuditLedgerWriteResolutionStatuses.ambiguous) {
+      await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+        event: "audit-ledger.write.failed",
+        source: input.source,
+        outcome: "failure",
+        severity: "warn",
+        occurredAt: this.now().toISOString(),
+        operationKey: input.operationKey,
+        action: input.event.action,
+        eventType: input.event.eventType,
+        eventId: input.event.eventId,
+        actorId: input.event.actor.actorId,
+        workspaceId: input.event.scope.workspaceId,
+        correlationId: input.event.correlationId,
+        requestId: input.event.requestId,
+        details: Object.freeze({
+          phase: "append-outcome-ambiguous",
+          message: redactAuditOperationalString(
+            resolution.details ?? "Append outcome could not be proven as committed or not committed.",
+          ),
+        }),
+      }));
+      throw new AuditDomainError("Authoritative audit append outcome is ambiguous and requires reconciliation.");
+    }
+
+    const recoveredEvent = resolution.event ?? input.event;
+    const recoveredResult = Object.freeze({
+      changed: false,
+      wasReplay: true,
+      sequence: resolution.sequence ?? 0,
+      event: recoveredEvent,
+    } satisfies AuditLedgerAppendResult);
+
+    await publishAuditLedgerWriteObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+      event: "audit-ledger.write.recovered",
+      source: input.source,
+      outcome: "success",
+      severity: "warn",
+      occurredAt: this.now().toISOString(),
+      operationKey: input.operationKey,
+      action: recoveredEvent.action,
+      eventType: recoveredEvent.eventType,
+      eventId: recoveredEvent.eventId,
+      actorId: recoveredEvent.actor.actorId,
+      workspaceId: recoveredEvent.scope.workspaceId,
+      correlationId: recoveredEvent.correlationId,
+      requestId: recoveredEvent.requestId,
+      details: Object.freeze({
+        phase: "append-outcome-recovered",
+        repairedReplayMapping: resolution.repairedReplayMapping ?? false,
+      }),
+      counters: Object.freeze({
+        sequence: recoveredResult.sequence,
+      }),
+    }));
+
+    return recoveredResult;
   }
 
   private assertActionPrefixForSource(source: AuthoritativeAuditEventSource, action: string): void {

@@ -14,6 +14,7 @@ import {
 } from "@domain/audit/AuditDomain";
 import { SharedApiSortDirections } from "@shared/contracts/api/SharedApiContractPrimitives";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
+import { mapCanonicalAuditEventToRowValues } from "../AuditLedgerPersistenceMapper";
 import { SqliteAuditLedgerRepository } from "../SqliteAuditLedgerRepository";
 
 const createdRoots: string[] = [];
@@ -64,6 +65,64 @@ function createEvent(overrides?: Partial<CanonicalAuditEvent>): CanonicalAuditEv
     requestId: overrides?.requestId,
     linkage: overrides?.linkage,
   });
+}
+
+function insertCanonicalEventRow(databasePath: string, event: CanonicalAuditEvent): void {
+  const database = openSqliteCompatDatabase(databasePath);
+  database.pragma("foreign_keys = ON");
+  database.prepare(`
+    INSERT INTO authoritative_audit_ledger_events (
+      event_id,
+      event_type,
+      category,
+      action,
+      outcome,
+      occurred_at,
+      recorded_at,
+      actor_id,
+      actor_kind,
+      actor_user_identity_id,
+      actor_service_id,
+      actor_session_id,
+      scope_kind,
+      scope_workspace_id,
+      resource_type,
+      resource_id,
+      resource_ref,
+      resource_sensitivity_class,
+      resource_workspace_id,
+      payload_has_protected_data,
+      payload_redaction_reasons_json,
+      payload_user_safe_json,
+      payload_admin_only_json,
+      integrity_schema_version,
+      integrity_hash_algorithm,
+      integrity_event_digest,
+      integrity_previous_event_digest,
+      retention,
+      retention_policy_key,
+      retention_policy_version,
+      retention_anchor,
+      retention_retain_until,
+      retention_archive_after,
+      lifecycle_state,
+      lifecycle_updated_at,
+      immutability,
+      correlation_id,
+      request_id,
+      linkage_event_group_id,
+      linkage_parent_event_id,
+      linkage_root_event_id,
+      linkage_workflow_id,
+      linkage_session_ref,
+      linkage_run_id,
+      linkage_governance_action_id,
+      linkage_related_resources_json,
+      event_json,
+      created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(...mapCanonicalAuditEventToRowValues(event));
+  database.close();
 }
 
 describe("SqliteAuditLedgerRepository", () => {
@@ -460,5 +519,124 @@ describe("SqliteAuditLedgerRepository", () => {
     expect(appended.changed).toBeTrue();
     expect(appended.sequence).toBe(2);
     repository.dispose();
+  });
+
+  it("resolves interrupted append outcomes from persisted replay metadata", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-audit-ledger-resolve-replay-"));
+    createdRoots.push(root);
+    const repository = new SqliteAuditLedgerRepository(path.join(root, "audit.sqlite"));
+    const event = createEvent({
+      eventId: "audit:event:resolve:replay",
+      action: "policy.updated",
+      category: AuditEventCategories.policy,
+      eventType: "policy-updated",
+    });
+
+    await repository.appendAuditEvent(event, {
+      operationKey: "audit:resolve:replay:1",
+      actorId: "user:alpha",
+      occurredAt: "2026-04-07T20:15:00.000Z",
+    });
+
+    const resolution = await repository.resolveAppendOutcome?.({
+      eventId: event.eventId,
+      context: {
+        operationKey: "audit:resolve:replay:1",
+        actorId: "user:alpha",
+        occurredAt: "2026-04-07T20:15:10.000Z",
+      },
+    });
+
+    expect(resolution?.status).toBe("committed");
+    expect(resolution?.repairedReplayMapping).toBeFalse();
+    expect(resolution?.sequence).toBe(1);
+    repository.dispose();
+  });
+
+  it("repairs missing replay metadata when canonical event exists", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-audit-ledger-resolve-repair-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "audit.sqlite");
+    const repository = new SqliteAuditLedgerRepository(databasePath);
+
+    await repository.listAuditEvents({ limit: 1 });
+    const event = createEvent({
+      eventId: "audit:event:resolve:repair",
+      action: "policy.updated",
+      category: AuditEventCategories.policy,
+      eventType: "policy-updated",
+    });
+    insertCanonicalEventRow(databasePath, event);
+
+    const resolution = await repository.resolveAppendOutcome?.({
+      eventId: event.eventId,
+      context: {
+        operationKey: "audit:resolve:repair:1",
+        actorId: "user:alpha",
+        occurredAt: "2026-04-07T20:16:00.000Z",
+      },
+    });
+    expect(resolution?.status).toBe("committed");
+    expect(resolution?.repairedReplayMapping).toBeTrue();
+    expect(resolution?.sequence).toBe(1);
+
+    const replay = await repository.appendAuditEvent(event, {
+      operationKey: "audit:resolve:repair:1",
+      actorId: "user:alpha",
+      occurredAt: "2026-04-07T20:16:10.000Z",
+    });
+    expect(replay.wasReplay).toBeTrue();
+    repository.dispose();
+  });
+
+  it("flags orphaned replay metadata as ambiguous and startup-follow-up required", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-audit-ledger-resolve-ambiguous-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "audit.sqlite");
+    const repository = new SqliteAuditLedgerRepository(databasePath);
+    await repository.listAuditEvents({ limit: 1 });
+    repository.dispose();
+
+    const tampered = openSqliteCompatDatabase(databasePath);
+    tampered.pragma("foreign_keys = OFF");
+    tampered.prepare(`
+      INSERT INTO authoritative_audit_ledger_mutation_replays (
+        operation_key,
+        event_id,
+        sequence,
+        actor_id,
+        correlation_id,
+        occurred_at,
+        created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "audit:resolve:ambiguous:1",
+      "audit:event:missing",
+      1,
+      "user:tampered",
+      null,
+      "2026-04-07T20:17:00.000Z",
+      "2026-04-07T20:17:00.000Z",
+    );
+    tampered.close();
+
+    const reopened = new SqliteAuditLedgerRepository(databasePath);
+    const resolution = await reopened.resolveAppendOutcome?.({
+      eventId: "audit:event:missing",
+      context: {
+        operationKey: "audit:resolve:ambiguous:1",
+        actorId: "user:alpha",
+        occurredAt: "2026-04-07T20:17:10.000Z",
+      },
+    });
+    expect(resolution?.status).toBe("ambiguous");
+
+    const startupReconciliation = await reopened.reconcileWritePathAnomalies?.({
+      asOf: "2026-04-07T20:17:30.000Z",
+      limit: 20,
+    });
+    expect(startupReconciliation?.manualFollowUpCount).toBe(1);
+    expect(startupReconciliation?.issues[0]?.kind).toBe("orphaned-mutation-replay");
+    reopened.dispose();
   });
 });

@@ -10,6 +10,8 @@ export interface AuditLedgerObservabilityLogEvent {
   readonly event:
     | "audit-ledger.write.completed"
     | "audit-ledger.write.failed"
+    | "audit-ledger.write.recovered"
+    | "audit-ledger.write.reconciliation.completed"
     | "audit-ledger.query.completed"
     | "audit-ledger.query.failed";
   readonly operation:

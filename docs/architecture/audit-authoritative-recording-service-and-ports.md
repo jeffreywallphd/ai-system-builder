@@ -1,6 +1,6 @@
 # Authoritative Audit Recording Service and Ports
 
-This note captures Story 18.1.3, Story 18.1.5, Story 18.1.6, and Story 18.1.7 for Feature 18 / Epic 18.1.
+This note captures Story 18.1.3, Story 18.1.5, Story 18.1.6, Story 18.1.7, and Story 18.3.4 for Feature 18.
 
 ## Scope
 
@@ -41,6 +41,7 @@ Story 18.1.7 extends baseline orchestration and governance capture for run and s
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
 - `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
+- `src/application/audit/use-cases/ReconcileAuditLedgerStartupStateUseCase.ts`
 - `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts`
 - `src/infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher.ts`
 - `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
@@ -86,6 +87,12 @@ Each method accepts `AuthoritativeAuditRecordEventInput`, which includes:
 5. sets/augments protected-data posture (`hasProtectedData`, `redactionReasons`)
 6. creates canonical immutable audit events (`createCanonicalAuditEvent(...)`)
 7. appends through `IAuditLedgerRepository`
+
+Story 18.3.4 adds interrupted-write handling inside this service:
+
+- append exceptions now attempt `repository.resolveAppendOutcome(...)` to determine whether durable commit still succeeded;
+- recovered commit outcomes return replay-safe results and emit `audit-ledger.write.recovered`;
+- unresolved/ambiguous outcomes raise explicit `AuditDomainError` rather than silently downgrading failures.
 
 ## Redaction and normalization posture
 

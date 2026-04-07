@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, and Story 18.2.7 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, Story 18.2.7, and Story 18.3.4 for Feature 18.
 
 ## Purpose
 
@@ -131,8 +131,34 @@ Key transport behavior:
 - Duplicate `eventId` with different payload/content is rejected.
 - Duplicate append with the same operation key resolves from replay ledger with `wasReplay: true`.
 - Existing identical event with a new operation key records replay metadata only.
+- `resolveAppendOutcome(...)` is available for interrupted-write recovery when a caller saw an append failure but needs to verify durable commit state.
 
 This preserves append-oriented ledger behavior while allowing safe mutation replay/idempotency metadata.
+
+## Story 18.3.4 interrupted-write recovery and startup reconciliation
+
+The durable repository now exposes explicit recovery/reconciliation seams for write-path interruptions and partial-failure diagnosis:
+
+- `resolveAppendOutcome({ eventId, context })` determines whether a failed append attempt was actually committed, not committed, or ambiguous.
+- If an event row exists but replay metadata is missing, `resolveAppendOutcome(...)` repairs the replay mapping and returns `committed` with `repairedReplayMapping: true`.
+- If replay metadata references a missing event row, `resolveAppendOutcome(...)` returns `ambiguous` and does not hide the inconsistency.
+- `reconcileWritePathAnomalies(...)` supports startup-time scanning for orphaned replay metadata records and returns explicit manual-follow-up counts.
+
+Authoritative-write success for this scope is now defined as:
+
+- canonical event row durably persisted, and
+- operation replay mapping present for the normalized `operationKey`.
+
+Safe retry posture for callers:
+
+- retrying the same logical write with the same `operationKey` is safe;
+- if a previous attempt committed, replay semantics return the existing record;
+- if a previous attempt did not commit, retry appends normally.
+
+Known limit (explicit):
+
+- this implementation does not provide exactly-once publication guarantees across external transport interruption windows;
+- when write outcome remains `ambiguous`, manual reconciliation is required and is surfaced as explicit operational signal.
 
 ## Story 18.2.2 immutable-enough safeguards
 

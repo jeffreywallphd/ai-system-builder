@@ -19,8 +19,10 @@ Human doc: `docs/architecture/audit-observability-failure-handling-and-redaction
 ## Behavior summary
 
 - write path emits structured `audit-ledger.write.*` diagnostics with correlation/request/workspace context when available
+- write path includes explicit recovery/reconciliation observability (`audit-ledger.write.recovered`, `audit-ledger.write.reconciliation.completed`)
 - read/query path emits structured `audit-ledger.query.*` diagnostics for list/detail and governance projections
 - write append failures become explicit audit-domain failures and include sanitized diagnostics for operators
+- interrupted append failures use `resolveAppendOutcome(...)` to avoid silently masking commit-vs-failure ambiguity
 - query service converts repository/authorizer throw paths into explicit `audit-ledger-query-failed` outcomes
 - API maps query-failed outcomes to stable `internal` responses
 - observability and metrics publication remain best-effort and non-blocking

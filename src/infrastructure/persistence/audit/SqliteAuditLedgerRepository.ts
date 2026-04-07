@@ -3,10 +3,16 @@ import path from "node:path";
 import type {
   AuditLedgerAppendContext,
   AuditLedgerAppendResult,
+  AuditLedgerReconciliationIssue,
+  AuditLedgerReconciliationResult,
   AuditLedgerQuery,
+  AuditLedgerWriteResolution,
   IAuditLedgerRepository,
 } from "@application/audit/ports/AuditLedgerPersistencePorts";
-import { normalizeAuditLedgerOperationKey } from "@application/audit/ports/AuditLedgerPersistencePorts";
+import {
+  AuditLedgerWriteResolutionStatuses,
+  normalizeAuditLedgerOperationKey,
+} from "@application/audit/ports/AuditLedgerPersistencePorts";
 import { AuditEventSortFields, AuditEventThinSafeCategories } from "@shared/contracts/audit/AuditEventContracts";
 import { SharedApiSortDirections } from "@shared/contracts/api/SharedApiContractPrimitives";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
@@ -28,6 +34,11 @@ interface AuditLedgerTailRow {
   readonly sequence: number;
   readonly event_id: string;
   readonly integrity_event_digest: string | null;
+}
+
+interface AuditLedgerOrphanedReplayRow {
+  readonly operation_key: string;
+  readonly event_id: string;
 }
 
 const SqlSortFieldMap = Object.freeze({
@@ -218,6 +229,96 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
     return this.getAuditEventByIdInternal(normalizedEventId);
   }
 
+  public async resolveAppendOutcome(input: {
+    readonly eventId: string;
+    readonly context: AuditLedgerAppendContext;
+  }): Promise<AuditLedgerWriteResolution> {
+    const operationKey = normalizeAuditLedgerOperationKey(input.context.operationKey);
+    const normalizedEventId = normalizeOptional(input.eventId);
+    if (!normalizedEventId) {
+      return Object.freeze({
+        status: AuditLedgerWriteResolutionStatuses.ambiguous,
+        details: "Append outcome resolution requires a non-empty eventId.",
+      });
+    }
+
+    const replayRow = this.getMutationReplayByOperationKey(operationKey);
+    if (replayRow) {
+      const replayEvent = this.getAuditEventByIdInternal(replayRow.event_id);
+      if (!replayEvent) {
+        return Object.freeze({
+          status: AuditLedgerWriteResolutionStatuses.ambiguous,
+          details: `Replay mapping '${operationKey}' references missing event '${replayRow.event_id}'.`,
+        });
+      }
+      return Object.freeze({
+        status: AuditLedgerWriteResolutionStatuses.committed,
+        sequence: replayRow.sequence,
+        event: replayEvent,
+        repairedReplayMapping: false,
+      });
+    }
+
+    const existing = this.getAuditEventRowByEventId(normalizedEventId);
+    if (!existing) {
+      return Object.freeze({
+        status: AuditLedgerWriteResolutionStatuses.notCommitted,
+        details: `No persisted event found for '${normalizedEventId}'.`,
+      });
+    }
+
+    const existingEvent = parseCanonicalAuditEventRow(existing);
+    try {
+      this.getDatabase().transaction(() => {
+        this.persistMutationReplay({
+          operationKey,
+          eventId: normalizedEventId,
+          sequence: existing.sequence,
+          context: input.context,
+        });
+      })();
+    } catch (error) {
+      return Object.freeze({
+        status: AuditLedgerWriteResolutionStatuses.ambiguous,
+        sequence: existing.sequence,
+        event: existingEvent,
+        details: `Event '${normalizedEventId}' exists but replay mapping could not be repaired: ${String(error)}`,
+      });
+    }
+
+    return Object.freeze({
+      status: AuditLedgerWriteResolutionStatuses.committed,
+      sequence: existing.sequence,
+      event: existingEvent,
+      repairedReplayMapping: true,
+    });
+  }
+
+  public async reconcileWritePathAnomalies(input: {
+    readonly asOf?: string;
+    readonly limit?: number;
+  } = {}): Promise<AuditLedgerReconciliationResult> {
+    const checkedAt = normalizeOptional(input.asOf) ?? new Date().toISOString();
+    const limit = typeof input.limit === "number" && Number.isFinite(input.limit) && input.limit > 0
+      ? Math.floor(input.limit)
+      : 100;
+
+    const orphanedReplays = this.listOrphanedReplayRows(limit);
+    const issues: AuditLedgerReconciliationIssue[] = orphanedReplays.map((row) => Object.freeze({
+      kind: "orphaned-mutation-replay",
+      operationKey: row.operation_key,
+      eventId: row.event_id,
+      details: "Mutation replay record references a missing canonical audit event.",
+    }));
+
+    return Object.freeze({
+      checkedAt,
+      repairedCount: 0,
+      manualFollowUpCount: issues.length,
+      issues: Object.freeze(issues),
+    });
+  }
+
   public dispose(): void {
     this.database?.close();
     this.database = undefined;
@@ -305,6 +406,20 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
       ORDER BY sequence DESC
       LIMIT 1
     `).get() as AuditLedgerTailRow | undefined;
+  }
+
+  private listOrphanedReplayRows(limit: number): ReadonlyArray<AuditLedgerOrphanedReplayRow> {
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : 100;
+    const rows = this.getDatabase().prepare(`
+      SELECT replay.operation_key, replay.event_id
+      FROM authoritative_audit_ledger_mutation_replays replay
+      LEFT JOIN authoritative_audit_ledger_events events
+        ON events.event_id = replay.event_id
+      WHERE events.event_id IS NULL
+      ORDER BY replay.created_at ASC
+      LIMIT ?
+    `).all(safeLimit) as AuditLedgerOrphanedReplayRow[];
+    return Object.freeze(rows);
   }
 
   private assertAppendIntegrityConstraints(event: CanonicalAuditEvent, previousTail: AuditLedgerTailRow | undefined): void {

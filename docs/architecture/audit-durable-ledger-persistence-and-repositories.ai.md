@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, and Story 18.2.7 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards, retention/lifecycle policy seams, and authoritative server APIs.
+Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, Story 18.2.7, and Story 18.3.4 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards, retention/lifecycle policy seams, and authoritative server APIs.
 
 Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
@@ -56,11 +56,17 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
   - retention/lifecycle list filters (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`),
   - environment-backed metadata defaults for authoritative recording (`AI_LOOM_AUDIT_RETENTION_*`),
   - explicit guardrail that destructive retention actions are rejected by configuration.
+- Added interrupted-write recovery and startup reconciliation seams:
+  - `resolveAppendOutcome(...)` for post-failure commit-state verification (`committed` / `not-committed` / `ambiguous`),
+  - replay-metadata repair when event row exists but replay row was missing,
+  - explicit ambiguous-state surfacing when replay metadata references missing event rows,
+  - `reconcileWritePathAnomalies(...)` for startup-time anomaly detection and manual-follow-up reporting.
 
 ## Behavior summary
 
 - Canonical events are appended, not updated in place.
 - Mutation replay metadata is append-maintenance only and does not mutate persisted event truth.
+- Authoritative write success is defined as event persistence + operation replay mapping persistence.
 - Query filters support category/action/eventType/actor/workspace/resource/occurred windows and thin-safe category mode.
 - Query filters also support retention/lifecycle selection and retain-until windows for future archival control surfaces.
 - Query filters also support correlation/request and linkage selectors for related workflow/event traversal.
@@ -69,6 +75,7 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - The same canonical event can render as `user-safe` detail for general actors and `admin` detail for administrative actors.
 - Trust boundary is explicit: this is immutable-enough within runtime/SQLite controls, not a full cryptographic immutability/notarization system.
 - Retention/lifecycle policy seams are metadata-only in this slice; no delete/purge worker is shipped.
+- Exactly-once external publication across transport interruption windows is not claimed; ambiguous write-path outcomes are explicit and require reconciliation/manual follow-up.
 
 ## Tests
 
