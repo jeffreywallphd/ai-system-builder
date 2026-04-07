@@ -12,6 +12,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-node-capability-matching.md`
 - `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
 - `docs/architecture/run-orchestration-scheduling-policy-shared-contracts.md`
+- `docs/architecture/run-orchestration-scheduling-policy-framework-and-rule-pipeline.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
@@ -49,11 +50,12 @@ Provide an implementation checklist for contributors extending the authoritative
 
 1. Add or evolve scheduler logic above queue persistence APIs; do not move policy into queue schema adapters.
 2. Keep canonical scheduling policy models in `src/domain/scheduling/SchedulingDomain.ts`.
-3. Keep scheduling decision-pipeline orchestration in `src/application/scheduling/*`.
-4. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
-5. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
-6. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
-7. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
+3. Keep scheduling decision-pipeline orchestration and rule-pipeline evaluation in `src/application/scheduling/*`.
+4. Add new scheduler policy checks as modular rules via `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts` and `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`.
+5. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
+6. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
+7. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
+8. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
 
 ## Extending backend dispatch integrations
 

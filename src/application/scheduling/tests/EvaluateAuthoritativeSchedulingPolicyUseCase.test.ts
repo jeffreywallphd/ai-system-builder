@@ -1,0 +1,199 @@
+import { describe, expect, it } from "bun:test";
+import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
+import { NodeRoleCapabilities, NodeTypes } from "@domain/nodes/NodeTrustDomain";
+import {
+  SchedulingCandidateDenialCodes,
+  SchedulingNodeUsageModes,
+  type SchedulingPolicyReason,
+} from "@domain/scheduling/SchedulingDomain";
+import type {
+  ISchedulingPolicyRule,
+  SchedulingPolicyRuleContext,
+} from "@application/scheduling/ports/SchedulingPolicyRulePorts";
+import { EvaluateAuthoritativeSchedulingPolicyUseCase } from "../use-cases/EvaluateAuthoritativeSchedulingPolicyUseCase";
+
+function createSnapshot() {
+  return Object.freeze({
+    asOf: "2026-04-07T20:00:00.000Z",
+    deploymentProfileId: "profile:production",
+    queueLeases: [
+      {
+        runId: "run:owner",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T19:59:20.000Z",
+        eligibleAt: "2026-04-07T19:59:20.000Z",
+        claimToken: "claim:owner",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:01:00.000Z",
+      },
+      {
+        runId: "run:viewer",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T19:55:20.000Z",
+        eligibleAt: "2026-04-07T19:55:20.000Z",
+        claimToken: "claim:viewer",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:01:00.000Z",
+      },
+    ],
+    runs: [
+      {
+        runId: "run:owner",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:owner",
+        workspaceRoleKeys: [WorkspaceAuthorizationRoleKeys.owner],
+        requirements: {
+          requiredCapabilities: [NodeRoleCapabilities.executor],
+          requiresRemoteScheduling: true,
+        },
+        queue: {
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:59:20.000Z",
+          eligibleAt: "2026-04-07T19:59:20.000Z",
+          claimToken: "claim:owner",
+          claimOwner: "scheduler:alpha",
+        },
+      },
+      {
+        runId: "run:viewer",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:viewer",
+        workspaceRoleKeys: [WorkspaceAuthorizationRoleKeys.viewer],
+        requirements: {
+          requiredCapabilities: [NodeRoleCapabilities.executor],
+          requiresRemoteScheduling: true,
+        },
+        queue: {
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:55:20.000Z",
+          eligibleAt: "2026-04-07T19:55:20.000Z",
+          claimToken: "claim:viewer",
+          claimOwner: "scheduler:alpha",
+        },
+      },
+    ],
+    nodes: [{
+      nodeId: "node:compute:1",
+      nodeType: NodeTypes.compute,
+      schedulable: true,
+      supportsRemoteScheduling: true,
+      enabledCapabilities: [NodeRoleCapabilities.executor],
+      usageMode: SchedulingNodeUsageModes.idle,
+    }],
+  });
+}
+
+class OrderedTrackingRule implements ISchedulingPolicyRule {
+  public constructor(
+    public readonly ruleId: string,
+    private readonly visited: string[],
+    private readonly factory: (input: SchedulingPolicyRuleContext) => ReadonlyArray<SchedulingPolicyReason>,
+  ) {}
+
+  public evaluate(input: SchedulingPolicyRuleContext) {
+    this.visited.push(this.ruleId);
+    const reasons = this.factory(input);
+    return Object.freeze({
+      allowed: reasons.length === 0,
+      reasons,
+    });
+  }
+}
+
+describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
+  it("selects eligible candidates deterministically by priority and queue age", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:priority",
+    });
+
+    const bundle = await useCase.evaluate(createSnapshot());
+
+    expect(bundle.decision.outcome).toBe("assignment-recommended");
+    expect(bundle.decision.selected?.runId).toBe("run:owner");
+    expect(bundle.decision.selected?.nodeId).toBe("node:compute:1");
+    expect(bundle.assignmentIntents).toEqual([
+      Object.freeze({
+        runId: "run:owner",
+        nodeId: "node:compute:1",
+        queueId: "queue:default",
+        claimToken: "claim:owner",
+        reservationOwner: "scheduler:alpha",
+        decisionId: "decision:priority",
+        decidedAt: "2026-04-07T20:00:01.000Z",
+      }),
+    ]);
+  });
+
+  it("evaluates rules in configured order and keeps denials explainable", async () => {
+    const visited: string[] = [];
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:ordered-rules",
+      rules: Object.freeze([
+        new OrderedTrackingRule("rule:first", visited, () => []),
+        new OrderedTrackingRule("rule:deny-viewer", visited, (input) => (
+          input.run.runId === "run:viewer"
+            ? Object.freeze([Object.freeze({
+              code: SchedulingCandidateDenialCodes.policyDenied,
+              message: "Viewer run denied by explicit policy rule.",
+            })])
+            : Object.freeze([])
+        )),
+      ]),
+    });
+
+    const bundle = await useCase.evaluate(createSnapshot());
+
+    expect(visited).toEqual([
+      "rule:first",
+      "rule:deny-viewer",
+      "rule:first",
+      "rule:deny-viewer",
+    ]);
+    expect(bundle.decision.outcome).toBe("assignment-recommended");
+    expect(bundle.decision.evaluatedCandidates.find((candidate) => candidate.runId === "run:viewer")?.eligible).toBeFalse();
+    expect(bundle.decision.evaluatedCandidates.find((candidate) => candidate.runId === "run:viewer")
+      ?.denialReasons[0]?.code).toBe("policy-denied");
+
+    const pipelineReason = bundle.decision.reasons.find((reason) => reason.code === "rule-pipeline-evaluated");
+    expect(pipelineReason?.details).toEqual(Object.freeze({
+      ruleOrder: Object.freeze(["rule:first", "rule:deny-viewer"]),
+      candidateCount: 2,
+      eligibleCandidateCount: 1,
+    }));
+  });
+
+  it("returns deferred outcomes when there are no candidates or no eligible candidates", async () => {
+    const queueEmptyUseCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:queue-empty",
+    });
+    const queueEmpty = await queueEmptyUseCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: [],
+      runs: [],
+      nodes: [],
+    }));
+
+    expect(queueEmpty.decision.outcome).toBe("deferred");
+    expect(queueEmpty.decision.reasons.some((reason) => reason.code === "queue-empty")).toBeTrue();
+
+    const noEligibleUseCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:no-eligible",
+      rules: Object.freeze([
+        new OrderedTrackingRule("rule:deny-all", [], () => Object.freeze([Object.freeze({
+          code: SchedulingCandidateDenialCodes.policyDenied,
+          message: "Denied by test rule.",
+        })])),
+      ]),
+    });
+    const noEligible = await noEligibleUseCase.evaluate(createSnapshot());
+
+    expect(noEligible.decision.outcome).toBe("deferred");
+    expect(noEligible.decision.selected).toBeUndefined();
+    expect(noEligible.assignmentIntents).toEqual([]);
+    expect(noEligible.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
+  });
+});

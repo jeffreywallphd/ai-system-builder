@@ -9,6 +9,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 - `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
 - `docs/architecture/run-orchestration-scheduling-policy-shared-contracts.md`
+- `docs/architecture/run-orchestration-scheduling-policy-framework-and-rule-pipeline.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
@@ -23,6 +24,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Build policy above reservation-backed queue selection.
 - Keep canonical scheduling policy concepts in `src/domain/scheduling/SchedulingDomain.ts`.
 - Keep scheduling decision-pipeline contracts in `src/application/scheduling/*`.
+- Add new policy checks as pluggable rules through `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts` and `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`.
 - Reuse node eligibility + assignment policy seams.
 - Preserve claim release behavior for ineligible node-targeted selections.
 - Keep deterministic queue ordering and reservation TTL semantics.
