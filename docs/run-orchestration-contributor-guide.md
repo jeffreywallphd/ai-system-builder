@@ -11,6 +11,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-queue-assignment-selection.md`
 - `docs/architecture/run-orchestration-node-capability-matching.md`
 - `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
+- `docs/architecture/run-orchestration-scheduling-policy-shared-contracts.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
@@ -27,6 +28,8 @@ Provide an implementation checklist for contributors extending the authoritative
 1. Update shared contracts and schema parsing first when payloads or route behavior change:
    - `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
    - `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
+   - `src/shared/contracts/runtime/SchedulingPolicyEvaluationContracts.ts`
+   - `src/shared/schemas/runtime/SchedulingPolicyEvaluationSchemaContracts.ts`
 2. Keep lifecycle and state coherence in canonical domain transitions:
    - `src/domain/runs/RunDomain.ts`
 3. Implement orchestration rules in application use cases and ports:

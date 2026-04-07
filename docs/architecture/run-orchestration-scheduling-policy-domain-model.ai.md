@@ -36,3 +36,9 @@ Story 17.1.1 defines canonical scheduling domain concepts and the authoritative 
 ## Future policy extension posture
 - Add new policy rules under `src/domain/scheduling/*` and `src/application/scheduling/*`.
 - Planned future policy feeds (quota, reservations, affinity, deployment-profile variants) map through `SchedulingPolicySourceKinds` and input-assembler contracts without redefining dispatch infrastructure seams.
+
+## Shared-contract handoff
+- Follow-on shared scheduling projection/schema contracts now live in:
+  - `src/shared/contracts/runtime/SchedulingPolicyEvaluationContracts.ts`
+  - `src/shared/schemas/runtime/SchedulingPolicyEvaluationSchemaContracts.ts`
+- Keep policy semantics in domain/application scheduling seams; use shared contracts for transport/admin/diagnostics result payloads.
