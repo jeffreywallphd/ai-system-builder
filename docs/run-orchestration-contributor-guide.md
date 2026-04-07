@@ -117,3 +117,4 @@ Provide an implementation checklist for contributors extending the authoritative
 6. Are terminal completion/failure paths still finalizing queue + assignment state and preserving diagnostics split?
 7. Are `.md` and `.ai.md` docs updated together for orchestration changes?
 8. Are relevant tests updated across application, infrastructure, transport, and persistence seams?
+9. Does regression coverage still pass for integrated lifecycle hardening in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`?

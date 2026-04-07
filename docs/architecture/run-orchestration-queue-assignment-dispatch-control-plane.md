@@ -161,3 +161,17 @@ Do not merge these responsibilities into one adapter or transport endpoint.
   - `src/infrastructure/api/runs/tests/AuthoritativeRunExecutionUpdateBackendApi.test.ts`
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunExecutionUpdateApi.test.ts`
   - `src/infrastructure/persistence/platform/tests/SqlitePlatformPersistenceAdapter.test.ts`
+- End-to-end lifecycle regression and recovery hardening:
+  - `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`
+
+## Story 16.3.8 hardening status
+
+- Representative integration coverage now exercises submission, queue admission, assignment selection, node claim, dispatch acceptance, progress updates, completion finalization, policy-checked cancellation/retry outcomes, startup recovery, and read-surface contract parsing.
+- Cross-layer drift checks now include schema-level parsing of list, queue-status, and status-envelope projections produced by authoritative orchestration query APIs.
+- Duplicate assignment prevention remains conflict-driven at claim time (`already-assigned`) and is asserted in regression coverage.
+
+## Explicit deferred edges
+
+- Scheduler scoring/prioritization policy remains intentionally minimal; queue persistence and reservation semantics are stable, but advanced policy tuning is deferred to subsequent scheduling work.
+- Automatic recovery remains guarded to safe cases (expired claims, stale assignment/running windows, persisted dispatch reconciliation). Broader autonomous remediation remains manual-follow-up by design.
+- Realtime event delivery is contract-stable but intentionally bounded to user-safe orchestration signals; expanded operator-only event families remain deferred until policy/audience expansion work.
