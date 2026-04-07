@@ -25,6 +25,8 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - desktop host local-mode profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- desktop host connectivity-state monitor and transition service:
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - desktop host cache runtime factory:
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - desktop offline snapshot cache persistence adapter:
@@ -115,6 +117,15 @@ Reconnect decisions are explicit and bounded:
 Enforced by:
 - `planOfflineResynchronization(...)`
 - `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`
+
+## Desktop connectivity-state boundaries
+
+Desktop host connectivity state is explicitly modeled and exposed through one host-owned state service instead of page-level heuristics.
+
+- server reachability, trusted-session availability, trust prerequisites, and deliberate offline-mode intent are evaluated together;
+- transitions are explicit across `connected`, `degraded`, `reconnecting`, and `disconnected`;
+- deliberate offline mode is distinguished from transient transport failures through structured reason metadata;
+- UI/shared layers consume one structured connectivity payload via the desktop host bridge rather than inferring status from ad hoc errors.
 
 ## Conflict categories and decision rules
 

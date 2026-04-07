@@ -137,6 +137,38 @@ describe("OfflineSynchronizationSchemaContracts", () => {
     })).toThrow(OfflineSynchronizationSchemaValidationError);
   });
 
+  it("parses structured desktop connectivity semantics for deliberate offline mode", () => {
+    const parsed = parseOfflineConnectivitySurfaceStateDto({
+      state: "disconnected",
+      stale: true,
+      localModeActive: true,
+      reasonCode: "offline-mode-deliberate",
+      offlineModeIntent: "deliberate",
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "required",
+      lastChangedAt: "2026-04-07T10:03:10.000Z",
+      canQueueOperations: true,
+      canResynchronize: false,
+    });
+
+    expect(parsed.offlineModeIntent).toBe("deliberate");
+    expect(parsed.reasonCode).toBe("offline-mode-deliberate");
+  });
+
+  it("rejects deliberate offline-mode intent when state is not disconnected", () => {
+    expect(() => parseOfflineConnectivitySurfaceStateDto({
+      state: "connected",
+      stale: false,
+      localModeActive: false,
+      offlineModeIntent: "deliberate",
+      lastChangedAt: "2026-04-07T10:03:11.000Z",
+      canQueueOperations: true,
+      canResynchronize: true,
+    })).toThrow(OfflineSynchronizationSchemaValidationError);
+  });
+
   it("rejects queue snapshots that keep sync-applied operations in pending queue", () => {
     expect(() => parseOfflineSynchronizationStateSnapshotDto({
       contractVersion: "offline-sync/v1",

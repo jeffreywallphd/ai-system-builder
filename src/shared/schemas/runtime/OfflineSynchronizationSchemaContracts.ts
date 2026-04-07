@@ -188,6 +188,17 @@ const OfflineConnectivityStateSchema = z.enum([
   OfflineConnectivityStates.disconnected,
 ]);
 
+const OfflineModeIntentSchema = z.enum([
+  "none",
+  "automatic",
+  "deliberate",
+]);
+
+const OfflineTrustEnforcementSchema = z.enum([
+  "required",
+  "optional",
+]);
+
 export const OfflineCachedResourceMetadataDtoSchema: z.ZodType<OfflineCachedResourceMetadataDto> = z.object({
   resourceClass: OfflineSyncResourceClassSchema,
   resourceId: RequiredStringSchema,
@@ -468,6 +479,12 @@ export const OfflineConnectivitySurfaceStateDtoSchema: z.ZodType<OfflineConnecti
   stale: z.boolean(),
   localModeActive: z.boolean(),
   detail: z.string().trim().min(1).max(512).optional(),
+  reasonCode: z.string().trim().min(1).max(128).optional(),
+  offlineModeIntent: OfflineModeIntentSchema.optional(),
+  transportReachable: z.boolean().optional(),
+  trustedSessionAvailable: z.boolean().optional(),
+  trustPrerequisitesSatisfied: z.boolean().optional(),
+  trustEnforcement: OfflineTrustEnforcementSchema.optional(),
   lastChangedAt: TimestampSchema,
   canQueueOperations: z.boolean(),
   canResynchronize: z.boolean(),
@@ -477,6 +494,20 @@ export const OfflineConnectivitySurfaceStateDtoSchema: z.ZodType<OfflineConnecti
       code: z.ZodIssueCode.custom,
       path: ["canResynchronize"],
       message: "Disconnected connectivity state cannot advertise canResynchronize=true.",
+    });
+  }
+  if (value.offlineModeIntent === "deliberate" && value.state !== OfflineConnectivityStates.disconnected) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["offlineModeIntent"],
+      message: "Deliberate offline mode requires disconnected connectivity state.",
+    });
+  }
+  if (value.transportReachable === false && value.state === OfflineConnectivityStates.connected) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["transportReachable"],
+      message: "Connected connectivity state requires transportReachable=true when provided.",
     });
   }
 });

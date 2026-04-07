@@ -1,0 +1,115 @@
+import { describe, expect, it } from "bun:test";
+import {
+  DesktopConnectivityReasonCodes,
+  DesktopConnectivityStateService,
+} from "../DesktopConnectivityStateService";
+
+describe("DesktopConnectivityStateService", () => {
+  it("transitions to connected when transport/session/trust prerequisites are satisfied", () => {
+    const service = new DesktopConnectivityStateService({
+      now: () => new Date("2026-04-07T12:00:00.000Z"),
+    });
+
+    const state = service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "required",
+      observedAt: "2026-04-07T12:00:00.000Z",
+    });
+
+    expect(state.state).toBe("connected");
+    expect(state.localModeActive).toBeFalse();
+    expect(state.canResynchronize).toBeTrue();
+    expect(state.reasonCode).toBe(DesktopConnectivityReasonCodes.online);
+  });
+
+  it("uses degraded when transport is up but trusted session is unavailable", () => {
+    const service = new DesktopConnectivityStateService({
+      now: () => new Date("2026-04-07T12:00:00.000Z"),
+    });
+
+    const state = service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: false,
+      trustedSessionDetail: "Session expired while disconnected.",
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "required",
+      observedAt: "2026-04-07T12:00:00.000Z",
+    });
+
+    expect(state.state).toBe("degraded");
+    expect(state.localModeActive).toBeTrue();
+    expect(state.canResynchronize).toBeFalse();
+    expect(state.reasonCode).toBe(DesktopConnectivityReasonCodes.trustedSessionUnavailable);
+    expect(state.detail).toContain("Session expired");
+  });
+
+  it("uses reconnecting for transient transport failures", () => {
+    const service = new DesktopConnectivityStateService({
+      now: () => new Date("2026-04-07T12:00:00.000Z"),
+    });
+
+    service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "optional",
+      observedAt: "2026-04-07T12:00:00.000Z",
+    });
+
+    const state = service.observe({
+      transportReachable: false,
+      transportTransientFailure: true,
+      transportDetail: "Connection reset.",
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "optional",
+      observedAt: "2026-04-07T12:00:03.000Z",
+    });
+
+    expect(state.state).toBe("reconnecting");
+    expect(state.localModeActive).toBeTrue();
+    expect(state.canResynchronize).toBeTrue();
+    expect(state.reasonCode).toBe(DesktopConnectivityReasonCodes.transportTransientFailure);
+  });
+
+  it("distinguishes deliberate offline mode from transport failures", () => {
+    const service = new DesktopConnectivityStateService({
+      now: () => new Date("2026-04-07T12:00:00.000Z"),
+    });
+
+    service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "optional",
+      observedAt: "2026-04-07T12:00:00.000Z",
+    });
+
+    const forcedOffline = service.setDeliberateOfflineMode(true, "User enabled offline mode.");
+    expect(forcedOffline.state).toBe("disconnected");
+    expect(forcedOffline.reasonCode).toBe(DesktopConnectivityReasonCodes.deliberateOfflineMode);
+    expect(forcedOffline.offlineModeIntent).toBe("deliberate");
+
+    const observedWhileForced = service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "optional",
+      observedAt: "2026-04-07T12:00:02.000Z",
+    });
+    expect(observedWhileForced.state).toBe("disconnected");
+    expect(observedWhileForced.reasonCode).toBe(DesktopConnectivityReasonCodes.deliberateOfflineMode);
+
+    service.setDeliberateOfflineMode(false);
+    const recovered = service.observe({
+      transportReachable: true,
+      trustedSessionAvailable: true,
+      trustPrerequisitesSatisfied: true,
+      trustEnforcement: "optional",
+      observedAt: "2026-04-07T12:00:04.000Z",
+    });
+    expect(recovered.state).toBe("connected");
+  });
+});

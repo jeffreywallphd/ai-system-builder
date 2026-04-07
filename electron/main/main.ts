@@ -99,6 +99,10 @@ import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPo
 import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
+  DesktopConnectivityStateService,
+  type DesktopConnectivityProbePort,
+} from "../../src/hosts/desktop/DesktopConnectivityStateService";
+import {
   startAuthoritativeServerHostAssembly,
   type AuthoritativeServerHostRuntimeHandle,
 } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
@@ -156,7 +160,10 @@ let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
+let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
+const IDENTITY_SESSION_STORAGE_KEY = "ai-loom.identity.session.v1";
+const CONNECTIVITY_PROBE_TIMEOUT_MS = 1_750;
 
 const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
   trustedDeviceBindingId: "identity.desktop.transport.trusted-device-binding-id",
@@ -334,6 +341,133 @@ function normalizeHttpOrigin(value: string): string | undefined {
     return origin === "null" ? undefined : origin;
   } catch {
     return undefined;
+  }
+}
+
+function createDesktopConnectivityProbePort(identityApiBaseUrl: string): DesktopConnectivityProbePort {
+  return Object.freeze({
+    probe: async () => {
+      const trustBootstrap = resolveDesktopIdentityTransportTrustBootstrap();
+      const trustEnforcement = trustBootstrap?.enforcement ?? "optional";
+      const trustPrerequisitesSatisfied = evaluateTrustPrerequisitesSatisfied(trustBootstrap);
+      const trustedSession = resolveTrustedSessionAvailability(trustEnforcement);
+      const transport = await probeTransportReachability(identityApiBaseUrl);
+      return Object.freeze({
+        transportReachable: transport.transportReachable,
+        transportTransientFailure: transport.transportTransientFailure,
+        transportDetail: transport.transportDetail,
+        trustedSessionAvailable: trustedSession.available,
+        trustedSessionDetail: trustedSession.detail,
+        trustPrerequisitesSatisfied,
+        trustPrerequisitesDetail: trustPrerequisitesSatisfied
+          ? undefined
+          : "Desktop trust bootstrap prerequisites are incomplete for trusted-session operation.",
+        trustEnforcement,
+      });
+    },
+  });
+}
+
+function evaluateTrustPrerequisitesSatisfied(
+  bootstrap: DesktopIdentityTransportTrustBootstrap | undefined,
+): boolean {
+  if (!bootstrap || bootstrap.enforcement !== "required") {
+    return true;
+  }
+  const trustedDeviceBindingId = normalizeOptional(bootstrap.registeredDevice?.trustedDeviceBindingId);
+  const pinReference = normalizeOptional(bootstrap.pinnedTrustMaterial?.pinReference);
+  const expiresAt = normalizeOptional(bootstrap.pinnedTrustMaterial?.expiresAt);
+  if (!trustedDeviceBindingId || !pinReference) {
+    return false;
+  }
+  if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
+    return false;
+  }
+  return true;
+}
+
+function resolveTrustedSessionAvailability(
+  trustEnforcement: "required" | "optional",
+): { readonly available: boolean; readonly detail?: string } {
+  const payload = storageDatabase?.getItem(IDENTITY_SESSION_STORAGE_KEY);
+  if (!payload) {
+    return Object.freeze({
+      available: false,
+      detail: "No persisted authenticated session was found in desktop storage.",
+    });
+  }
+  try {
+    const parsed = JSON.parse(payload) as {
+      readonly sessionToken?: string;
+      readonly sessionExpiresAt?: string;
+      readonly sessionTrustState?: string;
+    };
+    const sessionToken = normalizeOptional(parsed.sessionToken);
+    if (!sessionToken) {
+      return Object.freeze({
+        available: false,
+        detail: "Persisted desktop session is missing a session token.",
+      });
+    }
+    const expiresAt = normalizeOptional(parsed.sessionExpiresAt);
+    const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+      return Object.freeze({
+        available: false,
+        detail: "Persisted desktop session is expired.",
+      });
+    }
+    const trustState = normalizeOptional(parsed.sessionTrustState);
+    if (trustEnforcement === "required" && trustState !== "trusted") {
+      return Object.freeze({
+        available: false,
+        detail: "Persisted desktop session is not trusted under required trust enforcement.",
+      });
+    }
+    if (trustState === "revoked" || trustState === "expired") {
+      return Object.freeze({
+        available: false,
+        detail: `Persisted desktop session trust state '${trustState}' is not eligible for trusted operation.`,
+      });
+    }
+    return Object.freeze({ available: true });
+  } catch {
+    return Object.freeze({
+      available: false,
+      detail: "Persisted desktop session payload is invalid JSON.",
+    });
+  }
+}
+
+async function probeTransportReachability(identityApiBaseUrl: string): Promise<{
+  readonly transportReachable: boolean;
+  readonly transportTransientFailure?: boolean;
+  readonly transportDetail?: string;
+}> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => {
+    controller.abort();
+  }, CONNECTIVITY_PROBE_TIMEOUT_MS);
+  try {
+    const response = await fetch(identityApiBaseUrl, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return Object.freeze({
+      transportReachable: true,
+      transportTransientFailure: false,
+      transportDetail: `Authoritative server probe responded with HTTP ${response.status}.`,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown connectivity probe error.";
+    return Object.freeze({
+      transportReachable: false,
+      transportTransientFailure: true,
+      transportDetail: message,
+    });
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -574,6 +708,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     pythonRuntime,
     identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap(),
   });
+  desktopConnectivityStateService = new DesktopConnectivityStateService();
+  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl), {
+    intervalMs: 3_000,
+  });
 
   ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {
     event.returnValue = bootstrapContext;
@@ -586,6 +724,33 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   ipcMain.on("ai-loom-desktop-storage:removeItem", (_event, key: string) => {
     storageDatabase?.removeItem(key);
+  });
+  ipcMain.handle("ai-loom-desktop-connectivity:get-state", async () => {
+    const state = desktopConnectivityStateService?.getState() ?? {
+      state: "connecting",
+      stale: false,
+      localModeActive: false,
+      lastChangedAt: new Date().toISOString(),
+      canQueueOperations: true,
+      canResynchronize: false,
+    };
+    return JSON.stringify(state);
+  });
+  ipcMain.handle("ai-loom-desktop-connectivity:set-offline-mode", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
+    if (!desktopConnectivityStateService) {
+      return JSON.stringify({
+        state: "connecting",
+        stale: false,
+        localModeActive: false,
+        detail: "Desktop connectivity state service is unavailable.",
+        lastChangedAt: new Date().toISOString(),
+        canQueueOperations: true,
+        canResynchronize: false,
+      });
+    }
+    const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
+    return JSON.stringify(state);
   });
   ipcMain.on("ai-loom-desktop-secrets:is-available", (event) => {
     event.returnValue = safeStorage.isEncryptionAvailable();
@@ -1286,6 +1451,8 @@ async function bootstrapDesktopRuntime(): Promise<void> {
 }
 
 async function disposeDesktopRuntimeResources(): Promise<void> {
+  desktopConnectivityStateService?.stopMonitoring();
+  desktopConnectivityStateService = undefined;
   await authoritativeServerRuntime?.stop();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();

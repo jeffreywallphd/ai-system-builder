@@ -353,6 +353,12 @@ export interface OfflineConnectivitySurfaceStateDto {
   readonly stale: boolean;
   readonly localModeActive: boolean;
   readonly detail?: string;
+  readonly reasonCode?: string;
+  readonly offlineModeIntent?: "none" | "automatic" | "deliberate";
+  readonly transportReachable?: boolean;
+  readonly trustedSessionAvailable?: boolean;
+  readonly trustPrerequisitesSatisfied?: boolean;
+  readonly trustEnforcement?: "required" | "optional";
   readonly lastChangedAt: string;
   readonly canQueueOperations: boolean;
   readonly canResynchronize: boolean;
