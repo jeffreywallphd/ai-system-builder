@@ -8,9 +8,11 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-operational-visibility-projections.md`
 - `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 - `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
+- `docs/architecture/run-orchestration-scheduling-policy-shared-contracts.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
+- Update shared scheduling policy contracts/schemas first (`SchedulingPolicyEvaluationContracts` + `SchedulingPolicyEvaluationSchemaContracts`).
 - Keep lifecycle legality in `src/domain/runs/RunDomain.ts`.
 - Add scheduler/assignment/dispatch/update behavior in `src/application/runs/use-cases/*` and ports.
 - Add persistence/adapter/transport wiring only after application behavior is correct.

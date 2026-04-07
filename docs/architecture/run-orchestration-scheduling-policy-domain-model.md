@@ -166,3 +166,11 @@ Do not add policy rules in:
   - `src/domain/scheduling/tests/SchedulingDomain.test.ts`
 - Documentation discoverability and boundary assertions
   - `src/application/runs/tests/SchedulingPolicyArchitectureDocumentation.test.ts`
+
+## Shared-contract handoff
+
+Story 17.1.2 introduces shared scheduling transport/admin-facing policy-evaluation contracts and schemas:
+- `src/shared/contracts/runtime/SchedulingPolicyEvaluationContracts.ts`
+- `src/shared/schemas/runtime/SchedulingPolicyEvaluationSchemaContracts.ts`
+
+The domain model in this document remains the canonical source for scheduling policy semantics; shared contracts are projection-safe representations for transport, admin visibility, and diagnostics consumers.

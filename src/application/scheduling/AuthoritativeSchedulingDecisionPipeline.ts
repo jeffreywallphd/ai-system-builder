@@ -1,42 +1,21 @@
 import type {
-  SchedulingNodePolicyInput,
-  SchedulingPolicyDecision,
-  SchedulingRunPolicyInput,
-} from "@domain/scheduling/SchedulingDomain";
+  SchedulingAssignmentIntent as SharedSchedulingAssignmentIntent,
+  SchedulingDecisionBundle as SharedSchedulingDecisionBundle,
+  SchedulingEvaluationSnapshot as SharedSchedulingEvaluationSnapshot,
+  SchedulingQueueLease as SharedSchedulingQueueLease,
+} from "@shared/contracts/runtime/SchedulingPolicyEvaluationContracts";
 
-export interface SchedulingQueueLease {
-  readonly runId: string;
-  readonly queueId: string;
-  readonly enteredAt: string;
-  readonly eligibleAt: string;
-  readonly claimToken: string;
-  readonly claimOwner: string;
-  readonly claimExpiresAt: string;
-}
+/** @deprecated Use shared scheduling contracts from @shared/contracts/runtime/SchedulingPolicyEvaluationContracts. */
+export type SchedulingQueueLease = SharedSchedulingQueueLease;
 
-export interface SchedulingEvaluationSnapshot {
-  readonly asOf: string;
-  readonly queueLeases: ReadonlyArray<SchedulingQueueLease>;
-  readonly runs: ReadonlyArray<SchedulingRunPolicyInput>;
-  readonly nodes: ReadonlyArray<SchedulingNodePolicyInput>;
-  readonly deploymentProfileId?: string;
-}
+/** @deprecated Use shared scheduling contracts from @shared/contracts/runtime/SchedulingPolicyEvaluationContracts. */
+export type SchedulingEvaluationSnapshot = SharedSchedulingEvaluationSnapshot;
 
-export interface SchedulingAssignmentIntent {
-  readonly runId: string;
-  readonly nodeId: string;
-  readonly queueId: string;
-  readonly claimToken: string;
-  readonly reservationOwner: string;
-  readonly decisionId: string;
-  readonly decidedAt: string;
-}
+/** @deprecated Use shared scheduling contracts from @shared/contracts/runtime/SchedulingPolicyEvaluationContracts. */
+export type SchedulingAssignmentIntent = SharedSchedulingAssignmentIntent;
 
-export interface SchedulingDecisionBundle {
-  readonly snapshot: SchedulingEvaluationSnapshot;
-  readonly decision: SchedulingPolicyDecision;
-  readonly assignmentIntents: ReadonlyArray<SchedulingAssignmentIntent>;
-}
+/** @deprecated Use shared scheduling contracts from @shared/contracts/runtime/SchedulingPolicyEvaluationContracts. */
+export type SchedulingDecisionBundle = SharedSchedulingDecisionBundle;
 
 export interface IAuthoritativeSchedulingInputAssembler {
   assemble(input: {
