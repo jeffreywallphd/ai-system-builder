@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 3;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 4;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -166,5 +166,8 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
       ON platform_run_dispatch_attempts(run_id, prepared_at DESC, attempt_id ASC);
     CREATE UNIQUE INDEX IF NOT EXISTS platform_run_dispatch_attempts_claim_uidx
       ON platform_run_dispatch_attempts(run_id, claim_token);
+  `],
+  [4, `
+    ALTER TABLE platform_run_dispatch_attempts ADD COLUMN dispatch_result_json TEXT;
   `],
 ]);

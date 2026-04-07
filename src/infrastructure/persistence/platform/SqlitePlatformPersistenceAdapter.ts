@@ -40,6 +40,7 @@ import {
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
+  AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
@@ -83,6 +84,7 @@ interface PlatformRunDispatchAttemptRow {
   readonly claim_token: string;
   readonly prepared_at: string;
   readonly dispatch_metadata_json: string;
+  readonly dispatch_result_json: string | null;
 }
 
 export class SqlitePlatformPersistenceAdapter
@@ -622,8 +624,9 @@ export class SqlitePlatformPersistenceAdapter
             claim_token,
             prepared_at,
             dispatch_metadata_json,
+            dispatch_result_json,
             created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run(
         dispatchAttemptId,
         runId,
@@ -634,6 +637,7 @@ export class SqlitePlatformPersistenceAdapter
         claimToken,
         preparedAt,
         JSON.stringify(input.dispatchMetadata),
+        null,
         preparedAt,
       );
       return true;
@@ -683,6 +687,31 @@ export class SqlitePlatformPersistenceAdapter
     });
   }
 
+  public async recordDispatchAttemptResult(input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    const attemptId = normalizePlatformLookup(input.attemptId);
+    if (!runId || !attemptId) {
+      return false;
+    }
+
+    const mutationResult = this.executeMutation("record dispatch attempt result", () => this.getDatabase().prepare(`
+        UPDATE platform_run_dispatch_attempts
+        SET dispatch_result_json = ?
+        WHERE attempt_id = ?
+          AND run_id = ?
+      `).run(
+      JSON.stringify(input.result),
+      attemptId,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
   public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
     const normalizedRunId = normalizePlatformLookup(runId);
     if (!normalizedRunId) {
@@ -699,7 +728,8 @@ export class SqlitePlatformPersistenceAdapter
         reservation_owner,
         claim_token,
         prepared_at,
-        dispatch_metadata_json
+        dispatch_metadata_json,
+        dispatch_result_json
       FROM platform_run_dispatch_attempts
       WHERE run_id = ?
       ORDER BY prepared_at DESC, attempt_id ASC
@@ -1172,6 +1202,9 @@ export class SqlitePlatformPersistenceAdapter
       claimToken: row.claim_token,
       preparedAt: row.prepared_at,
       dispatchMetadata: Object.freeze(JSON.parse(row.dispatch_metadata_json) as Record<string, unknown>),
+      dispatchResult: row.dispatch_result_json
+        ? Object.freeze(JSON.parse(row.dispatch_result_json) as AuthoritativeRunDispatchAttemptResult)
+        : undefined,
     });
   }
 
