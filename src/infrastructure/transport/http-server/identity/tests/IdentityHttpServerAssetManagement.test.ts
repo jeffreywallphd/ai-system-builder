@@ -445,6 +445,29 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 }
 
 describe("IdentityHttpServer asset management routes", () => {
+  it("enforces shared auth and workspace guard semantics for converged asset routes", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.guard.1");
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/assets`);
+    expect(unauthenticatedResponse.status).toBe(401);
+    const unauthenticatedBody = await unauthenticatedResponse.json();
+    expect(unauthenticatedBody.ok).toBe(false);
+    expect(unauthenticatedBody.error.code).toBe("authentication-failed");
+
+    const missingWorkspaceResponse = await fetch(`${baseUrl}/api/v1/assets`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(missingWorkspaceResponse.status).toBe(400);
+    const missingWorkspaceBody = await missingWorkspaceResponse.json();
+    expect(missingWorkspaceBody.ok).toBe(false);
+    expect(missingWorkspaceBody.error.code).toBe("invalid-request");
+  });
+
   it("serves authenticated register and upload initiation flows", async () => {
     const service = new StubAssetUploadInitiationService();
     const baseUrl = await startServer(service);

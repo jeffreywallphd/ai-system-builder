@@ -845,6 +845,14 @@ interface AuthenticatedRequestContext {
   readonly principal: AuthenticatedIdentityPrincipalApiResponse;
   readonly session: ResolveAuthenticatedSessionApiResponse["session"];
   readonly sessionToken: string;
+  readonly actor: {
+    readonly userIdentityId: string;
+    readonly username: string;
+  };
+  readonly workspace?: {
+    readonly workspaceId: string;
+    readonly source: "query";
+  };
   readonly sessionTrust: {
     readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
     readonly isTrusted: boolean;
@@ -862,6 +870,27 @@ interface AuthenticatedRequestContext {
       readonly remotePeerType: TransportPeerType;
     };
   };
+}
+
+interface AuthenticatedWorkspaceRequestContext extends AuthenticatedRequestContext {
+  readonly workspace: {
+    readonly workspaceId: string;
+    readonly source: "query";
+  };
+}
+
+interface RequireAuthenticatedWorkspaceSessionOptions {
+  readonly sessionOptions?: {
+    readonly minimumAssuranceLevel?: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly transportScenario?: TransportSecurityScenario;
+    readonly transportActorType?: TransportConnectionActorType;
+    readonly transportRemotePeerType?: TransportPeerType;
+    readonly nodeId?: string;
+  };
+  readonly workspaceId?: string;
+  readonly workspaceQueryParam?: string;
+  readonly missingWorkspaceMessage: string;
+  readonly buildInvalidResponse(message: string): unknown;
 }
 
 interface AuthenticatedNodeTransportContext {
@@ -3157,27 +3186,22 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "POST"
         && path === "/api/v1/storage/instances"
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
             const parsedRequest = await parseAndValidateStorageCreateRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               requestId,
               logger,
               maxBodyBytes,
@@ -3200,23 +3224,18 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "GET"
         && path === "/api/v1/storage/instances"
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildStorageManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
             const parseArrayEnum = <TValue extends string>(
               key: string,
               values: ReadonlyArray<string>,
@@ -3250,8 +3269,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const listRequestDto = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               backendTypes: backendTypesValidation.data.length > 0 ? backendTypesValidation.data : undefined,
               lifecycleStates: lifecycleStatesValidation.data.length > 0 ? lifecycleStatesValidation.data : undefined,
               accessModes: accessModesValidation.data.length > 0 ? accessModesValidation.data : undefined,
@@ -3281,7 +3300,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
+              actorUserIdentityId: context.actor.userIdentityId,
               query: Object.fromEntries(searchParams.entries()),
             }), apiResponse);
           },
@@ -3294,18 +3313,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/storage/instances/")
         && path.endsWith("/health")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
             const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/health");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
+            if (!storageInstanceId) {
               const invalid = buildStorageManagementInvalidRequestResponse(
                 "workspaceId and storageInstanceId are required.",
               );
@@ -3315,8 +3336,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const healthRequest: GetStorageInstanceHealthApiRequest = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               storageInstanceId,
               occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
             };
@@ -3346,18 +3367,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/storage/instances/")
         && path.endsWith("/metadata")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
             const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/metadata");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
+            if (!storageInstanceId) {
               const invalid = buildStorageManagementInvalidRequestResponse(
                 "workspaceId and storageInstanceId are required.",
               );
@@ -3368,8 +3391,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const parsedRequest = await parseAndValidateStorageMetadataUpdateRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               storageInstanceId,
               requestId,
               logger,
@@ -3394,18 +3417,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/storage/instances/")
         && path.endsWith("/activate")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
             const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/activate");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
+            if (!storageInstanceId) {
               const invalid = buildStorageManagementInvalidRequestResponse(
                 "workspaceId and storageInstanceId are required.",
               );
@@ -3427,8 +3452,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const activateRequest: ActivateStorageInstanceApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               storageInstanceId,
               ...parsedRequest.data,
             });
@@ -3446,18 +3471,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/storage/instances/")
         && path.endsWith("/deactivate")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
             const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/", "/deactivate");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
+            if (!storageInstanceId) {
               const invalid = buildStorageManagementInvalidRequestResponse(
                 "workspaceId and storageInstanceId are required.",
               );
@@ -3479,8 +3506,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const deactivateRequest: DeactivateStorageInstanceApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               storageInstanceId,
               ...parsedRequest.data,
             });
@@ -3497,18 +3524,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "GET"
         && path.startsWith("/api/v1/storage/instances/")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and storageInstanceId are required.",
+            buildInvalidResponse: buildStorageManagementInvalidRequestResponse,
+          },
           async (context) => {
             const storageInstanceId = decodePathTail(path, "/api/v1/storage/instances/");
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!storageInstanceId || !workspaceId) {
+            if (!storageInstanceId) {
               const invalid = buildStorageManagementInvalidRequestResponse(
                 "workspaceId and storageInstanceId are required.",
               );
@@ -3518,8 +3547,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const detailRequestDto = {
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               storageInstanceId,
               occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
             };
@@ -3552,31 +3581,33 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "GET"
         && path === "/api/v1/assets"
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
             const parsedRequest = parseAndValidateAssetListRequest(
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               searchParams,
             );
             if (!parsedRequest.ok) {
               writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId }), parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
               return;
             }
 
@@ -3595,19 +3626,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/downloads/content")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId, assetId, and contentToken are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/content");
             const contentToken = normalizeOptionalString(searchParams.get("contentToken"));
-            if (!workspaceId || !assetId || assetId.includes("/") || !contentToken) {
+            if (!assetId || assetId.includes("/") || !contentToken) {
               const invalid = buildAssetManagementInvalidRequestResponse(
                 "workspaceId, assetId, and contentToken are required.",
               );
@@ -3617,8 +3650,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const streamRequest: OpenAuthorizedAssetDownloadStreamApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               assetId,
               contentToken,
               correlationId: normalizeOptionalString(searchParams.get("correlationId")),
@@ -3681,18 +3714,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/downloads/authorize")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/downloads/authorize");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
+            if (!assetId || assetId.includes("/")) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3701,8 +3736,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const parsedRequest = await parseAndValidateAssetDownloadAuthorizationRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               assetId,
               requestId,
               logger,
@@ -3727,18 +3762,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/preview")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/preview");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
+            if (!assetId || assetId.includes("/")) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3746,14 +3783,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const parsedRequest = parseAndValidateAssetPreviewRequest(
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               assetId,
               searchParams,
             );
             if (!parsedRequest.ok) {
               writeJson(response, parsedRequest.statusCode, parsedRequest.body);
-              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({ workspaceId, assetId }), parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId, assetId }),
+                parsedRequest.body,
+              );
               return;
             }
 
@@ -3770,18 +3814,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "GET"
         && path.startsWith("/api/v1/assets/")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
+            if (!assetId || assetId.includes("/")) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3789,8 +3835,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const detailRequest: GetAssetDetailApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               assetId,
               correlationId: normalizeOptionalString(searchParams.get("correlationId")),
               occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
@@ -3809,27 +3855,22 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "POST"
         && path === "/api/v1/assets/register"
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
             const parsedRequest = await parseAndValidateAssetRegisterRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               requestId,
               logger,
               maxBodyBytes,
@@ -3853,27 +3894,22 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && request.method === "POST"
         && path === "/api/v1/assets/generated-outputs/register"
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
-            if (!workspaceId) {
-              const invalid = buildAssetManagementInvalidRequestResponse("workspaceId is required.");
-              writeJson(response, 400, invalid);
-              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
-              return;
-            }
-
             const parsedRequest = await parseAndValidateGeneratedOutputRegisterRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               requestId,
               logger,
               maxBodyBytes,
@@ -3898,18 +3934,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/archive")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/archive");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
+            if (!assetId || assetId.includes("/")) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3917,8 +3955,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const archiveRequest: ArchiveAssetApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               assetId,
               operationKey: normalizeOptionalString(searchParams.get("operationKey")),
               correlationId: normalizeOptionalString(searchParams.get("correlationId")),
@@ -3938,18 +3976,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/delete")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/delete");
-            if (!workspaceId || !assetId || assetId.includes("/")) {
+            if (!assetId || assetId.includes("/")) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3957,8 +3997,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const deleteRequest: DeleteAssetApiRequest = Object.freeze({
-              actorUserIdentityId: context.principal.userIdentityId,
-              workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
               assetId,
               operationKey: normalizeOptionalString(searchParams.get("operationKey")),
               correlationId: normalizeOptionalString(searchParams.get("correlationId")),
@@ -3978,18 +4018,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/")
         && path.endsWith("/uploads/initiate")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const assetId = decodePathTail(path, "/api/v1/assets/", "/uploads/initiate");
-            if (!workspaceId || !assetId) {
+            if (!assetId) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -3998,8 +4040,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const parsedRequest = await parseAndValidateAssetUploadInitiationRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               assetId,
               requestId,
               logger,
@@ -4025,18 +4067,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         && path.startsWith("/api/v1/assets/upload-sessions/")
         && path.endsWith("/content")
       ) {
-        await requireAuthenticatedSession(
+        await requireAuthenticatedWorkspaceSession(
           request,
           response,
           requestId,
           options.backendApi,
           logger,
           options.transportTrust,
-          undefined,
+          {
+            missingWorkspaceMessage: "workspaceId and uploadSessionId are required.",
+            buildInvalidResponse: buildAssetManagementInvalidRequestResponse,
+          },
           async (context) => {
-            const workspaceId = normalizeOptionalString(searchParams.get("workspaceId"));
             const uploadSessionId = decodePathTail(path, "/api/v1/assets/upload-sessions/", "/content");
-            if (!workspaceId || !uploadSessionId) {
+            if (!uploadSessionId) {
               const invalid = buildAssetManagementInvalidRequestResponse("workspaceId and uploadSessionId are required.");
               writeJson(response, 400, invalid);
               logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
@@ -4049,19 +4093,19 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               const invalid = buildAssetManagementInvalidRequestResponse(
                 `Request body exceeds limit of ${maxBodyBytes} bytes.`,
               );
-              writeJson(response, 413, invalid);
-              logResponse(logger, requestId, request, 413, Object.freeze({
-                workspaceId,
-                uploadSessionId,
-                contentLength,
-              }), invalid);
+                writeJson(response, 413, invalid);
+                logResponse(logger, requestId, request, 413, Object.freeze({
+                  workspaceId: context.workspace.workspaceId,
+                  uploadSessionId,
+                  contentLength,
+                }), invalid);
               return;
             }
 
             const parsedRequest = parseAssetUploadContentRequest(
               request,
-              context.principal.userIdentityId,
-              workspaceId,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
               uploadSessionId,
             );
 
@@ -5951,6 +5995,10 @@ async function requireAuthenticatedSession(
     principal: resolvedSession.data.principal,
     session: resolvedSession.data.session,
     sessionToken,
+    actor: Object.freeze({
+      userIdentityId: resolvedSession.data.principal.userIdentityId,
+      username: resolvedSession.data.principal.username,
+    }),
     sessionTrust: Object.freeze({
       assuranceLevel: sessionAssuranceLevel,
       isTrusted: sessionAssuranceLevel === "authenticated-trusted",
@@ -5969,6 +6017,48 @@ async function requireAuthenticatedSession(
       }),
     }),
   }));
+}
+
+async function requireAuthenticatedWorkspaceSession(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requestId: string,
+  backendApi: IdentityAuthBackendApi,
+  logger: IdentityHttpServerLogger,
+  transportTrust: IdentityHttpServerTransportTrustOptions | undefined,
+  options: RequireAuthenticatedWorkspaceSessionOptions,
+  onAuthenticated: (context: AuthenticatedWorkspaceRequestContext) => Promise<void>,
+): Promise<void> {
+  await requireAuthenticatedSession(
+    request,
+    response,
+    requestId,
+    backendApi,
+    logger,
+    transportTrust,
+    options.sessionOptions,
+    async (context) => {
+      const searchParams = new URL(request.url ?? "/", "http://localhost").searchParams;
+      const workspaceId = options.workspaceId
+        ?? normalizeOptionalString(searchParams.get(options.workspaceQueryParam ?? "workspaceId"));
+      if (!workspaceId) {
+        const invalid = options.buildInvalidResponse(options.missingWorkspaceMessage);
+        writeJson(response, 400, invalid);
+        logResponse(logger, requestId, request, 400, Object.freeze({
+          actorUserIdentityId: context.actor.userIdentityId,
+        }), invalid);
+        return;
+      }
+
+      await onAuthenticated(Object.freeze({
+        ...context,
+        workspace: Object.freeze({
+          workspaceId,
+          source: "query",
+        }),
+      }));
+    },
+  );
 }
 
 async function requireAuthenticatedNodeTransport(

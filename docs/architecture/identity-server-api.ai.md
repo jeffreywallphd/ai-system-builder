@@ -192,6 +192,15 @@ Persisted session records now intentionally exclude:
 - Protected route `GET /api/v1/identity/session` now returns that context for authenticated clients.
 - Missing, invalid, expired, and revoked sessions are consistently rejected as `401` + `authentication-failed`.
 
+## Authoritative session-aware middleware and route guards (story 14.1.4)
+
+- `IdentityHttpServer` now composes a reusable `requireAuthenticatedWorkspaceSession(...)` guard for converged workspace-scoped routes.
+- The guard enforces a shared sequence: resolve authenticated session -> resolve workspace scope -> execute route handler.
+- Shared guard context now carries actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so downstream transport handlers avoid repeated parsing logic.
+- Storage and asset converged routes now use this shared pipeline and preserve shared failure semantics:
+  - unauthenticated requests return `401` + `authentication-failed`
+  - authenticated requests missing required workspace scope return `400` + `invalid-request`
+
 ## Secure transport adapter setup (story 7.2.1)
 
 - `IdentityHttpServer` now supports explicit secure transport adapter configuration:

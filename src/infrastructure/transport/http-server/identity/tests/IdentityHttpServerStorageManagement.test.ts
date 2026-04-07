@@ -209,6 +209,28 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 }
 
 describe("IdentityHttpServer storage management routes", () => {
+  it("enforces shared auth and workspace guard semantics for converged storage routes", async () => {
+    const baseUrl = await startServer();
+    const token = await registerAndLogin(baseUrl, "storage.http.guard.1");
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/storage/instances`);
+    expect(unauthenticatedResponse.status).toBe(401);
+    const unauthenticatedBody = await unauthenticatedResponse.json();
+    expect(unauthenticatedBody.ok).toBe(false);
+    expect(unauthenticatedBody.error.code).toBe("authentication-failed");
+
+    const missingWorkspaceResponse = await fetch(`${baseUrl}/api/v1/storage/instances`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(missingWorkspaceResponse.status).toBe(400);
+    const missingWorkspaceBody = await missingWorkspaceResponse.json();
+    expect(missingWorkspaceBody.ok).toBe(false);
+    expect(missingWorkspaceBody.error.code).toBe("invalid-request");
+  });
+
   it("serves authenticated storage create/list/detail/update/deactivate/health flows", async () => {
     const baseUrl = await startServer();
     const token = await registerAndLogin(baseUrl, "storage.http.owner");
