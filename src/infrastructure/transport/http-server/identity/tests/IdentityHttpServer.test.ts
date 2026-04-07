@@ -240,6 +240,10 @@ describe("IdentityHttpServer", () => {
     const invalidBody = await invalidResponse.json();
     expect(invalidBody.ok).toBe(false);
     expect(invalidBody.error.code).toBe("invalid-request");
+    expect(invalidBody.error.sharedCode).toBe("invalid-request");
+    expect(invalidBody.error.domainCode).toBe("invalid-request");
+    expect(invalidBody.error.retryable).toBe(false);
+    expect(typeof invalidBody.error.userMessage).toBe("string");
     expect(Array.isArray(invalidBody.error.validationErrors)).toBe(true);
 
     const failedLoginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
@@ -259,6 +263,65 @@ describe("IdentityHttpServer", () => {
     const failedLoginBody = await failedLoginResponse.json();
     expect(failedLoginBody.ok).toBe(false);
     expect(failedLoginBody.error.code).toBe("authentication-failed");
+    expect(failedLoginBody.error.sharedCode).toBe("authentication-failed");
+    expect(failedLoginBody.error.retryable).toBe(false);
+    expect(typeof failedLoginBody.error.userMessage).toBe("string");
+  });
+
+  it("returns standardized not-found semantics for unknown routes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const response = await fetch(`${baseUrl}/api/v1/identity/unknown-route`, {
+      method: "POST",
+    });
+
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("not-found");
+    expect(body.error.sharedCode).toBe("not-found");
+    expect(body.error.retryable).toBe(false);
+    expect(typeof body.error.userMessage).toBe("string");
+  });
+
+  it("sanitizes unhandled internal errors before sending responses", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(
+      logger,
+      {},
+      {
+        backendApi: {
+          registerLocalAccount: async () => {
+            throw new Error("sqlite failure at C:\\private\\secrets\\identity.db with token abc");
+          },
+        } as never,
+      },
+    );
+
+    const response = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "internal.error.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(500);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("internal");
+    expect(body.error.sharedCode).toBe("internal");
+    expect(body.error.retryable).toBe(false);
+    expect(typeof body.error.userMessage).toBe("string");
+    expect(String(body.error.message).toLowerCase()).not.toContain("sqlite");
+    expect(String(body.error.message).toLowerCase()).not.toContain("secret");
+    expect(String(body.error.message).toLowerCase()).not.toContain("token");
   });
 
   it("returns specific registration policy error details for weak credential input", async () => {

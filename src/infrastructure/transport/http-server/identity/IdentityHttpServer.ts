@@ -216,6 +216,11 @@ import {
   evaluateThinClientWebSocketOriginPolicy,
   type ThinClientSessionChannelContextDto,
 } from "@shared/contracts/security/ThinClientTransportContracts";
+import {
+  mapSharedApiErrorCodeToStatusCode,
+  mapToSharedApiErrorCode,
+  normalizeSharedApiErrorEnvelope,
+} from "./IdentityHttpServerErrorTranslation";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -5259,7 +5264,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       writeJson(response, 404, {
         ok: false,
         error: {
-          code: IdentityAuthApiErrorCodes.invalidRequest,
+          code: IdentityAuthApiErrorCodes.notFound,
           message: "Route not found.",
         },
       });
@@ -6427,15 +6432,14 @@ function denyWebSocketUpgrade(
   statusCode: number,
   reason: WebSocketUpgradeDeniedReason,
 ): void {
-  const payload = Object.freeze({
+  const payload = normalizeSharedApiErrorEnvelope(Object.freeze({
     ok: false,
     error: Object.freeze({
       code: reason.code,
       message: reason.message,
       closeCode: reason.closeCode,
-      details: reason.details,
     }),
-  });
+  }));
   const body = JSON.stringify(payload);
   const responseLines = [
     `HTTP/1.1 ${statusCode} ${resolveHttpStatusText(statusCode)}`,
@@ -7859,7 +7863,7 @@ function mapStatusCode(response: IdentityAuthApiResponse<unknown>): number {
     case IdentityAuthApiErrorCodes.notFound:
       return 404;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7882,7 +7886,7 @@ function mapWorkspaceStatusCode(response: WorkspaceInvitationApiResponse<unknown
     case WorkspaceInvitationApiErrorCodes.invalidInvite:
       return 400;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7905,7 +7909,7 @@ function mapWorkspaceAdministrationStatusCode(response: WorkspaceAdministrationA
     case WorkspaceAdministrationApiErrorCodes.invalidTransition:
       return 422;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7926,7 +7930,7 @@ function mapAuthorizationManagementStatusCode(response: AuthorizationManagementA
     case AuthorizationManagementApiErrorCodes.conflict:
       return 409;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7947,7 +7951,7 @@ function mapNodeTrustStatusCode(response: NodeTrustApiResponse<unknown>): number
     case NodeTrustApiErrorCodes.conflict:
       return 409;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7968,7 +7972,7 @@ function mapCertificateOperationsStatusCode(response: CertificateOperationsApiRe
     case CertificateOperationsApiErrorCodes.conflict:
       return 409;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -7989,7 +7993,7 @@ function mapSecretMetadataStatusCode(response: SecretMetadataApiResponse<unknown
     case SecretMetadataApiErrorCodes.conflict:
       return 409;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -8016,7 +8020,7 @@ function mapStorageManagementStatusCode(response: StorageManagementApiResponse<u
     case StorageManagementApiErrorCodes.provisioningFailed:
       return 409;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -8039,7 +8043,7 @@ function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unkno
     case AssetManagementApiErrorCodes.invalidState:
       return 422;
     default:
-      return 500;
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
   }
 }
 
@@ -8572,9 +8576,10 @@ function normalizeError(error: unknown): string {
 }
 
 function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {
+  const normalizedPayload = normalizeSharedApiErrorEnvelope(payload);
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
-  response.end(JSON.stringify(payload));
+  response.end(JSON.stringify(normalizedPayload));
 }
 
 function writeNoContent(response: ServerResponse, statusCode: number): void {
