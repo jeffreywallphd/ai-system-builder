@@ -111,6 +111,30 @@
   color: var(--color-text-secondary);
 }
 
+.ui-operational-result-review__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: var(--space-sm);
+}
+
+.ui-operational-result-review__card--selected {
+  border-color: rgba(79, 156, 249, 0.45);
+  background: rgba(79, 156, 249, 0.08);
+}
+
+.ui-operational-result-review__detail {
+  height: 100%;
+}
+
+.ui-operational-result-review__protected-actions {
+  border-top: 1px solid var(--color-border-soft);
+  margin-top: var(--space-xs);
+  padding-top: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
 @media (max-width: 1200px) {
   .ui-operational-dashboard__summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -122,7 +146,8 @@
   .ui-operational-dashboard__summary-grid,
   .ui-operational-dashboard__node-grid,
   .ui-operational-run-detail__grid,
-  .ui-operational-queue-filters__row {
+  .ui-operational-queue-filters__row,
+  .ui-operational-result-review__layout {
     grid-template-columns: 1fr;
   }
 }

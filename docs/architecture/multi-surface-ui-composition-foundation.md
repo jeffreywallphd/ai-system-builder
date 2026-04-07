@@ -180,3 +180,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Queue visibility now includes shared filter/list/detail seams in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx` with explicit queue row models, queue visibility scope filters, and responsive table-card rendering.
 - `RunPage` now applies queue visibility scopes to authoritative queue list reads and composes queue detail selection with shared action descriptors for permitted queue/run actions.
 - Queue action flows (`refresh`, `cancel`, `dequeue`, `inspect`) now run through shared action wrappers so desktop and thin-client operational surfaces preserve one permission-aware queue interaction model.
+
+## Story 15.2.5 update
+
+- Result/output review now includes shared output-card, result-detail, and protected-asset action seams in `src/ui/shared/operations/OperationalResultReviewPanels.tsx`.
+- `RunPage` now composes these result-review seams for both desktop and thin-client operational surfaces using authoritative runtime result metadata plus protected asset APIs (`getAssetDetail`, `resolvePreview`, `authorizeDownload`) via `AssetWorkflowService`.
+- Protected preview/download interactions now remain tokenized and server-mediated, with explicit restricted/unavailable messaging and no raw filesystem-path assumptions in UI flows.

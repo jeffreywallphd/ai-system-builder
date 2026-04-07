@@ -13,6 +13,7 @@ import {
 import { useUiDependencies } from "../composition/AppProviders";
 import { RuntimeOperationsService } from "../services/RuntimeOperationsService";
 import { NodeInventoryService } from "../services/NodeInventoryService";
+import { AssetWorkflowService } from "../services/AssetWorkflowService";
 import {
   ContextualRecommendationService,
   ContextualRecommendationSurfaces,
@@ -27,6 +28,7 @@ import {
 } from "../presenters/OperationalWorkspaceDashboardPresenter";
 import {
   OperationalApprovedRunLaunchPanel,
+  OperationalResultReviewPanels,
   OperationalQueueDetailPanel,
   OperationalQueueVisibilityPanel,
   OperationalRunDetailStatusPanel,
@@ -37,12 +39,15 @@ import {
   type OperationalQueueFilters,
 } from "../shared/operations";
 import type { OperationalApprovedRunLaunchValidatedInput } from "../shared/operations";
+import type { OperationalProtectedAssetActionState, OperationalResultReviewEntry } from "../shared/operations";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import RunDesktopOperationalDashboardPage from "./RunDesktopOperationalDashboardPage";
 import RunThinClientOperationalDashboardPage from "./RunThinClientOperationalDashboardPage";
 import { useSurfaceResponsiveProfile } from "../shared/responsive";
 import { SurfaceStatePanel } from "../shared/components/presentation-state";
 import { resolveIdentityAccessChannel } from "../shared/identity/IdentityAuthEnvironment";
+import { toUserFacingAssetWorkflowError } from "@shared/assets/AssetWorkflowClient";
+import type { AssetDetailDto } from "@shared/contracts/assets/AssetTransportContracts";
 
 interface RunPageProps {
   readonly runtimeOperationsService?: RuntimeOperationsService;
@@ -67,6 +72,10 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     () => props.runtimeRealtimeSubscriptionService ?? new RuntimeRealtimeSubscriptionService(),
     [props.runtimeRealtimeSubscriptionService],
   );
+  const assetWorkflowService = useMemo(
+    () => new AssetWorkflowService(),
+    [],
+  );
   const nodeInventoryService = useMemo(
     () => props.nodeInventoryService ?? new NodeInventoryService(),
     [props.nodeInventoryService],
@@ -78,6 +87,9 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
   const session = useMemo(() => sessionStore.getSession(), [sessionStore]);
   const sessionToken = session?.sessionToken;
+  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId
+    ?? session?.workspaceContext?.requestedWorkspaceId
+    ?? session?.initialCapabilityState?.workspaceId;
   const accessChannel = session?.sessionAccessChannel === "desktop"
     ? "desktop"
     : resolveIdentityAccessChannel();
@@ -137,16 +149,22 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   const [runtimeExecutionState, setRuntimeExecutionState] = useState<{
     readonly executionId?: string;
     readonly status?: string;
+    readonly rootAssetId?: string;
+    readonly rootVersionId?: string;
     readonly progressLabel?: string;
     readonly diagnosticsCount?: number;
     readonly traceEventCount?: number;
     readonly traceLogCount?: number;
     readonly outputFieldCount?: number;
     readonly outputContractIds?: ReadonlyArray<string>;
+    readonly outputAssetIds?: ReadonlyArray<string>;
   }>();
   const [selectedRunDetail, setSelectedRunDetail] = useState<ExecutionRunDetailProjection | undefined>();
   const [isRunDetailLoading, setIsRunDetailLoading] = useState(false);
   const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
+  const [selectedResultExecutionId, setSelectedResultExecutionId] = useState<string | undefined>();
+  const [assetDetailByExecutionAndAssetId, setAssetDetailByExecutionAndAssetId] = useState<Readonly<Record<string, Readonly<Record<string, AssetDetailDto | undefined>>>>(Object.freeze({}));
+  const [assetActionStateByExecutionAndAssetId, setAssetActionStateByExecutionAndAssetId] = useState<Readonly<Record<string, Readonly<Record<string, OperationalProtectedAssetActionState | undefined>>>>(Object.freeze({}));
 
   const refreshRuntimeQueue = useCallback(async (): Promise<void> => {
     setIsRuntimeQueueLoading(true);
@@ -207,13 +225,17 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     setRuntimeExecutionState(Object.freeze({
       executionId: summary.data.executionId,
       status: summary.data.status,
+      rootAssetId: summary.data.rootAssetId,
+      rootVersionId: summary.data.rootVersionId,
       progressLabel: summary.data.progressLabel,
       diagnosticsCount: summary.data.diagnosticsCount,
       traceEventCount: summary.data.traceEventCount,
       traceLogCount: summary.data.traceLogCount,
       outputFieldCount: summary.data.outputFieldCount,
       outputContractIds: summary.data.outputContractIds,
+      outputAssetIds: summary.data.outputAssetIds,
     }));
+    setSelectedResultExecutionId(summary.data.executionId);
     setRuntimeExecutionError(undefined);
     setIsRunDetailLoading(false);
   }, [executionHistoryService, runtimeOperationsService]);
@@ -262,8 +284,11 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       return Object.freeze({
         executionId: response.data.executionId,
         status: response.data.status,
+        rootAssetId: response.data.rootAssetId,
+        rootVersionId: response.data.rootVersionId,
         outputFieldCount,
         outputContractIds,
+        outputAssetIds: response.data.outputAssetIds ?? Object.freeze([]),
       } satisfies OperationalWorkspaceRecentOutputSummary);
     }));
 
@@ -330,6 +355,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         setRuntimeExecutionState((current) => Object.freeze({
           executionId: payload.executionId,
           status: payload.status,
+          rootAssetId: current?.rootAssetId,
+          rootVersionId: current?.rootVersionId,
           progressLabel: payload.progress
             ? `${payload.progress.completedNodeCount}/${payload.progress.totalNodeCount} nodes`
             : current?.progressLabel ?? "-",
@@ -338,6 +365,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
           traceLogCount: current?.traceLogCount,
           outputFieldCount: current?.outputFieldCount,
           outputContractIds: current?.outputContractIds,
+          outputAssetIds: current?.outputAssetIds,
         }));
       },
       onRuntimeConnectivityEvent: (payload) => {
@@ -395,6 +423,220 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     nodeInventory,
     realtime: runtimeRealtimeConnectionState,
   }), [history, nodeInventory, recentOutputs, runtimeQueueItems, runtimeRealtimeConnectionState]);
+
+  const resultReviewEntries = useMemo(() => {
+    const byExecutionId = new Map<string, OperationalResultReviewEntry>();
+    for (const output of recentOutputs) {
+      byExecutionId.set(output.executionId, Object.freeze({
+        executionId: output.executionId,
+        status: output.status,
+        rootAssetId: output.rootAssetId,
+        rootVersionId: output.rootVersionId,
+        outputFieldCount: output.outputFieldCount,
+        outputContractIds: output.outputContractIds,
+        outputAssetIds: output.outputAssetIds ?? Object.freeze([]),
+      }));
+    }
+    if (runtimeExecutionState?.executionId) {
+      byExecutionId.set(runtimeExecutionState.executionId, Object.freeze({
+        executionId: runtimeExecutionState.executionId,
+        status: runtimeExecutionState.status,
+        rootAssetId: runtimeExecutionState.rootAssetId,
+        rootVersionId: runtimeExecutionState.rootVersionId,
+        outputFieldCount: runtimeExecutionState.outputFieldCount ?? 0,
+        outputContractIds: runtimeExecutionState.outputContractIds ?? Object.freeze([]),
+        outputAssetIds: runtimeExecutionState.outputAssetIds ?? Object.freeze([]),
+      }));
+    }
+    return Object.freeze([...byExecutionId.values()]);
+  }, [recentOutputs, runtimeExecutionState]);
+
+  const normalizedRuntimeExecutionId = runtimeExecutionId.trim() || undefined;
+  const activeResultExecutionId = selectedResultExecutionId
+    ?? normalizedRuntimeExecutionId
+    ?? runtimeExecutionState?.executionId
+    ?? resultReviewEntries[0]?.executionId;
+
+  useEffect(() => {
+    if (!selectedResultExecutionId) {
+      return;
+    }
+    if (!resultReviewEntries.some((entry) => entry.executionId === selectedResultExecutionId)) {
+      setSelectedResultExecutionId(undefined);
+    }
+  }, [resultReviewEntries, selectedResultExecutionId]);
+
+  const setAssetDetailForRun = useCallback((executionId: string, assetId: string, detail: AssetDetailDto | undefined): void => {
+    setAssetDetailByExecutionAndAssetId((current) => {
+      const runEntries = {
+        ...(current[executionId] ?? Object.freeze({})),
+        [assetId]: detail,
+      };
+      return Object.freeze({
+        ...current,
+        [executionId]: Object.freeze(runEntries),
+      });
+    });
+  }, []);
+
+  const setAssetActionStateForRun = useCallback((executionId: string, assetId: string, next: OperationalProtectedAssetActionState): void => {
+    setAssetActionStateByExecutionAndAssetId((current) => {
+      const runEntries = {
+        ...(current[executionId] ?? Object.freeze({})),
+        [assetId]: next,
+      };
+      return Object.freeze({
+        ...current,
+        [executionId]: Object.freeze(runEntries),
+      });
+    });
+  }, []);
+
+  const ensureAssetDetail = useCallback(async (
+    executionId: string,
+    assetId: string,
+  ): Promise<AssetDetailDto | undefined> => {
+    const existing = assetDetailByExecutionAndAssetId[executionId]?.[assetId];
+    if (existing) {
+      return existing;
+    }
+    if (!sessionToken || !workspaceId) {
+      return undefined;
+    }
+    const response = await assetWorkflowService.getAssetDetail({
+      workspaceId,
+      assetId,
+    }, sessionToken);
+    if (!response.ok || !response.data) {
+      return undefined;
+    }
+    setAssetDetailForRun(executionId, assetId, response.data.asset);
+    return response.data.asset;
+  }, [assetDetailByExecutionAndAssetId, assetWorkflowService, sessionToken, setAssetDetailForRun, workspaceId]);
+
+  const requestProtectedPreview = useCallback(async (executionId: string, assetId: string): Promise<void> => {
+    if (!sessionToken || !workspaceId) {
+      return;
+    }
+    const currentState = assetActionStateByExecutionAndAssetId[executionId]?.[assetId];
+    setAssetActionStateForRun(executionId, assetId, Object.freeze({
+      previewStatus: "loading",
+      previewMessage: undefined,
+      previewPath: undefined,
+      downloadStatus: currentState?.downloadStatus ?? "idle",
+      downloadMessage: currentState?.downloadMessage,
+      downloadPath: currentState?.downloadPath,
+    }));
+    const detail = await ensureAssetDetail(executionId, assetId);
+    if (detail?.allowedActions && !detail.allowedActions.canResolvePreview) {
+      setAssetActionStateForRun(executionId, assetId, Object.freeze({
+        previewStatus: "restricted",
+        previewMessage: "Preview is restricted for this asset by authorization policy.",
+        previewPath: undefined,
+        downloadStatus: currentState?.downloadStatus ?? "idle",
+        downloadMessage: currentState?.downloadMessage,
+        downloadPath: currentState?.downloadPath,
+      }));
+      return;
+    }
+
+    const previewResolution = await assetWorkflowService.resolvePreview({
+      workspaceId,
+      assetId,
+      preferredMimeTypes: ["image/webp", "image/png", "image/jpeg", "application/pdf", "text/plain"],
+    }, sessionToken);
+    if (!previewResolution.ok || !previewResolution.data) {
+      setAssetActionStateForRun(executionId, assetId, Object.freeze({
+        previewStatus: previewResolution.error?.code === "forbidden" ? "restricted" : "unavailable",
+        previewMessage: toUserFacingAssetWorkflowError(previewResolution.error, "Preview is currently unavailable."),
+        previewPath: undefined,
+        downloadStatus: currentState?.downloadStatus ?? "idle",
+        downloadMessage: currentState?.downloadMessage,
+        downloadPath: currentState?.downloadPath,
+      }));
+      return;
+    }
+
+    const authorized = await assetWorkflowService.authorizeDownload({
+      workspaceId,
+      assetId: previewResolution.data.preview.previewAssetId ?? assetId,
+      versionId: previewResolution.data.preview.previewVersionId,
+      purpose: "inline-preview",
+    }, sessionToken);
+    if (!authorized.ok || !authorized.data) {
+      setAssetActionStateForRun(executionId, assetId, Object.freeze({
+        previewStatus: authorized.error?.code === "forbidden" ? "restricted" : "error",
+        previewMessage: toUserFacingAssetWorkflowError(authorized.error, "Preview authorization failed."),
+        previewPath: undefined,
+        downloadStatus: currentState?.downloadStatus ?? "idle",
+        downloadMessage: currentState?.downloadMessage,
+        downloadPath: currentState?.downloadPath,
+      }));
+      return;
+    }
+
+    setAssetActionStateForRun(executionId, assetId, Object.freeze({
+      previewStatus: "ready",
+      previewMessage: `Preview authorized for ${authorized.data.authorization.mimeType}.`,
+      previewPath: authorized.data.downloadPath,
+      downloadStatus: currentState?.downloadStatus ?? "idle",
+      downloadMessage: currentState?.downloadMessage,
+      downloadPath: currentState?.downloadPath,
+    }));
+  }, [assetActionStateByExecutionAndAssetId, assetWorkflowService, ensureAssetDetail, sessionToken, setAssetActionStateForRun, workspaceId]);
+
+  const requestProtectedDownload = useCallback(async (executionId: string, assetId: string): Promise<void> => {
+    if (!sessionToken || !workspaceId) {
+      return;
+    }
+    const currentState = assetActionStateByExecutionAndAssetId[executionId]?.[assetId];
+    setAssetActionStateForRun(executionId, assetId, Object.freeze({
+      previewStatus: currentState?.previewStatus ?? "idle",
+      previewMessage: currentState?.previewMessage,
+      previewPath: currentState?.previewPath,
+      downloadStatus: "loading",
+      downloadMessage: undefined,
+      downloadPath: undefined,
+    }));
+    const detail = await ensureAssetDetail(executionId, assetId);
+    if (detail?.allowedActions && !detail.allowedActions.canAuthorizeDownload) {
+      setAssetActionStateForRun(executionId, assetId, Object.freeze({
+        previewStatus: currentState?.previewStatus ?? "idle",
+        previewMessage: currentState?.previewMessage,
+        previewPath: currentState?.previewPath,
+        downloadStatus: "restricted",
+        downloadMessage: "Download is restricted for this asset by authorization policy.",
+        downloadPath: undefined,
+      }));
+      return;
+    }
+
+    const authorized = await assetWorkflowService.authorizeDownload({
+      workspaceId,
+      assetId,
+      purpose: "download",
+    }, sessionToken);
+    if (!authorized.ok || !authorized.data) {
+      setAssetActionStateForRun(executionId, assetId, Object.freeze({
+        previewStatus: currentState?.previewStatus ?? "idle",
+        previewMessage: currentState?.previewMessage,
+        previewPath: currentState?.previewPath,
+        downloadStatus: authorized.error?.code === "forbidden" ? "restricted" : "error",
+        downloadMessage: toUserFacingAssetWorkflowError(authorized.error, "Download authorization failed."),
+        downloadPath: undefined,
+      }));
+      return;
+    }
+
+    setAssetActionStateForRun(executionId, assetId, Object.freeze({
+      previewStatus: currentState?.previewStatus ?? "idle",
+      previewMessage: currentState?.previewMessage,
+      previewPath: currentState?.previewPath,
+      downloadStatus: "ready",
+      downloadMessage: `Download authorized for ${authorized.data.authorization.mimeType} (${authorized.data.authorization.sizeBytes} bytes).`,
+      downloadPath: authorized.data.downloadPath,
+    }));
+  }, [assetActionStateByExecutionAndAssetId, assetWorkflowService, ensureAssetDetail, sessionToken, setAssetActionStateForRun, workspaceId]);
 
   const actorPermissionIds = useMemo(() => {
     const roles = new Set(session?.workspaceContext?.workspaces
@@ -479,6 +721,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         }}
         onInspectRun={(executionId) => {
           setRuntimeExecutionId(executionId);
+          setSelectedResultExecutionId(executionId);
           void inspectRuntimeExecution(executionId);
         }}
         onCancelRun={(executionId) => {
@@ -523,6 +766,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         }}
         onInspectRun={(executionId) => {
           setRuntimeExecutionId(executionId);
+          setSelectedResultExecutionId(executionId);
           void inspectRuntimeExecution(executionId);
         }}
         onCancelRun={(executionId) => {
@@ -568,6 +812,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         }}
         onInspectRun={(executionId) => {
           setRuntimeExecutionId(executionId);
+          setSelectedResultExecutionId(executionId);
           void inspectRuntimeExecution(executionId);
         }}
         onCancelRun={(executionId) => {
@@ -598,6 +843,26 @@ export default function RunPage(props: RunPageProps): JSX.Element {
           setSelectedQueueItemId(queueItemId);
         }}
       />
+      <OperationalResultReviewPanels
+        entries={resultReviewEntries}
+        selectedExecutionId={activeResultExecutionId}
+        detailIsLoading={isRunDetailLoading}
+        detailError={runtimeExecutionError}
+        responsiveProfile={responsiveProfile}
+        assetDetailsByExecutionAndAssetId={assetDetailByExecutionAndAssetId}
+        actionStateByExecutionAndAssetId={assetActionStateByExecutionAndAssetId}
+        onSelectExecution={(executionId) => {
+          setSelectedResultExecutionId(executionId);
+          setRuntimeExecutionId(executionId);
+          void inspectRuntimeExecution(executionId);
+        }}
+        onRequestPreview={(executionId, assetId) => {
+          void requestProtectedPreview(executionId, assetId);
+        }}
+        onRequestDownload={(executionId, assetId) => {
+          void requestProtectedDownload(executionId, assetId);
+        }}
+      />
     </div>
   );
 
@@ -609,6 +874,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         onSubmit={launchApprovedRun}
         onRunAccepted={(data) => {
           setRuntimeExecutionId(data.executionId);
+          setSelectedResultExecutionId(data.executionId);
           void inspectRuntimeExecution(data.executionId);
           void refreshRuntimeQueue();
           void loadHistory();
@@ -677,6 +943,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         }}
         onInspectRun={(executionId) => {
           setRuntimeExecutionId(executionId);
+          setSelectedResultExecutionId(executionId);
           void inspectRuntimeExecution(executionId);
         }}
         onCancelRun={(executionId) => {

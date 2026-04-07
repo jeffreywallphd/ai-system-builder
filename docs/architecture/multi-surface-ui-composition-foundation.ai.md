@@ -94,3 +94,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared queue visibility/filter/detail seams now live in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx` with queue row models, visibility-scope filters, and responsive table-card rendering.
 - `RunPage` now composes queue scope filters into authoritative queue list reads and renders selected queue detail in the same desktop/thin operational shell.
 - Queue actions (`refresh`, `inspect`, `cancel`, `dequeue`) now run through shared action descriptors/wrappers for permission-aware queue workflows across surfaces.
+
+## Story 15.2.5 update
+- Shared result-review seams now live in `src/ui/shared/operations/OperationalResultReviewPanels.tsx` with reusable output cards, result detail panels, protected preview/download action components, and explicit protected-state messaging.
+- `RunPage` now composes result review for desktop and thin-client operational surfaces using authoritative runtime result metadata and protected asset workflow APIs (`getAssetDetail`, `resolvePreview`, `authorizeDownload`) through `AssetWorkflowService`.
+- Protected asset interactions stay logical and server-mediated (tokenized preview/download paths), with clear restricted/unavailable UX states and no raw file-path assumptions.

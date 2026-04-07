@@ -10,8 +10,11 @@ import type { RuntimeRealtimeConnectionStateSnapshot } from "../shared/runtime/R
 export interface OperationalWorkspaceRecentOutputSummary {
   readonly executionId: string;
   readonly status?: string;
+  readonly rootAssetId?: string;
+  readonly rootVersionId?: string;
   readonly outputFieldCount: number;
   readonly outputContractIds: ReadonlyArray<string>;
+  readonly outputAssetIds?: ReadonlyArray<string>;
 }
 
 export interface OperationalWorkspaceAlertDescriptor {

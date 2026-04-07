@@ -13,6 +13,7 @@ describe("RunPage", () => {
     expect(source).toContain("RuntimeOperationsService");
     expect(source).toContain("OperationalQueueVisibilityPanel");
     expect(source).toContain("OperationalQueueDetailPanel");
+    expect(source).toContain("OperationalResultReviewPanels");
     expect(source).toContain("resolveQueueVisibilityStatuses");
     expect(source).toContain("OperationalApprovedRunLaunchPanel");
     expect(source).toContain("launchApprovedRun");
@@ -21,6 +22,10 @@ describe("RunPage", () => {
     expect(source).toContain("runtimeOperationsService.startRun");
     expect(source).toContain("runtimeOperationsService.cancelRun");
     expect(source).toContain("runtimeOperationsService.dequeueQueueItem");
+    expect(source).toContain("AssetWorkflowService");
+    expect(source).toContain("assetWorkflowService.resolvePreview");
+    expect(source).toContain("assetWorkflowService.authorizeDownload");
+    expect(source).toContain("assetWorkflowService.getAssetDetail");
     expect(source).toContain("RuntimeRealtimeSubscriptionService");
     expect(source).toContain("subscribeOperationalUpdates");
     expect(source).toContain("resolveIdentityAccessChannel");

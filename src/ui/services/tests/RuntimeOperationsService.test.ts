@@ -8,9 +8,68 @@ describe("RuntimeOperationsService", () => {
     const client: RuntimeControlClient = {
       startRun: mock(async () => ({ ok: true, data: {} as any })),
       cancelRun: mock(async () => ({ ok: true, data: {} as any })),
-      getRunStatus: mock(async () => ({ ok: true, data: {} as any })),
-      getRunResult: mock(async () => ({ ok: true, data: {} as any })),
-      getRunTrace: mock(async () => ({ ok: true, data: {} as any })),
+      getRunStatus: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          status: "running",
+          rootAssetId: "asset:root:1",
+          startedAt: "2026-04-07T11:00:00.000Z",
+          updatedAt: "2026-04-07T11:01:00.000Z",
+          progress: Object.freeze({
+            totalNodeCount: 4,
+            completedNodeCount: 1,
+            failedNodeCount: 0,
+            runningNodeCount: 1,
+            updatedAt: "2026-04-07T11:01:00.000Z",
+          }),
+          executedVersionMap: Object.freeze({ nodeVersionIds: Object.freeze({}) }),
+          nestedExecutionLineage: Object.freeze([]),
+        }),
+      })),
+      getRunResult: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          status: "running",
+          rootAssetId: "asset:root:1",
+          diagnostics: Object.freeze([]),
+          outputSummary: Object.freeze({
+            hasOutput: false,
+            hasError: false,
+            outputFieldCount: 0,
+            contractOutputIds: Object.freeze([]),
+          }),
+          bounded: Object.freeze({ nodeResultsTruncated: false, diagnosticsTruncated: false }),
+          serialized: Object.freeze({
+            identity: Object.freeze({
+              executionId: "execution-1",
+              status: "running",
+              rootAssetId: "asset:root:1",
+              startedAt: "2026-04-07T11:00:00.000Z",
+            }),
+            summary: Object.freeze({
+              hasOutput: false,
+              hasError: false,
+              outputFieldCount: 0,
+              contractOutputIds: Object.freeze([]),
+              diagnosticsCount: 0,
+              nodeResultCount: 0,
+              nestedSystemResultCount: 0,
+            }),
+          }),
+        }),
+      })),
+      getRunTrace: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          trace: Object.freeze({
+            events: Object.freeze([]),
+            logs: Object.freeze([]),
+          }),
+        }),
+      })),
       listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
       dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
     };
@@ -100,6 +159,116 @@ describe("RuntimeOperationsService", () => {
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("unauthorized");
     expect(client.listQueueItems).toHaveBeenCalledTimes(0);
+  });
+
+  it("collects result asset references from root and output payloads", async () => {
+    const client: RuntimeControlClient = {
+      startRun: mock(async () => ({ ok: true, data: {} as any })),
+      cancelRun: mock(async () => ({ ok: true, data: {} as any })),
+      getRunStatus: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          status: "running",
+          rootAssetId: "asset:root:1",
+          rootVersionId: "asset:root:1:v1",
+          startedAt: "2026-04-07T11:00:00.000Z",
+          updatedAt: "2026-04-07T11:01:00.000Z",
+          progress: Object.freeze({
+            totalNodeCount: 4,
+            completedNodeCount: 2,
+            failedNodeCount: 0,
+            runningNodeCount: 1,
+            updatedAt: "2026-04-07T11:01:00.000Z",
+          }),
+          executedVersionMap: Object.freeze({ nodeVersionIds: Object.freeze({}) }),
+          nestedExecutionLineage: Object.freeze([]),
+        }),
+      })),
+      getRunResult: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          status: "running",
+          rootAssetId: "asset:root:1",
+          diagnostics: Object.freeze([]),
+          outputSummary: Object.freeze({
+            hasOutput: true,
+            hasError: false,
+            outputFieldCount: 2,
+            contractOutputIds: Object.freeze(["contract:alpha", "asset:contract:output"]),
+          }),
+          output: Object.freeze({
+            primaryAssetId: "asset:generated:1",
+            nested: Object.freeze({
+              previewAssetId: "asset:preview:1",
+              ignoredReference: "not-an-asset",
+            }),
+          }),
+          bounded: Object.freeze({ nodeResultsTruncated: false, diagnosticsTruncated: false }),
+          serialized: Object.freeze({
+            identity: Object.freeze({
+              executionId: "execution-1",
+              status: "running",
+              rootAssetId: "asset:root:1",
+              startedAt: "2026-04-07T11:00:00.000Z",
+            }),
+            summary: Object.freeze({
+              hasOutput: true,
+              hasError: false,
+              outputFieldCount: 2,
+              contractOutputIds: Object.freeze(["contract:alpha"]),
+              diagnosticsCount: 0,
+              nodeResultCount: 0,
+              nestedSystemResultCount: 0,
+            }),
+          }),
+        }),
+      })),
+      getRunTrace: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          executionId: "execution-1",
+          trace: Object.freeze({
+            events: Object.freeze([]),
+            logs: Object.freeze([]),
+          }),
+        }),
+      })),
+      listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
+      dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
+    };
+    const sessionStore = {
+      getSession: () => Object.freeze({
+        userIdentityId: "user-1",
+        username: "user",
+        providerId: "local",
+        sessionId: "session-1",
+        sessionToken: "token-1",
+        sessionTokenType: "Bearer" as const,
+        sessionIssuedAt: "2026-04-07T11:00:00.000Z",
+        sessionExpiresAt: "2026-04-07T23:00:00.000Z",
+        workspaceContext: Object.freeze({
+          requestedWorkspaceId: "workspace-requested",
+          resolvedWorkspaceId: "workspace-resolved",
+          workspaces: Object.freeze([]),
+        }),
+      }),
+      isSessionExpired: () => false,
+    } as unknown as IdentityAuthSessionStore;
+
+    const service = new RuntimeOperationsService(client, sessionStore);
+    const response = await service.inspectRun({ executionId: "execution-1" });
+
+    expect(response.ok).toBe(true);
+    expect(response.data?.rootAssetId).toBe("asset:root:1");
+    expect(response.data?.rootVersionId).toBe("asset:root:1:v1");
+    expect(response.data?.outputAssetIds).toEqual([
+      "asset:root:1",
+      "asset:contract:output",
+      "asset:generated:1",
+      "asset:preview:1",
+    ]);
   });
 });
 
