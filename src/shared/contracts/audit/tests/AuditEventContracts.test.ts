@@ -47,6 +47,20 @@ describe("AuditEventContracts", () => {
     immutability: "append-only",
     schemaVersion: "1.0",
     hashAlgorithm: "sha-256",
+    correlationId: "corr:trust:1",
+    requestId: "req:trust:1",
+    linkage: {
+      eventGroupId: "group:trust:1",
+      workflowId: "workflow:node-trust",
+      relatedResources: [
+        {
+          resourceType: "node",
+          resourceId: "node:1",
+          resourceRef: "node:1",
+          relationship: "subject",
+        },
+      ],
+    },
   });
 
   it("projects redacted summary and admin detail views", () => {
@@ -55,6 +69,8 @@ describe("AuditEventContracts", () => {
     const adminDetail = toAuditEventDetailView(event, AuditEventDetailVisibilities.admin);
 
     expect(summary.details).toEqual({ roleKey: "admin" });
+    expect(summary.correlationId).toBe("corr:trust:1");
+    expect(summary.linkage?.eventGroupId).toBe("group:trust:1");
     expect(summary.redactionReasons).toEqual(["personal-data"]);
     expect(userSafeDetail.adminOnlyDetails).toBeUndefined();
     expect(adminDetail.adminOnlyDetails).toEqual({ previousRoleKey: "member" });
@@ -68,6 +84,8 @@ describe("AuditEventContracts", () => {
         categories: ["administrative", "administrative"],
         outcomes: ["succeeded", "succeeded"],
         actionPrefix: "   workspace.  ",
+        eventGroupIds: [" group:trust:1 ", "group:trust:1"],
+        runIds: [" run:1 "],
         occurredAfter: "2026-04-07T15:00:00.000Z",
       },
     });
@@ -77,6 +95,8 @@ describe("AuditEventContracts", () => {
     expect(query.filters?.categories).toEqual(["administrative"]);
     expect(query.filters?.outcomes).toEqual(["succeeded"]);
     expect(query.filters?.actionPrefix).toBe("workspace.");
+    expect(query.filters?.eventGroupIds).toEqual(["group:trust:1"]);
+    expect(query.filters?.runIds).toEqual(["run:1"]);
     expect(query.filters?.occurredAfter).toBe("2026-04-07T15:00:00.000Z");
   });
 });

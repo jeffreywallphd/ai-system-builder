@@ -55,6 +55,7 @@ For canonical audit taxonomy/capture extension guidance, also reference:
   - `eventTypes[]`
   - `outcomes[]`
   - `includeThinSafeOnly`
+- Linkage selectors are also supported by the audit API contract (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`).
 - Query normalization enforces bounded pagination/search and supported sorting fields.
 
 ## Redaction contract

@@ -33,6 +33,7 @@ Out of scope in this slice:
 Shared audit contracts now define:
 
 - `AuditEventEnvelopeDto` for canonical record exchange across application, persistence, and transport boundaries
+- optional `linkage` metadata on envelopes and read projections for event/resource/workflow traversal
 - category payload contracts with stable shapes:
   - `SecuritySensitiveAuditCategoryPayloadDto`
   - `AdministrativeAuditCategoryPayloadDto`
@@ -47,6 +48,7 @@ Shared audit contracts now define:
   - `AuditEventListFiltersDto`
   - `AuditEventListQueryDto`
   - canonical sorting fields and thin-safe category subset contracts
+  - linkage-aware filter selectors (`correlationIds`, `requestIds`, `eventGroupIds`, `rootEventIds`, `parentEventIds`, `workflowIds`, `sessionRefs`, `runIds`, `governanceActionIds`)
 
 ## DTO usage notes
 

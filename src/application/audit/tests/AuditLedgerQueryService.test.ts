@@ -203,6 +203,9 @@ describe("AuditLedgerQueryService", () => {
           actorIds: ["user:auditor", "user:other"],
           resourceTypes: ["policy", "secret"],
           resourceIds: ["policy:alpha", "policy:beta"],
+          correlationIds: ["corr:scope:1"],
+          eventGroupIds: ["group:scope:1"],
+          runIds: ["run:scope:1"],
           categories: ["policy", "administrative"],
           hasProtectedData: false,
         },
@@ -218,6 +221,9 @@ describe("AuditLedgerQueryService", () => {
     expect(repository.listQuery?.filters?.actorIds).toEqual(["user:auditor"]);
     expect(repository.listQuery?.filters?.resourceTypes).toEqual(["policy"]);
     expect(repository.listQuery?.filters?.resourceIds).toEqual(["policy:alpha"]);
+    expect(repository.listQuery?.filters?.correlationIds).toEqual(["corr:scope:1"]);
+    expect(repository.listQuery?.filters?.eventGroupIds).toEqual(["group:scope:1"]);
+    expect(repository.listQuery?.filters?.runIds).toEqual(["run:scope:1"]);
     expect(repository.listQuery?.filters?.categories).toEqual(["policy"]);
     expect(repository.listQuery?.filters?.includeThinSafeOnly).toBeTrue();
     expect(repository.listQuery?.filters?.hasProtectedData).toBeFalse();

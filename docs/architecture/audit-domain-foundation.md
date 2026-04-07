@@ -48,6 +48,22 @@ Optional but supported:
 - `protectedResource`
 - `correlationId`
 - `requestId`
+- `linkage`
+
+## Linkage metadata model
+
+Canonical events may include `linkage` to support cross-event investigation without copying raw debug payloads.
+
+`linkage` is identifier-only metadata and supports:
+
+- event relationship identifiers (`eventGroupId`, `parentEventId`, `rootEventId`)
+- workflow/run/governance references (`workflowId`, `runId`, `governanceActionId`)
+- session linkage (`sessionRef`)
+- additional related resources (`relatedResources[]`) with bounded typed refs (`resourceType`, `resourceId`, `resourceRef`, `relationship`, optional `workspaceId`)
+
+Invariant guardrail:
+
+- `rootEventId` and `parentEventId` cannot be identical.
 
 ## Actor, scope, and protected-resource contracts
 

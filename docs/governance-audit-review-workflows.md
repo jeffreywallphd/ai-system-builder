@@ -59,6 +59,7 @@ The governance review surface aggregates prioritized governance and security eve
   - backend entrypoint: `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
 
 Filtering and pagination align to shared list query conventions (`workspaceId`, `search`, `limit`, `offset`, `sortBy`, `sortDirection`) with event/outcome filters layered on top.
+Linkage-aware filters are supported at the API contract level (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`) to follow multi-step governance workflows.
 
 ## Redaction posture
 

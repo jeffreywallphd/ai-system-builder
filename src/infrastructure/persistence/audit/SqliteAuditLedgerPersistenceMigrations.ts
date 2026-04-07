@@ -1,4 +1,4 @@
-export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 2;
+export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 3;
 
 export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -164,5 +164,45 @@ export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number
     BEGIN
       SELECT RAISE(ABORT, 'authoritative_audit_ledger_mutation_replays is append-only; DELETE is prohibited.');
     END;
+  `],
+  [3, `
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_event_group_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_parent_event_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_root_event_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_workflow_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_session_ref TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_run_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_governance_action_id TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN linkage_related_resources_json TEXT;
+
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_group_idx
+      ON authoritative_audit_ledger_events(linkage_event_group_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_event_group_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_root_idx
+      ON authoritative_audit_ledger_events(linkage_root_event_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_root_event_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_parent_idx
+      ON authoritative_audit_ledger_events(linkage_parent_event_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_parent_event_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_workflow_idx
+      ON authoritative_audit_ledger_events(linkage_workflow_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_workflow_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_session_idx
+      ON authoritative_audit_ledger_events(linkage_session_ref, occurred_at DESC, sequence DESC)
+      WHERE linkage_session_ref IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_run_idx
+      ON authoritative_audit_ledger_events(linkage_run_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_run_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_governance_action_idx
+      ON authoritative_audit_ledger_events(linkage_governance_action_id, occurred_at DESC, sequence DESC)
+      WHERE linkage_governance_action_id IS NOT NULL;
   `],
 ]);

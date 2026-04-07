@@ -22,6 +22,24 @@ export interface AuthoritativeAuditActionContextInput {
   readonly nodeId?: string;
 }
 
+export interface AuthoritativeAuditRelatedResourceInput {
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly relationship: string;
+  readonly workspaceId?: string;
+}
+
+export interface AuthoritativeAuditLinkageInput {
+  readonly eventGroupId?: string;
+  readonly parentEventId?: string;
+  readonly rootEventId?: string;
+  readonly workflowId?: string;
+  readonly sessionRef?: string;
+  readonly runId?: string;
+  readonly governanceActionId?: string;
+  readonly relatedResources?: ReadonlyArray<AuthoritativeAuditRelatedResourceInput>;
+}
+
 export interface NormalizedAuthoritativeAuditActionContext {
   readonly sessionRef?: string;
   readonly deviceRef?: string;
@@ -35,6 +53,7 @@ export interface NormalizedAuthoritativeAuditReferences {
   readonly correlationId?: string;
   readonly requestId?: string;
   readonly actionContext?: NormalizedAuthoritativeAuditActionContext;
+  readonly linkage?: AuthoritativeAuditLinkageInput;
 }
 
 export interface NormalizeAuthoritativeAuditReferencesInput {
@@ -44,6 +63,7 @@ export interface NormalizeAuthoritativeAuditReferencesInput {
   readonly correlationId?: string;
   readonly requestId?: string;
   readonly actionContext?: AuthoritativeAuditActionContextInput;
+  readonly linkage?: AuthoritativeAuditLinkageInput;
 }
 
 export const AuditReferenceContextPayloadKey = "referenceContext";
@@ -57,6 +77,7 @@ export function normalizeAuthoritativeAuditReferences(
   const correlationId = normalizeOptionalCanonicalIdentifier(input.correlationId);
   const requestId = normalizeOptionalCanonicalIdentifier(input.requestId);
   const actionContext = normalizeAuditActionContextReference(input.actionContext, actor);
+  const linkage = normalizeAuditLinkageReference(input.linkage, actionContext, scope.workspaceId);
 
   return Object.freeze({
     actor,
@@ -65,6 +86,7 @@ export function normalizeAuthoritativeAuditReferences(
     correlationId,
     requestId,
     actionContext,
+    linkage,
   });
 }
 
@@ -164,6 +186,71 @@ export function normalizeAuditActionContextReference(
     deviceRef: deviceId ? toTypedReference("device", deviceId) : undefined,
     nodeRef: nodeId ? toTypedReference("node", nodeId) : undefined,
   });
+}
+
+export function normalizeAuditLinkageReference(
+  linkage: AuthoritativeAuditLinkageInput | undefined,
+  actionContext: NormalizedAuthoritativeAuditActionContext | undefined,
+  defaultWorkspaceId?: string,
+): AuthoritativeAuditLinkageInput | undefined {
+  const eventGroupId = normalizeOptionalCanonicalIdentifier(linkage?.eventGroupId);
+  const parentEventId = normalizeOptionalCanonicalIdentifier(linkage?.parentEventId);
+  const rootEventId = normalizeOptionalCanonicalIdentifier(linkage?.rootEventId);
+  const workflowId = normalizeOptionalCanonicalIdentifier(linkage?.workflowId);
+  const runId = normalizeOptionalCanonicalIdentifier(linkage?.runId);
+  const governanceActionId = normalizeOptionalCanonicalIdentifier(linkage?.governanceActionId);
+  const sessionRef = normalizeOptionalCanonicalIdentifier(linkage?.sessionRef)
+    ?? actionContext?.sessionRef;
+  const relatedResources = normalizeRelatedResourceReferences(linkage?.relatedResources, defaultWorkspaceId);
+
+  if (
+    !eventGroupId
+    && !parentEventId
+    && !rootEventId
+    && !workflowId
+    && !sessionRef
+    && !runId
+    && !governanceActionId
+    && !relatedResources
+  ) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    eventGroupId,
+    parentEventId,
+    rootEventId,
+    workflowId,
+    sessionRef,
+    runId,
+    governanceActionId,
+    relatedResources,
+  });
+}
+
+function normalizeRelatedResourceReferences(
+  relatedResources: ReadonlyArray<AuthoritativeAuditRelatedResourceInput> | undefined,
+  defaultWorkspaceId?: string,
+): ReadonlyArray<AuthoritativeAuditRelatedResourceInput> | undefined {
+  if (!relatedResources || relatedResources.length < 1) {
+    return undefined;
+  }
+
+  const normalized: AuthoritativeAuditRelatedResourceInput[] = [];
+  for (const related of relatedResources) {
+    const resourceType = normalizeCanonicalResourceType(related.resourceType);
+    const resourceId = normalizeRequiredCanonicalIdentifier(related.resourceId, "relatedResourceId");
+    const relationship = normalizeRequiredCanonicalIdentifier(related.relationship, "relatedResourceRelationship");
+    const workspaceId = normalizeOptionalCanonicalIdentifier(related.workspaceId) ?? defaultWorkspaceId;
+    normalized.push(Object.freeze({
+      resourceType,
+      resourceId,
+      relationship,
+      workspaceId,
+    }));
+  }
+
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
 }
 
 function normalizeCanonicalResourceType(value: string): string {

@@ -103,6 +103,25 @@ export interface AuditProtectedResourceReference {
   readonly workspaceId?: string;
 }
 
+export interface AuditRelatedResourceReference {
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly resourceRef: string;
+  readonly relationship: string;
+  readonly workspaceId?: string;
+}
+
+export interface AuditEventLinkageMetadata {
+  readonly eventGroupId?: string;
+  readonly parentEventId?: string;
+  readonly rootEventId?: string;
+  readonly workflowId?: string;
+  readonly sessionRef?: string;
+  readonly runId?: string;
+  readonly governanceActionId?: string;
+  readonly relatedResources?: ReadonlyArray<AuditRelatedResourceReference>;
+}
+
 export interface AuditIntegrityEvidence {
   readonly schemaVersion: string;
   readonly hashAlgorithm: string;
@@ -135,6 +154,7 @@ export interface CanonicalAuditEvent {
   readonly immutability: AuditImmutabilityPosture;
   readonly correlationId?: string;
   readonly requestId?: string;
+  readonly linkage?: AuditEventLinkageMetadata;
 }
 
 export interface UserSafeAuditEventView {
@@ -149,6 +169,7 @@ export interface UserSafeAuditEventView {
   readonly actorKind: AuditActorKind;
   readonly scope: AuditScope;
   readonly protectedResource?: AuditProtectedResourceReference;
+  readonly linkage?: AuditEventLinkageMetadata;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
@@ -176,6 +197,25 @@ function normalizeTimestamp(value: string | Date, field: string): string {
 
 function freezeRecord(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
   return Object.freeze({ ...input });
+}
+
+function normalizeOptionalArray<TInput, TOutput>(
+  values: ReadonlyArray<TInput> | undefined,
+  mapValue: (value: TInput) => TOutput | undefined,
+): ReadonlyArray<TOutput> | undefined {
+  if (!values || values.length < 1) {
+    return undefined;
+  }
+
+  const normalized: TOutput[] = [];
+  for (const value of values) {
+    const mapped = mapValue(value);
+    if (mapped) {
+      normalized.push(mapped);
+    }
+  }
+
+  return normalized.length > 0 ? Object.freeze(normalized) : undefined;
 }
 
 function isKnownValue<TValue extends string>(
@@ -262,6 +302,66 @@ export function createAuditIntegrityEvidence(input: AuditIntegrityEvidence): Aud
   });
 }
 
+export function createAuditRelatedResourceReference(
+  input: AuditRelatedResourceReference,
+): AuditRelatedResourceReference {
+  return Object.freeze({
+    resourceType: normalizeRequired(input.resourceType, "Audit related resource type"),
+    resourceId: normalizeRequired(input.resourceId, "Audit related resource id"),
+    resourceRef: normalizeRequired(input.resourceRef, "Audit related resource ref"),
+    relationship: normalizeRequired(input.relationship, "Audit related resource relationship"),
+    workspaceId: normalizeOptional(input.workspaceId),
+  });
+}
+
+export function createAuditEventLinkageMetadata(
+  input?: AuditEventLinkageMetadata,
+): AuditEventLinkageMetadata | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const eventGroupId = normalizeOptional(input.eventGroupId);
+  const parentEventId = normalizeOptional(input.parentEventId);
+  const rootEventId = normalizeOptional(input.rootEventId);
+  const workflowId = normalizeOptional(input.workflowId);
+  const sessionRef = normalizeOptional(input.sessionRef);
+  const runId = normalizeOptional(input.runId);
+  const governanceActionId = normalizeOptional(input.governanceActionId);
+  const relatedResources = normalizeOptionalArray(
+    input.relatedResources,
+    (value) => createAuditRelatedResourceReference(value),
+  );
+
+  if (
+    !eventGroupId
+    && !parentEventId
+    && !rootEventId
+    && !workflowId
+    && !sessionRef
+    && !runId
+    && !governanceActionId
+    && !relatedResources
+  ) {
+    return undefined;
+  }
+
+  if (rootEventId && rootEventId === parentEventId) {
+    throw new AuditDomainError("Audit linkage rootEventId and parentEventId cannot be identical.");
+  }
+
+  return Object.freeze({
+    eventGroupId,
+    parentEventId,
+    rootEventId,
+    workflowId,
+    sessionRef,
+    runId,
+    governanceActionId,
+    relatedResources,
+  });
+}
+
 export function createAuditEventPayloadBoundary(input?: {
   readonly userSafeDetails?: Readonly<Record<string, unknown>>;
   readonly adminOnlyDetails?: Readonly<Record<string, unknown>>;
@@ -331,6 +431,7 @@ export function createCanonicalAuditEvent(input: {
   readonly immutability?: AuditImmutabilityPosture;
   readonly correlationId?: string;
   readonly requestId?: string;
+  readonly linkage?: AuditEventLinkageMetadata;
 }): CanonicalAuditEvent {
   const category = input.category;
   if (!isKnownValue(AuditEventCategories, category)) {
@@ -364,6 +465,7 @@ export function createCanonicalAuditEvent(input: {
 
   const payload = createAuditEventPayloadBoundary(input.payload);
   const integrity = createAuditIntegrityEvidence(input.integrity);
+  const linkage = createAuditEventLinkageMetadata(input.linkage);
 
   const retention = input.retention ?? AuditRetentionPostures.governance;
   if (!isKnownValue(AuditRetentionPostures, retention)) {
@@ -393,6 +495,7 @@ export function createCanonicalAuditEvent(input: {
     immutability,
     correlationId: normalizeOptional(input.correlationId),
     requestId: normalizeOptional(input.requestId),
+    linkage,
   });
 }
 
@@ -409,6 +512,7 @@ export function toUserSafeAuditEventView(event: CanonicalAuditEvent): UserSafeAu
     actorKind: event.actor.actorKind,
     scope: event.scope,
     protectedResource: event.protectedResource,
+    linkage: event.linkage,
     details: event.payload.userSafeDetails,
   });
 }

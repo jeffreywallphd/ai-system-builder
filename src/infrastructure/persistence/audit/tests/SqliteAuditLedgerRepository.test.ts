@@ -60,6 +60,7 @@ function createEvent(overrides?: Partial<CanonicalAuditEvent>): CanonicalAuditEv
     immutability: overrides?.immutability,
     correlationId: overrides?.correlationId,
     requestId: overrides?.requestId,
+    linkage: overrides?.linkage,
   });
 }
 
@@ -207,6 +208,25 @@ describe("SqliteAuditLedgerRepository", () => {
         workspaceId: "workspace:alpha",
       },
       correlationId: "corr:run:beta",
+      requestId: "req:run:beta",
+      linkage: {
+        eventGroupId: "group:run-governance:beta",
+        workflowId: "workflow:run-governance",
+        runId: "run:beta",
+        governanceActionId: "governance:run:retry",
+        rootEventId: "audit:event:admin",
+        parentEventId: "audit:event:secret",
+        sessionRef: "session:runner:beta",
+        relatedResources: [
+          {
+            resourceType: "workspace",
+            resourceId: "workspace:alpha",
+            resourceRef: "workspace:alpha",
+            relationship: "scope",
+            workspaceId: "workspace:alpha",
+          },
+        ],
+      },
     }), {
       operationKey: "audit:query:3",
       actorId: "user:runner",
@@ -237,6 +257,23 @@ describe("SqliteAuditLedgerRepository", () => {
     });
     expect(byActorAndResource).toHaveLength(1);
     expect(byActorAndResource[0]?.eventId).toBe("audit:event:secret");
+
+    const byLinkage = await repository.listAuditEvents({
+      filters: {
+        correlationIds: ["corr:run:beta"],
+        requestIds: ["req:run:beta"],
+        eventGroupIds: ["group:run-governance:beta"],
+        workflowIds: ["workflow:run-governance"],
+        runIds: ["run:beta"],
+        governanceActionIds: ["governance:run:retry"],
+        rootEventIds: ["audit:event:admin"],
+        parentEventIds: ["audit:event:secret"],
+        sessionRefs: ["session:runner:beta"],
+      },
+    });
+    expect(byLinkage).toHaveLength(1);
+    expect(byLinkage[0]?.eventId).toBe("audit:event:run");
+    expect(byLinkage[0]?.linkage?.relatedResources?.[0]?.relationship).toBe("scope");
 
     const scopedCount = await repository.countAuditEvents({
       filters: {

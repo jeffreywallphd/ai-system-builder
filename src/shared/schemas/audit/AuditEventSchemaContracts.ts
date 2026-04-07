@@ -124,6 +124,33 @@ const ProtectedResourceSchema = z.object({
   workspaceId: IdentifierSchema.optional(),
 }).strict();
 
+const LinkageRelatedResourceSchema = z.object({
+  resourceType: z.string().trim().min(1).max(255),
+  resourceId: IdentifierSchema,
+  resourceRef: z.string().trim().min(1).max(512),
+  relationship: z.string().trim().min(1).max(128),
+  workspaceId: IdentifierSchema.optional(),
+}).strict();
+
+const LinkageSchema = z.object({
+  eventGroupId: IdentifierSchema.optional(),
+  parentEventId: IdentifierSchema.optional(),
+  rootEventId: IdentifierSchema.optional(),
+  workflowId: IdentifierSchema.optional(),
+  sessionRef: z.string().trim().min(1).max(255).optional(),
+  runId: IdentifierSchema.optional(),
+  governanceActionId: IdentifierSchema.optional(),
+  relatedResources: z.array(LinkageRelatedResourceSchema).max(16).optional(),
+}).strict().superRefine((value, context) => {
+  if (value.rootEventId && value.parentEventId && value.rootEventId === value.parentEventId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["rootEventId"],
+      message: "rootEventId cannot match parentEventId.",
+    });
+  }
+});
+
 const CategoryPayloadSchema = z.discriminatedUnion("category", [
   z.object({
     category: z.literal(AuditEventCategories.securitySensitive),
@@ -224,6 +251,7 @@ export const AuditEventEnvelopeDtoSchema: z.ZodType<AuditEventEnvelopeDto> = z.o
   previousEventDigest: z.string().trim().min(1).max(1024).optional(),
   correlationId: IdentifierSchema.optional(),
   requestId: IdentifierSchema.optional(),
+  linkage: LinkageSchema.optional(),
 }).strict().superRefine((value, context) => {
   const occurredAt = Date.parse(value.occurredAt);
   const recordedAt = Date.parse(value.recordedAt);
@@ -298,6 +326,15 @@ export const AuditEventListQueryDtoSchema: z.ZodType<AuditEventListQueryDto> = z
     workspaceIds: z.array(IdentifierSchema).max(64).optional(),
     resourceTypes: z.array(z.string().trim().min(1).max(255)).max(32).optional(),
     resourceIds: z.array(IdentifierSchema).max(64).optional(),
+    correlationIds: z.array(IdentifierSchema).max(64).optional(),
+    requestIds: z.array(IdentifierSchema).max(64).optional(),
+    eventGroupIds: z.array(IdentifierSchema).max(64).optional(),
+    rootEventIds: z.array(IdentifierSchema).max(64).optional(),
+    parentEventIds: z.array(IdentifierSchema).max(64).optional(),
+    workflowIds: z.array(IdentifierSchema).max(64).optional(),
+    sessionRefs: z.array(z.string().trim().min(1).max(255)).max(64).optional(),
+    runIds: z.array(IdentifierSchema).max(64).optional(),
+    governanceActionIds: z.array(IdentifierSchema).max(64).optional(),
     hasProtectedData: z.boolean().optional(),
     occurredAfter: TimestampSchema.optional(),
     occurredBefore: TimestampSchema.optional(),
@@ -424,6 +461,15 @@ export function parseAuditEventListQueryFromSearchParams(searchParams: URLSearch
       workspaceIds: searchParams.getAll("workspaceId"),
       resourceTypes: searchParams.getAll("resourceType"),
       resourceIds: searchParams.getAll("resourceId"),
+      correlationIds: searchParams.getAll("correlationId"),
+      requestIds: searchParams.getAll("requestId"),
+      eventGroupIds: searchParams.getAll("eventGroupId"),
+      rootEventIds: searchParams.getAll("rootEventId"),
+      parentEventIds: searchParams.getAll("parentEventId"),
+      workflowIds: searchParams.getAll("workflowId"),
+      sessionRefs: searchParams.getAll("sessionRef"),
+      runIds: searchParams.getAll("runId"),
+      governanceActionIds: searchParams.getAll("governanceActionId"),
       hasProtectedData: parseOptionalBoolean(searchParams.getAll("hasProtectedData")),
       occurredAfter: parseOptionalString(searchParams.getAll("occurredAfter")),
       occurredBefore: parseOptionalString(searchParams.getAll("occurredBefore")),
