@@ -15,6 +15,11 @@ import type {
 import type { CanonicalRunSubmissionCommand } from "../use-cases/RunSubmissionValidationContracts";
 import { CreateAuthoritativeRunUseCase } from "../use-cases/CreateAuthoritativeRunUseCase";
 import { GetAuthoritativeRunUseCase } from "../use-cases/GetAuthoritativeRunUseCase";
+import {
+  RunSubmissionAuditEventTypes,
+  type RunSubmissionAuditEvent,
+  type RunSubmissionAuditSink,
+} from "../use-cases/RunSubmissionAudit";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   public readonly runs = new Map<string, PlatformRunRecord>();
@@ -92,6 +97,14 @@ class SpyTransactionManager implements IPlatformTransactionManager {
   }
 }
 
+class InMemoryRunSubmissionAuditSink implements RunSubmissionAuditSink {
+  public readonly events: RunSubmissionAuditEvent[] = [];
+
+  public async recordRunSubmissionEvent(event: RunSubmissionAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createCommand(): CanonicalRunSubmissionCommand {
   return Object.freeze({
     actor: Object.freeze({
@@ -130,9 +143,11 @@ describe("CreateAuthoritativeRunUseCase", () => {
   it("persists accepted runs with canonical metadata and supports authoritative reads", async () => {
     const runRepository = new InMemoryRunRepository();
     const auditRepository = new InMemoryAuditRepository();
+    const runSubmissionAuditSink = new InMemoryRunSubmissionAuditSink();
     const useCase = new CreateAuthoritativeRunUseCase({
       runRepository,
       orchestrationIntentRepository: auditRepository,
+      auditSink: runSubmissionAuditSink,
       idGenerator: {
         nextId: (prefix) => `${prefix}:test`,
       },
@@ -146,6 +161,18 @@ describe("CreateAuthoritativeRunUseCase", () => {
     expect(result.run.state).toBe("submitted");
     expect(result.persistedRunRevision).toBe(1);
     expect(result.orchestrationIntentEventId).toBe("audit:test");
+    expect(runSubmissionAuditSink.events.map((event) => event.type)).toEqual([
+      RunSubmissionAuditEventTypes.submissionAccepted,
+      RunSubmissionAuditEventTypes.lifecycleTransitioned,
+    ]);
+    expect(runSubmissionAuditSink.events[0]?.runId).toBe("run:idem-123");
+    expect(runSubmissionAuditSink.events[0]?.workspaceId).toBe("workspace-alpha");
+    expect((runSubmissionAuditSink.events[0]?.details as { parameterCount?: number } | undefined)?.parameterCount).toBe(2);
+    expect((runSubmissionAuditSink.events[0]?.details as Record<string, unknown> | undefined)?.parameters).toBeUndefined();
+    expect((runSubmissionAuditSink.events[1]?.details as { fromState?: string; toState?: string } | undefined)?.fromState)
+      .toBe("none");
+    expect((runSubmissionAuditSink.events[1]?.details as { fromState?: string; toState?: string } | undefined)?.toState)
+      .toBe("submitted");
 
     const persisted = await runRepository.findRunById("run:idem-123");
     expect(persisted).toBeDefined();
@@ -182,5 +209,28 @@ describe("CreateAuthoritativeRunUseCase", () => {
     });
 
     expect(transactionManager.calls).toBe(1);
+  });
+
+  it("keeps run creation successful when run-submission audit dispatch fails", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const useCase = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      orchestrationIntentRepository: new InMemoryAuditRepository(),
+      auditSink: {
+        async recordRunSubmissionEvent(): Promise<void> {
+          throw new Error("audit unavailable");
+        },
+      },
+      idGenerator: {
+        nextId: (prefix) => `${prefix}:audit-failure`,
+      },
+    });
+
+    const result = await useCase.execute({
+      command: createCommand(),
+    });
+
+    expect(result.run.runId).toBe("run:idem-123");
+    expect(await runRepository.findRunById("run:idem-123")).toBeDefined();
   });
 });

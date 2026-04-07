@@ -47,6 +47,11 @@ import {
   ValidateRunSubmissionUseCase,
 } from "../use-cases/ValidateRunSubmissionUseCase";
 import { RunSubmissionValidationErrorCodes } from "../use-cases/RunSubmissionValidationContracts";
+import {
+  RunSubmissionAuditEventTypes,
+  type RunSubmissionAuditEvent,
+  type RunSubmissionAuditSink,
+} from "../use-cases/RunSubmissionAudit";
 
 class InMemoryWorkspaceRepository implements IWorkspaceRepository {
   public readonly workspaces = new Map<string, Workspace>();
@@ -245,6 +250,14 @@ class StubEncryptionPolicyEvaluationService implements IEncryptionPolicyEvaluati
         resolvedFrom: "workspace",
       }),
     });
+  }
+}
+
+class InMemoryRunSubmissionAuditSink implements RunSubmissionAuditSink {
+  public readonly events: RunSubmissionAuditEvent[] = [];
+
+  public async recordRunSubmissionEvent(event: RunSubmissionAuditEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -486,5 +499,32 @@ describe("ValidateRunSubmissionUseCase", () => {
     expect(result.command.runtimeTarget.versionId).toBe("system-alpha:v1");
     expect(result.command.parameters.seed).toBe(42);
     expect(result.command.storageReferences[0]?.storageInstanceId).toBe("storage-alpha");
+  });
+
+  it("emits denied submission audit events with actor/workspace context and redacted details", async () => {
+    const workspaceRepository = new InMemoryWorkspaceRepository();
+    await workspaceRepository.saveWorkspace(createWorkspaceRecord("workspace-alpha"));
+
+    const authorization = new StubAuthorizationDecisionEvaluator();
+    authorization.deniedPermissions.add("system.execute");
+    const auditSink = new InMemoryRunSubmissionAuditSink();
+
+    const useCase = new ValidateRunSubmissionUseCase({
+      workspaceRepository,
+      authorizationDecisionEvaluator: authorization,
+      targetResolver: new StubTargetResolver(),
+      auditSink,
+    });
+
+    const result = await useCase.execute(createBaseRequest());
+
+    expect(result.ok).toBeFalse();
+    expect(auditSink.events.length).toBe(1);
+    expect(auditSink.events[0]?.type).toBe(RunSubmissionAuditEventTypes.submissionDenied);
+    expect(auditSink.events[0]?.workspaceId).toBe("workspace-alpha");
+    expect(auditSink.events[0]?.actorUserIdentityId).toBe("user:owner");
+    expect((auditSink.events[0]?.details as { validationCode?: string } | undefined)?.validationCode).toBe("forbidden");
+    expect((auditSink.events[0]?.details as { submission?: { parameterCount?: number } } | undefined)?.submission?.parameterCount).toBe(1);
+    expect((auditSink.events[0]?.details as { submission?: Record<string, unknown> } | undefined)?.submission?.parameters).toBeUndefined();
   });
 });

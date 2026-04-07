@@ -141,6 +141,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For execution, tools, MCP, and runtime selection, read [`workflow-execution-and-tools.md`](./workflow-execution-and-tools.md).
 - For canonical run identity/lifecycle/queue-assignment semantics and orchestration ownership boundaries, read [`run-orchestration-domain-foundation.md`](./run-orchestration-domain-foundation.md).
 - For shared run submission/mutation/status transport contracts, queue-read contracts, and lifecycle-update event envelopes, read [`run-orchestration-transport-contracts.md`](./run-orchestration-transport-contracts.md).
+- For run submission governance audit hooks covering denied/accepted submissions and initial lifecycle transition emission, read [`run-submission-lifecycle-audit-hooks.md`](./run-submission-lifecycle-audit-hooks.md).
 - For host/runtime composition and desktop delivery, read [`desktop-runtime-and-hosts.md`](./desktop-runtime-and-hosts.md).
 - For explicit host runtime kinds, authoritative control-plane role contracts, and composition-root boundary expectations, read [`host-runtime-composition-boundaries.md`](./host-runtime-composition-boundaries.md).
 - For shared host startup pipeline contracts, startup-context model, and contributor startup-sequence guidance, read [`host-bootstrap-pipeline.md`](./host-bootstrap-pipeline.md).

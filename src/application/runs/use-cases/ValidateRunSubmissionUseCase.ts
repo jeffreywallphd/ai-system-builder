@@ -30,6 +30,12 @@ import {
   type ValidateRunSubmissionRequest,
   type ValidateRunSubmissionResult,
 } from "./RunSubmissionValidationContracts";
+import {
+  RunSubmissionAuditEventTypes,
+  publishRunSubmissionAuditEventBestEffort,
+  type RunSubmissionAuditSink,
+  type RunSubmissionAuditEvent,
+} from "./RunSubmissionAudit";
 
 export interface ValidateRunSubmissionUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
@@ -38,6 +44,7 @@ export interface ValidateRunSubmissionUseCaseDependencies {
   readonly storageInstanceRepository?: IStorageInstanceRepository;
   readonly storagePolicyEvaluationPort?: IStoragePolicyEvaluationPort;
   readonly encryptionPolicyEvaluationService?: IEncryptionPolicyEvaluationService;
+  readonly auditSink?: RunSubmissionAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -55,21 +62,25 @@ export class ValidateRunSubmissionUseCase {
   public async execute(input: ValidateRunSubmissionRequest): Promise<ValidateRunSubmissionResult> {
     const structural = normalizeRunSubmissionStructuralInput(input);
     if (!structural.command) {
-      return this.failure(
+      const failure = this.failure(
         RunSubmissionValidationErrorCodes.invalidRequest,
         "Run submission payload is invalid.",
         structural.issues,
       );
+      await this.publishDeniedAuditEvent(input, failure.error.code, failure.error.validationIssues);
+      return failure;
     }
 
     const policyIssues = await this.evaluatePolicyEligibility(structural.command);
     if (policyIssues.length > 0) {
       const code = classifyFailureCode(policyIssues);
-      return this.failure(
+      const failure = this.failure(
         code,
         this.resolveFailureMessage(code),
         policyIssues,
       );
+      await this.publishDeniedAuditEvent(input, failure.error.code, failure.error.validationIssues);
+      return failure;
     }
 
     return Object.freeze({
@@ -461,6 +472,84 @@ export class ValidateRunSubmissionUseCase {
         validationIssues: issues,
       }),
     });
+  }
+
+  private async publishDeniedAuditEvent(
+    input: ValidateRunSubmissionRequest,
+    code: typeof RunSubmissionValidationErrorCodes[keyof typeof RunSubmissionValidationErrorCodes],
+    issues: ReadonlyArray<RunSubmissionValidationIssue>,
+  ): Promise<void> {
+    const event = this.createDeniedAuditEvent(input, code, issues);
+    await publishRunSubmissionAuditEventBestEffort(this.dependencies.auditSink, event);
+  }
+
+  private createDeniedAuditEvent(
+    input: ValidateRunSubmissionRequest,
+    code: typeof RunSubmissionValidationErrorCodes[keyof typeof RunSubmissionValidationErrorCodes],
+    issues: ReadonlyArray<RunSubmissionValidationIssue>,
+  ): RunSubmissionAuditEvent {
+    const issueKindCounts = issues.reduce<Record<string, number>>((accumulator, issue) => {
+      accumulator[issue.kind] = (accumulator[issue.kind] ?? 0) + 1;
+      return accumulator;
+    }, {});
+    const uniqueIssueCodes = [...new Set(issues.map((issue) => issue.code))].slice(0, 25);
+
+    return Object.freeze({
+      type: RunSubmissionAuditEventTypes.submissionDenied,
+      occurredAt: this.resolveOccurredAt(input.occurredAt),
+      workspaceId: this.normalizeOptional(input.submission.workspaceId),
+      actorUserIdentityId: this.normalizeOptional(input.actor.actorUserIdentityId),
+      actorServiceId: this.normalizeOptional(input.actor.actorServiceId),
+      details: Object.freeze({
+        validationCode: code,
+        issueCount: issues.length,
+        issueKindCounts: Object.freeze(issueKindCounts),
+        issueCodes: Object.freeze(uniqueIssueCodes),
+        submission: this.createSubmissionSummary(input),
+      }),
+    });
+  }
+
+  private createSubmissionSummary(input: ValidateRunSubmissionRequest): Readonly<Record<string, unknown>> {
+    const parameters = input.submission.parameters ?? {};
+    const tags = input.submission.tags ?? [];
+    const storageReferences = input.submission.storageReferences ?? [];
+    const resourceReferences = input.submission.resourceReferences ?? [];
+    const policyPrerequisites = input.submission.policyPrerequisites ?? [];
+    const metadata = input.submission.metadata ?? {};
+
+    return Object.freeze({
+      source: input.submission.source,
+      workflowId: this.normalizeOptional(input.submission.workflowId),
+      templateId: this.normalizeOptional(input.submission.templateId),
+      runtimeTarget: Object.freeze({
+        systemId: this.normalizeOptional(input.submission.runtimeTarget.systemId),
+        versionId: this.normalizeOptional(input.submission.runtimeTarget.versionId),
+        async: input.submission.runtimeTarget.async ?? false,
+      }),
+      parameterCount: Object.keys(parameters).length,
+      tagCount: tags.length,
+      storageReferenceCount: storageReferences.length,
+      resourceReferenceCount: resourceReferences.length,
+      policyPrerequisiteCount: policyPrerequisites.length,
+      hasMetadata: Object.keys(metadata).length > 0,
+      hasClientRequestId: typeof input.submission.clientRequestId === "string" && input.submission.clientRequestId.trim().length > 0,
+      hasCorrelationId: typeof input.submission.correlationId === "string" && input.submission.correlationId.trim().length > 0,
+      hasIdempotencyKey: typeof input.submission.idempotencyKey === "string" && input.submission.idempotencyKey.trim().length > 0,
+    });
+  }
+
+  private resolveOccurredAt(occurredAt: string | undefined): string {
+    if (occurredAt && occurredAt.trim().length > 0) {
+      return occurredAt;
+    }
+    const now = this.dependencies.clock?.now() ?? new Date();
+    return now.toISOString();
+  }
+
+  private normalizeOptional(value: string | undefined): string | undefined {
+    const normalized = value?.trim();
+    return normalized && normalized.length > 0 ? normalized : undefined;
   }
 
   private availabilityIssue(

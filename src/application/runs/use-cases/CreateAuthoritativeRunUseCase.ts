@@ -18,6 +18,11 @@ import {
   mapCanonicalRunToPlatformRecord,
   mapPlatformRunRecordToCanonicalRun,
 } from "./RunCreationPersistenceMapper";
+import {
+  RunSubmissionAuditEventTypes,
+  publishRunSubmissionAuditEventBestEffort,
+  type RunSubmissionAuditSink,
+} from "./RunSubmissionAudit";
 
 export interface CreateAuthoritativeRunRequest {
   readonly command: CanonicalRunSubmissionCommand;
@@ -34,6 +39,7 @@ export interface CreateAuthoritativeRunResult {
 interface CreateAuthoritativeRunUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
+  readonly auditSink?: RunSubmissionAuditSink;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly idGenerator?: {
     nextId(prefix: string): string;
@@ -130,6 +136,19 @@ export class CreateAuthoritativeRunUseCase {
       throw new Error(`Run '${runId}' was not found after authoritative persistence.`);
     }
 
+    await publishRunSubmissionAuditEventBestEffort(this.dependencies.auditSink, this.createSubmissionAcceptedAuditEvent({
+      command: input.command,
+      runId,
+      queueId,
+    }));
+    await publishRunSubmissionAuditEventBestEffort(this.dependencies.auditSink, this.createLifecycleTransitionAuditEvent({
+      command: input.command,
+      runId,
+      queueId,
+      fromState: "none",
+      toState: "submitted",
+    }));
+
     return Object.freeze({
       run: toRunDetail(mapPlatformRunRecordToCanonicalRun(persisted)),
       persistedRunRevision: persisted.revision,
@@ -160,6 +179,63 @@ export class CreateAuthoritativeRunUseCase {
         queueId: input.queueId,
         intentKind: "queue-admission-requested",
         lifecycleState: "submitted",
+      }),
+    });
+  }
+
+  private createSubmissionAcceptedAuditEvent(input: {
+    readonly command: CanonicalRunSubmissionCommand;
+    readonly runId: string;
+    readonly queueId: string;
+  }) {
+    return Object.freeze({
+      type: RunSubmissionAuditEventTypes.submissionAccepted,
+      occurredAt: input.command.occurredAt,
+      workspaceId: input.command.workspaceId,
+      runId: input.runId,
+      actorUserIdentityId: normalizeOptional(input.command.actor.actorUserIdentityId),
+      actorServiceId: normalizeOptional(input.command.actor.actorServiceId),
+      details: Object.freeze({
+        source: input.command.source,
+        workflowId: normalizeOptional(input.command.workflowId),
+        templateId: normalizeOptional(input.command.templateId),
+        queueId: input.queueId,
+        runtimeTarget: Object.freeze({
+          systemId: input.command.runtimeTarget.systemId,
+          versionId: input.command.runtimeTarget.versionId,
+          async: input.command.runtimeTarget.async,
+        }),
+        tagCount: input.command.tags.length,
+        parameterCount: Object.keys(input.command.parameters).length,
+        storageReferenceCount: input.command.storageReferences.length,
+        resourceReferenceCount: input.command.resourceReferences.length,
+        policyPrerequisiteCount: input.command.policyPrerequisites.length,
+        hasClientRequestId: Boolean(normalizeOptional(input.command.submissionContext.clientRequestId)),
+        hasCorrelationId: Boolean(normalizeOptional(input.command.submissionContext.correlationId)),
+        hasIdempotencyKey: Boolean(normalizeOptional(input.command.submissionContext.idempotencyKey)),
+      }),
+    });
+  }
+
+  private createLifecycleTransitionAuditEvent(input: {
+    readonly command: CanonicalRunSubmissionCommand;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly fromState: string;
+    readonly toState: string;
+  }) {
+    return Object.freeze({
+      type: RunSubmissionAuditEventTypes.lifecycleTransitioned,
+      occurredAt: input.command.occurredAt,
+      workspaceId: input.command.workspaceId,
+      runId: input.runId,
+      actorUserIdentityId: normalizeOptional(input.command.actor.actorUserIdentityId),
+      actorServiceId: normalizeOptional(input.command.actor.actorServiceId),
+      details: Object.freeze({
+        transitionKind: "run-submission-initialization",
+        fromState: input.fromState,
+        toState: input.toState,
+        queueId: input.queueId,
       }),
     });
   }

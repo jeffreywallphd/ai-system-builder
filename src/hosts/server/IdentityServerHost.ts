@@ -58,6 +58,7 @@ import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManag
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
+import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
@@ -938,6 +939,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     previewService: assetPreviewService,
     lifecycleService: assetLifecycleService,
   });
+  const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
+    persistentPlatformServices.platformPersistenceRepository,
+  );
   const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
     validateRunSubmissionUseCase: new ValidateRunSubmissionUseCase({
       workspaceRepository,
@@ -946,11 +950,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       storageInstanceRepository,
       storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
       encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+      auditSink: runSubmissionAuditSink,
       clock: workspaceClock,
     }),
     createAuthoritativeRunUseCase: new CreateAuthoritativeRunUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      auditSink: runSubmissionAuditSink,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
     }),
   });
