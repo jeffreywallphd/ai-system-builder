@@ -73,6 +73,12 @@ export interface IPlatformRunRecordRepository {
   ): Promise<PlatformRunMutationResult>;
 }
 
+/**
+ * @deprecated Story 18.1.2 migration note:
+ * Use canonical shared audit category contracts in
+ * `@shared/contracts/audit/AuditEventContracts` for new audit workflows.
+ * This legacy vocabulary remains for existing run-orchestration persistence paths.
+ */
 export const PlatformAuditEventKinds = Object.freeze({
   identity: "identity",
   workspace: "workspace",
@@ -90,6 +96,11 @@ export const PlatformAuditEventKinds = Object.freeze({
 export type PlatformAuditEventKind =
   typeof PlatformAuditEventKinds[keyof typeof PlatformAuditEventKinds];
 
+/**
+ * @deprecated Story 18.1.2 migration note:
+ * Use `AuditEventEnvelopeDto` from `@shared/contracts/audit/AuditEventContracts`
+ * for canonical cross-layer audit event payloads.
+ */
 export interface PlatformAuditEventRecord {
   readonly eventId: string;
   readonly eventKind: PlatformAuditEventKind;
@@ -116,6 +127,10 @@ export interface PlatformAuditEventListQuery {
   readonly offset?: number;
 }
 
+/**
+ * @deprecated Story 18.1.2 migration note:
+ * Migrate to canonical audit ledger repository contracts in `src/application/audit`.
+ */
 export interface IPlatformAuditEventRepository {
   appendAuditEvent(
     event: PlatformAuditEventRecord,

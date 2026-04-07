@@ -6,6 +6,10 @@ import {
   AuditEventCategories,
   AuditRecordKinds,
 } from "@domain/audit/AuditDomain";
+import type {
+  AuditLedgerAppendMutationDto,
+  AuditLedgerListQueryDto,
+} from "@shared/dto/audit/AuditEventDtos";
 
 export const AuditLedgerStreamKinds = Object.freeze({
   audit: "audit",
@@ -14,12 +18,7 @@ export const AuditLedgerStreamKinds = Object.freeze({
 
 export type AuditLedgerStreamKind = typeof AuditLedgerStreamKinds[keyof typeof AuditLedgerStreamKinds];
 
-export interface AuditLedgerAppendContext {
-  readonly operationKey: string;
-  readonly actorId: string;
-  readonly occurredAt?: string;
-  readonly correlationId?: string;
-}
+export interface AuditLedgerAppendContext extends AuditLedgerAppendMutationDto {}
 
 export interface AuditLedgerAppendResult {
   readonly changed: boolean;
@@ -28,8 +27,7 @@ export interface AuditLedgerAppendResult {
   readonly event: CanonicalAuditEvent;
 }
 
-export interface AuditLedgerQuery {
-  readonly workspaceId?: string;
+export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
   readonly actorId?: string;
   readonly category?: AuditEventCategory;
   readonly actionPrefix?: string;
