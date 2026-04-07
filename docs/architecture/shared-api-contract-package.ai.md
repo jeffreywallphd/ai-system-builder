@@ -7,6 +7,7 @@
 - Extend convergence with Story 14.1.3 shared error semantics.
 - Extend convergence with Story 14.1.5 shared client transport behavior.
 - Extend convergence with Story 14.1.6 shared list/read query and cache key conventions.
+- Extend convergence with Story 14.1.7 realtime event contract foundations.
 
 ## Added shared contract homes
 
@@ -15,6 +16,7 @@
 - `src/shared/contracts/identity/IdentityTransportContracts.ts`
 - `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts`
 - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
+- `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`
 - `src/shared/contracts/deployment/DeploymentTransportContracts.ts`
 - `src/ui/shared/api/SharedApiClient.ts`
 - `src/shared/api/SharedApiClient.ts`
@@ -36,6 +38,7 @@
 - `src/shared/schemas/api/SharedApiQuerySchemaContracts.ts`
 - `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`
+- `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`
 - `src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts`
 
 ## Converged initial domains covered
@@ -67,6 +70,18 @@
 - Shared list/read query builders are now reused in converged identity/workspace/node clients.
 - Shared list query key generation is centralized via `buildSharedApiListQueryKey` and used by converged asset-selector caches.
 - Shared query parser validation (`parseSharedApiListQueryConventions`) now drives consistent pagination validation for converged server list routes.
+
+## Realtime event baseline (Story 14.1.7)
+
+- Shared converged envelope/topic contracts now live in `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`.
+- Schema-backed payload parsing now lives in `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`.
+- Initial converged categories:
+  - `run-status`
+  - `queue-movement`
+  - `connectivity-state`
+  - `admin-change`
+- Subscription semantics include actor/workspace scope, topic filters, and reconnect cursors (`runtime-realtime:<sequence>`).
+- First server-side publish/subscribe seam is implemented at `src/infrastructure/api/system-runtime/AuthoritativeRuntimeEventStream.ts` and integrated via `SystemRuntimeBackendApi`.
 
 ## Canonical doc
 
