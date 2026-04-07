@@ -74,3 +74,13 @@ Route metadata changes should verify:
 - Added strict metadata-first route protection integration in `src/ui/routes/AppRouter.tsx` through `SurfaceProtectedRoute`, using session-derived role/capability/workspace context and route metadata access rules.
 - Updated admin-lite surface scope to keep thin-client entry points focused on lightweight workflows (`authorization-sharing-thin`, `workspace-thin-membership`, node trust review/inventory) while keeping full administration workflows desktop-first.
 - Command palette and settings shortcut projections now use strict session-derived availability context so unauthorized users do not discover gated admin routes through UI shortcut surfaces.
+
+## Story 15.3.6 update
+
+- Added governance review administration routes:
+  - desktop governance review: `/settings/governance-review` (`governance-review`)
+  - thin/admin-lite governance review: `/settings/governance-review/thin` (`governance-review-thin`)
+- Added metadata-first access requirements:
+  - desktop governance review: `owner|admin`, capability `log.read`, workspace context required
+  - thin governance review: `owner|admin|member`, capability `system.read`, workspace context required
+- Route-level strict metadata enforcement in `AppRouter.tsx` now protects both governance review routes from direct URL access by unauthorized sessions.

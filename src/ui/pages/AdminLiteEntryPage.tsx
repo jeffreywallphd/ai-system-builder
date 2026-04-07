@@ -14,6 +14,7 @@ const adminLiteRouteKeys = new Set([
   "node-enrollment-review",
   "node-inventory",
   "trusted-devices",
+  "governance-review-thin",
 ]);
 
 export default function AdminLiteEntryPage(): JSX.Element {

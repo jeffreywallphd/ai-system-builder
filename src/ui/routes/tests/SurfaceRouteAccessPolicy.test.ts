@@ -26,6 +26,9 @@ describe("SurfaceRouteAccessPolicy", () => {
     expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.securityPolicy, session, { strict: true }),
     ).toBeTrue();
+    expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.governanceReview, session, { strict: true }),
+    ).toBeTrue();
   });
 
   it("allows only lightweight admin-lite routes for thin member sessions", () => {
@@ -41,6 +44,9 @@ describe("SurfaceRouteAccessPolicy", () => {
       isRoutePathAccessibleForSession(ROUTE_PATHS.trustedDevices, session, { strict: true }),
     ).toBeTrue();
     expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.governanceReviewThin, session, { strict: true }),
+    ).toBeTrue();
+    expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.workspaceAdmin, session, { strict: true }),
     ).toBeFalse();
     expect(
@@ -48,6 +54,9 @@ describe("SurfaceRouteAccessPolicy", () => {
     ).toBeFalse();
     expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.securityPolicy, session, { strict: true }),
+    ).toBeFalse();
+    expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.governanceReview, session, { strict: true }),
     ).toBeFalse();
   });
 
