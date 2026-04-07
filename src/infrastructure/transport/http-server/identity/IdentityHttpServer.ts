@@ -177,6 +177,10 @@ import {
   type CreateStorageInstanceRequestDtoPayload,
   type UpdateStorageInstanceRequestDtoPayload,
 } from "@shared/schemas/storage/StorageTransportSchemaContracts";
+import {
+  SharedApiQuerySchemaValidationError,
+  parseSharedApiListQueryConventions,
+} from "@shared/schemas/api/SharedApiQuerySchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
@@ -1136,9 +1140,14 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
             const includeStatuses = url.searchParams.getAll("status");
-            const limit = parseOptionalInteger(url.searchParams.get("limit"));
-            const offset = parseOptionalInteger(url.searchParams.get("offset"));
             const providerId = normalizeOptionalString(url.searchParams.get("providerId"));
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const validationError = buildQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
 
             const statusValidation = z.array(AdminAccountStatusValues).safeParse(includeStatuses);
             if (!statusValidation.success) {
@@ -1152,8 +1161,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               context: buildAdminContext(context.principal.userIdentityId),
               providerId,
               includeStatuses: statusValidation.data,
-              limit,
-              offset,
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -1161,8 +1170,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               context: buildAdminContext(context.principal.userIdentityId),
               providerId,
               includeStatuses: statusValidation.data,
-              limit,
-              offset,
+              limit: pagination.limit,
+              offset: pagination.offset,
             }), apiResponse);
           },
         );
@@ -1280,8 +1289,13 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
             const workspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
             const includeStatuses = url.searchParams.getAll("status");
-            const limit = parseOptionalInteger(url.searchParams.get("limit"));
-            const offset = parseOptionalInteger(url.searchParams.get("offset"));
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const validationError = buildQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
             const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
             if (!statusValidation.success) {
               const validationError = buildQueryValidationError("status", "status values are invalid.");
@@ -1295,8 +1309,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               userIdentityId,
               workspaceId,
               includeStatuses: statusValidation.data,
-              limit,
-              offset,
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -1305,8 +1319,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               userIdentityId,
               workspaceId,
               includeStatuses: statusValidation.data,
-              limit,
-              offset,
+              limit: pagination.limit,
+              offset: pagination.offset,
             }), apiResponse);
           },
         );
@@ -1380,6 +1394,13 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
             const includeStatuses = url.searchParams.getAll("status");
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const validationError = buildQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, validationError);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), validationError);
+              return;
+            }
             const statusValidation = z.array(TrustedDeviceStatusValues).safeParse(includeStatuses);
             if (!statusValidation.success) {
               const validationError = buildQueryValidationError("status", "status values are invalid.");
@@ -1392,8 +1413,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               userIdentityId: context.principal.userIdentityId,
               workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
               includeStatuses: statusValidation.data,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -1401,8 +1422,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               userIdentityId: context.principal.userIdentityId,
               workspaceId: normalizeOptionalString(url.searchParams.get("workspaceId")),
               includeStatuses: statusValidation.data,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             }), apiResponse);
           },
         );
@@ -4477,14 +4498,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           async (context) => {
             const url = new URL(request.url ?? "/", "http://localhost");
             const statuses = url.searchParams.getAll("status");
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const invalid = buildWorkspaceAdministrationQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
             const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaces({
               actorUserIdentityId: context.principal.userIdentityId,
               ownerUserIdentityId: normalizeOptionalString(url.searchParams.get("ownerUserIdentityId")),
               statuses: statuses.length > 0 ? statuses.filter((status) => WorkspaceStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceStatusValues>> : undefined,
               visibility: parseOptionalEnum(url.searchParams.get("visibility"), WorkspaceVisibilityValues.options),
               slugPrefix: normalizeOptionalString(url.searchParams.get("slugPrefix")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -4708,6 +4736,13 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const url = new URL(request.url ?? "/", "http://localhost");
             const statuses = url.searchParams.getAll("status")
               .filter((status) => WorkspaceMembershipStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceMembershipStatusValues>>;
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const invalid = buildWorkspaceAdministrationQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
             const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceMemberships({
               workspaceId,
               actorUserIdentityId: context.principal.userIdentityId,
@@ -4715,8 +4750,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               statuses: statuses.length > 0 ? statuses : undefined,
               invitationId: normalizeOptionalString(url.searchParams.get("invitationId")),
               invitedByUserIdentityId: normalizeOptionalString(url.searchParams.get("invitedByUserIdentityId")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -4903,6 +4938,13 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const url = new URL(request.url ?? "/", "http://localhost");
             const statuses = url.searchParams.getAll("status")
               .filter((status) => WorkspaceInvitationStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceInvitationStatusValues>>;
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const invalid = buildWorkspaceAdministrationQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
             const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceInvitations({
               workspaceId,
               actorUserIdentityId: context.principal.userIdentityId,
@@ -4913,8 +4955,8 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               expiresBefore: normalizeOptionalString(url.searchParams.get("expiresBefore")),
               expiresAfter: normalizeOptionalString(url.searchParams.get("expiresAfter")),
               asOf: normalizeOptionalString(url.searchParams.get("asOf")),
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -4996,14 +5038,21 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               .filter((role) => WorkspaceRoleValues.safeParse(role).success) as Array<z.infer<typeof WorkspaceRoleValues>>;
             const statuses = url.searchParams.getAll("status")
               .filter((status) => WorkspaceRoleAssignmentStatusValues.safeParse(status).success) as Array<z.infer<typeof WorkspaceRoleAssignmentStatusValues>>;
+            const pagination = parseSharedListPaginationFromQuery(url.searchParams);
+            if (!pagination.ok) {
+              const invalid = buildWorkspaceAdministrationQueryValidationError(pagination.issue.path, pagination.issue.message);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
             const apiResponse = await options.workspaceAdministrationBackendApi.listWorkspaceRoleAssignments({
               workspaceId,
               actorUserIdentityId: context.principal.userIdentityId,
               userIdentityId: normalizeOptionalString(url.searchParams.get("userIdentityId")),
               roles: roles.length > 0 ? roles : undefined,
               statuses: statuses.length > 0 ? statuses : undefined,
-              limit: parseOptionalInteger(url.searchParams.get("limit")),
-              offset: parseOptionalInteger(url.searchParams.get("offset")),
+              limit: pagination.limit,
+              offset: pagination.offset,
             });
             const statusCode = mapWorkspaceAdministrationStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -7666,39 +7715,45 @@ function parseAndValidateAssetListRequest(
 ):
   | { readonly ok: true; readonly data: ListAssetsApiRequest }
   | { readonly ok: false; readonly statusCode: number; readonly body: AssetManagementApiResponse<never> } {
-  const assetKinds = parseOptionalCsvEnumList(
-    searchParams.get("assetKinds"),
+  const assetKinds = parseOptionalMultiEnumList(
+    searchParams,
+    "assetKind",
+    "assetKinds",
     ["uploaded-file", "generated-output", "preview", "derived"] as const,
   );
   if (!assetKinds.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("assetKinds includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("assetKind values are invalid."),
     };
   }
 
-  const visibilities = parseOptionalCsvEnumList(
-    searchParams.get("visibilities"),
+  const visibilities = parseOptionalMultiEnumList(
+    searchParams,
+    "visibility",
+    "visibilities",
     ["private", "workspace", "shared", "published"] as const,
   );
   if (!visibilities.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("visibilities includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("visibility values are invalid."),
     };
   }
 
-  const lifecycleStates = parseOptionalCsvEnumList(
-    searchParams.get("lifecycleStates"),
+  const lifecycleStates = parseOptionalMultiEnumList(
+    searchParams,
+    "lifecycleState",
+    "lifecycleStates",
     ["active", "archived", "deleted"] as const,
   );
   if (!lifecycleStates.ok) {
     return {
       ok: false,
       statusCode: 400,
-      body: buildAssetManagementInvalidRequestResponse("lifecycleStates includes unsupported values."),
+      body: buildAssetManagementInvalidRequestResponse("lifecycleState values are invalid."),
     };
   }
 
@@ -7711,6 +7766,15 @@ function parseAndValidateAssetListRequest(
       ok: false,
       statusCode: 400,
       body: buildAssetManagementInvalidRequestResponse("scope must be one of: private, workspace, all."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildAssetManagementInvalidRequestResponse(pagination.issue.message),
     };
   }
 
@@ -7730,8 +7794,8 @@ function parseAndValidateAssetListRequest(
       lifecycleStates: lifecycleStates.value,
       sourceAssetId: normalizeOptionalString(searchParams.get("sourceAssetId")),
       sourceAssetVersionId: normalizeOptionalString(searchParams.get("sourceAssetVersionId")),
-      limit: parseOptionalInteger(searchParams.get("limit")),
-      offset: parseOptionalInteger(searchParams.get("offset")),
+      limit: pagination.limit,
+      offset: pagination.offset,
     }),
   };
 }
@@ -8204,6 +8268,22 @@ function parseOptionalCsvEnumList<TValue extends string>(
   };
 }
 
+function parseOptionalMultiEnumList<TValue extends string>(
+  searchParams: URLSearchParams,
+  repeatedKey: string,
+  csvFallbackKey: string,
+  enumeration: ReadonlyArray<TValue>,
+): { readonly ok: true; readonly value?: ReadonlyArray<TValue> } | { readonly ok: false } {
+  const repeatedValues = searchParams.getAll(repeatedKey)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  if (repeatedValues.length > 0) {
+    return parseOptionalCsvEnumList(repeatedValues.join(","), enumeration);
+  }
+
+  return parseOptionalCsvEnumList(searchParams.get(csvFallbackKey), enumeration);
+}
+
 function normalizeOptionalString(value: string | null): string | undefined {
   if (!value) {
     return undefined;
@@ -8211,6 +8291,41 @@ function normalizeOptionalString(value: string | null): string | undefined {
 
   const normalized = value.trim();
   return normalized ? normalized : undefined;
+}
+
+function parseSharedListPaginationFromQuery(
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly limit: number | undefined; readonly offset: number | undefined }
+  | { readonly ok: false; readonly issue: SharedApiQuerySchemaValidationError["issues"][number] } {
+  try {
+    const parsed = parseSharedApiListQueryConventions(searchParams);
+    return {
+      ok: true,
+      limit: parsed.pagination?.limit,
+      offset: parsed.pagination?.offset,
+    };
+  } catch (error) {
+    if (error instanceof SharedApiQuerySchemaValidationError) {
+      return {
+        ok: false,
+        issue: error.issues[0] ?? Object.freeze({
+          path: "query",
+          code: "invalid-request",
+          message: "Query validation failed.",
+        }),
+      };
+    }
+
+    return {
+      ok: false,
+      issue: Object.freeze({
+        path: "query",
+        code: "invalid-request",
+        message: "Query validation failed.",
+      }),
+    };
+  }
 }
 
 function buildAdminContext(actorUserIdentityId: string): ListIdentityAdminAccountsApiRequest["context"] {
@@ -8497,6 +8612,24 @@ function buildQueryValidationError(path: string, message: string): IdentityAuthA
     ok: false,
     error: {
       code: IdentityAuthApiErrorCodes.invalidRequest,
+      message: "Request validation failed.",
+      validationErrors: Object.freeze([Object.freeze({
+        path,
+        code: "invalid_enum_value",
+        message,
+      })]),
+    },
+  });
+}
+
+function buildWorkspaceAdministrationQueryValidationError(
+  path: string,
+  message: string,
+): WorkspaceAdministrationApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: WorkspaceAdministrationApiErrorCodes.invalidRequest,
       message: "Request validation failed.",
       validationErrors: Object.freeze([Object.freeze({
         path,

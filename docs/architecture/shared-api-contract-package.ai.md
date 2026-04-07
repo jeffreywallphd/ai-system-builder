@@ -6,10 +6,12 @@
 - Ensure desktop and thin clients consume the same typed server transport contracts.
 - Extend convergence with Story 14.1.3 shared error semantics.
 - Extend convergence with Story 14.1.5 shared client transport behavior.
+- Extend convergence with Story 14.1.6 shared list/read query and cache key conventions.
 
 ## Added shared contract homes
 
 - `src/shared/contracts/api/SharedApiContractPrimitives.ts`
+- `src/shared/contracts/api/SharedApiQueryConventions.ts`
 - `src/shared/contracts/identity/IdentityTransportContracts.ts`
 - `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts`
 - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
@@ -31,6 +33,7 @@
 ## Added schema homes
 
 - `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts`
+- `src/shared/schemas/api/SharedApiQuerySchemaContracts.ts`
 - `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`
 - `src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts`
@@ -57,6 +60,13 @@
 - Normalized error output: transport failures and malformed/non-envelope payloads are mapped to stable shared error semantics.
 - Retry and cancellation: GET retries with bounded backoff for retryable failures; callers can cancel using `AbortSignal`.
 - Schema enforcement: shared envelope parsing is validated centrally; domain clients can inject stronger endpoint-specific parsers.
+
+## Shared list/read query baseline (Story 14.1.6)
+
+- Canonical list/read keys are centralized: `workspaceId`, `actorWorkspaceId`, `limit`, `offset`, `search`, `sortBy`, `sortDirection`.
+- Shared list/read query builders are now reused in converged identity/workspace/node clients.
+- Shared list query key generation is centralized via `buildSharedApiListQueryKey` and used by converged asset-selector caches.
+- Shared query parser validation (`parseSharedApiListQueryConventions`) now drives consistent pagination validation for converged server list routes.
 
 ## Canonical doc
 

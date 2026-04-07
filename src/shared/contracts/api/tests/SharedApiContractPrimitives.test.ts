@@ -4,6 +4,7 @@ import {
   SharedApiErrorCodes,
   SharedApiQueryDefaults,
   SharedApiRealtimeEventKinds,
+  SharedApiSortDirections,
 } from "../SharedApiContractPrimitives";
 
 describe("SharedApiContractPrimitives", () => {
@@ -19,5 +20,8 @@ describe("SharedApiContractPrimitives", () => {
     expect(SharedApiRealtimeEventKinds.queueItemEnqueued).toBe("queue-item-enqueued");
     expect(SharedApiQueryDefaults.defaultLimit).toBeGreaterThan(0);
     expect(SharedApiQueryDefaults.maxLimit).toBeGreaterThanOrEqual(SharedApiQueryDefaults.defaultLimit);
+    expect(SharedApiQueryDefaults.defaultOffset).toBe(0);
+    expect(SharedApiSortDirections.ascending).toBe("asc");
+    expect(SharedApiSortDirections.descending).toBe("desc");
   });
 });

@@ -91,4 +91,15 @@ export interface SharedApiRealtimeEventEnvelope<TPayload> {
 export const SharedApiQueryDefaults = Object.freeze({
   defaultLimit: 50,
   maxLimit: 200,
+  defaultOffset: 0,
+  defaultSortDirection: "asc",
+  maxSearchLength: 256,
 } as const);
+
+export const SharedApiSortDirections = Object.freeze({
+  ascending: "asc",
+  descending: "desc",
+} as const);
+
+export type SharedApiSortDirection =
+  typeof SharedApiSortDirections[keyof typeof SharedApiSortDirections];
