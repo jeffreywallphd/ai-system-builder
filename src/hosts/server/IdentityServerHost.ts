@@ -142,6 +142,7 @@ import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAutho
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
+import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -946,24 +947,26 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
     persistentPlatformServices.platformPersistenceRepository,
   );
+  const validateRunSubmissionUseCase = new ValidateRunSubmissionUseCase({
+    workspaceRepository,
+    authorizationDecisionEvaluator,
+    targetResolver: new AssetBackedRunSubmissionTargetResolver(assetRepository),
+    storageInstanceRepository,
+    storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+    encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+    auditSink: runSubmissionAuditSink,
+    clock: workspaceClock,
+  });
+  const createAuthoritativeRunUseCase = new CreateAuthoritativeRunUseCase({
+    runRepository: persistentPlatformServices.platformPersistenceRepository,
+    queueRepository: persistentPlatformServices.platformPersistenceRepository,
+    orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+    auditSink: runSubmissionAuditSink,
+    transactionManager: persistentPlatformServices.platformPersistenceRepository,
+  });
   const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
-    validateRunSubmissionUseCase: new ValidateRunSubmissionUseCase({
-      workspaceRepository,
-      authorizationDecisionEvaluator,
-      targetResolver: new AssetBackedRunSubmissionTargetResolver(assetRepository),
-      storageInstanceRepository,
-      storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-      encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-      auditSink: runSubmissionAuditSink,
-      clock: workspaceClock,
-    }),
-    createAuthoritativeRunUseCase: new CreateAuthoritativeRunUseCase({
-      runRepository: persistentPlatformServices.platformPersistenceRepository,
-      queueRepository: persistentPlatformServices.platformPersistenceRepository,
-      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-      auditSink: runSubmissionAuditSink,
-      transactionManager: persistentPlatformServices.platformPersistenceRepository,
-    }),
+    validateRunSubmissionUseCase,
+    createAuthoritativeRunUseCase,
   });
   const authoritativeRunQueryBackendApi = new AuthoritativeRunQueryBackendApi({
     listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(
@@ -982,6 +985,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }),
+    requestAuthoritativeRunRetryUseCase: new RequestAuthoritativeRunRetryUseCase({
+      runRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      validateRunSubmissionUseCase,
+      createAuthoritativeRunUseCase,
       now: () => workspaceClock.now(),
     }),
     authorizationDecisionEvaluator,

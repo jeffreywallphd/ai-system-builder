@@ -23,6 +23,18 @@ const cancellationAiDocPath = path.join(
   "architecture",
   "run-orchestration-authoritative-cancellation-workflow-and-state-matrix.ai.md",
 );
+const retryDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md",
+);
+const retryAiDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-authoritative-retry-rerun-workflow-and-lineage.ai.md",
+);
 const architectureAiDocPath = path.join(
   repoRoot,
   "docs",
@@ -40,6 +52,8 @@ describe("run orchestration control-plane documentation", () => {
     expect(existsSync(architectureAiDocPath)).toBeTrue();
     expect(existsSync(cancellationDocPath)).toBeTrue();
     expect(existsSync(cancellationAiDocPath)).toBeTrue();
+    expect(existsSync(retryDocPath)).toBeTrue();
+    expect(existsSync(retryAiDocPath)).toBeTrue();
     expect(existsSync(contributorDocPath)).toBeTrue();
     expect(existsSync(contributorAiDocPath)).toBeTrue();
   });
@@ -65,6 +79,7 @@ describe("run orchestration control-plane documentation", () => {
     expect(doc).toContain("## Extending scheduler policy");
     expect(doc).toContain("## Extending backend dispatch integrations");
     expect(doc).toContain("## Extending cancellation orchestration");
+    expect(doc).toContain("## Extending retry and rerun orchestration");
     expect(doc).toContain("## Extending progress ingestion and finalization");
     expect(doc).toContain("## Invariants and non-negotiable boundaries");
     expect(doc).toContain("## Prohibited patterns");
@@ -86,6 +101,7 @@ describe("run orchestration control-plane documentation", () => {
       "src/application/runs/use-cases/HandleRunDispatchResultUseCase.ts",
       "src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts",
       "src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts",
+      "src/application/runs/use-cases/RequestAuthoritativeRunRetryUseCase.ts",
       "src/application/runs/use-cases/FinalizeRunExecutionOutcomeUseCase.ts",
       "src/infrastructure/execution/runs/RunExecutionDispatchRouter.ts",
       "src/infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi.ts",
@@ -104,9 +120,11 @@ describe("run orchestration control-plane documentation", () => {
 
     expect(readme).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
     expect(readme).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
+    expect(readme).toContain("run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
     expect(readme).toContain("../run-orchestration-contributor-guide.md");
     expect(readmeAi).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
     expect(readmeAi).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
+    expect(readmeAi).toContain("run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
     expect(readmeAi).toContain("docs/run-orchestration-contributor-guide.md");
   });
 
@@ -119,6 +137,9 @@ describe("run orchestration control-plane documentation", () => {
     const cancellationAiDoc = readFileSync(cancellationAiDocPath, "utf8");
     expect(cancellationAiDoc).toContain("docs/architecture/run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
     expect(cancellationAiDoc).toContain("state-matrix");
+    const retryAiDoc = readFileSync(retryAiDocPath, "utf8");
+    expect(retryAiDoc).toContain("docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
+    expect(retryAiDoc).toContain("lineage");
     expect(contributorAiDoc).toContain("docs/run-orchestration-contributor-guide.md");
     expect(contributorAiDoc).toContain("Bypassing authoritative node claim use case before dispatch is prohibited.");
   });

@@ -214,6 +214,7 @@ import {
   parseRunCancellationRequest,
   parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
+  parseRunRetryRequest,
   parseRunSubmissionRequest,
 } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import {
@@ -4786,6 +4787,78 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
                 authenticatedAt: context.session.authenticatedAt,
               }),
               cancellation: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              runId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunMutationBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/retry")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/runtime/runs/", "/retry");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAuthoritativeRunRetryMutationRequest({
+              payload: parsedBody.value,
+              runId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunMutationBackendApi.retryRun({
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+              retry: parsedRequest.data,
             });
             const statusCode = mapRunSubmissionStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
@@ -9703,6 +9776,49 @@ function parseAndValidateAuthoritativeRunCancellationMutationRequest(input: {
       return {
         ok: false,
         body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run cancellation payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateAuthoritativeRunRetryMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+  readonly actorUserIdentityId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunRetryRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunRetryRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (parsed.requestedByActorId && parsed.requestedByActorId !== input.actorUserIdentityId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("retry.requestedByActorId must match authenticated actor."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+        requestedByActorId: input.actorUserIdentityId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run retry payload is invalid."),
       };
     }
     throw error;

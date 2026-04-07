@@ -30,9 +30,17 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Keep lifecycle-position-dependent outcomes explicit (terminal cancel, cancelling request, terminal no-op).
 - Keep queue claim release/finalization coordination in application seams, not transport handlers.
 
+## Retry/rerun extension guidance
+- Keep retry eligibility + lineage orchestration in `RequestAuthoritativeRunRetryUseCase`.
+- Keep retry implementation as authoritative resubmission through validation/creation use cases.
+- Preserve linkage via `retry.previousRunId`, incremented attempt counters, and explicit retry reason when present.
+- Keep source-run history immutable; retries create derived runs instead of mutating historical truth.
+- Return explicit ineligible semantics for non-retry-eligible states.
+
 ## Prohibited patterns
 - Bypassing reservation claim semantics is prohibited.
 - Bypassing authoritative node claim use case before dispatch is prohibited.
 - Dispatching directly from transport handlers is prohibited.
 - Mutating run lifecycle directly from infrastructure adapters is prohibited.
 - Bypassing execution-update ingestion validation for lifecycle/progress writes is prohibited.
+- Bypassing authoritative submission validation + creation for retried runs is prohibited.
