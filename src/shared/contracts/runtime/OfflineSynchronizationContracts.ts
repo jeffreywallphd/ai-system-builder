@@ -103,6 +103,18 @@ export const OfflineConflictSeverities = Object.freeze({
 export type OfflineConflictSeverity =
   typeof OfflineConflictSeverities[keyof typeof OfflineConflictSeverities];
 
+export const OfflineConflictClasses = Object.freeze({
+  staleBaseEdit: "stale-base-edit",
+  deletedOrRevokedResource: "deleted-or-revoked-resource",
+  permissionChangedDuringDisconnection: "permission-changed-during-disconnection",
+  invalidatedRunSubmission: "invalidated-run-submission",
+  resourceVersionMismatch: "resource-version-mismatch",
+  authoritativeStateUnavailable: "authoritative-state-unavailable",
+} as const);
+
+export type OfflineConflictClass =
+  typeof OfflineConflictClasses[keyof typeof OfflineConflictClasses];
+
 export const OfflineReconciliationActions = Object.freeze({
   applyToAuthoritative: "apply-to-authoritative",
   conflictRequiresReview: "conflict-requires-review",
@@ -198,6 +210,7 @@ export interface OfflineConflictIndicatorDto {
   readonly resourceClass: OfflineSyncResourceClass;
   readonly resourceId: string;
   readonly severity: OfflineConflictSeverity;
+  readonly conflictClass: OfflineConflictClass;
   readonly conflictCode: string;
   readonly summary: string;
   readonly authoritativeRevision?: string;
@@ -210,6 +223,9 @@ export interface OfflineReconciliationOutcomeDto {
   readonly operationId: string;
   readonly action: OfflineReconciliationAction;
   readonly requiresUserAttention: boolean;
+  readonly requiresAdminAttention: boolean;
+  readonly preserveLocalDraftAsUnsynced: boolean;
+  readonly decisionRule: string;
   readonly reason: string;
   readonly resolvedAt: string;
   readonly authoritativeRevisionAfter?: string;

@@ -5,6 +5,8 @@ import {
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
   OfflineResynchronizationActions,
+  OfflineResynchronizationConflictClasses,
+  OfflineResynchronizationDecisionRules,
   type OfflineResynchronizationDecision,
 } from "@application/common/OfflineLocalModeResynchronization";
 import {
@@ -54,7 +56,11 @@ describe("OfflineSynchronizationDtos", () => {
     const decision: OfflineResynchronizationDecision = {
       mutationId: "mutation:offline:2",
       action: OfflineResynchronizationActions.conflictRequiresReview,
+      conflictClass: OfflineResynchronizationConflictClasses.staleBaseEdit,
+      decisionRule: OfflineResynchronizationDecisionRules.preserveUnsyncedDraftAndRequireUserReview,
+      preserveLocalDraftAsUnsynced: true,
       requiresUserAttention: true,
+      requiresAdminAttention: false,
       reason: "Authoritative revision changed while offline.",
     };
 
@@ -66,6 +72,10 @@ describe("OfflineSynchronizationDtos", () => {
     });
 
     expect(outcome.action).toBe("conflict-requires-review");
+    expect(outcome.decisionRule).toBe("preserve-unsynced-draft-and-require-user-review");
+    expect(outcome.preserveLocalDraftAsUnsynced).toBeTrue();
+    expect(outcome.requiresAdminAttention).toBeFalse();
+    expect(outcome.conflicts?.[0]?.conflictClass).toBe("stale-base-edit");
     expect(outcome.conflicts?.[0]?.conflictCode).toBe("revision-mismatch");
     expect(outcome.requiresUserAttention).toBeTrue();
   });

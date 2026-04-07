@@ -9,6 +9,7 @@ Story 19.1.2 introduces canonical shared offline-state and synchronization contr
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
 
 Story 19.1.4 extends this package with local draft lifecycle and replayability semantics for disconnected work.
+Story 19.1.5 extends it with explicit conflict-class metadata and reconciliation decision markers.
 
 ## Usage guidance
 
@@ -17,6 +18,8 @@ Story 19.1.4 extends this package with local draft lifecycle and replayability s
 - Use `OfflinePendingOperationEnvelopeDto` for queue entries persisted while disconnected, including the required structured `replayDescriptor` for reconnect replay.
 - Use `OfflineSyncQueueStateDto.pendingRunSubmissions` for pending run submissions that are locally durable but not yet authoritative.
 - Use `OfflineReconciliationOutcomeDto` and `OfflineConflictIndicatorDto` for reconnect outcomes and user-review surfaces.
+  - `OfflineConflictIndicatorDto.conflictClass` carries canonical bounded conflict category.
+  - `OfflineReconciliationOutcomeDto` now carries `decisionRule`, `requiresAdminAttention`, and `preserveLocalDraftAsUnsynced`.
 - Use `OfflineConnectivitySurfaceStateDto` for connectivity-aware status rendering in UI surfaces.
 - Validate incoming/outgoing payloads with `parseOfflineSynchronizationStateSnapshotDto(...)` (and related parser helpers) before persistence or transport.
 
@@ -24,3 +27,4 @@ Story 19.1.4 extends this package with local draft lifecycle and replayability s
 
 - Domain `OfflineQueuedMutationEnvelope` and application `OfflineResynchronizationDecision` remain policy seams and are marked for migration alignment.
 - UI realtime connection snapshots now align to the shared connectivity-state contract shape (`state`/`stale`/`detail`).
+- Conflict-class and decision-rule fields are required to prevent ad hoc reconnect handling and over-claiming automatic resolution.

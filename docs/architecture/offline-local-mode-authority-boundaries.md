@@ -132,6 +132,37 @@ On reconnect:
 
 This behavior is enforced by `planOfflineResynchronization(...)` and `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`.
 
+## Conflict classes and reconciliation decision rules (Story 19.1.5)
+
+Supported conflict classes are explicit and intentionally bounded for the first production model:
+- `stale-base-edit`
+- `deleted-or-revoked-resource`
+- `permission-changed-during-disconnection`
+- `invalidated-run-submission`
+- `resource-version-mismatch`
+- `authoritative-state-unavailable`
+
+Representative reconciliation matrix for supported scope:
+
+| Conflict class | Typical trigger | Reconciliation action | Decision rule | Intervention | Local draft preservation |
+|---|---|---|---|---|---|
+| `stale-base-edit` | authoritative revision differs from queued baseline | `conflict-requires-review` | `preserve-unsynced-draft-and-require-user-review` | user | yes |
+| `deleted-or-revoked-resource` | target deleted or access revoked while offline | `reject-not-allowed` | `preserve-unsynced-draft-and-reject-replay` | user | yes (draft scope only) |
+| `permission-changed-during-disconnection` | replay no longer authorized after reconnect | `reject-not-allowed` | `reject-replay-and-require-user-review` or `reject-replay-and-require-admin-review` | user or admin | yes (draft scope only) |
+| `invalidated-run-submission` | run submission intent invalidated while offline | `reject-not-allowed` | `reject-replay-and-require-user-review` | user | no |
+| `resource-version-mismatch` | version line/format cannot be safely compared | `conflict-requires-review` | `unsafe-auto-merge-deferred` | user | yes (draft scope only) |
+| `authoritative-state-unavailable` | authoritative snapshot unavailable at reconnect | `conflict-requires-review` | `unsafe-auto-merge-deferred` | user | yes (draft scope only) |
+
+Auto-merge is intentionally narrow:
+- only `auto-apply-when-authoritative-baseline-matches` is eligible for automatic apply;
+- any conflict/rejection outcome requires visible intervention and cannot be silently applied;
+- admin-only intervention is reserved for explicit authorization failures requiring administrative policy action.
+
+Unsafe/impossible auto-merge cases are intentionally deferred:
+- mismatched version lines or non-comparable revisions;
+- missing authoritative snapshot state;
+- any scenario where deterministic merge safety cannot be proven from bounded reconnect metadata.
+
 ## Prohibited patterns
 
 - `silent-global-divergence`: local state appears globally authoritative without explicit sync outcome.
