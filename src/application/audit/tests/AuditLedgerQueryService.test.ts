@@ -207,6 +207,11 @@ describe("AuditLedgerQueryService", () => {
           eventGroupIds: ["group:scope:1"],
           runIds: ["run:scope:1"],
           categories: ["policy", "administrative"],
+          retentionPostures: ["governance"],
+          lifecycleStates: ["active"],
+          retentionPolicyKeys: ["retention-policy:workspace-default"],
+          retainUntilAfter: "2027-01-01T00:00:00.000Z",
+          retainUntilBefore: "2028-01-01T00:00:00.000Z",
           hasProtectedData: false,
         },
       },
@@ -225,6 +230,11 @@ describe("AuditLedgerQueryService", () => {
     expect(repository.listQuery?.filters?.eventGroupIds).toEqual(["group:scope:1"]);
     expect(repository.listQuery?.filters?.runIds).toEqual(["run:scope:1"]);
     expect(repository.listQuery?.filters?.categories).toEqual(["policy"]);
+    expect(repository.listQuery?.filters?.retentionPostures).toEqual(["governance"]);
+    expect(repository.listQuery?.filters?.lifecycleStates).toEqual(["active"]);
+    expect(repository.listQuery?.filters?.retentionPolicyKeys).toEqual(["retention-policy:workspace-default"]);
+    expect(repository.listQuery?.filters?.retainUntilAfter).toBe("2027-01-01T00:00:00.000Z");
+    expect(repository.listQuery?.filters?.retainUntilBefore).toBe("2028-01-01T00:00:00.000Z");
     expect(repository.listQuery?.filters?.includeThinSafeOnly).toBeTrue();
     expect(repository.listQuery?.filters?.hasProtectedData).toBeFalse();
   });

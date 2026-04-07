@@ -44,6 +44,14 @@ describe("AuditEventContracts", () => {
       redactionReasons: ["personal-data"],
     },
     retention: "governance",
+    retentionMetadata: {
+      policyKey: "retention-policy:workspace-default",
+      policyVersion: "2026-04-07",
+      retentionAnchor: "occurred-at",
+      retainUntil: "2027-04-07T00:00:00.000Z",
+      lifecycleState: "active",
+      lifecycleUpdatedAt: "2026-04-07T15:01:00.000Z",
+    },
     immutability: "append-only",
     schemaVersion: "1.0",
     hashAlgorithm: "sha-256",
@@ -72,6 +80,8 @@ describe("AuditEventContracts", () => {
     expect(summary.correlationId).toBe("corr:trust:1");
     expect(summary.linkage?.eventGroupId).toBe("group:trust:1");
     expect(summary.redactionReasons).toEqual(["personal-data"]);
+    expect(summary.retention).toBe("governance");
+    expect(summary.retentionMetadata?.policyKey).toBe("retention-policy:workspace-default");
     expect(userSafeDetail.adminOnlyDetails).toBeUndefined();
     expect(adminDetail.adminOnlyDetails).toEqual({ previousRoleKey: "member" });
   });
@@ -86,6 +96,10 @@ describe("AuditEventContracts", () => {
         actionPrefix: "   workspace.  ",
         eventGroupIds: [" group:trust:1 ", "group:trust:1"],
         runIds: [" run:1 "],
+        retentionPostures: ["governance", "governance"],
+        lifecycleStates: ["active"],
+        retentionPolicyKeys: [" retention-policy:workspace-default "],
+        retainUntilAfter: "2027-04-01T00:00:00.000Z",
         occurredAfter: "2026-04-07T15:00:00.000Z",
       },
     });
@@ -97,6 +111,10 @@ describe("AuditEventContracts", () => {
     expect(query.filters?.actionPrefix).toBe("workspace.");
     expect(query.filters?.eventGroupIds).toEqual(["group:trust:1"]);
     expect(query.filters?.runIds).toEqual(["run:1"]);
+    expect(query.filters?.retentionPostures).toEqual(["governance"]);
+    expect(query.filters?.lifecycleStates).toEqual(["active"]);
+    expect(query.filters?.retentionPolicyKeys).toEqual(["retention-policy:workspace-default"]);
+    expect(query.filters?.retainUntilAfter).toBe("2027-04-01T00:00:00.000Z");
     expect(query.filters?.occurredAfter).toBe("2026-04-07T15:00:00.000Z");
   });
 });

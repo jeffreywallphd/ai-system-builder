@@ -5,7 +5,9 @@ import path from "node:path";
 import {
   AuditActorKinds,
   AuditEventCategories,
+  AuditLifecycleStates,
   AuditImmutabilityPostures,
+  AuditRetentionAnchorKinds,
   AuditScopeKinds,
   createCanonicalAuditEvent,
   type CanonicalAuditEvent,
@@ -178,6 +180,14 @@ describe("SqliteAuditLedgerRepository", () => {
         hasProtectedData: true,
         redactionReasons: ["token"],
       },
+      retention: "legal-hold",
+      retentionMetadata: {
+        policyKey: "retention-policy:legal-hold",
+        policyVersion: "2026-04-07",
+        retentionAnchor: AuditRetentionAnchorKinds.recordedAt,
+        retainUntil: "2027-04-07T00:00:00.000Z",
+        lifecycleState: AuditLifecycleStates.retentionHold,
+      },
       protectedResource: {
         resourceType: "secret",
         resourceId: "secret:one",
@@ -257,6 +267,19 @@ describe("SqliteAuditLedgerRepository", () => {
     });
     expect(byActorAndResource).toHaveLength(1);
     expect(byActorAndResource[0]?.eventId).toBe("audit:event:secret");
+    expect(byActorAndResource[0]?.retentionMetadata?.policyKey).toBe("retention-policy:legal-hold");
+
+    const byRetentionLifecycle = await repository.listAuditEvents({
+      filters: {
+        retentionPostures: ["legal-hold"],
+        lifecycleStates: [AuditLifecycleStates.retentionHold],
+        retentionPolicyKeys: ["retention-policy:legal-hold"],
+        retainUntilAfter: "2027-01-01T00:00:00.000Z",
+        retainUntilBefore: "2028-01-01T00:00:00.000Z",
+      },
+    });
+    expect(byRetentionLifecycle).toHaveLength(1);
+    expect(byRetentionLifecycle[0]?.eventId).toBe("audit:event:secret");
 
     const byLinkage = await repository.listAuditEvents({
       filters: {

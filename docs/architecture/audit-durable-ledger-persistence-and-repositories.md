@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, and Story 18.2.5 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, Story 18.2.4, Story 18.2.5, and Story 18.2.7 for Feature 18 / Epic 18.2.
 
 ## Purpose
 
@@ -22,6 +22,8 @@ Introduce the durable persistence model and repository implementation for canoni
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
 - `src/infrastructure/persistence/audit/tests/SqliteAuditLedgerRepository.test.ts`
+- `src/infrastructure/config/AuditRetentionLifecycleConfig.ts`
+- `src/infrastructure/config/tests/AuditRetentionLifecycleConfig.test.ts`
 - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
@@ -39,6 +41,7 @@ SQLite schema additions (`authoritative_audit_ledger_events`) persist:
 - normalized actor/scope/resource references
 - immutable event timing (`occurredAt`, `recordedAt`) and integrity/retention/immutability fields
 - payload boundary metadata (`hasProtectedData`, redaction reasons, safe/admin JSON)
+- retention lifecycle metadata seams (`retention_policy_key`, `retention_policy_version`, `retention_anchor`, `retention_retain_until`, `retention_archive_after`, `lifecycle_state`, `lifecycle_updated_at`)
 - linkage metadata for event/resource/workflow traversal (`event_group`, `root/parent`, `workflow/run/session`, governance action, related-resource refs JSON)
 - full canonical event JSON snapshot for deterministic rehydration
 
@@ -49,7 +52,24 @@ Secondary indexes support common governance query paths:
 - actor/workspace/resource references
 - correlation/request lookups
 - linkage lookups (event group, root/parent, workflow, run, session, governance action)
+- retention/lifecycle lookups (retention posture, lifecycle state, policy key, retain-until windows)
 - protected-data posture filters
+
+## Story 18.2.7 retention/lifecycle policy seams
+
+The durable ledger now includes explicit non-destructive seams for future retention governance:
+
+- canonical event-level retention metadata (`retentionMetadata`) is supported in domain/contracts/schemas;
+- authoritative recording can apply default retention metadata policy seams from environment configuration;
+- persistence stores indexed retention/lifecycle selector columns to avoid future schema redesign for archival workflows;
+- list query filters support retention/lifecycle selectors (`retentionPostures`, `lifecycleStates`, `retentionPolicyKeys`, `retainUntilAfter`, `retainUntilBefore`).
+
+Current supported behavior is intentionally limited:
+
+- the system remains append-oriented and immutable-enough (`UPDATE`/`DELETE` prohibited via triggers);
+- retention/lifecycle fields are metadata and query seams only;
+- no destructive retention worker/job/delete pathway is implemented in this story;
+- configuration explicitly rejects enabling destructive retention actions.
 
 ## Story 18.2.3 query service workflows
 

@@ -3,9 +3,11 @@ import type {
   AuditActorKind,
   AuditEventCategory,
   AuditEventOutcome,
+  AuditLifecycleState,
   AuditImmutabilityPosture,
   AuditProtectedResourceReference,
   AuditRedactionReason,
+  AuditRetentionAnchorKind,
   AuditRetentionPosture,
   AuditScope,
 } from "@domain/audit/AuditDomain";
@@ -134,6 +136,16 @@ export interface AuditEventPayloadDto {
   readonly redactionReasons: ReadonlyArray<AuditRedactionReason>;
 }
 
+export interface AuditEventRetentionMetadataDto {
+  readonly policyKey?: string;
+  readonly policyVersion?: string;
+  readonly retentionAnchor: AuditRetentionAnchorKind;
+  readonly retainUntil?: string;
+  readonly archiveAfter?: string;
+  readonly lifecycleState: AuditLifecycleState;
+  readonly lifecycleUpdatedAt?: string;
+}
+
 export interface AuditEventEnvelopeDto {
   readonly contractVersion: AuditEventContractVersion;
   readonly eventId: string;
@@ -147,7 +159,8 @@ export interface AuditEventEnvelopeDto {
   readonly scope: AuditEventScopeReferenceDto;
   readonly protectedResource?: AuditEventResourceReferenceDto;
   readonly payload: AuditEventPayloadDto;
-  readonly retention: AuditRetentionPosture;
+  readonly retention?: AuditRetentionPosture;
+  readonly retentionMetadata?: AuditEventRetentionMetadataDto;
   readonly immutability: AuditImmutabilityPosture;
   readonly schemaVersion: string;
   readonly hashAlgorithm: string;
@@ -177,6 +190,8 @@ export interface AuditEventSummaryViewDto {
   readonly details?: Readonly<Record<string, unknown>>;
   readonly hasProtectedData: boolean;
   readonly redactionReasons: ReadonlyArray<AuditRedactionReason>;
+  readonly retention: AuditRetentionPosture;
+  readonly retentionMetadata?: AuditEventRetentionMetadataDto;
 }
 
 export interface AuditEventDetailViewDto extends AuditEventSummaryViewDto {
@@ -203,6 +218,11 @@ export interface AuditEventListFiltersDto {
   readonly sessionRefs?: ReadonlyArray<string>;
   readonly runIds?: ReadonlyArray<string>;
   readonly governanceActionIds?: ReadonlyArray<string>;
+  readonly retentionPostures?: ReadonlyArray<AuditRetentionPosture>;
+  readonly lifecycleStates?: ReadonlyArray<AuditLifecycleState>;
+  readonly retentionPolicyKeys?: ReadonlyArray<string>;
+  readonly retainUntilAfter?: string;
+  readonly retainUntilBefore?: string;
   readonly hasProtectedData?: boolean;
   readonly occurredAfter?: string;
   readonly occurredBefore?: string;
@@ -271,6 +291,11 @@ export function normalizeAuditEventListQuery(
       sessionRefs: toFrozenStringArray(query.filters.sessionRefs),
       runIds: toFrozenStringArray(query.filters.runIds),
       governanceActionIds: toFrozenStringArray(query.filters.governanceActionIds),
+      retentionPostures: toFrozenStringArray(query.filters.retentionPostures) as ReadonlyArray<AuditRetentionPosture> | undefined,
+      lifecycleStates: toFrozenStringArray(query.filters.lifecycleStates) as ReadonlyArray<AuditLifecycleState> | undefined,
+      retentionPolicyKeys: toFrozenStringArray(query.filters.retentionPolicyKeys),
+      retainUntilAfter: normalizeTimestamp(query.filters.retainUntilAfter),
+      retainUntilBefore: normalizeTimestamp(query.filters.retainUntilBefore),
       hasProtectedData: normalizeOptionalBoolean(query.filters.hasProtectedData),
       occurredAfter: normalizeTimestamp(query.filters.occurredAfter),
       occurredBefore: normalizeTimestamp(query.filters.occurredBefore),
@@ -319,6 +344,8 @@ export function toAuditEventSummaryView(event: AuditEventEnvelopeDto): AuditEven
     details: event.payload.userSafeDetails,
     hasProtectedData: event.payload.hasProtectedData,
     redactionReasons: event.payload.redactionReasons,
+    retention: event.retention,
+    retentionMetadata: event.retentionMetadata,
   });
 }
 

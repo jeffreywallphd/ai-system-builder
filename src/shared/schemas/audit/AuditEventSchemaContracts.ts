@@ -3,7 +3,9 @@ import {
   AuditActorKinds,
   AuditEventCategories,
   AuditEventOutcomes,
+  AuditLifecycleStates,
   AuditImmutabilityPostures,
+  AuditRetentionAnchorKinds,
   AuditRedactionReasons,
   AuditResourceSensitivityClasses,
   AuditRetentionPostures,
@@ -221,6 +223,32 @@ const PayloadSchema = z.object({
   }
 });
 
+const RetentionMetadataSchema = z.object({
+  policyKey: IdentifierSchema.optional(),
+  policyVersion: z.string().trim().min(1).max(64).optional(),
+  retentionAnchor: z.enum([
+    AuditRetentionAnchorKinds.occurredAt,
+    AuditRetentionAnchorKinds.recordedAt,
+  ]),
+  retainUntil: TimestampSchema.optional(),
+  archiveAfter: TimestampSchema.optional(),
+  lifecycleState: z.enum([
+    AuditLifecycleStates.active,
+    AuditLifecycleStates.retentionHold,
+    AuditLifecycleStates.archiveCandidate,
+    AuditLifecycleStates.archived,
+  ]),
+  lifecycleUpdatedAt: TimestampSchema.optional(),
+}).strict().superRefine((value, context) => {
+  if (value.retainUntil && value.archiveAfter && Date.parse(value.archiveAfter) < Date.parse(value.retainUntil)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["archiveAfter"],
+      message: "archiveAfter cannot be earlier than retainUntil.",
+    });
+  }
+});
+
 export const AuditEventEnvelopeDtoSchema: z.ZodType<AuditEventEnvelopeDto> = z.object({
   contractVersion: z.enum([
     AuditEventContractVersions.v1,
@@ -241,6 +269,7 @@ export const AuditEventEnvelopeDtoSchema: z.ZodType<AuditEventEnvelopeDto> = z.o
     AuditRetentionPostures.governance,
     AuditRetentionPostures.legalHold,
   ]),
+  retentionMetadata: RetentionMetadataSchema.optional(),
   immutability: z.enum([
     AuditImmutabilityPostures.appendOnly,
     AuditImmutabilityPostures.appendOnlyHashChained,
@@ -335,12 +364,38 @@ export const AuditEventListQueryDtoSchema: z.ZodType<AuditEventListQueryDto> = z
     sessionRefs: z.array(z.string().trim().min(1).max(255)).max(64).optional(),
     runIds: z.array(IdentifierSchema).max(64).optional(),
     governanceActionIds: z.array(IdentifierSchema).max(64).optional(),
+    retentionPostures: z.array(z.enum([
+      AuditRetentionPostures.operational,
+      AuditRetentionPostures.governance,
+      AuditRetentionPostures.legalHold,
+    ])).max(8).optional(),
+    lifecycleStates: z.array(z.enum([
+      AuditLifecycleStates.active,
+      AuditLifecycleStates.retentionHold,
+      AuditLifecycleStates.archiveCandidate,
+      AuditLifecycleStates.archived,
+    ])).max(12).optional(),
+    retentionPolicyKeys: z.array(IdentifierSchema).max(64).optional(),
+    retainUntilAfter: TimestampSchema.optional(),
+    retainUntilBefore: TimestampSchema.optional(),
     hasProtectedData: z.boolean().optional(),
     occurredAfter: TimestampSchema.optional(),
     occurredBefore: TimestampSchema.optional(),
     includeThinSafeOnly: z.boolean().optional(),
   }).strict().optional(),
 }).strict().superRefine((value, context) => {
+  if (
+    value.filters?.retainUntilAfter
+    && value.filters?.retainUntilBefore
+    && Date.parse(value.filters.retainUntilAfter) > Date.parse(value.filters.retainUntilBefore)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["filters", "retainUntilAfter"],
+      message: "retainUntilAfter cannot be later than retainUntilBefore.",
+    });
+  }
+
   if (
     value.filters?.occurredAfter
     && value.filters?.occurredBefore
@@ -470,6 +525,11 @@ export function parseAuditEventListQueryFromSearchParams(searchParams: URLSearch
       sessionRefs: searchParams.getAll("sessionRef"),
       runIds: searchParams.getAll("runId"),
       governanceActionIds: searchParams.getAll("governanceActionId"),
+      retentionPostures: searchParams.getAll("retentionPosture") as AuditQueryFilters["retentionPostures"],
+      lifecycleStates: searchParams.getAll("lifecycleState") as AuditQueryFilters["lifecycleStates"],
+      retentionPolicyKeys: searchParams.getAll("retentionPolicyKey"),
+      retainUntilAfter: parseOptionalString(searchParams.getAll("retainUntilAfter")),
+      retainUntilBefore: parseOptionalString(searchParams.getAll("retainUntilBefore")),
       hasProtectedData: parseOptionalBoolean(searchParams.getAll("hasProtectedData")),
       occurredAfter: parseOptionalString(searchParams.getAll("occurredAfter")),
       occurredBefore: parseOptionalString(searchParams.getAll("occurredBefore")),

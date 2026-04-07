@@ -2,9 +2,11 @@ import type {
   AuditActorIdentity,
   AuditEventCategory,
   AuditEventOutcome,
+  AuditLifecycleState,
   AuditImmutabilityPosture,
   AuditProtectedResourceReference,
   AuditRedactionReason,
+  AuditRetentionAnchorKind,
   AuditRetentionPosture,
   AuditScope,
 } from "@domain/audit/AuditDomain";
@@ -50,6 +52,15 @@ export interface AuthoritativeAuditRecordEventInput {
   readonly category?: AuditEventCategory;
   readonly protectedResource?: AuditProtectedResourceReference;
   readonly retention?: AuditRetentionPosture;
+  readonly retentionMetadata?: Readonly<{
+    readonly policyKey?: string;
+    readonly policyVersion?: string;
+    readonly retentionAnchor?: AuditRetentionAnchorKind;
+    readonly retainUntil?: string;
+    readonly archiveAfter?: string;
+    readonly lifecycleState?: AuditLifecycleState;
+    readonly lifecycleUpdatedAt?: string;
+  }>;
   readonly immutability?: AuditImmutabilityPosture;
   readonly integrity?: Readonly<{
     readonly schemaVersion?: string;
@@ -76,6 +87,11 @@ export interface AuthoritativeAuditRecordingPort {
 
 export interface AuthoritativeAuditRecordingServiceDependencies {
   readonly repository: IAuditLedgerRepository;
+  readonly retentionLifecycleDefaults?: Readonly<{
+    readonly policyKey?: string;
+    readonly policyVersion?: string;
+    readonly retentionAnchor?: AuditRetentionAnchorKind;
+  }>;
   readonly now?: () => Date;
   readonly idGenerator?: () => string;
 }

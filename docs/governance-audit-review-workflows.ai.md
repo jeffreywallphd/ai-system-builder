@@ -56,6 +56,7 @@ For canonical audit taxonomy/capture extension guidance, also reference:
   - `outcomes[]`
   - `includeThinSafeOnly`
 - Linkage selectors are also supported by the audit API contract (`correlationId`, `requestId`, `eventGroupId`, `rootEventId`, `parentEventId`, `workflowId`, `sessionRef`, `runId`, `governanceActionId`).
+- Retention/lifecycle selectors are supported for policy-ready review paths (`retentionPosture`, `lifecycleState`, `retentionPolicyKey`, `retainUntilAfter`, `retainUntilBefore`).
 - Query normalization enforces bounded pagination/search and supported sorting fields.
 
 ## Redaction contract

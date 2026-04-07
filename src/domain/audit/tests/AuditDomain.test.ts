@@ -3,7 +3,9 @@ import {
   AuditActorKinds,
   AuditDomainError,
   AuditEventCategories,
+  AuditLifecycleStates,
   AuditImmutabilityPostures,
+  AuditRetentionAnchorKinds,
   AuditRedactionReasons,
   AuditRetentionPostures,
   AuditScopeKinds,
@@ -211,6 +213,66 @@ describe("AuditDomain", () => {
       linkage: {
         rootEventId: "audit:event:same",
         parentEventId: "audit:event:same",
+      },
+    })).toThrow(AuditDomainError);
+  });
+
+  it("supports retention lifecycle metadata seams without destructive controls", () => {
+    const event = createCanonicalAuditEvent({
+      eventId: "audit:event:retention:1",
+      eventType: "policy-retention-updated",
+      category: AuditEventCategories.policy,
+      action: "retention.policy.updated",
+      outcome: "succeeded",
+      occurredAt: "2026-04-07T12:15:00.000Z",
+      actor: {
+        actorId: "user:governance-admin",
+        actorKind: AuditActorKinds.user,
+        actorUserIdentityId: "user:governance-admin",
+      },
+      scope: {
+        kind: AuditScopeKinds.workspace,
+        workspaceId: "workspace:1",
+      },
+      payload: {
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+      },
+      retention: AuditRetentionPostures.governance,
+      retentionMetadata: {
+        policyKey: "retention-policy:workspace-default",
+        policyVersion: "2026-04-07",
+        retentionAnchor: AuditRetentionAnchorKinds.recordedAt,
+        retainUntil: "2027-04-07T00:00:00.000Z",
+        archiveAfter: "2027-07-07T00:00:00.000Z",
+        lifecycleState: AuditLifecycleStates.archiveCandidate,
+        lifecycleUpdatedAt: "2026-04-07T12:16:00.000Z",
+      },
+    });
+
+    expect(event.retentionMetadata?.policyKey).toBe("retention-policy:workspace-default");
+    expect(event.retentionMetadata?.retentionAnchor).toBe(AuditRetentionAnchorKinds.recordedAt);
+    expect(event.retentionMetadata?.lifecycleState).toBe(AuditLifecycleStates.archiveCandidate);
+
+    const legalHoldDefault = createCanonicalAuditEvent({
+      ...event,
+      eventId: "audit:event:retention:2",
+      retention: AuditRetentionPostures.legalHold,
+      retentionMetadata: undefined,
+    });
+    expect(legalHoldDefault.retentionMetadata?.lifecycleState).toBe(AuditLifecycleStates.retentionHold);
+
+    expect(() => createCanonicalAuditEvent({
+      ...event,
+      eventId: "audit:event:retention:3",
+      retentionMetadata: {
+        retentionAnchor: AuditRetentionAnchorKinds.occurredAt,
+        retainUntil: "2027-04-07T00:00:00.000Z",
+        archiveAfter: "2027-01-01T00:00:00.000Z",
       },
     })).toThrow(AuditDomainError);
   });

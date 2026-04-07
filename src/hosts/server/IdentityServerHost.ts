@@ -29,6 +29,7 @@ import { IdentityAuthBackendApi } from "@infrastructure/api/identity/IdentityAut
 import { IdentitySessionPolicyConfig } from "@infrastructure/config/IdentitySessionPolicyConfig";
 import { IdentitySessionTrustPolicyConfig } from "@infrastructure/config/IdentitySessionTrustPolicyConfig";
 import { IdentityProviderAccountPolicyConfig } from "@infrastructure/config/IdentityProviderAccountPolicyConfig";
+import { resolveAuditRetentionLifecycleConfig } from "@infrastructure/config/AuditRetentionLifecycleConfig";
 import {
   HostSecureTransportKinds,
   resolveHostSecureTransportConfig,
@@ -368,8 +369,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   let secretService: ServerComposedSecretService | undefined;
   try {
+    const auditRetentionLifecycleConfig = resolveAuditRetentionLifecycleConfig({ env });
     const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
       repository: persistentPlatformServices.auditLedgerRepository,
+      retentionLifecycleDefaults: {
+        policyKey: auditRetentionLifecycleConfig.defaultPolicyKey,
+        policyVersion: auditRetentionLifecycleConfig.defaultPolicyVersion,
+        retentionAnchor: auditRetentionLifecycleConfig.defaultRetentionAnchor,
+      },
     });
     const legacySecretAccessAuditHook = createSecretAccessAuditHook(options.logger);
     const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);

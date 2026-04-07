@@ -1,4 +1,4 @@
-export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 3;
+export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 4;
 
 export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -204,5 +204,37 @@ export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number
     CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_linkage_governance_action_idx
       ON authoritative_audit_ledger_events(linkage_governance_action_id, occurred_at DESC, sequence DESC)
       WHERE linkage_governance_action_id IS NOT NULL;
+  `],
+  [4, `
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN retention_policy_key TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN retention_policy_version TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN retention_anchor TEXT CHECK (
+        retention_anchor IS NULL OR retention_anchor IN ('occurred-at', 'recorded-at')
+      );
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN retention_retain_until TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN retention_archive_after TEXT;
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN lifecycle_state TEXT CHECK (
+        lifecycle_state IS NULL OR lifecycle_state IN ('active', 'retention-hold', 'archive-candidate', 'archived')
+      );
+    ALTER TABLE authoritative_audit_ledger_events
+      ADD COLUMN lifecycle_updated_at TEXT;
+
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_retention_policy_key_idx
+      ON authoritative_audit_ledger_events(retention_policy_key, occurred_at DESC, sequence DESC)
+      WHERE retention_policy_key IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_retention_posture_idx
+      ON authoritative_audit_ledger_events(retention, occurred_at DESC, sequence DESC);
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_lifecycle_state_idx
+      ON authoritative_audit_ledger_events(lifecycle_state, occurred_at DESC, sequence DESC)
+      WHERE lifecycle_state IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_events_retain_until_idx
+      ON authoritative_audit_ledger_events(retention_retain_until, sequence DESC)
+      WHERE retention_retain_until IS NOT NULL;
   `],
 ]);
