@@ -3,6 +3,7 @@ import type {
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
   CompleteTrustedDevicePairingApiResponse,
+  DevelopmentLoginIdentityApiRequest,
   GetIdentityAdminAccountStatusApiRequest,
   GetIdentityAdminAccountStatusApiResponse,
   GetTrustedDeviceApiRequest,
@@ -85,6 +86,10 @@ export interface IdentitySessionTransportContract {
   };
   readonly loginLocalAccount: {
     readonly request: LoginLocalIdentityApiRequest;
+    readonly response: IdentityAuthApiResponse<LoginLocalIdentityApiResponse>;
+  };
+  readonly loginDevelopmentAccount: {
+    readonly request: DevelopmentLoginIdentityApiRequest;
     readonly response: IdentityAuthApiResponse<LoginLocalIdentityApiResponse>;
   };
   readonly resolveAuthenticatedSession: {

@@ -101,6 +101,31 @@ describe("IdentityHttpServer", () => {
     expect(devLoginBody.ok).toBe(true);
     expect(devLoginBody.data.username).toBe("dev.local.user");
     expect(devLoginBody.data.sessionToken).toBeDefined();
+    expect(devLoginBody.data.sessionAccessChannel).toBe("thin-client");
+  });
+
+  it("honors dev-login access-channel hints when provided", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger, {}, {
+      development: {
+        enableDevLoginRoute: true,
+      },
+    });
+
+    const devLoginResponse = await fetch(`${baseUrl}/api/v1/identity/dev-login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        accessChannel: "desktop",
+      }),
+    });
+
+    expect(devLoginResponse.status).toBe(200);
+    const devLoginBody = await devLoginResponse.json();
+    expect(devLoginBody.ok).toBe(true);
+    expect(devLoginBody.data.sessionAccessChannel).toBe("desktop");
   });
 
   it("does not expose development login route when disabled", async () => {

@@ -73,7 +73,10 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
     setErrorMessage(undefined);
     setIsSubmitting(true);
     try {
-      const response = await authService.loginDevelopmentAccount();
+      const response = await authService.loginDevelopmentAccount({
+        accessChannel: resolveIdentityAccessChannel(),
+        client: resolveIdentityClientContext(),
+      });
       if (!response.ok || !response.data) {
         setErrorMessage(renderApiError(response.error));
         return;

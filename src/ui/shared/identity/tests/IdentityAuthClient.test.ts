@@ -25,7 +25,12 @@ describe("HttpIdentityAuthClient", () => {
       username: "alice",
       credential: { candidate: "password-1" },
     });
-    await client.loginDevelopmentAccount();
+    await client.loginDevelopmentAccount({
+      accessChannel: "desktop",
+      client: {
+        userAgent: "ai-loom-tests",
+      },
+    });
     await client.loginLocalAccount({
       providerSubject: "alice",
       credential: { candidate: "password-1" },
@@ -207,5 +212,6 @@ describe("HttpIdentityAuthClient", () => {
     expect(requests[20]?.authorization).toBe("Bearer token-10");
     expect(requests[21]?.authorization).toBe("Bearer token-11");
     expect(requests[22]?.authorization).toBe("Bearer token-12");
+    expect(requests[1]?.body).toContain("\"accessChannel\":\"desktop\"");
   });
 });

@@ -104,6 +104,31 @@ Development-login route guard:
 }
 ```
 
+### Development login request
+
+`POST /api/v1/identity/dev-login`
+
+Optional request body:
+
+```json
+{
+  "accessChannel": "desktop | thin-client (optional, defaults to thin-client)",
+  "sessionTrustRequirement": "allow-untrusted | allow-pairing | require-trusted (optional)",
+  "client": {
+    "userAgent": "string (optional)",
+    "ipAddress": "string (optional)",
+    "deviceId": "string (optional)",
+    "trustedDeviceBindingId": "string (optional)",
+    "trustMarker": "string (optional)"
+  }
+}
+```
+
+Notes:
+
+- Dev login still targets the fixed development identity (`dev.local.user`) and local development credential.
+- Optional body fields are forwarded to session issuance so desktop clients can request desktop channel sessions during development bootstrap.
+
 ### Authenticated session resolve request
 
 `GET /api/v1/identity/session`
