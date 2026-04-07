@@ -36,6 +36,14 @@ export interface OfflineResynchronizationDecision {
   readonly reason: string;
 }
 
+/*
+  Migration note (Story 19.1.2):
+  Shared reconciliation outcome contracts now live in
+  `@shared/contracts/runtime/OfflineSynchronizationContracts`
+  as `OfflineReconciliationOutcomeDto` and related conflict indicators.
+  This decision model remains the application-policy seam.
+*/
+
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {

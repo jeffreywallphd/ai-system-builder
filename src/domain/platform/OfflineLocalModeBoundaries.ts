@@ -217,6 +217,14 @@ export interface OfflineQueuedMutationEnvelope {
   readonly divergenceDisclosureToken: string;
 }
 
+/*
+  Migration note (Story 19.1.2):
+  Shared offline/sync transport-facing queue contracts now live in
+  `@shared/contracts/runtime/OfflineSynchronizationContracts` as
+  `OfflinePendingOperationEnvelopeDto`.
+  This domain envelope remains authoritative for domain policy logic.
+*/
+
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
   if (!normalized) {
