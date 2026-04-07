@@ -79,3 +79,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared accessibility/focus foundations now live in `src/ui/shared/accessibility/*` and are documented in `docs/architecture/multi-surface-ui-accessibility-foundations.md`.
 - Route-level focus/announcement behavior and skip-link baseline are now applied in `src/ui/layout/AppLayout.tsx`.
 - Shared shell/action seams now carry landmark/live-region/menu keyboard semantics so accessibility behavior is standardized before page-specific UI work.
+
+## Story 15.1.8 update
+- Canonical contributor extension rules now live in `docs/architecture/multi-surface-ui-extension-guidance.md`.
+- New admin/operational screens now follow metadata-first route gating, shared state/presentation/action seams, and shared responsive/accessibility conventions by default.
+- Bypassing shared presentation/state seams in converged areas is explicitly prohibited unless justification is documented in PR + architecture updates.

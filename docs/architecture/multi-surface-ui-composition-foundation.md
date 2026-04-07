@@ -162,3 +162,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Shared accessibility and focus-management primitives now live in `src/ui/shared/accessibility/*` with canonical docs in `docs/architecture/multi-surface-ui-accessibility-foundations.md`.
 - App shell route transitions now use a shared route-focus + announcement seam and skip-link baseline through `src/ui/layout/AppLayout.tsx`.
 - Shared shell/action primitives now include landmark, live-status, and keyboard-menu semantics so first admin/operational shells expose usable accessibility behavior without per-page ad hoc wiring.
+
+## Story 15.1.8 update
+
+- Production contributor extension rules for new admin/operational screens now live in `docs/architecture/multi-surface-ui-extension-guidance.md`.
+- The extension guide defines canonical shared-vs-surface placement, metadata-first routing workflow, state/presentation/action seams, responsive/accessibility requirements, and prohibited anti-patterns.
+- For converged areas, bypassing shared presentation/state seams is now explicitly prohibited unless documented justification is provided in PR and architecture updates.
