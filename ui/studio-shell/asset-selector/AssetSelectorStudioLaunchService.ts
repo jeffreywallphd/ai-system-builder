@@ -1,4 +1,4 @@
-import type { AssetSelectorRequest } from "../../../domain/studio-shell/AssetSelectorContract";
+import type { AssetSelectorRequest } from "../../../src/domain/studio-shell/AssetSelectorContract";
 import {
   InlineAssetCreationModes,
   InlineAssetCreationService,

@@ -23,9 +23,9 @@ import type { IIdentityClock } from "../../../../application/identity/ports/IIde
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
-import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
-import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
+import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
 
 export type LoginLocalAccountErrorCode =
   | typeof IdentityErrorCodes.invalidCredentials

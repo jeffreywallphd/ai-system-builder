@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
-import { InMemoryWorkflowRunSummaryRepository } from "../../../workflows/InMemoryWorkflowRunSummaryRepository";
+import { InMemoryStudioShellRepository } from "../../../../src/infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../../../../src/infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
 import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
 import { AuthorizationPolicyDecisionEvaluator } from "../../../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import type {
@@ -30,7 +30,7 @@ import {
   createWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
 

@@ -24,8 +24,8 @@ import {
 import type { ICredentialMaterialRepository } from "../ports/ICredentialMaterialRepository";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
-import { IdentityPolicyService } from "../services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
+import { IdentityPolicyService } from "../../../src/application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../../../src/application/identity/services/LocalPasswordIdentityAuthenticator";
 import { VerifyLocalPasswordCredentialUseCase } from "../../../src/application/identity/use-cases/VerifyLocalPasswordCredentialUseCase";
 
 class InMemoryCredentialAdapter implements ICredentialMaterialRepository, IIdentityLookupRepository {

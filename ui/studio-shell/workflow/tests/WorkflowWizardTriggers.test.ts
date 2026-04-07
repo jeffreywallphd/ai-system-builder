@@ -3,7 +3,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   canMoveWorkflowTrigger,

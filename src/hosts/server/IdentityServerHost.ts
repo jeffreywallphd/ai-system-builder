@@ -8,10 +8,10 @@ import {
   createAuthProvider,
 } from "../../domain/identity/IdentityDomain";
 import { IdentityIdNamespaces, type IdentityIdNamespace } from "../../../application/contracts/IdentityApplicationContracts";
-import { IdentityPolicyService } from "../../../application/identity/services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../../../application/identity/services/LocalPasswordIdentityAuthenticator";
-import { IdentitySessionLifecycleService } from "../../../application/identity/services/IdentitySessionLifecycleService";
-import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { IdentityPolicyService } from "../../application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../../application/identity/services/LocalPasswordIdentityAuthenticator";
+import { IdentitySessionLifecycleService } from "../../application/identity/services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { IIdentityClock } from "../../../application/identity/ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../../../application/identity/ports/IIdentityIdGenerator";
 import type { IIdentityLifecycleEventPublisher } from "../../../application/identity/ports/IIdentityLifecycleEventPublisher";
@@ -35,9 +35,9 @@ import {
 } from "../../../infrastructure/config/HostSecureTransportConfig";
 import { SqliteIdentityPersistenceAdapter } from "../../infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter";
 import { SqliteTrustedDevicePersistenceAdapter } from "../../infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
-import { TrustedDeviceManagementService } from "../../../application/identity/services/TrustedDeviceManagementService";
-import { TrustedDevicePairingService } from "../../../application/identity/services/TrustedDevicePairingService";
-import { TrustedDeviceSessionTrustService } from "../../../application/identity/services/TrustedDeviceSessionTrustService";
+import { TrustedDeviceManagementService } from "../../application/identity/services/TrustedDeviceManagementService";
+import { TrustedDevicePairingService } from "../../application/identity/services/TrustedDevicePairingService";
+import { TrustedDeviceSessionTrustService } from "../../application/identity/services/TrustedDeviceSessionTrustService";
 import { ListTrustedDevicesUseCase } from "../../application/identity/use-cases/ListTrustedDevicesUseCase";
 import { GetTrustedDeviceUseCase } from "../../application/identity/use-cases/GetTrustedDeviceUseCase";
 import { RevokeTrustedDeviceUseCase } from "../../application/identity/use-cases/RevokeTrustedDeviceUseCase";
@@ -190,7 +190,7 @@ import {
   type IdentityHttpServerFactory,
   type IdentityHttpServerLogger,
 } from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
-import type { IdentitySessionLifecyclePolicies } from "../../../application/identity/services/IdentitySessionLifecycleService";
+import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
 import type { AuthProvider, CredentialPolicy } from "../../domain/identity/IdentityDomain";
 import type {
   EvaluateTransportConnectionPolicyRequest,

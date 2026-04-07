@@ -10,7 +10,7 @@ import { ContextNavigationService } from "../routes/ContextNavigation";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
 import ContextNavigationBar from "../components/navigation/ContextNavigationBar";
 import CommandPalette from "../components/navigation/CommandPalette";

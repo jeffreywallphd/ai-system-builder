@@ -2,7 +2,7 @@ import { ReferenceImageSystemTemplate } from "../../application/system-studio/Re
 import { createDefaultUiTriggerSystemContextMapper } from "../../application/workflow-studio/UiTriggerSystemContextMapper";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../../application/workflow-studio/SystemContextWorkflowInputMapper";
 import { createUiTriggerEvent } from "../../application/workflow-studio/UiTriggerEventContract";
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+import type { SystemContextContract } from "../../src/domain/system-studio/SystemContextContract";
 
 export function buildReferenceImageStartRequest(input: {
   readonly studioId: string;

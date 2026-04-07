@@ -8,7 +8,7 @@ import {
   type WorkflowRunStatus,
   type WorkflowRunDiagnosticRecord,
   type WorkflowStepRunRecord,
-} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
 import type {
   WorkflowRunDetailReadModel,
   WorkflowRunDiagnosticReadModel,

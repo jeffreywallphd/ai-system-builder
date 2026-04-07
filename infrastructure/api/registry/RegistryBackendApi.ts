@@ -1,7 +1,7 @@
 import type { CrossStudioRegistryQueryService } from "../../../application/asset-registry/CrossStudioRegistryQueryService";
 import type { RegistryDependencyGraphService, RegistryDependencyTraversalOptions } from "../../../application/asset-registry/RegistryDependencyGraphService";
 import { ListPersistedWorkflowsUseCase } from "../../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../src/domain/asset-registry/RegistryAsset";
 import type { RegistryFilterParams } from "../../../application/asset-registry/RegistryQueryService";
 import {
   ExploreAssetQueryService,

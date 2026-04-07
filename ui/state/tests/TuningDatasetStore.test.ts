@@ -2,9 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { TuningDatasetStore } from "../TuningDatasetStore";
 import { TuningDatasetService } from "../../services/TuningDatasetService";
 import { DefaultTuningDatasetStudioApplicationService } from "../../../application/tuning-datasets/DefaultTuningDatasetStudioApplicationService";
-import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../../domain/tuning-datasets/TuningDatasetServices";
-import { LocalStorageTuningDatasetRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
-import { LocalStorageTuningDatasetVersionRepository } from "../../../infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
+import { BrowserDatasetImportService, DatasetStatisticsService, DatasetWorkflowProgressService, DefaultDatasetDuplicationPolicy, DefaultDatasetPrivacyPolicy, DefaultDatasetReleasePolicy, DefaultDatasetReviewPolicy, DeterministicDatasetSplitService, JsonTuningDatasetExportService, ProviderAgnosticDatasetGenerationService, TaskTypeAwareValidationService } from "../../../src/domain/tuning-datasets/TuningDatasetServices";
+import { LocalStorageTuningDatasetRepository } from "../../../src/infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository";
+import { LocalStorageTuningDatasetVersionRepository } from "../../../src/infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository";
 
 class MemoryStorage {
   private readonly values = new Map<string, string>();

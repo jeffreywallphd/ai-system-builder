@@ -1,4 +1,4 @@
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+import type { SystemContextContract } from "../../src/domain/system-studio/SystemContextContract";
 import type {
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,

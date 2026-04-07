@@ -3,7 +3,7 @@ import {
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "../../../src/domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorUsageContexts,
   type AssetSelectorUsageContext,
@@ -12,7 +12,7 @@ import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "../../../src/domain/taxonomy/CompositionTaxonomy";
 import type { RegistryService } from "../../services/RegistryService";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 

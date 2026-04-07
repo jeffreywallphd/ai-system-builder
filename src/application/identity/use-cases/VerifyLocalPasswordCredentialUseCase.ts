@@ -10,8 +10,8 @@ import {
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
 
 export type VerifyLocalPasswordCredentialErrorCode =
   | typeof IdentityErrorCodes.invalidCredentials

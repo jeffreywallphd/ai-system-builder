@@ -1,4 +1,4 @@
-import { createModelStudioTaxonomy, ModelStudioIdentity } from "../../../domain/model-studio/ModelStudioDomain";
+import { createModelStudioTaxonomy, ModelStudioIdentity } from "../../../src/domain/model-studio/ModelStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

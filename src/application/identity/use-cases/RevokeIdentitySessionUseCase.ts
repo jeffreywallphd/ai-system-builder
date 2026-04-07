@@ -9,7 +9,7 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
-import { type IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { type IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
 
 export type RevokeIdentitySessionErrorCode =
   | typeof IdentityErrorCodes.invalidRequest

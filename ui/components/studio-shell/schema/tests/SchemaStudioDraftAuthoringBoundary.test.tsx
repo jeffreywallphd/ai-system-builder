@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   createEmptySchemaAssetDocument,
   serializeSchemaAssetDocument,
-} from "../../../../../domain/schema-studio/SchemaStudioDomain";
+} from "../../../../../src/domain/schema-studio/SchemaStudioDomain";
 import SchemaStudioDraftAuthoringBoundary from "../SchemaStudioDraftAuthoringBoundary";
 
 describe("SchemaStudioDraftAuthoringBoundary", () => {

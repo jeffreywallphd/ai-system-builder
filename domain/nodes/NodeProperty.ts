@@ -14,8 +14,8 @@ import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../models/interfaces/IModelDependency";
+} from "../../src/domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "../../src/domain/models/interfaces/IModelDependency";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();

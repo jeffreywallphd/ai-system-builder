@@ -2,7 +2,7 @@ import type {
   GetModelTrainingStudioSummaryQuery,
   ModelTrainingStudioSummary,
 } from "../../application/model-training/contracts";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { ModelTrainingJob } from "../../src/domain/model-training/ModelTrainingTypes";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 
 export interface ModelTrainingStoreState {

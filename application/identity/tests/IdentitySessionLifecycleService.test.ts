@@ -17,7 +17,7 @@ import {
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentitySessionRepository } from "../ports/IIdentitySessionRepository";
-import { IdentitySessionLifecycleService } from "../services/IdentitySessionLifecycleService";
+import { IdentitySessionLifecycleService } from "../../../src/application/identity/services/IdentitySessionLifecycleService";
 
 class InMemorySessionLifecycleAdapter implements IIdentitySessionRepository, IIdentityClock, IIdentityIdGenerator {
   private readonly sessions = new Map<string, Session>();

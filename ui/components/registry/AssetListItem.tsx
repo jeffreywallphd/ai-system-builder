@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../src/domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import { StudioEntryService } from "../../routes/StudioRouteMapping";
 import { UxStudioEntryLabelResolver } from "../../taxonomy/UxTaxonomySuppression";

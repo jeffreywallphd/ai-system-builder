@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { DeviceTrustStatuses, createTrustedDevice, createDeviceFingerprint, DeviceFingerprintAlgorithms, DevicePairingMethods, createDeviceTrustMaterialRef, DeviceTrustMaterialKinds } from "../../../src/domain/identity/TrustedDeviceDomain";
 import type { TrustedDevice } from "../../../src/domain/identity/TrustedDeviceDomain";
-import { TrustedDeviceSessionTrustService } from "../services/TrustedDeviceSessionTrustService";
+import { TrustedDeviceSessionTrustService } from "../../../src/application/identity/services/TrustedDeviceSessionTrustService";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
 import { createSession, IdentitySessionAccessChannels } from "../../../src/domain/identity/IdentityDomain";
 import { IdentityErrorCodes, identityFailure, type IdentityMutationOutcome, type IdentityOperationResult, type TrustedDeviceListQuery, type TrustedDeviceLookupByFingerprintQuery, type TrustedDeviceRevocationRequest } from "../../contracts/IdentityApplicationContracts";

@@ -1,4 +1,4 @@
-import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "../../src/domain/taxonomy/CompositionTaxonomy";
 
 export const UxTaxonomyPresentationModes = Object.freeze({
   intentPrimary: "intent-primary",

@@ -1,4 +1,4 @@
-import type { ExecutionContext } from "../../../domain/system-runtime/SystemRuntimeDomain";
+import type { ExecutionContext } from "../../../src/domain/system-runtime/SystemRuntimeDomain";
 import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
 import type { ExternalExecutionEnvironmentRequest } from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";

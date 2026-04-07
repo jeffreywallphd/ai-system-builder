@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowDraftInputSourceTypes } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   type WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKinds,
-} from "../../../../domain/workflow-studio/WorkflowInputBindingDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowInputBindingDomain";
 import { previewWorkflowInputBindings } from "../../../../application/workflow-studio/WorkflowInputBindingPreviewService";
 import {
   AssetSelectorSessionLifecycleStates,

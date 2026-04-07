@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { createPublishablePackage } from "../../../../domain/exchange/PublishablePackage";
-import { createExchangeCatalogEntry } from "../../../../domain/exchange/ExchangeCatalog";
+import { createPublishablePackage } from "../../../../src/domain/exchange/PublishablePackage";
+import { createExchangeCatalogEntry } from "../../../../src/domain/exchange/ExchangeCatalog";
 import {
   toExchangeSdkCatalogEntrySummary,
   toExchangeSdkExportResult,

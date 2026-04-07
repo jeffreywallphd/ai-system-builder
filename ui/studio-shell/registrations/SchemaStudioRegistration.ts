@@ -4,7 +4,7 @@ import {
   createSchemaStudioTaxonomy,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
-} from "../../../domain/schema-studio/SchemaStudioDomain";
+} from "../../../src/domain/schema-studio/SchemaStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

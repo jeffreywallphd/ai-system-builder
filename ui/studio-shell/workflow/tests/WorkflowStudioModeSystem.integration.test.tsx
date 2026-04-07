@@ -9,7 +9,7 @@ import {
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import WorkflowStudioDraftAuthoringBoundary from "../../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { resolveWorkflowStudioModeRoute } from "../WorkflowStudioModeRouting";

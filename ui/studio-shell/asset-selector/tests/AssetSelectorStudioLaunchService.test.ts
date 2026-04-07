@@ -3,7 +3,7 @@ import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../domain/studio-shell/AssetSelectorContract";
+} from "../../../../src/domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorStudioLaunchService } from "../AssetSelectorStudioLaunchService";
 import { InlineAssetCreationService } from "../../../routes/InlineAssetCreation";
 

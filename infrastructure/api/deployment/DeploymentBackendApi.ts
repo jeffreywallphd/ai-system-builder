@@ -11,9 +11,9 @@ import {
   type DeploymentAccessContext,
 } from "../../../application/deployment/DeploymentAccessControl";
 import { DeploymentQuotaExceededError } from "../../../application/deployment/DeploymentQuotaEvaluator";
-import { createDeploymentConfigurationContract } from "../../../domain/deployment/DeploymentConfigurationDomain";
-import { createDeploymentTarget } from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+import { createDeploymentConfigurationContract } from "../../../src/domain/deployment/DeploymentConfigurationDomain";
+import { createDeploymentTarget } from "../../../src/domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage } from "../../../src/domain/system-packaging/SystemPackagingDomain";
 import type {
   DeploymentSdkAccessContext,
   DeploymentSdkDeploymentStatusRequest,

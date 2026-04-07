@@ -6,7 +6,7 @@ import type {
   SystemAssetExportResult,
   SystemAssetImportResult,
 } from "../../../../application/exchange/AssetExportServices";
-import type { ExchangeCatalogEntry } from "../../../../domain/exchange/ExchangeCatalog";
+import type { ExchangeCatalogEntry } from "../../../../src/domain/exchange/ExchangeCatalog";
 import type { PublishPackageResult } from "../../../../application/exchange/ExchangePublishWorkflow";
 import type {
   ExchangeSdkCatalogEntrySummary,

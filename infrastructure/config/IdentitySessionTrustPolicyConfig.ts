@@ -3,7 +3,7 @@ import {
   IdentitySessionTrustRequirements,
   type IdentitySessionTrustRequirement,
 } from "../../application/identity/ports/IIdentitySessionTrustService";
-import type { TrustedDeviceSessionTrustPolicies } from "../../application/identity/services/TrustedDeviceSessionTrustService";
+import type { TrustedDeviceSessionTrustPolicies } from "../../src/application/identity/services/TrustedDeviceSessionTrustService";
 
 export interface IdentitySessionTrustPolicyConfigValues {
   readonly desktop?: IdentitySessionTrustRequirement;

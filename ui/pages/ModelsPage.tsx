@@ -4,7 +4,7 @@ import ModelBrowser from "../components/models/ModelBrowser";
 import PageTabs from "../components/navigation/PageTabs";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
-import { Model, ModelArtifact } from "../../domain/models/Model";
+import { Model, ModelArtifact } from "../../src/domain/models/Model";
 import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
 import { formatBytes } from "../presenters/PresenterFormatting";
 import { ROUTE_PATHS } from "../routes/RouteConfig";

@@ -32,9 +32,9 @@ import type { IIdentityIdGenerator } from "../../../../application/identity/port
 import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
-import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
-import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
+import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
 import {
   runInTransactionBoundary,
   type IPlatformTransactionManager,

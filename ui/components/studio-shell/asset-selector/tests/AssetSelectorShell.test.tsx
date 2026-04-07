@@ -5,7 +5,7 @@ import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../../domain/studio-shell/AssetSelectorContract";
+} from "../../../../../src/domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,

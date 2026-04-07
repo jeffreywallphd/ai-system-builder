@@ -11,8 +11,8 @@ import {
   describeIdentityProvider,
   providerSupportsAuthenticator,
   validateIdentityProvider,
-} from "../services/IdentityProviderCatalog";
-import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
+} from "../../../src/application/identity/services/IdentityProviderCatalog";
+import { LocalPasswordIdentityAuthenticator } from "../../../src/application/identity/services/LocalPasswordIdentityAuthenticator";
 
 class StubLocalPasswordCredentialService implements ILocalPasswordCredentialService {
   public normalizePassword(candidate: string): string {

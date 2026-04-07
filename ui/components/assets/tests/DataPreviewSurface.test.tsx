@@ -8,7 +8,7 @@ import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   createCanonicalTextItemsShape,
-} from "../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "../../../../src/domain/dataset-studio/CanonicalDataShapes";
 
 describe("DataPreviewSurface", () => {
   it("renders records/table/text/image previews", () => {

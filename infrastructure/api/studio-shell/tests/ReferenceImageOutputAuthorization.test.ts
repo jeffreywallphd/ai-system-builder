@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
+import { InMemoryStudioShellRepository } from "../../../../src/infrastructure/studio-shell/InMemoryStudioShellRepository";
 import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
 import { AuthorizationPolicyDecisionEvaluator } from "../../../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import type {

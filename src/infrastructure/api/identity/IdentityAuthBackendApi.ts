@@ -106,7 +106,7 @@ import {
   type TrustedDeviceAdministrativeAuthorizationPolicy,
 } from "../../../application/identity/use-cases/TrustedDeviceAdministrativeAuthorization";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
-import { IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import {
   IdentitySessionTrustRequirements,
   type IIdentitySessionTrustService,

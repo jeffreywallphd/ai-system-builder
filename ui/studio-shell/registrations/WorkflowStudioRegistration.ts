@@ -4,7 +4,7 @@ import {
   createWorkflowStudioTaxonomy,
   serializeWorkflowDraft,
   WorkflowStudioIdentity,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import WorkflowStudioRunHistoryPanel from "../../components/studio-shell/workflow/WorkflowStudioRunHistoryPanel";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { ModelCompatibility } from "../../models/ModelCompatibility";
-import { ModelDependency } from "../../models/ModelDependency";
+import { ModelCompatibility } from "../../../src/domain/models/ModelCompatibility";
+import { ModelDependency } from "../../../src/domain/models/ModelDependency";
 import { NodePort, NodePortCompatibilityProfile } from "../NodePort";
 
 describe("NodePort*", () => {

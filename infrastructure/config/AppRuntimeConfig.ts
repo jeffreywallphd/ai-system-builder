@@ -1,14 +1,14 @@
 import {
   isProductionRuntimeMode,
   type AppRuntimeMode,
-} from "../../domain/runtime/AppRuntimeMode";
+} from "../../src/domain/runtime/AppRuntimeMode";
 import {
   getAppRuntimeProfile,
   type AppDistributionTarget,
   type AppHostKind,
   type AppLifecycleStage,
   type RendererDeliveryMode,
-} from "../../domain/runtime/AppRuntimeProfile";
+} from "../../src/domain/runtime/AppRuntimeProfile";
 import type { DesktopPythonRuntimeInfo, DesktopStoragePaths } from "../../electron/shared/DesktopContracts";
 
 export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";

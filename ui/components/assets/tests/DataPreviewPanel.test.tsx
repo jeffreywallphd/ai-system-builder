@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createCanonicalRecordsShape } from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../../../domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalRecordsShape } from "../../../../src/domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "../../../../src/domain/dataset-studio/CanonicalDataAsset";
 import { DefaultDataAssetExecutionFramework } from "../../../../application/dataset-studio/DataAssetExecutionFramework";
 import DataPreviewPanel from "../DataPreviewPanel";
 

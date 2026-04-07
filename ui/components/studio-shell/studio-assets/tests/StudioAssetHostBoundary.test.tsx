@@ -14,7 +14,7 @@ import {
   StudioUiAssetKinds,
   type StudioAssetDefinition,
 } from "../../../../studio-shell/studio-assets/StudioAssetContracts";
-import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellExtensionContext } from "../../../../studio-shell/StudioShellExtensions";
 import {
   StudioEmbeddedIntentKinds,

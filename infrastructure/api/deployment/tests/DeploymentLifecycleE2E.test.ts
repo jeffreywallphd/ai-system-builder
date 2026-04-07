@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetDraft, AssetSession } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+import type { Studio, AssetDraft, AssetSession } from "../../../../src/domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
 import { SystemPackagingService } from "../../../../application/system-packaging/SystemPackagingService";
 import { DeploymentTargetSelector } from "../../../../application/deployment/DeploymentTargetSelector";
 import { DeploymentConfigurationValidator } from "../../../../application/deployment/DeploymentConfigurationValidator";
@@ -17,12 +17,12 @@ import {
 import {
   createDeploymentConfigurationContract,
   type DeploymentConfigurationContract,
-} from "../../../../domain/deployment/DeploymentConfigurationDomain";
+} from "../../../../src/domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
   type DeploymentTarget,
-} from "../../../../domain/deployment/DeploymentTargetDomain";
+} from "../../../../src/domain/deployment/DeploymentTargetDomain";
 import { DeploymentVersionManager } from "../../../../application/deployment/DeploymentVersionManager";
 import {
   DeploymentRollbackService,
@@ -53,13 +53,13 @@ import {
 import {
   DeploymentAuditEventKinds,
   type DeploymentAuditRecord,
-} from "../../../../domain/deployment/DeploymentAuditTrailDomain";
+} from "../../../../src/domain/deployment/DeploymentAuditTrailDomain";
 import {
   type EnvironmentProvisioningInterface,
   EnvironmentProvisioningStatuses,
-} from "../../../../domain/deployment/EnvironmentProvisioningDomain";
+} from "../../../../src/domain/deployment/EnvironmentProvisioningDomain";
 import { EnvironmentProvisioningService } from "../../../../application/deployment/EnvironmentProvisioningService";
-import { createSystemPackage } from "../../../../domain/system-packaging/SystemPackagingDomain";
+import { createSystemPackage } from "../../../../src/domain/system-packaging/SystemPackagingDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();

@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../../src/domain/workflows/interfaces/IWorkflow";
 import type { ContextPreviewResult } from "../../../application/context/models/ContextPreview";
 import ContextBudgetPanel from "./ContextBudgetPanel";
 import ContextPreviewPanel from "./ContextPreviewPanel";

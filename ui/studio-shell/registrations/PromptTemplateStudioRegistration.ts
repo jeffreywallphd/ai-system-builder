@@ -1,7 +1,7 @@
 import {
   createPromptTemplateStudioTaxonomy,
   PromptTemplateStudioIdentity,
-} from "../../../domain/prompt-template-studio/PromptTemplateStudioDomain";
+} from "../../../src/domain/prompt-template-studio/PromptTemplateStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

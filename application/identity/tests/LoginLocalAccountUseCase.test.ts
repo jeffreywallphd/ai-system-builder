@@ -37,8 +37,8 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
-import { IdentityPolicyService } from "../services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
+import { IdentityPolicyService } from "../../../src/application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../../../src/application/identity/services/LocalPasswordIdentityAuthenticator";
 import { LoginLocalAccountUseCase } from "../../../src/application/identity/use-cases/LoginLocalAccountUseCase";
 
 class InMemoryLoginAdapter implements IIdentityLookupRepository, ICredentialMaterialRepository, IIdentityClock {

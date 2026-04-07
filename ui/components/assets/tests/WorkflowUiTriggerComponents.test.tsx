@@ -4,7 +4,7 @@ import {
   serializeWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   createUiTriggerEvent,
   UiTriggerEventKinds,

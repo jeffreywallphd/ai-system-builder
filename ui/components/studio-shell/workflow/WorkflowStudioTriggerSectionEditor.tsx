@@ -12,7 +12,7 @@ import {
   type WorkflowDraftTrigger,
   type WorkflowDraftUserTrigger,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   canMoveWorkflowTrigger,

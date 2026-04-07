@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
+import { InMemoryStudioShellRepository } from "../../../../src/infrastructure/studio-shell/InMemoryStudioShellRepository";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { ComfyImageManipulationBaseGraph } from "../../../../application/system-studio/ComfyImageManipulationBaseGraph";
 import {

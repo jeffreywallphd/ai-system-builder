@@ -6,11 +6,11 @@ import type { DesktopStudioShellBridge } from "../../../electron/shared/DesktopC
 import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteSystemRuntimeExecutionStore } from "../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
-import { InMemoryStudioShellRepository } from "../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { InMemoryWorkflowPersistenceRepository } from "../../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
-import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
+import { SqliteStudioShellRepository } from "../../../src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteSystemRuntimeExecutionStore } from "../../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { InMemoryStudioShellRepository } from "../../../src/infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "../../../src/infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
+import { AssetDraftLifecycleStatuses } from "../../../src/domain/studio-shell/StudioShellDomain";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -19,16 +19,16 @@ import {
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellService } from "../StudioShellService";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
-import { InMemoryWorkflowRunSummaryRepository } from "../../../infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "../../../src/infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
 
 const createdRoots: string[] = [];
 

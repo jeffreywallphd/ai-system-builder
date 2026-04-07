@@ -1,22 +1,22 @@
 import { useEffect, useState } from "react";
-import type { AgentGoalPriorityLevel } from "../../../domain/agents/AgentGoal";
+import type { AgentGoalPriorityLevel } from "../../../src/domain/agents/AgentGoal";
 import {
   AgentPlanningStrategyModes,
   SupportedAgentPlanningStrategies,
   type AgentPlanningStrategy,
-} from "../../../domain/agents/Agent";
+} from "../../../src/domain/agents/Agent";
 import {
   AgentMemoryRetentionModes,
   AgentMemoryRetrievalStrategies,
   AgentMemoryTypes,
   type AgentMemoryConfiguration,
   type AgentMemoryType,
-} from "../../../domain/agents/AgentMemory";
+} from "../../../src/domain/agents/AgentMemory";
 import {
   AgentApprovalStatuses,
   type AgentPolicy,
   type AgentToolAccessPolicy,
-} from "../../../domain/agents/AgentPolicy";
+} from "../../../src/domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
 import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";

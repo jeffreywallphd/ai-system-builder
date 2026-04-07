@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
 import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
 import type {
   IWorkflowExecutionEvent,
@@ -7,7 +7,7 @@ import type {
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
-} from "../../domain/services/interfaces/IWorkflowValidator";
+} from "../../src/domain/services/interfaces/IWorkflowValidator";
 import {
   CreateWorkflowUseCase,
   type ICreateWorkflowRequest,

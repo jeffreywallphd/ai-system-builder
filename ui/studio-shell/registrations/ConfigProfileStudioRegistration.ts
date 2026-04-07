@@ -1,7 +1,7 @@
 import {
   ConfigProfileStudioIdentity,
   createConfigProfileStudioTaxonomy,
-} from "../../../domain/config-profile-studio/ConfigProfileStudioDomain";
+} from "../../../src/domain/config-profile-studio/ConfigProfileStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

@@ -2,7 +2,7 @@ import { IdentitySessionAccessChannels } from "../../src/domain/identity/Identit
 import type {
   IdentitySessionLifecyclePolicies,
   IdentitySessionLifecyclePolicy,
-} from "../../application/identity/services/IdentitySessionLifecycleService";
+} from "../../src/application/identity/services/IdentitySessionLifecycleService";
 
 export interface IdentitySessionPolicyConfigValues {
   readonly desktop?: Partial<IdentitySessionLifecyclePolicy>;

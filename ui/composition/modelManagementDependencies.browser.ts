@@ -2,10 +2,10 @@ import type { IInstalledModelCatalog } from "../../application/ports/interfaces/
 import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import type { IModelDownloader } from "../../application/ports/interfaces/IModelDownloader";
 import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
-import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
-import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
-import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
-import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
+import { BrowserDownloadModelLibrary } from "../../src/infrastructure/browser/models/BrowserDownloadModelLibrary";
+import { BrowserHuggingFaceModelDownloader } from "../../src/infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
+import { LocalStorageInstalledModelCatalog } from "../../src/infrastructure/browser/models/LocalStorageInstalledModelCatalog";
+import { HuggingFaceApiClient } from "../../src/infrastructure/huggingface/HuggingFaceApiClient";
 
 export interface ModelManagementDependencies {
   readonly fileStorage?: undefined;

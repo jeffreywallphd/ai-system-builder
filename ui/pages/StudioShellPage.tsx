@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../src/domain/studio-shell/StudioShellDomain";
 import type {
   DataStudioExecutionReadinessReadModel,
   RunDataStudioPipelineReadModel,
@@ -68,7 +68,7 @@ import {
   InlineAssetReturnStatuses,
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
-import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import { createWorkflowAssetMetadata } from "../../src/domain/workflow-studio/WorkflowStudioDomain";
 import { DataStudioWizardPersistenceStorageKey } from "../studio-shell/data/DataStudioPreparationWizardStateAdapter";
 import {
   createStudioHostContext,

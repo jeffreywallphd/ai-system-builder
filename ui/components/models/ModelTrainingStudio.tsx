@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ModelCreationPathSupport, ModelCreationSupportState } from "../../../domain/model-training/ModelCreationSupport";
+import type { ModelCreationPathSupport, ModelCreationSupportState } from "../../../src/domain/model-training/ModelCreationSupport";
 import type { ModelTrainingJobStudioSummary } from "../../../application/model-training/contracts";
 import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
 import type { ModelTrainingStore, ModelTrainingStoreState } from "../../state/ModelTrainingStore";

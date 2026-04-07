@@ -13,8 +13,8 @@ import { ListContextRecipesUseCase } from "../../../application/context/ListCont
 import { LoadContextPackageUseCase } from "../../../application/context/LoadContextPackageUseCase";
 import { LoadContextRecipeUseCase } from "../../../application/context/LoadContextRecipeUseCase";
 import { SearchContextPackagesUseCase } from "../../../application/context/SearchContextPackagesUseCase";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { InMemoryContextPackageRepository } from "../../../src/infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "../../../src/infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 function createStore(): ContextStore {
   const repository = new InMemoryContextPackageRepository();

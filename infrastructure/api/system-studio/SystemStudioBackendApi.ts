@@ -1,5 +1,5 @@
-import type { SystemComponentReference, SystemExecutionMetadata } from "../../../domain/system-studio/SystemAssetDomain";
-import { SystemStudioIdentity } from "../../../domain/system-studio/SystemAssetDomain";
+import type { SystemComponentReference, SystemExecutionMetadata } from "../../../src/domain/system-studio/SystemAssetDomain";
+import { SystemStudioIdentity } from "../../../src/domain/system-studio/SystemAssetDomain";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import {

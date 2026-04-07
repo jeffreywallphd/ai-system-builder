@@ -36,8 +36,8 @@ import type { IIdentityLookupRepository } from "../ports/IIdentityLookupReposito
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
 import type { ILocalPasswordCredentialService } from "../ports/ILocalPasswordCredentialService";
-import { IdentityPolicyService } from "../services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../services/LocalPasswordIdentityAuthenticator";
+import { IdentityPolicyService } from "../../../src/application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "../../../src/application/identity/services/LocalPasswordIdentityAuthenticator";
 import { RegisterLocalAccountUseCase } from "../../../src/application/identity/use-cases/RegisterLocalAccountUseCase";
 import type { IPlatformTransactionManager } from "../../../src/application/common/ports/PlatformTransactionPorts";
 

@@ -8,7 +8,7 @@ import type {
   ExampleStatus,
   ExportFormat,
   SplitType,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { DatasetDetails, DatasetSummary, StudioExample } from "../../application/tuning-datasets/contracts";
 import { buildDatasetWorkflowWizard } from "../../application/tuning-datasets/buildDatasetWorkflowWizard";
 import type { LinearWizardDefinition } from "../../application/wizards/contracts";
@@ -25,7 +25,7 @@ export interface TuningDatasetStoreState {
   readonly validation?: DatasetValidationResult;
   readonly statistics?: DatasetStatistics;
   readonly exports: ReadonlyArray<DatasetExportArtifact>;
-  readonly generationBatches: ReadonlyArray<import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetGenerationBatch>;
+  readonly generationBatches: ReadonlyArray<import("../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetGenerationBatch>;
   readonly duplicates: ReadonlyArray<{ readonly fingerprint: string; readonly exampleIds: ReadonlyArray<string> }>;
   readonly workflow?: DatasetWorkflowState;
   readonly wizard: LinearWizardDefinition<DatasetWorkflowStage>;
@@ -165,7 +165,7 @@ export class TuningDatasetStore {
     }
   }
 
-  public async createDataset(params: { name: string; description?: string; taskType: import("../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetTaskType; tags?: ReadonlyArray<string>; createdBy: string }): Promise<void> {
+  public async createDataset(params: { name: string; description?: string; taskType: import("../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetTaskType; tags?: ReadonlyArray<string>; createdBy: string }): Promise<void> {
     this.patch({ isMutating: true, error: undefined });
     try {
       const details = await this.service.createDataset({ ...params, initializeVersion: true });

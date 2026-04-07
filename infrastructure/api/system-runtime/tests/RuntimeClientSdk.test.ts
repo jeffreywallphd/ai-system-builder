@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "../../../../src/domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
 import { RuntimeAccessControlService } from "../../../../application/system-runtime/RuntimeAccessControlService";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";

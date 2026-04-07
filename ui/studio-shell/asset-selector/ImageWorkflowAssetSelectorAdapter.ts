@@ -3,12 +3,12 @@ import {
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "../../../src/domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorUsageContexts,
   type AssetSelectorUsageContext,
 } from "../../../application/studio-entry/AssetSelectorCapabilityRegistry";
-import { TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
+import { TaxonomySemanticRoles } from "../../../src/domain/taxonomy/CompositionTaxonomy";
 import {
   createDefaultImageWorkflowAssetRegistry,
   type ImageWorkflowAssetRegistry,

@@ -11,7 +11,7 @@ import { ReferenceImageSystemTemplate } from "../../../application/system-studio
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
 import type { ReferenceImageDatasetBindingId } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
+import type { FileIngestionPolicy } from "../../../src/domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import { ImageGallerySlider } from "../assets/image-system/ImageGallerySlider";

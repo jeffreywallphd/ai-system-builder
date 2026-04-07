@@ -6,7 +6,7 @@ import {
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
 
 describe("RegistryService", () => {
   const previousBridge = typeof window === "undefined" ? undefined : window.aiLoomDesktop;

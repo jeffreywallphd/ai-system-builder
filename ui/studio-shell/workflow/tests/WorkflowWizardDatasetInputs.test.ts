@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   applyInlineDatasetReturnToDraft,
   listDatasetInputs,

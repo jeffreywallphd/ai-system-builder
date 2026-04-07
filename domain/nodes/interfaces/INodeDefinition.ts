@@ -1,8 +1,8 @@
 import type { INode } from "./INode";
 import type { INodePort } from "./INodePort";
 import type { INodeProperty } from "./INodeProperty";
-import type { IModelCompatibility, ModelTask, RuntimeEngine } from "../../models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../models/interfaces/IModelDependency";
+import type { IModelCompatibility, ModelTask, RuntimeEngine } from "../../../src/domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "../../../src/domain/models/interfaces/IModelDependency";
 
 export type NodeExecutionKind =
   | "source"

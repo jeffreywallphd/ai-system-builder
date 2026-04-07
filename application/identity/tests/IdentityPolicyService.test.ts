@@ -5,7 +5,7 @@ import {
   createCredentialPolicy,
   createUserIdentity,
 } from "../../../src/domain/identity/IdentityDomain";
-import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { IdentityPolicyService } from "../../../src/application/identity/services/IdentityPolicyService";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type {
   IdentityPrincipalLookup,

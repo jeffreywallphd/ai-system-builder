@@ -1,6 +1,6 @@
 import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+import type { AssetVersion } from "../../src/domain/assets/AssetVersion";
+import type { AssetLineageEdge } from "../../src/domain/assets/AssetLineageEdge";
 import type { DesktopRegistryBridge } from "../../electron/shared/DesktopContracts";
 import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";

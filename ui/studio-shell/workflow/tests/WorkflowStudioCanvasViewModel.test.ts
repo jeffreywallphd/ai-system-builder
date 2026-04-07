@@ -4,7 +4,7 @@ import {
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   applyWorkflowCanvasConnection,
   applyWorkflowCanvasEdgeReconnect,

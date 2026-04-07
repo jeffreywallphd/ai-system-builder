@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
-import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../src/domain/studio-shell/StudioShellDomain";
+import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../src/domain/taxonomy/CompositionTaxonomy";
 import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
 import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";

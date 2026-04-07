@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
-import { AssetId } from "../../domain/assets/AssetId";
-import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
-import type { AgentPolicy, AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
+import type { AgentMemoryConfiguration } from "../../src/domain/agents/AgentMemory";
+import { AssetId } from "../../src/domain/assets/AssetId";
+import type { AgentPlanningStrategy } from "../../src/domain/agents/Agent";
+import type { AgentPolicy, AgentToolAccessPolicy } from "../../src/domain/agents/AgentPolicy";
 import type {
   AgentLaunchReadModel,
   AgentRunControlAction,

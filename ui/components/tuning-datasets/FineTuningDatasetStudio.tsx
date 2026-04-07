@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type SplitType } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type SplitType } from "../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import { buildDatasetWorkflowWizard } from "../../../application/tuning-datasets/buildDatasetWorkflowWizard";
-import { ChatCompletionExample, QuestionAnsweringExample } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+import { ChatCompletionExample, QuestionAnsweringExample } from "../../../src/domain/tuning-datasets/TuningDatasetEntities";
 import { useUiDependencies } from "../../composition/AppProviders";
 import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
 import LinearWizard from "../wizard/LinearWizard";

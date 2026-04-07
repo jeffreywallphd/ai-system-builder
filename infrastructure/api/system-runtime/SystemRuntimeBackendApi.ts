@@ -45,13 +45,13 @@ import {
   transitionExecutionSession,
   type ExecutionSession,
   type ExecutionSessionContext,
-} from "../../../domain/system-runtime/ExecutionSessionDomain";
+} from "../../../src/domain/system-runtime/ExecutionSessionDomain";
 import {
   ExecutionCallbackEventKinds,
   type ExecutionCallbackEventKind,
   type ExecutionCallbackRegistration,
-} from "../../../domain/system-runtime/ExecutionCallbackDomain";
-import type { RuntimeEnvironment } from "../../../domain/system-runtime/RuntimeEnvironmentDomain";
+} from "../../../src/domain/system-runtime/ExecutionCallbackDomain";
+import type { RuntimeEnvironment } from "../../../src/domain/system-runtime/RuntimeEnvironmentDomain";
 import {
   ExecutionUpdateEventKinds,
   ExecutionUpdateStream,
@@ -63,7 +63,7 @@ import {
   type ExecutionCallbackDispatcher,
   type ExecutionCallbackPayload,
 } from "./ExecutionCallbackDispatcher";
-import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "../../../src/domain/system-runtime/ExecutionAuditTrailDomain";
 import type { RetryAttemptRecord } from "./ExternalRetryPolicy";
 import { ExecutionAuditTrailService } from "../../../application/system-runtime/ExecutionAuditTrailService";
 import {

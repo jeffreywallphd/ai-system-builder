@@ -2,7 +2,7 @@ import type {
   IWorkflowValidationMessage,
   IWorkflowValidationResult,
   WorkflowValidationSeverity,
-} from "../../domain/services/interfaces/IWorkflowValidator";
+} from "../../src/domain/services/interfaces/IWorkflowValidator";
 
 export interface ValidationBadgeViewModel {
   readonly severity: WorkflowValidationSeverity;

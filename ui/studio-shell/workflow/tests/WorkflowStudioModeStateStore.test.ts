@@ -4,7 +4,7 @@ import {
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowValidationIssueCodes,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   clearWorkflowStudioModeStateStoresForTests,
   getWorkflowStudioModeStateStore,

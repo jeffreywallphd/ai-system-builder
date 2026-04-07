@@ -1,5 +1,5 @@
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../../src/domain/contracts/AssetContract";
+import type { CompositionTaxonomyDescriptor } from "../../../src/domain/taxonomy/CompositionTaxonomy";
 
 interface CompositionSummaryCardProps {
   readonly title: string;

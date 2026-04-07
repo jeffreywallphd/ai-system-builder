@@ -3,7 +3,7 @@ import {
   ReferenceImageExecutionFlowService,
   createReferenceImageOutputPersistenceRequest,
 } from "../ReferenceImageExecutionFlowService";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import { createSystemContextContract } from "../../../src/domain/system-studio/SystemContextContract";
 
 describe("ReferenceImageExecutionFlowService", () => {
   it("emits plain-language step status across trigger, execution, save, and refresh", async () => {

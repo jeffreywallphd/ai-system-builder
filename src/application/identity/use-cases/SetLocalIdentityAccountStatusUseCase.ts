@@ -23,8 +23,8 @@ import type { IIdentityLifecycleEventPublisher } from "../../../../application/i
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
-import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
-import type { IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
+import type { IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
 import type { IdentityAdministrativeActionContext } from "./IdentityAdministrativeContext";
 
 export interface SetLocalIdentityAccountStatusInput {

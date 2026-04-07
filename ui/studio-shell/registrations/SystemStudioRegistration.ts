@@ -1,7 +1,7 @@
 import {
   createSystemStudioTaxonomy,
   SystemStudioIdentity,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "../../../src/domain/system-studio/SystemAssetDomain";
 import { createElement } from "react";
 import { SystemCompatibilityInsightsPanel } from "../../components/studio-shell/SystemCompatibilityInsightsPanel";
 import { SystemRuntimeRunPanel } from "../../components/studio-shell/SystemRuntimeRunPanel";

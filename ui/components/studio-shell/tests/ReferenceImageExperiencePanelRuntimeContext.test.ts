@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../../domain/system-studio/SystemContextContract";
+import { createSystemContextContract } from "../../../../src/domain/system-studio/SystemContextContract";
 import {
   persistReferenceImageRuntimeContext,
   readStoredReferenceImageRuntimeContext,

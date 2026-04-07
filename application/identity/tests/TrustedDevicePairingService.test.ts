@@ -36,13 +36,13 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { ITrustedDevicePairingRepository } from "../ports/ITrustedDevicePairingRepository";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
-import { TrustedDevicePairingService } from "../services/TrustedDevicePairingService";
+import { TrustedDevicePairingService } from "../../../src/application/identity/services/TrustedDevicePairingService";
 import {
   mapPairingSessionRecord,
   mapPairingTokenRecord,
   mapSessionRecordToDomain,
   mapTokenRecordToDomain,
-} from "../services/TrustedDeviceServiceMappers";
+} from "../../../src/application/identity/services/TrustedDeviceServiceMappers";
 
 class FixedClock implements IIdentityClock {
   private current = new Date("2026-04-04T12:00:00.000Z");

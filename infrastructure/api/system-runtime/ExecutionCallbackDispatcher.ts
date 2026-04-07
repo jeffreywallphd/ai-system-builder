@@ -2,7 +2,7 @@ import type {
   ExecutionCallbackDeliveryResult,
   ExecutionCallbackEventKind,
   ExecutionCallbackRegistration,
-} from "../../../domain/system-runtime/ExecutionCallbackDomain";
+} from "../../../src/domain/system-runtime/ExecutionCallbackDomain";
 
 export interface ExecutionCallbackPayload {
   readonly callbackId: string;

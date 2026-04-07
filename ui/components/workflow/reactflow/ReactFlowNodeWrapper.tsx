@@ -7,7 +7,7 @@ import { ROUTE_PATHS } from "../../../routes/RouteConfig";
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
-} from "../../../../application/nodes/NodeCanvasLayoutMetrics";
+} from "../../../../src/application/nodes/NodeCanvasLayoutMetrics";
 
 const inputHandleStyle: React.CSSProperties = {
   top: "50%",

@@ -3,7 +3,7 @@ import {
   type WorkflowDraft,
   type WorkflowDraftOutput,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";

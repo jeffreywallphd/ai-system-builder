@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import type { WorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
   validateWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioModeId } from "../../../studio-shell/workflow/WorkflowStudioModes";
 import WorkflowStudioCanvasExperienceSurface from "./WorkflowStudioCanvasExperienceSurface";
 import WorkflowStudioWizardExperienceSurface from "./WorkflowStudioWizardExperienceSurface";
 import type { WorkflowStudioModeValidationIssue } from "../../../studio-shell/workflow/WorkflowStudioModeValidation";
-import type { WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowValidationIssue } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioWizardPageId } from "../../../studio-shell/workflow/WorkflowStudioWizardRouting";
 import type { WorkflowStudioHandoffStatus } from "../../../studio-shell/workflow/WorkflowStudioHandoffStatus";
 import { ExperienceAssetModeIds, type ExperienceAssetDefinition, type ExperienceAssetModeDefinition } from "../../../studio-shell/experience-assets/ExperienceAssetContracts";

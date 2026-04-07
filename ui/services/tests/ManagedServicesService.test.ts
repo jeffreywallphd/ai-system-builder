@@ -7,7 +7,7 @@ import {
   ManagedServiceSources,
   ManagedServiceTransports,
 } from "../../../application/services/ManagedServiceDefinition";
-import { createPythonRuntimeServiceDefinition } from "../../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { createPythonRuntimeServiceDefinition } from "../../../src/infrastructure/python/runtime/PythonRuntimeServiceDefinition";
 import { PythonRuntimeConfig } from "../../../infrastructure/config/PythonRuntimeConfig";
 import {
   ManagedServiceKinds,

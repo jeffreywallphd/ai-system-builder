@@ -20,7 +20,7 @@ import type {
 import type { ChangeLocalPasswordCredentialResult } from "../../../application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
 import type { LocalIdentityAccountSummary } from "../../../application/identity/use-cases/ListLocalIdentityAccountsUseCase";
 import type { SetLocalIdentityAccountStatusResult } from "../../../application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
-import type { IssueAuthenticatedSessionResult } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import type { IssueAuthenticatedSessionResult } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
 import type { LoginLocalAccountResult } from "../../../application/identity/use-cases/LoginLocalAccountUseCase";
 import type { SessionDeviceTrustContext } from "../../../domain/identity/IdentityDomain";
 import type {

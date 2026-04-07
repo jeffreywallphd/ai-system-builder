@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+import type { IModel } from "../../src/domain/models/interfaces/IModel";
 import type { NodePropertyFieldViewModel } from "../presenters/NodePresenter";
 import { formatBytes } from "../presenters/PresenterFormatting";
 

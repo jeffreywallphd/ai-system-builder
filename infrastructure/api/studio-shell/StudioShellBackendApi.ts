@@ -3,7 +3,7 @@ import {
   type AssetDraftLifecycleStatus,
   type AssetMetadata,
   type AssetMetadataPatch,
-} from "../../../domain/studio-shell/StudioShellDomain";
+} from "../../../src/domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
 import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
@@ -41,7 +41,7 @@ import {
   WorkflowPersistenceErrorCodes,
   WorkflowPersistenceInvalidRequestError,
 } from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
-import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
@@ -58,7 +58,7 @@ import {
   type WorkflowRunStatus,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
 import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
 import type {
   RunWorkflowDraftManualResult,
@@ -78,9 +78,9 @@ import {
   parseDataStudioPipelineVersionMetadata,
   type DataStudioPipelineVersionSummary,
 } from "../../../application/data-studio/DataStudioPipelineVersioning";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { AssetVersion } from "../../../src/domain/assets/AssetVersion";
 import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
-import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
+import { DataStudioPipelineExecutionUnitHandler } from "../../../src/infrastructure/execution/DataStudioPipelineExecutionUnitHandler";
 import {
   buildReferenceImageDatasetInstanceRequests,
   ReferenceImageSystemTemplate,
@@ -106,7 +106,7 @@ import {
 import type { StorageAttachmentOwnerKind, StorageInstanceMetadata } from "../../../application/system-runtime/StorageInstanceMetadataModel";
 import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "../../../application/system-runtime/DatasetInstanceAssetCatalog";
 import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
-import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DatasetSchemaIntentIds } from "../../../src/domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { createDefaultMediaAdapterBundle } from "../../../application/dataset-studio/adapters/media/MediaAdapterFactory";
 import { WorkflowOutputMaterializationService } from "../../../application/system-runtime/WorkflowOutputMaterializationService";
 import {
@@ -126,9 +126,9 @@ import {
   InMemoryImageRunHistoryRepository,
   type ImageRunHistoryRepository,
 } from "../../../application/system-runtime/ImageRunHistoryRepository";
-import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
-import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import type { DatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
+import { ComfyExecutionResultMaterializationMapper } from "../../../src/infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
+import type { SystemContextContract } from "../../../src/domain/system-studio/SystemContextContract";
+import type { DatasetInstance } from "../../../src/domain/system-runtime/DatasetInstanceDomain";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../../../src/application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationResourceFamilies } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";

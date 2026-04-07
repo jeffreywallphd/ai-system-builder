@@ -1,4 +1,4 @@
-import type { AssetSelectorAssetReference, AssetSelectorRequest } from "../../../domain/studio-shell/AssetSelectorContract";
+import type { AssetSelectorAssetReference, AssetSelectorRequest } from "../../../src/domain/studio-shell/AssetSelectorContract";
 
 export interface AssetSelectorResultItem {
   readonly id: string;

@@ -1,7 +1,7 @@
 import type { INodeDefinition } from "./INodeDefinition";
 import type { INodePort } from "./INodePort";
 import type { INodeProperty, INodePropertyValidationResult } from "./INodeProperty";
-import type { IModelCompatibility, ModelTask, RuntimeEngine } from "../../models/interfaces/IModelCompatibility";
+import type { IModelCompatibility, ModelTask, RuntimeEngine } from "../../../src/domain/models/interfaces/IModelCompatibility";
 
 export interface INodePosition {
   readonly x: number;

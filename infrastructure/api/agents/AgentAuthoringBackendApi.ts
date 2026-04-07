@@ -1,6 +1,6 @@
-import type { Agent, AgentReadModel } from "../../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../../domain/agents/AgentPolicy";
+import type { Agent, AgentReadModel } from "../../../src/domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "../../../src/domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "../../../src/domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
 import { CreateAgentUseCase, type CreateAgentRequest } from "../../../application/agents/CreateAgentUseCase";
 import { UpdateAgentUseCase, type UpdateAgentRequest } from "../../../application/agents/UpdateAgentUseCase";
@@ -22,9 +22,9 @@ import {
   type AgentConfigurationValidationResult,
 } from "../../../application/agents/services/AgentConfigurationValidationService";
 import { AgentConfigurationValidationError } from "../../../application/agents/services/AgentConfigurationValidationError";
-import type { AgentPlanningStrategy } from "../../../domain/agents/Agent";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
+import type { AgentPlanningStrategy } from "../../../src/domain/agents/Agent";
+import type { CompositionTaxonomyDescriptor } from "../../../src/domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "../../../src/domain/contracts/AssetContract";
 import { CompositionTaxonomyClassifier } from "../../../application/taxonomy/CompositionTaxonomyClassifier";
 import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
 

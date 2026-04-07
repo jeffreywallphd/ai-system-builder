@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { afterEach, describe, expect, it } from "bun:test";
-import { ExecutionCallbackEventKinds, type ExecutionCallbackRegistration } from "../../../../domain/system-runtime/ExecutionCallbackDomain";
+import { ExecutionCallbackEventKinds, type ExecutionCallbackRegistration } from "../../../../src/domain/system-runtime/ExecutionCallbackDomain";
 import { HttpExecutionCallbackDispatcher, type ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
 
 const payload: ExecutionCallbackPayload = Object.freeze({

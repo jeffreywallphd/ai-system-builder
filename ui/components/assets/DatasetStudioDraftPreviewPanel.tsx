@@ -34,8 +34,8 @@ import {
 } from "../../../application/dataset-studio/UnifiedIngestionAsset";
 import type { UnifiedIngestionPreviewSuccess } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
 import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+import type { CanonicalRecordValue } from "../../../src/domain/dataset-studio/CanonicalDataShapes";
+import { UnifiedIngestionReferenceKinds } from "../../../src/domain/dataset-studio/UnifiedIngestionDomain";
 import AssetConfigurationPanel from "./AssetConfigurationPanel";
 import type { AssetConfigurationMode } from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";

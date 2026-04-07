@@ -10,8 +10,8 @@ import type {
   IModelCompatibility,
   ModelTask,
   RuntimeEngine,
-} from "../models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../models/interfaces/IModelDependency";
+} from "../../src/domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "../../src/domain/models/interfaces/IModelDependency";
 import { Node } from "./Node";
 
 function normalize(value: string): string {

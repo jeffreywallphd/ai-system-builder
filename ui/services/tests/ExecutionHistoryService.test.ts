@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../../src/domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "../../../src/domain/execution/ExecutionRun";
 import { ListExecutionRunsUseCase } from "../../../application/execution/ListExecutionRunsUseCase";
 import { ExecutionRunProjectionService } from "../../../application/execution/ExecutionRunProjectionService";
 import { ListRelatedExecutionRunsUseCase } from "../../../application/execution/ListRelatedExecutionRunsUseCase";

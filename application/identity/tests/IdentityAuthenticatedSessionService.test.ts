@@ -24,8 +24,8 @@ import type {
   IdentitySessionTokenIssueResult,
   IIdentitySessionTokenService,
 } from "../ports/IIdentitySessionTokenService";
-import { IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
-import { IdentitySessionLifecycleService } from "../services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "../../../src/application/identity/services/IdentityAuthenticatedSessionService";
+import { IdentitySessionLifecycleService } from "../../../src/application/identity/services/IdentitySessionLifecycleService";
 
 class InMemoryIdentitySessionAdapter
   implements

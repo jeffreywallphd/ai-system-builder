@@ -14,8 +14,8 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
-import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
-import { type IdentityAuthenticatedSessionService } from "../../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
+import { type IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
 
 export type LogoutIdentitySessionErrorCode =
   | typeof IdentityErrorCodes.invalidRequest

@@ -24,7 +24,7 @@ import { IdentityLifecycleEventTypes, type IdentityLifecycleEvent } from "../../
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
-import { TrustedDeviceManagementService } from "../services/TrustedDeviceManagementService";
+import { TrustedDeviceManagementService } from "../../../src/application/identity/services/TrustedDeviceManagementService";
 
 class FixedClock implements IIdentityClock {
   public now(): Date {

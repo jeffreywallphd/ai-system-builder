@@ -1,7 +1,7 @@
-import type { AgentReadModel } from "../../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../../domain/agents/AgentPolicy";
-import type { AgentPlanningStrategy } from "../../../domain/agents/Agent";
+import type { AgentReadModel } from "../../../src/domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "../../../src/domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "../../../src/domain/agents/AgentPolicy";
+import type { AgentPlanningStrategy } from "../../../src/domain/agents/Agent";
 import type { AgentConfigurationValidationInput, AgentConfigurationValidationIssue, AgentConfigurationValidationResult } from "../../../application/agents/services/AgentConfigurationValidationService";
 import type { CreateAgentRequest } from "../../../application/agents/CreateAgentUseCase";
 import type { UpdateAgentRequest } from "../../../application/agents/UpdateAgentUseCase";

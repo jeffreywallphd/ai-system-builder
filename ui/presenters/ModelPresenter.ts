@@ -1,5 +1,5 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IModelCompatibilityResult } from "../../domain/services/interfaces/IModelCompatibilityService";
+import type { IModel } from "../../src/domain/models/interfaces/IModel";
+import type { IModelCompatibilityResult } from "../../src/domain/services/interfaces/IModelCompatibilityService";
 import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
 import type { ModelResponse } from "../../application/dto/ModelResponse";
 import { formatBytes, toTitleCase } from "./PresenterFormatting";

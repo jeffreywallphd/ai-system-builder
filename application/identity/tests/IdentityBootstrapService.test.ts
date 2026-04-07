@@ -31,8 +31,8 @@ import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../ports/IIdentityPersistenceRepository";
-import { IdentityBootstrapService } from "../services/IdentityBootstrapService";
-import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { IdentityBootstrapService } from "../../../src/application/identity/services/IdentityBootstrapService";
+import { IdentityPolicyService } from "../../../src/application/identity/services/IdentityPolicyService";
 
 class InMemoryIdentityBootstrapAdapter
   implements IIdentityLookupRepository, IIdentityPersistenceRepository, ICredentialMaterialRepository, IIdentityClock, IIdentityIdGenerator {

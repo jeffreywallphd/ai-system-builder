@@ -1,13 +1,13 @@
 import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { ICreateNodeRequest } from "../../application/nodes/CreateNodeUseCase";
-import type { IConnectNodesRequest } from "../../application/nodes/ConnectNodesUseCase";
+import type { ICreateNodeRequest } from "../../src/application/nodes/CreateNodeUseCase";
+import type { IConnectNodesRequest } from "../../src/application/nodes/ConnectNodesUseCase";
 import type { ICreateWorkflowRequest } from "../../application/workflows/CreateWorkflowUseCase";
 import type { IExecuteWorkflowRequest } from "../../application/workflows/ExecuteWorkflowUseCase";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
-} from "../../domain/services/interfaces/IWorkflowValidator";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+} from "../../src/domain/services/interfaces/IWorkflowValidator";
+import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
 import { NodeService } from "../services/NodeService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { WorkflowService } from "../services/WorkflowService";

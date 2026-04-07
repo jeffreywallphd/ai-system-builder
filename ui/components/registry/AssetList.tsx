@@ -1,4 +1,4 @@
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../src/domain/asset-registry/RegistryAsset";
 import { AssetListItem } from "./AssetListItem";
 
 export interface AssetListProps {

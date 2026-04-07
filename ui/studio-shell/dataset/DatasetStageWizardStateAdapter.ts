@@ -19,8 +19,8 @@ import {
 } from "../../../application/dataset-studio/StageOutputInspectionService";
 import { TemplateService } from "../../../application/dataset-studio/TemplateService";
 import { WizardFlowEngine } from "../../../application/dataset-studio/WizardFlowEngine";
-import type { DatasetPipelineStageKind } from "../../../domain/dataset-studio/StagePipelineDomain";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import type { DatasetPipelineStageKind } from "../../../src/domain/dataset-studio/StagePipelineDomain";
+import type { CanonicalRecordValue } from "../../../src/domain/dataset-studio/CanonicalDataShapes";
 import type { WizardStageStatus } from "../wizard/WizardStageContracts";
 
 export type DatasetStageWizardStageStatus = WizardStageStatus;

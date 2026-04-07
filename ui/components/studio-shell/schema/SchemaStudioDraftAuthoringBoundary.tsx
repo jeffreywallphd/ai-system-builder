@@ -18,7 +18,7 @@ import {
   type SchemaEntityDefinition,
   type SchemaFieldTypeKind,
   type SchemaRelationshipCardinalityKind,
-} from "../../../../domain/schema-studio/SchemaStudioDomain";
+} from "../../../../src/domain/schema-studio/SchemaStudioDomain";
 import {
   StudioEmbeddedIntentKinds,
   createStudioIntentEvent,

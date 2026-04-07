@@ -1,14 +1,14 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+import type { Studio, AssetSession, AssetDraft } from "../../../../src/domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
 import { RuntimeAccessControlService, type ExecutionAccessDecision, type ExecutionAccessPolicy, type ExecutionAccessRequest } from "../../../../application/system-runtime/RuntimeAccessControlService";
 import { ExecutionQuotaEvaluator } from "../../../../application/system-runtime/ExecutionQuotaEvaluator";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
 import { ExternalSystemRuntimeInterface } from "../ExternalSystemRuntimeInterface";
 import type { ExecutionCallbackDispatcher, ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
-import { ExecutionAuditEventKinds } from "../../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import { ExecutionAuditEventKinds } from "../../../../src/domain/system-runtime/ExecutionAuditTrailDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();

@@ -1,4 +1,4 @@
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../src/domain/asset-registry/RegistryAsset";
 import { BuildIntentRoutingService } from "./BuildIntentRouting";
 import { BuildIntents, type BuildIntent } from "./BuildIntentModels";
 import { InlineAssetCreationModes, InlineAssetCreationService } from "./InlineAssetCreation";

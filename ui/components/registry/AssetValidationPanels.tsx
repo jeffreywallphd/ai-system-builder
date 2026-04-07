@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../src/domain/asset-registry/RegistryAsset";
 
 function DetailPanel({
   title,

@@ -12,8 +12,8 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowDraftManualApprovalStepConfig,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,

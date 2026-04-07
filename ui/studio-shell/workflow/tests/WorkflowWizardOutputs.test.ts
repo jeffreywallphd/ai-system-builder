@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftOutputDestinationTypes,
   createEmptyWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowOutput,
   addWorkflowOutputs,

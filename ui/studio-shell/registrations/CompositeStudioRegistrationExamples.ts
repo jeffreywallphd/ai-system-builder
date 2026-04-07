@@ -3,7 +3,7 @@ import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "../../../src/domain/taxonomy/CompositionTaxonomy";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

@@ -1,4 +1,4 @@
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft, WorkflowValidationIssue } from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
 
 export const WorkflowWizardSectionIds = Object.freeze({
   trigger: "trigger",
