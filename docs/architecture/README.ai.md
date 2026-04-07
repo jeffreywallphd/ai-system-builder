@@ -151,9 +151,11 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 16 / Epic 16.2 Story 16.2.1 persistent queue admission, assignment-ready ordering, and reservation-backed claim selection baseline: `docs/architecture/run-orchestration-queue-assignment-selection.md`
 - Feature 16 / Epic 16.2 Story 16.2.2 node capability matching, assignment requirement derivation, and policy precondition evaluation baseline: `docs/architecture/run-orchestration-node-capability-matching.md`
 - Feature 16 / Epic 16.2 Story 16.2.3 authoritative queued-run node claim, dispatch-preparation persistence, and controlled duplicate-claim conflict baseline: `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
+- Feature 16 / Epic 16.2 Story 16.2.8 consolidated control-plane lifecycle architecture (queue selection, assignment, claim, dispatch, progress ingestion, completion/failure finalization) and scheduler boundary rules: `docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md`
 - Feature 16 / Epic 16.1 Story 16.1.7 run submission governance audit hooks for denied/accepted submission events and initial lifecycle transition emission: `docs/architecture/run-submission-lifecycle-audit-hooks.md`
 - Feature 16 / Epic 16.1 Story 16.1.8 end-to-end authoritative run-submission pipeline guardrails, extension points, and prohibited shortcuts: `docs/architecture/run-submission-pipeline-extension-guardrails.md`
 - Feature 16 / Epic 16.1 Story 16.1.8 contributor workflow and extension checklist for run-submission changes: `docs/run-submission-contributor-guide.md`
+- Feature 16 / Epic 16.2 Story 16.2.8 contributor workflow for scheduler-policy, assignment, dispatch, execution-update, and finalization extensions: `docs/run-orchestration-contributor-guide.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
