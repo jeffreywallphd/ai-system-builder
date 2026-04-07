@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type { PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
   AuthoritativeRunQueueEntryRecord,
@@ -87,6 +88,20 @@ class StubQueueRepository {
   }
 }
 
+class CapturingAuthoritativeRunAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<any> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: input,
+    });
+  }
+}
+
 describe("scheduling admin control use cases", () => {
   it("lists stale reservations with stale second projections", async () => {
     const queueRepository = new StubQueueRepository();
@@ -130,9 +145,11 @@ describe("scheduling admin control use cases", () => {
       revision: 1,
     }));
     const intentRepository = new StubIntentRepository();
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
     const useCase = new ReleaseStaleSchedulingReservationUseCase({
       queueRepository: queueRepository as never,
       orchestrationIntentRepository: intentRepository as never,
+      authoritativeAuditRecorder,
       now: () => new Date("2026-04-07T12:01:00.000Z"),
       idGenerator: {
         nextId: (prefix) => `${prefix}:test`,
@@ -150,6 +167,8 @@ describe("scheduling admin control use cases", () => {
     expect(result.staleSeconds).toBe(60);
     expect(queueRepository.releasedClaims).toHaveLength(1);
     expect(intentRepository.events[0]?.action).toBe("run.scheduling.admin.stale-reservation.released");
+    expect(authoritativeAuditRecorder.events).toHaveLength(1);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.scheduling.admin.stale-reservation.released");
   });
 
   it("fails closed when attempting to release non-stale reservations", async () => {
@@ -214,9 +233,11 @@ describe("scheduling admin control use cases", () => {
       }),
     ]);
     const intentRepository = new StubIntentRepository();
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
     const useCase = new ReevaluateDeferredSchedulingRunsUseCase({
       queueRepository: queueRepository as never,
       orchestrationIntentRepository: intentRepository as never,
+      authoritativeAuditRecorder,
       now: () => new Date("2026-04-07T12:01:00.000Z"),
       idGenerator: {
         nextId: (prefix) => `${prefix}:test`,
@@ -233,5 +254,7 @@ describe("scheduling admin control use cases", () => {
     expect(result.runIds).toEqual(["run:deferred:1", "run:deferred:2"]);
     expect(intentRepository.events).toHaveLength(2);
     expect(intentRepository.events[0]?.action).toBe("run.scheduling.admin.deferred.re-evaluated");
+    expect(authoritativeAuditRecorder.events).toHaveLength(2);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.scheduling.admin.deferred.re-evaluated");
   });
 });

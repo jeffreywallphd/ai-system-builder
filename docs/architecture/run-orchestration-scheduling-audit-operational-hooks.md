@@ -17,6 +17,7 @@ This story adds:
 - scheduling governance event contracts and sink port
 - application-layer event emission from scheduling decision and queue-assignment integration seams
 - infrastructure adapter for mapping audit-channel scheduling events into platform audit records
+- infrastructure adapter seam for mapping audit-channel scheduling events into authoritative canonical run/scheduling records
 - infrastructure bridge for mapping operational-channel scheduling events into shared runtime realtime run/queue publication
 
 ## Canonical implementation map
@@ -29,6 +30,7 @@ This story adds:
   - `src/application/runs/use-cases/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.ts`
 - Platform audit sink mapping:
   - `src/infrastructure/api/runs/PlatformSchedulingGovernanceEventSink.ts`
+  - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
   - operational scheduling event -> runtime realtime mapping for `runtime.run.status` and `runtime.queue`
 
 ## Emitted event model
@@ -83,4 +85,5 @@ This story therefore records supported scheduler and queue-integration behavior 
 - `src/application/scheduling/tests/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.test.ts`
 - `src/application/runs/tests/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/PlatformSchedulingGovernanceEventSink.test.ts`
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/infrastructure/api/runs/tests/AuthoritativeRunMutationBackendApi.test.ts`

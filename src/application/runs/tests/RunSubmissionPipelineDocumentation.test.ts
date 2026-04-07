@@ -70,6 +70,7 @@ describe("run submission pipeline documentation", () => {
       "src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts",
       "src/infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver.ts",
       "src/infrastructure/api/runs/PlatformRunSubmissionAuditSink.ts",
+      "src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts",
       "src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts",
       "src/hosts/server/IdentityServerHost.ts",
     ];

@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type { PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { PlatformAuditEventKinds } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -78,6 +80,7 @@ export class ReleaseStaleSchedulingReservationUseCase {
       readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
       readonly now?: () => Date;
       readonly idGenerator?: { readonly nextId: (prefix: string) => string };
+      readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
     },
   ) {
     this.now = dependencies.now ?? (() => new Date());
@@ -181,6 +184,52 @@ export class ReleaseStaleSchedulingReservationUseCase {
       occurredAt: input.releasedAt,
       correlationId: input.correlationId,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:scheduling-admin:release-stale-reservation:${input.runId}:${input.mutationId}`,
+        eventType: "run-scheduling-admin-stale-reservation-released",
+        action: "run.scheduling.admin.stale-reservation.released",
+        outcome: AuditEventOutcomes.succeeded,
+        occurredAt: input.releasedAt,
+        actor: Object.freeze({
+          actorId: input.actorUserIdentityId,
+          actorKind: AuditActorKinds.user,
+          actorUserIdentityId: input.actorUserIdentityId,
+        }),
+        scope: Object.freeze({
+          kind: AuditScopeKinds.workspace,
+          workspaceId: input.workspaceId,
+        }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.runId,
+          resourceRef: input.runId.startsWith("run:") ? input.runId : `run:${input.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            mutationId: input.mutationId,
+            reservationOwner: input.reservationOwner,
+            staleSeconds: input.staleSeconds,
+            reasonCode: "stale-reservation-released",
+          }),
+          adminOnlyDetails: Object.freeze({
+            claimToken: input.claimToken,
+            claimExpiresAt: input.claimExpiresAt,
+            reason: input.reason,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail scheduling-admin behavior.
+    }
   }
 }
 

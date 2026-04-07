@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type {
   PlatformAuditEventRecord,
   PlatformPersistenceMutationContext,
@@ -145,6 +146,20 @@ class StubCreateAuthoritativeRunUseCase {
   public async execute(request: Readonly<Record<string, unknown>>): Promise<CreateAuthoritativeRunResult> {
     this.calls = Object.freeze([...this.calls, request]);
     return this.nextResult;
+  }
+}
+
+class CapturingAuthoritativeRunAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<any> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: input,
+    });
   }
 }
 
@@ -301,6 +316,41 @@ describe("RequestAuthoritativeRunRetryUseCase", () => {
     expect(result.mutation.run.retry.attempt).toBe(2);
     expect(intentRepository.events).toHaveLength(1);
     expect(intentRepository.events[0]?.action).toBe("run.retry.requested");
+  });
+
+  it("emits authoritative run retry events when centralized recorder is configured", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const validate = new StubValidateRunSubmissionUseCase();
+    const create = new StubCreateAuthoritativeRunUseCase();
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
+    seedRun({
+      runRepository,
+      runId: "run:source",
+      state: RunLifecycleStates.failed,
+    });
+
+    const useCase = new RequestAuthoritativeRunRetryUseCase({
+      runRepository,
+      orchestrationIntentRepository: intentRepository,
+      validateRunSubmissionUseCase: validate as unknown as ValidateRunSubmissionUseCase,
+      createAuthoritativeRunUseCase: create as unknown as CreateAuthoritativeRunUseCase,
+      authoritativeAuditRecorder,
+      now: () => new Date("2026-04-07T12:11:00.000Z"),
+    });
+
+    await useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      request: Object.freeze({
+        runId: "run:source",
+        requestedAt: "2026-04-07T12:11:00.000Z",
+      }),
+    });
+
+    expect(authoritativeAuditRecorder.events).toHaveLength(1);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.retry.requested");
+    expect(authoritativeAuditRecorder.events[0]?.protectedResource?.resourceRef).toBe("run:source");
   });
 
   it("treats cancelled runs as retry-eligible", async () => {

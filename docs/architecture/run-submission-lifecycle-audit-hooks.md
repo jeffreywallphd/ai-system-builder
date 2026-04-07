@@ -9,6 +9,7 @@
 ## Purpose
 
 Ensure authoritative run submission is governed by application-level audit hooks so accepted submissions, denied submissions, and key lifecycle transitions are visible through the platform audit posture.
+Story 18.1.7 extends this hook path so these events also flow through the canonical authoritative audit service.
 
 ## Canonical implementation files
 
@@ -16,6 +17,8 @@ Ensure authoritative run submission is governed by application-level audit hooks
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
 - `src/application/runs/use-cases/CreateAuthoritativeRunUseCase.ts`
 - `src/infrastructure/api/runs/PlatformRunSubmissionAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
+- `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
 ## Audit hook boundary
@@ -23,7 +26,9 @@ Ensure authoritative run submission is governed by application-level audit hooks
 - Hook ownership is application-layer (`ValidateRunSubmissionUseCase`, `CreateAuthoritativeRunUseCase`).
 - Hooks are emitted through `RunSubmissionAuditSink` using best-effort dispatch.
 - Domain run invariants and lifecycle transition rules remain audit-agnostic.
-- Infrastructure translates application audit events into platform audit records through `PlatformRunSubmissionAuditSink`.
+- Infrastructure composes sink fan-out:
+  - `PlatformRunSubmissionAuditSink` preserves legacy run audit records.
+  - `AuthoritativeRunSubmissionAuditSink` emits canonical run orchestration audit records.
 
 ## Event coverage in this slice
 
@@ -48,7 +53,7 @@ This slice intentionally records structured summary metadata and omits raw poten
 
 ## Platform mapping
 
-`PlatformRunSubmissionAuditSink` maps application audit event types to platform audit actions:
+Run submission audit adapters map application audit event types to stable orchestration actions:
 
 - `run-submission-accepted` -> `run.submission.accepted` (`outcome: succeeded`)
 - `run-submission-denied` -> `run.submission.denied` (`outcome: denied`)
@@ -59,6 +64,7 @@ All mapped events use:
 - `eventKind: runs`
 - `workspaceId`, `userIdentityId`, `targetRef` (`run:<runId>`) when available
 - resolved actor identity (`actorUserIdentityId`, fallback `actorServiceId`, fallback system identity)
+- canonical authoritative adapter keeps the same action vocabulary and records workspace/run protected-resource references for governance joins
 
 ## Test coverage
 
@@ -70,3 +76,5 @@ All mapped events use:
   - best-effort behavior when audit sink dispatch fails
 - `src/infrastructure/api/runs/tests/PlatformRunSubmissionAuditSink.test.ts`
   - application-event to platform-audit mapping and outcome semantics
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+  - application-event to authoritative canonical run audit mapping

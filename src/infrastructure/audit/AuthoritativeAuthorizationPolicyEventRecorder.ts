@@ -75,6 +75,21 @@ function resolveAction(event: AuthorizationPolicyRecordedEvent): string {
       : "permission.role-assignment.upserted";
   }
 
+  if ("mutation" in event && event.mutation.entityKind === "resource-policy") {
+    if (event.mutation.mutationKind === "soft-delete") {
+      return "share.resource-policy.soft-deleted";
+    }
+
+    const details = asRecord(event.details);
+    const visibility = normalizeOptional(asString(details?.visibility));
+    const sharingPolicyMode = normalizeOptional(asString(details?.sharingPolicyMode));
+    const publishedAt = normalizeOptional(asString(details?.publishedAt));
+    if (visibility === "published" || sharingPolicyMode === "published" || publishedAt) {
+      return "share.resource.publication.updated";
+    }
+    return "share.resource-policy.updated";
+  }
+
   return "permission.resource-policy.updated";
 }
 
@@ -159,4 +174,15 @@ function resolveProtectedResource(
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
