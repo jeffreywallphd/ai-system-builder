@@ -46,6 +46,14 @@ import { InitiateTrustedDevicePairingUseCase } from "@application/identity/use-c
 import { ValidateTrustedDevicePairingUseCase } from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
 import { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import { SqliteIdentityLifecycleEventPublisher } from "@infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher";
+import {
+  FanoutIdentityLifecycleEventPublisher,
+  FanoutNodeTrustAuditSink,
+} from "@infrastructure/audit/AuditFanoutPublishers";
+import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
+import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
+import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
+import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
@@ -68,7 +76,6 @@ import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persist
 import { SqliteAuthorizationPersistenceAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
 import { SqliteAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
 import { SqliteNodeTrustPersistenceAdapter } from "@infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
-import { SqliteNodeTrustAuditRecorder } from "@infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
 import { SqliteStorageInstancePersistenceAdapter } from "@infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
 import { SqliteStorageManagementAuditRecorder } from "@infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
@@ -371,7 +378,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const sessionPolicies = options.sessionPolicies
       ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
     const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-    const eventPublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(databasePath);
+    const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
+      repository: persistentPlatformServices.platformPersistenceRepository,
+    });
+    const baseIdentityLifecyclePublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(databasePath);
+    const eventPublisher = new FanoutIdentityLifecycleEventPublisher([
+      baseIdentityLifecyclePublisher,
+      new AuthoritativeIdentityLifecycleEventPublisher(authoritativeAuditRecorder),
+    ]);
     const workspaceClock = new SystemWorkspaceClock();
     const workspaceIdGenerator = new RandomWorkspaceIdGenerator();
     const workspaceAuthorizationPolicyReadAdapter = new WorkspaceAuthorizationPolicyReadAdapter({
@@ -393,46 +407,51 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       clock: workspaceClock,
     });
     const authorizationMutationService = new AuthorizationPolicyMutationService({
-    ports: {
-      roleAssignmentPersistenceRepository: authorizationRepository,
-      sharingGrantPersistenceRepository: authorizationRepository,
-      resourcePolicyMetadataPersistenceRepository: authorizationRepository,
-    },
-    clock: workspaceClock,
-  });
-  const sessionTrustService = new TrustedDeviceSessionTrustService({
-    trustedDeviceRepository,
-    policies: sessionTrustPolicies,
-  });
-  const trustedDeviceAdminUserIdentityIds = parseOptionalCsvList(env.IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS);
-  const trustedDeviceManagementService = new TrustedDeviceManagementService(
-    trustedDeviceRepository,
-    idGenerator,
-    clock,
-    eventPublisher,
-  );
-  const trustedDevicePairingService = new TrustedDevicePairingService({
-    trustedDeviceRepository,
-    pairingRepository: trustedDeviceRepository,
-    idGenerator,
-    clock,
-    eventPublisher,
-  });
-  const sessionLifecycleService = new IdentitySessionLifecycleService({
-    sessionRepository: repository,
-    clock,
-    idGenerator,
-    policies: sessionPolicies,
-  });
-  const authenticatedSessionService = new IdentityAuthenticatedSessionService({
-    lifecycleService: sessionLifecycleService,
-    sessionRepository: repository,
-    tokenMaterialRepository: repository,
-    tokenService: new OpaqueIdentitySessionTokenService(),
-    clock,
-    sessionTrustEvaluator: sessionTrustService,
-    eventPublisher,
-  });
+      ports: {
+        roleAssignmentPersistenceRepository: authorizationRepository,
+        sharingGrantPersistenceRepository: authorizationRepository,
+        resourcePolicyMetadataPersistenceRepository: authorizationRepository,
+      },
+      policyEventRecorder: new AuthoritativeAuthorizationPolicyEventRecorder(authoritativeAuditRecorder),
+      clock: workspaceClock,
+    });
+    const nodeTrustAuditSink = new FanoutNodeTrustAuditSink([
+      nodeTrustAuditRecorder,
+      new AuthoritativeNodeTrustAuditSink(authoritativeAuditRecorder),
+    ]);
+    const sessionTrustService = new TrustedDeviceSessionTrustService({
+      trustedDeviceRepository,
+      policies: sessionTrustPolicies,
+    });
+    const trustedDeviceAdminUserIdentityIds = parseOptionalCsvList(env.IDENTITY_TRUSTED_DEVICE_ADMIN_USER_IDS);
+    const trustedDeviceManagementService = new TrustedDeviceManagementService(
+      trustedDeviceRepository,
+      idGenerator,
+      clock,
+      eventPublisher,
+    );
+    const trustedDevicePairingService = new TrustedDevicePairingService({
+      trustedDeviceRepository,
+      pairingRepository: trustedDeviceRepository,
+      idGenerator,
+      clock,
+      eventPublisher,
+    });
+    const sessionLifecycleService = new IdentitySessionLifecycleService({
+      sessionRepository: repository,
+      clock,
+      idGenerator,
+      policies: sessionPolicies,
+    });
+    const authenticatedSessionService = new IdentityAuthenticatedSessionService({
+      lifecycleService: sessionLifecycleService,
+      sessionRepository: repository,
+      tokenMaterialRepository: repository,
+      tokenService: new OpaqueIdentitySessionTokenService(),
+      clock,
+      sessionTrustEvaluator: sessionTrustService,
+      eventPublisher,
+    });
 
   const backendApi = new IdentityAuthBackendApi({
     registerLocalAccountUseCase: new RegisterLocalAccountUseCase({
@@ -766,11 +785,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const nodeTrustBackendApi = new NodeTrustBackendApi({
     registerNodeEnrollmentRequestUseCase: new RegisterNodeEnrollmentRequestUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     reviewPendingNodeEnrollmentUseCase: new ReviewPendingNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     getNodeEnrollmentDetailUseCase: new GetNodeEnrollmentDetailUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
@@ -783,25 +802,25 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
       transactionManager: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     rejectNodeEnrollmentUseCase: new RejectNodeEnrollmentUseCase({
       enrollmentRequestRepository: nodeTrustRepository,
       nodeRepository: nodeTrustRepository,
       transactionManager: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     revokeNodeTrustUseCase: new RevokeNodeTrustUseCase({
       nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     recordNodeHeartbeatUseCase: new RecordNodeHeartbeatUseCase({
       nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     recordNodeOperationalUpdateUseCase: new RecordNodeOperationalUpdateUseCase({
       nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     resolveApprovedNodeRuntimeTrustMaterialUseCase: new ResolveApprovedNodeRuntimeTrustMaterialUseCase({
       nodeRepository: nodeTrustRepository,
@@ -812,12 +831,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     listTrustedNodeInventoryUseCase: new ListTrustedNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
     listNodeInventoryUseCase: new ListNodeInventoryUseCase({
       nodeRepository: nodeTrustRepository,
       enrollmentRequestRepository: nodeTrustRepository,
-      auditSink: nodeTrustAuditRecorder,
+      auditSink: nodeTrustAuditSink,
     }),
   });
   const managedStorageRootPath = resolveManagedStorageRootPath(path.resolve(options.databasePath), env);
