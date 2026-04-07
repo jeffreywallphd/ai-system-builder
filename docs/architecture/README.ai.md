@@ -146,6 +146,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical contributor extension workflow + prohibited-pattern guardrails for new admin/operational screens on converged surfaces: `docs/architecture/multi-surface-ui-extension-guidance.md`
 - Canonical multi-surface responsive interaction rules for breakpoints/density/touch-target/stacking: `docs/architecture/multi-surface-ui-responsive-conventions.md`
 - Contributor implementation checklist for converged API additions (shared contracts/schemas/backend/transport/client wiring): `docs/unified-api-contributor-guide.md`
+- Feature 16 / Epic 16.1 Story 16.1.1 canonical run identity/lifecycle model, transition rules, and orchestration boundary ownership map: `docs/architecture/run-orchestration-domain-foundation.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
