@@ -39,3 +39,16 @@ export const RunReadAuthoritativeApiRouteFamily = Object.freeze({
     AuthoritativeApiRouteBackendKeys.runRead,
   ]),
 }) satisfies AuthoritativeApiRouteFamilyRegistration;
+
+export const RunExecutionUpdateAuthoritativeApiRouteFamily = Object.freeze({
+  routeFamilyId: "run-execution-update",
+  domain: AuthoritativeApiRouteDomains.runtime,
+  description: "Authoritative node-ingested run execution heartbeat/progress/lifecycle update endpoint.",
+  routePrefixes: Object.freeze([
+    "/api/v1/runtime/runs",
+  ]),
+  requiredBackendKeys: Object.freeze([
+    AuthoritativeApiRouteBackendKeys.nodeTrust,
+    AuthoritativeApiRouteBackendKeys.runExecutionUpdate,
+  ]),
+}) satisfies AuthoritativeApiRouteFamilyRegistration;

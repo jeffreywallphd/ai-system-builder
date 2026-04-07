@@ -5,7 +5,9 @@ import {
   parseRunListReadRequest,
   parseRunListReadResponse,
   parseRunLifecycleEventEnvelope,
+  parseRunLifecycleUpdateRequest,
   parseRunQueueStatusReadRequest,
+  parseRunStatusEnvelope,
   parseRunSubmissionRequest,
   toLegacyRuntimeStartRunRequest,
 } from "../RunOrchestrationTransportSchemaContracts";
@@ -111,6 +113,58 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
     });
 
     expect(event.run.state).toBe("running");
+  });
+
+  it("parses execution lifecycle updates with progress and sender metadata", () => {
+    const parsed = parseRunLifecycleUpdateRequest({
+      runId: "run-1",
+      occurredAt: "2026-04-07T12:04:00.000Z",
+      senderNodeId: "node:trusted-1",
+      senderBackendKind: "local-worker",
+      senderBackendRunId: "backend-run-1",
+      heartbeatAt: "2026-04-07T12:04:00.000Z",
+      progress: {
+        updatedAt: "2026-04-07T12:04:00.000Z",
+        percent: 65,
+        stage: "decode-latents",
+        message: "step 26/40",
+      },
+      execution: {
+        outcome: "none",
+        heartbeatAt: "2026-04-07T12:04:00.000Z",
+      },
+      internalDiagnostics: {
+        workerPid: 4142,
+      },
+    });
+
+    expect(parsed.senderNodeId).toBe("node:trusted-1");
+    expect(parsed.progress?.percent).toBe(65);
+    expect(parsed.toState).toBeUndefined();
+  });
+
+  it("parses status envelope execution progress projections", () => {
+    const status = parseRunStatusEnvelope({
+      runId: "run-1",
+      state: "running",
+      updatedAt: "2026-04-07T12:04:00.000Z",
+      assignmentStatus: "assigned",
+      executionOutcome: "none",
+      execution: {
+        startedAt: "2026-04-07T12:00:00.000Z",
+        heartbeatAt: "2026-04-07T12:04:00.000Z",
+        progress: {
+          updatedAt: "2026-04-07T12:04:00.000Z",
+          percent: 65,
+        },
+      },
+      retry: {
+        attempt: 1,
+        maxAttempts: 3,
+      },
+    });
+
+    expect(status.execution?.progress?.percent).toBe(65);
   });
 
   it("rejects malformed run payloads", () => {

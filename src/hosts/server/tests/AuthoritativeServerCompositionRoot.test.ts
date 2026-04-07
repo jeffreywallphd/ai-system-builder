@@ -212,6 +212,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedRouteFamilyIds).toContain("node-trust");
     expect(observedRouteFamilyIds).toContain("run-submission");
     expect(observedRouteFamilyIds).toContain("run-read");
+    expect(observedRouteFamilyIds).toContain("run-execution-update");
     await runtime.stop();
   });
 

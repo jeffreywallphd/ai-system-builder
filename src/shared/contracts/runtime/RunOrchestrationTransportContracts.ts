@@ -149,11 +149,24 @@ export interface RunStatusEnvelope {
   readonly queue?: RunQueueStatusSnapshot;
   readonly assignmentStatus: typeof RunAssignmentStatuses[keyof typeof RunAssignmentStatuses];
   readonly executionOutcome: typeof RunExecutionOutcomeKinds[keyof typeof RunExecutionOutcomeKinds];
+  readonly execution?: {
+    readonly startedAt?: string;
+    readonly heartbeatAt?: string;
+    readonly finishedAt?: string;
+    readonly progress?: RunExecutionProgressSnapshot;
+  };
   readonly retry: {
     readonly attempt: number;
     readonly maxAttempts: number;
     readonly queuedAt?: string;
   };
+}
+
+export interface RunExecutionProgressSnapshot {
+  readonly updatedAt: string;
+  readonly percent?: number;
+  readonly stage?: string;
+  readonly message?: string;
 }
 
 export interface RunQueueStatusReadRequest {
@@ -198,11 +211,17 @@ export interface RunRetryRequest {
 
 export interface RunLifecycleUpdateRequest {
   readonly runId: string;
-  readonly toState: RunLifecycleState;
+  readonly toState?: RunLifecycleState;
   readonly occurredAt?: string;
   readonly reason?: string;
   readonly actorId?: string;
   readonly idempotencyKey?: string;
+  readonly senderNodeId?: string;
+  readonly senderBackendKind?: string;
+  readonly senderBackendRunId?: string;
+  readonly heartbeatAt?: string;
+  readonly progress?: RunExecutionProgressSnapshot;
+  readonly internalDiagnostics?: Readonly<Record<string, unknown>>;
   readonly queue?: RunQueueState;
   readonly assignment?: RunAssignmentState;
   readonly execution?: RunExecutionState;
@@ -311,6 +330,19 @@ export function toRunStatusEnvelope(run: CanonicalRunRecord): RunStatusEnvelope 
     queue: toRunQueueStatusSnapshot(run.queue),
     assignmentStatus: run.assignment.status,
     executionOutcome: run.execution.outcome,
+    execution: Object.freeze({
+      startedAt: run.execution.startedAt,
+      heartbeatAt: run.execution.heartbeatAt,
+      finishedAt: run.execution.finishedAt,
+      progress: run.execution.progress
+        ? Object.freeze({
+          updatedAt: run.execution.progress.updatedAt,
+          percent: run.execution.progress.percent,
+          stage: run.execution.progress.stage,
+          message: run.execution.progress.message,
+        })
+        : undefined,
+    }),
     retry: Object.freeze({
       attempt: run.retry.attempt,
       maxAttempts: run.retry.maxAttempts,
