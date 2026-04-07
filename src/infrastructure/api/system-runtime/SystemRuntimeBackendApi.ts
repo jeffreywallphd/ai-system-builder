@@ -59,6 +59,8 @@ import {
   type ExecutionUpdateSubscription,
 } from "./ExecutionUpdateStream";
 import {
+  type RuntimeRealtimeQueueMovementPayload,
+  type RuntimeRealtimeRunStatusPayload,
   RuntimeRealtimeSubscriptionModes,
   type RuntimeRealtimeAdminChangePayload,
   type RuntimeRealtimeConnectivityStatePayload,
@@ -1276,6 +1278,30 @@ export class SystemRuntimeBackendApi {
       actorUserIdentityId: input.actorUserIdentityId,
       workspaceId: input.workspaceId,
       sessionId: input.sessionId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeRunStatus(input: {
+    readonly payload: RuntimeRealtimeRunStatusPayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishRunStatusEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeQueueMovement(input: {
+    readonly payload: RuntimeRealtimeQueueMovementPayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishQueueMovementEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
       payload: input.payload,
     });
   }

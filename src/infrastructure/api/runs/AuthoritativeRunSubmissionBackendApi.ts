@@ -16,6 +16,12 @@ import {
 } from "@application/runs/use-cases/RunSubmissionValidationContracts";
 import type { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
 import type { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
+import {
+  buildQueueMovementPayload,
+  buildRunStatusPayload,
+  publishRunOrchestrationRealtimeEventsBestEffort,
+  type RunOrchestrationRealtimePublisher,
+} from "./RunOrchestrationRealtimePublisher";
 
 export interface AuthoritativeRunSubmissionRequest {
   readonly actorUserIdentityId: string;
@@ -30,6 +36,7 @@ export interface AuthoritativeRunSubmissionRequest {
 export interface AuthoritativeRunSubmissionBackendApiDependencies {
   readonly validateRunSubmissionUseCase: ValidateRunSubmissionUseCase;
   readonly createAuthoritativeRunUseCase: CreateAuthoritativeRunUseCase;
+  readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
 }
 
 export class AuthoritativeRunSubmissionBackendApi {
@@ -58,6 +65,26 @@ export class AuthoritativeRunSubmissionBackendApi {
 
       const created = await this.dependencies.createAuthoritativeRunUseCase.execute({
         command: validation.command,
+      });
+      await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
+        this.dependencies.realtimePublisher?.publishRunStatus({
+          actorUserIdentityId: request.actorUserIdentityId,
+          workspaceId: created.run.workspaceId ?? request.workspaceId,
+          payload: buildRunStatusPayload({
+            run: created.run,
+            eventKind: "submission-accepted",
+            changedAt: validation.command.occurredAt,
+          }),
+        });
+        this.dependencies.realtimePublisher?.publishQueueMovement({
+          actorUserIdentityId: request.actorUserIdentityId,
+          workspaceId: created.run.workspaceId ?? request.workspaceId,
+          payload: buildQueueMovementPayload({
+            run: created.run,
+            eventKind: "queue-enqueued",
+            changedAt: validation.command.occurredAt,
+          }),
+        });
       });
 
       return Object.freeze({

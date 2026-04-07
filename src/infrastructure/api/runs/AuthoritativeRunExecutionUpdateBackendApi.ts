@@ -14,6 +14,13 @@ import {
   RunExecutionUpdateNotFoundError,
   RunExecutionUpdateValidationError,
 } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
+import type { RuntimeRealtimeRunStatusPayload } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import {
+  buildQueueMovementPayload,
+  buildRunStatusPayload,
+  publishRunOrchestrationRealtimeEventsBestEffort,
+  type RunOrchestrationRealtimePublisher,
+} from "./RunOrchestrationRealtimePublisher";
 
 export interface AuthoritativeRunExecutionUpdateRequest {
   readonly runId: string;
@@ -28,6 +35,7 @@ export interface AuthoritativeRunExecutionUpdateResponse {
 
 export interface AuthoritativeRunExecutionUpdateBackendApiDependencies {
   readonly ingestRunExecutionUpdateUseCase: IngestRunExecutionUpdateUseCase;
+  readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
 }
 
 export class AuthoritativeRunExecutionUpdateBackendApi {
@@ -42,6 +50,26 @@ export class AuthoritativeRunExecutionUpdateBackendApi {
         senderNodeId: request.senderNodeId,
         update: request.update,
       });
+      await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
+        this.dependencies.realtimePublisher?.publishRunStatus({
+          actorUserIdentityId: request.senderNodeId,
+          workspaceId: ingested.mutation.run.workspaceId,
+          payload: buildRunStatusPayload({
+            run: ingested.mutation.run,
+            eventKind: resolveRunStatusEventKind(ingested.mutation.run.state, Boolean(request.update.progress)),
+            changedAt: ingested.mutation.mutation.occurredAt,
+          }),
+        });
+        this.dependencies.realtimePublisher?.publishQueueMovement({
+          actorUserIdentityId: request.senderNodeId,
+          workspaceId: ingested.mutation.run.workspaceId,
+          payload: buildQueueMovementPayload({
+            run: ingested.mutation.run,
+            eventKind: "queue-updated",
+            changedAt: ingested.mutation.mutation.occurredAt,
+          }),
+        });
+      });
 
       return Object.freeze({
         ok: true,
@@ -53,6 +81,35 @@ export class AuthoritativeRunExecutionUpdateBackendApi {
     } catch (error) {
       return toExecutionUpdateErrorEnvelope(error);
     }
+  }
+}
+
+function resolveRunStatusEventKind(
+  state: string,
+  hasProgressUpdate: boolean,
+): RuntimeRealtimeRunStatusPayload["eventKind"] {
+  if (hasProgressUpdate) {
+    return "progress-updated";
+  }
+  switch (state) {
+    case "assignment-pending":
+    case "assigned":
+    case "dispatching":
+      return "assignment-updated";
+    case "running":
+      return "state-changed";
+    case "cancelling":
+      return "cancellation-requested";
+    case "retry-pending":
+      return "retry-queued";
+    case "completed":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "state-changed";
   }
 }
 

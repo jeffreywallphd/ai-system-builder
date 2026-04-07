@@ -32,6 +32,11 @@ describe("SystemRuntimeRealtimeEventSchemaContracts", () => {
       payload: {
         executionId: "exec-a",
         status: "running",
+        runId: "run:exec-a",
+        workflowId: "workflow:demo",
+        queueId: "queue:default",
+        lifecycleState: "running",
+        eventKind: "progress-updated",
         changedAt: "2026-04-07T12:00:00.000Z",
       },
     }));
@@ -122,6 +127,11 @@ describe("SystemRuntimeRealtimeEventSchemaContracts", () => {
           queueItemId: "queue-1",
           executionId: "exec-1",
           status: "queued",
+          runId: "run:1",
+          workflowId: "workflow:demo",
+          queueId: "queue:default",
+          lifecycleState: "queued",
+          eventKind: "queue-enqueued",
           changedAt: "2026-04-07T12:00:00.000Z",
         },
       },
