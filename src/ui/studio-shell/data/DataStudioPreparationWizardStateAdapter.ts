@@ -18,12 +18,12 @@ import {
   type DataStudioPipelineValidationResult,
 } from "../../../application/data-studio/DataStudioPipelineValidation";
 import type { DataStudioPipelineState } from "../../../application/data-studio/DataStudioPipelineState";
-import type { CanonicalRecordValue } from "../../../src/domain/dataset-studio/CanonicalDataShapes";
-import type { PipelineStageId } from "../../../src/domain/dataset-studio/PipelineStageDomain";
+import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
 import type {
   UnifiedPreparationStageActivation,
   UnifiedPreparationVisibilityMode,
-} from "../../../src/domain/dataset-studio/UnifiedPreparationAsset";
+} from "../../../domain/dataset-studio/UnifiedPreparationAsset";
 
 
 export const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";

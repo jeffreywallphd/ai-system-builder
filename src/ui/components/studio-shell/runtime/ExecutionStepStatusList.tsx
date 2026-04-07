@@ -1,4 +1,4 @@
-import type { RuntimeExecutionStatusReadModel } from "../../../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import type { RuntimeExecutionStatusReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 function toTone(status: RuntimeExecutionStatusReadModel["nodeStatuses"][number]["status"]): "success" | "warning" | "danger" | "info" {
   if (status === "succeeded") {

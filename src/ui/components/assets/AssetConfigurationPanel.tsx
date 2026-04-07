@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { CanonicalRecordValue } from "../../../src/domain/dataset-studio/CanonicalDataShapes";
+import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,

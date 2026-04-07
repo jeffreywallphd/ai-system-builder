@@ -1,4 +1,4 @@
-import { createToolStudioTaxonomy, ToolStudioIdentity } from "../../../src/domain/tool-studio/ToolStudioDomain";
+import { createToolStudioTaxonomy, ToolStudioIdentity } from "../../../domain/tool-studio/ToolStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

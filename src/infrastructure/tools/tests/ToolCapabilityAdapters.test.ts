@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { InMemoryWorkflowRepository } from "../../mocks/repositories/InMemoryWorkflowRepository";
-import { makeNode, makeWorkflow } from "../../../src/domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../src/domain/workflows/WorkflowMetadata";
+import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import { WorkflowToolProjectionService } from "../../../application/projection/WorkflowToolProjectionService";
 import { WorkflowProjectedToolCapabilityCatalog } from "../WorkflowProjectedToolCapabilityCatalog";
 import { mapMcpToolToCapability, McpToolCapabilityCatalog } from "../McpToolCapabilityCatalog";

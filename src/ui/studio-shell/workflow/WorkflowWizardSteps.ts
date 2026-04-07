@@ -17,7 +17,7 @@ import {
   type WorkflowDraftManualInteractionMode,
   WorkflowDraftManualInteractionModes,
   type WorkflowDraftStep,
-} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { createDefaultBuiltInWorkflowStepRegistry } from "../../../application/workflow-studio/BuiltInWorkflowStepRegistry";
 import {
   TaxonomyBehaviorKinds,
@@ -25,7 +25,7 @@ import {
   TaxonomyStructuralKinds,
   createCompositionTaxonomyDescriptor,
   type CompositionTaxonomyDescriptor,
-} from "../../../src/domain/taxonomy/CompositionTaxonomy";
+} from "../../../domain/taxonomy/CompositionTaxonomy";
 
 export const WorkflowWizardStepSelectionKinds = Object.freeze({
   assetBacked: "asset-backed",

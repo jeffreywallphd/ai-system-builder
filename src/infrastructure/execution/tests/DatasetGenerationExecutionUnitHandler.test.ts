@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../src/domain/execution/ExecutionPlan";
+import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
 import { DatasetGenerationExecutionUnitHandler } from "../DatasetGenerationExecutionUnitHandler";
 
 describe("DatasetGenerationExecutionUnitHandler", () => {

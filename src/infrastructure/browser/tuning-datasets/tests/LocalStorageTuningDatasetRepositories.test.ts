@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { ChatCompletionExample, DatasetExportRecord, TuningDataset, TuningDatasetVersion, QuestionAnsweringExample, SourceDocumentReference } from "../../../../src/domain/tuning-datasets/TuningDatasetEntities";
+import { ChatCompletionExample, DatasetExportRecord, TuningDataset, TuningDatasetVersion, QuestionAnsweringExample, SourceDocumentReference } from "../../../../domain/tuning-datasets/TuningDatasetEntities";
 import { LocalStorageTuningDatasetRepository } from "../LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../LocalStorageTuningDatasetVersionRepository";
 

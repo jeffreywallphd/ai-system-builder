@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { IModel } from "../../src/domain/models/interfaces/IModel";
+import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { ManagedModelLibraryItem, ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
 import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";

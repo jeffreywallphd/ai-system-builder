@@ -3,10 +3,10 @@ import type {
   AuthorizationAccessStateApiResponse,
   AuthorizationManagementApiError,
   AuthorizationSharingGrantApiRecord,
-} from "../../../src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
-import { AuthorizationPermissionActionMatrix } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationResourceFamily } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationRoleKey, ResourceVisibility, SharingPolicyMode } from "../../../src/domain/authorization/AuthorizationDomain";
+} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import { AuthorizationPermissionActionMatrix } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationRoleKey, ResourceVisibility, SharingPolicyMode } from "../../../domain/authorization/AuthorizationDomain";
 import { AuthorizationManagementService } from "../../services/AuthorizationManagementService";
 import type { AuthorizationSharingTargetDraft } from "../../shared/authorization/AuthorizationManagementClient";
 

@@ -8,7 +8,7 @@ import {
   createLocalCredentialState,
   createUserIdentity,
   type AuthProvider,
-} from "../../../src/domain/identity/IdentityDomain";
+} from "../../../domain/identity/IdentityDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,

@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { SqliteExecutionAuditRepository } from "../SqliteExecutionAuditRepository";
-import { ExecutionAuditEventKinds } from "../../../../src/domain/system-runtime/ExecutionAuditTrailDomain";
+import { ExecutionAuditEventKinds } from "../../../../domain/system-runtime/ExecutionAuditTrailDomain";
 
 describe("SqliteExecutionAuditRepository", () => {
   it("persists and lists audit records by execution id and recency", () => {

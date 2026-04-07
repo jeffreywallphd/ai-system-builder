@@ -1,4 +1,4 @@
-import type { AuthorizationResourceFamily } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export function buildAuthorizationSharingThinClientPath(resource: {

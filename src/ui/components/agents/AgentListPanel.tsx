@@ -1,4 +1,4 @@
-import type { AgentAuthoringApiReadModel } from "../../../src/infrastructure/api/agents/AgentAuthoringBackendApi";
+import type { AgentAuthoringApiReadModel } from "../../../infrastructure/api/agents/AgentAuthoringBackendApi";
 
 interface AgentListPanelProps {
   readonly agents: ReadonlyArray<AgentAuthoringApiReadModel>;

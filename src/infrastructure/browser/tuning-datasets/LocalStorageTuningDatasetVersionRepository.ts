@@ -9,8 +9,8 @@ import {
   ValidationIssue,
   type SourceSegmentReference,
   type DatasetExportRecord,
-} from "../../../src/domain/tuning-datasets/TuningDatasetEntities";
-import { DatasetExportRecord as DatasetExportRecordEntity } from "../../../src/domain/tuning-datasets/TuningDatasetEntities";
+} from "../../../domain/tuning-datasets/TuningDatasetEntities";
+import { DatasetExportRecord as DatasetExportRecordEntity } from "../../../domain/tuning-datasets/TuningDatasetEntities";
 import type {
   ChatCompletionMessage,
   DatasetExample,
@@ -25,7 +25,7 @@ import type {
   DatasetWorkflowState,
   ExampleStatus,
   SplitType,
-} from "../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -112,7 +112,7 @@ interface SerializedValidationIssue {
   readonly message: string;
   readonly exampleId?: string;
   readonly field?: string;
-  readonly stage?: import("../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetWorkflowStage;
+  readonly stage?: import("../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").DatasetWorkflowStage;
 }
 
 interface SerializedValidationResult {
@@ -150,7 +150,7 @@ interface WorkflowRecord {
   readonly versionId: string;
   readonly currentStage: DatasetWorkflowState["currentStage"];
   readonly completedStages: ReadonlyArray<DatasetWorkflowState["currentStage"]>;
-  readonly stageStates: ReadonlyArray<{ readonly stage: DatasetWorkflowState["currentStage"]; readonly status: import("../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio").WorkflowStageStatus }>;
+  readonly stageStates: ReadonlyArray<{ readonly stage: DatasetWorkflowState["currentStage"]; readonly status: import("../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio").WorkflowStageStatus }>;
   readonly progressPercent: number;
   readonly lastVisitedStage: DatasetWorkflowState["currentStage"];
   readonly updatedAt: string;

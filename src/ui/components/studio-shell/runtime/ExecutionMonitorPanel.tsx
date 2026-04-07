@@ -1,7 +1,7 @@
 import type {
   RuntimeExecutionStatusReadModel,
   RuntimeExecutionTraceReadModel,
-} from "../../../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { ExecutionStatusSummary } from "./ExecutionStatusSummary";
 import { ExecutionStepStatusList } from "./ExecutionStepStatusList";
 import { ExecutionTracePanel } from "./ExecutionTracePanel";

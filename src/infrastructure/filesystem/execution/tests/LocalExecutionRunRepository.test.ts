@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../src/domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../../src/domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "../../../../domain/execution/ExecutionRun";
 import { LocalFileStorage } from "../../LocalFileStorage";
 import { LocalExecutionRunRepository } from "../LocalExecutionRunRepository";
 

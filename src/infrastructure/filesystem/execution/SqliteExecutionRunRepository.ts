@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunRecord } from "../../../src/domain/execution/ExecutionRun";
+import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
 import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
 import { deriveExecutionRunQueryIndex } from "../../../application/execution/ExecutionRunQueryIndex";
 

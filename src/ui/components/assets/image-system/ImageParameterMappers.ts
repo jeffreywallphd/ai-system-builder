@@ -1,4 +1,4 @@
-import type { AssetContractParameterDescriptor } from "../../../../src/domain/contracts/AssetContract";
+import type { AssetContractParameterDescriptor } from "../../../../domain/contracts/AssetContract";
 import type { ImageParameterDefinition } from "./ImageUiContracts";
 
 function normalizeType(valueType?: string): ImageParameterDefinition["type"] {

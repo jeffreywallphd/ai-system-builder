@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionUnitKinds } from "../../../src/domain/execution/ExecutionPlan";
-import { PipelineStageIds } from "../../../src/domain/dataset-studio/PipelineStageDomain";
+import { ExecutionPlan, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
+import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
 import { DataStudioPreparationWizard } from "../../../application/data-studio/DataStudioPreparationWizard";
 import {
   DataStudioPipelineExecutionArtifacts,

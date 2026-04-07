@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { DataStudioPreparationWizardStateAdapter } from "../DataStudioPreparationWizardStateAdapter";
-import { PipelineStageIds } from "../../../../src/domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "../../../../domain/dataset-studio/PipelineStageDomain";
 
 describe("DataStudioPreparationWizardStateAdapter", () => {
   it("lists and applies intent templates", () => {

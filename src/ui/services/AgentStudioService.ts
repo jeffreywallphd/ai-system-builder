@@ -1,6 +1,6 @@
-import type { AgentPlanningStrategy } from "../../src/domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../src/domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../src/domain/agents/AgentPolicy";
+import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "../../domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
 import type {
   AgentLaunchReadModel,
@@ -11,8 +11,8 @@ import type {
 } from "../../application/agents/contracts/AgentRunContracts";
 import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
 import { resolveDesktopAgentBridge } from "../composition/DesktopAgentBridgeAdapter";
-import type { AgentAuthoringApiReadModel } from "../../src/infrastructure/api/agents/AgentAuthoringBackendApi";
-import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
+import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
+import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 
 export class AgentStudioService {

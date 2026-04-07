@@ -1,4 +1,4 @@
-import type { TaxonomySemanticRole } from "../../src/domain/taxonomy/CompositionTaxonomy";
+import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();

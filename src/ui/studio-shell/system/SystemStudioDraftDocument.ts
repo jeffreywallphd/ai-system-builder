@@ -1,4 +1,4 @@
-import type { SystemAsset } from "../../../src/domain/system-studio/SystemAssetDomain";
+import type { SystemAsset } from "../../../domain/system-studio/SystemAssetDomain";
 import {
   normalizeSystemStudioPageModel,
   toSerializableSystemStudioPageModel,

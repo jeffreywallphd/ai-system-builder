@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../src/domain/studio-shell/StudioShellDomain";
-import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../src/domain/taxonomy/CompositionTaxonomy";
-import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
+import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
 import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
 import type {
@@ -11,7 +11,7 @@ import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
   SystemRuntimeApiResponse,
-} from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
   LaunchSystemRuntimeWindowReadModel,
   LaunchSystemRuntimeWindowRequest,
@@ -24,7 +24,7 @@ import type {
   UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
-} from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
+} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
 import type { ExperienceSurfaceAssetId } from "./experience-assets/ExperienceSurfaceAssets";
 import type { DraftAuthoringSurfaceConfiguration } from "./experience-assets/ExperienceSurfaceAssets";
 

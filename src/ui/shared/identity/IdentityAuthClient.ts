@@ -34,7 +34,7 @@ import type {
   UpdateTrustedDeviceDisplayNameApiResponse,
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
-} from "../../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 export interface IdentityAuthClient {
   registerLocalAccount(

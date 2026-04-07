@@ -8,12 +8,12 @@ import {
   type WorkflowRunStatus,
   type WorkflowRunDiagnosticRecord,
   type WorkflowStepRunRecord,
-} from "../../../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import type {
   WorkflowRunDetailReadModel,
   WorkflowRunDiagnosticReadModel,
   WorkflowRunSummaryReadModel,
-} from "../../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../../../services/StudioShellService";
 import {
   buildWorkflowStudioRunDetailPath,

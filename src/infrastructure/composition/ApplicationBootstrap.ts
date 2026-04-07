@@ -1,9 +1,9 @@
 import { DependencyContainer } from "./DependencyContainer";
 import { InfrastructureRegistry, TOKENS, type IInfrastructureRegistryOptions } from "./InfrastructureRegistry";
 
-import { WorkflowValidator } from "../../src/domain/services/WorkflowValidator";
-import { NodeCompatibilityService } from "../../src/domain/services/NodeCompatibilityService";
-import { ModelCompatibilityService } from "../../src/domain/services/ModelCompatibilityService";
+import { WorkflowValidator } from "../../domain/services/WorkflowValidator";
+import { NodeCompatibilityService } from "../../domain/services/NodeCompatibilityService";
+import { ModelCompatibilityService } from "../../domain/services/ModelCompatibilityService";
 
 import { CreateWorkflowUseCase } from "../../application/workflows/CreateWorkflowUseCase";
 import { ExecuteWorkflowUseCase } from "../../application/workflows/ExecuteWorkflowUseCase";
@@ -11,9 +11,9 @@ import { ValidateWorkflowUseCase } from "../../application/workflows/ValidateWor
 import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
 import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
 
-import { CreateNodeUseCase } from "../../src/application/nodes/CreateNodeUseCase";
-import { ConnectNodesUseCase } from "../../src/application/nodes/ConnectNodesUseCase";
-import { ListAvailableNodesUseCase } from "../../src/application/nodes/ListAvailableNodesUseCase";
+import { CreateNodeUseCase } from "../../application/nodes/CreateNodeUseCase";
+import { ConnectNodesUseCase } from "../../application/nodes/ConnectNodesUseCase";
+import { ListAvailableNodesUseCase } from "../../application/nodes/ListAvailableNodesUseCase";
 
 import { InstallModelUseCase } from "../../application/models/InstallModelUseCase";
 import { ListInstalledModelsUseCase } from "../../application/models/ListInstalledModelsUseCase";
@@ -69,9 +69,9 @@ import type { IAssetLineageRepository } from "../../application/ports/interfaces
 import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
 import { WorkflowContextService } from "../../application/context/WorkflowContextService";
 import { UnifiedExecutionEngine } from "../../application/execution/UnifiedExecutionEngine";
-import type { IWorkflowValidator } from "../../src/domain/services/interfaces/IWorkflowValidator";
-import type { INodeCompatibilityService } from "../../src/domain/services/interfaces/INodeCompatibilityService";
-import type { IModelCompatibilityService } from "../../src/domain/services/interfaces/IModelCompatibilityService";
+import type { IWorkflowValidator } from "../../domain/services/interfaces/IWorkflowValidator";
+import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
+import type { IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
 
 export const APPLICATION_TOKENS = Object.freeze({
   ModelCompatibilityService: Symbol("ModelCompatibilityService"),

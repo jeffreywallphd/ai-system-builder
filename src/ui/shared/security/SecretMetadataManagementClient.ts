@@ -5,10 +5,10 @@ import type {
   ListSecretMetadataApiResponse,
   RotateSecretMetadataApiResponse,
   SecretMetadataApiResponse,
-} from "../../../src/infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
-import type { SecretKind, SecretScope } from "../../../src/domain/security/SecretDomain";
-import type { SecretClassificationId } from "../../../src/shared/contracts/security/SecretClassificationContracts";
-import type { SecretRotationInstructionContract } from "../../../src/shared/contracts/security/SecretTransportContracts";
+} from "../../../infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
+import type { SecretKind, SecretScope } from "../../../domain/security/SecretDomain";
+import type { SecretClassificationId } from "../../../shared/contracts/security/SecretClassificationContracts";
+import type { SecretRotationInstructionContract } from "../../../shared/contracts/security/SecretTransportContracts";
 
 export interface SecretMetadataOwnerDraft {
   readonly scope: SecretScope;

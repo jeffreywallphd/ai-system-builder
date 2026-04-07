@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../src/domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
+import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "../../../../domain/assets/AssetVersion";
 import {
   RuntimeAccessControlService,
   type ExecutionAccessDecision,

@@ -10,8 +10,8 @@ import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../src/domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../src/domain/models/interfaces/IModelDependency";
+} from "../../domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "../../domain/models/interfaces/IModelDependency";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();

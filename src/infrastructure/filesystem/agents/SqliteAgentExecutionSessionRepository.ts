@@ -5,7 +5,7 @@ import type {
   AgentExecutionSessionTransitionRecord,
   IAgentExecutionSessionRepository,
 } from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
-import type { AgentExecutionSession, AgentExecutionSessionStatus } from "../../../src/domain/agents/AgentExecutionSession";
+import type { AgentExecutionSession, AgentExecutionSessionStatus } from "../../../domain/agents/AgentExecutionSession";
 
 interface SessionRow {
   readonly session_json: string;

@@ -12,7 +12,7 @@ import { InMemoryEndpointExposureRepository, SystemEndpointExposureService } fro
 import { DeploymentEndpointRuntimeInvoker } from "../../system-runtime/DeploymentEndpointRuntimeInvoker";
 import { DeploymentBackendApi } from "../DeploymentBackendApi";
 import { buildSampleBundle, createSampleConfiguration } from "../../../../application/deployment/tests/testUtils";
-import { createSystemPackage } from "../../../../src/domain/system-packaging/SystemPackagingDomain";
+import { createSystemPackage } from "../../../../domain/system-packaging/SystemPackagingDomain";
 
 function createHarness() {
   const repository = new InMemoryDeploymentRecordRepository();

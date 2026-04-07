@@ -2,8 +2,8 @@ import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createSystemStudioTaxonomy } from "../../../../src/domain/system-studio/SystemAssetDomain";
-import { createSystemExecution } from "../../../../src/domain/system-runtime/SystemRuntimeDomain";
+import { createSystemStudioTaxonomy } from "../../../../domain/system-studio/SystemAssetDomain";
+import { createSystemExecution } from "../../../../domain/system-runtime/SystemRuntimeDomain";
 import { SqliteSystemRuntimeExecutionStore } from "../SqliteSystemRuntimeExecutionStore";
 
 function createExecution(executionId: string, rootVersionId = "system:root:v1") {

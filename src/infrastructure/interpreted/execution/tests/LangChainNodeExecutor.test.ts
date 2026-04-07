@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { makeNode } from "../../../../src/domain/workflows/tests/testUtils";
+import { makeNode } from "../../../../domain/workflows/tests/testUtils";
 import { Node } from "../../../../domain/nodes/Node";
 import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
 import { NodeProperty } from "../../../../domain/nodes/NodeProperty";

@@ -1,12 +1,12 @@
-import type { IModel } from "../../src/domain/models/interfaces/IModel";
-import type { ModelTask } from "../../src/domain/models/interfaces/IModelCompatibility";
+import type { IModel } from "../../domain/models/interfaces/IModel";
+import type { ModelTask } from "../../domain/models/interfaces/IModelCompatibility";
 import {
   Model,
   ModelArtifact,
   ModelResourceProfile,
   ModelSource,
-} from "../../src/domain/models/Model";
-import { ModelCompatibility } from "../../src/domain/models/ModelCompatibility";
+} from "../../domain/models/Model";
+import { ModelCompatibility } from "../../domain/models/ModelCompatibility";
 import type {
   IRemoteModelCatalog,
   IRemoteModelCatalogItem,

@@ -3,7 +3,7 @@ import type {
   CredentialPolicy,
   UserIdentity,
   UserIdentityStatus,
-} from "../../../src/domain/identity/IdentityDomain";
+} from "../../../domain/identity/IdentityDomain";
 import {
   evaluateCredentialPolicy,
   evaluateIdentityStatusTransition,
@@ -13,7 +13,7 @@ import {
   type IdentityPolicyResult,
   type NormalizedIdentityProfile,
   type ProviderSubjectReference,
-} from "../../../src/domain/identity/IdentityPolicy";
+} from "../../../domain/identity/IdentityPolicy";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,

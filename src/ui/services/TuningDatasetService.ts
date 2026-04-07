@@ -4,7 +4,7 @@ import type {
   DatasetWorkflowStage,
   ExportFormat,
   SplitType,
-} from "../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type {
   AddExampleCommand,
   BulkUpdateExamplesCommand,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   GetStorageInstanceDetailApiResponse,
   StorageManagementApiError,
-} from "../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -16,12 +16,12 @@ import {
   type StorageBackendType,
   type StorageEncryptionKeyScope,
   type StorageEncryptionMode,
-} from "../../../src/domain/storage/StorageDomain";
+} from "../../../domain/storage/StorageDomain";
 import {
   StorageTransportSchemaValidationError,
   parseCreateStorageInstanceRequestDto,
   parseUpdateStorageInstanceRequestDto,
-} from "../../../src/shared/schemas/storage/StorageTransportSchemaContracts";
+} from "../../../shared/schemas/storage/StorageTransportSchemaContracts";
 import type { StorageAdministrationService } from "../../services/StorageAdministrationService";
 
 interface StorageInstanceWorkflowPanelProps {

@@ -5,11 +5,11 @@ import type {
 import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
-} from "../../src/domain/workflow-studio/WorkflowPersistenceDomain";
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   normalizePersistedWorkflowRecord,
   toPersistedWorkflowSummary,
-} from "../../src/domain/workflow-studio/WorkflowPersistenceDomain";
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 
 export class InMemoryWorkflowPersistenceRepository implements IWorkflowPersistenceRepository {
   private readonly records = new Map<string, PersistedWorkflowRecord>();

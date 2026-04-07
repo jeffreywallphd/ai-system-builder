@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   WorkflowWizardSectionIds,
   deriveWorkflowWizardProgress,

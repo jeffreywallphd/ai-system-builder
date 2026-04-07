@@ -5,14 +5,14 @@ import {
   createDatasetInstance,
   type DatasetInstance,
   type DatasetInstanceRole,
-} from "../../../src/domain/system-runtime/DatasetInstanceDomain";
+} from "../../../domain/system-runtime/DatasetInstanceDomain";
 import {
   createDatasetInstanceImageRecord,
   matchesDatasetInstanceImageRecordQuery,
   normalizeDatasetInstanceImageRecordQuery,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
-} from "../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
+} from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import type {
   QueryDatasetInstanceImageRecordPageBySystemIdRequest,
   QueryDatasetInstanceImageRecordPageResult,

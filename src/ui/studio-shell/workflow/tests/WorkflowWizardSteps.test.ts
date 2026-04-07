@@ -7,7 +7,7 @@ import {
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
-} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowStepDependency,
   addWorkflowStep,

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { ContextPreviewResult } from "../../application/context/models/ContextPreview";
-import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import ContextWorkbench, { type ContextWorkbenchMode } from "../components/context/ContextWorkbench";
 import { useUiDependencies } from "../composition/AppProviders";
 import { ROUTE_PATHS } from "../routes/RouteConfig";

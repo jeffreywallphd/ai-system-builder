@@ -1,7 +1,7 @@
 import type { DesktopStudioShellBridge } from "../../electron/shared/DesktopContracts";
-import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
-import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
   resolveBrowserStudioShellRepository,
   resolveBrowserWorkflowPersistenceRepository,

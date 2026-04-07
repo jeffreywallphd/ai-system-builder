@@ -1,5 +1,5 @@
 import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunRecord } from "../../../src/domain/execution/ExecutionRun";
+import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
 import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
 import { deriveExecutionRunQueryIndex, type IExecutionRunQueryIndex } from "../../../application/execution/ExecutionRunQueryIndex";
 

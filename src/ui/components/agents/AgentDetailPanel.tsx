@@ -1,24 +1,24 @@
 import { useEffect, useState } from "react";
-import type { AgentGoalPriorityLevel } from "../../../src/domain/agents/AgentGoal";
+import type { AgentGoalPriorityLevel } from "../../../domain/agents/AgentGoal";
 import {
   AgentPlanningStrategyModes,
   SupportedAgentPlanningStrategies,
   type AgentPlanningStrategy,
-} from "../../../src/domain/agents/Agent";
+} from "../../../domain/agents/Agent";
 import {
   AgentMemoryRetentionModes,
   AgentMemoryRetrievalStrategies,
   AgentMemoryTypes,
   type AgentMemoryConfiguration,
   type AgentMemoryType,
-} from "../../../src/domain/agents/AgentMemory";
+} from "../../../domain/agents/AgentMemory";
 import {
   AgentApprovalStatuses,
   type AgentPolicy,
   type AgentToolAccessPolicy,
-} from "../../../src/domain/agents/AgentPolicy";
+} from "../../../domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentStudioSnapshotReadModel } from "../../../src/infrastructure/api/agents/AgentStudioBackendApi";
+import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { CompositionSummaryCard } from "./CompositionSummaryCard";
 import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";

@@ -1,7 +1,7 @@
 import {
   createTrainingRecipeStudioTaxonomy,
   TrainingRecipeStudioIdentity,
-} from "../../../src/domain/training-recipe-studio/TrainingRecipeStudioDomain";
+} from "../../../domain/training-recipe-studio/TrainingRecipeStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

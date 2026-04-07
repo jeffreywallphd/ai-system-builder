@@ -6,7 +6,7 @@ import {
   type AuthProviderCategory,
   type AuthProviderKind,
   type AuthProviderStatus,
-} from "../../../src/domain/identity/IdentityDomain";
+} from "../../../domain/identity/IdentityDomain";
 import {
   IdentityAuthenticatorKinds,
   type IdentityAuthenticatorKind,

@@ -8,8 +8,8 @@ import {
   createPairingToken,
   type PairingSession,
   type PairingToken,
-} from "../../../src/domain/identity/TrustedDevicePairingDomain";
-import type { TrustedDevice } from "../../../src/domain/identity/TrustedDeviceDomain";
+} from "../../../domain/identity/TrustedDevicePairingDomain";
+import type { TrustedDevice } from "../../../domain/identity/TrustedDeviceDomain";
 
 export function mapTrustedDeviceRecord(device: TrustedDevice): TrustedDeviceRecord {
   return Object.freeze({

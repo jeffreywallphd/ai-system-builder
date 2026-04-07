@@ -1,7 +1,7 @@
 import type {
   AssetManagementApiResponse,
   AssetManagementApiError,
-} from "../../../src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract";
+} from "../../../infrastructure/api/assets/sdk/PublicAssetManagementApiContract";
 import {
   AssetWorkflowClientContractVersions,
   buildAuthorizedAssetDownloadPath,
@@ -18,7 +18,7 @@ import {
   type AssetWorkflowPreviewResponse,
   type AssetWorkflowUploadInitiationRequest,
   type AssetWorkflowUploadInitiationResponse,
-} from "../../../src/shared/contracts/assets/AssetWorkflowClientContracts";
+} from "../../../shared/contracts/assets/AssetWorkflowClientContracts";
 
 export interface AssetWorkflowClient {
   initiateUpload(

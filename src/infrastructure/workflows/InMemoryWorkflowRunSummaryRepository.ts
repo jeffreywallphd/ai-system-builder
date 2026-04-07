@@ -3,13 +3,13 @@ import type {
   WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
   normalizeWorkflowRunSummaryRecord,
   normalizeWorkflowRunDetailRecord,
-} from "../../src/domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
 
 export class InMemoryWorkflowRunSummaryRepository implements IWorkflowRunSummaryRepository {
   private readonly records = new Map<string, WorkflowRunSummaryRecord>();

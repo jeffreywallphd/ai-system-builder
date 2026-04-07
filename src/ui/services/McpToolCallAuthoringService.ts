@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import { buildMcpToolDescriptorId } from "../../application/mcp/models/McpToolDescriptor";
 import {
   McpToolCallNodeConfigurationService,

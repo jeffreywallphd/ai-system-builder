@@ -7,7 +7,7 @@ import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
-} from "../../../../src/domain/agents/AgentExecutionSession";
+} from "../../../../domain/agents/AgentExecutionSession";
 import { SqliteAgentExecutionSessionRepository } from "../SqliteAgentExecutionSessionRepository";
 
 const createdRoots: string[] = [];

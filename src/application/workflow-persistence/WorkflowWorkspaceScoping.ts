@@ -1,9 +1,9 @@
-import type { WorkspaceOwnershipMetadata, WorkspaceVisibility } from "../../src/shared/workspaces/WorkspaceOwnership";
+import type { WorkspaceOwnershipMetadata, WorkspaceVisibility } from "../../shared/workspaces/WorkspaceOwnership";
 import {
   createWorkspaceOwnershipMetadata,
   rehydrateWorkspaceOwnershipMetadata,
   WorkspaceOwnershipError,
-} from "../../src/shared/workspaces/WorkspaceOwnership";
+} from "../../shared/workspaces/WorkspaceOwnership";
 import type { WorkflowPersistenceOwnershipContext } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import { WorkflowPersistenceInvalidRequestError } from "./WorkflowPersistenceErrors";
 

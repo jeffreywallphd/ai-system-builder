@@ -1,7 +1,7 @@
 import {
   createEmbeddingIndexStudioTaxonomy,
   EmbeddingIndexStudioIdentity,
-} from "../../../src/domain/embedding-index-studio/EmbeddingIndexStudioDomain";
+} from "../../../domain/embedding-index-studio/EmbeddingIndexStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

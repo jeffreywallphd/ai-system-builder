@@ -1,4 +1,4 @@
-import type { IModel } from "../../src/domain/models/interfaces/IModel";
+import type { IModel } from "../../domain/models/interfaces/IModel";
 import type { ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
 import type { IInstalledModelSearchCriteria } from "../../application/ports/interfaces/IInstalledModelCatalog";
 import type {

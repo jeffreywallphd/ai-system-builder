@@ -4,7 +4,7 @@ import type {
   WorkspaceAdminListItemApiRecord,
   WorkspaceInvitationApiRecord,
   WorkspaceMembershipApiRecord,
-} from "../../src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+} from "../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";

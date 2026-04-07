@@ -6,8 +6,8 @@ import {
   createDatasetInstance,
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRuntimeStatuses,
-} from "../../../../src/domain/system-runtime/DatasetInstanceDomain";
-import { createDatasetInstanceImageRecord } from "../../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
+} from "../../../../domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import { StorageBackedDatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
 import { SqliteDatasetInstanceRepository } from "../SqliteDatasetInstanceRepository";
 

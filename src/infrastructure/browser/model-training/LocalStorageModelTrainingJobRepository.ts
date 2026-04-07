@@ -1,4 +1,4 @@
-import type { ModelTrainingArtifact, ModelTrainingCheckpoint, ModelTrainingConfiguration, ModelTrainingDiagnostic, ModelTrainingJob } from "../../../src/domain/model-training/ModelTrainingTypes";
+import type { ModelTrainingArtifact, ModelTrainingCheckpoint, ModelTrainingConfiguration, ModelTrainingDiagnostic, ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
 import type { IModelTrainingJobRepository } from "../../../application/ports/interfaces/IModelTrainingJobRepository";
 
 interface StorageLike {

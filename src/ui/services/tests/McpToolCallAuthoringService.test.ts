@@ -1,9 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
 import { McpToolCallAuthoringService } from "../McpToolCallAuthoringService";
-import { ImplementationRegistryNodeCatalogProvider } from "../../../src/infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { McpNodeImplementationRegistry } from "../../../src/infrastructure/nodes/mcp/McpNodeImplementationRegistry";
-import { Workflow } from "../../../src/domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../src/domain/workflows/WorkflowMetadata";
+import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { McpNodeImplementationRegistry } from "../../../infrastructure/nodes/mcp/McpNodeImplementationRegistry";
+import { Workflow } from "../../../domain/workflows/Workflow";
+import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
 import {
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_ID_PROPERTY,

@@ -9,7 +9,7 @@ import {
   type SessionDeviceTrustContext,
   type Session,
   type SessionRevocationReason,
-} from "../../../src/domain/identity/IdentityDomain";
+} from "../../../domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,

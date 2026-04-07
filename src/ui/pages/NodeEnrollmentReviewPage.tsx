@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type {
   NodeEnrollmentDetailDto,
   NodePendingEnrollmentSummaryDto,
-} from "../../src/shared/contracts/nodes/NodeTrustApiContracts";
+} from "../../shared/contracts/nodes/NodeTrustApiContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeEnrollmentReviewService } from "../services/NodeEnrollmentReviewService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";

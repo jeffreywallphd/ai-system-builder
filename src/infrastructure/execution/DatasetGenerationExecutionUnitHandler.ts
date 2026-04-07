@@ -1,9 +1,9 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../src/domain/execution/ExecutionPlan";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
 import type {
   DatasetGenerationRequest,
   DatasetGenerationResult,
   DatasetGenerationService,
-} from "../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import {
   createDatasetGenerationExecutionArtifact,
   DatasetGenerationExecutionArtifacts,

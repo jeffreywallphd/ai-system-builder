@@ -1,5 +1,5 @@
 import type { JSX } from "react";
-import type { StudioShellValidationIssue } from "../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import PanelDesignStudio from "../../components/studio-shell/system/PanelDesignStudio";
 import type {
   CanvasExperienceAssetDefinition,

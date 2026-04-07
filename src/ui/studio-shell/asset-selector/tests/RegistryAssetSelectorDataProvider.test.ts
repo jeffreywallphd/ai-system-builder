@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../src/domain/studio-shell/AssetSelectorContract";
+import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../domain/studio-shell/AssetSelectorContract";
 import { RegistryAssetSelectorDataProvider } from "../RegistryAssetSelectorDataProvider";
 
 describe("RegistryAssetSelectorDataProvider", () => {

@@ -1,4 +1,4 @@
-import type { DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyUnavailableError,

@@ -2,7 +2,7 @@ import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
-} from "../../../src/infrastructure/config/HostSecureTransportConfig";
+} from "../../../infrastructure/config/HostSecureTransportConfig";
 
 export function resolveDesktopIdentityApiBaseUrl(): string | undefined {
   if (typeof window === "undefined") {

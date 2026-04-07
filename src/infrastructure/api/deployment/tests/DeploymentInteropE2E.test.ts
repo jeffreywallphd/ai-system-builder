@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
+import { AssetVersion } from "../../../../domain/assets/AssetVersion";
 import { SystemPackagingService } from "../../../../application/system-packaging/SystemPackagingService";
 import { DeploymentBuildPipeline } from "../../../../application/deployment/DeploymentBuildPipeline";
 import {
@@ -13,12 +13,12 @@ import {
 import {
   createDeploymentConfigurationContract,
   type DeploymentConfigurationContract,
-} from "../../../../src/domain/deployment/DeploymentConfigurationDomain";
+} from "../../../../domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
   type DeploymentTarget,
-} from "../../../../src/domain/deployment/DeploymentTargetDomain";
+} from "../../../../domain/deployment/DeploymentTargetDomain";
 import {
   DeploymentAccessEvaluator,
   RoleBasedDeploymentAccessPolicy,
@@ -38,7 +38,7 @@ import {
   InMemoryDeploymentAuditRepository,
 } from "../../../../application/deployment/DeploymentAuditTrailService";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../src/domain/studio-shell/StudioShellDomain";
+import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
 import { SystemRuntimeBackendApi } from "../../system-runtime/SystemRuntimeBackendApi";
 import { ExternalSystemRuntimeInterface } from "../../system-runtime/ExternalSystemRuntimeInterface";
 import { DeploymentEndpointRuntimeInvoker } from "../../system-runtime/DeploymentEndpointRuntimeInvoker";

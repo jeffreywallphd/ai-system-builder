@@ -1,4 +1,4 @@
-import { createDatasetPipelineStudioTaxonomy, DatasetPipelineStudioIdentity } from "../../../src/domain/dataset-pipeline-studio/DatasetPipelineStudioDomain";
+import { createDatasetPipelineStudioTaxonomy, DatasetPipelineStudioIdentity } from "../../../domain/dataset-pipeline-studio/DatasetPipelineStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 

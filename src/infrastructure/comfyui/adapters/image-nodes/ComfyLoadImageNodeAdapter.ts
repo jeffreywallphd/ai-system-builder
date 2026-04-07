@@ -7,7 +7,7 @@ import type {
   IImageNodeExecutionRequest,
 } from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import type { DatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
-import type { DatasetInstanceImageRecord } from "../../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
+import type { DatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,

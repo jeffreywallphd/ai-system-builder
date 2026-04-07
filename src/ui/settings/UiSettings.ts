@@ -1,13 +1,13 @@
-import type { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import {
   normalizePythonRuntimeWorkingDirectory,
   resolveDefaultPythonRuntimeWorkingDirectory,
-} from "../../src/infrastructure/config/PythonRuntimeWorkingDirectory";
+} from "../../infrastructure/config/PythonRuntimeWorkingDirectory";
 import {
   PythonRuntimeMode,
   parsePythonRuntimeMode,
   type PythonRuntimeMode as PythonRuntimeModeValue,
-} from "../../src/infrastructure/config/PythonRuntimeMode";
+} from "../../infrastructure/config/PythonRuntimeMode";
 import type { WorkflowViewMode } from "../state/WorkflowViewMode";
 
 export const WorkspaceDataMode = {

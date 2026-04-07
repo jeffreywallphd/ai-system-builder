@@ -1,7 +1,7 @@
-import { Model, ModelArtifact, ModelSource } from "../../../src/domain/models/Model";
-import { ModelCompatibility } from "../../../src/domain/models/ModelCompatibility";
-import { ModelDependency } from "../../../src/domain/models/ModelDependency";
-import { ModelRequirement } from "../../../src/domain/models/ModelRequirement";
+import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
+import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
+import { ModelDependency } from "../../../domain/models/ModelDependency";
+import { ModelRequirement } from "../../../domain/models/ModelRequirement";
 import { Node } from "../../nodes/Node";
 import { NodeDefinition, NodeDefinitionCapabilityProfile } from "../../nodes/NodeDefinition";
 import { NodePort, NodePortCompatibilityProfile } from "../../nodes/NodePort";
@@ -9,7 +9,7 @@ import { NodeProperty, NodePropertyBindingProfile } from "../../nodes/NodeProper
 import { Workflow } from "../../workflows/Workflow";
 import { WorkflowConnection } from "../../workflows/WorkflowConnection";
 import { WorkflowMetadata } from "../../workflows/WorkflowMetadata";
-import type { RuntimeEngine } from "../../../src/domain/models/interfaces/IModelCompatibility";
+import type { RuntimeEngine } from "../../../domain/models/interfaces/IModelCompatibility";
 
 export function makeCompatibility(overrides: ConstructorParameters<typeof ModelCompatibility>[0] = {}) {
   return new ModelCompatibility({

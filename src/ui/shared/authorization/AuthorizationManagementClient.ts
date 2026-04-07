@@ -5,13 +5,13 @@ import type {
   GrantAuthorizationSharingAccessApiResponse,
   RevokeAuthorizationSharingAccessApiResponse,
   UpdateAuthorizationVisibilityApiResponse,
-} from "../../../src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
-import type { AuthorizationResourceFamily } from "../../../src/domain/authorization/AuthorizationPermissionCatalog";
+} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationRoleKey,
   ResourceVisibility,
   SharingPolicyMode,
-} from "../../../src/domain/authorization/AuthorizationDomain";
+} from "../../../domain/authorization/AuthorizationDomain";
 
 export type AuthorizationSharingTargetDraft =
   | Readonly<{

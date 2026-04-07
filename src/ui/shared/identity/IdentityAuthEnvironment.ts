@@ -1,4 +1,4 @@
-import type { LoginLocalIdentityApiRequest } from "../../../src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type { LoginLocalIdentityApiRequest } from "../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 
 export function resolveIdentityAccessChannel(): NonNullable<LoginLocalIdentityApiRequest["accessChannel"]> {
   if (typeof window !== "undefined" && window.aiLoomDesktop) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { serializeDatasetPipelineAssetDocument } from "../../../../../src/domain/dataset-pipeline-studio/DatasetPipelineAssetDocument";
+import { serializeDatasetPipelineAssetDocument } from "../../../../../domain/dataset-pipeline-studio/DatasetPipelineAssetDocument";
 import DatasetPipelineStudioDraftAuthoringBoundary from "../DatasetPipelineStudioDraftAuthoringBoundary";
 
 describe("DatasetPipelineStudioDraftAuthoringBoundary", () => {

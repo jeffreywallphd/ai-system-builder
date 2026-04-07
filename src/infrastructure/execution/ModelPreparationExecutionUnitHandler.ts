@@ -1,4 +1,4 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../src/domain/execution/ExecutionPlan";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
 import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../application/ports/interfaces/IModelTrainingRuntime";
 import {
   createModelPreparationExecutionArtifact,

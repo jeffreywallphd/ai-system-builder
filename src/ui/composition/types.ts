@@ -1,4 +1,4 @@
-import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { WorkflowService } from "../services/WorkflowService";
 import { NodeService } from "../services/NodeService";
 import { ModelService } from "../services/ModelService";

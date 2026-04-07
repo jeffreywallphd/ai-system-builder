@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { ApplicationBootstrap, APPLICATION_TOKENS } from "../../src/infrastructure/composition/ApplicationBootstrap";
-import { TOKENS } from "../../src/infrastructure/composition/InfrastructureRegistry";
+import { ApplicationBootstrap, APPLICATION_TOKENS } from "../../infrastructure/composition/ApplicationBootstrap";
+import { TOKENS } from "../../infrastructure/composition/InfrastructureRegistry";
 
 describe("infrastructure cross-subfolder interactions", () => {
   it("composes config/filesystem/composition services through bootstrap", () => {
