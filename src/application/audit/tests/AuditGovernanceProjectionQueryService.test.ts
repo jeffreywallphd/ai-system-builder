@@ -228,4 +228,88 @@ describe("AuditGovernanceProjectionQueryService", () => {
     expect(admin.value.visibility).toBe("admin");
     expect(admin.value.adminOnlyDetails?.secretId).toBe("secret:alpha");
   });
+
+  it("supports policy seams for projection shaping and compliance/export notes", async () => {
+    const repository = new InMemoryAuditLedgerRepository(Object.freeze([
+      createEvent({
+        eventId: "audit:event:policy-seam",
+        eventType: "workspace-policy-updated",
+        category: AuditEventCategories.policy,
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T13:00:00.000Z",
+      }),
+    ]));
+    const queryService = new AuditLedgerQueryService({
+      repository,
+      authorizer: new StaticAuthorizer({
+        workspaceIds: ["workspace-alpha"],
+        canReadProtectedData: true,
+        detailVisibility: "admin",
+      }),
+    });
+    const projectionService = new AuditGovernanceProjectionQueryService({
+      auditLedgerQueryService: queryService,
+      projectionPolicy: Object.freeze({
+        summarizeEvent: ({ event }) => `profile-summary:${event.eventType}`,
+        resolveTargetRef: () => "workspace:projection-policy",
+        buildFacets: () => Object.freeze([Object.freeze({
+          key: "category",
+          options: Object.freeze([Object.freeze({
+            value: "policy",
+            count: 1,
+          })]),
+        })]),
+        listExplanatoryNotes: () => Object.freeze([
+          "Projection policy seam applied for deployment-profile governance review shaping.",
+        ]),
+        listComplianceExportNotes: () => Object.freeze([
+          "Compliance export pathways are not implemented in this slice; policy hook only defines extension seam.",
+        ]),
+      }),
+    });
+
+    const listOutcome = await projectionService.listGovernanceAuditEvents({
+      requesterId: "user:admin",
+      query: Object.freeze({
+        workspaceId: "workspace-alpha",
+      }),
+    });
+    expect(listOutcome.ok).toBeTrue();
+    if (!listOutcome.ok) {
+      return;
+    }
+
+    expect(listOutcome.value.events[0]?.summary).toBe("profile-summary:workspace-policy-updated");
+    expect(listOutcome.value.events[0]?.targetRef).toBe("workspace:projection-policy");
+    expect(listOutcome.value.facets).toEqual([{
+      key: "category",
+      options: [{
+        value: "policy",
+        count: 1,
+      }],
+    }]);
+    expect(listOutcome.value.explanatory.notes).toContain(
+      "Projection policy seam applied for deployment-profile governance review shaping.",
+    );
+    expect(listOutcome.value.explanatory.notes).toContain(
+      "Compliance export pathways are not implemented in this slice; policy hook only defines extension seam.",
+    );
+
+    const detailOutcome = await projectionService.getGovernanceAuditEventDetail({
+      requesterId: "user:admin",
+      workspaceId: "workspace-alpha",
+      eventId: "audit:event:policy-seam",
+    });
+    expect(detailOutcome.ok).toBeTrue();
+    if (!detailOutcome.ok) {
+      return;
+    }
+
+    expect(detailOutcome.value.explanatory.notes).toContain(
+      "Projection policy seam applied for deployment-profile governance review shaping.",
+    );
+    expect(detailOutcome.value.explanatory.notes).toContain(
+      "Compliance export pathways are not implemented in this slice; policy hook only defines extension seam.",
+    );
+  });
 });

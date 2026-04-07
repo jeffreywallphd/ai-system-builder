@@ -26,9 +26,11 @@ Related architecture baseline: `docs/architecture/audit-ledger-persistence-query
 - Keep audit read authorization/scope evaluation in application query services, not UI state services.
 - Keep audit detail visibility shaping (`user-safe` vs `admin`) in application authorizer/query services, not controllers/pages.
 - Keep list/detail retrieval ownership in `AuditLedgerQueryService` plus `WorkspaceAuditLedgerReadAuthorizer`, and governance/admin projection shaping ownership in `AuditGovernanceProjectionQueryService`, not transport/UI reimplementations.
+- Use `AuditGovernanceProjectionQueryService` projection-policy seams for deployment-profile-specific governance view growth and compliance/export note shaping, rather than introducing controller/UI branching.
 - Never place raw secret/prompt/path/credential material in ledger payload details.
 - Never place raw secret/prompt/path/credential material in audit observability logs or failure details.
 - Keep retention lifecycle behavior metadata-only in this slice; do not add destructive retention jobs.
+- Do not ship placeholder compliance-export endpoints or fake profile toggles; add only real seams that preserve current behavior.
 
 ## Tests
 

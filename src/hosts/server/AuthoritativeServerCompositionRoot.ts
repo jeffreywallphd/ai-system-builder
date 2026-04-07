@@ -262,6 +262,7 @@ export function createAuthoritativeServerCompositionRoot(
               ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
             const composedHost = await startHost({
               ...(context.hostConfiguration as IdentityServerHostOptions),
+              deploymentProfile: context.deploymentProfile,
               persistentPlatformServices: composedPersistentServices,
               routeRegistrationPlan: apiRouteRegistrationPlan,
             });

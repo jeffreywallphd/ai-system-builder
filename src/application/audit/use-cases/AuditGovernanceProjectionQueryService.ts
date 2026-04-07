@@ -97,6 +97,29 @@ export type GovernanceAuditProjectionDetailOutcome =
 
 export interface AuditGovernanceProjectionQueryServiceDependencies {
   readonly auditLedgerQueryService: Pick<AuditLedgerQueryService, "listAuditEvents" | "getAuditEventDetail">;
+  readonly projectionPolicy?: AuditGovernanceProjectionPolicy;
+}
+
+export interface AuditGovernanceProjectionPolicy {
+  buildFacets?(input: {
+    readonly events: ReadonlyArray<GovernanceAuditEventSummaryProjection>;
+  }): ReadonlyArray<AuditGovernanceProjectionFacet>;
+  summarizeEvent?(input: {
+    readonly event: AuditEventSummaryViewDto | AuditEventDetailViewDto;
+  }): string | undefined;
+  resolveTargetRef?(input: {
+    readonly event: AuditEventSummaryViewDto | AuditEventDetailViewDto;
+  }): string | undefined;
+  listExplanatoryNotes?(input: {
+    readonly projection: "list" | "detail";
+    readonly visibility: "user-safe" | "admin";
+    readonly event?: AuditEventDetailViewDto;
+  }): ReadonlyArray<string>;
+  listComplianceExportNotes?(input: {
+    readonly projection: "list" | "detail";
+    readonly visibility: "user-safe" | "admin";
+    readonly event?: AuditEventDetailViewDto;
+  }): ReadonlyArray<string>;
 }
 
 const UserSafeListNotes = Object.freeze([
@@ -125,19 +148,23 @@ export class AuditGovernanceProjectionQueryService {
       return outcome;
     }
 
-    const events = Object.freeze(outcome.value.response.events.map((event) => toGovernanceSummary(event)));
+    const events = Object.freeze(outcome.value.response.events.map((event) => this.toGovernanceSummary(event)));
     return {
       ok: true,
       value: Object.freeze({
         events,
-        facets: buildFacets(events),
+        facets: this.buildFacets(events),
         totalCount: outcome.value.response.totalCount,
         query: outcome.value.response.query,
         pagination: outcome.value.pagination,
         explanatory: Object.freeze({
           detailVisibility: "user-safe",
           facetCoverage: "page",
-          notes: UserSafeListNotes,
+          notes: this.listNotes({
+            projection: "list",
+            visibility: "user-safe",
+            baseline: UserSafeListNotes,
+          }),
         }),
       }),
     };
@@ -158,38 +185,108 @@ export class AuditGovernanceProjectionQueryService {
     return {
       ok: true,
       value: Object.freeze({
-        summary: toGovernanceSummary(event),
+        summary: this.toGovernanceSummary(event),
         visibility: event.visibility,
         adminOnlyDetails: event.adminOnlyDetails,
         explanatory: Object.freeze({
           roleSensitivity,
-          notes: event.visibility === "admin" ? AdminDetailNotes : UserSafeDetailNotes,
+          notes: this.listNotes({
+            projection: "detail",
+            visibility: event.visibility,
+            event,
+            baseline: event.visibility === "admin" ? AdminDetailNotes : UserSafeDetailNotes,
+          }),
         }),
       }),
     };
   }
-}
 
-function toGovernanceSummary(
-  event: AuditEventSummaryViewDto | AuditEventDetailViewDto,
-): GovernanceAuditEventSummaryProjection {
-  return Object.freeze({
-    eventId: event.eventId,
-    eventType: event.eventType,
-    category: event.category,
-    action: event.action,
-    outcome: event.outcome,
-    occurredAt: event.occurredAt,
-    recordedAt: event.recordedAt,
-    summary: deriveSummary(event),
-    actorId: event.actorId,
-    actorKind: event.actorKind,
-    workspaceId: event.scope.workspaceId,
-    targetRef: deriveTargetRef(event),
-    details: event.details,
-    hasProtectedData: event.hasProtectedData,
-    redactionReasons: event.redactionReasons,
-  });
+  private toGovernanceSummary(
+    event: AuditEventSummaryViewDto | AuditEventDetailViewDto,
+  ): GovernanceAuditEventSummaryProjection {
+    return Object.freeze({
+      eventId: event.eventId,
+      eventType: event.eventType,
+      category: event.category,
+      action: event.action,
+      outcome: event.outcome,
+      occurredAt: event.occurredAt,
+      recordedAt: event.recordedAt,
+      summary: this.resolveSummary(event),
+      actorId: event.actorId,
+      actorKind: event.actorKind,
+      workspaceId: event.scope.workspaceId,
+      targetRef: this.resolveTargetRef(event),
+      details: event.details,
+      hasProtectedData: event.hasProtectedData,
+      redactionReasons: event.redactionReasons,
+    });
+  }
+
+  private resolveSummary(
+    event: AuditEventSummaryViewDto | AuditEventDetailViewDto,
+  ): string {
+    const policySummary = this.dependencies.projectionPolicy?.summarizeEvent?.({ event })?.trim();
+    if (policySummary) {
+      return policySummary;
+    }
+
+    return deriveSummary(event);
+  }
+
+  private resolveTargetRef(
+    event: AuditEventSummaryViewDto | AuditEventDetailViewDto,
+  ): string | undefined {
+    const policyTargetRef = this.dependencies.projectionPolicy?.resolveTargetRef?.({ event })?.trim();
+    if (policyTargetRef) {
+      return policyTargetRef;
+    }
+
+    return deriveTargetRef(event);
+  }
+
+  private buildFacets(
+    events: ReadonlyArray<GovernanceAuditEventSummaryProjection>,
+  ): ReadonlyArray<AuditGovernanceProjectionFacet> {
+    const policyFacets = this.dependencies.projectionPolicy?.buildFacets?.({
+      events,
+    });
+    if (policyFacets && policyFacets.length > 0) {
+      return Object.freeze(policyFacets.map((facet) => Object.freeze({
+        ...facet,
+        options: Object.freeze([...facet.options]),
+      })));
+    }
+
+    return buildFacets(events);
+  }
+
+  private listNotes(input: {
+    readonly projection: "list" | "detail";
+    readonly visibility: "user-safe" | "admin";
+    readonly event?: AuditEventDetailViewDto;
+    readonly baseline: ReadonlyArray<string>;
+  }): ReadonlyArray<string> {
+    const extensionNotes = this.dependencies.projectionPolicy?.listExplanatoryNotes?.({
+      projection: input.projection,
+      visibility: input.visibility,
+      event: input.event,
+    }) ?? [];
+    const complianceExportNotes = this.dependencies.projectionPolicy?.listComplianceExportNotes?.({
+      projection: input.projection,
+      visibility: input.visibility,
+      event: input.event,
+    }) ?? [];
+
+    const combined = new Set<string>();
+    for (const note of [...input.baseline, ...extensionNotes, ...complianceExportNotes]) {
+      const normalized = note.trim();
+      if (normalized) {
+        combined.add(normalized);
+      }
+    }
+    return Object.freeze([...combined.values()]);
+  }
 }
 
 function deriveSummary(

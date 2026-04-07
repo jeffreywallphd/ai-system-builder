@@ -66,6 +66,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 ## Audit ledger query/access extension guardrails
 
 - Keep canonical list/detail retrieval routed through `AuditLedgerQueryService`, and governance/admin UI shaping routed through `AuditGovernanceProjectionQueryService`; do not re-implement authorization intersections or projection logic in transport/UI layers.
+- Extend governance projection behavior through `AuditGovernanceProjectionQueryService` policy seams (facets/summaries/explanatory notes) instead of embedding deployment-profile branching directly in UI or route handlers.
 - Keep workspace/role-derived scope decisions in `WorkspaceAuditLedgerReadAuthorizer`.
 - Keep detail visibility projection delegated to shared DTO contracts (`toAuditEventDetailView(...)`) so admin-only payloads are not leaked.
 - Keep retention/lifecycle behavior metadata-only until a dedicated retention workflow story introduces destructive policy operations.
@@ -94,6 +95,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Bypassing `AuditLedgerQueryService`/`WorkspaceAuditLedgerReadAuthorizer` for privileged reads is prohibited.
 - Returning `adminOnlyDetails` for non-admin audit detail responses is prohibited.
 - Implementing destructive retention deletes or archive jobs in this slice is prohibited.
+- Shipping placeholder compliance export endpoints or fake export toggles is prohibited; only real extension seams and documentation are allowed until a dedicated export/compliance story lands.
 - Storing raw secrets or raw prompts in the ledger is prohibited.
 - Creating duplicate taxonomy mappings outside `AuditApplicationContracts.ts` is prohibited.
 

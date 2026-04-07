@@ -22,6 +22,10 @@ export const AuditRetentionLifecycleEnvironmentKeys = Object.freeze({
   allowDestructiveActions: "AI_LOOM_AUDIT_RETENTION_ALLOW_DESTRUCTIVE_ACTIONS",
 });
 
+export interface AuditRetentionLifecycleDeploymentProfile {
+  readonly profileId: string;
+}
+
 export interface ResolvedAuditRetentionLifecycleConfig {
   readonly executionMode: AuditRetentionLifecycleExecutionMode;
   readonly defaultPolicyKey?: string;
@@ -32,8 +36,10 @@ export interface ResolvedAuditRetentionLifecycleConfig {
 
 export function resolveAuditRetentionLifecycleConfig(input?: {
   readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly deploymentProfile?: AuditRetentionLifecycleDeploymentProfile;
 }): ResolvedAuditRetentionLifecycleConfig {
   const env = input?.env ?? resolveRuntimeEnvironment();
+  const deploymentProfileId = normalizeDeploymentProfileId(input?.deploymentProfile?.profileId);
   const requestedMode = normalizeOptional(env[AuditRetentionLifecycleEnvironmentKeys.executionMode])?.toLowerCase();
   if (
     requestedMode
@@ -52,12 +58,24 @@ export function resolveAuditRetentionLifecycleConfig(input?: {
   }
 
   const defaultRetentionAnchor = normalizeDefaultRetentionAnchor(
-    env[AuditRetentionLifecycleEnvironmentKeys.defaultRetentionAnchor],
+    resolveProfileScopedValue({
+      env,
+      deploymentProfileId,
+      baseEnvironmentKey: AuditRetentionLifecycleEnvironmentKeys.defaultRetentionAnchor,
+    }),
   );
   return Object.freeze({
     executionMode: AuditRetentionLifecycleExecutionModes.metadataOnly,
-    defaultPolicyKey: normalizeOptional(env[AuditRetentionLifecycleEnvironmentKeys.defaultPolicyKey]),
-    defaultPolicyVersion: normalizeOptional(env[AuditRetentionLifecycleEnvironmentKeys.defaultPolicyVersion]),
+    defaultPolicyKey: normalizeOptional(resolveProfileScopedValue({
+      env,
+      deploymentProfileId,
+      baseEnvironmentKey: AuditRetentionLifecycleEnvironmentKeys.defaultPolicyKey,
+    })),
+    defaultPolicyVersion: normalizeOptional(resolveProfileScopedValue({
+      env,
+      deploymentProfileId,
+      baseEnvironmentKey: AuditRetentionLifecycleEnvironmentKeys.defaultPolicyVersion,
+    })),
     defaultRetentionAnchor,
     destructiveActionsEnabled: false,
   });
@@ -95,6 +113,35 @@ function resolveRuntimeEnvironment(): Readonly<Record<string, string | undefined
   ).process;
 
   return processLike?.env ?? Object.freeze({});
+}
+
+function normalizeDeploymentProfileId(value: string | undefined): string | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (!/^[a-z0-9][a-z0-9-]{1,63}$/i.test(normalized)) {
+    return undefined;
+  }
+
+  return normalized;
+}
+
+function resolveProfileScopedValue(input: {
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly deploymentProfileId?: string;
+  readonly baseEnvironmentKey: string;
+}): string | undefined {
+  if (input.deploymentProfileId) {
+    const profileEnvironmentKey = `${input.baseEnvironmentKey}_${input.deploymentProfileId.toUpperCase().replace(/[^A-Z0-9]/g, "_")}`;
+    const profileValue = input.env[profileEnvironmentKey];
+    if (normalizeOptional(profileValue)) {
+      return profileValue;
+    }
+  }
+
+  return input.env[input.baseEnvironmentKey];
 }
 
 function normalizeOptional(value: string | undefined): string | undefined {

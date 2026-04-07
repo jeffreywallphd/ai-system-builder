@@ -71,6 +71,7 @@ Canonical read path:
    - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
 4. `AuditGovernanceProjectionQueryService` builds UI-ready governance/admin summary/detail projections and page-bounded filter facets without moving projection logic into UI:
    - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
+   - projection policy seams can be injected for deployment-profile-specific review shaping, broader facet strategies, and future compliance/export annotation notes without introducing fake export workflows
 5. `AuditLedgerBackendApi` exposes both canonical and projection retrieval seams:
    - `GET /api/v1/audit/events`
    - `GET /api/v1/audit/events/:eventId`
@@ -125,6 +126,7 @@ Retention is metadata-first in this slice:
   - `src/infrastructure/config/AuditRetentionLifecycleConfig.ts`
 - only `metadata-only` execution mode is supported;
 - destructive retention actions are explicitly rejected;
+- deployment-profile-specific retention defaults are supported through profile-scoped environment overrides with fallback to global defaults;
 - no purge/archive worker is implemented here.
 
 This seam exists so future governance policy engines and admin tooling can add lifecycle workflows without replacing persistence/query contracts.
