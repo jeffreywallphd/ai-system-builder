@@ -1,6 +1,8 @@
 import { BuildEntryService } from "./BuildEntry";
-import { APP_ROUTES, ROUTE_PATHS, type AppRouteDefinition } from "./RouteConfig";
+import { ROUTE_PATHS } from "./RouteConfig";
 import { IntentNavigationFeatureFlag } from "../features/IntentNavigationFeatureFlag";
+import { listPrimaryNavigationRouteMetadata, resolveRouteSurfaceMetadataByPath } from "./SurfaceRouteMetadataCatalog";
+import { UiSurfaceKeys } from "../shared/navigation/SurfaceNavigationMetadata";
 
 export const PrimaryNavigationItemKeys = Object.freeze({
   build: "build",
@@ -32,9 +34,9 @@ export interface ShellRouteResolution {
   readonly canonicalPath: string;
 }
 
-function toLegacyNavigationRoutes(routes: ReadonlyArray<AppRouteDefinition>): ReadonlyArray<PrimaryNavigationItem> {
+function toLegacyNavigationRoutes(): ReadonlyArray<PrimaryNavigationItem> {
+  const routes = listPrimaryNavigationRouteMetadata({ surface: UiSurfaceKeys.desktopOperational });
   return routes
-    .filter((route) => route.showInNavigation)
     .map((route) => Object.freeze({
       key: route.key,
       title: route.title,
@@ -45,13 +47,15 @@ function toLegacyNavigationRoutes(routes: ReadonlyArray<AppRouteDefinition>): Re
 
 export class ShellRouteResolver {
   public resolve(pathname: string): ShellRouteResolution | undefined {
-    if (pathname === ROUTE_PATHS.explore || pathname.startsWith("/explore/") || pathname === ROUTE_PATHS.registry || pathname.startsWith("/studio-shell/registry")) {
+    const routeMetadata = resolveRouteSurfaceMetadataByPath(pathname);
+    const shellSection = routeMetadata?.navigation.shellSection;
+    if (shellSection === PrimaryNavigationItemKeys.explore) {
       return Object.freeze({ shellKey: PrimaryNavigationItemKeys.explore, canonicalPath: ROUTE_PATHS.explore });
     }
-    if (pathname === ROUTE_PATHS.build || (pathname.startsWith("/studio-shell") && !pathname.startsWith("/studio-shell/registry")) || pathname.startsWith("/agent-studio") || pathname.startsWith("/workflows")) {
+    if (shellSection === PrimaryNavigationItemKeys.build) {
       return Object.freeze({ shellKey: PrimaryNavigationItemKeys.build, canonicalPath: ROUTE_PATHS.build });
     }
-    if (pathname === ROUTE_PATHS.run || pathname.startsWith("/run") || pathname.startsWith("/tools")) {
+    if (shellSection === PrimaryNavigationItemKeys.run) {
       return Object.freeze({ shellKey: PrimaryNavigationItemKeys.run, canonicalPath: ROUTE_PATHS.run });
     }
     return undefined;
@@ -68,7 +72,7 @@ export class IntentNavigationShell {
     if (!this.featureFlag.isEnabled()) {
       return Object.freeze({
         isIntentNavigationEnabled: false,
-        items: toLegacyNavigationRoutes(APP_ROUTES).filter((route) => {
+        items: toLegacyNavigationRoutes().filter((route) => {
           if (route.key === "build") {
             return this.buildEntryService.isBuildEntryEnabled();
           }
