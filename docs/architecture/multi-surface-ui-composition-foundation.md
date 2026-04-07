@@ -149,3 +149,10 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Shared action modeling now lives in `src/ui/shared/actions/*` with canonical docs in `docs/architecture/multi-surface-ui-action-model.md`.
 - Converged admin/operational screens should define page/row/bulk operations as structured descriptors and render through shared action wrappers (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) instead of page-local ad hoc action markup and guard logic.
 - Permission-aware hidden/disabled action states, surface-capability gating, and confirmation/telemetry seams should be expressed in action descriptors so desktop and thin-client surfaces can reuse the same operation semantics with different wrappers.
+
+
+## Story 15.1.6 update
+
+- Responsive design tokens and interaction conventions now live in `src/ui/shared/responsive/*` with canonical docs in `docs/architecture/multi-surface-ui-responsive-conventions.md`.
+- Shared responsive wrappers for tables, forms, status cards, and action menu containers now live in `src/ui/shared/components/shell/SurfaceResponsiveConventions.tsx`.
+- Shell region layout and action wrappers now accept shared responsive profiles so desktop and thin-client surfaces can adapt density, stacking, touch-target, and menu behavior through one foundational rule set instead of page-local breakpoint logic.
