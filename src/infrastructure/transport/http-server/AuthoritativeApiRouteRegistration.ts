@@ -25,6 +25,7 @@ export const AuthoritativeApiRouteBackendKeys = Object.freeze({
   systemRuntime: "system-runtime",
   runSubmission: "run-submission",
   runRead: "run-read",
+  runMutation: "run-mutation",
   runExecutionUpdate: "run-execution-update",
 });
 

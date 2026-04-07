@@ -57,6 +57,14 @@ Provide an implementation checklist for contributors extending the authoritative
 3. Keep internal diagnostics in metadata telemetry, not run read projections.
 4. Keep completion/failure finalization in `FinalizeRunExecutionOutcomeUseCase`, including queue finalization and assignment release.
 
+## Extending cancellation orchestration
+
+1. Keep cancellation transition logic in `RequestAuthoritativeRunCancellationUseCase`.
+2. Add backend cancellation signaling only through `IRunExecutionCancellationSignalPort` implementations.
+3. Preserve explicit cancellation outcomes by lifecycle position (immediate terminal, cancellation-requested, or terminal no-op).
+4. Keep cancellation queue/claim coordination in application use cases; do not release claims directly from route handlers.
+5. Keep cancellation telemetry split: canonical run cancellation state for user-safe visibility, audit + metadata for operator diagnostics.
+
 ## Invariants and non-negotiable boundaries
 
 - Lifecycle transition legality is domain-owned (`RunDomain`) and must remain single-source.

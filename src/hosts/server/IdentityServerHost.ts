@@ -57,6 +57,7 @@ import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/ap
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
+import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
@@ -140,6 +141,7 @@ import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/Creat
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
+import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -974,6 +976,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     authorizationDecisionEvaluator,
     now: () => workspaceClock.now(),
   });
+  const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
+    requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
+      runRepository: persistentPlatformServices.platformPersistenceRepository,
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      transactionManager: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }),
+    authorizationDecisionEvaluator,
+    now: () => workspaceClock.now(),
+  });
   const authoritativeRunExecutionUpdateBackendApi = new AuthoritativeRunExecutionUpdateBackendApi({
     ingestRunExecutionUpdateUseCase: new IngestRunExecutionUpdateUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
@@ -1054,6 +1067,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     assetManagementBackendApi,
     authoritativeRunSubmissionBackendApi,
     authoritativeRunQueryBackendApi,
+    authoritativeRunMutationBackendApi,
     authoritativeRunExecutionUpdateBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,

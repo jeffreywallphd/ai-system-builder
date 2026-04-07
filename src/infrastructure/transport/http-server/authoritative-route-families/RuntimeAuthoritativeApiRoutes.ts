@@ -40,6 +40,18 @@ export const RunReadAuthoritativeApiRouteFamily = Object.freeze({
   ]),
 }) satisfies AuthoritativeApiRouteFamilyRegistration;
 
+export const RunMutationAuthoritativeApiRouteFamily = Object.freeze({
+  routeFamilyId: "run-mutation",
+  domain: AuthoritativeApiRouteDomains.runtime,
+  description: "Authoritative run mutation endpoints for cancellation/retry orchestration intents.",
+  routePrefixes: Object.freeze([
+    "/api/v1/runtime/runs",
+  ]),
+  requiredBackendKeys: Object.freeze([
+    AuthoritativeApiRouteBackendKeys.runMutation,
+  ]),
+}) satisfies AuthoritativeApiRouteFamilyRegistration;
+
 export const RunExecutionUpdateAuthoritativeApiRouteFamily = Object.freeze({
   routeFamilyId: "run-execution-update",
   domain: AuthoritativeApiRouteDomains.runtime,
