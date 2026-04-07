@@ -64,9 +64,12 @@ import {
   createAuthoritativeSecretAccessAuditHook,
 } from "@infrastructure/audit/AuthoritativeSecretAccessAuditHook";
 import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
+import { AuditLedgerQueryService } from "@application/audit/use-cases/AuditLedgerQueryService";
+import { WorkspaceAuditLedgerReadAuthorizer } from "@application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer";
 import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
+import { AuditLedgerBackendApi } from "@infrastructure/api/audit/AuditLedgerBackendApi";
 import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
 import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
 import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMetadataBackendApi";
@@ -1046,6 +1049,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
+  const auditLedgerBackendApi = new AuditLedgerBackendApi({
+    auditLedgerQueryService: new AuditLedgerQueryService({
+      repository: persistentPlatformServices.auditLedgerRepository,
+      authorizer: new WorkspaceAuditLedgerReadAuthorizer({
+        workspaceAuthorizationReadRepository: persistentPlatformServices.workspaceRepository,
+        clock: workspaceClock,
+      }),
+    }),
+  });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
     requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
@@ -1177,6 +1189,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     secretMetadataBackendApi,
     storageManagementBackendApi,
     assetManagementBackendApi,
+    auditLedgerBackendApi,
     authoritativeRunSubmissionBackendApi,
     authoritativeRunQueryBackendApi,
     authoritativeRunMutationBackendApi,

@@ -14,6 +14,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: true,
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: true,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: true,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
         [AuthoritativeApiRouteBackendKeys.nodeTrust]: true,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
         [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
@@ -57,6 +58,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
         [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
         [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
@@ -73,6 +75,31 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(() => assertAuthoritativeApiRouteFamilyCoverage(plan, ["identity-auth"])).not.toThrow();
     expect(() => assertAuthoritativeApiRouteFamilyCoverage(plan, ["workspace-administration"]))
       .toThrow(AuthoritativeApiRouteRegistrationError);
+  });
+
+  it("registers audit-ledger route family when audit backend is available", () => {
+    const plan = composeAuthoritativeApiRouteRegistrationPlan({
+      backendAvailability: Object.freeze({
+        [AuthoritativeApiRouteBackendKeys.identityAuth]: true,
+        [AuthoritativeApiRouteBackendKeys.workspaceInvitation]: false,
+        [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
+        [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.auditLedger]: true,
+        [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
+        [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
+        [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
+        [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
+        [AuthoritativeApiRouteBackendKeys.runSubmission]: false,
+        [AuthoritativeApiRouteBackendKeys.runRead]: false,
+        [AuthoritativeApiRouteBackendKeys.runMutation]: false,
+        [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: false,
+      }),
+    });
+
+    expect(plan.registeredRouteFamilies.map((family) => family.routeFamilyId)).toContain("audit-ledger");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/audit");
   });
 });
 
