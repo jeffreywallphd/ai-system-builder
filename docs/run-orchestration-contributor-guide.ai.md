@@ -13,6 +13,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Keep lifecycle legality in `src/domain/runs/RunDomain.ts`.
 - Add scheduler/assignment/dispatch/update behavior in `src/application/runs/use-cases/*` and ports.
 - Add persistence/adapter/transport wiring only after application behavior is correct.
+- Keep operational logging/metrics hooks in dedicated run observability seams (`RunOrchestrationObservability*`) rather than mixing log shaping into run-domain transitions.
 - Keep host route-family/backend registration composition aligned.
 
 ## Scheduler extension guidance
@@ -52,3 +53,4 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Mutating run lifecycle directly from infrastructure adapters is prohibited.
 - Bypassing execution-update ingestion validation for lifecycle/progress writes is prohibited.
 - Bypassing authoritative submission validation + creation for retried runs is prohibited.
+- Emitting unsanitized prompts/secrets/raw paths/backend payloads in orchestration diagnostics is prohibited.

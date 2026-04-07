@@ -7,6 +7,29 @@ import {
 } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "../AuthoritativeRunExecutionUpdateBackendApi";
 import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
+import {
+  RunOrchestrationObservability,
+  type RunOrchestrationObservabilityLogEvent,
+  type RunOrchestrationObservabilityLogger,
+} from "../RunOrchestrationObservability";
+
+class CapturingRunObservabilityLogger implements RunOrchestrationObservabilityLogger {
+  public readonly infoEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly warnEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly errorEvents: RunOrchestrationObservabilityLogEvent[] = [];
+
+  public info(event: RunOrchestrationObservabilityLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: RunOrchestrationObservabilityLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: RunOrchestrationObservabilityLogEvent): void {
+    this.errorEvents.push(event);
+  }
+}
 
 class StubIngestRunExecutionUpdateUseCase {
   public nextError: unknown;
@@ -216,5 +239,80 @@ describe("AuthoritativeRunExecutionUpdateBackendApi", () => {
 
     expect(response.ok).toBeTrue();
     expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("progress-updated");
+  });
+
+  it("emits dispatch-failure markers and node correlation in observability logs", async () => {
+    const logger = new CapturingRunObservabilityLogger();
+    const observability = new RunOrchestrationObservability({ logger });
+    const ingest = new StubIngestRunExecutionUpdateUseCase();
+    ingest.nextResult = Object.freeze({
+      mutation: Object.freeze({
+        action: "lifecycle-update",
+        run: Object.freeze({
+          contractVersion: "run-orchestration-transport/v1",
+          runId: "run:dispatch-failed",
+          workflowId: "workflow:demo",
+          workspaceId: "workspace-alpha",
+          source: "api",
+          state: "failed",
+          assignmentStatus: "released",
+          executionOutcome: "failed",
+          submittedAt: "2026-04-07T12:00:00.000Z",
+          updatedAt: "2026-04-07T12:02:00.000Z",
+          submission: Object.freeze({
+            correlationId: "corr-dispatch-1",
+          }),
+          assignment: Object.freeze({
+            status: "released",
+          }),
+          execution: Object.freeze({
+            outcome: "failed",
+            errorCode: "dispatch-failed-to-start",
+            errorMessage: "safe failure",
+          }),
+          retry: Object.freeze({
+            attempt: 1,
+            maxAttempts: 2,
+          }),
+        }),
+        mutation: Object.freeze({
+          changed: true,
+          mutationId: "mutation-dispatch-failed",
+          occurredAt: "2026-04-07T12:02:00.000Z",
+        }),
+      }),
+      status: Object.freeze({
+        runId: "run:dispatch-failed",
+        state: "failed",
+        updatedAt: "2026-04-07T12:02:00.000Z",
+        assignmentStatus: "released",
+        executionOutcome: "failed",
+        retry: Object.freeze({
+          attempt: 1,
+          maxAttempts: 2,
+        }),
+      }),
+    });
+
+    const api = new AuthoritativeRunExecutionUpdateBackendApi({
+      ingestRunExecutionUpdateUseCase: ingest as never,
+      observability,
+    });
+
+    const response = await api.ingestExecutionUpdate({
+      runId: "run:dispatch-failed",
+      senderNodeId: "node:trusted-99",
+      update: Object.freeze({
+        runId: "run:dispatch-failed",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+      }),
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(logger.infoEvents).toHaveLength(1);
+    expect(logger.infoEvents[0]?.nodeId).toBe("node:trusted-99");
+    expect(logger.infoEvents[0]?.correlationId).toBe("corr-dispatch-1");
+    expect(logger.infoEvents[0]?.markers).toContain("dispatch-failure-marker");
   });
 });

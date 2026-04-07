@@ -22,6 +22,7 @@ import {
   publishRunOrchestrationRealtimeEventsBestEffort,
   type RunOrchestrationRealtimePublisher,
 } from "./RunOrchestrationRealtimePublisher";
+import { RunOrchestrationObservability } from "./RunOrchestrationObservability";
 
 export interface AuthoritativeRunSubmissionRequest {
   readonly actorUserIdentityId: string;
@@ -37,6 +38,7 @@ export interface AuthoritativeRunSubmissionBackendApiDependencies {
   readonly validateRunSubmissionUseCase: ValidateRunSubmissionUseCase;
   readonly createAuthoritativeRunUseCase: CreateAuthoritativeRunUseCase;
   readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
+  readonly observability?: RunOrchestrationObservability;
 }
 
 export class AuthoritativeRunSubmissionBackendApi {
@@ -60,6 +62,28 @@ export class AuthoritativeRunSubmissionBackendApi {
       });
 
       if (!validation.ok) {
+        await this.recordObservability({
+          event: "run.orchestration.submission.completed",
+          operation: "submission",
+          outcome: "failure",
+          severity: validation.error.code === RunSubmissionValidationErrorCodes.invalidRequest ? "warn" : "error",
+          requestId: request.submission.clientRequestId,
+          correlationId: request.submission.correlationId,
+          workspaceId: request.workspaceId,
+          markers: Object.freeze(["submission-validation-failed"]),
+          details: Object.freeze({
+            code: validation.error.code,
+            message: validation.error.message,
+            issueCount: validation.error.validationIssues.length,
+            request: Object.freeze({
+              source: request.submission.source,
+              runtimeTarget: request.submission.runtimeTarget,
+              tagsCount: request.submission.tags?.length ?? 0,
+              hasTemplateId: typeof request.submission.templateId === "string",
+              hasParameters: typeof request.submission.parameters === "object",
+            }),
+          }),
+        });
         return this.buildValidationFailure(validation);
       }
 
@@ -86,6 +110,21 @@ export class AuthoritativeRunSubmissionBackendApi {
           }),
         });
       });
+      await this.recordObservability({
+        event: "run.orchestration.submission.completed",
+        operation: "submission",
+        outcome: "success",
+        severity: "info",
+        requestId: request.submission.clientRequestId,
+        correlationId: created.run.submission.correlationId ?? request.submission.correlationId,
+        runId: created.run.runId,
+        workspaceId: created.run.workspaceId ?? request.workspaceId,
+        lifecycleState: created.run.state,
+        markers: Object.freeze(["submission-accepted", "queue-enqueued"]),
+        counters: Object.freeze({
+          queue_position: created.run.queue?.position ?? -1,
+        }),
+      });
 
       return Object.freeze({
         ok: true,
@@ -100,6 +139,19 @@ export class AuthoritativeRunSubmissionBackendApi {
       });
     } catch (error) {
       if (isConflictError(error)) {
+        await this.recordObservability({
+          event: "run.orchestration.submission.completed",
+          operation: "submission",
+          outcome: "failure",
+          severity: "warn",
+          requestId: request.submission.clientRequestId,
+          correlationId: request.submission.correlationId,
+          workspaceId: request.workspaceId,
+          markers: Object.freeze(["submission-conflict"]),
+          details: Object.freeze({
+            reason: "run-already-exists",
+          }),
+        });
         return Object.freeze({
           ok: false,
           error: Object.freeze({
@@ -109,6 +161,20 @@ export class AuthoritativeRunSubmissionBackendApi {
         });
       }
 
+      await this.recordObservability({
+        event: "run.orchestration.submission.completed",
+        operation: "submission",
+        outcome: "failure",
+        severity: "error",
+        requestId: request.submission.clientRequestId,
+        correlationId: request.submission.correlationId,
+        workspaceId: request.workspaceId,
+        markers: Object.freeze(["submission-internal-error"]),
+        details: Object.freeze({
+          error,
+        }),
+      });
+
       return Object.freeze({
         ok: false,
         error: Object.freeze({
@@ -116,6 +182,19 @@ export class AuthoritativeRunSubmissionBackendApi {
           message: "Run submission failed due to an internal server error.",
         }),
       });
+    }
+  }
+
+  private async recordObservability(
+    event: Parameters<RunOrchestrationObservability["record"]>[0],
+  ): Promise<void> {
+    if (!this.dependencies.observability) {
+      return;
+    }
+    try {
+      await this.dependencies.observability.record(event);
+    } catch {
+      // Observability failures are intentionally non-blocking.
     }
   }
 

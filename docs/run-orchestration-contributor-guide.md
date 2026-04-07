@@ -35,6 +35,8 @@ Provide an implementation checklist for contributors extending the authoritative
    - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts`
    - `src/infrastructure/execution/runs/*`
    - `src/infrastructure/api/runs/*`
+   - `src/infrastructure/api/runs/RunOrchestrationObservability.ts`
+   - `src/infrastructure/api/runs/RunOrchestrationObservabilityRedaction.ts`
    - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 5. Keep host composition updated for required route family and backend registration coverage:
    - `src/hosts/server/IdentityServerHost.ts`
@@ -92,6 +94,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Scheduling policy selects candidate work; dispatch adapters execute backend translation only.
 - Transport handlers authenticate/validate/map requests but do not own orchestration decisions.
 - Completion/failure terminal handling must preserve user-safe outputs and internal diagnostics separation.
+- Observability/redaction concerns must stay in dedicated infrastructure seams, not in domain transition logic.
 
 ## Prohibited patterns
 
@@ -102,6 +105,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Bypassing `IngestRunExecutionUpdateUseCase` for execution progress/heartbeat/lifecycle mutation is prohibited.
 - Persisting internal diagnostics directly into user-facing run contracts is prohibited.
 - Creating retried runs by bypassing authoritative validation + creation use cases is prohibited.
+- Logging raw prompts, secrets/tokens, backend payload blobs, or raw path-bearing fields from run orchestration operations is prohibited.
 
 ## Review checklist
 

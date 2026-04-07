@@ -21,6 +21,7 @@ import {
   publishRunOrchestrationRealtimeEventsBestEffort,
   type RunOrchestrationRealtimePublisher,
 } from "./RunOrchestrationRealtimePublisher";
+import { RunOrchestrationObservability } from "./RunOrchestrationObservability";
 
 export interface AuthoritativeRunExecutionUpdateRequest {
   readonly runId: string;
@@ -36,6 +37,7 @@ export interface AuthoritativeRunExecutionUpdateResponse {
 export interface AuthoritativeRunExecutionUpdateBackendApiDependencies {
   readonly ingestRunExecutionUpdateUseCase: IngestRunExecutionUpdateUseCase;
   readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
+  readonly observability?: RunOrchestrationObservability;
 }
 
 export class AuthoritativeRunExecutionUpdateBackendApi {
@@ -70,6 +72,42 @@ export class AuthoritativeRunExecutionUpdateBackendApi {
           }),
         });
       });
+      const dispatchFailureMarker = ingested.mutation.run.execution.errorCode?.trim() === "dispatch-failed-to-start";
+      await this.recordObservability({
+        event: "run.orchestration.execution-update.completed",
+        operation: "execution-update",
+        outcome: "success",
+        severity: "info",
+        runId: ingested.mutation.run.runId,
+        workspaceId: ingested.mutation.run.workspaceId,
+        nodeId: request.senderNodeId,
+        correlationId: ingested.mutation.run.submission.correlationId,
+        lifecycleState: ingested.mutation.run.state,
+        markers: Object.freeze([
+          request.update.progress ? "progress-updated" : "state-updated",
+          dispatchFailureMarker ? "dispatch-failure-marker" : "no-dispatch-failure-marker",
+        ]),
+        counters: Object.freeze({
+          has_progress_update: request.update.progress ? 1 : 0,
+          has_internal_diagnostics: request.update.internalDiagnostics ? 1 : 0,
+        }),
+        details: Object.freeze({
+          mutationAction: ingested.mutation.action,
+          executionOutcome: ingested.mutation.run.execution.outcome,
+          executionErrorCode: ingested.mutation.run.execution.errorCode,
+          update: Object.freeze({
+            toState: request.update.toState,
+            actorId: request.update.actorId,
+            senderBackendKind: request.update.senderBackendKind,
+            senderBackendRunId: request.update.senderBackendRunId,
+            heartbeatAt: request.update.heartbeatAt,
+            resultMetricsCount: request.update.result?.metrics
+              ? Object.keys(request.update.result.metrics).length
+              : 0,
+            resultOutputCount: request.update.result?.outputs?.length ?? 0,
+          }),
+        }),
+      });
 
       return Object.freeze({
         ok: true,
@@ -79,7 +117,54 @@ export class AuthoritativeRunExecutionUpdateBackendApi {
         }),
       });
     } catch (error) {
+      await this.recordObservability({
+        event: "run.orchestration.execution-update.completed",
+        operation: "execution-update",
+        outcome: "failure",
+        severity: error instanceof RunExecutionUpdateValidationError
+          || error instanceof RunExecutionUpdateNotFoundError
+          || error instanceof RunExecutionUpdateForbiddenError
+          || error instanceof RunExecutionUpdateConflictError
+          ? "warn"
+          : "error",
+        runId: request.runId,
+        nodeId: request.senderNodeId,
+        correlationId: request.update.idempotencyKey,
+        markers: Object.freeze([
+          error instanceof RunExecutionUpdateValidationError
+            ? "invalid-request"
+            : error instanceof RunExecutionUpdateNotFoundError
+              ? "not-found"
+              : error instanceof RunExecutionUpdateForbiddenError
+                ? "forbidden"
+                : error instanceof RunExecutionUpdateConflictError
+                  ? "conflict"
+                  : "internal-error",
+        ]),
+        details: Object.freeze({
+          error,
+          update: Object.freeze({
+            toState: request.update.toState,
+            senderBackendKind: request.update.senderBackendKind,
+            senderBackendRunId: request.update.senderBackendRunId,
+            hasProgress: Boolean(request.update.progress),
+          }),
+        }),
+      });
       return toExecutionUpdateErrorEnvelope(error);
+    }
+  }
+
+  private async recordObservability(
+    event: Parameters<RunOrchestrationObservability["record"]>[0],
+  ): Promise<void> {
+    if (!this.dependencies.observability) {
+      return;
+    }
+    try {
+      await this.dependencies.observability.record(event);
+    } catch {
+      // Observability failures are intentionally non-blocking.
     }
   }
 }

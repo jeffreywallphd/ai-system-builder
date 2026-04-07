@@ -30,6 +30,7 @@ import {
   publishRunOrchestrationRealtimeEventsBestEffort,
   type RunOrchestrationRealtimePublisher,
 } from "./RunOrchestrationRealtimePublisher";
+import { RunOrchestrationObservability } from "./RunOrchestrationObservability";
 
 const AuthoritativeRunResourceType = "authoritative-run";
 
@@ -58,6 +59,7 @@ export interface AuthoritativeRunMutationBackendApiDependencies {
   readonly requestAuthoritativeRunRetryUseCase: RequestAuthoritativeRunRetryUseCase;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
   readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
+  readonly observability?: RunOrchestrationObservability;
   readonly now?: () => Date;
 }
 
@@ -75,6 +77,15 @@ export class AuthoritativeRunMutationBackendApi {
     const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
     const runId = request.cancellation.runId.trim();
     if (!workspaceId || !actorUserIdentityId || !runId) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.cancel.completed",
+        operation: "mutation.cancel",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId, actorUserIdentityId, and runId are required.");
     }
 
@@ -86,6 +97,15 @@ export class AuthoritativeRunMutationBackendApi {
       requiredPermissionKey: "run.cancel",
     });
     if (!allowed) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.cancel.completed",
+        operation: "mutation.cancel",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
       return this.forbidden("Run cancellation is not authorized for this actor.");
     }
 
@@ -121,12 +141,46 @@ export class AuthoritativeRunMutationBackendApi {
           }),
         });
       });
+      await this.recordObservability({
+        event: "run.orchestration.mutation.cancel.completed",
+        operation: "mutation.cancel",
+        outcome: "success",
+        severity: "info",
+        runId: cancelled.mutation.run.runId,
+        workspaceId,
+        correlationId: cancelled.mutation.run.submission.correlationId,
+        lifecycleState: cancelled.mutation.run.state,
+        markers: Object.freeze([
+          cancelled.outcome === "cancellation-requested" ? "cancellation-requested" : "cancelled",
+          "queue-updated",
+        ]),
+      });
 
       return Object.freeze({
         ok: true,
         data: cancelled.mutation,
       });
     } catch (error) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.cancel.completed",
+        operation: "mutation.cancel",
+        outcome: "failure",
+        severity: error instanceof RunCancellationValidationError || error instanceof RunCancellationNotFoundError
+          ? "warn"
+          : "error",
+        runId,
+        workspaceId,
+        markers: Object.freeze([
+          error instanceof RunCancellationValidationError
+            ? "invalid-request"
+            : error instanceof RunCancellationNotFoundError
+              ? "not-found"
+              : "internal-error",
+        ]),
+        details: Object.freeze({
+          error,
+        }),
+      });
       if (error instanceof RunCancellationValidationError) {
         return this.invalidRequest(error.message);
       }
@@ -151,6 +205,15 @@ export class AuthoritativeRunMutationBackendApi {
     const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
     const runId = request.retry.runId.trim();
     if (!workspaceId || !actorUserIdentityId || !runId) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.retry.completed",
+        operation: "mutation.retry",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId, actorUserIdentityId, and runId are required.");
     }
 
@@ -162,6 +225,15 @@ export class AuthoritativeRunMutationBackendApi {
       requiredPermissionKey: "run.retry",
     });
     if (!allowed) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.retry.completed",
+        operation: "mutation.retry",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
       return this.forbidden("Run retry is not authorized for this actor.");
     }
 
@@ -195,12 +267,48 @@ export class AuthoritativeRunMutationBackendApi {
           }),
         });
       });
+      await this.recordObservability({
+        event: "run.orchestration.mutation.retry.completed",
+        operation: "mutation.retry",
+        outcome: "success",
+        severity: "info",
+        runId: retried.mutation.run.runId,
+        workspaceId,
+        correlationId: retried.mutation.run.submission.correlationId,
+        lifecycleState: retried.mutation.run.state,
+        markers: Object.freeze(["retry-queued", "queue-enqueued"]),
+      });
 
       return Object.freeze({
         ok: true,
         data: retried.mutation,
       });
     } catch (error) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.retry.completed",
+        operation: "mutation.retry",
+        outcome: "failure",
+        severity: error instanceof RunRetryValidationError
+          || error instanceof RunRetrySubmissionValidationError
+          || error instanceof RunRetryIneligibleError
+          || error instanceof RunRetryNotFoundError
+          ? "warn"
+          : "error",
+        runId,
+        workspaceId,
+        markers: Object.freeze([
+          error instanceof RunRetryValidationError || error instanceof RunRetrySubmissionValidationError
+            ? "invalid-request"
+            : error instanceof RunRetryIneligibleError
+              ? "retry-ineligible"
+              : error instanceof RunRetryNotFoundError
+                ? "not-found"
+                : "internal-error",
+        ]),
+        details: Object.freeze({
+          error,
+        }),
+      });
       if (error instanceof RunRetryValidationError) {
         return this.invalidRequest(error.message);
       }
@@ -284,5 +392,18 @@ export class AuthoritativeRunMutationBackendApi {
         message,
       }),
     });
+  }
+
+  private async recordObservability(
+    event: Parameters<RunOrchestrationObservability["record"]>[0],
+  ): Promise<void> {
+    if (!this.dependencies.observability) {
+      return;
+    }
+    try {
+      await this.dependencies.observability.record(event);
+    } catch {
+      // Observability failures are intentionally non-blocking.
+    }
   }
 }
