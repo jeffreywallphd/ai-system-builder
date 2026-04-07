@@ -148,4 +148,18 @@ This seam exists so future governance policy engines and admin tooling can add l
 - `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
 - `src/infrastructure/api/audit/tests/AuditLedgerBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuditLedger.test.ts`
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+Story 18.3.6 adds a final production-readiness integration/regression pass that validates:
+
+- append-oriented behavior and replay-safe operation keys across authoritative capture and durable persistence
+- immutable-enough enforcement (`UPDATE`/`DELETE` rejection)
+- permission-safe reads with role-derived visibility and protected-data exclusions
+- correlation-aware retrieval and stable API projection responses
+- startup recovery/reconciliation behavior for orphaned replay anomalies
+
+Deferred edges remain explicit for this slice:
+
+- retention lifecycle stays metadata-only (no destructive purge/archive jobs)
+- cryptographic notarization/off-box attestation and compliance export are out of scope
 

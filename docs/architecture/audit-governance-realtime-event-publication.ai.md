@@ -52,3 +52,6 @@ Story 18.3.2 publishes authoritative audit/governance writes to the shared runti
 - `src/infrastructure/api/system-runtime/tests/AuthoritativeRuntimeEventStream.test.ts`
 - `src/infrastructure/api/system-runtime/tests/SystemRuntimeBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
+- `src/application/audit/tests/AuditLedgerProductionReadinessRegression.integration.test.ts`
+
+Story 18.3.6 validates realtime publication contract stability end-to-end (post-append category-to-kind mapping and user-safe payload-only fanout).
