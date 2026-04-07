@@ -49,7 +49,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(3);
+    expect(versionRow.version).toBe(4);
 
     const tables = database.prepare(`
       SELECT name
@@ -622,6 +622,29 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const attempts = await adapter.listDispatchAttemptsByRunId("run-dispatch-1");
     expect(attempts).toHaveLength(1);
     expect(["dispatch-attempt:1", "dispatch-attempt:2"]).toContain(attempts[0]?.attemptId);
+    expect(attempts[0]?.dispatchResult).toBeUndefined();
+
+    const updated = await adapter.recordDispatchAttemptResult({
+      runId: "run-dispatch-1",
+      attemptId: attempts[0]!.attemptId,
+      result: Object.freeze({
+        status: "accepted",
+        recordedAt: "2026-04-06T12:02:01.000Z",
+        acceptedAt: "2026-04-06T12:02:01.000Z",
+        dispatchId: "dispatch:run-dispatch-1",
+        backendKind: "remote-dispatch",
+        backendRunId: "backend-run-1",
+        metadata: Object.freeze({
+          lane: "standard",
+        }),
+      }),
+    });
+    expect(updated).toBeTrue();
+
+    const updatedAttempts = await adapter.listDispatchAttemptsByRunId("run-dispatch-1");
+    expect(updatedAttempts[0]?.dispatchResult?.status).toBe("accepted");
+    expect(updatedAttempts[0]?.dispatchResult?.dispatchId).toBe("dispatch:run-dispatch-1");
+    expect((updatedAttempts[0]?.dispatchResult?.metadata as { lane?: string } | undefined)?.lane).toBe("standard");
 
     adapter.dispose();
   });

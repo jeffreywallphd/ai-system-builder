@@ -6,6 +6,7 @@ import type {
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
+  type AuthoritativeRunDispatchAttemptResult,
   RunNodeClaimConflictReasons,
   type AuthoritativeRunDispatchAttemptRecord,
   type AuthoritativeRunNodeClaimResult,
@@ -208,6 +209,22 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       queueEntry: updated,
       dispatchAttempt,
     });
+  }
+
+  public async recordDispatchAttemptResult(input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    const attempt = this.dispatchAttempts.get(input.attemptId);
+    if (!attempt || attempt.runId !== input.runId) {
+      return false;
+    }
+    this.dispatchAttempts.set(input.attemptId, Object.freeze({
+      ...attempt,
+      dispatchResult: input.result,
+    }));
+    return true;
   }
 
   public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {

@@ -45,6 +45,7 @@ describe("DispatchAssignedRunExecutionUseCase", () => {
     });
 
     const dispatchedCommands: CanonicalRunExecutionCommand[] = [];
+    const handledOutcomes: string[] = [];
     const useCase = new DispatchAssignedRunExecutionUseCase({
       commandBuilder: {
         execute: async () => command,
@@ -61,6 +62,11 @@ describe("DispatchAssignedRunExecutionUseCase", () => {
           });
         },
       },
+      dispatchResultHandler: {
+        execute: async (input) => {
+          handledOutcomes.push(input.outcome.status);
+        },
+      },
     });
 
     const result = await useCase.execute({
@@ -73,6 +79,72 @@ describe("DispatchAssignedRunExecutionUseCase", () => {
     expect(result.command).toBe(command);
     expect(result.receipt.backendKind).toBe(RunExecutionBackendKinds.remoteDispatch);
     expect(result.receipt.backendRunId).toBe("remote-run-1");
+    expect(handledOutcomes).toEqual(["accepted"]);
+  });
+
+  it("records failed-to-start dispatch outcomes before rethrowing backend dispatch errors", async () => {
+    const command: CanonicalRunExecutionCommand = Object.freeze({
+      commandId: "run-execution-command:dispatch-attempt:2",
+      dispatchAttemptId: "dispatch-attempt:2",
+      preparedAt: "2026-04-07T09:12:00.000Z",
+      run: Object.freeze({
+        runId: "run-2",
+        workflowId: "workflow:test",
+        workspaceId: "workspace-alpha",
+        submittedAt: "2026-04-07T09:10:00.000Z",
+        source: "api",
+      }),
+      queue: Object.freeze({
+        queueId: "queue:default",
+      }),
+      assignment: Object.freeze({
+        nodeId: "node:trusted-a",
+        reservationOwner: "orchestrator:alpha",
+        claimToken: "claim:run-2",
+      }),
+      runtimeTarget: Object.freeze({
+        systemId: "system:test",
+        versionId: "runtime:v1",
+        async: true,
+      }),
+      backend: Object.freeze({
+        kind: RunExecutionBackendKinds.remoteDispatch,
+      }),
+      inputs: Object.freeze({
+        tags: Object.freeze([]),
+        parameters: Object.freeze({}),
+      }),
+      references: Object.freeze({
+        storageReferences: Object.freeze([]),
+        resourceReferences: Object.freeze([]),
+        policyPrerequisites: Object.freeze([]),
+      }),
+    });
+
+    const handledOutcomes: string[] = [];
+    const useCase = new DispatchAssignedRunExecutionUseCase({
+      commandBuilder: {
+        execute: async () => command,
+      },
+      dispatchPort: {
+        dispatch: async () => {
+          throw new Error("backend unavailable");
+        },
+      },
+      dispatchResultHandler: {
+        execute: async (input) => {
+          handledOutcomes.push(input.outcome.status);
+        },
+      },
+      now: () => new Date("2026-04-07T09:12:10.000Z"),
+    });
+
+    await expect(useCase.execute({
+      runId: "run-2",
+      dispatchAttemptId: "dispatch-attempt:2",
+    })).rejects.toThrow("backend unavailable");
+
+    expect(handledOutcomes).toEqual(["failed-to-start"]);
   });
 });
 

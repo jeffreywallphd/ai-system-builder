@@ -1,30 +1,35 @@
 import { describe, expect, it } from "bun:test";
 import type {
+  PlatformAuditEventListQuery,
+  PlatformAuditEventRecord,
   PlatformPersistenceMutationContext,
   PlatformRunListQuery,
   PlatformRunMutationResult,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
-  AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
+  AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { RunExecutionBackendKinds } from "@application/runs/ports/RunExecutionDispatchPorts";
 import {
+  RunExecutionOutcomeKinds,
   RunLifecycleStates,
   RunSubmissionSources,
   createCanonicalRunRecord,
 } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
 import {
-  BuildAssignedRunExecutionCommandUseCase,
-  RunExecutionCommandBuildError,
-} from "../use-cases/BuildAssignedRunExecutionCommandUseCase";
+  HandleRunDispatchResultUseCase,
+  createDispatchAcceptedOutcome,
+  createDispatchFailureOutcome,
+} from "../use-cases/HandleRunDispatchResultUseCase";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   public readonly runs = new Map<string, PlatformRunRecord>();
@@ -41,33 +46,46 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
     record: PlatformRunRecord,
     _mutation: PlatformPersistenceMutationContext,
   ): Promise<PlatformRunMutationResult> {
-    this.runs.set(record.runId, Object.freeze({
+    const persisted = Object.freeze({
       ...record,
       revision: 1,
-    }));
+    });
+    this.runs.set(record.runId, persisted);
     return Object.freeze({
       changed: true,
       wasReplay: false,
-      record: this.runs.get(record.runId)!,
+      record: persisted,
     });
   }
 
   public async saveRun(
     record: PlatformRunRecord,
-    _mutation: PlatformPersistenceMutationContext & { readonly expectedRevision?: number },
+    mutation: PlatformPersistenceMutationContext & { readonly expectedRevision?: number },
   ): Promise<PlatformRunMutationResult> {
-    this.runs.set(record.runId, record);
+    const existing = this.runs.get(record.runId);
+    if (!existing) {
+      throw new Error(`Run '${record.runId}' not found.`);
+    }
+    if (typeof mutation.expectedRevision === "number" && mutation.expectedRevision !== existing.revision) {
+      throw new Error("expectedRevision mismatch");
+    }
+
+    const persisted = Object.freeze({
+      ...record,
+      revision: existing.revision + 1,
+    });
+    this.runs.set(record.runId, persisted);
     return Object.freeze({
       changed: true,
       wasReplay: false,
-      record,
+      record: persisted,
     });
   }
 }
 
 class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
   public readonly queue = new Map<string, AuthoritativeRunQueueEntryRecord>();
-  public readonly dispatchAttempts = new Map<string, AuthoritativeRunDispatchAttemptRecord>();
+  public readonly attempts = new Map<string, AuthoritativeRunDispatchAttemptRecord>();
 
   public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
     return this.queue.get(runId);
@@ -125,35 +143,99 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly preparedAt: string;
     readonly dispatchMetadata: Readonly<Record<string, unknown>>;
   }): Promise<AuthoritativeRunNodeClaimResult> {
-    throw new Error("not used");
+    throw new Error("Not implemented.");
   }
 
-  public async recordDispatchAttemptResult(_input: {
+  public async recordDispatchAttemptResult(input: {
     readonly runId: string;
     readonly attemptId: string;
     readonly result: AuthoritativeRunDispatchAttemptResult;
   }): Promise<boolean> {
-    return false;
+    const attempt = this.attempts.get(input.attemptId);
+    if (!attempt || attempt.runId !== input.runId) {
+      return false;
+    }
+    this.attempts.set(input.attemptId, Object.freeze({
+      ...attempt,
+      dispatchResult: input.result,
+    }));
+    return true;
   }
 
   public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
-    return Object.freeze(
-      [...this.dispatchAttempts.values()].filter((attempt) => attempt.runId === runId),
-    );
+    return Object.freeze([...this.attempts.values()].filter((attempt) => attempt.runId === runId));
   }
 }
 
-function createAssignedRunRecord(runId: string, runtimeSystemId: string): PlatformRunRecord {
+class InMemoryAuditRepository implements IRunOrchestrationIntentRepository {
+  public readonly events = new Map<string, PlatformAuditEventRecord>();
+
+  public async appendOrchestrationIntent(
+    event: PlatformAuditEventRecord,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<{ readonly changed: boolean; readonly wasReplay: boolean; readonly record: PlatformAuditEventRecord }> {
+    this.events.set(event.eventId, event);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      record: event,
+    });
+  }
+
+  public async listAuditEvents(_query: PlatformAuditEventListQuery): Promise<ReadonlyArray<PlatformAuditEventRecord>> {
+    return Object.freeze([...this.events.values()]);
+  }
+}
+
+const command = Object.freeze({
+  commandId: "run-execution-command:dispatch-attempt:1",
+  dispatchAttemptId: "dispatch-attempt:1",
+  preparedAt: "2026-04-07T09:02:00.000Z",
+  run: Object.freeze({
+    runId: "run-1",
+    workflowId: "workflow:test",
+    workspaceId: "workspace-alpha",
+    submittedAt: "2026-04-07T09:00:00.000Z",
+    source: "api" as const,
+    correlationId: "corr-alpha",
+  }),
+  queue: Object.freeze({
+    queueId: "queue:default",
+  }),
+  assignment: Object.freeze({
+    nodeId: "node:trusted-a",
+    reservationOwner: "orchestrator:alpha",
+    claimToken: "claim:run-1",
+  }),
+  runtimeTarget: Object.freeze({
+    systemId: "system:test",
+    versionId: "runtime:v1",
+    async: true,
+  }),
+  backend: Object.freeze({
+    kind: RunExecutionBackendKinds.remoteDispatch,
+  }),
+  inputs: Object.freeze({
+    tags: Object.freeze([]),
+    parameters: Object.freeze({}),
+  }),
+  references: Object.freeze({
+    storageReferences: Object.freeze([]),
+    resourceReferences: Object.freeze([]),
+    policyPrerequisites: Object.freeze([]),
+  }),
+});
+
+function seedAssignedRun(runRepository: InMemoryRunRepository): void {
   const canonicalRun = createCanonicalRunRecord({
     identity: {
-      runId,
+      runId: "run-1",
       workflowId: "workflow:test",
       workspaceId: "workspace-alpha",
     },
     submission: {
       source: RunSubmissionSources.api,
       submittedAt: "2026-04-07T09:00:00.000Z",
-      submittedByActorId: "user-owner",
       correlationId: "corr-alpha",
     },
     state: RunLifecycleStates.assigned,
@@ -161,7 +243,7 @@ function createAssignedRunRecord(runId: string, runtimeSystemId: string): Platfo
       queueId: "queue:default",
       enteredAt: "2026-04-07T09:00:00.000Z",
       position: null,
-      positionAsOf: "2026-04-07T09:00:00.000Z",
+      positionAsOf: "2026-04-07T09:02:00.000Z",
       dequeuedAt: "2026-04-07T09:02:00.000Z",
     }),
     assignment: Object.freeze({
@@ -170,11 +252,11 @@ function createAssignedRunRecord(runId: string, runtimeSystemId: string): Platfo
       assignedAt: "2026-04-07T09:02:00.000Z",
     }),
     execution: Object.freeze({
-      outcome: "none",
+      outcome: RunExecutionOutcomeKinds.none,
     }),
     retry: Object.freeze({
       attempt: 1,
-      maxAttempts: 1,
+      maxAttempts: 2,
     }),
     updatedAt: "2026-04-07T09:02:00.000Z",
   });
@@ -188,12 +270,12 @@ function createAssignedRunRecord(runId: string, runtimeSystemId: string): Platfo
         activeWorkspaceId: "workspace-alpha",
       }),
       runtimeTarget: Object.freeze({
-        systemId: runtimeSystemId,
+        systemId: "system:test",
         versionId: "runtime:v1",
         async: true,
       }),
-      tags: Object.freeze(["priority:normal"]),
-      parameters: Object.freeze({ seed: 7, prompt: "test" }),
+      tags: Object.freeze([]),
+      parameters: Object.freeze({}),
       storageReferences: Object.freeze([]),
       resourceReferences: Object.freeze([]),
       policyPrerequisites: Object.freeze([]),
@@ -213,8 +295,8 @@ function createAssignedRunRecord(runId: string, runtimeSystemId: string): Platfo
     }),
   });
 
-  return Object.freeze({
-    runId,
+  runRepository.runs.set("run-1", Object.freeze({
+    runId: "run-1",
     runKind: "workflow",
     status: mapLifecycleStateToPlatformRunStatus(RunLifecycleStates.assigned),
     workspaceId: "workspace-alpha",
@@ -222,38 +304,14 @@ function createAssignedRunRecord(runId: string, runtimeSystemId: string): Platfo
     sourceAggregateRef: "workflow:test",
     initiatedAt: "2026-04-07T09:00:00.000Z",
     metadata,
-    revision: 2,
-  });
+    revision: 1,
+  }));
 }
 
-function createQueueEntry(runId: string): AuthoritativeRunQueueEntryRecord {
-  return Object.freeze({
-    runId,
-    queueId: "queue:default",
-    workspaceId: "workspace-alpha",
-    lifecycleState: "assigned",
-    enteredAt: "2026-04-07T09:00:00.000Z",
-    orderKey: "2026-04-07T09:00:00.000Z:run-1",
-    eligibilityMarker: "ready",
-    eligibleAt: "2026-04-07T09:00:00.000Z",
-    claimToken: "claim:run-1",
-    claimedBy: "orchestrator:alpha",
-    claimedAt: "2026-04-07T09:00:01.000Z",
-    claimExpiresAt: "2026-04-07T09:10:00.000Z",
-    assignmentNodeId: "node:trusted-a",
-    assignmentClaimedAt: "2026-04-07T09:02:00.000Z",
-    dispatchPreparedAt: "2026-04-07T09:02:00.000Z",
-    lastDispatchAttemptId: "dispatch-attempt:1",
-    dequeuedAt: "2026-04-07T09:02:00.000Z",
-    updatedAt: "2026-04-07T09:02:00.000Z",
-    revision: 4,
-  });
-}
-
-function createDispatchAttempt(runId: string): AuthoritativeRunDispatchAttemptRecord {
-  return Object.freeze({
+function seedDispatchAttempt(queueRepository: InMemoryQueueRepository): void {
+  queueRepository.attempts.set("dispatch-attempt:1", Object.freeze({
     attemptId: "dispatch-attempt:1",
-    runId,
+    runId: "run-1",
     queueId: "queue:default",
     workspaceId: "workspace-alpha",
     nodeId: "node:trusted-a",
@@ -261,59 +319,83 @@ function createDispatchAttempt(runId: string): AuthoritativeRunDispatchAttemptRe
     claimToken: "claim:run-1",
     preparedAt: "2026-04-07T09:02:00.000Z",
     dispatchMetadata: Object.freeze({
-      runId,
+      runId: "run-1",
     }),
-  });
+  }));
 }
 
-describe("BuildAssignedRunExecutionCommandUseCase", () => {
-  it("builds a canonical execution command from assigned run and dispatch attempt", async () => {
+describe("HandleRunDispatchResultUseCase", () => {
+  it("transitions run to running and records accepted dispatch attempt outcomes", async () => {
     const runRepository = new InMemoryRunRepository();
     const queueRepository = new InMemoryQueueRepository();
-    runRepository.runs.set("run-1", createAssignedRunRecord("run-1", "comfyui"));
-    queueRepository.queue.set("run-1", createQueueEntry("run-1"));
-    queueRepository.dispatchAttempts.set("dispatch-attempt:1", createDispatchAttempt("run-1"));
+    const auditRepository = new InMemoryAuditRepository();
+    seedAssignedRun(runRepository);
+    seedDispatchAttempt(queueRepository);
 
-    const useCase = new BuildAssignedRunExecutionCommandUseCase({
+    const useCase = new HandleRunDispatchResultUseCase({
       runRepository,
       queueRepository,
+      orchestrationIntentRepository: auditRepository,
+      idGenerator: {
+        nextId: (prefix) => `${prefix}:${auditRepository.events.size + 1}`,
+      },
     });
 
-    const command = await useCase.execute({
-      runId: "run-1",
-      dispatchAttemptId: "dispatch-attempt:1",
+    const result = await useCase.execute({
+      command,
+      dispatchStartedAt: "2026-04-07T09:03:00.000Z",
+      outcome: createDispatchAcceptedOutcome(Object.freeze({
+        dispatchId: "dispatch:1",
+        backendKind: RunExecutionBackendKinds.remoteDispatch,
+        acceptedAt: "2026-04-07T09:03:10.000Z",
+        status: "accepted",
+        backendRunId: "backend-run-1",
+      })),
     });
 
-    expect(command.commandId).toBe("run-execution-command:dispatch-attempt:1");
-    expect(command.assignment.nodeId).toBe("node:trusted-a");
-    expect(command.runtimeTarget.systemId).toBe("comfyui");
-    expect(command.inputs.parameters.seed).toBe(7);
-    expect(command.backend.kind).toBe(RunExecutionBackendKinds.comfyUi);
+    expect(result.run.state).toBe("running");
+    expect(result.run.execution.startedAt).toBe("2026-04-07T09:03:10.000Z");
+    expect(result.run.execution.adapterRunId).toBe("backend-run-1");
+    expect(result.dispatchAttemptResult.status).toBe("accepted");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("accepted");
+    expect([...auditRepository.events.values()].length).toBe(2);
   });
 
-  it("fails with a structured error when the dispatch attempt does not exist", async () => {
+  it("transitions run to failed for dispatch failures and stores user-safe/internal failure reasons", async () => {
     const runRepository = new InMemoryRunRepository();
     const queueRepository = new InMemoryQueueRepository();
-    runRepository.runs.set("run-1", createAssignedRunRecord("run-1", "system:remote"));
-    queueRepository.queue.set("run-1", createQueueEntry("run-1"));
+    const auditRepository = new InMemoryAuditRepository();
+    seedAssignedRun(runRepository);
+    seedDispatchAttempt(queueRepository);
 
-    const useCase = new BuildAssignedRunExecutionCommandUseCase({
+    const useCase = new HandleRunDispatchResultUseCase({
       runRepository,
       queueRepository,
+      orchestrationIntentRepository: auditRepository,
+      idGenerator: {
+        nextId: (prefix) => `${prefix}:${auditRepository.events.size + 1}`,
+      },
     });
 
-    let thrown: unknown;
-    try {
-      await useCase.execute({
-        runId: "run-1",
-        dispatchAttemptId: "dispatch-attempt:missing",
-      });
-    } catch (error) {
-      thrown = error;
-    }
+    const result = await useCase.execute({
+      command,
+      dispatchStartedAt: "2026-04-07T09:03:00.000Z",
+      outcome: createDispatchFailureOutcome({
+        failedAt: "2026-04-07T09:03:20.000Z",
+        error: Object.freeze({
+          code: "backend-unavailable",
+          message: "Socket connection timeout.",
+          retryable: true,
+        }),
+      }),
+    });
 
-    expect(thrown).toBeInstanceOf(RunExecutionCommandBuildError);
-    expect((thrown as RunExecutionCommandBuildError).code).toBe("dispatch-attempt-not-found");
+    expect(result.run.state).toBe("failed");
+    expect(result.run.execution.errorCode).toBe("dispatch-failed-to-start");
+    expect(result.run.execution.errorMessage).toBe("Run failed to start on the selected execution backend.");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.internalMessage)
+      .toContain("Socket connection timeout");
+    expect([...auditRepository.events.values()].length).toBe(2);
   });
 });
-

@@ -273,6 +273,15 @@ export function updatePlatformRunRecordCanonicalState(
   return Object.freeze({
     ...record,
     status: mapLifecycleStateToPlatformRunStatus(canonicalRun.state),
+    startedAt: canonicalRun.execution.startedAt,
+    completedAt: canonicalRun.execution.finishedAt,
+    terminalReason: canonicalRun.execution.outcome === RunExecutionOutcomeKinds.failed
+      ? canonicalRun.execution.errorMessage
+      : canonicalRun.execution.outcome === RunExecutionOutcomeKinds.cancelled
+        ? "cancelled"
+        : canonicalRun.execution.outcome === RunExecutionOutcomeKinds.succeeded
+          ? "succeeded"
+          : undefined,
     metadata: Object.freeze(metadata),
   });
 }

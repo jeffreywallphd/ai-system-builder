@@ -5,6 +5,7 @@ import type {
   PlatformRunMutationResult,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { RunExecutionBackendKind } from "@application/runs/ports/RunExecutionDispatchPorts";
 import type { RunLifecycleState } from "@domain/runs/RunDomain";
 
 export type AuthoritativeRunPersistenceMutationContext = PlatformPersistenceMutationContext;
@@ -95,6 +96,35 @@ export interface AuthoritativeRunDispatchAttemptRecord {
   readonly claimToken: string;
   readonly preparedAt: string;
   readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  readonly dispatchResult?: AuthoritativeRunDispatchAttemptResult;
+}
+
+export const RunDispatchAttemptResultStatuses = Object.freeze({
+  accepted: "accepted",
+  failedToStart: "failed-to-start",
+});
+
+export type RunDispatchAttemptResultStatus =
+  typeof RunDispatchAttemptResultStatuses[keyof typeof RunDispatchAttemptResultStatuses];
+
+export interface AuthoritativeRunDispatchAttemptFailure {
+  readonly safeCode: string;
+  readonly safeMessage: string;
+  readonly internalCode?: string;
+  readonly internalMessage?: string;
+  readonly retryable?: boolean;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface AuthoritativeRunDispatchAttemptResult {
+  readonly status: RunDispatchAttemptResultStatus;
+  readonly recordedAt: string;
+  readonly acceptedAt?: string;
+  readonly dispatchId?: string;
+  readonly backendKind?: RunExecutionBackendKind;
+  readonly backendRunId?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly failure?: AuthoritativeRunDispatchAttemptFailure;
 }
 
 export interface AuthoritativeRunNodeClaimSuccess {
@@ -149,6 +179,11 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly preparedAt: string;
     readonly dispatchMetadata: Readonly<Record<string, unknown>>;
   }): Promise<AuthoritativeRunNodeClaimResult>;
+  recordDispatchAttemptResult(input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean>;
   listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>;
 }
 

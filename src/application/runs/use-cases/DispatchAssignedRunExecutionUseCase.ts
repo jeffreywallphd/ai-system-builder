@@ -3,6 +3,11 @@ import type {
   IRunExecutionDispatchPort,
   RunExecutionDispatchReceipt,
 } from "@application/runs/ports/RunExecutionDispatchPorts";
+import {
+  createDispatchAcceptedOutcome,
+  createDispatchFailureOutcome,
+  type HandleRunDispatchResultRequest,
+} from "./HandleRunDispatchResultUseCase";
 import type {
   BuildAssignedRunExecutionCommandRequest,
 } from "./BuildAssignedRunExecutionCommandUseCase";
@@ -14,6 +19,10 @@ interface DispatchAssignedRunExecutionCommandBuilderPort {
 interface DispatchAssignedRunExecutionUseCaseDependencies {
   readonly commandBuilder: DispatchAssignedRunExecutionCommandBuilderPort;
   readonly dispatchPort: IRunExecutionDispatchPort;
+  readonly dispatchResultHandler: {
+    execute(request: HandleRunDispatchResultRequest): Promise<unknown>;
+  };
+  readonly now?: () => Date;
 }
 
 export interface DispatchAssignedRunExecutionRequest extends BuildAssignedRunExecutionCommandRequest {}
@@ -24,11 +33,36 @@ export interface DispatchAssignedRunExecutionResult {
 }
 
 export class DispatchAssignedRunExecutionUseCase {
-  public constructor(private readonly dependencies: DispatchAssignedRunExecutionUseCaseDependencies) {}
+  private readonly now: () => Date;
+
+  public constructor(private readonly dependencies: DispatchAssignedRunExecutionUseCaseDependencies) {
+    this.now = dependencies.now ?? (() => new Date());
+  }
 
   public async execute(request: DispatchAssignedRunExecutionRequest): Promise<DispatchAssignedRunExecutionResult> {
     const command = await this.dependencies.commandBuilder.execute(request);
-    const receipt = await this.dependencies.dispatchPort.dispatch(command);
+    const dispatchStartedAt = this.now().toISOString();
+    let receipt: RunExecutionDispatchReceipt;
+    try {
+      receipt = await this.dependencies.dispatchPort.dispatch(command);
+    } catch (error) {
+      await this.dependencies.dispatchResultHandler.execute({
+        command,
+        dispatchStartedAt,
+        outcome: createDispatchFailureOutcome({
+          failedAt: this.now().toISOString(),
+          error,
+        }),
+      });
+      throw error;
+    }
+
+    await this.dependencies.dispatchResultHandler.execute({
+      command,
+      dispatchStartedAt,
+      outcome: createDispatchAcceptedOutcome(receipt),
+    });
+
     return Object.freeze({
       command,
       receipt,

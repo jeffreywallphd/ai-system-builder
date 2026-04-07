@@ -6,6 +6,7 @@ import type {
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
+  AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
@@ -175,6 +176,14 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly dispatchMetadata: Readonly<Record<string, unknown>>;
   }): Promise<AuthoritativeRunNodeClaimResult> {
     throw new Error("Not implemented.");
+  }
+
+  public async recordDispatchAttemptResult(_input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
   }
 
   public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {

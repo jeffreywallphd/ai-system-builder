@@ -9,6 +9,7 @@ import type {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
 import type {
+  AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
@@ -153,6 +154,14 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly dispatchMetadata: Readonly<Record<string, unknown>>;
   }): Promise<AuthoritativeRunNodeClaimResult> {
     throw new Error("Not implemented.");
+  }
+
+  public async recordDispatchAttemptResult(_input: {
+    readonly runId: string;
+    readonly attemptId: string;
+    readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
   }
 
   public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
