@@ -14,6 +14,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-hybrid-node-local-interactive-protection.md`
 - `docs/architecture/run-orchestration-scheduling-required-capability-affinity-eligibility.md`
 - `docs/architecture/run-orchestration-scheduling-decision-reason-capture.md`
+- `docs/architecture/run-orchestration-scheduling-architecture-extension-guidance.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
@@ -29,6 +30,8 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Keep canonical scheduling policy concepts in `src/domain/scheduling/SchedulingDomain.ts`.
 - Keep scheduling decision-pipeline contracts in `src/application/scheduling/*`.
 - Add new policy checks as pluggable rules through `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts` and `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`.
+- Keep arbitration behavior explicit in `RolePrioritySchedulingArbitration.ts` (or an explicit replacement module) with deterministic fallback ordering.
+- Keep affinity preference handling in `SchedulingPlacementAffinityPreference.ts`; keep hard denials in rule modules.
 - Reuse node eligibility + assignment policy seams.
 - Preserve claim release behavior for ineligible node-targeted selections.
 - Keep deterministic queue ordering and reservation TTL semantics.
@@ -62,6 +65,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Bypassing authoritative node claim use case before dispatch is prohibited.
 - Dispatching directly from transport handlers is prohibited.
 - Mutating run lifecycle directly from infrastructure adapters is prohibited.
+- Embedding scheduling policy logic in UI/transport/persistence/dispatch adapters is prohibited.
 - Bypassing execution-update ingestion validation for lifecycle/progress writes is prohibited.
 - Bypassing authoritative submission validation + creation for retried runs is prohibited.
 - Emitting unsanitized prompts/secrets/raw paths/backend payloads in orchestration diagnostics is prohibited.

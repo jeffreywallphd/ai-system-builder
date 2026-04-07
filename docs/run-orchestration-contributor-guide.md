@@ -17,6 +17,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-hybrid-node-local-interactive-protection.md`
 - `docs/architecture/run-orchestration-scheduling-required-capability-affinity-eligibility.md`
 - `docs/architecture/run-orchestration-scheduling-decision-reason-capture.md`
+- `docs/architecture/run-orchestration-scheduling-architecture-extension-guidance.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
@@ -56,10 +57,12 @@ Provide an implementation checklist for contributors extending the authoritative
 2. Keep canonical scheduling policy models in `src/domain/scheduling/SchedulingDomain.ts`.
 3. Keep scheduling decision-pipeline orchestration and rule-pipeline evaluation in `src/application/scheduling/*`.
 4. Add new scheduler policy checks as modular rules via `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts` and `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`.
-5. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
-6. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
-7. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
-8. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
+5. Keep arbitration behavior explicit in `RolePrioritySchedulingArbitration.ts` (or a named successor arbitration module), with deterministic fallback tie-break semantics.
+6. Keep affinity behavior in `SchedulingPlacementAffinityPreference.ts` for preference filtering, and keep hard eligibility denials in rule modules.
+7. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
+8. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
+9. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
+10. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
 
 ## Extending backend dispatch integrations
 
@@ -115,6 +118,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Bypassing `ClaimRunForNodeDispatchPreparationUseCase` for assignment writes is prohibited.
 - Performing dispatch directly from route handlers without canonical command building is prohibited.
 - Mutating canonical run lifecycle directly from infrastructure adapters is prohibited.
+- Embedding scheduling policy logic in UI components/state, transport handlers, persistence adapters, or backend dispatch adapters is prohibited.
 - Bypassing `IngestRunExecutionUpdateUseCase` for execution progress/heartbeat/lifecycle mutation is prohibited.
 - Persisting internal diagnostics directly into user-facing run contracts is prohibited.
 - Creating retried runs by bypassing authoritative validation + creation use cases is prohibited.
