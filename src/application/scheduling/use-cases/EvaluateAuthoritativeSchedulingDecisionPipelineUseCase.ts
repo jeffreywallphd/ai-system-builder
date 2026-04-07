@@ -5,12 +5,19 @@ import type {
   SchedulingDecisionBundle,
 } from "@application/scheduling/AuthoritativeSchedulingDecisionPipeline";
 import type { ISchedulingDecisionOutcomeRecorder } from "@application/scheduling/ports/SchedulingDecisionOutcomeCapturePorts";
+import {
+  publishSchedulingGovernanceEventBestEffort,
+  SchedulingGovernanceEventChannels,
+  SchedulingGovernanceEventTypes,
+  type ISchedulingGovernanceEventSink,
+} from "@application/scheduling/ports/SchedulingGovernanceEventPorts";
 import { toSchedulingDecisionOutcomeCaptureRecord } from "./SchedulingDecisionOutcomeCapture";
 
 interface EvaluateAuthoritativeSchedulingDecisionPipelineUseCaseDependencies {
   readonly inputAssembler: IAuthoritativeSchedulingInputAssembler;
   readonly policyEvaluator: IAuthoritativeSchedulingPolicyEvaluator;
   readonly outcomeRecorder?: ISchedulingDecisionOutcomeRecorder;
+  readonly governanceEventSink?: ISchedulingGovernanceEventSink;
   readonly now?: () => Date;
 }
 
@@ -51,8 +58,101 @@ export class EvaluateAuthoritativeSchedulingDecisionPipelineUseCase
         }),
       );
     }
+    await this.publishGovernanceEvents({
+      decisionBundle,
+      reservationOwner: input.reservationOwner,
+      requestedWorkspaceId: input.workspaceId,
+    });
 
     return decisionBundle;
+  }
+
+  private async publishGovernanceEvents(input: {
+    readonly decisionBundle: SchedulingDecisionBundle;
+    readonly reservationOwner: string;
+    readonly requestedWorkspaceId?: string;
+  }): Promise<void> {
+    const outcome = input.decisionBundle.decision.outcome;
+    const selected = input.decisionBundle.decision.selected;
+    const selectedCandidate = selected
+      ? input.decisionBundle.decision.evaluatedCandidates.find((candidate) => (
+        candidate.runId === selected.runId && candidate.nodeId === selected.nodeId
+      ))
+      : undefined;
+    const workspaceId = selected
+      ? resolveRunWorkspaceId(input.decisionBundle, selected.runId) ?? normalizeOptional(input.requestedWorkspaceId)
+      : normalizeOptional(input.requestedWorkspaceId);
+
+    if (outcome === "assignment-recommended" && selected) {
+      const details = selectedCandidate
+        ? Object.freeze({
+          priorityBand: selectedCandidate.scorecard.priorityBand,
+          rolePriorityScore: selectedCandidate.scorecard.rolePriorityScore,
+          queueAgeSeconds: selectedCandidate.scorecard.queueAgeSeconds,
+          reasonCodes: input.decisionBundle.evaluation.reasonSummary.decisionReasonCodes,
+          policySources: input.decisionBundle.decision.policySources,
+        })
+        : Object.freeze({
+          reasonCodes: input.decisionBundle.evaluation.reasonSummary.decisionReasonCodes,
+          policySources: input.decisionBundle.decision.policySources,
+        });
+      await this.publishEventPair({
+        type: SchedulingGovernanceEventTypes.priorityPlacementSelected,
+        outcome: "succeeded",
+        occurredAt: input.decisionBundle.decision.occurredAt,
+        decisionId: input.decisionBundle.decision.decisionId,
+        reservationOwner: normalizeOptional(input.reservationOwner),
+        actorServiceId: normalizeOptional(input.reservationOwner),
+        workspaceId,
+        runId: selected.runId,
+        nodeId: selected.nodeId,
+        queueId: resolveRunQueueId(input.decisionBundle, selected.runId),
+        details,
+      });
+      return;
+    }
+
+    if (outcome === "deferred" || outcome === "no-placement") {
+      await this.publishEventPair({
+        type: SchedulingGovernanceEventTypes.deferredNoPlacement,
+        outcome: "deferred",
+        occurredAt: input.decisionBundle.decision.occurredAt,
+        decisionId: input.decisionBundle.decision.decisionId,
+        reservationOwner: normalizeOptional(input.reservationOwner),
+        actorServiceId: normalizeOptional(input.reservationOwner),
+        workspaceId,
+        details: Object.freeze({
+          schedulerOutcome: outcome,
+          queueLeaseCount: input.decisionBundle.snapshot.queueLeases.length,
+          candidateCount: input.decisionBundle.decision.evaluatedCandidates.length,
+          reasonCodes: input.decisionBundle.evaluation.reasonSummary.decisionReasonCodes,
+          exclusionReasonCodes: input.decisionBundle.evaluation.reasonSummary.exclusionReasonCodes,
+        }),
+      });
+    }
+  }
+
+  private async publishEventPair(event: {
+    readonly type: typeof SchedulingGovernanceEventTypes[keyof typeof SchedulingGovernanceEventTypes];
+    readonly outcome: "succeeded" | "deferred" | "conflict" | "rejected";
+    readonly occurredAt: string;
+    readonly decisionId?: string;
+    readonly reservationOwner?: string;
+    readonly actorServiceId?: string;
+    readonly workspaceId?: string;
+    readonly runId?: string;
+    readonly nodeId?: string;
+    readonly queueId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishSchedulingGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      ...event,
+      channel: SchedulingGovernanceEventChannels.audit,
+    });
+    await publishSchedulingGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      ...event,
+      channel: SchedulingGovernanceEventChannels.operational,
+    });
   }
 }
 
@@ -83,4 +183,14 @@ function normalizeNodeScope(nodeScope?: ReadonlyArray<string>): ReadonlyArray<st
 
   const normalized = [...new Set(nodeScope.map((nodeId) => nodeId.trim()).filter((nodeId) => nodeId.length > 0))];
   return normalized.length > 0 ? Object.freeze(normalized) : undefined;
+}
+
+function resolveRunWorkspaceId(decisionBundle: SchedulingDecisionBundle, runId: string): string | undefined {
+  const run = decisionBundle.snapshot.runs.find((candidate) => candidate.runId === runId);
+  return normalizeOptional(run?.workspaceId);
+}
+
+function resolveRunQueueId(decisionBundle: SchedulingDecisionBundle, runId: string): string | undefined {
+  const queueLease = decisionBundle.snapshot.queueLeases.find((lease) => lease.runId === runId);
+  return normalizeOptional(queueLease?.queueId);
 }

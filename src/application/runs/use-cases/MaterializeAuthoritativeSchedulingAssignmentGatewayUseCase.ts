@@ -4,6 +4,12 @@ import type {
   SchedulingAssignmentIntent,
   SchedulingDecisionBundle,
 } from "@application/scheduling/AuthoritativeSchedulingDecisionPipeline";
+import {
+  publishSchedulingGovernanceEventBestEffort,
+  SchedulingGovernanceEventChannels,
+  SchedulingGovernanceEventTypes,
+  type ISchedulingGovernanceEventSink,
+} from "@application/scheduling/ports/SchedulingGovernanceEventPorts";
 import type {
   IRunNodePlacementHoldRepository,
   IRunOrchestrationQueuePersistenceRepository,
@@ -19,6 +25,7 @@ interface MaterializeAuthoritativeSchedulingAssignmentGatewayUseCaseDependencies
   readonly queueRepository: Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim" | "deferRunClaimForNoPlacement">;
   readonly placementHoldRepository: IRunNodePlacementHoldRepository;
   readonly claimRunForNodeDispatchPreparationUseCase: Pick<ClaimRunForNodeDispatchPreparationUseCase, "execute">;
+  readonly governanceEventSink?: ISchedulingGovernanceEventSink;
   readonly now?: () => Date;
   readonly placementHoldTtlSeconds?: number;
   readonly idGenerator?: {
@@ -74,6 +81,25 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
         maxDelaySeconds: noPlacement.backoff.maxDelaySeconds,
         multiplier: noPlacement.backoff.multiplier,
       });
+      await this.publishEventPair({
+        type: SchedulingGovernanceEventTypes.deferredNoPlacement,
+        outcome: "deferred",
+        occurredAt: this.now().toISOString(),
+        decisionId: input.decisionBundle.decision.decisionId,
+        reservationOwner: lease.claimOwner,
+        actorServiceId: lease.claimOwner,
+        workspaceId: resolveRunWorkspaceId(input.decisionBundle, lease.runId),
+        runId: lease.runId,
+        queueId: lease.queueId,
+        details: Object.freeze({
+          reasonCategory: noPlacement.reasonCategory,
+          reasonCodes: noPlacement.reasonCodes,
+          requiresAdministrativeAttention: noPlacement.requiresAdministrativeAttention,
+          initialDelaySeconds: noPlacement.backoff.initialDelaySeconds,
+          maxDelaySeconds: noPlacement.backoff.maxDelaySeconds,
+          multiplier: noPlacement.backoff.multiplier,
+        }),
+      });
     }
 
     const materialized: SchedulingAssignmentIntent[] = [];
@@ -98,6 +124,22 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
           claimToken: intent.claimToken,
           releasedAt: this.now().toISOString(),
         });
+        await this.publishEventPair({
+          type: SchedulingGovernanceEventTypes.reservationConflict,
+          outcome: "conflict",
+          occurredAt: this.now().toISOString(),
+          decisionId: intent.decisionId,
+          reservationOwner: intent.reservationOwner,
+          actorServiceId: intent.reservationOwner,
+          workspaceId: resolveRunWorkspaceId(input.decisionBundle, intent.runId),
+          runId: intent.runId,
+          nodeId: intent.nodeId,
+          queueId: intent.queueId,
+          details: Object.freeze({
+            conflictReason: hold.conflict.reason,
+            conflictMessage: hold.conflict.message,
+          }),
+        });
         continue;
       }
 
@@ -114,6 +156,25 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
         if (!(error instanceof RunNodeDispatchClaimConflictError)) {
           throw error;
         }
+        const eventType = error.conflict.reason === RunNodeClaimConflictReasons.reservationConflict
+          ? SchedulingGovernanceEventTypes.reservationConflict
+          : SchedulingGovernanceEventTypes.assignmentMaterializationConflict;
+        await this.publishEventPair({
+          type: eventType,
+          outcome: "conflict",
+          occurredAt: this.now().toISOString(),
+          decisionId: intent.decisionId,
+          reservationOwner: intent.reservationOwner,
+          actorServiceId: intent.reservationOwner,
+          workspaceId: resolveRunWorkspaceId(input.decisionBundle, intent.runId),
+          runId: intent.runId,
+          nodeId: intent.nodeId,
+          queueId: intent.queueId,
+          details: Object.freeze({
+            conflictReason: error.conflict.reason,
+            conflictMessage: error.conflict.message,
+          }),
+        });
       } finally {
         await this.dependencies.placementHoldRepository.releaseNodePlacementHold({
           nodeId: intent.nodeId,
@@ -124,6 +185,29 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
     }
 
     return Object.freeze(materialized);
+  }
+
+  private async publishEventPair(event: {
+    readonly type: typeof SchedulingGovernanceEventTypes[keyof typeof SchedulingGovernanceEventTypes];
+    readonly outcome: "succeeded" | "deferred" | "conflict" | "rejected";
+    readonly occurredAt: string;
+    readonly decisionId?: string;
+    readonly reservationOwner?: string;
+    readonly actorServiceId?: string;
+    readonly workspaceId?: string;
+    readonly runId?: string;
+    readonly nodeId?: string;
+    readonly queueId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishSchedulingGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      ...event,
+      channel: SchedulingGovernanceEventChannels.audit,
+    });
+    await publishSchedulingGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      ...event,
+      channel: SchedulingGovernanceEventChannels.operational,
+    });
   }
 }
 
@@ -219,4 +303,10 @@ function buildRunNoPlacementDisposition(input: {
       maxDelaySeconds: noPlacementOutcome ? 300 : 120,
     }),
   });
+}
+
+function resolveRunWorkspaceId(decisionBundle: SchedulingDecisionBundle, runId: string): string | undefined {
+  const run = decisionBundle.snapshot.runs.find((candidate) => candidate.runId === runId);
+  const normalized = run?.workspaceId?.trim();
+  return normalized ? normalized : undefined;
 }
