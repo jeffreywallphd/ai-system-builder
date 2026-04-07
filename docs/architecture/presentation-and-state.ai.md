@@ -945,3 +945,12 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - API error to UI-state mapping is centralized through `toSurfacePresentationStateFromApiError` to keep converged UI behavior aligned with shared API error semantics.
 - `NodeInventoryPage` and `StorageAdministrationPage` now use these shared state seams for list/detail loading/error/empty rendering.
 
+
+## Operational workspace dashboard foundation update (story 15.2.1)
+
+- Run entry now composes a shared operational workspace dashboard foundation using shared dashboard widgets under `src/ui/shared/operations/OperationalWorkspaceDashboard.tsx` and a presenter seam in `src/ui/presenters/OperationalWorkspaceDashboardPresenter.ts`.
+- Desktop and thin-client operational pages now share the same dashboard content model and widget composition while rendering through surface-specific shell wrappers:
+  - `src/ui/pages/RunDesktopOperationalDashboardPage.tsx`
+  - `src/ui/pages/RunThinClientOperationalDashboardPage.tsx`
+- Dashboard content is API-driven from existing authoritative contracts/services (runtime queue + run inspection + execution history + trusted node inventory) and realtime status updates via `RuntimeRealtimeSubscriptionService`.
+- The foundation now provides a coherent workspace-level operational entry point for queue state, recent run/output review, node availability summary, actionable alerts, and approved run initiation controls.
