@@ -20,6 +20,7 @@ describe("RunOrchestrationTransportContracts", () => {
   it("defines canonical route catalog", () => {
     expect(RunOrchestrationTransportContractVersions.v1).toBe("run-orchestration-transport/v1");
     expect(RunOrchestrationTransportRoutes.submitRun).toBe("/api/v1/runtime/runs/start");
+    expect(RunOrchestrationTransportRoutes.listRuns).toBe("/api/v1/runtime/runs");
     expect(RunOrchestrationTransportRoutes.retryRun).toBe("/api/v1/runtime/runs/:runId/retry");
     expect(RunOrchestrationTransportRoutes.updateLifecycle).toBe("/api/v1/runtime/runs/:runId/lifecycle");
   });

@@ -61,6 +61,17 @@ const RunLifecycleStateSchema = z.enum([
   RunLifecycleStates.cancelled,
 ]);
 
+const RunListSortBySchema = z.enum([
+  "submittedAt",
+  "updatedAt",
+  "state",
+]);
+
+const RunListSortDirectionSchema = z.enum([
+  "asc",
+  "desc",
+]);
+
 const RunAssignmentStatusSchema = z.enum([
   RunAssignmentStatuses.unassigned,
   RunAssignmentStatuses.pending,
@@ -181,6 +192,17 @@ export const RunDetailSchema = RunSummarySchema.extend({
   retry: RunRetrySchema,
 }).strict();
 
+export const RunListReadRequestSchema = z.object({
+  workspaceId: IdentifierSchema,
+  states: z.array(RunLifecycleStateSchema).max(16).optional(),
+  sources: z.array(RunSubmissionSourceSchema).max(16).optional(),
+  search: z.string().trim().min(1).max(256).optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+  offset: z.number().int().min(0).optional(),
+  sortBy: RunListSortBySchema.optional(),
+  sortDirection: RunListSortDirectionSchema.optional(),
+}).strict();
+
 const MutationResultSchema = z.object({
   changed: z.boolean(),
   mutationId: IdentifierSchema.optional(),
@@ -197,6 +219,11 @@ export const RunSubmissionAcceptedResponseSchema = z.object({
   run: RunDetailSchema,
   mutation: MutationResultSchema,
   validationIssues: z.array(RunSubmissionValidationIssueSchema).optional(),
+}).strict();
+
+export const RunListReadResponseSchema = z.object({
+  items: z.array(RunSummarySchema),
+  totalCount: z.number().int().min(0),
 }).strict();
 
 export const RunStatusEnvelopeSchema = z.object({
@@ -325,7 +352,9 @@ function parseRunOrchestrationSchema<T>(schemaName: string, schema: z.ZodSchema<
 
 export type RunSubmissionRequestPayload = z.infer<typeof CanonicalRunSubmissionRequestSchema>;
 export type RunDetailPayload = z.infer<typeof RunDetailSchema>;
+export type RunListReadRequestPayload = z.infer<typeof RunListReadRequestSchema>;
 export type RunSubmissionAcceptedResponsePayload = z.infer<typeof RunSubmissionAcceptedResponseSchema>;
+export type RunListReadResponsePayload = z.infer<typeof RunListReadResponseSchema>;
 export type RunStatusEnvelopePayload = z.infer<typeof RunStatusEnvelopeSchema>;
 export type RunQueueStatusReadRequestPayload = z.infer<typeof RunQueueStatusReadRequestSchema>;
 export type RunQueueStatusReadResponsePayload = z.infer<typeof RunQueueStatusReadResponseSchema>;
@@ -359,8 +388,16 @@ export function parseRunDetail(payload: unknown): RunDetailPayload {
   return parseRunOrchestrationSchema("RunDetail", RunDetailSchema, payload);
 }
 
+export function parseRunListReadRequest(payload: unknown): RunListReadRequestPayload {
+  return parseRunOrchestrationSchema("RunListReadRequest", RunListReadRequestSchema, payload);
+}
+
 export function parseRunSubmissionAcceptedResponse(payload: unknown): RunSubmissionAcceptedResponsePayload {
   return parseRunOrchestrationSchema("RunSubmissionAcceptedResponse", RunSubmissionAcceptedResponseSchema, payload);
+}
+
+export function parseRunListReadResponse(payload: unknown): RunListReadResponsePayload {
+  return parseRunOrchestrationSchema("RunListReadResponse", RunListReadResponseSchema, payload);
 }
 
 export function parseRunStatusEnvelope(payload: unknown): RunStatusEnvelopePayload {

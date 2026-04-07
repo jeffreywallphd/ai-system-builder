@@ -56,6 +56,7 @@ import { StorageManagementBackendApi } from "@infrastructure/api/storage/Storage
 import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
+import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
@@ -134,6 +135,8 @@ import { TrustMaterialKinds } from "@domain/security/CertificateAuthorityDomain"
 import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
 import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
+import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
+import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -951,6 +954,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
     }),
   });
+  const authoritativeRunQueryBackendApi = new AuthoritativeRunQueryBackendApi({
+    listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(
+      persistentPlatformServices.platformPersistenceRepository,
+    ),
+    getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
+      persistentPlatformServices.platformPersistenceRepository,
+    ),
+    runRepository: persistentPlatformServices.platformPersistenceRepository,
+    authorizationDecisionEvaluator,
+    now: () => workspaceClock.now(),
+  });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
     nodeTrustIdentityRepository: nodeTrustRepository,
@@ -1021,6 +1035,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageManagementBackendApi,
     assetManagementBackendApi,
     authoritativeRunSubmissionBackendApi,
+    authoritativeRunQueryBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,

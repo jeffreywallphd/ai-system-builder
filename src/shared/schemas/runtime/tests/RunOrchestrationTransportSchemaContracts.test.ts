@@ -2,6 +2,8 @@ import { describe, expect, it } from "bun:test";
 import {
   RunOrchestrationTransportSchemaValidationError,
   parseRunCancellationRequest,
+  parseRunListReadRequest,
+  parseRunListReadResponse,
   parseRunLifecycleEventEnvelope,
   parseRunQueueStatusReadRequest,
   parseRunSubmissionRequest,
@@ -56,6 +58,38 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       offset: 0,
     });
     expect(queueRead.statuses?.length).toBe(2);
+  });
+
+  it("parses authoritative run list read contracts", () => {
+    const request = parseRunListReadRequest({
+      workspaceId: "workspace-1",
+      states: ["submitted", "running"],
+      sources: ["api"],
+      search: "workflow-alpha",
+      limit: 25,
+      offset: 10,
+      sortBy: "updatedAt",
+      sortDirection: "desc",
+    });
+    expect(request.workspaceId).toBe("workspace-1");
+    expect(request.states?.length).toBe(2);
+
+    const response = parseRunListReadResponse({
+      items: [{
+        contractVersion: "run-orchestration-transport/v1",
+        runId: "run-1",
+        workflowId: "workflow-1",
+        workspaceId: "workspace-1",
+        source: "api",
+        state: "running",
+        assignmentStatus: "assigned",
+        executionOutcome: "none",
+        submittedAt: "2026-04-07T10:00:00.000Z",
+        updatedAt: "2026-04-07T10:00:05.000Z",
+      }],
+      totalCount: 1,
+    });
+    expect(response.items[0]?.runId).toBe("run-1");
   });
 
   it("parses run lifecycle event envelopes", () => {
