@@ -6,6 +6,8 @@
 2. Add/update DTO contracts in `src/shared/contracts/*`.
 3. Add/update schema validation in `src/shared/schemas/*`.
 4. Implement authoritative backend + transport (`src/infrastructure/api/*`, `src/infrastructure/transport/http-server/*`).
+   - domain route-family registration modules live in `src/infrastructure/transport/http-server/authoritative-route-families/*`
+   - authoritative route-family catalog lives in `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
 5. Integrate desktop/thin clients through `src/ui/shared/*` using `SharedApiClient`.
 
 ## Must not do

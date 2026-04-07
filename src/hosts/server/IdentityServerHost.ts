@@ -190,6 +190,7 @@ import {
   type IdentityHttpServerFactory,
   type IdentityHttpServerLogger,
 } from "@infrastructure/transport/http-server/identity/IdentityHttpServer";
+import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 import type { IdentitySessionLifecyclePolicies } from "@application/identity/services/IdentitySessionLifecycleService";
 import type { AuthProvider, CredentialPolicy } from "@domain/identity/IdentityDomain";
 import type {
@@ -216,6 +217,7 @@ export interface IdentityServerHostOptions {
   readonly eventPublisher?: IIdentityLifecycleEventPublisher;
   readonly providerAccountPolicies?: IdentityProviderAccountPolicyConfig;
   readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
+  readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
 }
 
 export interface IdentityServerHost {
@@ -1001,6 +1003,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     authorizationManagementBackendApi,
     workspaceBackendApi,
     workspaceAdministrationBackendApi,
+    routeRegistrationPlan: options.routeRegistrationPlan,
     cors: options.cors,
     logger: options.logger,
     secureTransport: Object.freeze({

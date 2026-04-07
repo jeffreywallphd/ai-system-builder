@@ -9,6 +9,7 @@
 - Dedicated entrypoint: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
 - Runtime host startup implementation: `src/hosts/server/IdentityServerHost.ts`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
+- Route registration composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 
 ## Control-plane ownership
 - Authoritative server is the single runtime with control-plane authority.
@@ -39,6 +40,16 @@
   - normal host stop disposes persistent platform services and persistence runtime resources
 - Repository command: `npm run start:authoritative-server`
 
+## Authoritative API route registration
+- Shared route-registration contracts and catalog:
+  - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistration.ts`
+  - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
+- Domain route family modules:
+  - `src/infrastructure/transport/http-server/authoritative-route-families/*`
+- Startup behavior:
+  - `dependencies` stage composes route registration artifact
+  - `feature-registration` stage asserts authoritative required route-family coverage before transport start
+
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
 - `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now delegates browser-development local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
@@ -46,3 +57,4 @@
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
+- `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`

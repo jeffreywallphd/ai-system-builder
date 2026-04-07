@@ -69,6 +69,17 @@ async function startServer(
 }
 
 describe("IdentityHttpServer", () => {
+  it("composes and logs authoritative route family registration at startup", async () => {
+    const logger = new CapturingLogger();
+    await startServer(logger);
+
+    const event = logger.events.find((entry) => entry.event === "identity-http.route-families.composed");
+    expect(event).toBeDefined();
+    const details = event?.details as { routeFamilyIds?: unknown } | undefined;
+    expect(Array.isArray(details?.routeFamilyIds)).toBeTrue();
+    expect(details?.routeFamilyIds).toEqual(["identity-auth"]);
+  });
+
   it("supports development login route when explicitly enabled", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger, {}, {
