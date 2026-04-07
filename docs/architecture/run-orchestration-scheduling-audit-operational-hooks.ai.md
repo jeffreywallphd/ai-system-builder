@@ -3,6 +3,7 @@
 ## Story scope
 Story 17.2.7 adds structured audit/operational hooks for scheduler decisions and queue-integration exceptional outcomes.
 Story 17.3.3 extends those hooks by bridging operational-channel events into shared runtime realtime publication.
+Story 18.1.7 adds baseline authoritative mapping seams for audit-channel scheduling governance events.
 
 ## Human doc
 - `docs/architecture/run-orchestration-scheduling-audit-operational-hooks.md`
@@ -12,6 +13,7 @@ Story 17.3.3 extends those hooks by bridging operational-channel events into sha
 - `src/application/scheduling/use-cases/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.ts`
 - `src/application/runs/use-cases/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.ts`
 - `src/infrastructure/api/runs/PlatformSchedulingGovernanceEventSink.ts`
+- `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
 
 ## Core delivery
 - Scheduling now emits structured governance events for:
@@ -22,6 +24,7 @@ Story 17.3.3 extends those hooks by bridging operational-channel events into sha
 - Events are emitted from application seams (decision pipeline + queue integration), not from domain rules.
 - Publication is best-effort and sanitized for sensitive/internal detail keys.
 - Platform audit integration maps audit-channel scheduling events into stable run-audit actions.
+- Authoritative audit integration seam maps audit-channel scheduling events into canonical run orchestration records.
 - Platform realtime integration maps operational-channel scheduling events into canonical `runtime.run.status` and `runtime.queue` payloads.
 
 ## Redaction posture
@@ -38,3 +41,4 @@ Story 17.3.3 extends those hooks by bridging operational-channel events into sha
 - `src/application/scheduling/tests/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.test.ts`
 - `src/application/runs/tests/MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/PlatformSchedulingGovernanceEventSink.test.ts`
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`

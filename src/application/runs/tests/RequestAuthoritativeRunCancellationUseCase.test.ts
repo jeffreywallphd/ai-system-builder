@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type {
   PlatformAuditEventRecord,
   PlatformPersistenceMutationContext,
@@ -211,6 +212,20 @@ class StubCancellationSignalPort implements IRunExecutionCancellationSignalPort 
   ): Promise<RunExecutionCancellationSignalResult> {
     this.requests.push(request);
     return this.nextResult;
+  }
+}
+
+class CapturingAuthoritativeRunAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<any> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: input,
+    });
   }
 }
 
@@ -537,5 +552,42 @@ describe("RequestAuthoritativeRunCancellationUseCase", () => {
     expect(result.signalResult?.status).toBe("not-supported");
     expect(intentRepository.events).toHaveLength(1);
     expect(intentRepository.events[0]?.details?.signal).toBeDefined();
+  });
+
+  it("emits authoritative run cancellation events through centralized recorder when configured", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
+
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:cancel-authoritative",
+      state: RunLifecycleStates.queued,
+      withClaim: true,
+    });
+
+    const useCase = new RequestAuthoritativeRunCancellationUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      authoritativeAuditRecorder,
+      now: () => new Date("2026-04-07T12:10:00.000Z"),
+    });
+
+    await useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      request: Object.freeze({
+        runId: "run:cancel-authoritative",
+        requestedAt: "2026-04-07T12:10:00.000Z",
+      }),
+    });
+
+    expect(authoritativeAuditRecorder.events).toHaveLength(1);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.cancellation.requested");
+    expect(authoritativeAuditRecorder.events[0]?.scope.kind).toBe("workspace");
+    expect(authoritativeAuditRecorder.events[0]?.protectedResource?.resourceRef).toBe("run:cancel-authoritative");
   });
 });

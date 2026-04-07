@@ -51,12 +51,14 @@ import {
   FanoutStorageManagementAuditSink,
   FanoutAssetAuditSink,
   FanoutNodeTrustAuditSink,
+  FanoutRunSubmissionAuditSink,
 } from "@infrastructure/audit/AuditFanoutPublishers";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
+import { AuthoritativeRunSubmissionAuditSink } from "@infrastructure/audit/AuthoritativeRunSubmissionAuditSink";
 import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
@@ -993,6 +995,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
     persistentPlatformServices.platformPersistenceRepository,
   );
+  const authoritativeRunSubmissionAuditSink = new FanoutRunSubmissionAuditSink([
+    runSubmissionAuditSink,
+    new AuthoritativeRunSubmissionAuditSink(authoritativeAuditRecorder),
+  ]);
   const validateRunSubmissionUseCase = new ValidateRunSubmissionUseCase({
     workspaceRepository,
     authorizationDecisionEvaluator,
@@ -1000,14 +1006,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
-    auditSink: runSubmissionAuditSink,
+    auditSink: authoritativeRunSubmissionAuditSink,
     clock: workspaceClock,
   });
   const createAuthoritativeRunUseCase = new CreateAuthoritativeRunUseCase({
     runRepository: persistentPlatformServices.platformPersistenceRepository,
     queueRepository: persistentPlatformServices.platformPersistenceRepository,
     orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-    auditSink: runSubmissionAuditSink,
+    auditSink: authoritativeRunSubmissionAuditSink,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
   const runOrchestrationObservability = new RunOrchestrationObservability({
@@ -1046,6 +1052,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
+      authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
     }),
     requestAuthoritativeRunRetryUseCase: new RequestAuthoritativeRunRetryUseCase({
@@ -1053,16 +1060,19 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       validateRunSubmissionUseCase,
       createAuthoritativeRunUseCase,
+      authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
     }),
     releaseStaleSchedulingReservationUseCase: new ReleaseStaleSchedulingReservationUseCase({
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
     }),
     reevaluateDeferredSchedulingRunsUseCase: new ReevaluateDeferredSchedulingRunsUseCase({
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
     }),
     authorizationDecisionEvaluator,

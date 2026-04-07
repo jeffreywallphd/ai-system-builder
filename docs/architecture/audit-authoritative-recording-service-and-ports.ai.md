@@ -5,6 +5,7 @@
 Story 18.1.3 introduces an application-layer authoritative audit recording service so audited features can emit canonical events through one reusable port instead of per-feature ad hoc sinks.
 Story 18.1.5 wires this service into baseline high-risk security flows.
 Story 18.1.6 expands baseline governance capture for storage, protected asset access, and secret configuration events.
+Story 18.1.7 extends baseline orchestration/sharing governance capture for run launch/mutation and publication-related policy events.
 
 ## Canonical files
 
@@ -17,6 +18,8 @@ Story 18.1.6 expands baseline governance capture for storage, protected asset ac
 - `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeProtectedAssetAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
+- `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -62,6 +65,13 @@ Story 18.1.6 composition/wiring now:
 - fans out secret access audit hooks to legacy operational logging plus authoritative canonical secret event recording
 - records logical protected-resource references and safe summary details without raw secret values or raw path/object-key payloads
 
+Story 18.1.7 composition/wiring now:
+
+- fans out run submission audit sink publication to legacy platform run audit + authoritative canonical run recording
+- run cancellation/retry and scheduling-admin use cases emit authoritative `run.*` orchestration actions through optional centralized recorder dependency
+- adds authoritative adapter seam for audit-channel scheduling governance events
+- maps published resource-policy mutations to publication-oriented sharing action (`share.resource.publication.updated`)
+
 ## Why this matters
 
 - Audit recording is now a reusable application capability.
@@ -78,3 +88,5 @@ Story 18.1.6 composition/wiring now:
 - adapter integration tests for storage metadata/policy governance events
 - adapter integration tests for protected asset download access events
 - adapter integration tests for secret access-decision and operation event mapping
+- adapter integration tests for run submission and scheduling governance authoritative mapping
+- run-use-case tests validating authoritative run cancellation/retry/scheduling-admin emission

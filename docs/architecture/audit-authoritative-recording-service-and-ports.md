@@ -1,6 +1,6 @@
 # Authoritative Audit Recording Service and Ports
 
-This note captures Story 18.1.3, Story 18.1.5, and Story 18.1.6 for Feature 18 / Epic 18.1.
+This note captures Story 18.1.3, Story 18.1.5, Story 18.1.6, and Story 18.1.7 for Feature 18 / Epic 18.1.
 
 ## Scope
 
@@ -30,6 +30,13 @@ Story 18.1.6 extends this with baseline governance capture for storage, protecte
 - protected asset download authorization/open events
 - secret access-decision and secret operation events (create/rotate/disable/delete/re-encryption/runtime retrieval)
 
+Story 18.1.7 extends baseline orchestration and governance capture for run and sharing/publication workflows:
+
+- run submission lifecycle events now fan out into authoritative run recording
+- run cancellation/retry/scheduling-admin actions emit authoritative orchestration records from use-case boundaries
+- scheduling governance audit-channel events have an authoritative adapter seam
+- resource-policy sharing mutations emit publication-oriented actions when published posture is involved
+
 ## Canonical files
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
@@ -41,6 +48,8 @@ Story 18.1.6 extends this with baseline governance capture for storage, protecte
 - `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeProtectedAssetAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
+- `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -112,6 +121,13 @@ Story 18.1.6 integration adds governance-oriented fan-out and mapping adapters:
 - `createAuthoritativeSecretAccessAuditHook(...)` translates secret access-decision and operation events into authoritative canonical secret events, and host composition uses best-effort secret audit hook fan-out to keep secret workflows non-blocking.
 - Mapping intentionally records logical resource references (`storage-instance`, `asset-record`, `secret`) and safe summaries, never plaintext secret material or raw storage/object paths.
 
+Story 18.1.7 integration adds baseline run orchestration and governance wiring:
+
+- `FanoutRunSubmissionAuditSink` composes legacy run-submission audit with `AuthoritativeRunSubmissionAuditSink` so launch/denial/lifecycle events are captured through the authoritative service.
+- run mutation governance use cases (`RequestAuthoritativeRunCancellationUseCase`, `RequestAuthoritativeRunRetryUseCase`, `ReleaseStaleSchedulingReservationUseCase`, `ReevaluateDeferredSchedulingRunsUseCase`) include optional authoritative recorder emission while preserving existing orchestration-intent audit behavior.
+- `AuthoritativeSchedulingGovernanceEventSink` maps audit-channel scheduler events into canonical run/scheduling orchestration actions.
+- `AuthoritativeAuthorizationPolicyEventRecorder` maps published resource-policy posture to `share.resource.publication.updated` for publication-related governance visibility.
+
 ## Tests
 
 `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts` covers:
@@ -130,3 +146,5 @@ Story 18.1.6 integration adds governance-oriented fan-out and mapping adapters:
 - storage metadata/policy adapter emission with canonical administrative vs policy category mapping
 - protected asset download adapter emission with canonical protected-data taxonomy mapping
 - secret audit-hook adapter emission for secret access-decision and operation events
+- run submission adapter emission for canonical orchestration run lifecycle actions
+- scheduling governance adapter emission for canonical orchestration scheduling actions

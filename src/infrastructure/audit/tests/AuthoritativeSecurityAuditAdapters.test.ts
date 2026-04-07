@@ -17,6 +17,8 @@ import { AuthoritativeNodeTrustAuditSink } from "../AuthoritativeNodeTrustAuditS
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "../AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
+import { AuthoritativeRunSubmissionAuditSink } from "../AuthoritativeRunSubmissionAuditSink";
+import { AuthoritativeSchedulingGovernanceEventSink } from "../AuthoritativeSchedulingGovernanceEventSink";
 import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
@@ -289,5 +291,118 @@ describe("Authoritative security audit adapters", () => {
     expect(repository.events[1]?.action).toBe("secret.rotate.operation-recorded");
     expect(repository.events[1]?.outcome).toBe("succeeded");
     expect(repository.events[1]?.scope.kind).toBe("global");
+  });
+
+  it("records run submission lifecycle events through authoritative orchestration audit records", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T19:00:00.000Z"),
+      idGenerator: () => "run-submission-1",
+    });
+    const sink = new AuthoritativeRunSubmissionAuditSink(recorder);
+
+    await sink.recordRunSubmissionEvent(Object.freeze({
+      type: "run-submission-accepted",
+      occurredAt: "2026-04-07T19:00:00.000Z",
+      workspaceId: "workspace:primary",
+      runId: "run:submitted-1",
+      actorUserIdentityId: "user:runner",
+      details: Object.freeze({
+        source: "api",
+      }),
+    }));
+    await sink.recordRunSubmissionEvent(Object.freeze({
+      type: "run-submission-denied",
+      occurredAt: "2026-04-07T19:00:01.000Z",
+      workspaceId: "workspace:primary",
+      actorUserIdentityId: "user:runner",
+      details: Object.freeze({
+        reasonCode: "policy-ineligible",
+      }),
+    }));
+
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[0]?.action).toBe("run.submission.accepted");
+    expect(repository.events[0]?.category).toBe("orchestration");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("run:submitted-1");
+    expect(repository.events[1]?.action).toBe("run.submission.denied");
+    expect(repository.events[1]?.outcome).toBe("denied");
+  });
+
+  it("records scheduling governance audit-channel events through authoritative orchestration records", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T19:10:00.000Z"),
+      idGenerator: () => "scheduling-1",
+    });
+    const sink = new AuthoritativeSchedulingGovernanceEventSink(recorder);
+
+    await sink.recordSchedulingGovernanceEvent(Object.freeze({
+      channel: "audit",
+      type: "scheduling-reservation-conflict",
+      occurredAt: "2026-04-07T19:10:00.000Z",
+      outcome: "conflict",
+      workspaceId: "workspace:primary",
+      actorServiceId: "scheduler:default",
+      runId: "run:123",
+      queueId: "queue:default",
+      decisionId: "decision:abc",
+      details: Object.freeze({
+        reasonCode: "reservation-owner-mismatch",
+      }),
+    }));
+    await sink.recordSchedulingGovernanceEvent(Object.freeze({
+      channel: "operational",
+      type: "scheduling-assignment-materialized",
+      occurredAt: "2026-04-07T19:10:01.000Z",
+      outcome: "succeeded",
+      runId: "run:123",
+    }));
+
+    expect(repository.events).toHaveLength(1);
+    expect(repository.events[0]?.action).toBe("run.scheduling.reservation.conflict");
+    expect(repository.events[0]?.outcome).toBe("failed");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("run:123");
+  });
+
+  it("maps published visibility resource policy mutations to publication-oriented sharing actions", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T19:20:00.000Z"),
+      idGenerator: () => "share-publication-1",
+    });
+    const eventRecorder = new AuthoritativeAuthorizationPolicyEventRecorder(recorder);
+
+    await eventRecorder.recordPolicyEvaluationEvent({
+      type: "authorization-resource-policy-upserted",
+      occurredAt: "2026-04-07T19:20:00.000Z",
+      actor: {
+        actorUserIdentityId: "user:owner-1",
+      },
+      workspaceId: "workspace:primary",
+      resource: {
+        resourceFamily: "asset",
+        resourceType: "asset-record",
+        resourceId: "asset:123",
+      },
+      mutation: {
+        entityKind: "resource-policy",
+        mutationKind: "upsert",
+        operationKey: "authorization:resource-policy:upsert:published",
+        changed: true,
+        wasReplay: false,
+      },
+      details: Object.freeze({
+        visibility: "published",
+        sharingPolicyMode: "published",
+      }),
+    });
+
+    expect(repository.events).toHaveLength(1);
+    expect(repository.events[0]?.action).toBe("share.resource.publication.updated");
+    expect(repository.events[0]?.category).toBe("sharing");
   });
 });

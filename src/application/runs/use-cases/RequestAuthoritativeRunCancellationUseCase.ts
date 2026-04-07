@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import {
   PlatformAuditEventKinds,
   type PlatformAuditEventRecord,
@@ -30,6 +31,7 @@ import {
   type RunExecutionState,
   type RunLifecycleState,
 } from "@domain/runs/RunDomain";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 import {
   mapPlatformRunRecordToCanonicalRun,
   toRunDetailFromPlatformRecord,
@@ -190,6 +192,7 @@ interface RequestAuthoritativeRunCancellationUseCaseDependencies {
   readonly idGenerator?: {
     nextId(prefix: string): string;
   };
+  readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
 }
 
 export class RequestAuthoritativeRunCancellationUseCase {
@@ -548,5 +551,69 @@ export class RequestAuthoritativeRunCancellationUseCase {
       occurredAt: input.requestedAt,
       correlationId: input.correlationId,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:cancellation:${input.run.identity.runId}:${input.outcome}`,
+        eventType: "run-cancellation-requested",
+        action: "run.cancellation.requested",
+        outcome: input.outcome === RunCancellationOutcomes.alreadyFinalized
+          ? AuditEventOutcomes.denied
+          : AuditEventOutcomes.succeeded,
+        occurredAt: input.requestedAt,
+        actor: Object.freeze({
+          actorId: input.actorId,
+          actorKind: input.actorId.startsWith("user:")
+            ? AuditActorKinds.user
+            : AuditActorKinds.service,
+          actorUserIdentityId: input.actorId.startsWith("user:") ? input.actorId : undefined,
+          actorServiceId: input.actorId.startsWith("user:") ? undefined : input.actorId,
+        }),
+        scope: Object.freeze({
+          kind: AuditScopeKinds.workspace,
+          workspaceId: input.run.identity.workspaceId,
+        }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.run.identity.runId,
+          resourceRef: input.run.identity.runId.startsWith("run:")
+            ? input.run.identity.runId
+            : `run:${input.run.identity.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.run.identity.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            outcome: input.outcome,
+            fromState: input.fromState,
+            toState: input.toState,
+            reasonCode: resolveCancellationReasonCode(input.outcome),
+          }),
+          adminOnlyDetails: Object.freeze({
+            reason: input.reason,
+            idempotencyKey: input.idempotencyKey,
+            signal: Object.freeze({
+              outcome: mapSignalOutcome(input.signalResult),
+              acknowledgedAt: input.signalResult?.acknowledgedAt,
+              safeCode: input.signalResult?.safeCode,
+              safeMessage: input.signalResult?.safeMessage,
+            }),
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail cancellation behavior.
+    }
   }
+}
+
+function resolveCancellationReasonCode(
+  outcome: RunCancellationOutcome,
+): "cancelled" | "cancellation-requested" | "already-finalized" | "already-cancelling" {
+  return outcome;
 }

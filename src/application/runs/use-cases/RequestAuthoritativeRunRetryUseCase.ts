@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type { PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { PlatformAuditEventKinds } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
@@ -15,6 +16,7 @@ import {
 import { RunMutationActions, type RunMutationResponse, type RunRetryRequest } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import { mapPlatformRunRecordToCanonicalRun, type RunAuthoritativeMetadata } from "./RunCreationPersistenceMapper";
 import type { RunSubmissionValidationIssue } from "./RunSubmissionValidationContracts";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -146,6 +148,7 @@ interface RequestAuthoritativeRunRetryUseCaseDependencies {
   readonly idGenerator?: {
     nextId(prefix: string): string;
   };
+  readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
 }
 
 export class RequestAuthoritativeRunRetryUseCase {
@@ -324,5 +327,52 @@ export class RequestAuthoritativeRunRetryUseCase {
       occurredAt: input.requestedAt,
       correlationId: input.correlationId,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:retry:${input.sourceRunId}:${input.retriedRunId}`,
+        eventType: "run-retry-requested",
+        action: "run.retry.requested",
+        outcome: AuditEventOutcomes.succeeded,
+        occurredAt: input.requestedAt,
+        actor: Object.freeze({
+          actorId: input.actorUserIdentityId,
+          actorKind: AuditActorKinds.user,
+          actorUserIdentityId: input.actorUserIdentityId,
+        }),
+        scope: Object.freeze({
+          kind: AuditScopeKinds.workspace,
+          workspaceId: input.workspaceId,
+        }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.sourceRunId,
+          resourceRef: input.sourceRunId.startsWith("run:") ? input.sourceRunId : `run:${input.sourceRunId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            sourceRunId: input.sourceRunId,
+            retriedRunId: input.retriedRunId,
+            fromState: input.fromState,
+            reasonCode: "retry-requested",
+            attempt: input.nextAttempt,
+            maxAttempts: input.nextMaxAttempts,
+          }),
+          adminOnlyDetails: Object.freeze({
+            reason: input.reason,
+            idempotencyKey: input.idempotencyKey,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail retry behavior.
+    }
   }
 }

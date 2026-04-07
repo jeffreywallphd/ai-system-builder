@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type { PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { PlatformAuditEventKinds } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -63,6 +65,7 @@ export class ReevaluateDeferredSchedulingRunsUseCase {
       readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
       readonly now?: () => Date;
       readonly idGenerator?: { readonly nextId: (prefix: string) => string };
+      readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
     },
   ) {
     this.now = dependencies.now ?? (() => new Date());
@@ -150,6 +153,49 @@ export class ReevaluateDeferredSchedulingRunsUseCase {
       occurredAt: input.requestedAt,
       correlationId: input.correlationId,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:scheduling-admin:re-evaluate-deferred:${input.entryRunId}:${input.mutationId}`,
+        eventType: "run-scheduling-admin-deferred-re-evaluated",
+        action: "run.scheduling.admin.deferred.re-evaluated",
+        outcome: AuditEventOutcomes.succeeded,
+        occurredAt: input.requestedAt,
+        actor: Object.freeze({
+          actorId: input.actorUserIdentityId,
+          actorKind: AuditActorKinds.user,
+          actorUserIdentityId: input.actorUserIdentityId,
+        }),
+        scope: Object.freeze({
+          kind: AuditScopeKinds.workspace,
+          workspaceId: input.workspaceId,
+        }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.entryRunId,
+          resourceRef: input.entryRunId.startsWith("run:") ? input.entryRunId : `run:${input.entryRunId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            mutationId: input.mutationId,
+            queueId: input.queueId,
+            reasonCode: "deferred-run-re-evaluated",
+          }),
+          adminOnlyDetails: Object.freeze({
+            reason: input.reason,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail scheduling-admin behavior.
+    }
   }
 }
 

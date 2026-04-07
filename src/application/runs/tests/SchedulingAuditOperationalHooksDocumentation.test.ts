@@ -56,5 +56,6 @@ describe("scheduling audit and operational hooks documentation", () => {
     expect(aiDoc).toContain("docs/architecture/run-orchestration-scheduling-audit-operational-hooks.md");
     expect(aiDoc).toContain("SchedulingGovernanceEventPorts.ts");
     expect(aiDoc).toContain("PlatformSchedulingGovernanceEventSink.ts");
+    expect(aiDoc).toContain("AuthoritativeSchedulingGovernanceEventSink.ts");
   });
 });
