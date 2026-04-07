@@ -7,8 +7,9 @@ Contributors adding or modifying protected client-facing operations for desktop,
 ## What to read first
 
 1. `docs/architecture/unified-api-authoritative-surface.md`
-2. `docs/architecture/unified-api-convergence-plan.md`
-3. `docs/architecture/shared-api-contract-package.md`
+2. `docs/architecture/unified-api-endpoint-reference.md`
+3. `docs/architecture/unified-api-convergence-plan.md`
+4. `docs/architecture/shared-api-contract-package.md`
 
 ## Where to add new shared contracts
 

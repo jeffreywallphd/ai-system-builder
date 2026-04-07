@@ -3,12 +3,13 @@
 ## Fast path
 
 1. Read `docs/architecture/unified-api-authoritative-surface.md`.
-2. Add/update DTO contracts in `src/shared/contracts/*`.
-3. Add/update schema validation in `src/shared/schemas/*`.
-4. Implement authoritative backend + transport (`src/infrastructure/api/*`, `src/infrastructure/transport/http-server/*`).
+2. Read `docs/architecture/unified-api-endpoint-reference.md` for route-family endpoint mapping.
+3. Add/update DTO contracts in `src/shared/contracts/*`.
+4. Add/update schema validation in `src/shared/schemas/*`.
+5. Implement authoritative backend + transport (`src/infrastructure/api/*`, `src/infrastructure/transport/http-server/*`).
    - domain route-family registration modules live in `src/infrastructure/transport/http-server/authoritative-route-families/*`
    - authoritative route-family catalog lives in `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
-5. Integrate desktop/thin clients through `src/ui/shared/*` using `SharedApiClient`.
+6. Integrate desktop/thin clients through `src/ui/shared/*` using `SharedApiClient`.
 
 ## Must not do
 
@@ -26,5 +27,6 @@
 
 - `docs/unified-api-contributor-guide.md`
 - `docs/architecture/unified-api-authoritative-surface.md`
+- `docs/architecture/unified-api-endpoint-reference.md`
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/unified-api-observability-troubleshooting.md`

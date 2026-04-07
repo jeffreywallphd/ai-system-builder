@@ -119,6 +119,7 @@ Before opening a PR that adds or changes a protected client-facing operation, ve
 
 ## Related docs
 
+- `docs/architecture/unified-api-endpoint-reference.md`
 - `docs/architecture/unified-api-convergence-plan.md`
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/architecture/identity-server-api.md`
