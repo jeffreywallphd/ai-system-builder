@@ -44,6 +44,17 @@ export const OfflineLocalChangeKinds = Object.freeze({
 export type OfflineLocalChangeKind =
   typeof OfflineLocalChangeKinds[keyof typeof OfflineLocalChangeKinds];
 
+export const OfflineDraftSyncStatuses = Object.freeze({
+  localOnly: "local-only",
+  queuedPendingSync: "queued-pending-sync",
+  syncConflict: "sync-conflict",
+  syncRejected: "sync-rejected",
+  syncApplied: "sync-applied",
+} as const);
+
+export type OfflineDraftSyncStatus =
+  typeof OfflineDraftSyncStatuses[keyof typeof OfflineDraftSyncStatuses];
+
 export const OfflinePendingOperationIntents = Object.freeze({
   promoteLocalDraft: "promote-local-draft",
   createOrUpdateAuthoritative: "create-or-update-authoritative",
@@ -62,6 +73,16 @@ export const OfflinePendingOperationStatuses = Object.freeze({
 
 export type OfflinePendingOperationStatus =
   typeof OfflinePendingOperationStatuses[keyof typeof OfflinePendingOperationStatuses];
+
+export const OfflineReplayHttpMethods = Object.freeze({
+  post: "POST",
+  put: "PUT",
+  patch: "PATCH",
+  delete: "DELETE",
+} as const);
+
+export type OfflineReplayHttpMethod =
+  typeof OfflineReplayHttpMethods[keyof typeof OfflineReplayHttpMethods];
 
 export const OfflineSynchronizationStates = Object.freeze({
   idle: "idle",
@@ -130,11 +151,22 @@ export interface OfflineDraftStateDto {
   readonly resourceClass: OfflineSyncResourceClass;
   readonly resourceId: string;
   readonly baseAuthoritativeRevision: string;
+  readonly authoritativeSnapshotRevision: string;
   readonly draftRevision: number;
+  readonly syncStatus: OfflineDraftSyncStatus;
+  readonly queuedMutationId?: string;
   readonly dirty: boolean;
   readonly lastEditedAt: string;
   readonly lastEditedByActorUserIdentityId: string;
   readonly localChanges: ReadonlyArray<OfflineLocalChangeRecordDto>;
+}
+
+export interface OfflinePendingOperationReplayDescriptorDto {
+  readonly method: OfflineReplayHttpMethod;
+  readonly path: string;
+  readonly idempotencyKey: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly payloadContentType?: string;
 }
 
 export interface OfflinePendingOperationEnvelopeDto {
@@ -147,8 +179,18 @@ export interface OfflinePendingOperationEnvelopeDto {
   readonly queuedAt: string;
   readonly userVisibleSyncStatus: OfflinePendingOperationStatus;
   readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflinePendingOperationReplayDescriptorDto;
   readonly retryCount: number;
   readonly lastAttemptedAt?: string;
+}
+
+export interface OfflinePendingRunSubmissionDto {
+  readonly submissionId: string;
+  readonly operationId: string;
+  readonly workflowDefinitionId: string;
+  readonly inputDigest: string;
+  readonly requestedAt: string;
+  readonly requestedByActorUserIdentityId: string;
 }
 
 export interface OfflineConflictIndicatorDto {
@@ -177,6 +219,7 @@ export interface OfflineReconciliationOutcomeDto {
 export interface OfflineSyncQueueStateDto {
   readonly queueId: string;
   readonly operations: ReadonlyArray<OfflinePendingOperationEnvelopeDto>;
+  readonly pendingRunSubmissions: ReadonlyArray<OfflinePendingRunSubmissionDto>;
   readonly outcomes: ReadonlyArray<OfflineReconciliationOutcomeDto>;
   readonly updatedAt: string;
 }
@@ -244,6 +287,107 @@ export function deriveOfflineSynchronizationStatus(input: {
     lastSynchronizedAt: input.lastSynchronizedAt,
     lastAttemptedAt: input.lastAttemptedAt,
     reasonCode: state === OfflineSynchronizationStates.failed ? "resynchronization-unavailable" : undefined,
+  });
+}
+
+function resolveAllowedOfflineDraftSyncTransitions(
+  status: OfflineDraftSyncStatus,
+): ReadonlyArray<OfflineDraftSyncStatus> {
+  const transitions: Record<OfflineDraftSyncStatus, ReadonlyArray<OfflineDraftSyncStatus>> = {
+    [OfflineDraftSyncStatuses.localOnly]: Object.freeze([
+      OfflineDraftSyncStatuses.localOnly,
+      OfflineDraftSyncStatuses.queuedPendingSync,
+    ]),
+    [OfflineDraftSyncStatuses.queuedPendingSync]: Object.freeze([
+      OfflineDraftSyncStatuses.queuedPendingSync,
+      OfflineDraftSyncStatuses.syncConflict,
+      OfflineDraftSyncStatuses.syncRejected,
+      OfflineDraftSyncStatuses.syncApplied,
+    ]),
+    [OfflineDraftSyncStatuses.syncConflict]: Object.freeze([
+      OfflineDraftSyncStatuses.syncConflict,
+      OfflineDraftSyncStatuses.queuedPendingSync,
+      OfflineDraftSyncStatuses.syncRejected,
+    ]),
+    [OfflineDraftSyncStatuses.syncRejected]: Object.freeze([
+      OfflineDraftSyncStatuses.syncRejected,
+      OfflineDraftSyncStatuses.queuedPendingSync,
+    ]),
+    [OfflineDraftSyncStatuses.syncApplied]: Object.freeze([
+      OfflineDraftSyncStatuses.syncApplied,
+      OfflineDraftSyncStatuses.localOnly,
+    ]),
+  };
+  return transitions[status];
+}
+
+export function transitionOfflineDraftSyncStatus(input: {
+  readonly draft: OfflineDraftStateDto;
+  readonly nextStatus: OfflineDraftSyncStatus;
+  readonly queuedMutationId?: string;
+}): OfflineDraftStateDto {
+  const allowed = resolveAllowedOfflineDraftSyncTransitions(input.draft.syncStatus);
+  if (!allowed.includes(input.nextStatus)) {
+    throw new OfflineSynchronizationContractError(
+      `Draft '${input.draft.draftId}' cannot transition from '${input.draft.syncStatus}' to '${input.nextStatus}'.`,
+    );
+  }
+
+  const queuedMutationId = input.nextStatus === OfflineDraftSyncStatuses.queuedPendingSync
+    ? normalizeRequired(input.queuedMutationId ?? input.draft.queuedMutationId ?? "", "Draft queuedMutationId")
+    : undefined;
+
+  return Object.freeze({
+    ...input.draft,
+    syncStatus: input.nextStatus,
+    queuedMutationId,
+  });
+}
+
+function resolveAllowedOfflinePendingOperationStatusTransitions(
+  status: OfflinePendingOperationStatus,
+): ReadonlyArray<OfflinePendingOperationStatus> {
+  const transitions: Record<OfflinePendingOperationStatus, ReadonlyArray<OfflinePendingOperationStatus>> = {
+    [OfflinePendingOperationStatuses.queuedPendingSync]: Object.freeze([
+      OfflinePendingOperationStatuses.queuedPendingSync,
+      OfflinePendingOperationStatuses.syncConflict,
+      OfflinePendingOperationStatuses.syncRejected,
+      OfflinePendingOperationStatuses.syncApplied,
+    ]),
+    [OfflinePendingOperationStatuses.syncConflict]: Object.freeze([
+      OfflinePendingOperationStatuses.syncConflict,
+      OfflinePendingOperationStatuses.queuedPendingSync,
+      OfflinePendingOperationStatuses.syncRejected,
+    ]),
+    [OfflinePendingOperationStatuses.syncRejected]: Object.freeze([
+      OfflinePendingOperationStatuses.syncRejected,
+      OfflinePendingOperationStatuses.queuedPendingSync,
+    ]),
+    [OfflinePendingOperationStatuses.syncApplied]: Object.freeze([
+      OfflinePendingOperationStatuses.syncApplied,
+    ]),
+  };
+  return transitions[status];
+}
+
+export function transitionOfflinePendingOperationStatus(input: {
+  readonly operation: OfflinePendingOperationEnvelopeDto;
+  readonly nextStatus: OfflinePendingOperationStatus;
+  readonly lastAttemptedAt?: string;
+  readonly retryCount?: number;
+}): OfflinePendingOperationEnvelopeDto {
+  const allowed = resolveAllowedOfflinePendingOperationStatusTransitions(input.operation.userVisibleSyncStatus);
+  if (!allowed.includes(input.nextStatus)) {
+    throw new OfflineSynchronizationContractError(
+      `Operation '${input.operation.operationId}' cannot transition from '${input.operation.userVisibleSyncStatus}' to '${input.nextStatus}'.`,
+    );
+  }
+
+  return Object.freeze({
+    ...input.operation,
+    userVisibleSyncStatus: input.nextStatus,
+    retryCount: Math.max(input.operation.retryCount, Math.floor(input.retryCount ?? input.operation.retryCount)),
+    lastAttemptedAt: input.lastAttemptedAt ?? input.operation.lastAttemptedAt,
   });
 }
 

@@ -5,6 +5,7 @@ import type {
   OfflineResynchronizationDecision,
 } from "@application/common/OfflineLocalModeResynchronization";
 import {
+  type OfflinePendingOperationReplayDescriptorDto,
   OfflineConnectivityStates,
   OfflineConflictSeverities,
   OfflineReconciliationActions,
@@ -43,6 +44,14 @@ export function toOfflinePendingOperationEnvelopeDto(
     readonly lastAttemptedAt?: string;
   },
 ): OfflinePendingOperationEnvelopeDto {
+  const replayDescriptor: OfflinePendingOperationReplayDescriptorDto = Object.freeze({
+    method: envelope.replayDescriptor.method,
+    path: envelope.replayDescriptor.path,
+    idempotencyKey: envelope.replayDescriptor.idempotencyKey,
+    payload: Object.freeze({ ...envelope.replayDescriptor.payload }),
+    payloadContentType: envelope.replayDescriptor.payloadContentType,
+  });
+
   return Object.freeze({
     operationId: envelope.mutationId,
     targetResourceClass: envelope.targetResourceClass,
@@ -53,6 +62,7 @@ export function toOfflinePendingOperationEnvelopeDto(
     queuedAt: envelope.queuedAt,
     userVisibleSyncStatus: envelope.userVisibleSyncStatus,
     divergenceDisclosureToken: envelope.divergenceDisclosureToken,
+    replayDescriptor,
     retryCount: Math.max(0, Math.floor(options?.retryCount ?? 0)),
     lastAttemptedAt: options?.lastAttemptedAt,
   });
@@ -126,12 +136,21 @@ export function toOfflineConnectivitySurfaceStateDto(
 export function toOfflineSyncQueueStateDto(input: {
   readonly queueId: string;
   readonly operations: ReadonlyArray<OfflinePendingOperationEnvelopeDto>;
+  readonly pendingRunSubmissions?: ReadonlyArray<{
+    readonly submissionId: string;
+    readonly operationId: string;
+    readonly workflowDefinitionId: string;
+    readonly inputDigest: string;
+    readonly requestedAt: string;
+    readonly requestedByActorUserIdentityId: string;
+  }>;
   readonly outcomes?: ReadonlyArray<OfflineReconciliationOutcomeDto>;
   readonly updatedAt?: string;
 }): OfflineSyncQueueStateDto {
   return Object.freeze({
     queueId: input.queueId,
     operations: Object.freeze([...input.operations]),
+    pendingRunSubmissions: Object.freeze([...(input.pendingRunSubmissions ?? [])]),
     outcomes: Object.freeze([...(input.outcomes ?? [])]),
     updatedAt: input.updatedAt ?? new Date().toISOString(),
   });

@@ -8,10 +8,14 @@ Story 19.1.2 introduces canonical shared offline-state and synchronization contr
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
 
+Story 19.1.4 extends this package with local draft lifecycle and replayability semantics for disconnected work.
+
 ## Usage guidance
 
 - Use `OfflineSynchronizationStateSnapshotDto` as the top-level state shape for workspace offline/resync views.
-- Use `OfflinePendingOperationEnvelopeDto` for queue entries persisted while disconnected.
+- Use `OfflineDraftStateDto.syncStatus` transitions to model local draft lifecycle explicitly (`local-only`, `queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
+- Use `OfflinePendingOperationEnvelopeDto` for queue entries persisted while disconnected, including the required structured `replayDescriptor` for reconnect replay.
+- Use `OfflineSyncQueueStateDto.pendingRunSubmissions` for pending run submissions that are locally durable but not yet authoritative.
 - Use `OfflineReconciliationOutcomeDto` and `OfflineConflictIndicatorDto` for reconnect outcomes and user-review surfaces.
 - Use `OfflineConnectivitySurfaceStateDto` for connectivity-aware status rendering in UI surfaces.
 - Validate incoming/outgoing payloads with `parseOfflineSynchronizationStateSnapshotDto(...)` (and related parser helpers) before persistence or transport.

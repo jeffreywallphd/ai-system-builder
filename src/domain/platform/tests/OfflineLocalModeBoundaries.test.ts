@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  OfflineDraftSynchronizationStatuses,
   OfflineAuthorityScopes,
   OfflineDeviceTrustPostures,
   OfflineLocalModeDomainError,
@@ -10,11 +11,15 @@ import {
   OfflineStorageRules,
   OfflineWorkspaceAccessRoles,
   OfflineWorkspaceSharingPostures,
+  appendOfflineLocalDraftChange,
+  createOfflineLocalDraftDocument,
+  createOfflinePendingRunSubmissionRecord,
   createOfflineQueuedMutationEnvelope,
   evaluateOfflineResourcePolicy,
   listOfflineResourceEligibilityPolicies,
   listOfflineResourceAuthorityBoundaries,
   resolveOfflineResourceAuthorityBoundary,
+  transitionOfflineLocalDraftSynchronizationStatus,
 } from "../OfflineLocalModeBoundaries";
 import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 
@@ -125,6 +130,12 @@ describe("OfflineLocalModeBoundaries", () => {
       baseAuthoritativeRevision: "rev-1",
       localMutationRevision: 1,
       divergenceDisclosureToken: "offline-sync-warning:1",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/runtime/local-sessions/runtime:session:1",
+        idempotencyKey: "idem:mutation:1",
+        payload: { sessionId: "runtime:session:1" },
+      },
     })).toThrow(OfflineLocalModeDomainError);
   });
 
@@ -138,6 +149,12 @@ describe("OfflineLocalModeBoundaries", () => {
       localMutationRevision: 3,
       userVisibleSyncStatus: OfflineQueuedMutationStatuses.syncConflict,
       divergenceDisclosureToken: "offline-sync-warning:run:intent:123",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/runs/intents/run:intent:123",
+        idempotencyKey: "idem:mutation:2",
+        payload: { runIntentId: "run:intent:123" },
+      },
     });
 
     expect(envelope.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
@@ -154,6 +171,93 @@ describe("OfflineLocalModeBoundaries", () => {
       localMutationRevision: 1,
       userVisibleSyncStatus: OfflineQueuedMutationStatuses.syncApplied,
       divergenceDisclosureToken: "offline-sync-warning:workflow:draft:1",
+      replayDescriptor: {
+        method: "PATCH",
+        path: "/v1/workflows/drafts/workflow:draft:1/promote",
+        idempotencyKey: "idem:mutation:3",
+        payload: { draftId: "workflow:draft:1" },
+      },
     })).toThrow(OfflineLocalModeDomainError);
+  });
+
+  it("tracks local draft lifecycle without mutating authoritative snapshot revisions", () => {
+    const draft = createOfflineLocalDraftDocument({
+      draftId: "draft:workflow:1",
+      resourceClass: OfflineResourceClasses.workflowDraft,
+      resourceId: "workflow:draft:1",
+      baseAuthoritativeRevision: "workflow:rev:9",
+      lastEditedByActorUserIdentityId: "user:author-1",
+    });
+
+    const changed = appendOfflineLocalDraftChange({
+      draft,
+      changeId: "change:1",
+      kind: "update",
+      changedByActorUserIdentityId: "user:author-1",
+      summary: "Adjusted tool parameters",
+    });
+    const queued = transitionOfflineLocalDraftSynchronizationStatus({
+      draft: changed,
+      nextStatus: OfflineDraftSynchronizationStatuses.queuedPendingSync,
+      queuedMutationId: "mutation:workflow:1",
+    });
+    const conflicted = transitionOfflineLocalDraftSynchronizationStatus({
+      draft: queued,
+      nextStatus: OfflineDraftSynchronizationStatuses.syncConflict,
+    });
+
+    expect(changed.syncStatus).toBe(OfflineDraftSynchronizationStatuses.localOnly);
+    expect(changed.baseAuthoritativeRevision).toBe("workflow:rev:9");
+    expect(changed.authoritativeSnapshotRevision).toBe("workflow:rev:9");
+    expect(queued.syncStatus).toBe(OfflineDraftSynchronizationStatuses.queuedPendingSync);
+    expect(queued.queuedMutationId).toBe("mutation:workflow:1");
+    expect(conflicted.syncStatus).toBe(OfflineDraftSynchronizationStatuses.syncConflict);
+  });
+
+  it("requires rooted replay descriptors for queued operations", () => {
+    expect(() => createOfflineQueuedMutationEnvelope({
+      mutationId: "mutation:bad:descriptor",
+      targetResourceClass: OfflineResourceClasses.workflowDraft,
+      targetResourceId: "workflow:draft:2",
+      intent: "promote-local-draft",
+      baseAuthoritativeRevision: "workflow:rev:10",
+      localMutationRevision: 1,
+      divergenceDisclosureToken: "offline-sync-warning:workflow:draft:2",
+      replayDescriptor: {
+        method: "PATCH",
+        path: "v1/workflows/drafts/workflow:draft:2/promote",
+        idempotencyKey: "idem:bad:descriptor",
+        payload: { draftId: "workflow:draft:2" },
+      },
+    })).toThrow(OfflineLocalModeDomainError);
+  });
+
+  it("creates pending run submission records from queued authoritative intents", () => {
+    const queued = createOfflineQueuedMutationEnvelope({
+      mutationId: "mutation:run:1",
+      targetResourceClass: OfflineResourceClasses.runSubmissionIntent,
+      targetResourceId: "run:intent:22",
+      intent: "create-or-update-authoritative",
+      baseAuthoritativeRevision: "run:rev:4",
+      localMutationRevision: 2,
+      divergenceDisclosureToken: "offline-sync-warning:run:intent:22",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/runs/intents/run:intent:22",
+        idempotencyKey: "idem:mutation:run:1",
+        payload: { runIntentId: "run:intent:22", workflowId: "workflow:definition:10" },
+      },
+    });
+
+    const runSubmission = createOfflinePendingRunSubmissionRecord({
+      submissionId: "submission:run:1",
+      queuedMutation: queued,
+      requestedByActorUserIdentityId: "user:author-1",
+      workflowDefinitionId: "workflow:definition:10",
+      inputDigest: "sha256:abc123",
+    });
+
+    expect(runSubmission.queuedMutation.targetResourceClass).toBe(OfflineResourceClasses.runSubmissionIntent);
+    expect(runSubmission.queuedMutation.replayDescriptor.path).toBe("/v1/runs/intents/run:intent:22");
   });
 });
