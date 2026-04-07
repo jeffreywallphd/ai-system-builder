@@ -21,6 +21,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-deterministic-candidate-arbitration.md`
 - `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
 - `docs/architecture/run-orchestration-scheduling-node-availability-and-eligibility-refresh.md`
+- `docs/architecture/run-orchestration-scheduling-dispatch-outcome-requeue-and-release.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
@@ -41,6 +42,15 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Reuse node eligibility + assignment policy seams.
 - Preserve claim release behavior for ineligible node-targeted selections.
 - Keep deterministic queue ordering and reservation TTL semantics.
+
+## Queue/reservation/arbitration integration map
+- Queue leasing remains in `SelectAssignmentReadyRunsUseCase` + `IRunOrchestrationQueuePersistenceRepository`.
+- Scheduling snapshot assembly and policy evaluation remain in `AssembleAuthoritativeSchedulingInputUseCase` + `EvaluateAuthoritativeSchedulingDecisionPipelineUseCase`.
+- Assignment materialization and temporary hold lifecycle remain in `MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`.
+- Node-claim finalization conflict semantics remain in `ClaimRunForNodeDispatchPreparationUseCase`.
+- Dispatch outcome reservation settlement remains in `HandleRunDispatchResultUseCase`.
+- Preserve explicit outcomes as contract behavior: duplicate-assignment conflicts, explicit no-placement defer/release, hold acquire/conflict/release, and dispatch release/requeue/finalize settlement.
+- Add future capacity/quota/reservation-window policy logic in scheduling/arbitration modules, not transport handlers or dispatch adapters.
 
 ## Dispatch extension guidance
 - Build canonical command first.

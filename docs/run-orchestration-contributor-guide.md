@@ -24,6 +24,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-deterministic-candidate-arbitration.md`
 - `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
 - `docs/architecture/run-orchestration-scheduling-node-availability-and-eligibility-refresh.md`
+- `docs/architecture/run-orchestration-scheduling-dispatch-outcome-requeue-and-release.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
@@ -69,6 +70,22 @@ Provide an implementation checklist for contributors extending the authoritative
 8. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
 9. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
 10. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
+
+## Queue integration and reservation/arbitration extension seams
+
+1. Keep queue lease selection in `SelectAssignmentReadyRunsUseCase` and `IRunOrchestrationQueuePersistenceRepository`.
+2. Keep snapshot assembly and policy evaluation in:
+   - `AssembleAuthoritativeSchedulingInputUseCase`
+   - `EvaluateAuthoritativeSchedulingDecisionPipelineUseCase`
+3. Keep assignment materialization and temporary hold lifecycle in `MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`.
+4. Keep assignment finalization conflict handling in `ClaimRunForNodeDispatchPreparationUseCase`.
+5. Keep dispatch outcome reservation settlement in `HandleRunDispatchResultUseCase`.
+6. Preserve explicit outcomes as first-class behavior:
+   - no duplicate assignment (`already-assigned` and reservation conflict semantics)
+   - explicit no-placement defer/release behavior (reason-bearing queue settlement)
+   - explicit placement-hold acquire/conflict/release lifecycle
+   - explicit dispatch outcome settlement (release, requeue, terminal finalization)
+7. Add new capacity/quota/reservation-window policies in scheduling policy and arbitration modules, not in transport handlers or dispatch adapters.
 
 ## Extending backend dispatch integrations
 
