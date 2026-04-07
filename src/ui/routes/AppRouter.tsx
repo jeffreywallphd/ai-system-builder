@@ -46,8 +46,12 @@ import NodeInventoryPage from "../pages/NodeInventoryPage";
 import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
 import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
 import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
+import DesktopAdministrationShellPage from "../pages/DesktopAdministrationShellPage";
+import AdminLiteEntryPage from "../pages/AdminLiteEntryPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import { isRoutePathAccessibleForSession } from "./SurfaceRouteAccessPolicy";
 import type { LoginLocalIdentityApiResponse } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
 
@@ -140,18 +144,118 @@ export default function AppRouter({
           { path: ROUTE_PATHS.promptTemplateStudio, element: <PromptTemplateStudioPage /> },
           { path: ROUTE_PATHS.embeddingIndexStudio, element: <EmbeddingIndexStudioPage /> },
           { path: ROUTE_PATHS.configProfileStudio, element: <ConfigProfileStudioPage /> },
-          { path: ROUTE_PATHS.settings, element: <SettingsPage /> },
-          { path: ROUTE_PATHS.authorizationSharing, element: <AuthorizationSharingManagementPage /> },
-          { path: ROUTE_PATHS.authorizationSharingThin, element: <AuthorizationSharingThinClientPage /> },
-          { path: ROUTE_PATHS.authorizationReporting, element: <AuthorizationReportingPage /> },
-          { path: ROUTE_PATHS.storageAdmin, element: <StorageAdministrationPage /> },
-          { path: ROUTE_PATHS.workspaceAdmin, element: <WorkspaceAdministrationPage /> },
-          { path: ROUTE_PATHS.nodeEnrollmentReview, element: <NodeEnrollmentReviewPage /> },
-          { path: ROUTE_PATHS.nodeInventory, element: <NodeInventoryPage /> },
-          { path: ROUTE_PATHS.workspaceThinMembership, element: <WorkspaceMembershipThinClientPage /> },
-          { path: ROUTE_PATHS.identityAdmin, element: <IdentityAdminPage /> },
-          { path: ROUTE_PATHS.trustedDevices, element: <TrustedDevicesPage /> },
-          { path: ROUTE_PATHS.secretsAdmin, element: <SecretMetadataManagementPage /> },
+          {
+            path: ROUTE_PATHS.settings,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.settings}>
+                <SettingsPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.adminShell,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.adminShell}>
+                <DesktopAdministrationShellPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.adminLiteShell,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.adminLiteShell}>
+                <AdminLiteEntryPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationSharing,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationSharing}>
+                <AuthorizationSharingManagementPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationSharingThin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationSharingThin}>
+                <AuthorizationSharingThinClientPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.authorizationReporting,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.authorizationReporting}>
+                <AuthorizationReportingPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.storageAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.storageAdmin}>
+                <StorageAdministrationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.workspaceAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.workspaceAdmin}>
+                <WorkspaceAdministrationPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.nodeEnrollmentReview,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.nodeEnrollmentReview}>
+                <NodeEnrollmentReviewPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.nodeInventory,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.nodeInventory}>
+                <NodeInventoryPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.workspaceThinMembership,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.workspaceThinMembership}>
+                <WorkspaceMembershipThinClientPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.identityAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>
+                <IdentityAdminPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.trustedDevices,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.trustedDevices}>
+                <TrustedDevicesPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
+          {
+            path: ROUTE_PATHS.secretsAdmin,
+            element: (
+              <SurfaceProtectedRoute path={ROUTE_PATHS.secretsAdmin}>
+                <SecretMetadataManagementPage />
+              </SurfaceProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -167,5 +271,25 @@ export default function AppRouter({
   return (
     <RouterProvider router={router} />
   );
+}
+
+interface SurfaceProtectedRouteProps {
+  readonly path: string;
+  readonly children: JSX.Element;
+}
+
+function SurfaceProtectedRoute({ path, children }: SurfaceProtectedRouteProps): JSX.Element {
+  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const session = sessionStore.getSession();
+  const isAllowed = useMemo(
+    () => isRoutePathAccessibleForSession(path, session, { strict: true }),
+    [path, session],
+  );
+
+  if (!isAllowed) {
+    return <Navigate to={ROUTE_PATHS.home} replace />;
+  }
+
+  return children;
 }
 

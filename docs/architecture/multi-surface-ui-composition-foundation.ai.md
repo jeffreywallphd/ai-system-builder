@@ -137,3 +137,10 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
   - live-runtime browser E2E automation for the operational surfaces,
   - broader analytics/reporting UX beyond operational monitoring needs,
   - additional admin-authoring expansion outside the prioritized Epic 15.2 operational scope.
+
+## Story 15.3.1 update
+- Added production admin entry surfaces:
+  - desktop administration shell (`/settings/admin`),
+  - thin admin-lite entry (`/settings/admin-lite`).
+- Added metadata-driven route protection in the route seam via `src/ui/routes/SurfaceRouteAccessPolicy.ts` + `SurfaceProtectedRoute` in `AppRouter.tsx`.
+- Settings shortcuts and command palette now apply strict session-derived availability context so unauthorized users cannot discover gated admin destinations through UI shortcut channels.

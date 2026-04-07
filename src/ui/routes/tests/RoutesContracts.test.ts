@@ -35,6 +35,8 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('systemStudio: "/studio-shell/system"');
     expect(source).toContain('schemaStudio: "/studio-shell/schema"');
     expect(source).toContain('settings: "/settings"');
+    expect(source).toContain('adminShell: "/settings/admin"');
+    expect(source).toContain('adminLiteShell: "/settings/admin-lite"');
     expect(source).toContain('authorizationSharing: "/settings/sharing"');
     expect(source).toContain('authorizationSharingThin: "/settings/sharing/thin"');
     expect(source).toContain('authorizationReporting: "/settings/sharing/reporting"');

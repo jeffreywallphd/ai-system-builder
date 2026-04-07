@@ -23,11 +23,15 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("path: ROUTE_PATHS.buildAutomate, element: <BuildAutomatePage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workflowConversation");
     expect(appRouterSource).toContain("<BuildPage />");
-    expect(appRouterSource).toContain("element: <SettingsPage />");
-    expect(appRouterSource).toContain("element: <WorkspaceAdministrationPage />");
-    expect(appRouterSource).toContain("element: <IdentityAdminPage />");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.settings}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.workspaceAdmin}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>");
+    expect(appRouterSource).toContain("<DesktopAdministrationShellPage />");
+    expect(appRouterSource).toContain("<AdminLiteEntryPage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.identityAdmin");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.adminShell");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.adminLiteShell");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.agentStudio, element: <Navigate to={ROUTE_PATHS.build} replace />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.studioShell, element: <Navigate to={ROUTE_PATHS.build} replace />");
     expect(appRouterSource).toContain("element: <RegistryPage />");

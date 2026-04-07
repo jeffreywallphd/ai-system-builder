@@ -65,3 +65,12 @@ Route metadata changes should verify:
 - shell section derivation remains coherent for build/explore/run surfaces
 - admin and operational shortcut projections are derived from metadata
 - capability/role/workspace gating evaluates as expected in strict mode
+
+## Story 15.3.1 update
+
+- Added canonical administration entry routes:
+  - desktop admin shell: `/settings/admin` (`admin-shell`)
+  - thin admin-lite entry: `/settings/admin-lite` (`admin-lite-shell`)
+- Added strict metadata-first route protection integration in `src/ui/routes/AppRouter.tsx` through `SurfaceProtectedRoute`, using session-derived role/capability/workspace context and route metadata access rules.
+- Updated admin-lite surface scope to keep thin-client entry points focused on lightweight workflows (`authorization-sharing-thin`, `workspace-thin-membership`, node trust review/inventory) while keeping full administration workflows desktop-first.
+- Command palette and settings shortcut projections now use strict session-derived availability context so unauthorized users do not discover gated admin routes through UI shortcut surfaces.

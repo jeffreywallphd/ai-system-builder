@@ -1,7 +1,10 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CommandPaletteService, type CommandPaletteEntry } from "../../routes/CommandPalette";
 import { useSurfaceDialogFocusTrap } from "../../shared/accessibility";
+import { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import { UiSurfaceKeys } from "../../shared/navigation/SurfaceNavigationMetadata";
+import { resolveNavigationAvailabilityContextForSession } from "../../routes/SurfaceRouteAccessPolicy";
 
 export interface CommandPaletteProps {
   readonly isOpen: boolean;
@@ -12,7 +15,19 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const location = useLocation();
   const navigate = useNavigate();
   const service = useMemo(() => new CommandPaletteService(), []);
+  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const [session] = useState(() => sessionStore.getSession());
   const dialogRef = useRef<HTMLElement>(null);
+  const availabilityContext = useMemo(
+    () => resolveNavigationAvailabilityContextForSession(session, {
+      preferredSurface: session?.sessionAccessChannel === "desktop"
+        ? UiSurfaceKeys.desktopAdmin
+        : UiSurfaceKeys.adminLite,
+      fallbackSurface: UiSurfaceKeys.desktopOperational,
+      strict: true,
+    }),
+    [session],
+  );
 
   useSurfaceDialogFocusTrap({
     isOpen,
@@ -21,8 +36,11 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   });
 
   const model = useMemo(
-    () => service.resolveDefaultModel({ pathname: location.pathname, search: location.search }),
-    [location.pathname, location.search, service],
+    () => service.resolveDefaultModel(
+      { pathname: location.pathname, search: location.search },
+      availabilityContext,
+    ),
+    [availabilityContext, location.pathname, location.search, service],
   );
 
   const onExecute = (entry: CommandPaletteEntry): void => {

@@ -26,3 +26,11 @@ Story 15.1.3 centralizes navigation grouping, surface eligibility, and route acc
 5. Update tests:
    - `src/ui/routes/tests/SurfaceRouteMetadataCatalog.test.ts`
    - `src/ui/shared/tests/SurfaceNavigationMetadata.test.ts`
+
+## Story 15.3.1 update
+- New canonical admin entry points:
+  - `admin-shell` -> `/settings/admin` (desktop administration shell)
+  - `admin-lite-shell` -> `/settings/admin-lite` (thin admin-lite entry)
+- Route access now enforces metadata with strict session context in `AppRouter.tsx` via `SurfaceProtectedRoute`.
+- Admin-lite navigation scope is now intentionally lightweight; full desktop administration flows stay desktop-first.
+- Command palette and settings shortcuts now consume strict session-derived availability context so unauthorized users cannot discover protected admin destinations through shortcut UIs.

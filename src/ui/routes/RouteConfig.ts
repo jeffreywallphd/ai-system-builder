@@ -54,6 +54,8 @@ export const ROUTE_PATHS = Object.freeze({
   embeddingIndexStudio: "/studio-shell/embedding-index",
   configProfileStudio: "/studio-shell/config-profile",
   settings: "/settings",
+  adminShell: "/settings/admin",
+  adminLiteShell: "/settings/admin-lite",
   authorizationSharing: "/settings/sharing",
   authorizationSharingThin: "/settings/sharing/thin",
   authorizationReporting: "/settings/sharing/reporting",
@@ -321,6 +323,18 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     path: ROUTE_PATHS.settings,
     title: "Settings",
     showInNavigation: true,
+  }),
+  Object.freeze({
+    key: "admin-shell",
+    path: ROUTE_PATHS.adminShell,
+    title: "Administration",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "admin-lite-shell",
+    path: ROUTE_PATHS.adminLiteShell,
+    title: "Admin lite",
+    showInNavigation: false,
   }),
   Object.freeze({
     key: "authorization-sharing",
