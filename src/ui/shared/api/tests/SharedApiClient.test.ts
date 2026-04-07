@@ -87,6 +87,7 @@ describe("SharedApiClient", () => {
   });
 
   it("normalizes transport failures into typed envelopes", async () => {
+    const diagnostics: unknown[] = [];
     const fetchImplementation: typeof fetch = async () => {
       throw new Error("network unavailable");
     };
@@ -95,6 +96,9 @@ describe("SharedApiClient", () => {
       fetchImplementation,
       retryPolicy: {
         maxAttempts: 1,
+      },
+      onDiagnosticEvent: (event) => {
+        diagnostics.push(event);
       },
     });
 
@@ -107,6 +111,9 @@ describe("SharedApiClient", () => {
     expect(response.ok).toBeFalse();
     expect(response.error?.sharedCode).toBe("temporarily-unavailable");
     expect(response.error?.retryable).toBeTrue();
+    expect((response.error as { diagnostics?: { request?: { method?: string; path?: string } } } | undefined)?.diagnostics?.request?.method).toBe("POST");
+    expect((response.error as { diagnostics?: { request?: { method?: string; path?: string } } } | undefined)?.diagnostics?.request?.path).toBe("/api/v1/workspaces");
+    expect(diagnostics.length).toBeGreaterThan(0);
   });
 
   it("normalizes aborted requests", async () => {

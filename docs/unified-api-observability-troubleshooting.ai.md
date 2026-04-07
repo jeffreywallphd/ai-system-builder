@@ -19,6 +19,8 @@ Structured events cover:
 5. runtime realtime subscription accepted/error
 6. websocket lifecycle transitions
 
+Shared client transport diagnostics are emitted by `src/ui/shared/api/SharedApiClient.ts` through `onDiagnosticEvent` for retries, timeout/cancellation, and transport failures (no-response conditions).
+
 ## Correlation guarantees
 
 - `x-request-id`: always emitted.
@@ -41,9 +43,10 @@ Structured events cover:
 ## Troubleshooting quick flow
 
 1. Capture correlation id from client response/frame.
-2. Locate matching server events by `correlationId` or `requestId`.
-3. Follow event sequence and status codes.
-4. Confirm redaction remains intact.
+2. If no server event exists, inspect shared client diagnostics (request URL, method, attempt, transport failure metadata).
+3. Locate matching server events by `correlationId` or `requestId`.
+4. Follow event sequence and status codes.
+5. Confirm redaction remains intact.
 
 ## Story 14.3.8 readiness checks
 

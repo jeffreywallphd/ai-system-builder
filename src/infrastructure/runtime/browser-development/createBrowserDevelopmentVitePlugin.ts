@@ -56,7 +56,7 @@ export function createBrowserDevelopmentAuthoritativeServerHostOptions(
 export function createBrowserDevelopmentVitePlugin(): Plugin {
   const managedRuntime = resolveBrowserDevelopmentManagedRuntimeFromEnvironment();
   const identityHostAddress = process.env.AI_LOOM_BROWSER_IDENTITY_HOST || "127.0.0.1";
-  const requestedIdentityHostPort = parseOptionalPort(process.env.AI_LOOM_BROWSER_IDENTITY_PORT);
+  const requestedIdentityHostPort = parseOptionalPort(process.env.AI_LOOM_BROWSER_IDENTITY_PORT) ?? 8788;
   const identitySecureTransport = resolveHostSecureTransportConfig({
     hostKind: HostSecureTransportKinds.worker,
     hostAddress: identityHostAddress,

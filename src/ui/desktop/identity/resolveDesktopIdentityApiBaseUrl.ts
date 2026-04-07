@@ -9,7 +9,7 @@ export function resolveDesktopIdentityApiBaseUrl(): string | undefined {
     return undefined;
   }
 
-  const configured = window.aiLoomDesktop?.bootstrap.runtimeConfig.identityApiBaseUrl;
+  const configured = window.aiLoomDesktop?.bootstrap?.runtimeConfig?.identityApiBaseUrl;
   const normalized = configured?.trim();
   if (!normalized) {
     return undefined;

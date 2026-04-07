@@ -7,8 +7,8 @@ import {
   type ShellSectionKey,
   type SurfaceAvailabilityContext,
   type SurfaceRouteMetadata,
-} from "../shared/navigation/SurfaceNavigationMetadata";
-import { APP_ROUTES, ROUTE_PATHS, type AppRouteDefinition } from "./RouteConfig";
+} from "@ui/shared/navigation/SurfaceNavigationMetadata";
+import { APP_ROUTES, ROUTE_PATHS, type AppRouteDefinition } from "@ui/routes/RouteConfig";
 
 export type AppRouteKey = AppRouteDefinition["key"];
 

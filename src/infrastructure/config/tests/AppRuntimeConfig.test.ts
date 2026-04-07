@@ -26,6 +26,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.isProductionMode).toBe(false);
     expect(config.devSyncBaseUrl).toBe("http://192.168.1.100:8787");
     expect(config.devSyncToken).toBe("ai-loom-dev-sync");
+    expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
     expect(config.isDevSyncEnabled).toBe(true);
     expect(config.modelInstallDirectory).toBe("dev/models");
     expect(config.workflowStorageDirectory).toBe("dev/workflow-data/workflows");

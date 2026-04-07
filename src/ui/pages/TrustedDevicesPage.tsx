@@ -7,8 +7,8 @@ import type {
   TrustedDeviceSummaryApiResponse,
   ValidateTrustedDevicePairingApiResponse,
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
-import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { IdentityAuthService } from "../services/IdentityAuthService";
+import { ROUTE_PATHS } from "@ui/routes/RouteConfig";
+import { IdentityAuthService } from "@ui/services/IdentityAuthService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 import {

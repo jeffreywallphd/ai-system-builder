@@ -50,6 +50,7 @@ import type {
   ResolveSessionActorContextApiResponse,
 } from "@shared/contracts/identity/IdentityTransportContracts";
 import { HttpIdentityAuthClient, type IdentityAuthClient, type IdentityAuthRequestOptions } from "@shared/identity/IdentityAuthClient";
+import type { SharedApiClientDiagnosticEvent } from "@shared/api/SharedApiClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 const DefaultIdentityApiTimeoutMs = 10_000;
@@ -223,7 +224,32 @@ function createDefaultIdentityAuthClient(): IdentityAuthClient {
   return new DesktopTrustedDeviceIdentityAuthClient(
     new HttpIdentityAuthClient(baseUrl, {
       defaultTimeoutMs: DefaultIdentityApiTimeoutMs,
+      onDiagnosticEvent: (event) => logIdentityApiDiagnostic(event),
     }),
   );
+}
+
+function logIdentityApiDiagnostic(event: SharedApiClientDiagnosticEvent): void {
+  if (!event.stage.startsWith("request-transport") && !event.stage.startsWith("request-timeout")) {
+    return;
+  }
+  const message = [
+    "[ai-loom][identity-api]",
+    event.stage,
+    `method=${event.method}`,
+    `url=${event.url}`,
+    `attempt=${event.attempt}/${event.maxAttempts}`,
+    event.status !== undefined ? `status=${event.status}` : undefined,
+    event.errorName ? `error=${event.errorName}` : undefined,
+    event.errorMessage ? `message=${event.errorMessage}` : undefined,
+  ]
+    .filter((entry): entry is string => Boolean(entry))
+    .join(" ");
+
+  if (event.severity === "error" || event.severity === "warn") {
+    console.warn(message);
+    return;
+  }
+  console.info(message);
 }
 

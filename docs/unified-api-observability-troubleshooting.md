@@ -19,6 +19,14 @@ The authoritative HTTP/WebSocket transport in `src/infrastructure/transport/http
 
 All transport log events flow through centralized event sanitization before logger/hook emission.
 
+The shared UI HTTP client in `src/ui/shared/api/SharedApiClient.ts` also emits structured client-side diagnostics (via `onDiagnosticEvent`) for:
+
+1. request retries
+2. request timeout/cancellation
+3. transport-level failures before response receipt
+
+Identity auth wiring in `src/ui/services/IdentityAuthService.ts` logs these events with request method/URL/attempt metadata.
+
 ## Correlation model
 
 For every HTTP request and WebSocket upgrade:
@@ -52,9 +60,10 @@ The hook receives the same sanitized `IdentityHttpServerLogEvent` shape that the
 
 1. Collect `x-correlation-id` (or `x-request-id`) from the failing client response/frame.
 2. Search server logs for matching `correlationId` or `requestId`.
-3. Inspect structured event sequence (`received` -> `completed` or websocket failure/lifecycle events).
-4. Validate that payloads/messages remain redacted; if sensitive values appear, treat as regression.
-5. For realtime failures, map websocket close code and error code with the same correlation id.
+3. If no server event exists, inspect shared-client diagnostics for timeout/transport failures and resolved request URL.
+4. Inspect structured server event sequence (`received` -> `completed` or websocket failure/lifecycle events).
+5. Validate that payloads/messages remain redacted; if sensitive values appear, treat as regression.
+6. For realtime failures, map websocket close code and error code with the same correlation id.
 
 ## Regression checklist
 
