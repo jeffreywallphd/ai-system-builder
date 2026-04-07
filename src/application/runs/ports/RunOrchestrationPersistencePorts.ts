@@ -76,6 +76,16 @@ export interface AuthoritativeRunQueueMutationResult {
   readonly record: AuthoritativeRunQueueEntryRecord;
 }
 
+export interface AuthoritativeRunStaleQueueReservationRecord {
+  readonly runId: string;
+  readonly queueId: string;
+  readonly workspaceId?: string;
+  readonly claimToken: string;
+  readonly claimedBy: string;
+  readonly claimedAt: string;
+  readonly claimExpiresAt: string;
+}
+
 export const RunNodeClaimConflictReasons = Object.freeze({
   notFound: "not-found",
   alreadyAssigned: "already-assigned",
@@ -230,6 +240,20 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly asOf: string;
     readonly queueId?: string;
     readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>>;
+  listStaleQueueReservations?(query: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunStaleQueueReservationRecord>>;
+  reconsiderDeferredRunsForScheduling?(input: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly runIds?: ReadonlyArray<string>;
     readonly limit?: number;
   }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>>;
   claimAssignmentReadyRuns(input: {

@@ -22,6 +22,12 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(RunOrchestrationTransportRoutes.submitRun).toBe("/api/v1/runtime/runs/start");
     expect(RunOrchestrationTransportRoutes.listRuns).toBe("/api/v1/runtime/runs");
     expect(RunOrchestrationTransportRoutes.listQueueStatus).toBe("/api/v1/runtime/queue");
+    expect(RunOrchestrationTransportRoutes.listSchedulingStaleReservations)
+      .toBe("/api/v1/runtime/scheduling/admin/reservations/stale");
+    expect(RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation)
+      .toBe("/api/v1/runtime/scheduling/admin/reservations/stale/release");
+    expect(RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns)
+      .toBe("/api/v1/runtime/scheduling/admin/deferred/re-evaluate");
     expect(RunOrchestrationTransportRoutes.retryRun).toBe("/api/v1/runtime/runs/:runId/retry");
     expect(RunOrchestrationTransportRoutes.updateLifecycle).toBe("/api/v1/runtime/runs/:runId/lifecycle");
   });

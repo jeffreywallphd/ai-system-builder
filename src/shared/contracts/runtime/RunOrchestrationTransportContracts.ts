@@ -29,12 +29,16 @@ export const RunOrchestrationTransportRoutes = Object.freeze({
   cancelRun: "/api/v1/runtime/runs/:runId/cancel",
   retryRun: "/api/v1/runtime/runs/:runId/retry",
   listQueueStatus: "/api/v1/runtime/queue",
+  listSchedulingStaleReservations: "/api/v1/runtime/scheduling/admin/reservations/stale",
+  releaseSchedulingStaleReservation: "/api/v1/runtime/scheduling/admin/reservations/stale/release",
+  reevaluateSchedulingDeferredRuns: "/api/v1/runtime/scheduling/admin/deferred/re-evaluate",
   updateLifecycle: "/api/v1/runtime/runs/:runId/lifecycle",
 } as const);
 
 export const RunMutationActions = Object.freeze({
   cancel: "cancel",
   retry: "retry",
+  schedulingAdmin: "scheduling-admin",
   lifecycleUpdate: "lifecycle-update",
 } as const);
 
@@ -374,6 +378,62 @@ export interface RunQueueStatusReadResponse {
   readonly schedulingAdminSummary?: RunQueueSchedulingAdminSummary;
 }
 
+export interface SchedulingAdminListStaleReservationsRequest {
+  readonly workspaceId: string;
+  readonly queueId?: string;
+  readonly asOf?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface SchedulingAdminStaleReservation {
+  readonly runId: string;
+  readonly queueId: string;
+  readonly workspaceId?: string;
+  readonly claimToken: string;
+  readonly claimedBy: string;
+  readonly claimedAt: string;
+  readonly claimExpiresAt: string;
+  readonly staleSeconds: number;
+}
+
+export interface SchedulingAdminListStaleReservationsResponse {
+  readonly asOf: string;
+  readonly totalCount: number;
+  readonly items: ReadonlyArray<SchedulingAdminStaleReservation>;
+}
+
+export interface SchedulingAdminReleaseStaleReservationRequest {
+  readonly runId: string;
+  readonly claimToken: string;
+  readonly releasedAt?: string;
+  readonly reason?: string;
+}
+
+export interface SchedulingAdminReleaseStaleReservationResponse {
+  readonly runId: string;
+  readonly queueId: string;
+  readonly releasedAt: string;
+  readonly staleSeconds: number;
+  readonly reservationOwner: string;
+  readonly mutation: SharedApiMutationResult;
+}
+
+export interface SchedulingAdminReevaluateDeferredRunsRequest {
+  readonly queueId?: string;
+  readonly runIds?: ReadonlyArray<string>;
+  readonly requestedAt?: string;
+  readonly reason?: string;
+  readonly limit?: number;
+}
+
+export interface SchedulingAdminReevaluateDeferredRunsResponse {
+  readonly requestedAt: string;
+  readonly reEvaluatedCount: number;
+  readonly runIds: ReadonlyArray<string>;
+  readonly mutation: SharedApiMutationResult;
+}
+
 export interface RunCancellationRequest {
   readonly runId: string;
   readonly reason?: string;
@@ -452,6 +512,18 @@ export interface RunOrchestrationTransportContract {
   readonly listQueueStatus: {
     readonly request: RunQueueStatusReadRequest;
     readonly response: SharedApiResponseEnvelope<RunQueueStatusReadResponse>;
+  };
+  readonly listSchedulingStaleReservations: {
+    readonly request: SchedulingAdminListStaleReservationsRequest;
+    readonly response: SharedApiResponseEnvelope<SchedulingAdminListStaleReservationsResponse>;
+  };
+  readonly releaseSchedulingStaleReservation: {
+    readonly request: SchedulingAdminReleaseStaleReservationRequest;
+    readonly response: SharedApiResponseEnvelope<SchedulingAdminReleaseStaleReservationResponse>;
+  };
+  readonly reevaluateSchedulingDeferredRuns: {
+    readonly request: SchedulingAdminReevaluateDeferredRunsRequest;
+    readonly response: SharedApiResponseEnvelope<SchedulingAdminReevaluateDeferredRunsResponse>;
   };
   readonly updateLifecycle: {
     readonly request: RunLifecycleUpdateRequest;

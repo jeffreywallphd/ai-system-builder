@@ -45,6 +45,7 @@ import type {
   AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunStaleQueueReservationRecord,
   AuthoritativeRunQueueMutationResult,
   AuthoritativeRunNodeClaimResult,
   IRunNodePlacementHoldRepository,
@@ -286,6 +287,80 @@ export class SqlitePlatformPersistenceAdapter
     `).all(...where.params, ...paging.params) as PlatformRunQueueRow[];
 
     return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async listStaleQueueReservations(query: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunStaleQueueReservationRecord>> {
+    const asOf = query.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
+    const queueId = normalizePlatformLookup(query.queueId ?? "");
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND claim_token IS NOT NULL
+        AND claimed_by IS NOT NULL
+        AND claimed_at IS NOT NULL
+        AND claim_expires_at IS NOT NULL
+        AND claim_expires_at <= ?
+        AND (? IS NULL OR workspace_id = ?)
+        AND (? IS NULL OR queue_id = ?)
+      ORDER BY claim_expires_at ASC, claimed_at ASC, run_id ASC
+      ${paging.sql}
+    `).all(
+      asOf,
+      workspaceId ?? null,
+      workspaceId ?? null,
+      queueId ?? null,
+      queueId ?? null,
+      ...paging.params,
+    ) as Array<{
+      readonly run_id: string;
+      readonly queue_id: string;
+      readonly workspace_id: string | null;
+      readonly claim_token: string | null;
+      readonly claimed_by: string | null;
+      readonly claimed_at: string | null;
+      readonly claim_expires_at: string | null;
+    }>;
+
+    return Object.freeze(rows
+      .map((row) => {
+        const claimToken = normalizePlatformLookup(row.claim_token ?? "");
+        const claimedBy = normalizePlatformLookup(row.claimed_by ?? "");
+        const claimedAt = normalizePlatformLookup(row.claimed_at ?? "");
+        const claimExpiresAt = normalizePlatformLookup(row.claim_expires_at ?? "");
+        if (!claimToken || !claimedBy || !claimedAt || !claimExpiresAt) {
+          return undefined;
+        }
+        return Object.freeze({
+          runId: row.run_id,
+          queueId: row.queue_id,
+          workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+          claimToken,
+          claimedBy,
+          claimedAt,
+          claimExpiresAt,
+        });
+      })
+      .filter((entry): entry is AuthoritativeRunStaleQueueReservationRecord => Boolean(entry)));
   }
 
   public async enqueueRunForAssignment(
@@ -612,6 +687,120 @@ export class SqlitePlatformPersistenceAdapter
     ));
 
     return mutationResult.changes === 1;
+  }
+
+  public async reconsiderDeferredRunsForScheduling(input: {
+    readonly asOf: string;
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly runIds?: ReadonlyArray<string>;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = input.asOf.trim();
+    if (!asOf || Number.isNaN(Date.parse(asOf))) {
+      return Object.freeze([]);
+    }
+    const workspaceId = normalizePlatformLookup(input.workspaceId ?? "");
+    const queueId = normalizePlatformLookup(input.queueId ?? "");
+    const normalizedRunIds = (input.runIds ?? [])
+      .map((runId) => normalizePlatformLookup(runId))
+      .filter((runId): runId is string => Boolean(runId));
+    const dedupedRunIds = [...new Set(normalizedRunIds)];
+    const limit = Math.max(1, input.limit ?? 100);
+
+    const targetRunIds = this.getDatabase().prepare(`
+      SELECT run_id
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND eligibility_marker = 'deferred'
+        AND (? IS NULL OR workspace_id = ?)
+        AND (? IS NULL OR queue_id = ?)
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      LIMIT ?
+    `).all(
+      workspaceId ?? null,
+      workspaceId ?? null,
+      queueId ?? null,
+      queueId ?? null,
+      limit,
+    ) as Array<{ readonly run_id: string }>;
+
+    const selectedRunIds = dedupedRunIds.length > 0
+      ? targetRunIds
+        .map((row) => row.run_id)
+        .filter((runId) => dedupedRunIds.includes(runId))
+      : targetRunIds.map((row) => row.run_id);
+    if (selectedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const updatedRunIds = this.getDatabase().transaction(() => {
+      const updated: string[] = [];
+      for (const runId of selectedRunIds) {
+        const result = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            eligibility_marker = 'ready',
+            eligible_at = ?,
+            claim_token = NULL,
+            claimed_by = NULL,
+            claimed_at = NULL,
+            claim_expires_at = NULL,
+            updated_at = ?,
+            revision = revision + 1
+          WHERE run_id = ?
+            AND dequeued_at IS NULL
+            AND eligibility_marker = 'deferred'
+        `).run(
+          asOf,
+          asOf,
+          runId,
+        );
+        if (result.changes === 1) {
+          updated.push(runId);
+        }
+      }
+      return updated;
+    })();
+    if (updatedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const placeholders = updatedRunIds.map(() => "?").join(", ");
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        defer_count,
+        last_no_placement_category,
+        last_no_placement_reason_codes_json,
+        last_no_placement_reason_message,
+        last_no_placement_decision_id,
+        last_no_placement_recorded_at,
+        last_no_placement_admin_attention,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id IN (${placeholders})
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+    `).all(...updatedRunIds) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
   }
 
   public async deferRunClaimForNoPlacement(input: {

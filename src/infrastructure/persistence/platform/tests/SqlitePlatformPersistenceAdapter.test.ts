@@ -588,6 +588,106 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     adapter.dispose();
   });
 
+  it("lists stale queue reservations and supports bounded deferred-run admin re-evaluation", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-admin-scheduling-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await adapter.createRun({
+      runId: "run-admin-1",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:admin",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      metadata: {},
+      revision: 0,
+    }, {
+      operationKey: "op-run-admin-1-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+    await adapter.createRun({
+      runId: "run-admin-2",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:admin",
+      initiatedAt: "2026-04-06T12:00:30.000Z",
+      metadata: {},
+      revision: 0,
+    }, {
+      operationKey: "op-run-admin-2-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:30.000Z",
+    });
+
+    await adapter.enqueueRunForAssignment({
+      runId: "run-admin-1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:00:00.000Z",
+      orderKey: "2026-04-06T12:00:00.000Z:run-admin-1",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:00:00.000Z",
+      updatedAt: "2026-04-06T12:00:00.000Z",
+    }, {
+      operationKey: "op-run-admin-1-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+    await adapter.enqueueRunForAssignment({
+      runId: "run-admin-2",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:00:30.000Z",
+      orderKey: "2026-04-06T12:00:30.000Z:run-admin-2",
+      eligibilityMarker: "deferred",
+      eligibleAt: "2026-04-06T12:10:00.000Z",
+      updatedAt: "2026-04-06T12:00:30.000Z",
+    }, {
+      operationKey: "op-run-admin-2-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:30.000Z",
+    });
+
+    const reservation = await adapter.claimAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:00.000Z",
+      reservationOwner: "orchestrator:alpha",
+      reservationTtlSeconds: 20,
+      limit: 1,
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+    });
+    expect(reservation).toHaveLength(1);
+
+    const staleReservations = await adapter.listStaleQueueReservations?.({
+      asOf: "2026-04-06T12:01:30.000Z",
+      workspaceId: "workspace-alpha",
+      queueId: "queue:default",
+      limit: 10,
+      offset: 0,
+    });
+    expect(staleReservations?.map((entry) => entry.runId)).toEqual(["run-admin-1"]);
+
+    const reconsidered = await adapter.reconsiderDeferredRunsForScheduling?.({
+      asOf: "2026-04-06T12:01:31.000Z",
+      workspaceId: "workspace-alpha",
+      queueId: "queue:default",
+      runIds: ["run-admin-2"],
+      limit: 10,
+    });
+    expect(reconsidered?.map((entry) => entry.runId)).toEqual(["run-admin-2"]);
+    expect(reconsidered?.[0]?.eligibilityMarker).toBe("ready");
+    expect(reconsidered?.[0]?.claimToken).toBeUndefined();
+
+    adapter.dispose();
+  });
+
   it("claims queued runs for node dispatch once and surfaces controlled duplicate conflicts", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-node-claim-"));
     createdRoots.push(root);

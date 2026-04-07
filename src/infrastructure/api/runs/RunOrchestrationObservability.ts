@@ -8,9 +8,12 @@ export interface RunOrchestrationObservabilityLogEvent {
     | "submission"
     | "mutation.cancel"
     | "mutation.retry"
+    | "mutation.scheduling-admin.reevaluate-deferred"
+    | "mutation.scheduling-admin.release-stale-reservation"
     | "execution-update"
     | "query.list-runs"
     | "query.list-queue-status"
+    | "query.list-stale-scheduling-reservations"
     | "query.get-run-detail"
     | "query.get-run-status";
   readonly outcome: "success" | "failure";

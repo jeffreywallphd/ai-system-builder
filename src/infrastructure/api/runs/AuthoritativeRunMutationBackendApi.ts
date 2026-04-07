@@ -11,6 +11,10 @@ import type {
   RunMutationResponse,
   RunRetryRequest,
   RunCancellationRequest,
+  SchedulingAdminReleaseStaleReservationRequest,
+  SchedulingAdminReleaseStaleReservationResponse,
+  SchedulingAdminReevaluateDeferredRunsRequest,
+  SchedulingAdminReevaluateDeferredRunsResponse,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
   RequestAuthoritativeRunCancellationUseCase,
@@ -25,6 +29,16 @@ import {
   RunRetryValidationError,
 } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import {
+  ReleaseStaleSchedulingReservationConflictError,
+  ReleaseStaleSchedulingReservationNotFoundError,
+  ReleaseStaleSchedulingReservationUseCase,
+  ReleaseStaleSchedulingReservationValidationError,
+} from "@application/runs/use-cases/ReleaseStaleSchedulingReservationUseCase";
+import {
+  ReevaluateDeferredSchedulingRunsUseCase,
+  ReevaluateDeferredSchedulingRunsValidationError,
+} from "@application/runs/use-cases/ReevaluateDeferredSchedulingRunsUseCase";
+import {
   buildQueueMovementPayload,
   buildRunStatusPayload,
   publishRunOrchestrationRealtimeEventsBestEffort,
@@ -34,7 +48,7 @@ import { RunOrchestrationObservability } from "./RunOrchestrationObservability";
 
 const AuthoritativeRunResourceType = "authoritative-run";
 
-type RunMutationPermission = "run.cancel" | "run.retry";
+type RunMutationPermission = "run.cancel" | "run.retry" | "run.manage";
 
 export interface AuthoritativeRunMutationAuthorizationContext {
   readonly actorUserIdentityId: string;
@@ -54,9 +68,23 @@ export interface AuthoritativeRunRetryMutationRequest {
   readonly retry: RunRetryRequest;
 }
 
+export interface AuthoritativeSchedulingAdminReevaluateDeferredRunsRequest {
+  readonly workspaceId: string;
+  readonly authorization: AuthoritativeRunMutationAuthorizationContext;
+  readonly reevaluate: SchedulingAdminReevaluateDeferredRunsRequest;
+}
+
+export interface AuthoritativeSchedulingAdminReleaseStaleReservationRequest {
+  readonly workspaceId: string;
+  readonly authorization: AuthoritativeRunMutationAuthorizationContext;
+  readonly release: SchedulingAdminReleaseStaleReservationRequest;
+}
+
 export interface AuthoritativeRunMutationBackendApiDependencies {
   readonly requestAuthoritativeRunCancellationUseCase: RequestAuthoritativeRunCancellationUseCase;
   readonly requestAuthoritativeRunRetryUseCase: RequestAuthoritativeRunRetryUseCase;
+  readonly releaseStaleSchedulingReservationUseCase: ReleaseStaleSchedulingReservationUseCase;
+  readonly reevaluateDeferredSchedulingRunsUseCase: ReevaluateDeferredSchedulingRunsUseCase;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
   readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
   readonly observability?: RunOrchestrationObservability;
@@ -332,6 +360,289 @@ export class AuthoritativeRunMutationBackendApi {
     }
   }
 
+  public async releaseStaleSchedulingReservation(
+    request: AuthoritativeSchedulingAdminReleaseStaleReservationRequest,
+  ): Promise<SharedApiResponseEnvelope<SchedulingAdminReleaseStaleReservationResponse>> {
+    const workspaceId = request.workspaceId.trim();
+    const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
+    const runId = request.release.runId.trim();
+    const claimToken = request.release.claimToken.trim();
+    if (!workspaceId || !actorUserIdentityId || !runId || !claimToken) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.release-stale-reservation.completed",
+        operation: "mutation.scheduling-admin.release-stale-reservation",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        runId,
+        markers: Object.freeze(["invalid-request"]),
+      });
+      return this.invalidRequest("workspaceId, actorUserIdentityId, runId, and claimToken are required.");
+    }
+
+    const allowed = await this.isRunMutationAllowed({
+      actorUserIdentityId,
+      activeWorkspaceId: request.authorization.activeWorkspaceId,
+      authenticatedAt: request.authorization.authenticatedAt,
+      runId,
+      requiredPermissionKey: "run.manage",
+    });
+    if (!allowed) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.release-stale-reservation.completed",
+        operation: "mutation.scheduling-admin.release-stale-reservation",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        runId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
+      return this.forbidden("Scheduling admin reservation release is not authorized for this actor.");
+    }
+
+    try {
+      const released = await this.dependencies.releaseStaleSchedulingReservationUseCase.execute({
+        workspaceId,
+        actorUserIdentityId,
+        runId,
+        claimToken,
+        releasedAt: request.release.releasedAt,
+        reason: request.release.reason,
+      });
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.release-stale-reservation.completed",
+        operation: "mutation.scheduling-admin.release-stale-reservation",
+        outcome: "success",
+        severity: "info",
+        workspaceId,
+        runId,
+        markers: Object.freeze(["stale-reservation-released"]),
+        counters: Object.freeze({
+          stale_seconds: released.staleSeconds,
+        }),
+      });
+
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          runId: released.runId,
+          queueId: released.queueId,
+          releasedAt: released.releasedAt,
+          staleSeconds: released.staleSeconds,
+          reservationOwner: released.reservationOwner,
+          mutation: Object.freeze({
+            changed: true,
+            mutationId: released.mutationId,
+            occurredAt: released.releasedAt,
+          }),
+        }),
+      });
+    } catch (error) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.release-stale-reservation.completed",
+        operation: "mutation.scheduling-admin.release-stale-reservation",
+        outcome: "failure",
+        severity: error instanceof ReleaseStaleSchedulingReservationValidationError
+          || error instanceof ReleaseStaleSchedulingReservationNotFoundError
+          || error instanceof ReleaseStaleSchedulingReservationConflictError
+          ? "warn"
+          : "error",
+        workspaceId,
+        runId,
+        markers: Object.freeze([
+          error instanceof ReleaseStaleSchedulingReservationValidationError
+            ? "invalid-request"
+            : error instanceof ReleaseStaleSchedulingReservationNotFoundError
+              ? "not-found"
+              : error instanceof ReleaseStaleSchedulingReservationConflictError
+                ? "conflict"
+                : "internal-error",
+        ]),
+        details: Object.freeze({
+          error,
+        }),
+      });
+      if (error instanceof ReleaseStaleSchedulingReservationValidationError) {
+        return this.invalidRequest(error.message);
+      }
+      if (error instanceof ReleaseStaleSchedulingReservationNotFoundError) {
+        return this.notFound(error.message);
+      }
+      if (error instanceof ReleaseStaleSchedulingReservationConflictError) {
+        return this.conflict(error.message);
+      }
+
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: SharedApiErrorCodes.internal,
+          message: "Scheduling admin stale reservation release failed due to an internal server error.",
+        }),
+      });
+    }
+  }
+
+  public async reevaluateDeferredSchedulingRuns(
+    request: AuthoritativeSchedulingAdminReevaluateDeferredRunsRequest,
+  ): Promise<SharedApiResponseEnvelope<SchedulingAdminReevaluateDeferredRunsResponse>> {
+    const workspaceId = request.workspaceId.trim();
+    const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
+    if (!workspaceId || !actorUserIdentityId) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.reevaluate-deferred.completed",
+        operation: "mutation.scheduling-admin.reevaluate-deferred",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
+      return this.invalidRequest("workspaceId and actorUserIdentityId are required.");
+    }
+
+    const runIds = request.reevaluate.runIds ?? Object.freeze([]);
+    const manageAllowed = runIds.length > 0
+      ? await this.ensureRunManageAllowedForRuns({
+        actorUserIdentityId,
+        activeWorkspaceId: request.authorization.activeWorkspaceId,
+        authenticatedAt: request.authorization.authenticatedAt,
+        runIds,
+      })
+      : await this.isWorkspaceRunManageAllowed({
+        actorUserIdentityId,
+        activeWorkspaceId: request.authorization.activeWorkspaceId,
+        authenticatedAt: request.authorization.authenticatedAt,
+      });
+    if (!manageAllowed) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.reevaluate-deferred.completed",
+        operation: "mutation.scheduling-admin.reevaluate-deferred",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
+      return this.forbidden("Deferred run re-evaluation is not authorized for this actor.");
+    }
+
+    try {
+      const reevaluated = await this.dependencies.reevaluateDeferredSchedulingRunsUseCase.execute({
+        workspaceId,
+        actorUserIdentityId,
+        queueId: request.reevaluate.queueId,
+        runIds: request.reevaluate.runIds,
+        requestedAt: request.reevaluate.requestedAt,
+        reason: request.reevaluate.reason,
+        limit: request.reevaluate.limit,
+      });
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.reevaluate-deferred.completed",
+        operation: "mutation.scheduling-admin.reevaluate-deferred",
+        outcome: "success",
+        severity: "info",
+        workspaceId,
+        markers: Object.freeze([
+          reevaluated.reEvaluatedCount > 0 ? "deferred-runs-reevaluated" : "no-deferred-runs-eligible",
+        ]),
+        counters: Object.freeze({
+          re_evaluated_count: reevaluated.reEvaluatedCount,
+        }),
+      });
+
+      return Object.freeze({
+        ok: true,
+        data: Object.freeze({
+          requestedAt: reevaluated.requestedAt,
+          reEvaluatedCount: reevaluated.reEvaluatedCount,
+          runIds: reevaluated.runIds,
+          mutation: Object.freeze({
+            changed: reevaluated.reEvaluatedCount > 0,
+            mutationId: reevaluated.mutationId,
+            occurredAt: reevaluated.requestedAt,
+          }),
+        }),
+      });
+    } catch (error) {
+      await this.recordObservability({
+        event: "run.orchestration.mutation.scheduling-admin.reevaluate-deferred.completed",
+        operation: "mutation.scheduling-admin.reevaluate-deferred",
+        outcome: "failure",
+        severity: error instanceof ReevaluateDeferredSchedulingRunsValidationError ? "warn" : "error",
+        workspaceId,
+        markers: Object.freeze([
+          error instanceof ReevaluateDeferredSchedulingRunsValidationError
+            ? "invalid-request"
+            : "internal-error",
+        ]),
+        details: Object.freeze({
+          error,
+        }),
+      });
+      if (error instanceof ReevaluateDeferredSchedulingRunsValidationError) {
+        return this.invalidRequest(error.message);
+      }
+
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: SharedApiErrorCodes.internal,
+          message: "Deferred run re-evaluation failed due to an internal server error.",
+        }),
+      });
+    }
+  }
+
+  private async ensureRunManageAllowedForRuns(input: {
+    readonly actorUserIdentityId: string;
+    readonly activeWorkspaceId: string;
+    readonly authenticatedAt?: string;
+    readonly runIds: ReadonlyArray<string>;
+  }): Promise<boolean> {
+    for (const runId of input.runIds) {
+      const normalizedRunId = runId.trim();
+      if (!normalizedRunId) {
+        return false;
+      }
+      const allowed = await this.isRunMutationAllowed({
+        actorUserIdentityId: input.actorUserIdentityId,
+        activeWorkspaceId: input.activeWorkspaceId,
+        authenticatedAt: input.authenticatedAt,
+        runId: normalizedRunId,
+        requiredPermissionKey: "run.manage",
+      });
+      if (!allowed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private async isWorkspaceRunManageAllowed(input: {
+    readonly actorUserIdentityId: string;
+    readonly activeWorkspaceId: string;
+    readonly authenticatedAt?: string;
+  }): Promise<boolean> {
+    if (!this.dependencies.authorizationDecisionEvaluator) {
+      return true;
+    }
+
+    const decision = await this.dependencies.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId: input.actorUserIdentityId,
+        activeWorkspaceId: input.activeWorkspaceId.trim() || undefined,
+        authenticatedAt: input.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "run.manage",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        workspaceId: input.activeWorkspaceId.trim(),
+        capabilityResourceType: AuthoritativeRunResourceType,
+      }),
+      asOf: this.now().toISOString(),
+    });
+
+    return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
+  }
+
   private async isRunMutationAllowed(input: {
     readonly actorUserIdentityId: string;
     readonly activeWorkspaceId: string;
@@ -389,6 +700,16 @@ export class AuthoritativeRunMutationBackendApi {
       ok: false,
       error: Object.freeze({
         code: SharedApiErrorCodes.notFound,
+        message,
+      }),
+    });
+  }
+
+  private conflict(message: string): SharedApiResponseEnvelope<never> {
+    return Object.freeze({
+      ok: false,
+      error: Object.freeze({
+        code: SharedApiErrorCodes.conflict,
         message,
       }),
     });
