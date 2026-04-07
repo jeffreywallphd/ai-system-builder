@@ -5,6 +5,7 @@ This document describes the admin-facing governance audit review surfaces introd
 For extending canonical audit emission and taxonomy rules (not just reviewing events), use:
 
 - `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
 - `docs/audit-governance-contributor-guide.md`
 
 ## Entry points

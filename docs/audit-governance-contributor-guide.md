@@ -12,6 +12,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - `docs/architecture/audit-authoritative-recording-service-and-ports.md`
 - `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
 - `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
+- `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
 
 ## Required implementation path
 
@@ -60,6 +61,13 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Keep audit retrieval authorization and logical scope enforcement in application query services, not UI state services.
 - Keep audit detail visibility (`user-safe` vs `admin`) role-derived in application authorizer/query use cases.
 
+## Audit ledger query/access extension guardrails
+
+- Keep list/detail retrieval routed through `AuditLedgerQueryService`; do not re-implement authorization intersections in transport/UI layers.
+- Keep workspace/role-derived scope decisions in `WorkspaceAuditLedgerReadAuthorizer`.
+- Keep detail visibility projection delegated to shared DTO contracts (`toAuditEventDetailView(...)`) so admin-only payloads are not leaked.
+- Keep retention/lifecycle behavior metadata-only until a dedicated retention workflow story introduces destructive policy operations.
+
 ## Redaction and payload rules
 
 - Use identifiers, reason codes, booleans, counts, and bounded summaries.
@@ -79,6 +87,9 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Writing audit records directly from UI code is prohibited.
 - Writing canonical audit events directly from transport route handlers is prohibited.
 - Bypassing `AuthoritativeAuditRecordingService` for new canonical events is prohibited.
+- Bypassing `AuditLedgerQueryService`/`WorkspaceAuditLedgerReadAuthorizer` for privileged reads is prohibited.
+- Returning `adminOnlyDetails` for non-admin audit detail responses is prohibited.
+- Implementing destructive retention deletes or archive jobs in this slice is prohibited.
 - Storing raw secrets or raw prompts in the ledger is prohibited.
 - Creating duplicate taxonomy mappings outside `AuditApplicationContracts.ts` is prohibited.
 

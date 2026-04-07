@@ -6,6 +6,8 @@ Contributor quick-reference for extending audit event taxonomy/capture safely an
 
 Canonical human doc: `docs/audit-governance-contributor-guide.md`
 
+Related architecture baseline: `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
+
 ## Canonical implementation seams
 
 - taxonomy/domain: `src/domain/audit/AuditDomain.ts`, `src/application/audit/AuditApplicationContracts.ts`
@@ -22,7 +24,9 @@ Canonical human doc: `docs/audit-governance-contributor-guide.md`
 - Keep UI/transport write paths out of canonical audit append workflows.
 - Keep audit read authorization/scope evaluation in application query services, not UI state services.
 - Keep audit detail visibility shaping (`user-safe` vs `admin`) in application authorizer/query services, not controllers/pages.
+- Keep list/detail retrieval ownership in `AuditLedgerQueryService` plus `WorkspaceAuditLedgerReadAuthorizer`, not transport/UI reimplementations.
 - Never place raw secret/prompt/path/credential material in ledger payload details.
+- Keep retention lifecycle behavior metadata-only in this slice; do not add destructive retention jobs.
 
 ## Tests
 
