@@ -14,9 +14,10 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 
 1. Shared offline contracts/schemas.
 2. Domain offline boundary catalog and policy model.
-3. Application classification/resynchronization seams.
-4. Desktop host profile gating.
-5. Adapter/UI consumption updates.
+3. Application classification/resynchronization/cache seams.
+4. Desktop host profile + offline cache runtime gating.
+5. Infrastructure adapter and persistence updates.
+6. Adapter/UI consumption updates.
 
 ## Invariants to preserve
 
@@ -24,6 +25,8 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - reconnect conflict/rejection outcomes are visible and explicit;
 - queued operations keep divergence disclosure and replay descriptors;
 - desktop host remains control-plane-client and non-authoritative.
+- authoritative snapshot cache stores logical payload + sync metadata, not filesystem references.
+- snapshot cache writes respect eligibility and protected-storage requirements.
 
 ## Prohibited patterns
 

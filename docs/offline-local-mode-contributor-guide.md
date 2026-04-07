@@ -18,8 +18,13 @@ Provide a durable implementation workflow for extending offline/local-mode behav
 - application classification and reconnect policy:
   - `src/application/common/OfflineResourceClassificationPolicy.ts`
   - `src/application/common/OfflineLocalModeResynchronization.ts`
+- application authoritative snapshot cache service:
+  - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - desktop host local-mode binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+- desktop persistence adapter:
+  - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - shared offline contracts and schema parsers:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -56,6 +61,15 @@ Required:
 - preserve explicit sync-status transitions;
 - keep local edits resetting draft sync status to `local-only`;
 - keep queued linkage explicit via `queuedMutationId`.
+
+## Extending authoritative snapshot cache semantics
+
+Required:
+- keep authoritative snapshot cache restricted to server-authoritative resource classes allowed by offline policy;
+- persist logical snapshot payload + metadata (workspace context, authoritative revisions, sync timestamps, eligibility markers);
+- keep cache bounded (retention cap) to prevent uncontrolled local-cache sprawl;
+- reject raw filesystem references in snapshot payloads;
+- when storage rule requires encrypted cache, gate writes on protected-at-rest cache capability.
 
 ## Extending pending operation semantics
 
@@ -96,7 +110,10 @@ At minimum, update:
 - `src/domain/platform/tests/OfflineLocalModeBoundaries.test.ts`
 - `src/application/common/tests/OfflineResourceClassificationPolicy.test.ts`
 - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
+- `src/application/common/tests/OfflineAuthoritativeSnapshotCache.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`
+- `src/hosts/desktop/tests/DesktopOfflineSnapshotCacheHost.test.ts`
+- `src/infrastructure/desktop/tests/DesktopOfflineSnapshotCacheRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`
 - `src/shared/schemas/runtime/tests/OfflineSynchronizationSchemaContracts.test.ts`
