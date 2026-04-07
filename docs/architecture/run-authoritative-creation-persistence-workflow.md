@@ -25,12 +25,13 @@ Establish a production-oriented application workflow that converts an accepted r
 
 `CreateAuthoritativeRunUseCase` accepts a validated `CanonicalRunSubmissionCommand` and:
 
-1. Creates the initial canonical run record (`submitted` lifecycle, unassigned, no execution outcome).
+1. Creates the initial canonical run record and transitions it to canonical `queued` state.
 2. Assigns initial orchestration intent (`queue-admission-requested`) with queue routing context.
 3. Maps canonical run + submission snapshot into authoritative persisted metadata.
 4. Persists the run record durably via `IPlatformRunRecordRepository`.
-5. Records the initial orchestration intent via `IPlatformAuditEventRepository`.
-6. Performs authoritative read-after-write and returns canonical run detail for consumers.
+5. Persists queue admission durably via `IRunOrchestrationQueuePersistenceRepository`.
+6. Records the initial orchestration intent via `IPlatformAuditEventRepository`.
+7. Performs authoritative read-after-write and returns canonical run detail for consumers.
 
 `GetAuthoritativeRunUseCase` provides authoritative reads by run id (with optional workspace scoping).
 
@@ -52,7 +53,7 @@ Execution-backend mechanics (filesystem locations, adapter-specific runtime inte
 ## Transaction safety
 
 Run creation and initial orchestration-intent persistence execute under `runInTransactionBoundary`.
-`SqlitePlatformPersistenceAdapter` now implements `IPlatformTransactionManager` using `SqliteTransactionCoordinator`, enabling atomic run + audit intent writes in the supported SQLite layer.
+`SqlitePlatformPersistenceAdapter` now implements `IPlatformTransactionManager` using `SqliteTransactionCoordinator`, enabling atomic run + queue-admission + audit-intent writes in the supported SQLite layer.
 
 ## Validation coverage
 

@@ -49,19 +49,25 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
       FROM sqlite_master
       WHERE type = 'table'
-        AND name IN ('platform_run_records', 'platform_audit_events', 'platform_persistence_mutation_replays')
+        AND name IN (
+          'platform_run_records',
+          'platform_audit_events',
+          'platform_persistence_mutation_replays',
+          'platform_run_orchestration_queue'
+        )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
 
     expect(tables.map((table) => table.name)).toEqual([
       "platform_audit_events",
       "platform_persistence_mutation_replays",
+      "platform_run_orchestration_queue",
       "platform_run_records",
     ]);
 
@@ -338,6 +344,158 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       targetRef: "run:run-tx-001",
     });
     expect(events).toHaveLength(0);
+
+    adapter.dispose();
+  });
+
+  it("persists queue entries and claims assignment-ready runs in queue order", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-queue-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    const queueRunIds = ["run-queue-1", "run-queue-2", "run-queue-3"] as const;
+    for (const [index, runId] of queueRunIds.entries()) {
+      const submittedAt = `2026-04-06T12:0${index + 1}:00.000Z`;
+      await adapter.createRun({
+        runId,
+        runKind: "workflow",
+        status: "pending",
+        workspaceId: "workspace-alpha",
+        userIdentityId: "user-owner",
+        sourceAggregateRef: "workflow:queue",
+        initiatedAt: submittedAt,
+        metadata: {
+          canonicalRun: {
+            identity: {
+              runId,
+              workflowId: "workflow:queue",
+              workspaceId: "workspace-alpha",
+            },
+            submission: {
+              source: "api",
+              submittedAt,
+            },
+            state: "queued",
+            queue: {
+              queueId: "queue:default",
+              enteredAt: submittedAt,
+              position: null,
+              positionAsOf: submittedAt,
+            },
+            assignment: {
+              status: "unassigned",
+            },
+            execution: {
+              outcome: "none",
+            },
+            retry: {
+              attempt: 1,
+              maxAttempts: 1,
+            },
+            updatedAt: submittedAt,
+          },
+        },
+        revision: 0,
+      }, {
+        operationKey: `op-${runId}-create`,
+        actorId: "system:orchestrator",
+        occurredAt: submittedAt,
+      });
+    }
+
+    await adapter.enqueueRunForAssignment({
+      runId: "run-queue-1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:01:00.000Z",
+      orderKey: "2026-04-06T12:01:00.000Z:run-queue-1",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:03:00.000Z",
+      updatedAt: "2026-04-06T12:01:00.000Z",
+    }, {
+      operationKey: "op-run-queue-1-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:01:00.000Z",
+    });
+    await adapter.enqueueRunForAssignment({
+      runId: "run-queue-2",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:02:00.000Z",
+      orderKey: "2026-04-06T12:02:00.000Z:run-queue-2",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:02:00.000Z",
+      updatedAt: "2026-04-06T12:02:00.000Z",
+    }, {
+      operationKey: "op-run-queue-2-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:02:00.000Z",
+    });
+    await adapter.enqueueRunForAssignment({
+      runId: "run-queue-3",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:03:00.000Z",
+      orderKey: "2026-04-06T12:03:00.000Z:run-queue-3",
+      eligibilityMarker: "deferred",
+      eligibleAt: "2026-04-06T12:01:00.000Z",
+      updatedAt: "2026-04-06T12:03:00.000Z",
+    }, {
+      operationKey: "op-run-queue-3-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:03:00.000Z",
+    });
+
+    const ready = await adapter.listAssignmentReadyRuns({
+      asOf: "2026-04-06T12:05:00.000Z",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+    });
+    expect(ready.map((entry) => entry.runId)).toEqual([
+      "run-queue-2",
+      "run-queue-1",
+    ]);
+
+    const claimed = await adapter.claimAssignmentReadyRuns({
+      asOf: "2026-04-06T12:05:00.000Z",
+      reservationOwner: "orchestrator:alpha",
+      reservationTtlSeconds: 60,
+      limit: 2,
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+    });
+    expect(claimed).toHaveLength(2);
+    expect(claimed[0]?.runId).toBe("run-queue-2");
+    expect(claimed[0]?.claimToken).toBeDefined();
+    expect(claimed[1]?.runId).toBe("run-queue-1");
+    expect(claimed[1]?.claimToken).toBeDefined();
+
+    const stillReady = await adapter.listAssignmentReadyRuns({
+      asOf: "2026-04-06T12:05:00.000Z",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+    });
+    expect(stillReady).toHaveLength(0);
+
+    const releaseResult = await adapter.releaseRunClaim({
+      runId: "run-queue-2",
+      claimToken: claimed[0]?.claimToken ?? "missing",
+      releasedAt: "2026-04-06T12:05:10.000Z",
+    });
+    expect(releaseResult).toBeTrue();
+
+    const readyAfterRelease = await adapter.listAssignmentReadyRuns({
+      asOf: "2026-04-06T12:05:11.000Z",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+    });
+    expect(readyAfterRelease.map((entry) => entry.runId)).toEqual(["run-queue-2"]);
 
     adapter.dispose();
   });

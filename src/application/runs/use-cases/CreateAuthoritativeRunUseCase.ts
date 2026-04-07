@@ -9,8 +9,13 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunOrchestrationQueuePersistenceRepository,
   IRunOrchestrationIntentRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import {
+  RunLifecycleStates,
+  transitionCanonicalRunRecord,
+} from "@domain/runs/RunDomain";
 import { toRunDetail, type RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import type { CanonicalRunSubmissionCommand } from "./RunSubmissionValidationContracts";
 import {
@@ -38,6 +43,7 @@ export interface CreateAuthoritativeRunResult {
 
 interface CreateAuthoritativeRunUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
+  readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly auditSink?: RunSubmissionAuditSink;
   readonly transactionManager?: IPlatformTransactionManager;
@@ -100,7 +106,19 @@ export class CreateAuthoritativeRunUseCase {
       ?? resolveIdempotentRunId(input.command)
       ?? this.idGenerator.nextId("run");
     const queueId = resolveQueueId(input);
-    const canonicalRun = createInitialCanonicalRunRecord(input.command, runId);
+    const canonicalRun = transitionCanonicalRunRecord(
+      createInitialCanonicalRunRecord(input.command, runId),
+      {
+        toState: RunLifecycleStates.queued,
+        occurredAt: input.command.occurredAt,
+        queue: Object.freeze({
+          queueId,
+          enteredAt: input.command.occurredAt,
+          position: null,
+          positionAsOf: input.command.occurredAt,
+        }),
+      },
+    );
     const record = mapCanonicalRunToPlatformRecord({
       command: input.command,
       run: canonicalRun,
@@ -113,6 +131,22 @@ export class CreateAuthoritativeRunUseCase {
     await runInTransactionBoundary(this.dependencies.transactionManager, async () => {
       await this.dependencies.runRepository.createRun(record, {
         operationKey,
+        actorId,
+        occurredAt: input.command.occurredAt,
+        correlationId: normalizeOptional(input.command.submissionContext.correlationId),
+      });
+      await this.dependencies.queueRepository.enqueueRunForAssignment({
+        runId,
+        queueId,
+        workspaceId: input.command.workspaceId,
+        lifecycleState: canonicalRun.state,
+        enteredAt: input.command.occurredAt,
+        orderKey: `${input.command.occurredAt}:${runId}`,
+        eligibilityMarker: "ready",
+        eligibleAt: input.command.occurredAt,
+        updatedAt: input.command.occurredAt,
+      }, {
+        operationKey: `${operationKey}:queue-enqueue`,
         actorId,
         occurredAt: input.command.occurredAt,
         correlationId: normalizeOptional(input.command.submissionContext.correlationId),
@@ -146,7 +180,7 @@ export class CreateAuthoritativeRunUseCase {
       runId,
       queueId,
       fromState: "none",
-      toState: "submitted",
+      toState: "queued",
     }));
 
     return Object.freeze({
@@ -178,7 +212,7 @@ export class CreateAuthoritativeRunUseCase {
         runId: input.runId,
         queueId: input.queueId,
         intentKind: "queue-admission-requested",
-        lifecycleState: "submitted",
+        lifecycleState: "queued",
       }),
     });
   }

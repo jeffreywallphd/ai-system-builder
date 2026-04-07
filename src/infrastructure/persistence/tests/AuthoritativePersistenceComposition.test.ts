@@ -24,6 +24,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(ids).toContain("assets:v1");
     expect(ids).toContain("asset-upload-sessions:v1");
     expect(ids).toContain("platform:v1");
+    expect(ids).toContain("platform:v2");
     expect(ids).toContain("certificate-authority:v1");
     expect(ids).toContain("secret-records:v1");
   });

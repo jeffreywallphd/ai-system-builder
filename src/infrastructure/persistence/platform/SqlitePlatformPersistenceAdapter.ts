@@ -1,5 +1,6 @@
 ﻿import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import type {
   IPlatformAuditEventRepository,
   IPlatformRunRecordRepository,
@@ -37,12 +38,41 @@ import {
   PLATFORM_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqlitePlatformPersistenceMigrations";
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
+import type {
+  AuthoritativeRunQueueEntryRecord,
+  AuthoritativeRunQueueMutationResult,
+  IRunOrchestrationQueuePersistenceRepository,
+  RunQueueEligibilityMarker,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type { RunLifecycleState } from "@domain/runs/RunDomain";
 
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
 
+interface PlatformRunQueueRow {
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly workspace_id: string | null;
+  readonly lifecycle_state: string;
+  readonly entered_at: string;
+  readonly order_key: string;
+  readonly eligibility_marker: RunQueueEligibilityMarker;
+  readonly eligible_at: string;
+  readonly claim_token: string | null;
+  readonly claimed_by: string | null;
+  readonly claimed_at: string | null;
+  readonly claim_expires_at: string | null;
+  readonly dequeued_at: string | null;
+  readonly updated_at: string;
+  readonly revision: number;
+}
+
 export class SqlitePlatformPersistenceAdapter
   extends SafeSqliteRepositoryBase
-  implements IPlatformRunRecordRepository, IPlatformAuditEventRepository, IPlatformTransactionManager {
+  implements
+    IPlatformRunRecordRepository,
+    IPlatformAuditEventRepository,
+    IPlatformTransactionManager,
+    IRunOrchestrationQueuePersistenceRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
   private readonly transactionCoordinator: SqliteTransactionCoordinator;
@@ -144,6 +174,287 @@ export class SqlitePlatformPersistenceAdapter
     },
   ): Promise<PlatformRunMutationResult> {
     return this.persistRunMutation("save-run", record, mutation, false, mutation.expectedRevision);
+  }
+
+  public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    const normalizedRunId = normalizePlatformLookup(runId);
+    if (!normalizedRunId) {
+      return undefined;
+    }
+
+    const row = this.getQueueRowByRunId(normalizedRunId);
+    return row ? this.mapQueueRowToRecord(row) : undefined;
+  }
+
+  public async enqueueRunForAssignment(
+    record: Omit<
+      AuthoritativeRunQueueEntryRecord,
+      "claimToken" | "claimedBy" | "claimedAt" | "claimExpiresAt" | "dequeuedAt" | "revision"
+    >,
+    _mutation: PlatformPersistenceMutationContext,
+  ): Promise<AuthoritativeRunQueueMutationResult> {
+    const runId = normalizePlatformLookup(record.runId);
+    if (!runId) {
+      throw new Error("Run queue persistence requires runId.");
+    }
+
+    const existing = this.getQueueRowByRunId(runId);
+    if (existing) {
+      return Object.freeze({
+        changed: false,
+        record: this.mapQueueRowToRecord(existing),
+      });
+    }
+
+    const persistedRow: PlatformRunQueueRow = Object.freeze({
+      run_id: runId,
+      queue_id: record.queueId.trim(),
+      workspace_id: normalizePlatformLookup(record.workspaceId ?? "") ?? null,
+      lifecycle_state: record.lifecycleState,
+      entered_at: record.enteredAt.trim(),
+      order_key: record.orderKey.trim(),
+      eligibility_marker: record.eligibilityMarker,
+      eligible_at: record.eligibleAt.trim(),
+      claim_token: null,
+      claimed_by: null,
+      claimed_at: null,
+      claim_expires_at: null,
+      dequeued_at: null,
+      updated_at: record.updatedAt.trim(),
+      revision: 1,
+    });
+
+    this.executeMutation("enqueue run for assignment", () => this.getDatabase().prepare(`
+        INSERT INTO platform_run_orchestration_queue (
+          run_id,
+          queue_id,
+          workspace_id,
+          lifecycle_state,
+          entered_at,
+          order_key,
+          eligibility_marker,
+          eligible_at,
+          claim_token,
+          claimed_by,
+          claimed_at,
+          claim_expires_at,
+          dequeued_at,
+          updated_at,
+          revision
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+      persistedRow.run_id,
+      persistedRow.queue_id,
+      persistedRow.workspace_id,
+      persistedRow.lifecycle_state,
+      persistedRow.entered_at,
+      persistedRow.order_key,
+      persistedRow.eligibility_marker,
+      persistedRow.eligible_at,
+      persistedRow.claim_token,
+      persistedRow.claimed_by,
+      persistedRow.claimed_at,
+      persistedRow.claim_expires_at,
+      persistedRow.dequeued_at,
+      persistedRow.updated_at,
+      persistedRow.revision,
+    ));
+
+    return Object.freeze({
+      changed: true,
+      record: this.mapQueueRowToRecord(persistedRow),
+    });
+  }
+
+  public async listAssignmentReadyRuns(query: {
+    readonly asOf: string;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+    readonly limit?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = query.asOf.trim();
+    const limit = Number.isInteger(query.limit) && (query.limit ?? 0) > 0
+      ? query.limit as number
+      : 10;
+    const queueId = normalizePlatformLookup(query.queueId ?? "");
+    const workspaceId = normalizePlatformLookup(query.workspaceId ?? "");
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        dequeued_at,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE dequeued_at IS NULL
+        AND eligibility_marker = 'ready'
+        AND eligible_at <= ?
+        AND (? IS NULL OR queue_id = ?)
+        AND (? IS NULL OR workspace_id = ?)
+        AND (claim_token IS NULL OR claim_expires_at <= ?)
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      LIMIT ?
+    `).all(
+      asOf,
+      queueId ?? null,
+      queueId ?? null,
+      workspaceId ?? null,
+      workspaceId ?? null,
+      asOf,
+      limit,
+    ) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async claimAssignmentReadyRuns(input: {
+    readonly asOf: string;
+    readonly reservationOwner: string;
+    readonly reservationTtlSeconds: number;
+    readonly limit: number;
+    readonly queueId?: string;
+    readonly workspaceId?: string;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const asOf = input.asOf.trim();
+    const limit = Math.max(1, input.limit);
+    const reservationOwner = input.reservationOwner.trim();
+    if (!reservationOwner) {
+      return Object.freeze([]);
+    }
+    const reservationTtlSeconds = Math.max(1, input.reservationTtlSeconds);
+    const queueId = normalizePlatformLookup(input.queueId ?? "");
+    const workspaceId = normalizePlatformLookup(input.workspaceId ?? "");
+    const claimExpiresAt = new Date(Date.parse(asOf) + (reservationTtlSeconds * 1000)).toISOString();
+
+    const claimedRunIds = this.getDatabase().transaction(() => {
+      const candidateRows = this.getDatabase().prepare(`
+        SELECT run_id
+        FROM platform_run_orchestration_queue
+        WHERE dequeued_at IS NULL
+          AND eligibility_marker = 'ready'
+          AND eligible_at <= ?
+          AND (? IS NULL OR queue_id = ?)
+          AND (? IS NULL OR workspace_id = ?)
+          AND (claim_token IS NULL OR claim_expires_at <= ?)
+        ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+        LIMIT ?
+      `).all(
+        asOf,
+        queueId ?? null,
+        queueId ?? null,
+        workspaceId ?? null,
+        workspaceId ?? null,
+        asOf,
+        limit,
+      ) as Array<{ run_id: string }>;
+
+      const runIds: string[] = [];
+      for (const candidateRow of candidateRows) {
+        const claimToken = `queue-claim:${randomUUID()}`;
+        const mutationResult = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            claim_token = ?,
+            claimed_by = ?,
+            claimed_at = ?,
+            claim_expires_at = ?,
+            updated_at = ?,
+            revision = revision + 1
+          WHERE run_id = ?
+            AND dequeued_at IS NULL
+            AND eligibility_marker = 'ready'
+            AND eligible_at <= ?
+            AND (claim_token IS NULL OR claim_expires_at <= ?)
+        `).run(
+          claimToken,
+          reservationOwner,
+          asOf,
+          claimExpiresAt,
+          asOf,
+          candidateRow.run_id,
+          asOf,
+          asOf,
+        );
+        if (mutationResult.changes === 1) {
+          runIds.push(candidateRow.run_id);
+        }
+      }
+
+      return runIds;
+    })();
+
+    if (claimedRunIds.length === 0) {
+      return Object.freeze([]);
+    }
+
+    const placeholders = claimedRunIds.map(() => "?").join(", ");
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        dequeued_at,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id IN (${placeholders})
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+    `).all(...claimedRunIds) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
+  public async releaseRunClaim(input: {
+    readonly runId: string;
+    readonly claimToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    if (!runId || !claimToken) {
+      return false;
+    }
+
+    const releasedAt = input.releasedAt.trim();
+    const mutationResult = this.executeMutation("release run claim", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND claim_token = ?
+          AND dequeued_at IS NULL
+      `).run(
+      releasedAt,
+      runId,
+      claimToken,
+    ));
+
+    return mutationResult.changes === 1;
   }
 
   public async appendAuditEvent(
@@ -545,6 +856,50 @@ export class SqlitePlatformPersistenceAdapter
       this.resolveMutationTimestamp(mutation.occurredAt),
       new Date().toISOString(),
     ));
+  }
+
+  private getQueueRowByRunId(runId: string): PlatformRunQueueRow | undefined {
+    return this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        dequeued_at,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      WHERE run_id = ?
+      LIMIT 1
+    `).get(runId) as PlatformRunQueueRow | undefined;
+  }
+
+  private mapQueueRowToRecord(row: PlatformRunQueueRow): AuthoritativeRunQueueEntryRecord {
+    return Object.freeze({
+      runId: row.run_id,
+      queueId: row.queue_id,
+      workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+      lifecycleState: row.lifecycle_state as RunLifecycleState,
+      enteredAt: row.entered_at,
+      orderKey: row.order_key,
+      eligibilityMarker: row.eligibility_marker,
+      eligibleAt: row.eligible_at,
+      claimToken: normalizePlatformLookup(row.claim_token ?? ""),
+      claimedBy: normalizePlatformLookup(row.claimed_by ?? ""),
+      claimedAt: normalizePlatformLookup(row.claimed_at ?? ""),
+      claimExpiresAt: normalizePlatformLookup(row.claim_expires_at ?? ""),
+      dequeuedAt: normalizePlatformLookup(row.dequeued_at ?? ""),
+      updatedAt: row.updated_at,
+      revision: row.revision,
+    });
   }
 
   private assertExpectedRevision(

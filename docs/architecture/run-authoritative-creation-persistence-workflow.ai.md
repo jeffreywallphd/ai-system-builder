@@ -15,8 +15,9 @@ Story 16.1.4 adds the authoritative run creation workflow that persists accepted
 - Human doc: `docs/architecture/run-authoritative-creation-persistence-workflow.md`
 
 ## Core behavior
-- Converts validated run submission commands into canonical initial run state (`submitted`).
+- Converts validated run submission commands into canonical queued run state (`queued`).
 - Persists the run as an authoritative platform record with canonical metadata snapshot.
+- Persists durable queue admission for the run in the authoritative queue table.
 - Stores actor/workspace scope, target references, validated parameters, references, and visibility posture.
 - Records initial orchestration intent (`queue-admission-requested`) through the runs audit stream.
 - Provides authoritative read reconstruction for run detail queries.
@@ -24,7 +25,7 @@ Story 16.1.4 adds the authoritative run creation workflow that persists accepted
 ## Transaction model
 - Create flow uses `runInTransactionBoundary(...)`.
 - SQLite platform adapter now supports `IPlatformTransactionManager` using `SqliteTransactionCoordinator`.
-- Run and initial orchestration-intent writes can be committed or rolled back atomically in supported persistence.
+- Run, queue-admission, and initial orchestration-intent writes can be committed or rolled back atomically in supported persistence.
 
 ## Metadata boundary
 - Canonical run metadata contains orchestration-safe control-plane state only.

@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 1;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -97,5 +97,49 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
 
     CREATE INDEX IF NOT EXISTS platform_persistence_mutation_replays_record_idx
       ON platform_persistence_mutation_replays(record_scope, record_id, created_at DESC);
+  `],
+  [2, `
+    CREATE TABLE IF NOT EXISTS platform_run_orchestration_queue (
+      run_id TEXT PRIMARY KEY,
+      queue_id TEXT NOT NULL,
+      workspace_id TEXT,
+      lifecycle_state TEXT NOT NULL,
+      entered_at TEXT NOT NULL,
+      order_key TEXT NOT NULL,
+      eligibility_marker TEXT NOT NULL CHECK (eligibility_marker IN ('ready', 'deferred', 'blocked')),
+      eligible_at TEXT NOT NULL,
+      claim_token TEXT,
+      claimed_by TEXT,
+      claimed_at TEXT,
+      claim_expires_at TEXT,
+      dequeued_at TEXT,
+      updated_at TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK (revision >= 1),
+      FOREIGN KEY (run_id) REFERENCES platform_run_records(run_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS platform_run_orchestration_queue_ready_idx
+      ON platform_run_orchestration_queue(
+        queue_id,
+        eligibility_marker,
+        eligible_at ASC,
+        order_key ASC,
+        entered_at ASC,
+        run_id ASC
+      );
+    CREATE INDEX IF NOT EXISTS platform_run_orchestration_queue_workspace_ready_idx
+      ON platform_run_orchestration_queue(
+        workspace_id,
+        queue_id,
+        eligibility_marker,
+        eligible_at ASC,
+        order_key ASC,
+        entered_at ASC,
+        run_id ASC
+      )
+      WHERE workspace_id IS NOT NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS platform_run_orchestration_queue_claim_token_uidx
+      ON platform_run_orchestration_queue(claim_token)
+      WHERE claim_token IS NOT NULL;
   `],
 ]);
