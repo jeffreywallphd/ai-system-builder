@@ -165,6 +165,15 @@ Trusted-device transport contracts are defined in `src/infrastructure/api/identi
 - pairing lifecycle: initiation, validation, and completion request/response contracts
 - all trusted-device routes run through authenticated session guard middleware and resolve actor context from bearer session state
 
+### Authoritative session-aware middleware and route guards
+
+- `IdentityHttpServer` now composes a reusable `requireAuthenticatedWorkspaceSession(...)` guard for converged workspace-scoped routes.
+- The guard first resolves authenticated session context, then resolves workspace context, then enters route handlers.
+- Guard-provided context includes shared actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so handlers and backend calls avoid repeated session/workspace parsing.
+- Storage and asset converged routes now run through this shared pipeline and preserve shared failure semantics:
+  - unauthenticated requests fail with `401` + `authentication-failed`
+  - authenticated requests missing required workspace scope fail with `400` + `invalid-request`
+
 ### Admin account list request
 
 `GET /api/v1/identity/admin/accounts`

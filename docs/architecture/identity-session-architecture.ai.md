@@ -55,8 +55,15 @@ Guarded endpoints:
 
 - extracts bearer token
 - resolves principal/session via backend API
+- injects shared actor metadata (`actor.userIdentityId`, `actor.username`) into downstream route context
 - normalizes missing/invalid/expired/revoked to `401` + `authentication-failed`
 - account disablement now revokes all active sessions for the target account with `admin` reason in administration status-mutation flow
+
+`IdentityHttpServer.requireAuthenticatedWorkspaceSession(...)`:
+
+- composes authenticated-session resolution with workspace-scope resolution for converged routes
+- supplies workspace metadata (`workspace.workspaceId`) before route handler execution
+- preserves shared semantics: unauthenticated `401/authentication-failed`, authenticated missing workspace `400/invalid-request`
 
 ## Policy controls
 

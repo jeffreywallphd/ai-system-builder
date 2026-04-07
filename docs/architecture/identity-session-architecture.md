@@ -166,8 +166,14 @@ Guard behavior in `IdentityHttpServer`:
 
 - extracts `Authorization: Bearer <token>`
 - resolves session/principal through `IdentityAuthBackendApi.resolveAuthenticatedSession(...)`
-- injects authenticated context into route handlers
+- injects authenticated context into route handlers, including shared actor metadata (`actor.userIdentityId`, `actor.username`)
 - normalizes missing/invalid/expired/revoked session states to `401` + `authentication-failed`
+
+Workspace-scoped guard behavior:
+
+- `requireAuthenticatedWorkspaceSession(...)` composes session guard + workspace resolution for converged routes.
+- route handlers receive resolved workspace metadata (`workspace.workspaceId`) before use-case delegation.
+- missing workspace scope returns shared `400` + `invalid-request` semantics after authentication succeeds.
 
 Operational expectation:
 
