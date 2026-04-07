@@ -16,11 +16,16 @@ import { SharedApiSortDirections } from "@shared/contracts/api/SharedApiContract
 import { parseAuditEventListQueryDto, type AuditEventSchemaValidationError } from "@shared/schemas/audit/AuditEventSchemaContracts";
 import type { AuditEventCategory, CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 import type { AuditLedgerQuery, IAuditLedgerRepository } from "../ports/AuditLedgerPersistencePorts";
+import {
+  redactAuditOperationalErrorMessage,
+  sanitizeAuditOperationalDetails,
+} from "../shared/AuditOperationalSignalRedaction";
 
 export const AuditLedgerQueryErrorCodes = Object.freeze({
   invalidRequest: "audit-ledger-query-invalid-request",
   forbidden: "audit-ledger-query-forbidden",
   notFound: "audit-ledger-query-not-found",
+  queryFailed: "audit-ledger-query-failed",
 });
 
 export type AuditLedgerQueryErrorCode =
@@ -120,10 +125,22 @@ export class AuditLedgerQueryService {
       };
     }
 
-    const authorization = await this.dependencies.authorizer.authorizeAuditLedgerRead({
-      requesterId,
-      query: parsedQuery.value,
-    });
+    let authorization: Awaited<ReturnType<AuditLedgerQueryAuthorizer["authorizeAuditLedgerRead"]>>;
+    try {
+      authorization = await this.dependencies.authorizer.authorizeAuditLedgerRead({
+        requesterId,
+        query: parsedQuery.value,
+      });
+    } catch (error) {
+      return this.failure(
+        AuditLedgerQueryErrorCodes.queryFailed,
+        "Audit ledger query failed.",
+        sanitizeAuditOperationalDetails(Object.freeze({
+          phase: "authorization",
+          message: redactAuditOperationalErrorMessage(error),
+        })),
+      );
+    }
 
     if (!authorization.allowed) {
       return this.failure(
@@ -152,16 +169,30 @@ export class AuditLedgerQueryService {
       };
     }
 
-    const totalCount = await this.dependencies.repository.countAuditEvents(scoped.query);
-    const window = await this.dependencies.repository.listAuditEvents({
-      ...scoped.query,
-      pagination: Object.freeze({
+    let totalCount: number;
+    let window: ReadonlyArray<CanonicalAuditEvent>;
+    try {
+      totalCount = await this.dependencies.repository.countAuditEvents(scoped.query);
+      window = await this.dependencies.repository.listAuditEvents({
+        ...scoped.query,
+        pagination: Object.freeze({
+          limit: scoped.limit + 1,
+          offset: scoped.offset,
+        }),
         limit: scoped.limit + 1,
         offset: scoped.offset,
-      }),
-      limit: scoped.limit + 1,
-      offset: scoped.offset,
-    } satisfies AuditLedgerQuery);
+      } satisfies AuditLedgerQuery);
+    } catch (error) {
+      return this.failure(
+        AuditLedgerQueryErrorCodes.queryFailed,
+        "Audit ledger query failed.",
+        sanitizeAuditOperationalDetails(Object.freeze({
+          phase: "list-or-count",
+          message: redactAuditOperationalErrorMessage(error),
+          requesterId,
+        })),
+      );
+    }
 
     const hasMore = window.length > scoped.limit;
     const events = hasMore ? window.slice(0, scoped.limit) : window;
@@ -199,7 +230,20 @@ export class AuditLedgerQueryService {
       return this.failure(AuditLedgerQueryErrorCodes.invalidRequest, "eventId is required.");
     }
 
-    const event = await this.dependencies.repository.getAuditEventById(eventId);
+    let event: CanonicalAuditEvent | undefined;
+    try {
+      event = await this.dependencies.repository.getAuditEventById(eventId);
+    } catch (error) {
+      return this.failure(
+        AuditLedgerQueryErrorCodes.queryFailed,
+        "Audit ledger query failed.",
+        sanitizeAuditOperationalDetails(Object.freeze({
+          phase: "detail-load",
+          message: redactAuditOperationalErrorMessage(error),
+          requesterId,
+        })),
+      );
+    }
     if (!event) {
       return this.failure(
         AuditLedgerQueryErrorCodes.notFound,
@@ -208,12 +252,25 @@ export class AuditLedgerQueryService {
     }
 
     const scopedWorkspaceId = normalizeOptionalString(input.workspaceId) ?? event.scope.workspaceId;
-    const authorization = await this.dependencies.authorizer.authorizeAuditLedgerRead({
-      requesterId,
-      query: Object.freeze({
-        workspaceId: scopedWorkspaceId,
-      }),
-    });
+    let authorization: Awaited<ReturnType<AuditLedgerQueryAuthorizer["authorizeAuditLedgerRead"]>>;
+    try {
+      authorization = await this.dependencies.authorizer.authorizeAuditLedgerRead({
+        requesterId,
+        query: Object.freeze({
+          workspaceId: scopedWorkspaceId,
+        }),
+      });
+    } catch (error) {
+      return this.failure(
+        AuditLedgerQueryErrorCodes.queryFailed,
+        "Audit ledger query failed.",
+        sanitizeAuditOperationalDetails(Object.freeze({
+          phase: "detail-authorization",
+          message: redactAuditOperationalErrorMessage(error),
+          requesterId,
+        })),
+      );
+    }
     if (!authorization.allowed) {
       return this.failure(
         AuditLedgerQueryErrorCodes.forbidden,

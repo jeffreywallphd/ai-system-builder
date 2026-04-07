@@ -6,6 +6,8 @@ Story 18.2.8 architecture baseline for canonical audit write/read workflows, app
 
 Canonical human doc: `docs/architecture/audit-ledger-persistence-query-and-access-control-architecture.md`
 
+Related hardening note: `docs/architecture/audit-observability-failure-handling-and-redaction-safeguards.md`
+
 ## Canonical seams
 
 - Write orchestration:
