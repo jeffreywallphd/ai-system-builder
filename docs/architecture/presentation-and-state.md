@@ -1108,3 +1108,13 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - `src/ui/shared/workspaces/tests/WorkspaceAdministrationPanels.test.tsx`
   - `src/ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
   - `src/ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
+
+## Node trust administration surfaces update (story 15.3.4)
+
+- Added shared node administration list/detail/status/action seams in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`.
+- `NodeInventoryPage` now composes those shared seams for desktop and thin/admin-lite sessions, including:
+  - capability + heartbeat/last-seen visibility,
+  - policy-governed disable action (trust revocation) with shared confirmation action modeling,
+  - pending enrollment handoff action from node detail.
+- `NodeEnrollmentReviewPage` now composes shared pending-list and decision panels so approval/rejection workflows use one action contract across desktop and thin/admin-lite surfaces.
+- Added shared panel regression coverage in `src/ui/shared/nodes/tests/NodeTrustAdministrationPanels.test.tsx`.

@@ -4,23 +4,23 @@ import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeRevocationReasons,
-  NodeRevocationStates,
   NodeRoleCapabilities,
-  NodeTrustStates,
-  type NodeRevocationReason,
   NodeTypes,
+  type NodeRevocationReason,
 } from "@domain/nodes/NodeTrustDomain";
 import {
   NodeInventoryOperationalStates,
   NodeInventoryPresenceStates,
-  type NodeCapabilityProfileDto,
   type NodeInventoryDetailDto,
   type NodeInventorySummaryDto,
 } from "@shared/contracts/nodes/NodeTrustApiContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeInventoryService } from "../services/NodeInventoryService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
-import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
+import type {
+  IdentityAuthPersistedSession,
+  IdentityAuthSessionStore as IdentityAuthSessionStoreContract,
+} from "@shared/identity/IdentityAuthSessionStore";
 import {
   SurfaceStatePanel,
   SurfaceStateBoundary,
@@ -32,11 +32,14 @@ import {
 } from "../shared/components/presentation-state";
 import {
   SurfaceActionButtonStrip,
-  SurfaceActionMenu,
   createSurfaceActionContext,
-  type SurfaceActionContext,
   type SurfaceActionDescriptor,
 } from "../shared/actions";
+import {
+  NodeInventoryDetailPanel,
+  NodeInventoryListPanel,
+  type NodeAdministrationSurface,
+} from "@ui/shared/nodes/NodeTrustAdministrationPanels";
 
 interface NodeInventoryPageProps {
   readonly service?: NodeInventoryService;
@@ -74,6 +77,11 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   const [session] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
 
+  const surface = useMemo<NodeAdministrationSurface>(
+    () => (session?.sessionAccessChannel === "desktop" ? "desktop" : "thin-client"),
+    [session?.sessionAccessChannel],
+  );
+
   const [filters, setFilters] = useState<InventoryFilterState>(defaultFilters);
   const [nodes, setNodes] = useState<ReadonlyArray<NodeInventorySummaryDto>>(Object.freeze([]));
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
@@ -92,28 +100,15 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   const [revocationNote, setRevocationNote] = useState("");
   const [revocationConfirmationNodeId, setRevocationConfirmationNodeId] = useState("");
 
-  const actorPermissionIds = useMemo(
-    () => Object.freeze(["node.inventory.view", "node.inventory.refresh", "node.trust.revoke"]),
-    [],
-  );
-  const buildBaseActionContext = useCallback(
-    (input: {
-      readonly resource?: unknown;
-      readonly selection?: unknown;
-      readonly meta?: unknown;
-      readonly surfaceCapabilities?: ReadonlyArray<string>;
-    }): SurfaceActionContext => createSurfaceActionContext({
-      actorPermissionIds,
-      surface: "desktop",
-      surfaceCapabilities: input.surfaceCapabilities ?? Object.freeze(["inline-actions", "menu-actions", "confirmations"]),
-      resource: input.resource,
-      selection: input.selection,
-      meta: input.meta,
-    }),
-    [actorPermissionIds],
-  );
+  const actorPermissionIds = useMemo(() => {
+    const permissions = ["node.inventory.view", "node.inventory.refresh"];
+    if (isNodeTrustAdminSession(session)) {
+      permissions.push("node.trust.revoke", "node.enrollment.review");
+    }
+    return Object.freeze(permissions);
+  }, [session]);
 
-  const loadDetail = async (nodeId: string): Promise<void> => {
+  const loadDetail = useCallback(async (nodeId: string): Promise<void> => {
     if (!sessionToken) {
       return;
     }
@@ -134,12 +129,9 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       setSelectedNodeDetail(undefined);
       setDetailState(toDisconnectedState("Node detail unavailable", "Unable to reach the node inventory service."));
     }
-  };
+  }, [service, sessionToken]);
 
-  const refresh = async (
-    preferredNodeId?: string,
-    nextFilters: InventoryFilterState = filters,
-  ): Promise<void> => {
+  const refresh = useCallback(async (preferredNodeId?: string, nextFilters: InventoryFilterState = filters): Promise<void> => {
     if (!sessionToken) {
       return;
     }
@@ -148,6 +140,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     if (nodes.length < 1) {
       setInventoryState(createLoadingState("Loading node inventory", "Loading trusted node inventory from the authoritative API."));
     }
+
     try {
       const response = await service.listNodeInventory({
         nodeTypes: toOptionalSingleValueArray(nextFilters.nodeType),
@@ -175,17 +168,14 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       }
 
       setNodes(response.data.nodes);
-      if (response.data.nodes.length < 1) {
-        setInventoryState(createEmptyState("No nodes found", "No nodes matched the current inventory filters."));
-      } else {
-        setInventoryState(undefined);
-      }
+      setInventoryState(response.data.nodes.length < 1
+        ? createEmptyState("No nodes found", "No nodes matched the current inventory filters.")
+        : undefined);
+
       const nextNodeId = preferredNodeId
-        ?? (
-          selectedNodeId && response.data.nodes.some((node) => node.nodeId === selectedNodeId)
-            ? selectedNodeId
-            : response.data.nodes[0]?.nodeId
-        );
+        ?? (selectedNodeId && response.data.nodes.some((node) => node.nodeId === selectedNodeId)
+          ? selectedNodeId
+          : response.data.nodes[0]?.nodeId);
       setSelectedNodeId(nextNodeId);
       if (!nextNodeId) {
         setSelectedNodeDetail(undefined);
@@ -202,7 +192,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     } finally {
       setIsLoadingInventory(false);
     }
-  };
+  }, [filters, loadDetail, nodes.length, selectedNodeId, service, sessionToken]);
 
   const executeNodeRevocation = useCallback(async (node: NodeInventoryDetailDto): Promise<void> => {
     if (!sessionToken) {
@@ -212,6 +202,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       setErrorMessage("Type the exact node id to confirm revocation.");
       return;
     }
+
     setIsRevoking(true);
     setErrorMessage(undefined);
     setStatusMessage(undefined);
@@ -225,23 +216,14 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
         return;
       }
-      setStatusMessage(
-        `Revoked "${response.data.node.displayName}" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`,
-      );
+      setStatusMessage(`Disabled \"${response.data.node.displayName}\" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`);
       await refresh(node.nodeId);
     } catch {
       setErrorMessage("Node trust revocation request failed.");
     } finally {
       setIsRevoking(false);
     }
-  }, [
-    refresh,
-    revocationConfirmationNodeId,
-    revocationNote,
-    revocationReason,
-    service,
-    sessionToken,
-  ]);
+  }, [refresh, revocationConfirmationNodeId, revocationNote, revocationReason, service, sessionToken]);
 
   const pageActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
     () => Object.freeze([
@@ -265,7 +247,6 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         availability: () => (isLoadingInventory
           ? Object.freeze({ disabled: true, disabledReason: "Inventory refresh is already in progress." })
           : Object.freeze({})),
-        telemetry: Object.freeze({ eventName: "ui.nodeInventory.refresh" }),
         onInvoke: async () => {
           await refresh();
         },
@@ -275,11 +256,14 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   );
 
   const pageActionContext = useMemo(
-    () => buildBaseActionContext({
+    () => createSurfaceActionContext({
+      actorPermissionIds,
+      surface,
+      surfaceCapabilities: Object.freeze(["inline-actions", "menu-actions", "confirmations"]),
       selection: Object.freeze({ selectedNodeId }),
       meta: Object.freeze({ isLoadingInventory }),
     }),
-    [buildBaseActionContext, isLoadingInventory, selectedNodeId],
+    [actorPermissionIds, isLoadingInventory, selectedNodeId, surface],
   );
 
   useEffect(() => {
@@ -287,7 +271,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       return;
     }
     void refresh();
-  }, [sessionToken]);
+  }, [refresh, sessionToken]);
 
   useEffect(() => {
     setRevocationReason(NodeRevocationReasons.operatorAction);
@@ -317,15 +301,10 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
           <h1 className="ui-page__title">Trusted node inventory</h1>
           <p className="ui-page__subtitle">
             Browse enrolled nodes by approval, activation, and presence state. Inspect capability profiles and
-            trust metadata before scheduling, revocation, or certificate lifecycle actions.
+            trust metadata before scheduling and policy-driven node disable operations.
           </p>
         </div>
-        <SurfaceActionButtonStrip
-          actions={pageActions}
-          context={pageActionContext}
-          scope="page"
-          className="ui-page__actions"
-        />
+        <SurfaceActionButtonStrip actions={pageActions} context={pageActionContext} scope="page" className="ui-page__actions" />
       </div>
 
       {errorMessage ? <p className="ui-node-inventory-page__alert ui-node-inventory-page__alert--error" role="alert">{errorMessage}</p> : null}
@@ -340,11 +319,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
           <div className="ui-node-inventory-page__filters-grid">
             <label className="ui-field">
               <span className="ui-field__label">Operational state</span>
-              <select
-                className="ui-select"
-                value={filters.operationalState}
-                onChange={(event) => setFilters((current) => ({ ...current, operationalState: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.operationalState} onChange={(event) => setFilters((current) => ({ ...current, operationalState: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeInventoryOperationalStates.active}>active</option>
                 <option value={NodeInventoryOperationalStates.pending}>pending</option>
@@ -355,11 +330,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Presence state</span>
-              <select
-                className="ui-select"
-                value={filters.presenceState}
-                onChange={(event) => setFilters((current) => ({ ...current, presenceState: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.presenceState} onChange={(event) => setFilters((current) => ({ ...current, presenceState: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeInventoryPresenceStates.online}>online</option>
                 <option value={NodeInventoryPresenceStates.degraded}>degraded</option>
@@ -369,11 +340,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Approval status</span>
-              <select
-                className="ui-select"
-                value={filters.approvalStatus}
-                onChange={(event) => setFilters((current) => ({ ...current, approvalStatus: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.approvalStatus} onChange={(event) => setFilters((current) => ({ ...current, approvalStatus: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeApprovalStatuses.pending}>pending</option>
                 <option value={NodeApprovalStatuses.approved}>approved</option>
@@ -383,11 +350,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Enrollment status</span>
-              <select
-                className="ui-select"
-                value={filters.enrollmentStatus}
-                onChange={(event) => setFilters((current) => ({ ...current, enrollmentStatus: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.enrollmentStatus} onChange={(event) => setFilters((current) => ({ ...current, enrollmentStatus: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeEnrollmentRequestStatuses.submitted}>submitted</option>
                 <option value={NodeEnrollmentRequestStatuses.underReview}>under-review</option>
@@ -399,11 +362,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Node type</span>
-              <select
-                className="ui-select"
-                value={filters.nodeType}
-                onChange={(event) => setFilters((current) => ({ ...current, nodeType: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.nodeType} onChange={(event) => setFilters((current) => ({ ...current, nodeType: event.target.value }))}>
                 <option value="">All</option>
                 <option value={NodeTypes.compute}>compute</option>
                 <option value={NodeTypes.hybrid}>hybrid</option>
@@ -412,11 +371,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Capability</span>
-              <select
-                className="ui-select"
-                value={filters.capability}
-                onChange={(event) => setFilters((current) => ({ ...current, capability: event.target.value }))}
-              >
+              <select className="ui-select" value={filters.capability} onChange={(event) => setFilters((current) => ({ ...current, capability: event.target.value }))}>
                 <option value="">Any</option>
                 <option value={NodeRoleCapabilities.api}>api</option>
                 <option value={NodeRoleCapabilities.executor}>executor</option>
@@ -428,53 +383,27 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Deployment tags</span>
-              <input
-                className="ui-input"
-                value={filters.deploymentTagCsv}
-                onChange={(event) => setFilters((current) => ({ ...current, deploymentTagCsv: event.target.value }))}
-                placeholder="prod, us-east"
-              />
+              <input className="ui-input" value={filters.deploymentTagCsv} onChange={(event) => setFilters((current) => ({ ...current, deploymentTagCsv: event.target.value }))} placeholder="prod, us-east" />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Last seen after</span>
-              <input
-                className="ui-input"
-                type="datetime-local"
-                value={filters.lastSeenAfter}
-                onChange={(event) => setFilters((current) => ({ ...current, lastSeenAfter: event.target.value }))}
-              />
+              <input className="ui-input" type="datetime-local" value={filters.lastSeenAfter} onChange={(event) => setFilters((current) => ({ ...current, lastSeenAfter: event.target.value }))} />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Last seen before</span>
-              <input
-                className="ui-input"
-                type="datetime-local"
-                value={filters.lastSeenBefore}
-                onChange={(event) => setFilters((current) => ({ ...current, lastSeenBefore: event.target.value }))}
-              />
+              <input className="ui-input" type="datetime-local" value={filters.lastSeenBefore} onChange={(event) => setFilters((current) => ({ ...current, lastSeenBefore: event.target.value }))} />
             </label>
           </div>
           <div className="ui-page__actions">
-            <button
-              type="button"
-              className="ui-button ui-button--primary ui-button--sm"
-              disabled={isLoadingInventory}
-              onClick={() => {
-                void refresh();
-              }}
-            >
-              {isLoadingInventory ? "Loading..." : "Apply filters"}
+            <button type="button" className="ui-button ui-button--primary ui-button--sm" disabled={isLoadingInventory} onClick={() => { void refresh(); }}>
+              {isLoadingInventory ? "Applying..." : "Apply filters"}
             </button>
-            <button
-              type="button"
-              className="ui-button ui-button--secondary ui-button--sm"
-              disabled={isLoadingInventory}
-              onClick={() => {
-                setFilters(defaultFilters);
-                void refresh(undefined, defaultFilters);
-              }}
-            >
-              Clear
+            <button type="button" className="ui-button ui-button--secondary ui-button--sm" disabled={isLoadingInventory} onClick={() => {
+              const cleared = defaultFilters;
+              setFilters(cleared);
+              void refresh(undefined, cleared);
+            }}>
+              Reset
             </button>
           </div>
         </div>
@@ -484,80 +413,22 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         <section className="ui-card">
           <div className="ui-card__header">
             <h2 className="ui-card__title">Inventory</h2>
-            <p className="ui-card__subtitle">Pending, active, offline, and revoked nodes from the live trust inventory.</p>
+            <p className="ui-card__subtitle">Operational state, capabilities, and recent heartbeat telemetry.</p>
           </div>
           <div className="ui-card__body">
             <SurfaceStateBoundary state={inventoryState}>
-              <div className="ui-table-wrapper">
-                <table className="ui-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Node</th>
-                      <th scope="col">Operational</th>
-                      <th scope="col">Presence</th>
-                      <th scope="col">Approval</th>
-                      <th scope="col">Capabilities</th>
-                      <th scope="col">Last seen</th>
-                      <th scope="col">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {nodes.map((node) => (
-                      <tr
-                        key={node.nodeId}
-                        className={node.nodeId === selectedNodeId ? "ui-node-inventory-page__table-row--selected" : undefined}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            className="ui-button ui-button--ghost ui-button--sm ui-node-inventory-page__select-button"
-                            onClick={() => {
-                              setSelectedNodeId(node.nodeId);
-                              setErrorMessage(undefined);
-                              void loadDetail(node.nodeId);
-                            }}
-                          >
-                            {node.displayName}
-                          </button>
-                          <div className="ui-text-secondary ui-text-small">{node.nodeId}</div>
-                        </td>
-                        <td><span className={`ui-badge ${operationalStateBadgeClass(node.operationalState)}`}>{node.operationalState}</span></td>
-                        <td><span className={`ui-badge ${presenceStateBadgeClass(node.presenceState)}`}>{node.presenceState}</span></td>
-                        <td><span className={`ui-badge ${approvalStatusBadgeClass(node.approvalStatus)}`}>{node.approvalStatus}</span></td>
-                        <td>{formatCapabilities(node.capabilityProfile)}</td>
-                        <td>{formatTimestamp(node.lastSeen?.lastSeenAt) ?? "Never"}</td>
-                        <td>
-                          <SurfaceActionMenu
-                            triggerLabel="Row actions"
-                            actions={Object.freeze([{
-                              id: `node-row-inspect:${node.nodeId}`,
-                              label: "Inspect node",
-                              scope: "row",
-                              tone: "secondary",
-                              availability: () => (isLoadingInventory
-                                ? Object.freeze({ disabled: true, disabledReason: "Inventory list is refreshing." })
-                                : Object.freeze({})),
-                              telemetry: Object.freeze({ eventName: "ui.nodeInventory.inspectRow" }),
-                              onInvoke: async () => {
-                                setSelectedNodeId(node.nodeId);
-                                setErrorMessage(undefined);
-                                await loadDetail(node.nodeId);
-                              },
-                            } satisfies SurfaceActionDescriptor])}
-                            context={buildBaseActionContext({
-                              resource: node,
-                              selection: Object.freeze({ selectedNodeId }),
-                              meta: Object.freeze({ isLoadingInventory }),
-                              surfaceCapabilities: Object.freeze(["menu-actions"]),
-                            })}
-                            scope="row"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <NodeInventoryListPanel
+                surface={surface}
+                nodes={nodes}
+                selectedNodeId={selectedNodeId}
+                isLoadingInventory={isLoadingInventory}
+                actorPermissionIds={actorPermissionIds}
+                onSelectNode={async (nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setErrorMessage(undefined);
+                  await loadDetail(nodeId);
+                }}
+              />
             </SurfaceStateBoundary>
           </div>
         </section>
@@ -565,224 +436,28 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         <section className="ui-card">
           <div className="ui-card__header">
             <h2 className="ui-card__title">Node detail</h2>
-            <p className="ui-card__subtitle">Identity, trust state, enrollment context, capability profile, and revocation metadata.</p>
+            <p className="ui-card__subtitle">Identity, trust state, enrollment context, capability profile, and disable actions.</p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--md">
             <SurfaceStateBoundary state={detailState}>
               {selectedNodeDetail ? (
-              <>
-                <div className="ui-node-inventory-page__detail-grid">
-                  <div>
-                    <strong>Display name</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.displayName}</div>
-                  </div>
-                  <div>
-                    <strong>Node id</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.nodeId}</div>
-                  </div>
-                  <div>
-                    <strong>Node type</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.nodeType}</div>
-                  </div>
-                  <div>
-                    <strong>Operational state</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${operationalStateBadgeClass(selectedNodeDetail.operationalState)}`}>
-                        {selectedNodeDetail.operationalState}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Presence state</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${presenceStateBadgeClass(selectedNodeDetail.presenceState)}`}>
-                        {selectedNodeDetail.presenceState}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Approval status</strong>
-                    <div className="ui-text-secondary">
-                      <span className={`ui-badge ${approvalStatusBadgeClass(selectedNodeDetail.approvalStatus)}`}>
-                        {selectedNodeDetail.approvalStatus}
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <strong>Trust state</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.trustState}</div>
-                  </div>
-                  <div>
-                    <strong>Enrollment status</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.enrollmentStatus ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Last seen</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.lastSeen?.lastSeenAt) ?? "Never"}</div>
-                  </div>
-                  <div>
-                    <strong>Heartbeat</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.lastSeen?.heartbeatStatus ?? "unknown"}</div>
-                  </div>
-                  <div>
-                    <strong>Observed by</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.lastSeen?.observedBy ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Certificate ref</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.certificateRef ?? "not assigned"}</div>
-                  </div>
-                  <div>
-                    <strong>Enrolled</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.enrolledAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Approved</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.approvedAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Revoked</strong>
-                    <div className="ui-text-secondary">{formatTimestamp(selectedNodeDetail.revokedAt) ?? "n/a"}</div>
-                  </div>
-                  <div>
-                    <strong>Pending request id</strong>
-                    <div className="ui-text-secondary">{selectedNodeDetail.pendingEnrollmentRequestId ?? "n/a"}</div>
-                  </div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Capabilities</strong>
-                  <div className="ui-text-secondary">{formatCapabilities(selectedNodeDetail.capabilityProfile)}</div>
-                  <div className="ui-text-secondary ui-text-small">
-                    Remote scheduling: {selectedNodeDetail.capabilityProfile.supportsRemoteScheduling ? "enabled" : "disabled"}.
-                    {selectedNodeDetail.capabilityProfile.maxConcurrentWorkloads
-                      ? ` Max concurrent workloads: ${selectedNodeDetail.capabilityProfile.maxConcurrentWorkloads}.`
-                      : ""}
-                  </div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Deployment tags</strong>
-                  <div className="ui-text-secondary">{selectedNodeDetail.deploymentTags.length > 0 ? selectedNodeDetail.deploymentTags.join(", ") : "none"}</div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Revocation</strong>
-                  <div className="ui-text-secondary">State: {selectedNodeDetail.revocation.state}</div>
-                  <div className="ui-text-secondary">Reason: {selectedNodeDetail.revocation.reason ?? "n/a"}</div>
-                  <div className="ui-text-secondary">Note: {selectedNodeDetail.revocation.note ?? "n/a"}</div>
-                  <div className="ui-text-secondary">Revoked at: {formatTimestamp(selectedNodeDetail.revocation.revokedAt) ?? "n/a"}</div>
-                </div>
-
-                <div className="ui-stack ui-stack--2xs">
-                  <strong>Trust actions</strong>
-                  {selectedNodeDetail.revocation.state === NodeRevocationStates.revoked || selectedNodeDetail.trustState === NodeTrustStates.revoked
-                    ? (
-                      <p className="ui-text-secondary">
-                        This node is already revoked and no longer treated as active.
-                      </p>
-                    )
-                    : (
-                      <>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Revocation reason</span>
-                          <select
-                            className="ui-select"
-                            value={revocationReason}
-                            onChange={(event) => setRevocationReason(event.target.value as NodeRevocationReason)}
-                            disabled={isRevoking}
-                          >
-                            <option value={NodeRevocationReasons.operatorAction}>operator-action</option>
-                            <option value={NodeRevocationReasons.ownerRequest}>owner-request</option>
-                            <option value={NodeRevocationReasons.policyViolation}>policy-violation</option>
-                            <option value={NodeRevocationReasons.certificateCompromise}>certificate-compromise</option>
-                            <option value={NodeRevocationReasons.decommissioned}>decommissioned</option>
-                          </select>
-                        </label>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Administrative note (optional)</span>
-                          <textarea
-                            className="ui-textarea ui-node-inventory-page__revocation-note"
-                            value={revocationNote}
-                            maxLength={2000}
-                            onChange={(event) => setRevocationNote(event.target.value)}
-                            placeholder="Include ticket id, incident, or operator context"
-                            disabled={isRevoking}
-                          />
-                        </label>
-                        <label className="ui-field">
-                          <span className="ui-field__label">Confirmation</span>
-                          <input
-                            className="ui-input"
-                            value={revocationConfirmationNodeId}
-                            onChange={(event) => setRevocationConfirmationNodeId(event.target.value)}
-                            placeholder={`Type ${selectedNodeDetail.nodeId} to confirm`}
-                            disabled={isRevoking}
-                          />
-                        </label>
-                        <div className="ui-page__actions">
-                          <SurfaceActionButtonStrip
-                            scope="bulk"
-                            actions={Object.freeze([{
-                              id: "node-detail-revoke-trust",
-                              label: isRevoking ? "Revoking..." : "Revoke node trust",
-                              scope: "bulk",
-                              tone: "danger",
-                              requiredPermissions: Object.freeze(["node.trust.revoke"]),
-                              requiredSurfaceCapabilities: Object.freeze(["confirmations"]),
-                              telemetry: Object.freeze({
-                                eventName: "ui.nodeInventory.revokeTrust",
-                                auditCategory: "node-trust-administration",
-                              }),
-                              confirmation: Object.freeze({
-                                title: "Revoke trusted node?",
-                                message: `Revoke trust for ${selectedNodeDetail.displayName} (${selectedNodeDetail.nodeId}). This action is administrative and should follow your incident/change process.`,
-                                confirmLabel: "Revoke node trust",
-                                cancelLabel: "Cancel",
-                                tone: "danger",
-                              }),
-                              availability: () => {
-                                if (isRevoking) {
-                                  return Object.freeze({ disabled: true, disabledReason: "A revocation request is already running." });
-                                }
-                                if (revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId) {
-                                  return Object.freeze({
-                                    disabled: true,
-                                    disabledReason: "Type the exact node id in the confirmation field.",
-                                  });
-                                }
-                                return Object.freeze({});
-                              },
-                              onInvoke: async () => {
-                                await executeNodeRevocation(selectedNodeDetail);
-                              },
-                            } satisfies SurfaceActionDescriptor])}
-                            context={buildBaseActionContext({
-                              resource: selectedNodeDetail,
-                              selection: Object.freeze({ selectedNodeId }),
-                              meta: Object.freeze({ isRevoking, revocationConfirmationNodeId }),
-                              surfaceCapabilities: Object.freeze(["inline-actions", "confirmations"]),
-                            })}
-                          />
-                        </div>
-                        <p className="ui-text-secondary ui-text-small">
-                          Revoked nodes remain visible in inventory and are blocked from active trusted participation.
-                        </p>
-                      </>
-                    )}
-                </div>
-
-                {selectedNodeDetail.pendingEnrollment ? (
-                  <div className="ui-stack ui-stack--2xs">
-                    <strong>Pending enrollment</strong>
-                    <div className="ui-text-secondary">Request: {selectedNodeDetail.pendingEnrollment.requestId}</div>
-                    <div className="ui-text-secondary">Status: {selectedNodeDetail.pendingEnrollment.status}</div>
-                    <div className="ui-text-secondary">Requested: {formatTimestamp(selectedNodeDetail.pendingEnrollment.requestedAt) ?? selectedNodeDetail.pendingEnrollment.requestedAt}</div>
-                    <div className="ui-text-secondary">Reviewed: {formatTimestamp(selectedNodeDetail.pendingEnrollment.reviewedAt) ?? "n/a"}</div>
-                    <div className="ui-text-secondary">Decision note: {selectedNodeDetail.pendingEnrollment.decisionNote ?? "n/a"}</div>
-                  </div>
-                ) : null}
-              </>
+                <NodeInventoryDetailPanel
+                  surface={surface}
+                  actorPermissionIds={actorPermissionIds}
+                  node={selectedNodeDetail}
+                  selectedNodeId={selectedNodeId}
+                  isRevoking={isRevoking}
+                  revocationReason={revocationReason}
+                  revocationNote={revocationNote}
+                  revocationConfirmationNodeId={revocationConfirmationNodeId}
+                  onRevocationReasonChange={setRevocationReason}
+                  onRevocationNoteChange={setRevocationNote}
+                  onRevocationConfirmationNodeIdChange={setRevocationConfirmationNodeId}
+                  onRevokeNodeTrust={executeNodeRevocation}
+                  onOpenEnrollmentReview={() => {
+                    navigate(ROUTE_PATHS.nodeEnrollmentReview);
+                  }}
+                />
               ) : null}
             </SurfaceStateBoundary>
           </div>
@@ -790,6 +465,16 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       </div>
     </section>
   );
+}
+
+function isNodeTrustAdminSession(session?: IdentityAuthPersistedSession): boolean {
+  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.workspaceContext?.requestedWorkspaceId;
+  const workspaceRoles = workspaceId
+    ? session?.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId === workspaceId)?.effectiveRoles
+    : undefined;
+  const fallbackRoles = session?.initialCapabilityState?.effectiveRoles ?? Object.freeze([]);
+  const roles = workspaceRoles ?? fallbackRoles;
+  return roles.includes("owner") || roles.includes("admin");
 }
 
 function toOptionalSingleValueArray<TValue extends string>(value: string): ReadonlyArray<TValue> | undefined {
@@ -801,12 +486,7 @@ function toOptionalSingleValueArray<TValue extends string>(value: string): Reado
 }
 
 function parseCsv(value: string): ReadonlyArray<string> | undefined {
-  const values = [...new Set(
-    value
-      .split(",")
-      .map((item) => item.trim())
-      .filter((item) => item.length > 0),
-  )];
+  const values = [...new Set(value.split(",").map((item) => item.trim()).filter((item) => item.length > 0))];
   return values.length > 0 ? Object.freeze(values) : undefined;
 }
 
@@ -822,13 +502,6 @@ function toIsoTimestamp(value: string): string | undefined {
   return new Date(parsed).toISOString();
 }
 
-function formatCapabilities(profile: NodeCapabilityProfileDto): string {
-  if (profile.enabledCapabilities.length === 0) {
-    return "none";
-  }
-  return profile.enabledCapabilities.join(", ");
-}
-
 function formatTimestamp(value?: string): string | undefined {
   if (!value) {
     return undefined;
@@ -839,47 +512,3 @@ function formatTimestamp(value?: string): string | undefined {
   }
   return new Date(parsed).toLocaleString();
 }
-
-function operationalStateBadgeClass(state: NodeInventorySummaryDto["operationalState"]): string {
-  switch (state) {
-    case NodeInventoryOperationalStates.active:
-      return "ui-badge--success";
-    case NodeInventoryOperationalStates.pending:
-    case NodeInventoryOperationalStates.offline:
-      return "ui-badge--warning";
-    case NodeInventoryOperationalStates.rejected:
-    case NodeInventoryOperationalStates.revoked:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-function presenceStateBadgeClass(state: NodeInventorySummaryDto["presenceState"]): string {
-  switch (state) {
-    case NodeInventoryPresenceStates.online:
-      return "ui-badge--success";
-    case NodeInventoryPresenceStates.degraded:
-      return "ui-badge--warning";
-    case NodeInventoryPresenceStates.offline:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-function approvalStatusBadgeClass(status: NodeInventorySummaryDto["approvalStatus"]): string {
-  switch (status) {
-    case NodeApprovalStatuses.approved:
-      return "ui-badge--success";
-    case NodeApprovalStatuses.pending:
-    case NodeApprovalStatuses.suspended:
-      return "ui-badge--warning";
-    case NodeApprovalStatuses.rejected:
-      return "ui-badge--danger";
-    default:
-      return "ui-badge--neutral";
-  }
-}
-
-

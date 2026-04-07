@@ -234,3 +234,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
   - thin admin-lite entry (`/settings/admin-lite`) for lightweight policy/workspace/node workflows.
 - Route access now enforces metadata-driven role/capability/workspace checks in the route seam (`src/ui/routes/AppRouter.tsx`) through shared policy helpers in `src/ui/routes/SurfaceRouteAccessPolicy.ts`.
 - Shortcut discovery surfaces (settings shortcuts, command palette) now consume strict session-derived access context so protected admin routes are not exposed to unauthorized sessions.
+
+## Story 15.3.4 update
+
+- Node administration now uses shared multi-surface presentation seams in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx` for inventory list/detail/status/actions and enrollment review list/decision actions.
+- Desktop sessions render dense table/menu administration layouts, while thin/admin-lite sessions render compact card/list interaction wrappers over the same action semantics.
+- `NodeInventoryPage` and `NodeEnrollmentReviewPage` now compose those shared seams rather than page-local list/detail action implementations.

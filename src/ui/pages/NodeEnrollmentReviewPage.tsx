@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import type {
   NodeEnrollmentDetailDto,
   NodePendingEnrollmentSummaryDto,
@@ -7,7 +7,20 @@ import type {
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeEnrollmentReviewService } from "../services/NodeEnrollmentReviewService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
-import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
+import type {
+  IdentityAuthPersistedSession,
+  IdentityAuthSessionStore as IdentityAuthSessionStoreContract,
+} from "@shared/identity/IdentityAuthSessionStore";
+import {
+  SurfaceActionButtonStrip,
+  createSurfaceActionContext,
+  type SurfaceActionDescriptor,
+} from "@ui/shared/actions";
+import {
+  NodeEnrollmentDecisionPanel,
+  NodeEnrollmentPendingListPanel,
+  type NodeAdministrationSurface,
+} from "@ui/shared/nodes/NodeTrustAdministrationPanels";
 
 interface NodeEnrollmentReviewPageProps {
   readonly service?: NodeEnrollmentReviewService;
@@ -15,10 +28,16 @@ interface NodeEnrollmentReviewPageProps {
 }
 
 export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPageProps = {}): JSX.Element {
+  const navigate = useNavigate();
   const service = useMemo(() => props.service ?? new NodeEnrollmentReviewService(), [props.service]);
   const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
   const [session] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
+
+  const surface = useMemo<NodeAdministrationSurface>(
+    () => (session?.sessionAccessChannel === "desktop" ? "desktop" : "thin-client"),
+    [session?.sessionAccessChannel],
+  );
 
   const [enrollments, setEnrollments] = useState<ReadonlyArray<NodePendingEnrollmentSummaryDto>>(Object.freeze([]));
   const [selectedRequestId, setSelectedRequestId] = useState<string>();
@@ -28,6 +47,14 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
   const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<string>();
+
+  const actorPermissionIds = useMemo(() => {
+    const permissions = ["node.enrollment.view"];
+    if (isNodeTrustAdminSession(session)) {
+      permissions.push("node.enrollment.review");
+    }
+    return Object.freeze(permissions);
+  }, [session]);
 
   const selectedEnrollment = enrollments.find((enrollment) => enrollment.requestId === selectedRequestId);
 
@@ -93,6 +120,44 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
     }
   };
 
+  const pageActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
+    () => Object.freeze([
+      {
+        id: "node-enrollment-back-to-settings",
+        label: "Back to settings",
+        scope: "page",
+        tone: "secondary",
+        onInvoke: () => {
+          navigate(ROUTE_PATHS.settings);
+        },
+      },
+      {
+        id: "node-enrollment-refresh",
+        label: isLoading ? "Refreshing..." : "Refresh",
+        scope: "page",
+        tone: "secondary",
+        availability: () => (isLoading
+          ? Object.freeze({ disabled: true, disabledReason: "Pending request refresh is already running." })
+          : Object.freeze({})),
+        onInvoke: async () => {
+          await refresh();
+        },
+      },
+    ]),
+    [isLoading, navigate],
+  );
+
+  const pageActionContext = useMemo(
+    () => createSurfaceActionContext({
+      actorPermissionIds,
+      surface,
+      surfaceCapabilities: Object.freeze(["inline-actions", "menu-actions", "confirmations"]),
+      selection: Object.freeze({ selectedRequestId }),
+      meta: Object.freeze({ isLoading }),
+    }),
+    [actorPermissionIds, isLoading, selectedRequestId, surface],
+  );
+
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-node-enrollment-review-page">
@@ -120,17 +185,12 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
             Review pending compute and hybrid node enrollment requests, then approve or reject each request.
           </p>
         </div>
-        <div className="ui-page__actions">
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.settings}>Back to settings</Link>
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--sm"
-            disabled={isLoading}
-            onClick={() => { void refresh(); }}
-          >
-            Refresh
-          </button>
-        </div>
+        <SurfaceActionButtonStrip
+          actions={pageActions}
+          context={pageActionContext}
+          scope="page"
+          className="ui-page__actions"
+        />
       </div>
 
       {errorMessage ? <p className="ui-node-enrollment-review-page__alert ui-node-enrollment-review-page__alert--error" role="alert">{errorMessage}</p> : null}
@@ -142,52 +202,18 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
             <h2 className="ui-card__title">Pending requests</h2>
           </div>
           <div className="ui-card__body">
-            {isLoading && enrollments.length === 0 ? <p className="ui-text-secondary">Loading pending enrollment requests...</p> : null}
-            {!isLoading && enrollments.length === 0 ? <p className="ui-text-secondary">No pending enrollment requests.</p> : null}
-            {enrollments.length > 0 ? (
-              <div className="ui-table-wrapper">
-                <table className="ui-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Node</th>
-                      <th scope="col">Type</th>
-                      <th scope="col">Capabilities</th>
-                      <th scope="col">Tags</th>
-                      <th scope="col">Requested</th>
-                      <th scope="col">Trust status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {enrollments.map((enrollment) => (
-                      <tr
-                        key={enrollment.requestId}
-                        className={enrollment.requestId === selectedRequestId ? "ui-node-enrollment-review-page__table-row--selected" : undefined}
-                      >
-                        <td>
-                          <button
-                            type="button"
-                            className="ui-button ui-button--ghost ui-button--sm ui-node-enrollment-review-page__select-button"
-                            onClick={() => {
-                              setSelectedRequestId(enrollment.requestId);
-                              setErrorMessage(undefined);
-                              void loadEnrollmentDetail(enrollment.requestId);
-                            }}
-                          >
-                            {enrollment.displayName}
-                          </button>
-                          <div className="ui-text-secondary ui-text-small">{enrollment.nodeId}</div>
-                        </td>
-                        <td>{enrollment.nodeType}</td>
-                        <td>{formatCapabilitySummary(enrollment)}</td>
-                        <td>{formatDeploymentTags(enrollment.deploymentTags)}</td>
-                        <td>{formatRequestedAt(enrollment.requestedAt)}</td>
-                        <td>{formatTrustStatus(enrollment.status)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : null}
+            <NodeEnrollmentPendingListPanel
+              surface={surface}
+              enrollments={enrollments}
+              selectedRequestId={selectedRequestId}
+              isLoading={isLoading}
+              actorPermissionIds={actorPermissionIds}
+              onSelectEnrollment={async (requestId) => {
+                setSelectedRequestId(requestId);
+                setErrorMessage(undefined);
+                await loadEnrollmentDetail(requestId);
+              }}
+            />
           </div>
         </section>
 
@@ -196,101 +222,52 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
             <h2 className="ui-card__title">Review decision</h2>
           </div>
           <div className="ui-card__body ui-stack ui-stack--sm">
-            {!selectedEnrollment ? <p className="ui-text-secondary">Select a pending request to review details and take action.</p> : null}
-            {selectedEnrollment ? (
-              <>
-                <div className="ui-node-enrollment-review-page__detail-grid">
-                  <div>
-                    <strong>Display name</strong>
-                    <div className="ui-text-secondary">{selectedEnrollment.displayName}</div>
-                  </div>
-                  <div>
-                    <strong>Node type</strong>
-                    <div className="ui-text-secondary">{selectedEnrollment.nodeType}</div>
-                  </div>
-                  <div>
-                    <strong>Trust status</strong>
-                    <div className="ui-text-secondary">{formatTrustStatus(selectedEnrollment.status)}</div>
-                  </div>
-                  <div>
-                    <strong>Request time</strong>
-                    <div className="ui-text-secondary">{formatRequestedAt(selectedEnrollment.requestedAt)}</div>
-                  </div>
-                  <div>
-                    <strong>Capabilities</strong>
-                    <div className="ui-text-secondary">{formatCapabilitySummary(selectedEnrollment)}</div>
-                  </div>
-                  <div>
-                    <strong>Deployment tags</strong>
-                    <div className="ui-text-secondary">{formatDeploymentTags(selectedEnrollment.deploymentTags)}</div>
-                  </div>
-                </div>
-                <label className="ui-field">
-                  <span className="ui-field__label">Decision note</span>
-                  <textarea
-                    className="ui-textarea ui-node-enrollment-review-page__decision-note"
-                    value={decisionNote}
-                    onChange={(event) => setDecisionNote(event.target.value)}
-                    placeholder="Optional note for audit and operators"
-                  />
-                </label>
-                <div className="ui-page__actions">
-                  <button
-                    type="button"
-                    className="ui-button ui-button--primary ui-button--sm"
-                    disabled={isMutating}
-                    onClick={() => {
-                      if (!selectedRequestId) {
-                        return;
-                      }
-                      void runMutation(async () => {
-                        const response = await service.approveNodeEnrollment({
-                          requestId: selectedRequestId,
-                          decisionNote: decisionNote.trim() || undefined,
-                        }, sessionToken);
-                        if (!response.ok || !response.data) {
-                          setErrorMessage(response.error?.message ?? "Unable to approve node enrollment.");
-                          return;
-                        }
-                        setDecisionNote("");
-                        setStatusMessage(`Approved "${response.data.enrollment.displayName}" (${response.data.node.trustState}).`);
-                        await refresh();
-                      });
-                    }}
-                  >
-                    {isMutating ? "Approving..." : "Approve"}
-                  </button>
-                  <button
-                    type="button"
-                    className="ui-button ui-button--danger ui-button--sm"
-                    disabled={isMutating}
-                    onClick={() => {
-                      if (!selectedRequestId) {
-                        return;
-                      }
-                      void runMutation(async () => {
-                        const response = await service.rejectNodeEnrollment({
-                          requestId: selectedRequestId,
-                          decisionNote: decisionNote.trim() || undefined,
-                        }, sessionToken);
-                        if (!response.ok || !response.data) {
-                          setErrorMessage(response.error?.message ?? "Unable to reject node enrollment.");
-                          return;
-                        }
-                        setDecisionNote("");
-                        setStatusMessage(`Rejected "${response.data.enrollment.displayName}" (${response.data.node.trustState}).`);
-                        await refresh();
-                      });
-                    }}
-                  >
-                    {isMutating ? "Rejecting..." : "Reject"}
-                  </button>
-                </div>
-                {selectedEnrollmentDetail?.decisionNote ? (
-                  <p className="ui-text-secondary ui-text-small">Latest decision note: {selectedEnrollmentDetail.decisionNote}</p>
-                ) : null}
-              </>
-            ) : null}
+            <NodeEnrollmentDecisionPanel
+              surface={surface}
+              actorPermissionIds={actorPermissionIds}
+              selectedEnrollment={selectedEnrollment}
+              selectedEnrollmentDetail={selectedEnrollmentDetail}
+              selectedRequestId={selectedRequestId}
+              decisionNote={decisionNote}
+              isMutating={isMutating}
+              onDecisionNoteChange={setDecisionNote}
+              onApprove={async () => {
+                if (!selectedRequestId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.approveNodeEnrollment({
+                    requestId: selectedRequestId,
+                    decisionNote: decisionNote.trim() || undefined,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to approve node enrollment.");
+                    return;
+                  }
+                  setDecisionNote("");
+                  setStatusMessage(`Approved \"${response.data.enrollment.displayName}\" (${response.data.node.trustState}).`);
+                  await refresh();
+                });
+              }}
+              onReject={async () => {
+                if (!selectedRequestId) {
+                  return;
+                }
+                await runMutation(async () => {
+                  const response = await service.rejectNodeEnrollment({
+                    requestId: selectedRequestId,
+                    decisionNote: decisionNote.trim() || undefined,
+                  }, sessionToken);
+                  if (!response.ok || !response.data) {
+                    setErrorMessage(response.error?.message ?? "Unable to reject node enrollment.");
+                    return;
+                  }
+                  setDecisionNote("");
+                  setStatusMessage(`Rejected \"${response.data.enrollment.displayName}\" (${response.data.node.trustState}).`);
+                  await refresh();
+                });
+              }}
+            />
           </div>
         </section>
       </div>
@@ -298,48 +275,12 @@ export default function NodeEnrollmentReviewPage(props: NodeEnrollmentReviewPage
   );
 }
 
-function formatCapabilitySummary(
-  enrollment: Pick<NodePendingEnrollmentSummaryDto, "capabilityProfile"> | Pick<NodeEnrollmentDetailDto, "capabilityProfile">,
-): string {
-  const capabilityList = enrollment.capabilityProfile.enabledCapabilities.join(", ");
-  const scheduling = enrollment.capabilityProfile.supportsRemoteScheduling ? "remote scheduling enabled" : "remote scheduling disabled";
-  if (!capabilityList) {
-    return scheduling;
-  }
-  return `${capabilityList} (${scheduling})`;
+function isNodeTrustAdminSession(session?: IdentityAuthPersistedSession): boolean {
+  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.workspaceContext?.requestedWorkspaceId;
+  const workspaceRoles = workspaceId
+    ? session?.workspaceContext?.workspaces.find((workspace) => workspace.workspaceId === workspaceId)?.effectiveRoles
+    : undefined;
+  const fallbackRoles = session?.initialCapabilityState?.effectiveRoles ?? Object.freeze([]);
+  const roles = workspaceRoles ?? fallbackRoles;
+  return roles.includes("owner") || roles.includes("admin");
 }
-
-function formatDeploymentTags(tags: ReadonlyArray<string>): string {
-  if (tags.length === 0) {
-    return "none";
-  }
-  return tags.join(", ");
-}
-
-function formatRequestedAt(requestedAt: string): string {
-  const parsed = Date.parse(requestedAt);
-  if (!Number.isFinite(parsed)) {
-    return requestedAt;
-  }
-  return new Date(parsed).toLocaleString();
-}
-
-function formatTrustStatus(status: string): string {
-  switch (status) {
-    case "under-review":
-      return "pending-enrollment (under review)";
-    case "submitted":
-      return "pending-enrollment (submitted)";
-    case "approved":
-      return "trusted (approved)";
-    case "rejected":
-      return "quarantined (rejected)";
-    case "withdrawn":
-      return "enrollment withdrawn";
-    case "expired":
-      return "enrollment expired";
-    default:
-      return status;
-  }
-}
-

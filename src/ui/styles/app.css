@@ -1259,6 +1259,19 @@ body {
   min-height: 6rem;
 }
 
+.ui-node-admin-shared__inventory-card,
+.ui-node-admin-shared__enrollment-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.26);
+  padding: var(--space-sm);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
 .ui-storage-admin-page__alert {
   margin: 0;
   font-size: var(--font-size-sm);
