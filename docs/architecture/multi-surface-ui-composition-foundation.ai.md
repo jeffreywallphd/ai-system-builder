@@ -84,3 +84,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Canonical contributor extension rules now live in `docs/architecture/multi-surface-ui-extension-guidance.md`.
 - New admin/operational screens now follow metadata-first route gating, shared state/presentation/action seams, and shared responsive/accessibility conventions by default.
 - Bypassing shared presentation/state seams in converged areas is explicitly prohibited unless justification is documented in PR + architecture updates.
+
+## Story 15.2.2 update
+- Shared operational run list/detail-status panels now live in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx` and are composed by `src/ui/pages/RunPage.tsx` for desktop and thin-client operational surfaces.
+- Run visibility and status monitoring now use authoritative runtime queue/status/result/trace reads plus persisted execution-run detail projection reads on the same shared page composition.
+- Run actions (`refresh`, `inspect`, `cancel`, `dequeue`) now render through shared action descriptor wrappers for permission-aware behavior across both operational surfaces.
