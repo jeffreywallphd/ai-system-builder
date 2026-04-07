@@ -1,9 +1,9 @@
-import {
+﻿import {
   resolveComfyImageManipulationConfig,
   type ComfyImageManipulationConfig,
-} from "../../application/system-studio/ComfyImageManipulationPropertySchema";
-import type { OutputGalleryItem } from "../../application/system-runtime/OutputGalleryDataContract";
-import { createSystemContextContract, type SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
+import { createSystemContextContract, type SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import type {
   HydratedRuntimeDatasetBinding,
 } from "./SystemRuntimeWindowHydrationService";
@@ -247,3 +247,4 @@ export function mapImageManipulationRuntimeStateToExecutionRequest(
     sourceAssetId,
   });
 }
+

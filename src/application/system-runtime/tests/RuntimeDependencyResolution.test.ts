@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import { resolveSystemRuntimeDependencies } from "../RuntimeDependencyResolution";
 
 function createSystem(input: {
@@ -143,3 +143,4 @@ describe("RuntimeDependencyResolution", () => {
     ]);
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import {
   AssetKinds,
@@ -10,7 +10,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { AssetDiscoveryService } from "../use-cases/AssetDiscoveryService";
 
@@ -268,3 +268,4 @@ describe("AssetDiscoveryService", () => {
     expect(outcome.value.pagination.offset).toBe(0);
   });
 });
+

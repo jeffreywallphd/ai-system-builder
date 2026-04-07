@@ -1,6 +1,6 @@
-import { Asset } from "../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo, AssetTechnicalMetadata } from "../../domain/assets/AssetMetadata";
-import type { AssetKind } from "../../domain/assets/interfaces/IAsset";
+﻿import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo, AssetTechnicalMetadata } from "@domain/assets/AssetMetadata";
+import type { AssetKind } from "@domain/assets/interfaces/IAsset";
 import { RegisterAssetUseCase } from "./RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "./CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "./RecordAssetTransformationUseCase";
@@ -220,3 +220,4 @@ export class ProjectArtifactToAssetSystemUseCase {
     });
   }
 }
+

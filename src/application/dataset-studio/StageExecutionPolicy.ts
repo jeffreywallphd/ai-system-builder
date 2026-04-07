@@ -1,7 +1,7 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { DatasetPipelineStageKinds, type DatasetPipelineStageDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
-import type { StageFlowDefinition, StageFlowRuntimeState } from "../../domain/dataset-studio/StageFlowDefinition";
-import { UnifiedIngestionSourceKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { DatasetPipelineStageKinds, type DatasetPipelineStageDefinition } from "@domain/dataset-studio/StagePipelineDomain";
+import type { StageFlowDefinition, StageFlowRuntimeState } from "@domain/dataset-studio/StageFlowDefinition";
+import { UnifiedIngestionSourceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import type { IntentContext } from "./IntentService";
 import { readUnifiedIngestionStageOutput } from "./StageIntegrationContracts";
 import { StageAssetMappingService } from "./StageAssetMappingService";
@@ -170,3 +170,4 @@ export class StageExecutionPolicy {
 export function createStageExecutionPolicy(mappingService?: StageAssetMappingService): StageExecutionPolicy {
   return new StageExecutionPolicy(mappingService);
 }
+

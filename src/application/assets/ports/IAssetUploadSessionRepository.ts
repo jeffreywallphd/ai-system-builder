@@ -1,4 +1,4 @@
-import type { AssetStorageArea } from "../../../domain/assets/AssetDomain";
+﻿import type { AssetStorageArea } from "@domain/assets/AssetDomain";
 
 export const AssetUploadSessionStatuses = Object.freeze({
   pending: "pending",
@@ -43,3 +43,4 @@ export interface IAssetUploadSessionRepository {
   findUploadSessionById(uploadSessionId: string): Promise<AssetUploadSessionRecord | undefined>;
   saveUploadSession(session: AssetUploadSessionRecord): Promise<void>;
 }
+

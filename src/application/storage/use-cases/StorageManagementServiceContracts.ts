@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
@@ -8,7 +8,7 @@ import type {
   StorageLifecycleState,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type {
   StorageBackendCapabilitySnapshot,
   StorageBackendHealthStatus,
@@ -278,3 +278,4 @@ export interface StorageManagementReadUseCaseContracts {
     query: InspectStorageInstanceStatusQuery,
   ): Promise<StorageManagementResult<InspectStorageInstanceStatusResult>>;
 }
+

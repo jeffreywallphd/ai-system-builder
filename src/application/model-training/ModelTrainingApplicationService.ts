@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   GetModelTrainingStudioSummaryQuery,
   ModelTrainingStudioSummary,
   PromoteModelTrainingJobCommand,
   PromoteModelTrainingJobResult,
   SubmitModelTrainingJobCommand,
 } from "./contracts";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 
 export interface ModelTrainingApplicationService {
   listJobs(): Promise<ReadonlyArray<ModelTrainingJob>>;
@@ -17,3 +17,4 @@ export interface ModelTrainingApplicationService {
   getStudioSummary(query?: GetModelTrainingStudioSummaryQuery): Promise<ModelTrainingStudioSummary>;
   promoteJob(command: PromoteModelTrainingJobCommand): Promise<PromoteModelTrainingJobResult>;
 }
+

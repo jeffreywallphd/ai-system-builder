@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+﻿import { describe, expect, it } from "bun:test";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
 import { RuntimeRequestRouter, RuntimeRequestSources } from "../RuntimeRequestRouter";
@@ -191,3 +191,4 @@ describe("RuntimeRequestRouter", () => {
     expect(typeof result.response.data?.bounded.diagnosticsTruncated).toBe("boolean");
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -6,7 +6,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   NodeEnrollmentRequestPersistenceRecordSchema,
   NodeIdentityPersistenceRecordSchema,
@@ -124,3 +124,4 @@ describe("NodeTrustPersistenceSchemaContracts", () => {
     })).toThrow("must also include 'executor'");
   });
 });
+

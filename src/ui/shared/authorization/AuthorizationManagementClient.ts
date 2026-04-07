@@ -1,17 +1,17 @@
-import type {
+﻿import type {
   AuthorizationAccessStateApiResponse,
   AuthorizationManagementApiResponse,
   AuthorizationWorkspaceSharingReportApiResponse,
   GrantAuthorizationSharingAccessApiResponse,
   RevokeAuthorizationSharingAccessApiResponse,
   UpdateAuthorizationVisibilityApiResponse,
-} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationRoleKey,
   ResourceVisibility,
   SharingPolicyMode,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 
 export type AuthorizationSharingTargetDraft =
   | Readonly<{
@@ -331,3 +331,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

@@ -1,8 +1,8 @@
-import { ExecutionPlan, ExecutionUnitKinds, type IExecutionUnitDefinition } from "../../../domain/execution/ExecutionPlan";
-import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
-import { AssetId } from "../../../domain/assets/AssetId";
-import type { AgentPlan, AgentPlanStep } from "../../../domain/agents/AgentPlan";
-import { isMcpToolId, parseMcpToolId } from "../../../domain/mcp/McpToolIdentity";
+﻿import { ExecutionPlan, ExecutionUnitKinds, type IExecutionUnitDefinition } from "@domain/execution/ExecutionPlan";
+import type { AgentExecutionSession } from "@domain/agents/AgentExecutionSession";
+import { AssetId } from "@domain/assets/AssetId";
+import type { AgentPlan, AgentPlanStep } from "@domain/agents/AgentPlan";
+import { isMcpToolId, parseMcpToolId } from "@domain/mcp/McpToolIdentity";
 
 export interface AgentPlanStepOutputReference {
   readonly stepId: string;
@@ -320,3 +320,4 @@ export function mapAgentExecutionToBackbone(input: AgentExecutionBackboneMapping
     unitPayloadByUnitId: Object.freeze(Object.fromEntries(payloadEntries)),
   });
 }
+

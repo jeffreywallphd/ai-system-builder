@@ -1,10 +1,10 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../domain/assets/Asset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
 import {
   AssetAuditInfo,
   AssetLocation,
   AssetTechnicalMetadata,
-} from "../../domain/assets/AssetMetadata";
+} from "@domain/assets/AssetMetadata";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
@@ -154,3 +154,4 @@ export class LoadAssetUseCase {
     };
   }
 }
+

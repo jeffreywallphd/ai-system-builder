@@ -1,4 +1,4 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
 
 export interface ContextPackageCardProps {
   readonly contextPackage: IContextPackageSummary;
@@ -50,3 +50,4 @@ export default function ContextPackageCard({
     </button>
   );
 }
+

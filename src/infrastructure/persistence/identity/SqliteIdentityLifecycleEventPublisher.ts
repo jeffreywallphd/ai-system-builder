@@ -1,8 +1,8 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { IdentityLifecycleEvent } from "../../../../application/contracts/IdentityLifecycleEventContracts";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import type { IdentityLifecycleEvent } from "@application/contracts/IdentityLifecycleEventContracts";
+import type { IIdentityLifecycleEventPublisher } from "@application/identity/ports/IIdentityLifecycleEventPublisher";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   IDENTITY_PERSISTENCE_MIGRATIONS,
@@ -135,3 +135,4 @@ function normalizeIdentifier(value: unknown): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }
+

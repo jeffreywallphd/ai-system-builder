@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { UpdateNodePropertyUseCase } from "../UpdateNodePropertyUseCase";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
 
 describe("UpdateNodePropertyUseCase", () => {
   it("updates property value and returns updated workflow", () => {
@@ -23,3 +23,4 @@ describe("UpdateNodePropertyUseCase", () => {
     expect(() => new UpdateNodePropertyUseCase().execute({ workflow, nodeId: "n1", propertyId: "missing", value: 1 })).toThrow("does not contain property");
   });
 });
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "../../../../domain/security/SecretDomain";
+import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
 import { composeServerSecretService } from "../SecretServiceComposition";
 import { SecretServiceOperationalDiagnosticsProvider } from "../SecretServiceOperationalDiagnostics";
 
@@ -94,3 +94,4 @@ describe("SecretServiceOperationalDiagnosticsProvider", () => {
     }
   });
 });
+

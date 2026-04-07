@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   AuthorizationActorReference,
   AuthorizationPolicyDecisionEvaluationRequest,
   AuthorizationPolicyDecisionEvaluationResult,
   AuthorizationPolicyDecisionDenialReason,
-} from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import {
   AuthorizationPolicyDecisionDenialReasons,
   AuthorizationPolicyEvaluationTargetKinds,
-} from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 
 export const AuthorizationTransportFailureCodes = Object.freeze({
   unauthorized: "unauthorized",
@@ -292,3 +292,4 @@ function normalizeErrorMessage(error: unknown): string {
   }
   return "Authorization evaluation failed unexpectedly.";
 }
+

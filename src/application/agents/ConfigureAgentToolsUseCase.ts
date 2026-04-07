@@ -1,5 +1,5 @@
-import { toAgentReadModel, updateAgent, type AgentReadModel } from "../../domain/agents/Agent";
-import type { AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
+﻿import { toAgentReadModel, updateAgent, type AgentReadModel } from "@domain/agents/Agent";
+import type { AgentToolAccessPolicy } from "@domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -34,3 +34,4 @@ export class ConfigureAgentToolsUseCase {
     return toAgentReadModel(saved);
   }
 }
+

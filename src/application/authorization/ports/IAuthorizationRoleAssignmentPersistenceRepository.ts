@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationRoleAssignmentPersistenceLookupQuery,
   AuthorizationRoleAssignmentPersistenceRecord,
   RevokeAuthorizationRoleAssignmentPersistenceRecordInput,
   UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 
 export interface IAuthorizationRoleAssignmentPersistenceRepository {
   findRoleAssignmentById(roleAssignmentId: string): Promise<AuthorizationRoleAssignmentPersistenceRecord | undefined>;
@@ -18,3 +18,4 @@ export interface IAuthorizationRoleAssignmentPersistenceRepository {
     input: RevokeAuthorizationRoleAssignmentPersistenceRecordInput,
   ): Promise<AuthorizationPersistenceMutationResult<AuthorizationRoleAssignmentPersistenceRecord>>;
 }
+

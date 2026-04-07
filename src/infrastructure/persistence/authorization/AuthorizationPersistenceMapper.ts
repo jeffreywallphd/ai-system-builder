@@ -1,4 +1,4 @@
-import {
+﻿import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   RoleAssignmentScopes,
@@ -11,16 +11,16 @@ import {
   type RoleAssignmentStatus,
   type SharingPolicyMode,
   type SharingSubject,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import {
   AuthorizationResourceFamilies,
   type AuthorizationResourceFamily,
-} from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationResourcePolicyMetadataPersistenceRecord,
   AuthorizationRoleAssignmentPersistenceRecord,
   AuthorizationSharingGrantPersistenceRecord,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 
 export interface AuthorizationRoleAssignmentRow {
   readonly role_assignment_id: string;
@@ -395,3 +395,4 @@ function assertAuthorizationResourceFamily(value: string): AuthorizationResource
   }
   throw new Error(`Persisted authorization resource family '${value}' is invalid.`);
 }
+

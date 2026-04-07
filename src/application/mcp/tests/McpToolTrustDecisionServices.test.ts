@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { McpToolApprovalPolicyService } from "../security/McpToolApprovalPolicyService";
 import { McpToolSandboxPolicyService } from "../security/McpToolSandboxPolicyService";
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 
 function makeTool(overrides: Partial<InstalledMcpToolRecord> = {}): InstalledMcpToolRecord {
   return Object.freeze({
@@ -60,3 +60,4 @@ describe("Mcp trust decision services", () => {
     expect(decision.enforcement.environment).toBe("declared-only");
   });
 });
+

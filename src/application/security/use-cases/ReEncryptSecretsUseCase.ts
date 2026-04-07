@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import { SecretAccessActions, SecretScopes } from "../../../domain/security/SecretDomain";
+﻿import { randomUUID } from "node:crypto";
+import { SecretAccessActions, SecretScopes } from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -679,3 +679,4 @@ function resolveReasonCode(
 function toSafeErrorMessage(_error: unknown, fallback: string): string {
   return fallback;
 }
+

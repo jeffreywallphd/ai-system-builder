@@ -1,9 +1,9 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   deriveStorageReferenceFromImageRecord,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import type { OutputGalleryItem, OutputGalleryListing } from "./OutputGalleryDataContract";
 import { validateOutputGalleryListing } from "./OutputGalleryDataContract";
 import { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
@@ -197,3 +197,4 @@ export class OutputGalleryDatasetIntegrationService {
     return validateOutputGalleryListing(listing);
   }
 }
+

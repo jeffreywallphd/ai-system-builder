@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetRegistry,
   DataAssetRegistrySpecializations,
@@ -325,3 +325,4 @@ describe("DataAssetRegistry", () => {
     })).toThrow("schema intent 'media' validation failed");
   });
 });
+

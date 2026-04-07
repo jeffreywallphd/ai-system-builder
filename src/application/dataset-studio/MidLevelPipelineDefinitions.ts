@@ -1,4 +1,4 @@
-import { getEncoding, type TiktokenEncoding } from "js-tiktoken";
+﻿import { getEncoding, type TiktokenEncoding } from "js-tiktoken";
 import { z } from "zod";
 import {
   createCanonicalImageMetadataRecordsShape,
@@ -9,43 +9,43 @@ import {
   type CanonicalImageMetadataRecordsShape,
   type CanonicalRecordValue,
   type CanonicalTextItemsShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   EnrichmentStrategyKinds,
   createEnrichmentStageConfig,
   parseEnrichmentStageConfigFromStageOptions,
   toEnrichmentStageOptions,
   type EnrichmentStageConfig,
-} from "../../domain/dataset-studio/EnrichmentStageDomain";
+} from "@domain/dataset-studio/EnrichmentStageDomain";
 import {
   FeatureEngineeringStrategyKinds,
   createFeatureEngineeringStageConfig,
   toFeatureEngineeringStageOptions,
-} from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+} from "@domain/dataset-studio/FeatureEngineeringStageDomain";
 import {
   AnnotationModeKinds,
   AnnotationTargetKinds,
   createLabelingStageConfig,
   toLabelingStageOptions,
-} from "../../domain/dataset-studio/LabelingStageDomain";
-import type { PipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
-import { validatePipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
+} from "@domain/dataset-studio/LabelingStageDomain";
+import type { PipelineDefinition } from "@domain/dataset-studio/PipelineDefinitionDomain";
+import { validatePipelineDefinition } from "@domain/dataset-studio/PipelineDefinitionDomain";
 import {
   createPipelineStageInstance,
   PipelineStageConfigModes,
   PipelineStageIds,
   type PipelineStageId,
   type PipelineStageInstance,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   DatasetIngestionStageAssetIds,
   DatasetTransformationStageAssetIds,
-} from "../../domain/dataset-studio/StagePipelineDomain";
+} from "@domain/dataset-studio/StagePipelineDomain";
 import type {
   IImageTransformer,
   ImageTransformationResult,
-} from "../../domain/dataset-studio/interfaces/ImageInspection";
+} from "@domain/dataset-studio/interfaces/ImageInspection";
 import type { ResolvedDataSource } from "./DataConverterContracts";
 import { createDefaultMediaAdapterBundle } from "./adapters/media/MediaAdapterFactory";
 import {
@@ -1932,3 +1932,4 @@ export function chunkDocumentTextItems(
     },
   });
 }
+

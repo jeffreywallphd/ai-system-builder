@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+﻿import { createHash, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import { createServer as createHttpsServer } from "node:https";
@@ -6,196 +6,196 @@ import {
   AuthProviderCategories,
   AuthProviderKinds,
   createAuthProvider,
-} from "../../domain/identity/IdentityDomain";
-import { IdentityIdNamespaces, type IdentityIdNamespace } from "../../../application/contracts/IdentityApplicationContracts";
-import { IdentityPolicyService } from "../../application/identity/services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../../application/identity/services/LocalPasswordIdentityAuthenticator";
-import { IdentitySessionLifecycleService } from "../../application/identity/services/IdentitySessionLifecycleService";
-import { IdentityAuthenticatedSessionService } from "../../application/identity/services/IdentityAuthenticatedSessionService";
-import type { IIdentityClock } from "../../../application/identity/ports/IIdentityClock";
-import type { IIdentityIdGenerator } from "../../../application/identity/ports/IIdentityIdGenerator";
-import type { IIdentityLifecycleEventPublisher } from "../../../application/identity/ports/IIdentityLifecycleEventPublisher";
-import { RegisterLocalAccountUseCase } from "../../application/identity/use-cases/RegisterLocalAccountUseCase";
-import { LoginLocalAccountUseCase } from "../../application/identity/use-cases/LoginLocalAccountUseCase";
-import { ChangeLocalPasswordCredentialUseCase } from "../../application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
-import { LogoutIdentitySessionUseCase } from "../../application/identity/use-cases/LogoutIdentitySessionUseCase";
-import { RevokeIdentitySessionUseCase } from "../../application/identity/use-cases/RevokeIdentitySessionUseCase";
-import { ListLocalIdentityAccountsUseCase } from "../../application/identity/use-cases/ListLocalIdentityAccountsUseCase";
-import { GetLocalIdentityAccountStatusUseCase } from "../../application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
-import { SetLocalIdentityAccountStatusUseCase } from "../../application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
-import { ScryptLocalPasswordCredentialService } from "../../../infrastructure/security/identity/ScryptLocalPasswordCredentialService";
-import { OpaqueIdentitySessionTokenService } from "../../../infrastructure/security/identity/OpaqueIdentitySessionTokenService";
-import { IdentityAuthBackendApi } from "../../infrastructure/api/identity/IdentityAuthBackendApi";
-import { IdentitySessionPolicyConfig } from "../../../infrastructure/config/IdentitySessionPolicyConfig";
-import { IdentitySessionTrustPolicyConfig } from "../../../infrastructure/config/IdentitySessionTrustPolicyConfig";
-import { IdentityProviderAccountPolicyConfig } from "../../../infrastructure/config/IdentityProviderAccountPolicyConfig";
+} from "@domain/identity/IdentityDomain";
+import { IdentityIdNamespaces, type IdentityIdNamespace } from "@application/contracts/IdentityApplicationContracts";
+import { IdentityPolicyService } from "@application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "@application/identity/services/LocalPasswordIdentityAuthenticator";
+import { IdentitySessionLifecycleService } from "@application/identity/services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "@application/identity/services/IdentityAuthenticatedSessionService";
+import type { IIdentityClock } from "@application/identity/ports/IIdentityClock";
+import type { IIdentityIdGenerator } from "@application/identity/ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "@application/identity/ports/IIdentityLifecycleEventPublisher";
+import { RegisterLocalAccountUseCase } from "@application/identity/use-cases/RegisterLocalAccountUseCase";
+import { LoginLocalAccountUseCase } from "@application/identity/use-cases/LoginLocalAccountUseCase";
+import { ChangeLocalPasswordCredentialUseCase } from "@application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+import { LogoutIdentitySessionUseCase } from "@application/identity/use-cases/LogoutIdentitySessionUseCase";
+import { RevokeIdentitySessionUseCase } from "@application/identity/use-cases/RevokeIdentitySessionUseCase";
+import { ListLocalIdentityAccountsUseCase } from "@application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import { GetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+import { SetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+import { ScryptLocalPasswordCredentialService } from "@infrastructure/security/identity/ScryptLocalPasswordCredentialService";
+import { OpaqueIdentitySessionTokenService } from "@infrastructure/security/identity/OpaqueIdentitySessionTokenService";
+import { IdentityAuthBackendApi } from "@infrastructure/api/identity/IdentityAuthBackendApi";
+import { IdentitySessionPolicyConfig } from "@infrastructure/config/IdentitySessionPolicyConfig";
+import { IdentitySessionTrustPolicyConfig } from "@infrastructure/config/IdentitySessionTrustPolicyConfig";
+import { IdentityProviderAccountPolicyConfig } from "@infrastructure/config/IdentityProviderAccountPolicyConfig";
 import {
   HostSecureTransportKinds,
   resolveHostSecureTransportConfig,
-} from "../../../infrastructure/config/HostSecureTransportConfig";
-import { SqliteIdentityPersistenceAdapter } from "../../infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter";
-import { SqliteTrustedDevicePersistenceAdapter } from "../../infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
-import { TrustedDeviceManagementService } from "../../application/identity/services/TrustedDeviceManagementService";
-import { TrustedDevicePairingService } from "../../application/identity/services/TrustedDevicePairingService";
-import { TrustedDeviceSessionTrustService } from "../../application/identity/services/TrustedDeviceSessionTrustService";
-import { ListTrustedDevicesUseCase } from "../../application/identity/use-cases/ListTrustedDevicesUseCase";
-import { GetTrustedDeviceUseCase } from "../../application/identity/use-cases/GetTrustedDeviceUseCase";
-import { RevokeTrustedDeviceUseCase } from "../../application/identity/use-cases/RevokeTrustedDeviceUseCase";
-import { UpdateTrustedDeviceDisplayNameUseCase } from "../../application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
-import { InitiateTrustedDevicePairingUseCase } from "../../application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
-import { ValidateTrustedDevicePairingUseCase } from "../../application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
-import { CompleteTrustedDevicePairingUseCase } from "../../application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
-import { SqliteIdentityLifecycleEventPublisher } from "../../infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher";
-import { WorkspaceInvitationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
-import { WorkspaceAdministrationBackendApi } from "../../infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
-import { AuthorizationManagementBackendApi } from "../../infrastructure/api/authorization/AuthorizationManagementBackendApi";
-import { NodeTrustBackendApi } from "../../infrastructure/api/nodes/NodeTrustBackendApi";
-import { CertificateOperationsBackendApi } from "../../infrastructure/api/security/CertificateOperationsBackendApi";
-import { SecretMetadataBackendApi } from "../../infrastructure/api/security/SecretMetadataBackendApi";
-import { StorageManagementBackendApi } from "../../infrastructure/api/storage/StorageManagementBackendApi";
-import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "../../infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
-import { AssetManagementBackendApi } from "../../infrastructure/api/assets/AssetManagementBackendApi";
-import { StorageSyncDeploymentAvailabilities } from "../../infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
-import { SqliteWorkspacePersistenceAdapter } from "../../infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
-import { WorkspaceAuthorizationPolicyReadAdapter } from "../../infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
-import { SqliteAuthorizationPersistenceAdapter } from "../../infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
-import { SqliteAuthorizationPolicyReadAdapter } from "../../infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
-import { SqliteNodeTrustPersistenceAdapter } from "../../infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
-import { SqliteNodeTrustAuditRecorder } from "../../infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
-import { SqliteCertificateAuthorityPersistenceAdapter } from "../../infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
-import { SqliteStorageInstancePersistenceAdapter } from "../../infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
-import { SqliteStorageManagementAuditRecorder } from "../../infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
-import { SqliteAssetPersistenceAdapter } from "../../infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
-import { SqliteAssetAuditRecorder } from "../../infrastructure/persistence/assets/SqliteAssetAuditRecorder";
-import { SqliteAssetUploadSessionPersistenceAdapter } from "../../infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
+} from "@infrastructure/config/HostSecureTransportConfig";
+import { SqliteIdentityPersistenceAdapter } from "@infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter";
+import { SqliteTrustedDevicePersistenceAdapter } from "@infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
+import { TrustedDeviceManagementService } from "@application/identity/services/TrustedDeviceManagementService";
+import { TrustedDevicePairingService } from "@application/identity/services/TrustedDevicePairingService";
+import { TrustedDeviceSessionTrustService } from "@application/identity/services/TrustedDeviceSessionTrustService";
+import { ListTrustedDevicesUseCase } from "@application/identity/use-cases/ListTrustedDevicesUseCase";
+import { GetTrustedDeviceUseCase } from "@application/identity/use-cases/GetTrustedDeviceUseCase";
+import { RevokeTrustedDeviceUseCase } from "@application/identity/use-cases/RevokeTrustedDeviceUseCase";
+import { UpdateTrustedDeviceDisplayNameUseCase } from "@application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+import { InitiateTrustedDevicePairingUseCase } from "@application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+import { ValidateTrustedDevicePairingUseCase } from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
+import { SqliteIdentityLifecycleEventPublisher } from "@infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher";
+import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
+import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
+import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
+import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
+import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
+import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMetadataBackendApi";
+import { StorageManagementBackendApi } from "@infrastructure/api/storage/StorageManagementBackendApi";
+import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
+import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
+import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
+import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
+import { SqliteAuthorizationPersistenceAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
+import { SqliteAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
+import { SqliteNodeTrustPersistenceAdapter } from "@infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "@infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
+import { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import { SqliteStorageInstancePersistenceAdapter } from "@infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
+import { SqliteStorageManagementAuditRecorder } from "@infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
+import { SqliteAssetPersistenceAdapter } from "@infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
+import { SqliteAssetAuditRecorder } from "@infrastructure/persistence/assets/SqliteAssetAuditRecorder";
+import { SqliteAssetUploadSessionPersistenceAdapter } from "@infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
 import {
   createAuthoritativePersistentPlatformServices,
   type AuthoritativePersistentPlatformServices,
-} from "../../infrastructure/persistence/AuthoritativePersistenceComposition";
-import { StorageManagementService } from "../../application/storage/use-cases/StorageManagementService";
-import { AssetUploadInitiationService } from "../../application/assets/use-cases/AssetUploadInitiationService";
-import { AssetGeneratedOutputRegistrationService } from "../../application/assets/use-cases/AssetGeneratedOutputRegistrationService";
-import { AssetUploadIngestionService } from "../../application/assets/use-cases/AssetUploadIngestionService";
-import { AssetDiscoveryService } from "../../application/assets/use-cases/AssetDiscoveryService";
-import { AssetDetailService } from "../../application/assets/use-cases/AssetDetailService";
-import { AssetDownloadService } from "../../application/assets/use-cases/AssetDownloadService";
-import { AssetPreviewService } from "../../application/assets/use-cases/AssetPreviewService";
-import { AssetLifecycleService } from "../../application/assets/use-cases/AssetLifecycleService";
-import { StorageLogicalAccessResolutionService } from "../../application/storage/use-cases/StorageLogicalAccessResolutionService";
-import { EncryptionPolicyEvaluationService } from "../../application/security/use-cases/EncryptionPolicyEvaluationService";
-import { EncryptionKeyResolutionService } from "../../application/security/use-cases/EncryptionKeyResolutionService";
-import { StorageBackendProvisioningOrchestrator } from "../../infrastructure/storage/StorageBackendProvisioningOrchestrator";
-import { createStorageBackendAdapterRegistry } from "../../infrastructure/storage/StorageBackendAdapterRegistry";
+} from "@infrastructure/persistence/AuthoritativePersistenceComposition";
+import { StorageManagementService } from "@application/storage/use-cases/StorageManagementService";
+import { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
+import { AssetGeneratedOutputRegistrationService } from "@application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "@application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "@application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "@application/assets/use-cases/AssetDownloadService";
+import { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
+import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
+import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
+import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
+import { StorageBackendProvisioningOrchestrator } from "@infrastructure/storage/StorageBackendProvisioningOrchestrator";
+import { createStorageBackendAdapterRegistry } from "@infrastructure/storage/StorageBackendAdapterRegistry";
 import {
   ServerManagedLocalStorageBackendAdapter,
   ServerManagedLocalStorageObjectAdapter,
-} from "../../infrastructure/storage/local";
-import { ServerManagedStorageSynchronizationAdapter } from "../../infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
-import { EncryptedAssetDownloadGrantAdapter } from "../../infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
-import { AesGcmAssetContentCipherPort } from "../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
-import { DeterministicScopeEncryptionKeyPort } from "../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
-import { WorkspaceStorageEncryptionPolicyContextResolver } from "../../infrastructure/security/encryption/WorkspaceStorageEncryptionPolicyContextResolver";
+} from "@infrastructure/storage/local";
+import { ServerManagedStorageSynchronizationAdapter } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
+import { EncryptedAssetDownloadGrantAdapter } from "@infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
+import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { WorkspaceStorageEncryptionPolicyContextResolver } from "@infrastructure/security/encryption/WorkspaceStorageEncryptionPolicyContextResolver";
 import {
   assertCertificateAuthorityStartupSafe,
   ResolveCertificateAuthorityStartupStateUseCase,
-} from "../../application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
+} from "@application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
 import {
   InitializeCertificateAuthorityUseCase,
   type InitializeCertificateAuthorityUseCaseInput,
   type InitializeCertificateAuthorityUseCaseResult,
   type CertificateAuthorityInitializationAuditEvent,
-} from "../../application/security/use-cases/InitializeCertificateAuthorityUseCase";
+} from "@application/security/use-cases/InitializeCertificateAuthorityUseCase";
 import {
   EnvironmentCertificateAuthorityBootstrapConfigurationProvider,
   EnvironmentCertificateAuthoritySecretService,
-} from "../../infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
-import { ServerManagedTransportTrustStateResolver } from "../../infrastructure/security/ServerManagedTransportTrustStateResolver";
-import { TransportSecurityObservabilityReporter } from "../../infrastructure/security/TransportSecurityObservabilityReporter";
-import { EncryptionEnforcementObservabilityReporter } from "../../infrastructure/security/EncryptionEnforcementObservabilityReporter";
-import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../infrastructure/security/secrets/FileSystemProtectedSecretStore";
-import { composeServerSecretService, type ServerComposedSecretService } from "../../infrastructure/security/secrets/SecretServiceComposition";
-import { SecretServiceOperationalDiagnosticsProvider } from "../../infrastructure/security/secrets/SecretServiceOperationalDiagnostics";
-import { ServerPlatformSecretConsumers } from "../../infrastructure/security/secrets/ServerPlatformSecretConsumers";
-import { assertSystemSecretBootstrapSafe } from "../../infrastructure/security/secrets/SystemSecretBootstrapService";
-import type { ICertificateAuthorityIssuerPort } from "../../application/security/ports/ICertificateAuthorityIssuerPort";
-import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
-import { RuntimeTrustMaterialDistributionService } from "../../infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
-import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
-import { ResolveCertificateRevocationStatusUseCase } from "../../application/security/use-cases/ResolveCertificateRevocationStatusUseCase";
-import { ValidateTransportConnectionTrustUseCase } from "../../application/security/use-cases/ValidateTransportConnectionTrustUseCase";
-import { GetCertificateAuthorityStatusIntrospectionUseCase } from "../../application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
-import { ListIssuedCertificateMetadataUseCase } from "../../application/security/use-cases/ListIssuedCertificateMetadataUseCase";
-import { GetIssuedCertificateMetadataUseCase } from "../../application/security/use-cases/GetIssuedCertificateMetadataUseCase";
-import { RevokeIssuedCertificateUseCase } from "../../application/security/use-cases/RevokeIssuedCertificateUseCase";
-import { RenewIssuedCertificateUseCase } from "../../application/security/use-cases/RenewIssuedCertificateUseCase";
-import { TrustMaterialKinds } from "../../domain/security/CertificateAuthorityDomain";
-import { AuthorizationPolicyDecisionEvaluator } from "../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
-import { AuthorizationPolicyMutationService } from "../../application/authorization/use-cases/AuthorizationPolicyMutationService";
-import { GrantAuthorizationSharingAccessUseCase } from "../../application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
-import { RevokeAuthorizationSharingAccessUseCase } from "../../application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
-import { UpdateAuthorizationVisibilityUseCase } from "../../application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
-import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
-import { ListAuthorizationEffectiveAccessUseCase } from "../../application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
+} from "@infrastructure/security/InternalCertificateAuthorityBootstrapEnvironmentAdapter";
+import { ServerManagedTransportTrustStateResolver } from "@infrastructure/security/ServerManagedTransportTrustStateResolver";
+import { TransportSecurityObservabilityReporter } from "@infrastructure/security/TransportSecurityObservabilityReporter";
+import { EncryptionEnforcementObservabilityReporter } from "@infrastructure/security/EncryptionEnforcementObservabilityReporter";
+import { createFileSystemProtectedSecretStoreFromEnvironment } from "@infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import { composeServerSecretService, type ServerComposedSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
+import { SecretServiceOperationalDiagnosticsProvider } from "@infrastructure/security/secrets/SecretServiceOperationalDiagnostics";
+import { ServerPlatformSecretConsumers } from "@infrastructure/security/secrets/ServerPlatformSecretConsumers";
+import { assertSystemSecretBootstrapSafe } from "@infrastructure/security/secrets/SystemSecretBootstrapService";
+import type { ICertificateAuthorityIssuerPort } from "@application/security/ports/ICertificateAuthorityIssuerPort";
+import { ProtectedCertificateAuthorityRootMaterialStorage } from "@infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
+import { RuntimeTrustMaterialDistributionService } from "@infrastructure/security/certificates/RuntimeTrustMaterialDistributionService";
+import { ResolveRuntimeTrustMaterialPackageUseCase } from "@application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
+import { ResolveCertificateRevocationStatusUseCase } from "@application/security/use-cases/ResolveCertificateRevocationStatusUseCase";
+import { ValidateTransportConnectionTrustUseCase } from "@application/security/use-cases/ValidateTransportConnectionTrustUseCase";
+import { GetCertificateAuthorityStatusIntrospectionUseCase } from "@application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
+import { ListIssuedCertificateMetadataUseCase } from "@application/security/use-cases/ListIssuedCertificateMetadataUseCase";
+import { GetIssuedCertificateMetadataUseCase } from "@application/security/use-cases/GetIssuedCertificateMetadataUseCase";
+import { RevokeIssuedCertificateUseCase } from "@application/security/use-cases/RevokeIssuedCertificateUseCase";
+import { RenewIssuedCertificateUseCase } from "@application/security/use-cases/RenewIssuedCertificateUseCase";
+import { TrustMaterialKinds } from "@domain/security/CertificateAuthorityDomain";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
+import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
+import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
+import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
   type WorkspaceInvitationIssuanceIdGenerator,
   Sha256WorkspaceInvitationTokenIssuer,
-} from "../../application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
+} from "@application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
 import {
   ResolveWorkspaceInvitationLifecycleUseCase,
   type WorkspaceInvitationLifecycleClock,
   type WorkspaceInvitationLifecycleIdGenerator,
-} from "../../application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+} from "@application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
 import {
   ResolveAuthenticatedWorkspaceOnboardingUseCase,
   type AuthenticatedWorkspaceOnboardingClock,
-} from "../../application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
-import { WorkspaceAdministrationQueryService } from "../../application/workspaces/use-cases/WorkspaceAdministrationQueryService";
-import { CreateWorkspaceUseCase } from "../../application/workspaces/use-cases/CreateWorkspaceUseCase";
-import { UpdateWorkspaceUseCase } from "../../application/workspaces/use-cases/UpdateWorkspaceUseCase";
-import { TransitionWorkspaceLifecycleUseCase } from "../../application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
-import { AddWorkspaceMemberUseCase } from "../../application/workspaces/use-cases/AddWorkspaceMemberUseCase";
-import { ChangeWorkspaceMembershipStatusUseCase } from "../../application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
-import { RemoveWorkspaceMemberUseCase } from "../../application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
-import { AssignWorkspaceRoleUseCase } from "../../application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
-import { ReassignWorkspaceRoleUseCase } from "../../application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
-import { RevokeWorkspaceRoleUseCase } from "../../application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
-import { ApproveNodeEnrollmentUseCase } from "../../application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
-import { GetNodeInventoryDetailUseCase } from "../../application/nodes/use-cases/GetNodeInventoryDetailUseCase";
-import { GetNodeEnrollmentDetailUseCase } from "../../application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
-import { ListNodeInventoryUseCase } from "../../application/nodes/use-cases/ListNodeInventoryUseCase";
-import { ListTrustedNodeInventoryUseCase } from "../../application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
-import { RecordNodeHeartbeatUseCase } from "../../application/nodes/use-cases/RecordNodeHeartbeatUseCase";
-import { RecordNodeOperationalUpdateUseCase } from "../../application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
-import { RegisterNodeEnrollmentRequestUseCase } from "../../application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
-import { RejectNodeEnrollmentUseCase } from "../../application/nodes/use-cases/RejectNodeEnrollmentUseCase";
-import { ResolveApprovedNodeCertificateEligibilityUseCase } from "../../application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
-import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
-import { ResolveNodeMutualTlsTransportIdentityUseCase } from "../../application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
-import { RevokeNodeTrustUseCase } from "../../application/nodes/use-cases/RevokeNodeTrustUseCase";
-import { ReviewPendingNodeEnrollmentUseCase } from "../../application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
-import { InternalCertificateAuthorityIssuer } from "../../infrastructure/security/ca/InternalCertificateAuthorityIssuer";
+} from "@application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+import { WorkspaceAdministrationQueryService } from "@application/workspaces/use-cases/WorkspaceAdministrationQueryService";
+import { CreateWorkspaceUseCase } from "@application/workspaces/use-cases/CreateWorkspaceUseCase";
+import { UpdateWorkspaceUseCase } from "@application/workspaces/use-cases/UpdateWorkspaceUseCase";
+import { TransitionWorkspaceLifecycleUseCase } from "@application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
+import { AddWorkspaceMemberUseCase } from "@application/workspaces/use-cases/AddWorkspaceMemberUseCase";
+import { ChangeWorkspaceMembershipStatusUseCase } from "@application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
+import { RemoveWorkspaceMemberUseCase } from "@application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
+import { AssignWorkspaceRoleUseCase } from "@application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
+import { ReassignWorkspaceRoleUseCase } from "@application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
+import { RevokeWorkspaceRoleUseCase } from "@application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+import { ApproveNodeEnrollmentUseCase } from "@application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeInventoryDetailUseCase } from "@application/nodes/use-cases/GetNodeInventoryDetailUseCase";
+import { GetNodeEnrollmentDetailUseCase } from "@application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListNodeInventoryUseCase } from "@application/nodes/use-cases/ListNodeInventoryUseCase";
+import { ListTrustedNodeInventoryUseCase } from "@application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { RecordNodeHeartbeatUseCase } from "@application/nodes/use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "@application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
+import { RegisterNodeEnrollmentRequestUseCase } from "@application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
+import { RejectNodeEnrollmentUseCase } from "@application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { ResolveApprovedNodeCertificateEligibilityUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
+import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
+import { ResolveNodeMutualTlsTransportIdentityUseCase } from "@application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
+import { RevokeNodeTrustUseCase } from "@application/nodes/use-cases/RevokeNodeTrustUseCase";
+import { ReviewPendingNodeEnrollmentUseCase } from "@application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
+import { InternalCertificateAuthorityIssuer } from "@infrastructure/security/ca/InternalCertificateAuthorityIssuer";
 import {
   HttpTransportTrustValidationAdapter,
   WebSocketTransportTrustValidationAdapter,
-} from "../../infrastructure/transport/TransportTrustValidationAdapters";
-import type { WorkspaceIdNamespace } from "../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@infrastructure/transport/TransportTrustValidationAdapters";
+import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   evaluateTransportConnectionTrust,
   resolveBaselineTransportSecurityPolicy,
-} from "../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerFactory,
   type IdentityHttpServerLogger,
-} from "../../infrastructure/transport/http-server/identity/IdentityHttpServer";
-import type { IdentitySessionLifecyclePolicies } from "../../application/identity/services/IdentitySessionLifecycleService";
-import type { AuthProvider, CredentialPolicy } from "../../domain/identity/IdentityDomain";
+} from "@infrastructure/transport/http-server/identity/IdentityHttpServer";
+import type { IdentitySessionLifecyclePolicies } from "@application/identity/services/IdentitySessionLifecycleService";
+import type { AuthProvider, CredentialPolicy } from "@domain/identity/IdentityDomain";
 import type {
   EvaluateTransportConnectionPolicyRequest,
   ResolveTransportSecurityPolicyRequest,
-} from "../../application/security/ports/TransportSecurityPorts";
+} from "@application/security/ports/TransportSecurityPorts";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -1524,3 +1524,4 @@ export async function initializeCertificateAuthorityForFirstSetup(
     certificateAuthorityRepository.dispose();
   }
 }
+

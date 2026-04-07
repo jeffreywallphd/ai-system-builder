@@ -1,7 +1,7 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentExecutionSession } from "@domain/agents/AgentExecutionSession";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type { AgentRunnerResult } from "../services/AgentRunnerService";
 import type { AgentExecutionSessionTransitionRecord } from "../../ports/interfaces/IAgentExecutionSessionRepository";
 
@@ -323,3 +323,4 @@ export function toAgentLaunchReadModel(input: {
     composition,
   });
 }
+

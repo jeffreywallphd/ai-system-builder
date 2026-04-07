@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
 import { mapDatasetEventToWorkflowTriggerEntries, WorkflowDatasetEventNames } from "../WorkflowDatasetEventTriggerAdapter";
@@ -15,7 +15,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowStudioIdentity,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -921,3 +921,4 @@ describe("WorkflowStudioApplicationService", () => {
     expect(outputFailure.executionStatus.failure?.stage).toBe("output-delivery");
   });
 });
+

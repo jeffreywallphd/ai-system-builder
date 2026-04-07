@@ -1,4 +1,4 @@
-import type { INode } from "../../../../domain/nodes/interfaces/INode";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
 import type { IWorkflowConnection } from "./IWorkflowConnection";
 import type { IWorkflowGraph } from "./IWorkflowGraph";
 import type { RuntimeEngine } from "../../models/interfaces/IModelCompatibility";
@@ -279,3 +279,4 @@ export interface IWorkflow {
    */
   isExecutable(): boolean;
 }
+

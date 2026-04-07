@@ -1,16 +1,16 @@
-import type {
+﻿import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
   IWorkflowExecutor,
-} from "../../../application/ports/interfaces/IWorkflowExecutor";
+} from "@application/ports/interfaces/IWorkflowExecutor";
 import {
   WorkflowExecutionEvent,
   WorkflowExecutionHandle,
   WorkflowExecutionProgress,
   WorkflowExecutionResult,
-} from "../../../application/ports/WorkflowExecutor";
+} from "@application/ports/WorkflowExecutor";
 import { DefaultNodeExecutionContextResolver } from "./DefaultNodeExecutionContextResolver";
 import { DefaultNodeOutputStore } from "./DefaultNodeOutputStore";
 import { LangChainNodeExecutor } from "./LangChainNodeExecutor";
@@ -163,3 +163,4 @@ export class InterpretedWorkflowExecutor implements IWorkflowExecutor {
     return true;
   }
 }
+

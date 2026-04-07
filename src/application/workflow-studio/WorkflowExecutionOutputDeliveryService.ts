@@ -1,9 +1,9 @@
-import {
+﻿import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftSystemOutputRecordShapes,
   WorkflowDraftSystemOutputWriteModes,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import type {
   WorkflowDraftExecutionOutputPlan,
   WorkflowDraftExecutionPlan,
@@ -252,3 +252,4 @@ export async function deliverWorkflowExecutionOutputs(
     issues: Object.freeze(issues),
   });
 }
+

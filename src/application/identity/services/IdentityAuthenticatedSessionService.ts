@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   SessionRevocationReasons,
@@ -11,7 +11,7 @@ import {
   type SessionDeviceTrustInvalidationReason,
   type Session,
   type SessionRevocationReason,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
@@ -479,3 +479,4 @@ function mergeSessionTrustContext(
       ?? session.client?.trustMarker,
   });
 }
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   ICommonImageNodeInternalImage,
   ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
-} from "../../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import { VaeDecodeNodeAdapter } from "../VaeDecodeNodeAdapter";
 import { VaeEncodeNodeAdapter } from "../VaeEncodeNodeAdapter";
 
@@ -121,3 +121,4 @@ describe("VAE encode/decode node adapters", () => {
     expect(Object.keys(module).some((key) => key.toLowerCase().includes("comfy"))).toBe(false);
   });
 });
+

@@ -1,5 +1,5 @@
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
-import type { ModelModality, ModelTask, RuntimeEngine } from "../../../domain/models/interfaces/IModelCompatibility";
+﻿import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { ModelModality, ModelTask, RuntimeEngine } from "@domain/models/interfaces/IModelCompatibility";
 
 export interface INodeCatalogSearchCriteria {
   /**
@@ -71,3 +71,4 @@ export interface INodeCatalogProvider {
    */
   getCategories(): Promise<ReadonlyArray<string>>;
 }
+

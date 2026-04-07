@@ -1,9 +1,9 @@
-import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
+﻿import { NodeEnrollmentRequestStatuses } from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
@@ -148,3 +148,4 @@ export class GetNodeInventoryDetailUseCase {
     throw new Error("Node inventory detail could not be resolved.");
   }
 }
+

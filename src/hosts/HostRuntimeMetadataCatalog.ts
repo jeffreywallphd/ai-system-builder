@@ -1,9 +1,9 @@
-import {
+﻿import {
   type HostCapabilityFlag,
   type HostRuntimeIdentity,
   type HostRuntimeKind,
-} from "../domain/hosts/HostRuntimeDomain";
-import { createHostRuntimeMetadata, type HostRuntimeMetadata } from "../application/common/HostCompositionContracts";
+} from "@domain/hosts/HostRuntimeDomain";
+import { createHostRuntimeMetadata, type HostRuntimeMetadata } from "@application/common/HostCompositionContracts";
 import { HostRuntimeCatalog } from "./HostRuntimeCatalog";
 
 export const HostRuntimeMetadataArtifactKey = "artifact:host:runtime:metadata";
@@ -39,3 +39,4 @@ export function listHostRuntimeMetadataCatalog(): ReadonlyArray<HostRuntimeMetad
     Object.values(HostRuntimeCatalog).map((host) => advertiseHostRuntimeMetadata({ host })),
   );
 }
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ManagedServiceStartPolicies } from "../../../../application/services/interfaces/ManagedServiceTypes";
+﻿import { describe, expect, it } from "bun:test";
+import { ManagedServiceStartPolicies } from "@application/services/interfaces/ManagedServiceTypes";
 import { PythonRuntimeConfig } from "../../../config/PythonRuntimeConfig";
 import {
   PYTHON_RUNTIME_MANAGED_SERVICE_ID,
@@ -45,3 +45,4 @@ describe("createPythonRuntimeServiceDefinition", () => {
     expect(definition.healthCheckPath).toBe("/health");
   });
 });
+

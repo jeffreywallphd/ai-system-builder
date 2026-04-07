@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IMediaDatasetValidator,
   IMediaRecordValidator,
-} from "../../../../domain/dataset-studio/interfaces/MediaValidation";
-import type { IImageRecordValidator } from "../../../../domain/dataset-studio/contracts/ImageRecord";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
+import type { IImageRecordValidator } from "@domain/dataset-studio/contracts/ImageRecord";
 import { ZodImageRecordValidator } from "./ImageRecordValidator";
 import { ZodMediaDatasetValidator, ZodMediaRecordValidator } from "./MediaDatasetValidator";
 
@@ -22,3 +22,4 @@ export function createDefaultMediaValidationAdapters(): MediaValidationAdapterBu
     mediaDatasetValidator,
   });
 }
+

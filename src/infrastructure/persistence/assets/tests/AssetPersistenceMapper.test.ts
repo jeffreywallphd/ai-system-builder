@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -8,7 +8,7 @@ import {
   createAssetVersion,
   createContentDescriptor,
   createStorageInstanceRef,
-} from "../../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   AssetLineageRelations,
   mapAssetRecordToRowValues,
@@ -187,3 +187,4 @@ describe("AssetPersistenceMapper", () => {
     expect(mapped.versions[0]?.content.encryption?.keyReferenceId).toBe("kek:asset-content:workspace:workspace-alpha:v1");
   });
 });
+

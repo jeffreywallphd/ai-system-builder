@@ -1,4 +1,4 @@
-import {
+﻿import {
   normalizeWorkflowDraft,
   normalizeWorkflowDraftBuiltInStepConfig,
   validateWorkflowDraft,
@@ -11,7 +11,7 @@ import {
   type WorkflowDraftManualApprovalStepConfig,
   type WorkflowDraftOutput,
   type WorkflowDraftStep,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createDefaultWorkflowOutputTypeRegistry,
   WorkflowOutputRegistryFieldTargets,
@@ -681,4 +681,5 @@ export function mapWorkflowDraftToExecutionPlan(
   }
   return translation.plan;
 }
+
 

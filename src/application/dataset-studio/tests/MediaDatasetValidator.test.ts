@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   ZodMediaDatasetValidator,
   ZodMediaRecordValidator,
@@ -237,3 +237,4 @@ describe("MediaDatasetValidator", () => {
     expect(result.issues.some((issue) => issue.code === "media.schema-version.incompatible")).toBeTrue();
   });
 });
+

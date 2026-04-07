@@ -1,6 +1,6 @@
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalRecordsShape, type CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   UnifiedIngestionContractVersion,
   type UnifiedIngestionConfiguration,
@@ -9,8 +9,8 @@ import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionSourceKinds,
   UnifiedIngestionStrategyKinds,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
-import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
+import type { DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,
@@ -381,3 +381,4 @@ export function createUnifiedIngestionDataAsset(
     },
   });
 }
+

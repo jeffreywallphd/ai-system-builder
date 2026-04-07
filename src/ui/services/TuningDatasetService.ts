@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   DatasetExportArtifact,
   DatasetSourceDocument,
   DatasetWorkflowStage,
   ExportFormat,
   SplitType,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type {
   AddExampleCommand,
   BulkUpdateExamplesCommand,
@@ -16,8 +16,8 @@ import type {
   ListExamplesQuery,
   StudioExample,
   UpdateExampleCommand,
-} from "../../application/tuning-datasets/contracts";
-import type { TuningDatasetStudioApplicationService } from "../../application/tuning-datasets/TuningDatasetStudioApplicationService";
+} from "@application/tuning-datasets/contracts";
+import type { TuningDatasetStudioApplicationService } from "@application/tuning-datasets/TuningDatasetStudioApplicationService";
 
 export class TuningDatasetService {
   constructor(private readonly applicationService: TuningDatasetStudioApplicationService) {}
@@ -122,3 +122,4 @@ export class TuningDatasetService {
     return this.applicationService.computeDatasetStatistics(datasetId, versionId);
   }
 }
+

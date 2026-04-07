@@ -1,5 +1,5 @@
-import type { IExecutionRunSummary } from "../../domain/execution/ExecutionRun";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+﻿import type { IExecutionRunSummary } from "@domain/execution/ExecutionRun";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import type { IExecutionArtifact, IExecutionEngineEvent, IExecutionProvenance } from "./ExecutionContracts";
 import type { IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 
@@ -145,3 +145,4 @@ function describeModelTrainingDetail(job: ModelTrainingJob): string {
 
   return job.summary ?? "Training did not complete cleanly.";
 }
+

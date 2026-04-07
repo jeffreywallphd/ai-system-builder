@@ -1,4 +1,4 @@
-import { memo } from "react";
+﻿import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { Link } from "react-router-dom";
 import type { ReactFlowNodeData } from "./NodeAdapter";
@@ -7,7 +7,7 @@ import { ROUTE_PATHS } from "../../../routes/RouteConfig";
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
-} from "../../../../application/nodes/NodeCanvasLayoutMetrics";
+} from "@application/nodes/NodeCanvasLayoutMetrics";
 
 const inputHandleStyle: React.CSSProperties = {
   top: "50%",
@@ -224,3 +224,4 @@ function buildModelSearchQuery(search: NonNullable<ReactFlowNodeData["node"]["mo
 
   return params.toString();
 }
+

@@ -1,10 +1,10 @@
-import type { AssetStorageArea } from "../../../../domain/assets/AssetDomain";
+﻿import type { AssetStorageArea } from "@domain/assets/AssetDomain";
 import type {
   AssetDetailDto,
   AssetDownloadAuthorizationDto,
   AssetPreviewResolutionDto,
   AssetSummaryDto,
-} from "../../../../shared/contracts/assets/AssetTransportContracts";
+} from "@shared/contracts/assets/AssetTransportContracts";
 
 export const AssetManagementApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -297,3 +297,4 @@ export interface DeleteAssetApiRequest {
 export interface DeleteAssetApiResponse {
   readonly asset: AssetDetailDto;
 }
+

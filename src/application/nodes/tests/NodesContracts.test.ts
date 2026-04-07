@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { INodeCatalogProvider } from "../../ports/interfaces/INodeCatalogProvider";
-import type { INodeCompatibilityService } from "../../../domain/services/interfaces/INodeCompatibilityService";
+import type { INodeCompatibilityService } from "@domain/services/interfaces/INodeCompatibilityService";
 import { makeNodeCatalogProvider, makeNodeCompatibilityService } from "./testUtils";
 
 describe("application/nodes contracts", () => {
@@ -12,3 +12,4 @@ describe("application/nodes contracts", () => {
     expect(compat.evaluatePortCompatibility({} as any, {} as any).isCompatible).toBeTrue();
   });
 });
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { UpdateContextPackageUseCase } from "../UpdateContextPackageUseCase";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("UpdateContextPackageUseCase", () => {
   it("preserves package identity, createdAt, and deterministic fragment ordering", async () => {
@@ -53,3 +53,4 @@ describe("UpdateContextPackageUseCase", () => {
     ).rejects.toThrow("Context package 'missing' was not found.");
   });
 });
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   type WorkflowDraftBuiltInStepCategory,
   type WorkflowDraftBuiltInStepType,
   WorkflowDraftBuiltInStepTypes,
@@ -17,15 +17,15 @@ import {
   type WorkflowDraftManualInteractionMode,
   WorkflowDraftManualInteractionModes,
   type WorkflowDraftStep,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
-import { createDefaultBuiltInWorkflowStepRegistry } from "../../../application/workflow-studio/BuiltInWorkflowStepRegistry";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { createDefaultBuiltInWorkflowStepRegistry } from "@application/workflow-studio/BuiltInWorkflowStepRegistry";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   createCompositionTaxonomyDescriptor,
   type CompositionTaxonomyDescriptor,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 export const WorkflowWizardStepSelectionKinds = Object.freeze({
   assetBacked: "asset-backed",
@@ -1226,3 +1226,4 @@ export async function loadAgentAssistantAssetCandidates(
     assets: Object.freeze(response.data.map((asset) => toAssetCandidate(asset))),
   });
 }
+

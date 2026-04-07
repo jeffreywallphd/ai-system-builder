@@ -149,6 +149,11 @@ When adding or changing behavior:
 
 If a change needs data from the outside world, prefer adding or using an **application port** rather than importing infrastructure directly into a use case.
 
+## Source import convention
+
+- `src/` is the canonical architecture root for domain, application, infrastructure, hosts, shared, and ui layers.
+- Cross-layer imports should use configured aliases (`@application/*`, `@domain/*`, `@hosts/*`, `@infrastructure/*`, `@shared/*`, `@ui/*`, and `@src/*`) instead of fragile deep relative traversal.
+
 ## Direction 4 boundary note (Phase 1)
 - Agent business meaning is now in `domain/agents/` (goals, policies, asset-backed memory configuration, execution sessions with validated lifecycle transitions).
 - Application-level mapping to runtime execution lives in `application/agents/contracts/AgentExecutionMapping.ts`, which maps agent steps onto `ExecutionPlan` units and exposes bounded per-unit execution payload contracts.

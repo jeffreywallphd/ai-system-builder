@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import { mapSystemContractToRuntimeExecutionContract } from "../RuntimeExecutionContractMapping";
 
 const contractResolver = new CompositionAssetContractResolver();
@@ -137,3 +137,4 @@ describe("RuntimeExecutionContractMapping", () => {
     })).rejects.toThrow("requires a system taxonomy root");
   });
 });
+

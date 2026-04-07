@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   AssetDraftLifecycleStatuses,
   AssetSessionStatuses,
@@ -14,7 +14,7 @@ import {
   type AssetDraftLifecycleStatus,
   type AssetSession,
   type Studio,
-} from "../../../domain/studio-shell/StudioShellDomain";
+} from "@domain/studio-shell/StudioShellDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface SnapshotRow {
@@ -564,3 +564,4 @@ function freezeDependencyList(value: unknown): AssetDraft["dependencies"] {
 
   return Object.freeze([...deduped.values()]);
 }
+

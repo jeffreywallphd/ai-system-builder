@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
@@ -9,8 +9,8 @@ import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionRe
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidator,
-} from "../../domain/services/interfaces/IWorkflowValidator";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/services/interfaces/IWorkflowValidator";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { WorkflowContextService } from "../context/WorkflowContextService";
 import type { DynamicContextSourceInput } from "../context/models/ContextAssemblyRequest";
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
@@ -307,3 +307,4 @@ export class ExecuteWorkflowUseCase {
     }
   }
 }
+

@@ -1,13 +1,13 @@
-import { randomUUID } from "node:crypto";
-import { AssetServiceErrorCodes } from "../../../application/assets/use-cases/AssetServiceContracts";
-import type { AssetUploadInitiationService } from "../../../application/assets/use-cases/AssetUploadInitiationService";
-import type { AssetUploadIngestionService } from "../../../application/assets/use-cases/AssetUploadIngestionService";
-import type { AssetDetailService } from "../../../application/assets/use-cases/AssetDetailService";
-import type { AssetDownloadService } from "../../../application/assets/use-cases/AssetDownloadService";
-import type { AssetGeneratedOutputRegistrationService } from "../../../application/assets/use-cases/AssetGeneratedOutputRegistrationService";
-import type { AssetPreviewService } from "../../../application/assets/use-cases/AssetPreviewService";
-import type { AssetLifecycleService } from "../../../application/assets/use-cases/AssetLifecycleService";
-import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "../../../shared/contracts/assets/AssetTransportContracts";
+﻿import { randomUUID } from "node:crypto";
+import { AssetServiceErrorCodes } from "@application/assets/use-cases/AssetServiceContracts";
+import type { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
+import type { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
+import type { AssetDetailService } from "@application/assets/use-cases/AssetDetailService";
+import type { AssetDownloadService } from "@application/assets/use-cases/AssetDownloadService";
+import type { AssetGeneratedOutputRegistrationService } from "@application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import type { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewService";
+import type { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
+import { type AssetSummaryDto, toAssetDetailDto, toAssetSummaryDto } from "@shared/contracts/assets/AssetTransportContracts";
 import {
   toAuthorizeAssetDownloadRequest,
   toGetAssetByIdQuery,
@@ -18,7 +18,7 @@ import {
   toRegisterAssetRequest,
   toAuthorizeAssetDownloadResponseDto,
   toResolveAssetPreviewResponseDto,
-} from "../../../shared/dto/assets/AssetTransportDtos";
+} from "@shared/dto/assets/AssetTransportDtos";
 import {
   AssetManagementApiErrorCodes,
   type AssetManagementApiError,
@@ -46,7 +46,7 @@ import {
   type DeleteAssetApiRequest,
   type DeleteAssetApiResponse,
 } from "./sdk/PublicAssetManagementApiContract";
-import type { AssetDiscoveryService } from "../../../application/assets/use-cases/AssetDiscoveryService";
+import type { AssetDiscoveryService } from "@application/assets/use-cases/AssetDiscoveryService";
 import { sanitizeAssetManagementApiError } from "./AssetManagementErrorSanitizer";
 
 export interface AssetManagementBackendApiDependencies {
@@ -532,3 +532,4 @@ function normalizeRequired(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

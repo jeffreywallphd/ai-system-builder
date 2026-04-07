@@ -1,4 +1,4 @@
-import type { StudioInitializationContext } from "../../application/studio-entry/StudioEntryContracts";
+﻿import type { StudioInitializationContext } from "@application/studio-entry/StudioEntryContracts";
 import type { BuildIntent, BuildIntentSelection } from "./BuildIntentModels";
 import type { BuildIntentFlowTarget, BuildIntentRouteDecision } from "./BuildIntentRouting";
 import type { InlineAssetCreationReturnTarget } from "./InlineAssetCreation";
@@ -199,3 +199,4 @@ export class BuildFlowContextService {
     return this.store.get(sessionId);
   }
 }
+

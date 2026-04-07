@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
@@ -236,3 +236,4 @@ export class InstalledModelCatalog implements IInstalledModelCatalog {
     );
   }
 }
+

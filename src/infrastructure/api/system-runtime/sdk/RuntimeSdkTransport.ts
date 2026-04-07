@@ -1,4 +1,4 @@
-import type { ExecutionAccessContext } from "../../../../application/system-runtime/RuntimeAccessControlService";
+﻿import type { ExecutionAccessContext } from "@application/system-runtime/RuntimeAccessControlService";
 import type {
   ExecutionCallbackRegistrationRequest,
 } from "../SystemRuntimeBackendApi";
@@ -198,3 +198,4 @@ export class ExternalInterfaceRuntimeSdkTransport implements RuntimeSdkTransport
     return toSdkResponse(response);
   }
 }
+

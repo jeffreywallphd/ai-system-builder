@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RegistryBackendApi } from "../RegistryBackendApi";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
@@ -9,17 +9,17 @@ import type {
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
-} from "../../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationRoleGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationRoleGrantReadRepository";
-import type { IAuthorizationSharingGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationSharingGrantReadRepository";
-import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationRoleGrantReadRepository } from "@application/authorization/ports/IAuthorizationRoleGrantReadRepository";
+import type { IAuthorizationSharingGrantReadRepository } from "@application/authorization/ports/IAuthorizationSharingGrantReadRepository";
+import type { IAuthorizationResourcePolicyMetadataReadRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   SharingPolicyModes,
   SharingSubjectKinds,
-} from "../../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 
 class InMemoryRegistryAuthorizationRepositories
   implements
@@ -139,3 +139,4 @@ describe("RegistryBackendApi authorization", () => {
     expect(denied.error).toEqual(missing.error);
   });
 });
+

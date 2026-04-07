@@ -1,25 +1,25 @@
-import { describe, expect, it } from "bun:test";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
+﻿import { describe, expect, it } from "bun:test";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { ComfyImageManipulationBaseGraph } from "../../../../application/system-studio/ComfyImageManipulationBaseGraph";
+import { ComfyImageManipulationBaseGraph } from "@application/system-studio/ComfyImageManipulationBaseGraph";
 import {
   ComfyImageManipulationExecutionContractVersion,
-} from "../../../../application/system-studio/ComfyImageManipulationExecutionAdapterContract";
+} from "@application/system-studio/ComfyImageManipulationExecutionAdapterContract";
 import {
   createComfyExecutionReadinessFailure,
   validateComfyImageManipulationExecutionReadiness,
-} from "../../../../application/system-studio/ComfyImageManipulationExecutionValidation";
+} from "@application/system-studio/ComfyImageManipulationExecutionValidation";
 import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
-} from "../../../../application/system-studio/ComfyImageManipulationPropertySchema";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
 import {
   ImageManipulationTemplateValidationCategories,
   validateImageManipulationTemplateCompleteness,
-} from "../../../../application/system-studio/ImageManipulationSystemCompletenessValidationService";
-import { SystemBuildTemplateCatalog } from "../../../../application/system-studio/SystemBuildTemplateCatalog";
-import { ImageManipulationWorkflowTemplate } from "../../../../application/workflow-template-studio/ImageManipulationWorkflowTemplate";
-import { ComfyRuntimeSystemDiagnosticsVersion } from "../../../../application/runtime/ComfyRuntimeSystemDiagnostics";
+} from "@application/system-studio/ImageManipulationSystemCompletenessValidationService";
+import { SystemBuildTemplateCatalog } from "@application/system-studio/SystemBuildTemplateCatalog";
+import { ImageManipulationWorkflowTemplate } from "@application/workflow-template-studio/ImageManipulationWorkflowTemplate";
+import { ComfyRuntimeSystemDiagnosticsVersion } from "@application/runtime/ComfyRuntimeSystemDiagnostics";
 
 function createRuntimeDiagnosticsWithMissingCheckpoint() {
   return Object.freeze({
@@ -281,3 +281,4 @@ describe("Image manipulation failure-path integration", () => {
     expect(missing.error?.message).toContain("dataset-instance:reference-image:output");
   });
 });
+

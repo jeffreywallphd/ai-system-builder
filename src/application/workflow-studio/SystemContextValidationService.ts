@@ -1,5 +1,5 @@
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
-import type { WorkflowInputBindingDescriptor } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
+import type { WorkflowInputBindingDescriptor } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import { previewWorkflowInputBindings, type WorkflowInputBindingPreviewResult } from "./WorkflowInputBindingPreviewService";
 import {
   createDefaultSystemContextDatasetReferenceResolver,
@@ -296,3 +296,4 @@ export class SystemContextValidationService {
     });
   }
 }
+

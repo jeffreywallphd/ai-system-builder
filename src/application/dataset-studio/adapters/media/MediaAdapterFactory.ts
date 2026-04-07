@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   IImageDimensionReader,
   IImageExifReader,
   IImageFormatDetector,
   IImageMetadataExtractor,
-} from "../../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
-import type { IImageTransformer } from "../../../../domain/dataset-studio/interfaces/ImageInspection";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
+import type { IImageTransformer } from "@domain/dataset-studio/interfaces/ImageInspection";
 import { ImageSizeDimensionReaderAdapter } from "./ImageDimensionReaderAdapter";
 import { FileTypeImageFormatDetectorAdapter } from "./ImageFormatDetectorAdapter";
 import {
@@ -39,3 +39,4 @@ export function createDefaultMediaAdapterBundle(): MediaAdapterBundle {
     imageTransformer,
   });
 }
+

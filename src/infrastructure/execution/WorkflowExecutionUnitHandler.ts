@@ -1,25 +1,25 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import type { IExecutionEngineEvent } from "../../application/execution/ExecutionContracts";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionEngineEvent } from "@application/execution/ExecutionContracts";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
   IExecutionUnitRunHandle,
-} from "../../application/execution/UnifiedExecutionEngine";
+} from "@application/execution/UnifiedExecutionEngine";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
   IWorkflowExecutor,
-} from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { WorkflowRuntimeOutputPersistenceService } from "../../application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
-import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
-import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
+} from "@application/ports/interfaces/IWorkflowExecutor";
+import type { WorkflowRuntimeOutputPersistenceService } from "@application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
+import type { ExecutionAssetLineageRecorder } from "@application/assets-system/ExecutionAssetLineageRecorder";
+import type { WorkflowRunHistoryService } from "@application/workflow-run-history/WorkflowRunHistoryService";
 import {
   createExecutionArtifact,
   toExecutionProvenance,
   WorkflowExecutionArtifacts,
-} from "../../application/execution/WorkflowExecutionAdapter";
+} from "@application/execution/WorkflowExecutionAdapter";
 
 
 function toExecutionStatus(status: "completed" | "failed" | "cancelled"): IExecutionUnitExecutionResult["status"] {
@@ -264,3 +264,4 @@ export class WorkflowExecutionUnitHandler implements IExecutionUnitHandler {
     return fromParameters ?? fromMetadata;
   }
 }
+

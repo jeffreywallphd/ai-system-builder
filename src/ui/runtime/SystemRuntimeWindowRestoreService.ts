@@ -1,8 +1,8 @@
-import {
+﻿import {
   createSystemRuntimeWindowLaunchContract,
   type LaunchSystemRuntimeWindowRequest,
   type SystemRuntimeWindowLaunchContract,
-} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+} from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import {
   type RuntimeWindowSessionScope,
   type RuntimeWindowSessionState,
@@ -13,7 +13,7 @@ import {
   SystemRuntimeWindowHydrationService,
   type SystemRuntimeHydratedState,
 } from "./SystemRuntimeWindowHydrationService";
-import type { StudioShellSnapshotReadModel } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellSnapshotReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 
 export type RuntimeWindowRestoreIssueSeverity = "warning" | "error";
 export type RuntimeWindowRestoreIssueSource = "launch" | "hydration" | "session-restore";
@@ -267,3 +267,4 @@ export class SystemRuntimeWindowRestoreService {
     return value as Readonly<Record<string, unknown>>;
   }
 }
+

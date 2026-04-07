@@ -1,4 +1,4 @@
-import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+﻿import { AppRuntimeConfig } from "@infrastructure/config/AppRuntimeConfig";
 import { WorkflowService } from "../services/WorkflowService";
 import { NodeService } from "../services/NodeService";
 import { ModelService } from "../services/ModelService";
@@ -7,12 +7,12 @@ import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";
 import { ManagedServicesStore } from "../state/ManagedServicesStore";
-import type { IPythonRuntimeManager } from "../../application/ports/interfaces/IPythonRuntimeManager";
+import type { IPythonRuntimeManager } from "@application/ports/interfaces/IPythonRuntimeManager";
 import { ToolService } from "../services/ToolService";
 import { ToolStore } from "../state/ToolStore";
 import { McpService } from "../services/McpService";
 import { McpStore } from "../state/McpStore";
-import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
+import { WorkflowProjectionService } from "@application/projection/WorkflowProjectionService";
 import { ContextService } from "../services/ContextService";
 import { TuningDatasetService } from "../services/TuningDatasetService";
 import { ContextStore } from "../state/ContextStore";
@@ -80,3 +80,4 @@ export interface CreateUiDependenciesOptions {
   readonly config?: AppRuntimeConfig;
   readonly settingsStorage?: UiSettingsStorage;
 }
+

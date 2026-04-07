@@ -1,11 +1,11 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretDomainError,
   SecretKinds,
   createSecretRecord,
   createSecretScopeOwner,
   toSecretReference,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -24,12 +24,12 @@ import {
   type CreateSecretResult,
   type SecretServiceResult,
 } from "./SecretManagementServiceContracts";
-import { toCreateSecretRequestDiagnosticDto, toSecretOwnerDiagnosticDto } from "../../../shared/dto/security/SecretServiceDtos";
-import { SecretClassificationContractError, assertSecretClassificationSupport } from "../../../shared/contracts/security/SecretClassificationContracts";
+import { toCreateSecretRequestDiagnosticDto, toSecretOwnerDiagnosticDto } from "@shared/dto/security/SecretServiceDtos";
+import { SecretClassificationContractError, assertSecretClassificationSupport } from "@shared/contracts/security/SecretClassificationContracts";
 import {
   SecretApiSchemaValidationError,
   parseCreateSecretMetadataCommand,
-} from "../../../shared/schemas/security/SecretApiSchemaContracts";
+} from "@shared/schemas/security/SecretApiSchemaContracts";
 
 export interface CreateSecretUseCaseDependencies {
   readonly secretRecordRepository: ISecretRecordPersistenceRepository;
@@ -520,3 +520,4 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
+

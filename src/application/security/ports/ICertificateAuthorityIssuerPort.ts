@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   CertificateRevocationReason,
   CertificateSubjectDescriptor,
   CertificateSubjectReference,
   CertificateUsageKind,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 
 export interface InitializeInternalCertificateAuthorityInput {
   readonly certificateAuthorityId: string;
@@ -67,3 +67,4 @@ export interface ICertificateAuthorityIssuerPort {
   issueCertificateMaterial(input: IssueCertificateMaterialInput): Promise<IssueCertificateMaterialResult>;
   revokeCertificateMaterial(input: RevokeCertificateMaterialInput): Promise<RevokeCertificateMaterialResult>;
 }
+

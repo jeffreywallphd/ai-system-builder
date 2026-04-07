@@ -1,7 +1,7 @@
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
-import type { INodeExecutionProfile, INodePosition, INodeSize } from "../../../domain/nodes/interfaces/INode";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { INodeExecutionProfile, INodePosition, INodeSize } from "@domain/nodes/interfaces/INode";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { INodeCatalogProvider } from "../ports/interfaces/INodeCatalogProvider";
 
 export interface ICreateNodeRequest {
@@ -156,3 +156,4 @@ function defaultIdFactory(): string {
 
   return `node_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
+

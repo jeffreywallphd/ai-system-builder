@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IComfyAdapterError,
   IComfyAdapterExecutionContext,
   IComfyAdapterLifecycleEvent,
-} from "../../../application/execution/comfyui/ComfyAdapterContract";
+} from "@application/execution/comfyui/ComfyAdapterContract";
 
 export interface IComfyAdapterLogEvent {
   readonly scope: "comfyui-adapter";
@@ -110,3 +110,4 @@ export class ComfyAdapterObservability {
     }));
   }
 }
+

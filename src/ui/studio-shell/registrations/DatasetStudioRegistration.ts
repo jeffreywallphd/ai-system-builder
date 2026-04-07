@@ -1,4 +1,4 @@
-import { createDatasetStudioTaxonomy, DatasetStudioIdentity } from "../../../domain/dataset-studio/DatasetStudioDomain";
+﻿import { createDatasetStudioTaxonomy, DatasetStudioIdentity } from "@domain/dataset-studio/DatasetStudioDomain";
 import { createElement } from "react";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
@@ -97,3 +97,4 @@ export const datasetStudioRegistration: AtomicStudioRegistration = Object.freeze
     },
   ]),
 });
+

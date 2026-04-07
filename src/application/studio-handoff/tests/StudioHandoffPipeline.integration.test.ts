@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -9,7 +9,7 @@ import {
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   type CompositionTaxonomyDescriptor,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   StudioCapabilityQueryService,
   StudioCapabilityRegistry,
@@ -52,10 +52,10 @@ import { StudioHandoffRetryService } from "../StudioHandoffRetryService";
 import {
   createStudioHandoffContract,
   StudioHandoffIntentKinds,
-} from "../../../domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext } from "../../../domain/studio-handoff/StudioHandoffContext";
-import { SqliteStudioHandoffRepository } from "../../../infrastructure/filesystem/studio-handoff/SqliteStudioHandoffRepository";
-import { SqliteStudioHandoffAuditRepository } from "../../../infrastructure/filesystem/studio-handoff/SqliteStudioHandoffAuditRepository";
+} from "@domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
+import { SqliteStudioHandoffRepository } from "@infrastructure/filesystem/studio-handoff/SqliteStudioHandoffRepository";
+import { SqliteStudioHandoffAuditRepository } from "@infrastructure/filesystem/studio-handoff/SqliteStudioHandoffAuditRepository";
 import { SystemStudioHandoffIntegrationService } from "../SystemStudioHandoffIntegrationService";
 
 const resolver = new CompositionAssetContractResolver();
@@ -289,7 +289,7 @@ function trackAndPersistPrepared(input: {
 }
 
 describe("Studio handoff end-to-end pipeline integration", () => {
-  it("orchestrates route→compatibility→adapter→persistence→lineage→dependency→audit for atomic→composite", async () => {
+  it("orchestrates routeâ†’compatibilityâ†’adapterâ†’persistenceâ†’lineageâ†’dependencyâ†’audit for atomicâ†’composite", async () => {
     const fixture = createFixture();
     const datasetTaxonomy = createCompositionTaxonomyDescriptor({
       structuralKind: TaxonomyStructuralKinds.atomic,
@@ -592,3 +592,4 @@ describe("Studio handoff end-to-end pipeline integration", () => {
     expect(fixture.lineageTracker.listRecords().some((record) => record.handoffRevisionId === "rev-v2")).toBeTrue();
   });
 });
+

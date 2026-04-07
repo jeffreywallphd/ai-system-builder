@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { attachInstalledModelOptions, buildInstalledModelOptions } from "../buildInstalledModelOptions";
-import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
 
 const baseModel: any = {
   isRunnable: true,
@@ -124,3 +124,4 @@ describe("buildInstalledModelOptions", () => {
     expect(embeddingField.options?.map((option) => option.value)).toEqual(["embed-1"]);
   });
 });
+

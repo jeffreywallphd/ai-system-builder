@@ -1,5 +1,5 @@
-import { StudioEntryModes, type StudioEntryContext, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import { StudioEntryModes, type StudioEntryContext, type StudioEntryRequest, type StudioEntryResolution } from "@application/studio-entry/StudioEntryContracts";
+import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 import { StudioEntryResolver, StudioEntryService } from "./StudioRouteMapping";
 import type { BuildIntent, BuildIntentSelection } from "./BuildIntentModels";
 
@@ -145,3 +145,4 @@ export class BuildIntentLaunchResolver {
     return this.routingService.decideRoute(context);
   }
 }
+

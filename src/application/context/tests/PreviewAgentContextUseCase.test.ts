@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { PreviewAgentContextUseCase } from "../PreviewAgentContextUseCase";
 import { WorkflowContextService } from "../WorkflowContextService";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { ListToolCapabilitiesUseCase } from "../../tools/ListToolCapabilitiesUseCase";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import { buildToolCapabilityId, type ToolCapabilityDescriptor } from "../../tools/models/ToolCapabilityDescriptor";
@@ -92,3 +92,4 @@ describe("PreviewAgentContextUseCase", () => {
     expect(result.deliveryTargets.map((target) => target.channel)).toContain("mcp-capabilities");
   });
 });
+

@@ -1,4 +1,4 @@
-import type { RuntimeExecutionTraceReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionTraceReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 export function ExecutionTracePanel({ trace }: { readonly trace: RuntimeExecutionTraceReadModel | undefined }): JSX.Element {
   return (
@@ -9,14 +9,14 @@ export function ExecutionTracePanel({ trace }: { readonly trace: RuntimeExecutio
       ) : (
         <>
           <div className="ui-text-small ui-text-secondary">
-            Events: {trace.trace.events.length} · Logs: {trace.trace.logs.length}
+            Events: {trace.trace.events.length} Â· Logs: {trace.trace.logs.length}
           </div>
           <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
             {trace.trace.events.slice(-8).map((event) => (
               <li key={event.eventId} className="ui-text-small">
                 <strong>{event.kind}</strong>
                 {event.nodeId ? ` (${event.nodeId})` : ""}
-                {event.summary ? ` — ${event.summary}` : ""}
+                {event.summary ? ` â€” ${event.summary}` : ""}
               </li>
             ))}
           </ul>
@@ -34,3 +34,4 @@ export function ExecutionTracePanel({ trace }: { readonly trace: RuntimeExecutio
     </div>
   );
 }
+

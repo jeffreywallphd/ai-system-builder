@@ -1,6 +1,6 @@
-import type { ManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
-import { validateManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
-import type { IManagedServiceDefinitionRegistry } from "../../application/services/interfaces/IManagedServiceDefinitionRegistry";
+﻿import type { ManagedServiceDefinition } from "@application/services/ManagedServiceDefinition";
+import { validateManagedServiceDefinition } from "@application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRegistry } from "@application/services/interfaces/IManagedServiceDefinitionRegistry";
 
 export class InMemoryManagedServiceDefinitionRegistry implements IManagedServiceDefinitionRegistry {
   private readonly definitions = new Map<string, ManagedServiceDefinition>();
@@ -23,3 +23,4 @@ export class InMemoryManagedServiceDefinitionRegistry implements IManagedService
     return this.definitions.get(serviceId);
   }
 }
+

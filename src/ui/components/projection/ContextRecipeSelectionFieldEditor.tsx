@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
-import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
+import type { ProjectedField } from "@application/projection/models/ProjectedField";
 
 interface ContextRecipeSelection {
   readonly recipeId: string;
@@ -55,7 +55,7 @@ function moveSelection(
 
 function resolveRecipeOptionLabel(contextRecipe: IContextRecipeSummary): string {
   return contextRecipe.version
-    ? `${contextRecipe.name} (${contextRecipe.id} · ${contextRecipe.version})`
+    ? `${contextRecipe.name} (${contextRecipe.id} Â· ${contextRecipe.version})`
     : `${contextRecipe.name} (${contextRecipe.id})`;
 }
 
@@ -292,3 +292,4 @@ export default function ContextRecipeSelectionFieldEditor({
     </div>
   );
 }
+

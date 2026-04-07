@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftOutputDestinationTypes,
@@ -8,7 +8,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   mapWorkflowInputToExecutionBinding,
   WorkflowExecutionValidationStages,
@@ -887,4 +887,5 @@ describe("WorkflowDefinitionExecutionPlanTranslator", () => {
     }));
   });
 });
+
 

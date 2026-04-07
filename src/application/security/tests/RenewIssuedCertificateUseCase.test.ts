@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
-import { CertificateSubjectProfileKinds } from "../../../domain/security/CertificateIssuancePolicyDomain";
+} from "@domain/security/CertificateAuthorityDomain";
+import { CertificateSubjectProfileKinds } from "@domain/security/CertificateIssuancePolicyDomain";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -21,7 +21,7 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
@@ -583,3 +583,4 @@ function createServiceIssuedRecord(input: {
     revision: 1,
   });
 }
+

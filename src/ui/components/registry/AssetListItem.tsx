@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+﻿import { Link } from "react-router-dom";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import { StudioEntryService } from "../../routes/StudioRouteMapping";
 import { UxStudioEntryLabelResolver } from "../../taxonomy/UxTaxonomySuppression";
@@ -42,7 +42,7 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
           <span className="ui-badge">Behavior: {asset.taxonomy?.behaviorKind ?? "n/a"}</span>
         </div>
         <div className="ui-text-small ui-text-secondary">
-          Latest version: {asset.versionId ?? "unavailable"} · Dependencies: {asset.dependencies.length}
+          Latest version: {asset.versionId ?? "unavailable"} Â· Dependencies: {asset.dependencies.length}
         </div>
         <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
           <Link to={toAssetDetailPath(asset.assetId, registryContextQuery)} className="ui-button ui-button--ghost ui-button--small">
@@ -61,3 +61,4 @@ export function AssetListItem({ asset, registryContextQuery }: AssetListItemProp
     </article>
   );
 }
+

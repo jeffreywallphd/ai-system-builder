@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretKinds,
   createSecretScopeOwner,
   type SecretScope,
   type SecretKind,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -202,3 +202,4 @@ function toErrorMessage(error: unknown): string {
   }
   return "Secret list request is invalid.";
 }
+

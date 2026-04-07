@@ -1,6 +1,6 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import type { RuntimeEngine } from "../../../domain/models/interfaces/IModelCompatibility";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { RuntimeEngine } from "@domain/models/interfaces/IModelCompatibility";
 
 export type WorkflowExecutionStatus =
   | "queued"
@@ -350,3 +350,4 @@ export interface IWorkflowExecutor {
    */
   canExecute(input: IWorkflowExecutionInput): boolean;
 }
+

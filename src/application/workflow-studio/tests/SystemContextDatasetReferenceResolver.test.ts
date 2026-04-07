@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 import {
   createDefaultSystemContextDatasetReferenceResolver,
   SystemContextDatasetResolutionIssueCodes,
@@ -72,3 +72,4 @@ describe("SystemContextDatasetReferenceResolver", () => {
     ]));
   });
 });
+

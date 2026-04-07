@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   IImageFormatDetector,
   ImageFormatHint,
-} from "../../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 
 interface FileTypeResult {
   readonly ext?: string;
@@ -58,3 +58,4 @@ export class FileTypeImageFormatDetectorAdapter implements IImageFormatDetector 
     });
   }
 }
+

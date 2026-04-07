@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthenticatedTrustStates,
   TransportChannelTypes,
   TransportConnectionRejectionReasons,
   TransportSecurityScenarios,
   resolveBaselineTransportSecurityPolicy,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import {
   NodePeerCapabilities,
   NodePeerOperationClasses,
@@ -230,3 +230,4 @@ function rejectedTransportOutcome(
     }),
   });
 }
+

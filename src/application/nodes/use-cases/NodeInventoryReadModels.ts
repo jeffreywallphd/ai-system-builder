@@ -1,4 +1,4 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeHeartbeatStatuses,
   NodeRevocationStates,
@@ -9,11 +9,11 @@ import {
   type NodeRevocationReason,
   type NodeRevocationState,
   type NodeTrustState,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export const NodeInventoryOperationalStates = Object.freeze({
   active: "active",
@@ -185,3 +185,4 @@ export function toNodeInventoryDetailReadModel(
     pendingEnrollment: pending,
   });
 }
+

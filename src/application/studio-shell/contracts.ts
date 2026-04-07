@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AssetDraft,
   AssetDraftDependencyReference,
   AssetDraftLifecycleStatus,
@@ -6,8 +6,8 @@ import type {
   AssetMetadataPatch,
   AssetSession,
   Studio,
-} from "../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+} from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 
 export interface InitializeStudioCommand {
   readonly studioId: string;
@@ -99,3 +99,4 @@ export interface AssetVersionHistoryResult {
   readonly draft: AssetDraft;
   readonly versions: ReadonlyArray<AssetVersion>;
 }
+

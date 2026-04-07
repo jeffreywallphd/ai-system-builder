@@ -1,4 +1,4 @@
-import {
+﻿import {
   Session,
   AuthProviderCategories,
   AuthProviderKinds,
@@ -8,7 +8,7 @@ import {
   type AuthProvider,
   type CredentialPolicy,
   type UserIdentity,
-} from "../../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   DeviceFingerprintAlgorithms,
   DevicePairingMethods,
@@ -19,11 +19,11 @@ import {
   createTrustedDevice,
   revokeTrustedDevice,
   type TrustedDevice,
-} from "../../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import type {
   PairingSession,
   PairingToken,
-} from "../../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorCodes,
@@ -46,51 +46,51 @@ import {
   type TrustedDevicePairingTokenRecord,
   type TrustedDeviceRevocationRequest,
   type IdentityUserIdentityListQuery,
-} from "../../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityClock } from "../../../../../application/identity/ports/IIdentityClock";
-import type { IIdentityIdGenerator } from "../../../../../application/identity/ports/IIdentityIdGenerator";
-import type { IIdentityLookupRepository } from "../../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityPersistenceRepository } from "../../../../../application/identity/ports/IIdentityPersistenceRepository";
-import type { IIdentitySessionRepository } from "../../../../../application/identity/ports/IIdentitySessionRepository";
-import type { IIdentitySessionTokenMaterialRepository } from "../../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
-import type { IIdentitySessionTokenService } from "../../../../../application/identity/ports/IIdentitySessionTokenService";
-import type { ITrustedDevicePairingRepository } from "../../../../../application/identity/ports/ITrustedDevicePairingRepository";
-import type { ITrustedDeviceRepository } from "../../../../../application/identity/ports/ITrustedDeviceRepository";
-import { TrustedDeviceManagementService } from "../../../../../application/identity/services/TrustedDeviceManagementService";
-import { TrustedDevicePairingService } from "../../../../../application/identity/services/TrustedDevicePairingService";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
+import type { IIdentityClock } from "@application/identity/ports/IIdentityClock";
+import type { IIdentityIdGenerator } from "@application/identity/ports/IIdentityIdGenerator";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityPersistenceRepository } from "@application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
+import type { IIdentitySessionTokenMaterialRepository } from "@application/identity/ports/IIdentitySessionTokenMaterialRepository";
+import type { IIdentitySessionTokenService } from "@application/identity/ports/IIdentitySessionTokenService";
+import type { ITrustedDevicePairingRepository } from "@application/identity/ports/ITrustedDevicePairingRepository";
+import type { ITrustedDeviceRepository } from "@application/identity/ports/ITrustedDeviceRepository";
+import { TrustedDeviceManagementService } from "@application/identity/services/TrustedDeviceManagementService";
+import { TrustedDevicePairingService } from "@application/identity/services/TrustedDevicePairingService";
 import type {
   ILocalPasswordCredentialService,
   LocalPasswordCredentialMaterial,
-} from "../../../../../application/identity/ports/ILocalPasswordCredentialService";
-import { IdentityPolicyService } from "../../../../../application/identity/services/IdentityPolicyService";
-import { LocalPasswordIdentityAuthenticator } from "../../../../../application/identity/services/LocalPasswordIdentityAuthenticator";
-import { IdentitySessionLifecycleService } from "../../../../../application/identity/services/IdentitySessionLifecycleService";
-import { IdentityAuthenticatedSessionService } from "../../../../../application/identity/services/IdentityAuthenticatedSessionService";
-import { TrustedDeviceSessionTrustService } from "../../../../../application/identity/services/TrustedDeviceSessionTrustService";
+} from "@application/identity/ports/ILocalPasswordCredentialService";
+import { IdentityPolicyService } from "@application/identity/services/IdentityPolicyService";
+import { LocalPasswordIdentityAuthenticator } from "@application/identity/services/LocalPasswordIdentityAuthenticator";
+import { IdentitySessionLifecycleService } from "@application/identity/services/IdentitySessionLifecycleService";
+import { IdentityAuthenticatedSessionService } from "@application/identity/services/IdentityAuthenticatedSessionService";
+import { TrustedDeviceSessionTrustService } from "@application/identity/services/TrustedDeviceSessionTrustService";
 import { IdentityAuthBackendApi } from "../IdentityAuthBackendApi";
-import { RegisterLocalAccountUseCase } from "../../../../application/identity/use-cases/RegisterLocalAccountUseCase";
-import { LoginLocalAccountUseCase } from "../../../../application/identity/use-cases/LoginLocalAccountUseCase";
-import { ChangeLocalPasswordCredentialUseCase } from "../../../../application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
-import { LogoutIdentitySessionUseCase } from "../../../../application/identity/use-cases/LogoutIdentitySessionUseCase";
-import { RevokeIdentitySessionUseCase } from "../../../../application/identity/use-cases/RevokeIdentitySessionUseCase";
-import { ListLocalIdentityAccountsUseCase } from "../../../../application/identity/use-cases/ListLocalIdentityAccountsUseCase";
-import { GetLocalIdentityAccountStatusUseCase } from "../../../../application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
-import { SetLocalIdentityAccountStatusUseCase } from "../../../../application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
-import { ListTrustedDevicesUseCase } from "../../../../application/identity/use-cases/ListTrustedDevicesUseCase";
-import { GetTrustedDeviceUseCase } from "../../../../application/identity/use-cases/GetTrustedDeviceUseCase";
-import { RevokeTrustedDeviceUseCase } from "../../../../application/identity/use-cases/RevokeTrustedDeviceUseCase";
-import { UpdateTrustedDeviceDisplayNameUseCase } from "../../../../application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
-import { InitiateTrustedDevicePairingUseCase } from "../../../../application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
-import { ValidateTrustedDevicePairingUseCase } from "../../../../application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
-import { CompleteTrustedDevicePairingUseCase } from "../../../../application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
+import { RegisterLocalAccountUseCase } from "@application/identity/use-cases/RegisterLocalAccountUseCase";
+import { LoginLocalAccountUseCase } from "@application/identity/use-cases/LoginLocalAccountUseCase";
+import { ChangeLocalPasswordCredentialUseCase } from "@application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+import { LogoutIdentitySessionUseCase } from "@application/identity/use-cases/LogoutIdentitySessionUseCase";
+import { RevokeIdentitySessionUseCase } from "@application/identity/use-cases/RevokeIdentitySessionUseCase";
+import { ListLocalIdentityAccountsUseCase } from "@application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import { GetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+import { SetLocalIdentityAccountStatusUseCase } from "@application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+import { ListTrustedDevicesUseCase } from "@application/identity/use-cases/ListTrustedDevicesUseCase";
+import { GetTrustedDeviceUseCase } from "@application/identity/use-cases/GetTrustedDeviceUseCase";
+import { RevokeTrustedDeviceUseCase } from "@application/identity/use-cases/RevokeTrustedDeviceUseCase";
+import { UpdateTrustedDeviceDisplayNameUseCase } from "@application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+import { InitiateTrustedDevicePairingUseCase } from "@application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+import { ValidateTrustedDevicePairingUseCase } from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
 import type { IdentityAuthObservabilityOptions } from "../IdentityAuthObservability";
 import {
   mapPairingSessionRecord,
   mapPairingTokenRecord,
   mapSessionRecordToDomain,
   mapTokenRecordToDomain,
-} from "../../../../../application/identity/services/TrustedDeviceServiceMappers";
+} from "@application/identity/services/TrustedDeviceServiceMappers";
 
 class InMemoryIdentityAdapter
   implements
@@ -719,3 +719,4 @@ export async function createIdentityAuthTestHarness(
 }
 
 export { InMemoryIdentityAdapter };
+

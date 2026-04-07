@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyNodeAdapter } from "../ComfyNodeAdapter";
 import { ComfyWorkflowAdapter } from "../ComfyWorkflowAdapter";
 
@@ -13,3 +13,4 @@ describe("adapters interactions", () => {
     expect(adapter.adaptWorkflowEnvelope(wf).prompt.n1.class_type).toBe("test");
   });
 });
+

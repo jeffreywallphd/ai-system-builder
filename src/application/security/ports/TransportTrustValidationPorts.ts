@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthenticatedTrustState,
   TransportChannelType,
   TransportConnectionActorType,
@@ -6,7 +6,7 @@ import type {
   TransportPeerType,
   TransportSecurityPolicy,
   TransportSecurityScenario,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type { TransportSecurityPolicyEvaluationPorts } from "./TransportSecurityPorts";
 
 export const TransportConnectionDirections = Object.freeze({
@@ -137,4 +137,5 @@ export interface TransportTrustValidationPorts extends TransportSecurityPolicyEv
   readonly nodeStateResolverPort?: ITransportNodeStateResolverPort;
   readonly peerCertificateStateResolverPort?: ITransportPeerCertificateStateResolverPort;
 }
+
 

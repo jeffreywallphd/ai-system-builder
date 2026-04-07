@@ -1,6 +1,6 @@
-import type {
+﻿import type {
   RuntimeCapabilityProviderTranslator,
-} from "../../../../application/system-runtime/RuntimeCapabilityExecutionPreflight";
+} from "@application/system-runtime/RuntimeCapabilityExecutionPreflight";
 
 export interface ComfyRuntimeExecutionConfiguration {
   readonly checkpointBindingId: string;
@@ -62,3 +62,4 @@ implements RuntimeCapabilityProviderTranslator<ComfyRuntimeExecutionConfiguratio
     });
   }
 }
+

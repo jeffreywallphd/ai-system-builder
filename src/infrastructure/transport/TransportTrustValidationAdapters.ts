@@ -1,16 +1,16 @@
-import {
+﻿import {
   ValidateTransportConnectionTrustErrorCodes,
   type ValidateTransportConnectionTrustOutcome,
   type ValidateTransportConnectionTrustUseCase,
-} from "../../application/security/use-cases/ValidateTransportConnectionTrustUseCase";
-import type { ValidateTransportConnectionTrustRequest } from "../../application/security/ports/TransportTrustValidationPorts";
+} from "@application/security/use-cases/ValidateTransportConnectionTrustUseCase";
+import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import {
   TransportConnectionRejectionReasons,
-} from "../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import {
   TransportSecurityAuditEventTypes,
   type TransportSecurityEventReporter,
-} from "../../application/security/ports/TransportSecurityAuditPorts";
+} from "@application/security/ports/TransportSecurityAuditPorts";
 
 export const TransportTrustValidationTransportErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -324,4 +324,5 @@ function classifyDeniedEventType(outcome: ValidateTransportConnectionTrustOutcom
   }
   return TransportSecurityAuditEventTypes.transportConnectionRejected;
 }
+
 

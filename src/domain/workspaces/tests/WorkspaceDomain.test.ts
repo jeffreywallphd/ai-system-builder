@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkspaceDomainError,
   WorkspaceInvitationLifecycleTransitionError,
@@ -28,7 +28,7 @@ import {
   WorkspaceOwnershipError,
   WorkspaceVisibilities,
   createWorkspaceOwnershipMetadata,
-} from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/workspaces/WorkspaceOwnership";
 
 describe("WorkspaceOwnership", () => {
   it("enforces owner-aligned creation metadata", () => {
@@ -336,3 +336,4 @@ describe("WorkspaceDomain", () => {
     expect(updated.lastModifiedAt).toBe("2026-04-05T16:05:00.000Z");
   });
 });
+

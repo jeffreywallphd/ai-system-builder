@@ -1,7 +1,7 @@
-import type { DesktopWorkflowBridge } from "../../../electron/shared/DesktopContracts";
-import type { IWorkflowRecordSummary, IWorkflowRepository } from "../../../application/ports/interfaces/IWorkflowRepository";
-import type { INodeCatalogProvider } from "../../../application/ports/interfaces/INodeCatalogProvider";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { DesktopWorkflowBridge } from "../../../electron/shared/DesktopContracts";
+import type { IWorkflowRecordSummary, IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { WorkflowPersistenceCodec, type WorkflowRecord } from "../../workflows/WorkflowPersistenceCodec";
 
 export class DesktopBridgeWorkflowRepository implements IWorkflowRepository {
@@ -41,3 +41,4 @@ export class DesktopBridgeWorkflowRepository implements IWorkflowRepository {
     return this.bridge.workflowExists(id.trim());
   }
 }
+

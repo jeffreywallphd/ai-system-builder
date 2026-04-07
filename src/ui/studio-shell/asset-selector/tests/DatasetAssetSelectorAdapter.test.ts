@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetSelectorApplicationValidationService,
   AssetSelectorUsageContexts,
   createDefaultAssetSelectorCapabilityRegistry,
-} from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
+} from "@application/studio-entry/AssetSelectorCapabilityRegistry";
 import {
   createDatasetAssetSelectorRequest,
   DatasetAssetSelectorAdapter,
@@ -234,3 +234,4 @@ describe("DatasetAssetSelectorAdapter", () => {
     expect(filterCallCount).toBe(1);
   });
 });
+

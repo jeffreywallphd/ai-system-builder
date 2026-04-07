@@ -1,4 +1,4 @@
-import process from "node:process";
+﻿import process from "node:process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
@@ -11,7 +11,7 @@ import {
   startAuthoritativeServerHostAssembly,
   type AuthoritativeServerHostEntrypointOptions,
   type AuthoritativeServerHostRuntimeHandle,
-} from "../../../hosts/server/AuthoritativeServerHostEntrypoint";
+} from "@hosts/server/AuthoritativeServerHostEntrypoint";
 import {
   resolveBrowserDevelopmentManagedRuntimeFromEnvironment,
 } from "./BrowserDevelopmentManagedRuntime";
@@ -135,3 +135,4 @@ function parseOptionalPort(value: string | undefined): number | undefined {
   }
   return parsed;
 }
+

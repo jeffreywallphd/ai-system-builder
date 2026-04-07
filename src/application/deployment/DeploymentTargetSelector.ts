@@ -1,5 +1,5 @@
-import type { DeploymentTarget } from "../../domain/deployment/DeploymentTargetDomain";
-import type { SystemPackage } from "../../domain/system-packaging/SystemPackagingDomain";
+﻿import type { DeploymentTarget } from "@domain/deployment/DeploymentTargetDomain";
+import type { SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import {
   DeploymentTargetCompatibilityValidator,
   type DeploymentTargetCompatibilityResult,
@@ -42,3 +42,4 @@ export class DeploymentTargetSelector {
     });
   }
 }
+

@@ -1,7 +1,7 @@
-import { serializeWorkflowTemplateDefinition, createWorkflowTemplateAssetMetadata, WorkflowTemplateStudioIdentity } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
-import { CoreImageStarterWorkflowTemplates } from "../../application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
-import { createWorkflowTemplateContractProjection } from "../../application/workflow-template-studio/WorkflowTemplateContractProjection";
+﻿import { serializeWorkflowTemplateDefinition, createWorkflowTemplateAssetMetadata, WorkflowTemplateStudioIdentity } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
+import { CoreImageStarterWorkflowTemplates } from "@application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import { createWorkflowTemplateContractProjection } from "@application/workflow-template-studio/WorkflowTemplateContractProjection";
 import type { RegistryService } from "./RegistryService";
 import type { StudioShellService } from "./StudioShellService";
 
@@ -67,3 +67,4 @@ export class WorkflowTemplateBootstrapService {
     }
   }
 }
+

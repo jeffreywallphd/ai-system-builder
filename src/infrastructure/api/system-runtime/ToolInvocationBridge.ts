@@ -1,7 +1,7 @@
-import type { ExecutionContext } from "../../../domain/system-runtime/SystemRuntimeDomain";
-import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
+﻿import type { ExecutionContext } from "@domain/system-runtime/SystemRuntimeDomain";
+import type { ExecutionAccessContext } from "@application/system-runtime/RuntimeAccessControlService";
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
-import type { ExternalExecutionEnvironmentRequest } from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";
+import type { ExternalExecutionEnvironmentRequest } from "@application/system-runtime/ExecutionEnvironmentConfigurationValidator";
 import {
   ExternalSystemRuntimeInterface,
   type ExternalExecutionResult,
@@ -311,3 +311,4 @@ export class ToolInvocationBridge {
     });
   }
 }
+

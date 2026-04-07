@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
-} from "../../../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@application/studio-entry/AssetSelectorSessionStore";
 import AssetSelectorShell from "../AssetSelectorShell";
 
 function createState(input?: {
@@ -144,3 +144,4 @@ describe("AssetSelectorShell", () => {
     expect(html).toContain("disabled");
   });
 });
+

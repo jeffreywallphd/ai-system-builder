@@ -1,4 +1,4 @@
-import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
+﻿import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
 import RuntimeEventRow from "./RuntimeEventRow";
 
 export interface RuntimeEventListProps {
@@ -18,3 +18,4 @@ export default function RuntimeEventList({ events }: RuntimeEventListProps): JSX
     </ul>
   );
 }
+

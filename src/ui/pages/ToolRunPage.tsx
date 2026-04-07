@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import ExecutionHistoryPanel from "../components/execution/ExecutionHistoryPanel";
 import ToolRunView from "../components/tools/ToolRunView";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -43,7 +43,7 @@ export default function ToolRunPage(): JSX.Element {
   if (!state.selectedTool) {
     return (
       <section className="ui-page">
-        <p>Preparing tool…</p>
+        <p>Preparing toolâ€¦</p>
       </section>
     );
   }
@@ -70,3 +70,4 @@ export default function ToolRunPage(): JSX.Element {
     </section>
   );
 }
+

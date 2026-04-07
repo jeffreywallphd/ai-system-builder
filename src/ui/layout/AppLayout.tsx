@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   Outlet,
@@ -10,13 +10,13 @@ import { ContextNavigationService } from "../routes/ContextNavigation";
 import { useUiDependencies } from "../composition/AppProviders";
 import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import RuntimeConsoleDrawer from "../components/execution/RuntimeConsoleDrawer";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import logo from "../images/ai-loom-studio-logo.svg";
 import ContextNavigationBar from "../components/navigation/ContextNavigationBar";
 import CommandPalette from "../components/navigation/CommandPalette";
 import { GlobalCommandTrigger } from "../routes/CommandPalette";
 import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
-import { SystemRuntimeWindowLaunchQueryParam } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import { SystemRuntimeWindowLaunchQueryParam } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import SystemRuntimeWindowHost from "../components/studio-shell/SystemRuntimeWindowHost";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
@@ -28,7 +28,7 @@ const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   healthChecks: Object.freeze([]),
   isRefreshingHealth: false,
   appState: "starting",
-  appStateDetail: "Checking runtime status…",
+  appStateDetail: "Checking runtime statusâ€¦",
   canRestartRuntime: false,
   isRestartingRuntime: false,
 });
@@ -265,3 +265,4 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
     </div>
   );
 }
+

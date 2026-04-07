@@ -1,9 +1,9 @@
-import {
+﻿import {
   EncryptionKeyScopes,
   ProtectedDataClasses,
   type EncryptionKeyScope,
   type ProtectedDataClass,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type { EncryptionKeyScopeOwner, IEncryptionKeyCatalogPort } from "../ports/EncryptionKeyResolutionPorts";
 import type { IEncryptionPolicyEvaluationService } from "./EncryptionPolicyEvaluationServiceContracts";
 import { EncryptionPolicyEvaluationErrorCodes } from "./EncryptionPolicyEvaluationServiceContracts";
@@ -424,3 +424,4 @@ function toErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback;
 }
+

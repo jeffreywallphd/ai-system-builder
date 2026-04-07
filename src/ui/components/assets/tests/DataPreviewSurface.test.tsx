@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import DataPreviewSurface from "../DataPreviewSurface";
-import { DataPreviewEngine } from "../../../../application/data-studio/DataPreviewEngine";
+import { DataPreviewEngine } from "@application/data-studio/DataPreviewEngine";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   createCanonicalTextItemsShape,
-} from "../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 
 describe("DataPreviewSurface", () => {
   it("renders records/table/text/image previews", () => {
@@ -115,3 +115,4 @@ describe("DataPreviewSurface", () => {
     expect(html).toContain("1 errors");
   });
 });
+

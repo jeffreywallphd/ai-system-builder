@@ -1,16 +1,16 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { SqliteAssetSystemRepository } from "../../../infrastructure/filesystem/SqliteAssetSystemRepository";
-import { NoopAssetLineageGraphProjectionSink } from "../../../infrastructure/filesystem/NoopAssetLineageGraphProjectionSink";
+import { SqliteAssetSystemRepository } from "@infrastructure/filesystem/SqliteAssetSystemRepository";
+import { NoopAssetLineageGraphProjectionSink } from "@infrastructure/filesystem/NoopAssetLineageGraphProjectionSink";
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "../RecordAssetTransformationUseCase";
 import { ProjectArtifactToAssetSystemUseCase } from "../ProjectArtifactToAssetSystemUseCase";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 
 describe("ProjectArtifactToAssetSystemUseCase integration", () => {
   it("projects workflow outputs into canonical asset/version/lineage records", async () => {
@@ -62,3 +62,4 @@ describe("ProjectArtifactToAssetSystemUseCase integration", () => {
     }
   });
 });
+

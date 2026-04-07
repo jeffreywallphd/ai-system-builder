@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type { NodePropertyFieldViewModel } from "../presenters/NodePresenter";
 import { formatBytes } from "../presenters/PresenterFormatting";
 
@@ -19,7 +19,7 @@ export function buildInstalledModelOptions(
       .map((model) => {
         const details = [model.publisher, model.architectureFamily, formatBytes(model.artifact.sizeBytes)]
           .filter(Boolean)
-          .join(" · ");
+          .join(" Â· ");
 
         return Object.freeze({
           value: model.id,
@@ -87,3 +87,4 @@ export function attachInstalledModelOptions(
     options,
   });
 }
+

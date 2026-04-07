@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetPipelineStageKinds } from "../../domain/dataset-studio/StagePipelineDomain";
-import { UnifiedIngestionOutputTargetKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetPipelineStageKinds } from "@domain/dataset-studio/StagePipelineDomain";
+import { UnifiedIngestionOutputTargetKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { StageAssetMappingService } from "../StageAssetMappingService";
 
 describe("StageAssetMappingService", () => {
@@ -198,3 +198,4 @@ describe("StageAssetMappingService", () => {
     }
   });
 });
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { createCompositionTaxonomyDescriptor, TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
-import { createStudioHandoffContract, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext } from "../../../domain/studio-handoff/StudioHandoffContext";
+﻿import { describe, expect, it } from "bun:test";
+import { createCompositionTaxonomyDescriptor, TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
+import { createStudioHandoffContract, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import type { PersistedStudioHandoffRecord } from "../StudioHandoffPersistenceService";
 import { StudioHandoffRetryDecisionKinds, StudioHandoffRetryService, StudioHandoffRetryableFailureClassifier } from "../StudioHandoffRetryService";
 
@@ -264,3 +264,4 @@ describe("StudioHandoffRetryService", () => {
     expect(system.decision).toBe(StudioHandoffRetryDecisionKinds.reconcilable);
   });
 });
+

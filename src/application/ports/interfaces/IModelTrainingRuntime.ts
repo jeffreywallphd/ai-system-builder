@@ -1,5 +1,5 @@
-import type { ModelTrainingConfiguration, ModelTrainingExecutionKind, ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
-import type { DatasetTaskType } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+﻿import type { ModelTrainingConfiguration, ModelTrainingExecutionKind, ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
+import type { DatasetTaskType } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 export interface SubmitModelTrainingDatasetExample {
   readonly id: string;
@@ -40,3 +40,4 @@ export interface IModelTrainingRuntime {
   listJobs(): Promise<ReadonlyArray<ModelTrainingJob>>;
   cancelJob(jobId: string): Promise<ModelTrainingJob>;
 }
+

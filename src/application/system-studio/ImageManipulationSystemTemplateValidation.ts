@@ -1,4 +1,4 @@
-import type { AssetValidationResult } from "../../domain/contracts/AssetValidation";
+﻿import type { AssetValidationResult } from "@domain/contracts/AssetValidation";
 import type { ImageManipulationSystemTemplateDefinition } from "./ImageManipulationSystemTemplate";
 import {
   ImageManipulationRuntimeTargets,
@@ -12,3 +12,4 @@ export function validateImageManipulationSystemTemplate(
 ): AssetValidationResult {
   return validateImageManipulationTemplateCompleteness({ template }).assetValidation;
 }
+

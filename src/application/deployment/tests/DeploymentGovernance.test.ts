@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DeploymentExecutionService, InMemoryDeploymentRecordRepository } from "../DeploymentExecutionService";
 import { DeploymentVersionManager } from "../DeploymentVersionManager";
 import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "../DeploymentRollbackService";
@@ -14,7 +14,7 @@ import {
   DeploymentQuotaExceededError,
 } from "../DeploymentQuotaEvaluator";
 import { buildSampleBundle, createSampleConfiguration } from "./testUtils";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 
 const operatorContext: DeploymentAccessContext = Object.freeze({
   caller: Object.freeze({
@@ -288,3 +288,4 @@ describe("Deployment governance: quotas and limits", () => {
     })).toThrow(DeploymentQuotaExceededError);
   });
 });
+

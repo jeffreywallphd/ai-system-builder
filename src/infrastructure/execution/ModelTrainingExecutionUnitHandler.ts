@@ -1,22 +1,22 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import type { IExecutionEngineEvent } from "../../application/execution/ExecutionContracts";
-import type { IExecutionDiagnostics } from "../../application/execution/ExecutionContracts";
-import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../application/ports/interfaces/IModelTrainingRuntime";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionEngineEvent } from "@application/execution/ExecutionContracts";
+import type { IExecutionDiagnostics } from "@application/execution/ExecutionContracts";
+import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "@application/ports/interfaces/IModelTrainingRuntime";
 import {
   createModelTrainingExecutionArtifact,
   ModelTrainingExecutionArtifacts,
   toModelTrainingExecutionOutputMetadata,
   toModelTrainingExecutionOutputSummary,
   toModelTrainingExecutionProvenance,
-} from "../../application/execution/ModelTrainingExecutionAdapter";
+} from "@application/execution/ModelTrainingExecutionAdapter";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
   IExecutionUnitRunHandle,
-} from "../../application/execution/UnifiedExecutionEngine";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
-import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+} from "@application/execution/UnifiedExecutionEngine";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
+import type { ExecutionAssetLineageRecorder } from "@application/assets-system/ExecutionAssetLineageRecorder";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -165,3 +165,4 @@ export class ModelTrainingExecutionUnitHandler implements IExecutionUnitHandler 
     });
   }
 }
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { TransportChannelTypes } from "../../../../../domain/security/TransportSecurityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { TransportChannelTypes } from "@domain/security/TransportSecurityDomain";
 import { validateNodeMutualTlsTransport } from "../NodeMutualTlsTransportAdapter";
 
 describe("NodeMutualTlsTransportAdapter", () => {
@@ -168,3 +168,4 @@ describe("NodeMutualTlsTransportAdapter", () => {
     }
   });
 });
+

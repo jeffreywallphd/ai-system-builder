@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { Node } from "../../../domain/nodes/Node";
+﻿import { describe, expect, it } from "bun:test";
+import { Node } from "@domain/nodes/Node";
 import { classifyNodeTruth, ensureNodeExecutionProvenance, aggregateWorkflowProvenance, deriveMcpExecutionProvenance } from "../ExecutionTruth";
 
 function makeNode(nodeType: string) {
@@ -50,3 +50,4 @@ describe("ExecutionTruth", () => {
     expect(deriveMcpExecutionProvenance({ serverStatus: { serverId: "local", name: "Local", transport: "stdio", configured: true, enabled: true, state: "disconnected", sessionState: "stale", connected: false, checkedAt: "2026-03-21T00:00:00.000Z", toolCount: 1, resourceCount: 0, capabilities: {} } }).status).toBe("stale");
   });
 });
+

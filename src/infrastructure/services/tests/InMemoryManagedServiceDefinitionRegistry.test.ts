@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ManagedServiceRestartPolicies,
   ManagedServiceTransports,
   type ManagedServiceDefinition,
-} from "../../../application/services/ManagedServiceDefinition";
-import { ManagedServiceKinds, ManagedServiceStartPolicies } from "../../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/ManagedServiceDefinition";
+import { ManagedServiceKinds, ManagedServiceStartPolicies } from "@application/services/interfaces/ManagedServiceTypes";
 import { InMemoryManagedServiceDefinitionRegistry } from "../InMemoryManagedServiceDefinitionRegistry";
 
 function createDefinition(serviceId: string, kind = ManagedServiceKinds.custom): ManagedServiceDefinition {
@@ -48,3 +48,4 @@ describe("InMemoryManagedServiceDefinitionRegistry", () => {
     ])).toThrow("already registered");
   });
 });
+

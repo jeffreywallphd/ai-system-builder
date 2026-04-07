@@ -1,7 +1,7 @@
-import type { WorkspaceRole, WorkspaceRoleAssignment } from "../../../domain/workspaces/WorkspaceDomain";
+﻿import type { WorkspaceRole, WorkspaceRoleAssignment } from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceRoleAssignmentListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 
 export interface IWorkspaceRoleAssignmentRepository {
   findRoleAssignmentById(roleAssignmentId: string): Promise<WorkspaceRoleAssignment | undefined>;
@@ -9,3 +9,4 @@ export interface IWorkspaceRoleAssignmentRepository {
   countActiveRoleAssignments(workspaceId: string, role?: WorkspaceRole): Promise<number>;
   saveRoleAssignment(roleAssignment: WorkspaceRoleAssignment): Promise<WorkspaceRoleAssignment>;
 }
+

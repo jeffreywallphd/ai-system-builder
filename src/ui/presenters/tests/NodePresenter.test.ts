@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { NodeDefinition } from "../../../domain/nodes/NodeDefinition";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
+﻿import { describe, expect, it } from "bun:test";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import { NodePresenter } from "../NodePresenter";
 
 describe("NodePresenter", () => {
@@ -75,3 +75,4 @@ describe("NodePresenter", () => {
     expect(field.visibility).toBe("hidden");
   });
 });
+

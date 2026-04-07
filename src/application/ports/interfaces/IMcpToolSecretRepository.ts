@@ -1,4 +1,4 @@
-import type { McpToolCredentialFieldRequirement } from "../../../domain/mcp/McpToolTrust";
+﻿import type { McpToolCredentialFieldRequirement } from "@domain/mcp/McpToolTrust";
 
 export type McpToolSecretScopeType = "global" | "project" | "user";
 
@@ -34,3 +34,4 @@ export interface IMcpToolSecretRepository {
   ): Promise<McpToolSecretReferenceRecord>;
   removeSecret(toolId: string, scope?: McpToolSecretScope): Promise<boolean>;
 }
+

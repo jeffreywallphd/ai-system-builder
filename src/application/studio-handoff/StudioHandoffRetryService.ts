@@ -1,6 +1,6 @@
-import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "../../domain/studio-handoff/StudioHandoffAuditTrail";
-import type { StudioHandoffContract } from "../../domain/studio-handoff/StudioHandoffContract";
-import type { StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
+﻿import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "@domain/studio-handoff/StudioHandoffAuditTrail";
+import type { StudioHandoffContract } from "@domain/studio-handoff/StudioHandoffContract";
+import type { StudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffFailure, StudioHandoffFailureKind, StudioHandoffRejectionReason } from "./StudioHandoffFailure";
 import type { StudioHandoffRequest, StudioHandoffResult } from "./StudioHandoffOrchestrationService";
 import type {
@@ -313,3 +313,4 @@ export class StudioHandoffRetryService {
     return "compatibility-rejected";
   }
 }
+

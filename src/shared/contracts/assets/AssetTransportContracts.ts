@@ -1,9 +1,9 @@
-import type { Asset } from "../../../domain/assets/AssetDomain";
-import type { AssetAuditEvent } from "../../../application/assets/ports/AssetAuditPort";
+﻿import type { Asset } from "@domain/assets/AssetDomain";
+import type { AssetAuditEvent } from "@application/assets/ports/AssetAuditPort";
 import type {
   AssetDownloadAuthorization,
   AssetPreviewResolution,
-} from "../../../application/assets/use-cases/AssetServiceContracts";
+} from "@application/assets/use-cases/AssetServiceContracts";
 
 export class AssetTransportContractError extends Error {
   constructor(message: string) {
@@ -348,4 +348,5 @@ export function toAssetAuditEventPayloadDto(event: AssetAuditEvent): AssetAuditE
     details: event.details,
   });
 }
+
 

@@ -1,14 +1,14 @@
-import type {
+﻿import type {
   IManagedServiceSupervisorClient,
   ManagedSupervisorServiceDefinitionListResponse,
   ManagedSupervisorServiceDefinitionResponse,
   ManagedSupervisorHealthResponse,
   ManagedSupervisorServiceListResponse,
   ManagedSupervisorServiceResponse,
-} from "../../application/services/interfaces/IManagedServiceSupervisorClient";
-import type { ManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
-import { bindSafeFetch } from "../../application/runtime/RuntimeDiagnostics";
-import { RuntimeDiagnosticsError } from "../../application/runtime/RuntimeDiagnosticsError";
+} from "@application/services/interfaces/IManagedServiceSupervisorClient";
+import type { ManagedServiceDefinition } from "@application/services/ManagedServiceDefinition";
+import { bindSafeFetch } from "@application/runtime/RuntimeDiagnostics";
+import { RuntimeDiagnosticsError } from "@application/runtime/RuntimeDiagnosticsError";
 
 export interface HttpManagedServiceSupervisorClientOptions {
   readonly baseUrl: string;
@@ -193,3 +193,4 @@ export class HttpManagedServiceSupervisorClient implements IManagedServiceSuperv
     }
   }
 }
+

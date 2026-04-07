@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   CanonicalDataMetadata,
   CanonicalDataShape,
   CanonicalDataShapeKind,
@@ -6,8 +6,8 @@ import type {
   CanonicalTableColumn,
   CanonicalTableRow,
   CanonicalTextItem,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DataAssetBase } from "@domain/dataset-studio/DataAssetBase";
 import type {
   DataConverterDiagnostic,
   DataConverterResult,
@@ -316,4 +316,5 @@ export class DataPreviewEngine implements IDataPreviewEngine {
     });
   }
 }
+
 

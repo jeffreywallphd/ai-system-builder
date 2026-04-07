@@ -1,5 +1,5 @@
-import type { AuthorizationSharingGrantPersistenceRecord, AuthorizationPersistenceMutationResult } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { parseAuthorizationSharingGrantChangeRequest } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+﻿import type { AuthorizationSharingGrantPersistenceRecord, AuthorizationPersistenceMutationResult } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { parseAuthorizationSharingGrantChangeRequest } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService, type AuthorizationPolicyMutationServiceClock } from "./AuthorizationPolicyMutationService";
@@ -120,3 +120,4 @@ export class RevokeAuthorizationSharingAccessUseCase {
     };
   }
 }
+

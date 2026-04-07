@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepCategories,
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   BuiltInWorkflowStepRegistry,
   createDefaultBuiltInWorkflowStepRegistry,
@@ -162,3 +162,4 @@ describe("BuiltInWorkflowStepRegistry", () => {
     });
   });
 });
+

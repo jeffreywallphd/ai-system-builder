@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
   z.string(),
@@ -128,3 +128,4 @@ export function validateImageRunHistoryRecord(input: unknown): ImageRunHistoryRe
 export function validateImageRunHistoryListing(input: unknown): ImageRunHistoryListing {
   return ImageRunHistoryListingSchema.parse(input);
 }
+

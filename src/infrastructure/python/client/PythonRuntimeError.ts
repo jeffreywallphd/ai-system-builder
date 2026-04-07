@@ -1,7 +1,7 @@
-import {
+﻿import {
   RuntimeDiagnosticsError,
   type RuntimeDiagnosticsErrorParams,
-} from "../../../application/runtime/RuntimeDiagnosticsError";
+} from "@application/runtime/RuntimeDiagnosticsError";
 
 export class PythonRuntimeError extends RuntimeDiagnosticsError {
   constructor(message: string, params: RuntimeDiagnosticsErrorParams = {}) {
@@ -11,3 +11,4 @@ export class PythonRuntimeError extends RuntimeDiagnosticsError {
     });
   }
 }
+

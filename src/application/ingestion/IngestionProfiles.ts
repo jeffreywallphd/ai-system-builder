@@ -1,4 +1,4 @@
-import type { FileIngestionProfile } from "../../domain/ingestion/interfaces/IFileIngestion";
+﻿import type { FileIngestionProfile } from "@domain/ingestion/interfaces/IFileIngestion";
 
 export function createFileIngestionProfile(profile: FileIngestionProfile): FileIngestionProfile {
   return Object.freeze({
@@ -17,3 +17,4 @@ export function createFileIngestionProfile(profile: FileIngestionProfile): FileI
     metadata: profile.metadata ? Object.freeze({ ...profile.metadata }) : undefined,
   });
 }
+

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import type { AddressInfo } from "node:net";
 import { connect, type Socket } from "node:net";
 import type { Server } from "node:http";
@@ -8,13 +8,13 @@ import {
   type IdentityHttpServerLogEvent,
   type IdentityHttpServerLogger,
 } from "../IdentityHttpServer";
-import { TransportSecurityScenarios } from "../../../../../domain/security/TransportSecurityDomain";
-import type { ValidateTransportConnectionTrustRequest } from "../../../../../application/security/ports/TransportTrustValidationPorts";
+import { TransportSecurityScenarios } from "@domain/security/TransportSecurityDomain";
+import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import type {
   HttpTransportTrustValidationResult,
   WebSocketTransportTrustValidationResult,
-} from "../../../../../infrastructure/transport/TransportTrustValidationAdapters";
-import type { WebSocketChannelContext } from "../../../../../infrastructure/transport/websocket/SecureWebSocketChannelContext";
+} from "@infrastructure/transport/TransportTrustValidationAdapters";
+import type { WebSocketChannelContext } from "@infrastructure/transport/websocket/SecureWebSocketChannelContext";
 
 class NoopLogger implements IdentityHttpServerLogger {
   public info(_event: IdentityHttpServerLogEvent): void {}
@@ -612,3 +612,4 @@ describe("IdentityHttpServer websocket transport trust", () => {
     socket.destroy();
   });
 });
+

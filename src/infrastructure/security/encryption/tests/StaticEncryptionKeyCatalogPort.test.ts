@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { EncryptionKeyScopes } from "../../../../domain/security/EncryptionAtRestPolicyDomain";
-import type { EncryptionKeyDescriptor } from "../../../../application/security/ports/EncryptionKeyResolutionPorts";
+﻿import { describe, expect, it } from "bun:test";
+import { EncryptionKeyScopes } from "@domain/security/EncryptionAtRestPolicyDomain";
+import type { EncryptionKeyDescriptor } from "@application/security/ports/EncryptionKeyResolutionPorts";
 import { StaticEncryptionKeyCatalogPort } from "../StaticEncryptionKeyCatalogPort";
 
 describe("StaticEncryptionKeyCatalogPort", () => {
@@ -137,4 +137,5 @@ function createKey(
     },
   };
 }
+
 

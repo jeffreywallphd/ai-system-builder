@@ -1,4 +1,4 @@
-import {
+﻿import {
   createAsset,
   createAssetOwnershipMetadata,
   createAssetVersion,
@@ -11,7 +11,7 @@ import {
   type AssetLifecycleState,
   type AssetStorageArea,
   type AssetVisibility,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 
 export interface AssetSharingPolicyReferenceDto {
   readonly policyId: string;
@@ -228,3 +228,4 @@ export function createAssetDto(input: {
 
   return toAssetDto(domainAsset);
 }
+

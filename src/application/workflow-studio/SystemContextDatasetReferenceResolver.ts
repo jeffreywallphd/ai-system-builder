@@ -1,4 +1,4 @@
-import type { SystemContextContract, SystemContextDatasetReference } from "../../domain/system-studio/SystemContextContract";
+﻿import type { SystemContextContract, SystemContextDatasetReference } from "@domain/system-studio/SystemContextContract";
 
 export const SystemContextDatasetResolutionIssueCodes = Object.freeze({
   missingReferenceIdentity: "missing-reference-identity",
@@ -202,3 +202,4 @@ export function resolveSystemContextDatasets(
 ): ResolveSystemContextDatasetsResult {
   return resolver.resolve({ datasets: context.datasets });
 }
+

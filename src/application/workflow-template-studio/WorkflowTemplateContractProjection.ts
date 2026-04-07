@@ -1,9 +1,9 @@
-import {
+﻿import {
   AssetContractShapeKinds,
   createAssetContractDescriptor,
   type AssetContractDescriptor,
-} from "../../domain/contracts/AssetContract";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+} from "@domain/contracts/AssetContract";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 
 function mapTemplateInputValueType(
   valueType: WorkflowTemplateDefinition["inputRequirements"][number]["valueType"],
@@ -104,3 +104,4 @@ export function createWorkflowTemplateContractProjection(
     },
   });
 }
+

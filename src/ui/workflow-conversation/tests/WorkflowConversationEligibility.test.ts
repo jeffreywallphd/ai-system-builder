@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowDraftOutputDestinationTypes } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowDraftOutputDestinationTypes } from "@domain/workflow-studio/WorkflowStudioDomain";
 import { evaluateWorkflowConversationEligibility } from "../WorkflowConversationEligibility";
 
 function createWorkflow(): any {
@@ -75,3 +75,4 @@ describe("WorkflowConversationEligibility", () => {
     expect(eligibility.reason).toContain("prompt-like");
   });
 });
+

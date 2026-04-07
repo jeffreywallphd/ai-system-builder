@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createCanonicalRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { createCanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   FieldMappingAsset,
   FilteringAsset,
@@ -125,3 +125,4 @@ describe("Transformation preview system", () => {
     expect(preview.normalized.samples.outputRows).toHaveLength(0);
   });
 });
+

@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
+import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import {
   createExecutionApplicationInfrastructure,
   createExecutionRunRepository,
   createUnifiedExecutionInfrastructure,
 } from "../createExecutionInfrastructure";
-import { DesktopBridgeExecutionRunRepository } from "../../../infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
+import { DesktopBridgeExecutionRunRepository } from "@infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../../filesystem/execution/SqliteExecutionRunRepository";
 
 describe("execution infrastructure composition", () => {
@@ -353,3 +353,4 @@ describe("execution infrastructure composition", () => {
     expect(savedRuns.length).toBeGreaterThan(0);
   });
 });
+

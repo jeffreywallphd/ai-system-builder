@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ContextRecipe } from "../../../../application/context/models/ContextRecipe";
+﻿import { describe, expect, it } from "bun:test";
+import { ContextRecipe } from "@application/context/models/ContextRecipe";
 import { LocalStorageContextRecipeRepository } from "../LocalStorageContextRecipeRepository";
 
 function createStorage(): Storage {
@@ -46,3 +46,4 @@ describe("LocalStorageContextRecipeRepository", () => {
     expect(loaded?.guidance?.strictStructuredOutput).toBeTrue();
   });
 });
+

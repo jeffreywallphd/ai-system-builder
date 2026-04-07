@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   UnifiedIngestionDetectionConfidenceLevels,
   UnifiedIngestionReferenceKinds,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { UnifiedSourceTypeDetectionService } from "../UnifiedSourceTypeDetectionService";
 
 function createSource(overrides?: Partial<{
@@ -143,3 +143,4 @@ describe("UnifiedSourceTypeDetectionService", () => {
     expect(result.evidence.some((entry) => entry.kind === "signature-sniff")).toBeTrue();
   });
 });
+

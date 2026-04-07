@@ -1,8 +1,8 @@
-import { useMemo, useState, type JSX } from "react";
-import { buildImageRunLineageView } from "../../../../application/system-runtime/ImageRunLineageDataContract";
-import type { ImageRunHistoryWithOutputs } from "../../../../application/system-runtime/ImageRunHistoryService";
-import type { ImageRunHistoryListing } from "../../../../application/system-runtime/ImageRunHistoryDataContract";
-import type { OutputGalleryItem, OutputGalleryListing } from "../../../../application/system-runtime/OutputGalleryDataContract";
+﻿import { useMemo, useState, type JSX } from "react";
+import { buildImageRunLineageView } from "@application/system-runtime/ImageRunLineageDataContract";
+import type { ImageRunHistoryWithOutputs } from "@application/system-runtime/ImageRunHistoryService";
+import type { ImageRunHistoryListing } from "@application/system-runtime/ImageRunHistoryDataContract";
+import type { OutputGalleryItem, OutputGalleryListing } from "@application/system-runtime/OutputGalleryDataContract";
 import { mapOutputGalleryItemToImageViewModel, mapOutputGalleryListingToImageInterfaceState } from "./ImageOutputGalleryDataAdapter";
 import {
   DEFAULT_IMAGE_RENDER_OPTIONS,
@@ -294,3 +294,4 @@ export function ImageResultHistoryInteractionSpaceAsset({
     </section>
   );
 }
+

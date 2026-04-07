@@ -1,5 +1,5 @@
-import type { ExecutionAccessContext } from "../system-runtime/RuntimeAccessControlService";
-import type { DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import type { ExecutionAccessContext } from "../system-runtime/RuntimeAccessControlService";
+import type { DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 
 export const DeploymentAccessActions = Object.freeze({
   executeDeployment: "execute-deployment",
@@ -217,3 +217,4 @@ export class DeploymentAccessEvaluator {
     return decision;
   }
 }
+

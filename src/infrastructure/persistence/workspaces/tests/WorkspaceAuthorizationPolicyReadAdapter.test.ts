@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { IWorkspaceAuthorizationReadRepository } from "../../../../application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+﻿import { describe, expect, it } from "bun:test";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -9,12 +9,12 @@ import {
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
   type Workspace,
-} from "../../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
-} from "../../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceVisibilities } from "../../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "../WorkspaceAuthorizationPolicyReadAdapter";
 
 class InMemoryWorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationReadRepository {
@@ -104,3 +104,4 @@ describe("WorkspaceAuthorizationPolicyReadAdapter", () => {
     expect(snapshot.permissionGrants).toEqual([]);
   });
 });
+

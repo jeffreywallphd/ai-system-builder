@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerTypes,
   WorkflowDraftUserTriggerScopes,
@@ -6,7 +6,7 @@ import {
   type WorkflowDraftStateTriggerConfig,
   type WorkflowDraftTemporalTriggerConfig,
   type WorkflowDraftUserTriggerConfig,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   mapWorkflowDraftTriggersToRuntimeDescriptors,
   type WorkflowRuntimeManualTriggerDescriptor,
@@ -205,3 +205,4 @@ export function mapWorkflowDraftTriggersToExecutionTriggerPlan(
   const runtimeDescriptors = mapWorkflowDraftTriggersToRuntimeDescriptors(draft);
   return Object.freeze(runtimeDescriptors.map((descriptor) => mapDescriptorToExecutionTriggerPlan(descriptor)));
 }
+

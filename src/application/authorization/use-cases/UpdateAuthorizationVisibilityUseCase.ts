@@ -1,10 +1,10 @@
-import { ResourceOwnershipScopes, ResourceVisibilities } from "../../../domain/authorization/AuthorizationDomain";
+﻿import { ResourceOwnershipScopes, ResourceVisibilities } from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationResourcePolicyMetadataPersistenceRecord,
   AuthorizationSharingGrantPersistenceRecord,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { parseAuthorizationVisibilityUpdateRequest } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { parseAuthorizationVisibilityUpdateRequest } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService, type AuthorizationPolicyMutationServiceClock } from "./AuthorizationPolicyMutationService";
@@ -295,3 +295,4 @@ function isBroadPersistenceSubject(subject: {
 
   return false;
 }
+

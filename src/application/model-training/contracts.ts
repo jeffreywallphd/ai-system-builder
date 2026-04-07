@@ -1,18 +1,18 @@
-import type { AppRuntimeMode } from "../../domain/runtime/AppRuntimeMode";
+﻿import type { AppRuntimeMode } from "@domain/runtime/AppRuntimeMode";
 import type {
   ModelCreationCapability,
   ModelCreationPath,
   ModelCreationRecommendedAction,
   ModelCreationSupportState,
   ModelCreationRuntimeStatus,
-} from "../../domain/model-training/ModelCreationSupport";
+} from "@domain/model-training/ModelCreationSupport";
 import type {
   ModelTrainingArtifact,
   ModelTrainingConfiguration,
   ModelTrainingExecutionKind,
   ModelTrainingJob,
-} from "../../domain/model-training/ModelTrainingTypes";
-import type { DatasetTaskType } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/model-training/ModelTrainingTypes";
+import type { DatasetTaskType } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 export interface SubmitModelTrainingJobCommand {
   readonly id?: string;
@@ -118,3 +118,4 @@ export interface ModelTrainingStudioSummary {
   readonly recommendedNextSteps: ReadonlyArray<ModelCreationRecommendedAction>;
   readonly jobs: ReadonlyArray<ModelTrainingJobStudioSummary>;
 }
+

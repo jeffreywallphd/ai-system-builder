@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
@@ -6,20 +6,20 @@ import {
   StudioHandoffPersistenceService,
   StudioHandoffQueryService,
   type PersistedStudioHandoffRecord,
-} from "../../../../application/studio-handoff/StudioHandoffPersistenceService";
+} from "@application/studio-handoff/StudioHandoffPersistenceService";
 import { SqliteStudioHandoffRepository } from "../SqliteStudioHandoffRepository";
 import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
-} from "../../../../domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext } from "../../../../domain/studio-handoff/StudioHandoffContext";
+} from "@domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 const tempDirs: string[] = [];
 
@@ -218,3 +218,4 @@ describe("SqliteStudioHandoffRepository + query/persistence services", () => {
     expect(loaded?.authoritativeAsset.versionId).toBe("asset:dataset:v2");
   });
 });
+

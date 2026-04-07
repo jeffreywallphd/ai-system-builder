@@ -1,9 +1,9 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   ISystemRuntimeExecutionStore,
   PersistedExecutionRecord,
-} from "../../../application/system-runtime/SystemRuntimeExecutionStore";
+} from "@application/system-runtime/SystemRuntimeExecutionStore";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface ExecutionRecordRow {
@@ -200,3 +200,4 @@ export class SqliteSystemRuntimeExecutionStore implements ISystemRuntimeExecutio
 function parseRecord(raw: string): PersistedExecutionRecord {
   return Object.freeze(JSON.parse(raw) as PersistedExecutionRecord);
 }
+

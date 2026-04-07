@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import StudioAssetHostBoundary from "../StudioAssetHostBoundary";
@@ -14,7 +14,7 @@ import {
   StudioUiAssetKinds,
   type StudioAssetDefinition,
 } from "../../../../studio-shell/studio-assets/StudioAssetContracts";
-import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import type { StudioShellExtensionContext } from "../../../../studio-shell/StudioShellExtensions";
 import {
   StudioEmbeddedIntentKinds,
@@ -215,3 +215,4 @@ describe("StudioAssetHostBoundary", () => {
     expect(emittedCount).toBe(0);
   });
 });
+

@@ -1,4 +1,4 @@
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import type {
   RuntimeCapabilityBindingContract,
 } from "../system-runtime/RuntimeCapabilityBindingContract";
@@ -8,7 +8,7 @@ import {
   type RuntimeCapabilityPreflightFailure,
 } from "../system-runtime/RuntimeCapabilityExecutionPreflight";
 import type { ModelCapabilityDescriptor } from "../system-runtime/ModelCapabilityBindingRules";
-import { ComfyRuntimeCapabilityTranslator } from "../../infrastructure/comfyui/execution/mappers/ComfyRuntimeCapabilityTranslator";
+import { ComfyRuntimeCapabilityTranslator } from "@infrastructure/comfyui/execution/mappers/ComfyRuntimeCapabilityTranslator";
 import type {
   ComfyImageManipulationDatasetRuntimeHandle,
 } from "./ComfyImageManipulationDatasetBindingAsset";
@@ -195,3 +195,4 @@ export function resolveComfyImageManipulationRuntimeConfiguration(
     }),
   });
 }
+

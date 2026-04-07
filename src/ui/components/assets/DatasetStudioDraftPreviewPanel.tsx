@@ -1,41 +1,41 @@
-import { useEffect, useMemo, useState } from "react";
-import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
-import { buildDatasetInspectionViewModel } from "../../../application/data-studio/DatasetInspectionViewModel";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { DataPreviewModel } from "@application/data-studio/DataPreviewEngine";
+import { buildDatasetInspectionViewModel } from "@application/data-studio/DatasetInspectionViewModel";
 import {
   DatasetPreviewSelectionModes,
   DatasetPreviewSelectionState,
-} from "../../../application/data-studio/DatasetPreviewSelectionModel";
-import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "../../../application/dataset-studio/BatchIngestionFramework";
-import { resolveDataAssetConfigDefaults } from "../../../application/dataset-studio/DataAssetConfiguration";
-import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "../../../application/dataset-studio/DataAssetExecutionFramework";
-import type { DataAssetRegistryEntry } from "../../../application/dataset-studio/DataAssetRegistry";
-import { DataSourceReferenceKinds } from "../../../application/dataset-studio/DataConverterContracts";
+} from "@application/data-studio/DatasetPreviewSelectionModel";
+import { BatchIngestionAssetId, BatchIngestionFramework, BatchIngestionStrategyKinds, BatchIngestorKinds } from "@application/dataset-studio/BatchIngestionFramework";
+import { resolveDataAssetConfigDefaults } from "@application/dataset-studio/DataAssetConfiguration";
+import { type DataAssetExecutionResult, DefaultDataAssetExecutionFramework } from "@application/dataset-studio/DataAssetExecutionFramework";
+import type { DataAssetRegistryEntry } from "@application/dataset-studio/DataAssetRegistry";
+import { DataSourceReferenceKinds } from "@application/dataset-studio/DataConverterContracts";
 import {
   getDataStudioAssetRegistry,
   IngestionCatalogVisibilityModes,
   listIngestionDataAssets,
-} from "../../../application/dataset-studio/DataStudioAssetRegistryCatalog";
+} from "@application/dataset-studio/DataStudioAssetRegistryCatalog";
 import {
   DataStudioValidationSections,
   hasErrorIssues,
   validateDataAssetConfigValues,
   type DataStudioValidationIssue,
-} from "../../../application/dataset-studio/DataStudioValidation";
-import { CsvIngestorAsset } from "../../../application/dataset-studio/CsvIngestorAsset";
-import { DocumentPdfIngestorAsset, toDocumentPdfIngestorConfig } from "../../../application/dataset-studio/DocumentPdfIngestorAsset";
-import { type IngestionIssue } from "../../../application/dataset-studio/IngestionContracts";
-import { ImageIngestorAsset, toImageIngestorConfig } from "../../../application/dataset-studio/ImageIngestorAsset";
-import { JsonIngestorAsset } from "../../../application/dataset-studio/JsonIngestorAsset";
-import { resolveUnifiedIngestionConfiguration } from "../../../application/dataset-studio/UnifiedIngestionConfiguration";
+} from "@application/dataset-studio/DataStudioValidation";
+import { CsvIngestorAsset } from "@application/dataset-studio/CsvIngestorAsset";
+import { DocumentPdfIngestorAsset, toDocumentPdfIngestorConfig } from "@application/dataset-studio/DocumentPdfIngestorAsset";
+import { type IngestionIssue } from "@application/dataset-studio/IngestionContracts";
+import { ImageIngestorAsset, toImageIngestorConfig } from "@application/dataset-studio/ImageIngestorAsset";
+import { JsonIngestorAsset } from "@application/dataset-studio/JsonIngestorAsset";
+import { resolveUnifiedIngestionConfiguration } from "@application/dataset-studio/UnifiedIngestionConfiguration";
 import {
   UnifiedIngestionAssetExecutionWrapper,
   UnifiedIngestionAssetId,
   type UnifiedIngestionAssetBatchExecutionResult,
-} from "../../../application/dataset-studio/UnifiedIngestionAsset";
-import type { UnifiedIngestionPreviewSuccess } from "../../../application/dataset-studio/UnifiedIngestionOrchestrationService";
-import { SourceInputKinds } from "../../../application/dataset-studio/SourceLocatorInputAbstraction";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@application/dataset-studio/UnifiedIngestionAsset";
+import type { UnifiedIngestionPreviewSuccess } from "@application/dataset-studio/UnifiedIngestionOrchestrationService";
+import { SourceInputKinds } from "@application/dataset-studio/SourceLocatorInputAbstraction";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { UnifiedIngestionReferenceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import AssetConfigurationPanel from "./AssetConfigurationPanel";
 import type { AssetConfigurationMode } from "./AssetConfigurationPanel";
 import DataPreviewPanel from "./DataPreviewPanel";
@@ -1101,7 +1101,7 @@ export default function DatasetStudioDraftPreviewPanel({
               {unifiedBatchSummary.items.slice(0, 20).map((item, index) => (
                 <li key={`${item.source.sourceId}-${index}`} className="ui-row ui-row--between ui-row--wrap">
                   <span>{item.source.displayName ?? item.source.reference}</span>
-                  <span className="ui-subtle">{item.status}{item.routeHandler ? ` • ${item.routeHandler}` : ""}</span>
+                  <span className="ui-subtle">{item.status}{item.routeHandler ? ` â€¢ ${item.routeHandler}` : ""}</span>
                 </li>
               ))}
             </ul>
@@ -1150,3 +1150,4 @@ export default function DatasetStudioDraftPreviewPanel({
     </section>
   );
 }
+

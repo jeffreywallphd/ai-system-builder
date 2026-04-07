@@ -1,13 +1,13 @@
-import {
+﻿import {
   AssetSelectorResultKinds,
   AssetSelectorSelectionTypes,
   type AssetSelectorAssetReference,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionStore,
-} from "../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@application/studio-entry/AssetSelectorSessionStore";
 import { InlineAssetCreationService } from "../../routes/InlineAssetCreation";
 import {
   type StudioReturnPayloadResolutionKind,
@@ -275,4 +275,5 @@ export class AssetSelectorReturnHandoffService {
     return false;
   }
 }
+
 

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import { DataConverterCore } from "../DataConverterCore";
 import { DataSourceReferenceKinds } from "../DataConverterContracts";
 import {
@@ -230,3 +230,4 @@ describe("DefaultDataAssetExecutionFramework", () => {
     expect(result.validationIssues.length).toBe(0);
   });
 });
+

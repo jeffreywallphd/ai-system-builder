@@ -1,4 +1,4 @@
-import type { SystemStudioContextExtractionSource } from "../../../../application/workflow-studio/SystemStudioContextExtraction";
+﻿import type { SystemStudioContextExtractionSource } from "@application/workflow-studio/SystemStudioContextExtraction";
 import type { ImageInterfaceState } from "./ImageSystemStateIntegration";
 
 export function mapImageInterfaceStateToSystemContextSource(
@@ -61,3 +61,4 @@ export function mapImageInterfaceStateToSystemContextSource(
     }),
   });
 }
+

@@ -1,7 +1,7 @@
-import { useMemo } from "react";
-import { SystemContextDebugPreviewService } from "../../../application/workflow-studio/SystemContextDebugPreviewService";
-import type { SystemStudioContextExtractionSource } from "../../../application/workflow-studio/SystemStudioContextExtraction";
-import type { SystemContextValidationRequest } from "../../../application/workflow-studio/SystemContextValidationService";
+﻿import { useMemo } from "react";
+import { SystemContextDebugPreviewService } from "@application/workflow-studio/SystemContextDebugPreviewService";
+import type { SystemStudioContextExtractionSource } from "@application/workflow-studio/SystemStudioContextExtraction";
+import type { SystemContextValidationRequest } from "@application/workflow-studio/SystemContextValidationService";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 
 interface SystemSpecContent {
@@ -129,3 +129,4 @@ export function SystemContextDebugPreviewPanel({ context }: { readonly context: 
     </div>
   );
 }
+

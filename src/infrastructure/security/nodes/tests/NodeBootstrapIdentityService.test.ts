@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { NodeRoleCapabilities, NodeTypes } from "../../../../domain/nodes/NodeTrustDomain";
-import { parseNodeEnrollmentSubmissionRequestDto } from "../../../../shared/schemas/nodes/NodeTrustApiSchemaContracts";
+import { NodeRoleCapabilities, NodeTypes } from "@domain/nodes/NodeTrustDomain";
+import { parseNodeEnrollmentSubmissionRequestDto } from "@shared/schemas/nodes/NodeTrustApiSchemaContracts";
 import {
   NodeBootstrapIdentityService,
   NodeBootstrapIdentityServiceError,
@@ -124,3 +124,4 @@ describe("NodeBootstrapIdentityService", () => {
     })).rejects.toThrow(NodeBootstrapIdentityServiceError);
   });
 });
+

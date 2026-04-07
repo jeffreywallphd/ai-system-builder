@@ -1,7 +1,7 @@
-import {
+﻿import {
   type RuntimeDiagnostics,
   type RuntimeLogVerbosity,
-} from "../../../application/runtime/RuntimeDiagnostics";
+} from "@application/runtime/RuntimeDiagnostics";
 import type { RuntimeConsoleLogEntry } from "../../state/RuntimeConsoleStore";
 
 export type RuntimeConsoleLogFilter = "all" | "error" | "warn" | "info";
@@ -83,7 +83,7 @@ export default function RuntimeLogsList({
               disabled={!canRestartRuntime || isRestartingRuntime}
               onClick={onRestartRuntime}
             >
-              {isRestartingRuntime ? "Restarting…" : "Restart runtime"}
+              {isRestartingRuntime ? "Restartingâ€¦" : "Restart runtime"}
             </button>
           ) : null}
         </div>
@@ -240,3 +240,4 @@ function mapBadgeVariant(severity: RuntimeConsoleLogEntry["severity"]): "healthy
 function presentLogSource(source: RuntimeConsoleLogEntry["source"]): string {
   return source.replaceAll("-", " ");
 }
+

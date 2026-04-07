@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionReferenceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { IntentService } from "../IntentService";
 import { StageExecutionPolicy } from "../StageExecutionPolicy";
 import { TemplateService } from "../TemplateService";
@@ -263,3 +263,4 @@ describe("WizardFlowEngine", () => {
     expect(tracking.normalization?.metadata.status.marker).toBe("pending");
   });
 });
+

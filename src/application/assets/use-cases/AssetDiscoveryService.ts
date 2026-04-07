@@ -1,12 +1,12 @@
-import {
+﻿import {
   AssetLifecycleStates,
   AssetVisibilities,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoles,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import {
   publishAssetAuditEventBestEffort,
@@ -231,3 +231,4 @@ function resolveVisibilityFilter(
       ]);
   }
 }
+

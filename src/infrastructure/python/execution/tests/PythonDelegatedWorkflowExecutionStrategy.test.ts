@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { PythonDelegatedWorkflowExecutionStrategy } from "../PythonDelegatedWorkflowExecutionStrategy";
 
 describe("PythonDelegatedWorkflowExecutionStrategy", () => {
@@ -17,3 +17,4 @@ describe("PythonDelegatedWorkflowExecutionStrategy", () => {
     expect(result.status).toBe("completed");
   });
 });
+

@@ -1,11 +1,11 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type {
   MultiAssetStudioHandoffContract,
   StudioHandoffContract,
   TargetStudioInputContract,
-} from "../../domain/studio-handoff/StudioHandoffContract";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import { listStudioHandoffPrefillKeys } from "../../domain/studio-handoff/StudioHandoffContext";
+} from "@domain/studio-handoff/StudioHandoffContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import { listStudioHandoffPrefillKeys } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioCapabilityDescriptor, StudioCapabilityQueryService } from "./StudioCapabilityRegistry";
 import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
@@ -367,3 +367,4 @@ export class StudioHandoffCompatibilityValidator {
     ].join("::");
   }
 }
+

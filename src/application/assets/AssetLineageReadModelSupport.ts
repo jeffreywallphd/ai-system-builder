@@ -1,4 +1,4 @@
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import type { AssetVersion } from "@domain/assets/AssetVersion";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
@@ -73,3 +73,4 @@ async function toVersionSummary(
     transformationCount: transformations.length,
   });
 }
+

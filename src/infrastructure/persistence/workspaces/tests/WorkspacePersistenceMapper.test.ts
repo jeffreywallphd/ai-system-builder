@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkspaceInvitationStatuses,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
   WorkspaceStatuses,
-} from "../../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   mapWorkspaceInvitationRowToDomain,
   mapWorkspaceMembershipRowToDomain,
@@ -118,3 +118,4 @@ describe("WorkspacePersistenceMapper", () => {
     expect(normalizeEmailLookup(" MEMBER@EXAMPLE.COM ")).toBe("member@example.com");
   });
 });
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { AgentMcpToolGovernanceService } from "../services/AgentMcpToolGovernanceService";
-import { createAgent } from "../../../domain/agents/Agent";
-import { AssetId } from "../../../domain/assets/AssetId";
-import { createAgentPlan } from "../../../domain/agents/AgentPlan";
-import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+import { createAgent } from "@domain/agents/Agent";
+import { AssetId } from "@domain/assets/AssetId";
+import { createAgentPlan } from "@domain/agents/AgentPlan";
+import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
 
 function makeAgent() {
@@ -99,3 +99,4 @@ describe("AgentMcpToolGovernanceService", () => {
     expect(result.issues[0]?.code).toBe("tool-not-installed");
   });
 });
+

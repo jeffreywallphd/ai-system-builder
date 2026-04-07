@@ -1,9 +1,9 @@
-import { Model, ModelArtifact, ModelSource } from "../../domain/models/Model";
+﻿import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
 import {
   ModelCreationCapabilityPolicy,
   type ModelCreationRecommendedAction,
   type ModelCreationSupportState,
-} from "../../domain/model-training/ModelCreationSupport";
+} from "@domain/model-training/ModelCreationSupport";
 import type { IInstalledModelCatalog } from "../ports/interfaces/IInstalledModelCatalog";
 import type { IModelTrainingJobRepository } from "../ports/interfaces/IModelTrainingJobRepository";
 import type { IModelTrainingRuntime } from "../ports/interfaces/IModelTrainingRuntime";
@@ -11,10 +11,10 @@ import type { IModelCreationEnvironmentGateway } from "../ports/interfaces/IMode
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
-import type { DatasetRepository, DatasetVersionRepository, DatasetTaskType } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import { ChatCompletionExample, QuestionAnsweringExample } from "../../domain/tuning-datasets/TuningDatasetEntities";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { ModelTrainingArtifact, ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { DatasetRepository, DatasetVersionRepository, DatasetTaskType } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import { ChatCompletionExample, QuestionAnsweringExample } from "@domain/tuning-datasets/TuningDatasetEntities";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { ModelTrainingArtifact, ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import type { ModelTrainingApplicationService } from "./ModelTrainingApplicationService";
 import {
   createModelPreparationExecutionPlan,
@@ -491,7 +491,7 @@ export class DefaultModelTrainingApplicationService implements ModelTrainingAppl
     return Object.freeze({
       job,
       userFacingStatus: presentJobStatus(job),
-      technicalSummary: [job.backend, job.provenance.truthfulness, job.provenance.runMode].join(" • "),
+      technicalSummary: [job.backend, job.provenance.truthfulness, job.provenance.runMode].join(" â€¢ "),
       technicalDetails: Object.freeze({
         baseModel: baseModel?.name ?? job.baseModelId,
         durablePath: job.provenance.path,
@@ -669,3 +669,4 @@ function selectPromotableArtifact(job: ModelTrainingJob): ModelTrainingArtifact 
 function buildPromotedModelId(job: ModelTrainingJob, artifact: ModelTrainingArtifact): string {
   return `trained-output:${job.id}:${artifact.id}`;
 }
+

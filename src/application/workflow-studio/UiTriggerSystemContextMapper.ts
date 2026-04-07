@@ -1,10 +1,10 @@
-import type { UiTriggerEvent } from "./UiTriggerEventContract";
+﻿import type { UiTriggerEvent } from "./UiTriggerEventContract";
 import {
   createSystemContextContract,
   type SystemContextContract,
   type SystemContextDatasetReference,
   type SystemContextImageReference,
-} from "../../domain/system-studio/SystemContextContract";
+} from "@domain/system-studio/SystemContextContract";
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -143,3 +143,4 @@ export function createDefaultUiTriggerSystemContextMapper(): UiTriggerSystemCont
     },
   });
 }
+

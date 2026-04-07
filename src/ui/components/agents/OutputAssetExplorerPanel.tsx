@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { CanonicalAssetDetailReadModel, CanonicalVersionChainItemReadModel } from "../../../application/assets-system/AssetManagementReadModels";
+﻿import { useState } from "react";
+import type { CanonicalAssetDetailReadModel, CanonicalVersionChainItemReadModel } from "@application/assets-system/AssetManagementReadModels";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 
 interface OutputAssetExplorerPanelProps {
@@ -53,7 +53,7 @@ export function OutputAssetExplorerPanel(props: OutputAssetExplorerPanelProps): 
       {assetDetail ? (
         <div className="ui-stack ui-stack--2xs">
           <p className="ui-text-small">
-            <strong>{assetDetail.name}</strong> ({assetDetail.kind}) · status={assetDetail.status} · latest={assetDetail.latestVersionId ?? "n/a"}
+            <strong>{assetDetail.name}</strong> ({assetDetail.kind}) Â· status={assetDetail.status} Â· latest={assetDetail.latestVersionId ?? "n/a"}
           </p>
           {assetDetail.taxonomy ? (
             <p className="ui-text-small ui-text-secondary">
@@ -71,7 +71,7 @@ export function OutputAssetExplorerPanel(props: OutputAssetExplorerPanelProps): 
                   <li key={version.versionId} className="ui-text-small ui-text-secondary">
                     {version.versionId}
                     {version.parentVersionId ? ` <- ${version.parentVersionId}` : ""}
-                    {version.dependencyState ? ` · ${version.dependencyState.state}` : ""}
+                    {version.dependencyState ? ` Â· ${version.dependencyState.state}` : ""}
                   </li>
                 ))}
               </ul>
@@ -82,3 +82,4 @@ export function OutputAssetExplorerPanel(props: OutputAssetExplorerPanelProps): 
     </section>
   );
 }
+

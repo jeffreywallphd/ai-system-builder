@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
-} from "../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 import {
   AuthoritativeServerHostRuntime,
   HostRuntimeCatalog,
@@ -65,4 +65,5 @@ describe("HostRuntimeCatalog", () => {
     expect(serverMetadata.roleInspection.supportsNodeExecution).toBeFalse();
   });
 });
+
 

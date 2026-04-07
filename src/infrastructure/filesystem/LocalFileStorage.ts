@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+﻿import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
   IFileStorage,
@@ -8,7 +8,7 @@ import type {
   IFileStorageMoveRequest,
   IFileStorageReadResult,
   IFileStorageWriteRequest,
-} from "../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/interfaces/IFileStorage";
 
 function normalizePath(value: string): string {
   const normalized = value.trim();
@@ -259,3 +259,4 @@ function isNodeError(
 ): error is NodeJS.ErrnoException {
   return !!error && typeof error === "object" && "code" in error && error.code === code;
 }
+

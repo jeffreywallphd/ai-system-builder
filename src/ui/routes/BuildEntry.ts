@@ -1,9 +1,9 @@
-import {
+﻿import {
   UxTaxonomyPresentationModes,
   UxTaxonomySuppressionPolicy,
   UxTaxonomyVisibilityRules,
 } from "../taxonomy/UxTaxonomySuppression";
-import type { StudioEntryContext } from "../../application/studio-entry/StudioEntryContracts";
+import type { StudioEntryContext } from "@application/studio-entry/StudioEntryContracts";
 import { BuildEntryFeatureFlag } from "../features/BuildEntryFeatureFlag";
 import { ROUTE_PATHS } from "./RouteConfig";
 import {
@@ -90,3 +90,4 @@ export class BuildEntryService {
     return mode === UxTaxonomyPresentationModes.intentPrimary;
   }
 }
+

@@ -1,4 +1,4 @@
-import type { DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import type { DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import type { DeploymentAccessContext } from "./DeploymentAccessControl";
 
 export const DeploymentQuotaActions = Object.freeze({
@@ -235,3 +235,4 @@ export class DeploymentQuotaEvaluator {
     });
   }
 }
+

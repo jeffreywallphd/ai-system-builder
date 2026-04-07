@@ -1,5 +1,5 @@
-import type { ImageRunHistoryRecord } from "../../application/system-runtime/ImageRunHistoryDataContract";
-import type { OutputGalleryItem } from "../../application/system-runtime/OutputGalleryDataContract";
+﻿import type { ImageRunHistoryRecord } from "@application/system-runtime/ImageRunHistoryDataContract";
+import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
 
 export interface ReferenceImageCrossStudioSyncRequest {
   readonly refreshSharedStudioSnapshot: () => Promise<void>;
@@ -58,3 +58,4 @@ export class ReferenceImageCrossStudioSyncService {
     });
   }
 }
+

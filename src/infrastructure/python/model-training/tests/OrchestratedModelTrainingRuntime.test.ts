@@ -1,5 +1,5 @@
-import { describe, expect, it, mock } from "bun:test";
-import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "../../../../application/runtime/RuntimeDependencyOrchestrator";
+﻿import { describe, expect, it, mock } from "bun:test";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "@application/runtime/RuntimeDependencyOrchestrator";
 import { OrchestratedModelTrainingRuntime } from "../OrchestratedModelTrainingRuntime";
 
 describe("OrchestratedModelTrainingRuntime", () => {
@@ -53,3 +53,4 @@ describe("OrchestratedModelTrainingRuntime", () => {
     expect(delegate.submitJob).not.toHaveBeenCalled();
   });
 });
+

@@ -1,4 +1,4 @@
-import type { WorkspaceInvitationStatus, WorkspaceMembershipStatus, WorkspaceRole, WorkspaceRoleAssignmentStatus } from "../../../../domain/workspaces/WorkspaceDomain";
+﻿import type { WorkspaceInvitationStatus, WorkspaceMembershipStatus, WorkspaceRole, WorkspaceRoleAssignmentStatus } from "@domain/workspaces/WorkspaceDomain";
 
 export const WorkspaceInvitationApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -109,4 +109,5 @@ export interface AcceptWorkspaceInvitationOnboardingApiResponse {
   readonly createdRoleAssignments: ReadonlyArray<WorkspaceRoleAssignmentApiRecord>;
   readonly resolvedMembershipStatus: WorkspaceMembershipStatus;
 }
+
 

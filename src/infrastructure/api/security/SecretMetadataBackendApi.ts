@@ -1,19 +1,19 @@
-import { randomUUID } from "node:crypto";
-import { WorkspaceMembershipStatuses } from "../../../domain/workspaces/WorkspaceDomain";
-import { SecretAccessActions, SecretActorTypes, SecretScopes, type SecretAccessActor, type SecretKind, type SecretReference, type SecretScopeOwner } from "../../../domain/security/SecretDomain";
-import type { CreateSecretUseCase } from "../../../application/security/use-cases/CreateSecretUseCase";
-import type { DisableSecretUseCase } from "../../../application/security/use-cases/DisableSecretUseCase";
-import type { GetSecretMetadataUseCase } from "../../../application/security/use-cases/GetSecretMetadataUseCase";
-import type { ListSecretsUseCase } from "../../../application/security/use-cases/ListSecretsUseCase";
-import type { ReEncryptSecretsUseCase } from "../../../application/security/use-cases/ReEncryptSecretsUseCase";
-import type { RotateSecretUseCase } from "../../../application/security/use-cases/RotateSecretUseCase";
-import { SecretServiceErrorCodes } from "../../../application/security/use-cases/SecretManagementServiceContracts";
-import type { IWorkspaceAuthorizationReadRepository } from "../../../application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+﻿import { randomUUID } from "node:crypto";
+import { WorkspaceMembershipStatuses } from "@domain/workspaces/WorkspaceDomain";
+import { SecretAccessActions, SecretActorTypes, SecretScopes, type SecretAccessActor, type SecretKind, type SecretReference, type SecretScopeOwner } from "@domain/security/SecretDomain";
+import type { CreateSecretUseCase } from "@application/security/use-cases/CreateSecretUseCase";
+import type { DisableSecretUseCase } from "@application/security/use-cases/DisableSecretUseCase";
+import type { GetSecretMetadataUseCase } from "@application/security/use-cases/GetSecretMetadataUseCase";
+import type { ListSecretsUseCase } from "@application/security/use-cases/ListSecretsUseCase";
+import type { ReEncryptSecretsUseCase } from "@application/security/use-cases/ReEncryptSecretsUseCase";
+import type { RotateSecretUseCase } from "@application/security/use-cases/RotateSecretUseCase";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type {
   SecretServiceHealthViewDto,
   SecretServiceOperationalDiagnosticsViewDto,
-} from "../../../shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
-import { toSecretMetadataQueryDto } from "../../../shared/dto/security/SecretTransportDtos";
+} from "@shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
+import { toSecretMetadataQueryDto } from "@shared/dto/security/SecretTransportDtos";
 import {
   SecretApiSchemaValidationError,
   parseCreateSecretMetadataCommand,
@@ -23,7 +23,7 @@ import {
   parseListSecretMetadataQuery,
   parseReEncryptSecretsCommand,
   parseRotateSecretMetadataCommand,
-} from "../../../shared/schemas/security/SecretApiSchemaContracts";
+} from "@shared/schemas/security/SecretApiSchemaContracts";
 import {
   SecretMetadataApiErrorCodes,
   type CreateSecretMetadataApiRequest,
@@ -1019,3 +1019,4 @@ function sanitizeSecretServiceOperationalDiagnostics(
     }),
   });
 }
+

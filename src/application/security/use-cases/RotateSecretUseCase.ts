@@ -1,9 +1,9 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretDomainError,
   rotateSecretRecord,
   toSecretReference,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -418,3 +418,4 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
+

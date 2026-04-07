@@ -1,13 +1,13 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   ICommonImageNodeContract,
   ICommonImageNodeDatasetSelection,
   ICommonImageNodeInternalImage,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
-import type { DatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
-import type { DatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+import type { DatasetInstanceRepository } from "@application/system-runtime/DatasetInstanceRepository";
+import type { DatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -219,3 +219,4 @@ export class ComfyLoadImageNodeAdapter extends ComfyImageNodeAdapterBase {
     return normalized.length > 0 ? normalized : undefined;
   }
 }
+

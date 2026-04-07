@@ -1,6 +1,6 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import { WorkflowDraftOutputDestinationTypes } from "../../domain/workflow-studio/WorkflowStudioDomain";
-import type { IExecuteWorkflowRequest, IExecuteWorkflowResult } from "../../application/workflows/ExecuteWorkflowUseCase";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import { WorkflowDraftOutputDestinationTypes } from "@domain/workflow-studio/WorkflowStudioDomain";
+import type { IExecuteWorkflowRequest, IExecuteWorkflowResult } from "@application/workflows/ExecuteWorkflowUseCase";
 import type { WorkflowConversationPromptBinding } from "./WorkflowConversationContracts";
 
 export interface WorkflowConversationOutputConfiguration {
@@ -211,3 +211,4 @@ export function evaluateWorkflowConversationEligibility(
     }),
   });
 }
+

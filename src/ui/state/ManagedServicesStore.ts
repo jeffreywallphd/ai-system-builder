@@ -1,13 +1,13 @@
-import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+﻿import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
 import {
   appendDistinctRuntimeEvent,
   collapseConsecutiveRuntimeEvents,
-} from "../../application/runtime/RuntimeEventStability";
-import type { ManagedServiceDefinitionInput } from "../../application/services/ManagedServiceDefinition";
+} from "@application/runtime/RuntimeEventStability";
+import type { ManagedServiceDefinitionInput } from "@application/services/ManagedServiceDefinition";
 import type { ManagedServiceRecord, ManagedServicesService } from "../services/ManagedServicesService";
 import type { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
-import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../../application/services/ManagedServiceIds";
-import { RuntimeDependencyIds, type IRuntimeDependencyOrchestrator } from "../../application/runtime/RuntimeDependencyOrchestrator";
+import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "@application/services/ManagedServiceIds";
+import { RuntimeDependencyIds, type IRuntimeDependencyOrchestrator } from "@application/runtime/RuntimeDependencyOrchestrator";
 
 export interface ManagedServicesStoreState {
   readonly services: ReadonlyArray<ManagedServiceRecord>;
@@ -373,3 +373,4 @@ function resolveSelectedServiceId(
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown managed service error.";
 }
+

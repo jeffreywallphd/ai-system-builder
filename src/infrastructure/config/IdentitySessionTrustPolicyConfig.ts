@@ -1,9 +1,9 @@
-import { IdentitySessionAccessChannels } from "../../domain/identity/IdentityDomain";
+﻿import { IdentitySessionAccessChannels } from "@domain/identity/IdentityDomain";
 import {
   IdentitySessionTrustRequirements,
   type IdentitySessionTrustRequirement,
-} from "../../application/identity/ports/IIdentitySessionTrustService";
-import type { TrustedDeviceSessionTrustPolicies } from "../../application/identity/services/TrustedDeviceSessionTrustService";
+} from "@application/identity/ports/IIdentitySessionTrustService";
+import type { TrustedDeviceSessionTrustPolicies } from "@application/identity/services/TrustedDeviceSessionTrustService";
 
 export interface IdentitySessionTrustPolicyConfigValues {
   readonly desktop?: IdentitySessionTrustRequirement;
@@ -51,3 +51,4 @@ function parseTrustRequirement(value: string | undefined): IdentitySessionTrustR
     `Identity session trust policy value '${value}' must be one of allow-untrusted, allow-pairing, require-trusted.`,
   );
 }
+

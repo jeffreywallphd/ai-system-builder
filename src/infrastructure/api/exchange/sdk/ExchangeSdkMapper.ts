@@ -1,13 +1,13 @@
-import type {
+﻿import type {
   AtomicAssetExportResult,
   AtomicAssetImportResult,
   CompositeAssetExportResult,
   CompositeAssetImportResult,
   SystemAssetExportResult,
   SystemAssetImportResult,
-} from "../../../../application/exchange/AssetExportServices";
-import type { ExchangeCatalogEntry } from "../../../../domain/exchange/ExchangeCatalog";
-import type { PublishPackageResult } from "../../../../application/exchange/ExchangePublishWorkflow";
+} from "@application/exchange/AssetExportServices";
+import type { ExchangeCatalogEntry } from "@domain/exchange/ExchangeCatalog";
+import type { PublishPackageResult } from "@application/exchange/ExchangePublishWorkflow";
 import type {
   ExchangeSdkCatalogEntrySummary,
   ExchangeSdkExportResult,
@@ -126,3 +126,4 @@ export function toExchangeSdkPublishResult(result: Extract<PublishPackageResult,
     },
   });
 }
+

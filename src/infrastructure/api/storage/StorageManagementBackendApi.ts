@@ -1,18 +1,18 @@
-import { randomUUID } from "node:crypto";
-import type { IStorageCapabilityInspectionPort, StorageBackendCapabilitySnapshot } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
-import type { StorageSynchronizationAdapter, StorageSynchronizationStateSnapshot } from "../../../infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
-import { toStorageSynchronizationMetadataDto } from "../../../infrastructure/storage/sync/StorageSynchronizationTransportMapper";
-import type { IStorageManagementService, StorageManagementErrorCode } from "../../../application/storage/use-cases/StorageManagementServiceContracts";
-import { StorageManagementErrorCodes } from "../../../application/storage/use-cases/StorageManagementServiceContracts";
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import { randomUUID } from "node:crypto";
+import type { IStorageCapabilityInspectionPort, StorageBackendCapabilitySnapshot } from "@application/storage/ports/StorageCapabilityInspectionPort";
+import type { StorageSynchronizationAdapter, StorageSynchronizationStateSnapshot } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
+import { toStorageSynchronizationMetadataDto } from "@infrastructure/storage/sync/StorageSynchronizationTransportMapper";
+import type { IStorageManagementService, StorageManagementErrorCode } from "@application/storage/use-cases/StorageManagementServiceContracts";
+import { StorageManagementErrorCodes } from "@application/storage/use-cases/StorageManagementServiceContracts";
+import type { StorageInstance } from "@domain/storage/StorageDomain";
 import {
   toCreateStorageInstanceResponseDto,
   toGetStorageInstanceDetailResponseDto,
   toListStorageInstancesResponseDto,
   toUpdateStorageInstanceResponseDto,
   type StorageDtoProjectionOptions,
-} from "../../../shared/dto/storage/StorageTransportDtos";
-import type { StorageSyncStatus } from "../../../shared/contracts/storage/StorageTransportContracts";
+} from "@shared/dto/storage/StorageTransportDtos";
+import type { StorageSyncStatus } from "@shared/contracts/storage/StorageTransportContracts";
 import {
   StorageTransportSchemaValidationError,
   parseCreateStorageInstanceRequestDto,
@@ -21,7 +21,7 @@ import {
   parseListStorageInstancesResponseDto,
   parseUpdateStorageInstanceRequestDto,
   parseUpdateStorageInstanceResponseDto,
-} from "../../../shared/schemas/storage/StorageTransportSchemaContracts";
+} from "@shared/schemas/storage/StorageTransportSchemaContracts";
 import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
@@ -691,3 +691,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { CoreImageStarterWorkflowTemplates } from "../../../../application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
-import { WorkflowTemplateInstantiationService } from "../../../../application/workflow-template-studio/WorkflowTemplateInstantiationService";
-import type { WorkflowTemplateDefinition } from "../../../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import { useEffect, useMemo, useState } from "react";
+import { CoreImageStarterWorkflowTemplates } from "@application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
+import { WorkflowTemplateInstantiationService } from "@application/workflow-template-studio/WorkflowTemplateInstantiationService";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import { RegistryService } from "../../../services/RegistryService";
 
 interface WorkflowTemplateSelectionPanelProps {
@@ -20,7 +20,7 @@ interface TemplateEntry {
 const fallbackById = new Map(CoreImageStarterWorkflowTemplates.map((entry) => [entry.templateId, entry] as const));
 
 function summarizeIo(template: WorkflowTemplateDefinition): string {
-  return `${template.inputRequirements.length} input(s) • ${template.outputExpectations.length} output(s)`;
+  return `${template.inputRequirements.length} input(s) â€¢ ${template.outputExpectations.length} output(s)`;
 }
 
 export default function WorkflowTemplateSelectionPanel({ surface }: WorkflowTemplateSelectionPanelProps): JSX.Element {
@@ -122,7 +122,7 @@ export default function WorkflowTemplateSelectionPanel({ surface }: WorkflowTemp
         </select>
       </label>
 
-      {loading ? <div className="ui-text-small ui-text-secondary">Loading templates…</div> : null}
+      {loading ? <div className="ui-text-small ui-text-secondary">Loading templatesâ€¦</div> : null}
 
       <div className="ui-template-selection-grid">
         <ul className="ui-stack ui-stack--2xs" role="listbox" aria-label="Workflow templates">
@@ -137,7 +137,7 @@ export default function WorkflowTemplateSelectionPanel({ surface }: WorkflowTemp
                 >
                   <span className="ui-template-selection-card__title">{template.name}</span>
                   <span className="ui-text-small ui-text-muted">{template.summary}</span>
-                  <span className="ui-text-small ui-text-secondary">{template.category} • {definition ? summarizeIo(definition) : "inspectable"}</span>
+                  <span className="ui-text-small ui-text-secondary">{template.category} â€¢ {definition ? summarizeIo(definition) : "inspectable"}</span>
                 </button>
               </li>
             );
@@ -186,3 +186,4 @@ export default function WorkflowTemplateSelectionPanel({ surface }: WorkflowTemp
     </section>
   );
 }
+

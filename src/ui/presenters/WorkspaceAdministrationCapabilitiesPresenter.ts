@@ -1,4 +1,4 @@
-import type { WorkspaceAdminListItemApiRecord } from "../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+﻿import type { WorkspaceAdminListItemApiRecord } from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 
 export interface WorkspaceAdministrationCapabilityViewModel {
   readonly canManageWorkspaceSettings: boolean;
@@ -39,3 +39,4 @@ export function presentWorkspaceAdministrationCapabilities(
     canAdministrate: canManageWorkspaceSettings || canManageMembers || canManageInvitations || canManageRoles,
   });
 }
+

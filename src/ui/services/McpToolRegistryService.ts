@@ -1,9 +1,9 @@
-import {
+﻿import {
   type ApplyMcpToolUpdateResult,
   type ApplyMcpToolUpdateRequest,
   type PreviewMcpToolUpdateRequest,
   type PreviewMcpToolUpdateResult,
-} from "../../application/mcp/registry/McpToolRegistryUseCases";
+} from "@application/mcp/registry/McpToolRegistryUseCases";
 
 export interface UpdateMcpToolWithApprovalRequest extends ApplyMcpToolUpdateRequest {
   readonly requireExplicitApproval?: boolean;
@@ -37,3 +37,4 @@ export class McpToolRegistryService {
     });
   }
 }
+

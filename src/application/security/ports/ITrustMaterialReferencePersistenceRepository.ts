@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   CertificateAuthorityPersistenceMutationResult,
   SaveTrustMaterialReferencePersistenceRecordInput,
   TrustMaterialReferenceLookupQuery,
   TrustMaterialReferencePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface ITrustMaterialReferencePersistenceRepository {
   findTrustMaterialByRef(materialRef: string): Promise<TrustMaterialReferencePersistenceRecord | undefined>;
@@ -14,3 +14,4 @@ export interface ITrustMaterialReferencePersistenceRepository {
     input: SaveTrustMaterialReferencePersistenceRecordInput,
   ): Promise<CertificateAuthorityPersistenceMutationResult<TrustMaterialReferencePersistenceRecord>>;
 }
+

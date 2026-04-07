@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../../ports/interfaces/IFileStorage";
 import { WorkflowTemplateAssetService } from "../WorkflowTemplateAssetService";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 
 class InMemoryAssetCatalog implements IAssetCatalog {
   private readonly records = new Map<string, IAsset>();
@@ -105,3 +105,4 @@ describe("WorkflowTemplateAssetService", () => {
     expect(defaults.steps).toBe(20);
   });
 });
+

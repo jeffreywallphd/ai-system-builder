@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DataStudioPreparationWizard,
   DataStudioWizardPresentationModes,
   createDefaultDataStudioPreparationAssetDefinition,
 } from "../DataStudioPreparationWizard";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
-import { UnifiedPreparationStageActivationModes } from "../../../domain/dataset-studio/UnifiedPreparationAsset";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import { UnifiedPreparationStageActivationModes } from "@domain/dataset-studio/UnifiedPreparationAsset";
 
 describe("DataStudioPreparationWizard", () => {
   it("initializes from intent templates and supports template selection", () => {
@@ -161,4 +161,5 @@ describe("DataStudioPreparationWizard", () => {
     expect(handoff.authoringGraph.nodes.length).toBeGreaterThan(0);
   });
 });
+
 

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { InstallModelUseCase } from "../InstallModelUseCase";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeInstalledModelCatalog, makeModelInstaller, makeRemoteModelCatalog } from "./testUtils";
 
 describe("InstallModelUseCase", () => {
@@ -55,3 +55,4 @@ describe("InstallModelUseCase", () => {
     await expect(useCase.execute({ remoteId: "x", destination: "/tmp" })).rejects.toThrow("remote model catalog");
   });
 });
+

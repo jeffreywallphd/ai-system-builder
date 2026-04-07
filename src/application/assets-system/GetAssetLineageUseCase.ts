@@ -1,5 +1,5 @@
-import type { AssetLineageDirection, IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+﻿import type { AssetLineageDirection, IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 
 export class GetAssetLineageUseCase {
   constructor(private readonly lineageRepository: IAssetLineageRepository) {}
@@ -46,3 +46,4 @@ export class GetAssetLineageUseCase {
     return Object.freeze(results);
   }
 }
+

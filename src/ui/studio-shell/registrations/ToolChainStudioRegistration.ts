@@ -1,4 +1,4 @@
-import { createToolChainStudioTaxonomy, ToolChainStudioIdentity } from "../../../domain/tool-chain-studio/ToolChainStudioDomain";
+﻿import { createToolChainStudioTaxonomy, ToolChainStudioIdentity } from "@domain/tool-chain-studio/ToolChainStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -88,3 +88,4 @@ export const toolChainStudioRegistration: CompositeStudioRegistration = Object.f
     },
   ]),
 });
+

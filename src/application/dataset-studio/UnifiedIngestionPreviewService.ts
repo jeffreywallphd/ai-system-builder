@@ -1,14 +1,14 @@
-import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
+﻿import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import type {
   UnifiedIngestionIssue,
   UnifiedIngestionNormalizedOutput,
   UnifiedIngestionSourceReference,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
   UnifiedIngestionIssueSeverities,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 export interface UnifiedIngestionPreviewSampleItem {
   readonly sampleId: string;
@@ -215,3 +215,4 @@ export class UnifiedIngestionPreviewService {
     }
   }
 }
+

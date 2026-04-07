@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   SessionRevocationReasons,
   type Session,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import { IdentityLifecycleEventTypes, type IdentityLifecycleEvent } from "../../contracts/IdentityLifecycleEventContracts";
 import type { IdentitySessionTokenMaterialRecord } from "../../contracts/IdentityApplicationContracts";
 import {
@@ -533,3 +533,4 @@ describe("IdentityAuthenticatedSessionService", () => {
     expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.sessionTrustInvalidated)).toBeTrue();
   });
 });
+

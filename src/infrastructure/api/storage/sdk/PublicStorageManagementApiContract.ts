@@ -1,6 +1,6 @@
-import type { StorageBackendCapabilitySnapshot } from "../../../../application/storage/ports/StorageCapabilityInspectionPort";
-import type { StorageProvisioningReceipt } from "../../../../application/storage/ports/StorageProvisioningPort";
-import type { StorageLifecycleState } from "../../../../domain/storage/StorageDomain";
+﻿import type { StorageBackendCapabilitySnapshot } from "@application/storage/ports/StorageCapabilityInspectionPort";
+import type { StorageProvisioningReceipt } from "@application/storage/ports/StorageProvisioningPort";
+import type { StorageLifecycleState } from "@domain/storage/StorageDomain";
 import type {
   CreateStorageInstanceRequestDto,
   CreateStorageInstanceResponseDto,
@@ -10,8 +10,8 @@ import type {
   ListStorageInstancesResponseDto,
   UpdateStorageInstanceRequestDto,
   UpdateStorageInstanceResponseDto,
-} from "../../../../shared/dto/storage/StorageTransportDtos";
-import type { StorageSyncStatus, StorageSynchronizationMetadataDto } from "../../../../shared/contracts/storage/StorageTransportContracts";
+} from "@shared/dto/storage/StorageTransportDtos";
+import type { StorageSyncStatus, StorageSynchronizationMetadataDto } from "@shared/contracts/storage/StorageTransportContracts";
 
 export const StorageManagementApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -135,3 +135,4 @@ export interface GetStorageInstanceHealthApiResponse {
   readonly reasonCode: string;
   readonly operationalNotes: ReadonlyArray<string>;
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   ExchangeAccessActions,
   ExchangeAccessEvaluator,
   ExchangeAccessDeniedError,
@@ -9,8 +9,8 @@ import {
   withPublishablePackageStatus,
   type PublishablePackage,
   type PublishablePackageStatus,
-} from "../../domain/exchange/PublishablePackage";
-import type { ExchangeBundle } from "../../domain/exchange/ExchangeBundleDomain";
+} from "@domain/exchange/PublishablePackage";
+import type { ExchangeBundle } from "@domain/exchange/ExchangeBundleDomain";
 
 export interface IPublishablePackageRepository {
   save(entry: PublishablePackage): Promise<void>;
@@ -171,3 +171,4 @@ export class PublishablePackageService {
     }
   }
 }
+

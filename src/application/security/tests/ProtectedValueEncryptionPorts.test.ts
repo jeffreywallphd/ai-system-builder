@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { EncryptionKeyScopes } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { EncryptionKeyScopes } from "@domain/security/EncryptionAtRestPolicyDomain";
 import type {
   IEncryptionKeyMaterialPort,
   IProtectedValueEncryptionPort,
@@ -113,3 +113,4 @@ describe("ProtectedValueEncryption ports", () => {
     expect(Buffer.from(decrypted.value.plaintext).toString("utf8")).toBe("hello");
   });
 });
+

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -17,8 +17,8 @@ import {
   createWorkspaceInvitation,
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
-} from "../../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteWorkspacePersistenceAdapter } from "../SqliteWorkspacePersistenceAdapter";
 
@@ -490,3 +490,4 @@ describe("SqliteWorkspacePersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

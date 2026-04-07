@@ -1,5 +1,5 @@
-import type { IModelCompatibility, ModelModality, ModelTask, RuntimeEngine } from "../../../domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../../domain/models/interfaces/IModelDependency";
+﻿import type { IModelCompatibility, ModelModality, ModelTask, RuntimeEngine } from "@domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "@domain/models/interfaces/IModelDependency";
 
 export type NodePropertyType =
   | "text"
@@ -196,3 +196,4 @@ export interface INodeProperty<TValue = NodePropertyValue> {
    */
   isModelBound(): boolean;
 }
+

@@ -1,5 +1,5 @@
-import { ExecutionStatuses, type ExecutionStatus } from "../../domain/execution/ExecutionPlan";
-import type { IExecutionRunProvenance, IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+﻿import { ExecutionStatuses, type ExecutionStatus } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunProvenance, IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 
 export interface ExecutionRunProjection {
   readonly runId: string;
@@ -58,13 +58,13 @@ export class ExecutionRunProjectionService {
         truthfulProgress: truthfullyReportedProgress,
       }),
       terminalSummary: run.terminalSummary
-        ? [run.terminalSummary.headline, run.terminalSummary.detail].filter(Boolean).join(" — ")
+        ? [run.terminalSummary.headline, run.terminalSummary.detail].filter(Boolean).join(" â€” ")
         : undefined,
       executionPathLabel: executionPath.label,
       executionPathDetail: executionPath.detail,
       errorSummary: run.finalErrorMessage,
       diagnosticsSummary: run.diagnosticsSummary
-        ? [run.diagnosticsSummary.headline, run.diagnosticsSummary.detail].filter(Boolean).join(" — ")
+        ? [run.diagnosticsSummary.headline, run.diagnosticsSummary.detail].filter(Boolean).join(" â€” ")
         : undefined,
       startedAt: run.startedAt,
       updatedAt: run.updatedAt,
@@ -170,7 +170,7 @@ function resolveTruthfulProgress(
     lifecycleState ? `lifecycle ${lifecycleState}` : undefined,
     sessionState ? `session ${sessionState}` : undefined,
     serverState ? `server ${serverState}` : undefined,
-  ].filter((value): value is string => Boolean(value)).join(" • ");
+  ].filter((value): value is string => Boolean(value)).join(" â€¢ ");
 
   if (progressPercent === undefined && !label) {
     return undefined;
@@ -197,16 +197,16 @@ function describeProgressLabel(
   }
 
   if (params.truthfulProgress?.label) {
-    return `${baseline} • ${params.truthfulProgress.label}`;
+    return `${baseline} â€¢ ${params.truthfulProgress.label}`;
   }
 
   const supportsProgress = run.metadata?.supportsProgressEvents === true
     || run.metadata?.supportsPollingProgress === true;
   if (!supportsProgress) {
-    return `${baseline} • runtime progress unavailable`;
+    return `${baseline} â€¢ runtime progress unavailable`;
   }
 
-  return `${baseline} • ${params.progressPercent}%`;
+  return `${baseline} â€¢ ${params.progressPercent}%`;
 }
 
 function summarizeMetadata(run: IExecutionRunRecord): string | undefined {
@@ -217,7 +217,7 @@ function summarizeMetadata(run: IExecutionRunRecord): string | undefined {
     typeof run.metadata?.versionLabel === "string" ? run.metadata.versionLabel : undefined,
   ].filter((value): value is string => Boolean(value));
 
-  return values.length > 0 ? values.join(" • ") : undefined;
+  return values.length > 0 ? values.join(" â€¢ ") : undefined;
 }
 
 function mapStatusTone(status: ExecutionStatus): ExecutionRunProjection["statusTone"] {
@@ -263,3 +263,4 @@ function toTitleCase(value: string): string {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
+

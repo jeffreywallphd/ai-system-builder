@@ -1,4 +1,4 @@
-import type { IMcpToolExecutionAuditSink, McpToolExecutionAuditEvent } from "../../../application/ports/interfaces/IMcpToolExecutionAuditSink";
+﻿import type { IMcpToolExecutionAuditSink, McpToolExecutionAuditEvent } from "@application/ports/interfaces/IMcpToolExecutionAuditSink";
 
 const defaultStorageKey = "ai-loom-studio.mcp-tool-execution-audit";
 
@@ -34,3 +34,4 @@ function sanitizeEvent(event: McpToolExecutionAuditEvent): McpToolExecutionAudit
     metadata: event.metadata ? Object.freeze({ ...event.metadata }) : undefined,
   });
 }
+

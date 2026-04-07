@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createEnvironmentProvisioningRequest, EnvironmentProvisioningStatuses } from "../../../domain/deployment/EnvironmentProvisioningDomain";
-import { createDeploymentTarget, DeploymentTargetTypes } from "../../../domain/deployment/DeploymentTargetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createEnvironmentProvisioningRequest, EnvironmentProvisioningStatuses } from "@domain/deployment/EnvironmentProvisioningDomain";
+import { createDeploymentTarget, DeploymentTargetTypes } from "@domain/deployment/DeploymentTargetDomain";
 import { EnvironmentProvisioningCompatibilityValidator } from "../EnvironmentProvisioningCompatibilityValidator";
 import { EnvironmentProvisioningService } from "../EnvironmentProvisioningService";
 import { buildSampleBundle, createSampleConfiguration, createSamplePackage } from "./testUtils";
@@ -109,3 +109,4 @@ describe("EnvironmentProvisioningInterface", () => {
     expect(result.provisionedEnvironment?.bundleReproducibilityKey).toBe(bundle.manifest.build.reproducibilityKey);
   });
 });
+

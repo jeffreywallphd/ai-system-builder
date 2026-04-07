@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -16,10 +16,10 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   type WorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
-import { SqliteWorkflowPersistenceRepository } from "../../../infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
-import { WorkflowPersistenceStatuses } from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { openSqliteCompatDatabase } from "../../../infrastructure/filesystem/sqlite/SqliteCompat";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { SqliteWorkflowPersistenceRepository } from "@infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
+import { WorkflowPersistenceStatuses } from "@domain/workflow-studio/WorkflowPersistenceDomain";
+import { openSqliteCompatDatabase } from "@infrastructure/filesystem/sqlite/SqliteCompat";
 
 const createdRoots: string[] = [];
 
@@ -250,3 +250,4 @@ async function createBaselineRecord(repository: SqliteWorkflowPersistenceReposit
     metadata: { tags: ["malformed"] },
   });
 }
+

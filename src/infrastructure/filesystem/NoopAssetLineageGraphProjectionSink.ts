@@ -1,6 +1,6 @@
-import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
-import type { AssetTransformation } from "../../domain/assets/AssetTransformation";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+﻿import type { IAssetLineageGraphProjectionSink } from "@application/ports/interfaces/IAssetLineageGraphProjectionSink";
+import type { AssetTransformation } from "@domain/assets/AssetTransformation";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 
 export class NoopAssetLineageGraphProjectionSink implements IAssetLineageGraphProjectionSink {
   public async publishTransformation(_transformation: AssetTransformation): Promise<void> {
@@ -11,3 +11,4 @@ export class NoopAssetLineageGraphProjectionSink implements IAssetLineageGraphPr
     return;
   }
 }
+

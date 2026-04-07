@@ -1,4 +1,4 @@
-import type { RegistryAsset, RegistryDependencyReference } from "../../domain/asset-registry/RegistryAsset";
+﻿import type { RegistryAsset, RegistryDependencyReference } from "@domain/asset-registry/RegistryAsset";
 import type {
   RegistryGraphProjectionEdgeRecord,
   RegistryGraphProjectionNodeRecord,
@@ -77,3 +77,4 @@ export function buildRegistryGraphProjection(
     sourceSignature,
   });
 }
+

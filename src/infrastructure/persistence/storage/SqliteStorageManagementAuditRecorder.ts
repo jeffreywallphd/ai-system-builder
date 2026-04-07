@@ -1,10 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type {
   StorageManagementAuditEvent,
   StorageManagementAuditSink,
-} from "../../../application/storage/ports/StorageObservabilityPorts";
+} from "@application/storage/ports/StorageObservabilityPorts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   STORAGE_INSTANCE_PERSISTENCE_MIGRATIONS,
@@ -160,3 +160,4 @@ export class SqliteStorageManagementAuditRecorder implements StorageManagementAu
     return typeof row?.version === "number" ? row.version : 0;
   }
 }
+

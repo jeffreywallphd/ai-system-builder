@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import type { ExploreAssetSummary } from "../../../application/asset-registry/ExploreAssetQueryService";
+﻿import { Link } from "react-router-dom";
+import type { ExploreAssetSummary } from "@application/asset-registry/ExploreAssetQueryService";
 import { AssetActionExecutionService, AssetIntentActionTypes } from "../../routes/AssetIntentActions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import {
@@ -29,7 +29,7 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
   const actionService = new AssetActionExecutionService();
 
   if (isLoading) {
-    return <p className="ui-text-secondary">Loading explore assets…</p>;
+    return <p className="ui-text-secondary">Loading explore assetsâ€¦</p>;
   }
 
   if (error) {
@@ -86,7 +86,7 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
                 ))}
               </div>
               <div className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
-                <span className="ui-text-small ui-text-secondary">{asset.metadata.dependencyCount} upstream dep(s) • {asset.metadata.versionCount} version(s)</span>
+                <span className="ui-text-small ui-text-secondary">{asset.metadata.dependencyCount} upstream dep(s) â€¢ {asset.metadata.versionCount} version(s)</span>
                 <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
                   {workflowOpenPath ? (
                     <Link className="ui-button ui-button--ghost ui-button--small" to={workflowOpenPath}>
@@ -114,3 +114,4 @@ export function ExploreAssetList({ assets, isLoading, error, registryContextQuer
     </div>
   );
 }
+

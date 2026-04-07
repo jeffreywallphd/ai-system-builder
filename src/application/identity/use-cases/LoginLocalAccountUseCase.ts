@@ -1,15 +1,15 @@
-import {
+﻿import {
   CredentialStatuses,
   UserIdentityStatuses,
   type AuthProvider,
   type UserIdentity,
   type UserIdentityProviderLink,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -17,10 +17,10 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
@@ -354,3 +354,4 @@ export class LoginLocalAccountUseCase {
     return identityFailure(error);
   }
 }
+

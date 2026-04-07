@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetSelectorApplicationValidationService,
   AssetSelectorCapabilityRegistry,
@@ -11,7 +11,7 @@ import {
   AssetSelectorSelectionTypes,
   AssetSelectorValidationIssueCodes,
   createAssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 
 describe("AssetSelectorCapabilityRegistry", () => {
   it("supports default workflow input/step mappings", () => {
@@ -101,3 +101,4 @@ describe("AssetSelectorCapabilityRegistry", () => {
     expect(registry.isAssetTypeAllowed("workflow-training", "training-recipe")).toBeTrue();
   });
 });
+

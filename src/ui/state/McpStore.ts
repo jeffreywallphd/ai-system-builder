@@ -1,9 +1,9 @@
-import type { LocalMcpToolDraft } from "../../application/mcp/models/LocalMcpToolDraft";
-import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
-import type { McpServerDescriptor } from "../../application/mcp/models/McpServerDescriptor";
-import type { McpServerSearchCriteria } from "../../application/mcp/models/McpServerSearchCriteria";
-import type { McpServerStatus } from "../../application/mcp/models/McpServerStatus";
-import type { McpToolDescriptor } from "../../application/mcp/models/McpToolDescriptor";
+﻿import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerSearchCriteria } from "@application/mcp/models/McpServerSearchCriteria";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
+import type { McpToolDescriptor } from "@application/mcp/models/McpToolDescriptor";
 import { McpService } from "../services/McpService";
 
 export interface McpStoreState {
@@ -461,3 +461,4 @@ export class McpStore {
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown MCP page error.";
 }
+

@@ -1,11 +1,11 @@
-import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
-import { bindSafeFetch } from "../../application/runtime/RuntimeDiagnostics";
-import { RuntimeEventSources, type RuntimeEvent } from "../../application/runtime/RuntimeEvent";
-import { collapseConsecutiveRuntimeEvents } from "../../application/runtime/RuntimeEventStability";
+﻿import type { IRuntimeEventStore } from "@application/ports/interfaces/IRuntimeEventStore";
+import { bindSafeFetch } from "@application/runtime/RuntimeDiagnostics";
+import { RuntimeEventSources, type RuntimeEvent } from "@application/runtime/RuntimeEvent";
+import { collapseConsecutiveRuntimeEvents } from "@application/runtime/RuntimeEventStability";
 import type {
   ManagedSupervisorServiceLogEntry,
   ManagedSupervisorServiceRecord,
-} from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+} from "@application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   createManagedServiceDefinition,
   getManagedServiceHealthUrl,
@@ -13,12 +13,12 @@ import {
   mergeBuiltinManagedServiceDefinition,
   type ManagedServiceDefinition,
   type ManagedServiceDefinitionInput,
-} from "../../application/services/ManagedServiceDefinition";
-import type { IManagedServiceDefinitionRepository } from "../../application/services/interfaces/IManagedServiceDefinitionRepository";
-import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
-import type { IManagedServiceStatusRefresher } from "../../application/services/interfaces/IManagedServiceStatusRefresher";
-import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
-import type { IManagedServiceSupervisorClient } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+} from "@application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRepository } from "@application/services/interfaces/IManagedServiceDefinitionRepository";
+import type { IManagedServiceManager } from "@application/services/interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "@application/services/interfaces/IManagedServiceStatusRefresher";
+import type { IManagedServiceSupervisor } from "@application/services/interfaces/IManagedServiceSupervisor";
+import type { IManagedServiceSupervisorClient } from "@application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   ManagedServiceOwnership,
   ManagedServiceProvisioningActions,
@@ -28,7 +28,7 @@ import {
   type ManagedServiceProvisioningState,
   type ManagedServiceState,
   type ManagedServiceStatus,
-} from "../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/interfaces/ManagedServiceTypes";
 
 export interface ManagedServiceRecord {
   readonly id: string;
@@ -931,3 +931,4 @@ function mapSupervisorLogLevelToRuntimeSeverity(
       return level;
   }
 }
+

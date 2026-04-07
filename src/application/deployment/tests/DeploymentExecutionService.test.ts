@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { DeploymentStates } from "../../../domain/deployment/DeploymentStateDomain";
-import { DeploymentStatuses } from "../../../domain/deployment/DeploymentExecutionDomain";
-import { createDeploymentTarget, DeploymentTargetTypes } from "../../../domain/deployment/DeploymentTargetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
+import { DeploymentStatuses } from "@domain/deployment/DeploymentExecutionDomain";
+import { createDeploymentTarget, DeploymentTargetTypes } from "@domain/deployment/DeploymentTargetDomain";
 import { DeploymentExecutionService } from "../DeploymentExecutionService";
 import { EnvironmentProvisioningService } from "../EnvironmentProvisioningService";
 import { buildSampleBundle, createSampleConfiguration, createSamplePackage } from "./testUtils";
@@ -140,3 +140,4 @@ describe("DeploymentExecutionService", () => {
     expect(logs.every((entry) => !entry.message.includes("runtimeState"))).toBeTrue();
   });
 });
+

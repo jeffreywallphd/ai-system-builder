@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepKinds,
@@ -9,7 +9,7 @@ import {
   WorkflowDraftOutputFormats,
   WorkflowDraftOutputTypes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   mapWorkflowDraftToExecutionPlan,
   WorkflowDraftExecutionPlanSchemaVersion,
@@ -387,3 +387,4 @@ describe("WorkflowDraftExecutionPlanMapper", () => {
     })).toThrow("output-prompt-response-field-missing");
   });
 });
+

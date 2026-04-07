@@ -1,20 +1,20 @@
-import { describe, expect, it, mock } from "bun:test";
-import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
-import { createRuntimeEvent, RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+﻿import { describe, expect, it, mock } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
+import { createRuntimeEvent, RuntimeEventSources } from "@application/runtime/RuntimeEvent";
 import {
   createManagedServiceDefinition,
   ManagedServiceRestartPolicies,
   ManagedServiceSources,
   ManagedServiceTransports,
-} from "../../../application/services/ManagedServiceDefinition";
-import { createPythonRuntimeServiceDefinition } from "../../../infrastructure/python/runtime/PythonRuntimeServiceDefinition";
-import { PythonRuntimeConfig } from "../../../infrastructure/config/PythonRuntimeConfig";
+} from "@application/services/ManagedServiceDefinition";
+import { createPythonRuntimeServiceDefinition } from "@infrastructure/python/runtime/PythonRuntimeServiceDefinition";
+import { PythonRuntimeConfig } from "@infrastructure/config/PythonRuntimeConfig";
 import {
   ManagedServiceKinds,
   ManagedServiceOwnership,
   ManagedServiceStartPolicies,
   ManagedServiceStates,
-} from "../../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/interfaces/ManagedServiceTypes";
 import { ManagedServicesService } from "../ManagedServicesService";
 
 function createRepository(initialDefinitions: ReadonlyArray<any> = []) {
@@ -740,3 +740,4 @@ describe("ManagedServicesService", () => {
     expect(mapped.provisioning.detail).toContain("NumPy");
   });
 });
+

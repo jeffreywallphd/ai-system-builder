@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ReferenceImageExecutionFlowService,
   createReferenceImageOutputPersistenceRequest,
 } from "../ReferenceImageExecutionFlowService";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 
 describe("ReferenceImageExecutionFlowService", () => {
   it("emits plain-language step status across trigger, execution, save, and refresh", async () => {
@@ -166,3 +166,4 @@ describe("ReferenceImageExecutionFlowService", () => {
     expect(final.issues.some((issue) => issue.code === "save-non-recoverable")).toBeTrue();
   });
 });
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowConnection } from "../../../../domain/workflows/WorkflowConnection";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { DefaultNodeOutputStore } from "../DefaultNodeOutputStore";
 import { DefaultNodeExecutionContextResolver } from "../DefaultNodeExecutionContextResolver";
 
@@ -24,3 +24,4 @@ describe("DefaultNodeExecutionContextResolver", () => {
     expect(context.resolvedInputs.in).toBe("hello");
   });
 });
+

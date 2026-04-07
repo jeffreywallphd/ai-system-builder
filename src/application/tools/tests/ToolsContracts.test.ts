@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { readSource } from "../../../ui/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { readSource } from "@ui/tests/testUtils";
 
 describe("tools contracts", () => {
   it("defines tool use cases", () => {
@@ -10,3 +10,4 @@ describe("tools contracts", () => {
     expect(readSource("application/tools/InvokeToolCapabilityUseCase.ts")).toContain("class InvokeToolCapabilityUseCase");
   });
 });
+

@@ -1,11 +1,11 @@
-import { CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateLinkedSubjectTrustState,
   CertificateTrustEvaluationStatus,
   CertificateTrustEvaluationViewDto,
   IssuedCertificatePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
-import { CertificateTrustEvaluationStatuses } from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
+import { CertificateTrustEvaluationStatuses } from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface CertificateTrustEvaluationClock {
   now(): Date;
@@ -146,3 +146,4 @@ function normalizeTimestamp(value: string | undefined, fallback: string): string
   }
   return parsed.toISOString();
 }
+

@@ -1,4 +1,4 @@
-import type { ExecutionAuditRecord } from "../../domain/system-runtime/ExecutionAuditTrailDomain";
+﻿import type { ExecutionAuditRecord } from "@domain/system-runtime/ExecutionAuditTrailDomain";
 
 export interface ExecutionAuditRepository {
   save(record: ExecutionAuditRecord): void;
@@ -39,3 +39,4 @@ export class InMemoryExecutionAuditRepository implements ExecutionAuditRepositor
     return Object.freeze([...bounded]);
   }
 }
+

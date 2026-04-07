@@ -1,4 +1,4 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
 import type { WorkflowTemplateWorkflowContractResolver } from "./WorkflowTemplateCompositionResolver";
@@ -30,3 +30,4 @@ export class CanonicalWorkflowTemplateContractResolver implements WorkflowTempla
     return workflow ? this.resolver.resolveWorkflowContract(workflow) : undefined;
   }
 }
+

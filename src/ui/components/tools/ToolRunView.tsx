@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ToolDefinition } from "../../../application/projection/models/ToolDefinition";
-import type { ToolRunResult } from "../../../application/projection/models/ToolRunResult";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { ToolDefinition } from "@application/projection/models/ToolDefinition";
+import type { ToolRunResult } from "@application/projection/models/ToolRunResult";
 import ToolSectionView from "./ToolSectionView";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 
@@ -72,7 +72,7 @@ export default function ToolRunView({
           disabled={!canRun}
           onClick={() => onRun(values)}
         >
-          {isRunning ? "Working…" : "Start tool"}
+          {isRunning ? "Workingâ€¦" : "Start tool"}
         </button>
       </div>
 
@@ -83,7 +83,7 @@ export default function ToolRunView({
             {result.provenance ? (
               <div className="ui-text-secondary ui-text-small">
                 Execution path: {result.provenance.classification}
-                {result.provenance.selectionReason ? ` • ${result.provenance.selectionReason}` : ""}
+                {result.provenance.selectionReason ? ` â€¢ ${result.provenance.selectionReason}` : ""}
               </div>
             ) : null}
           </div>
@@ -92,3 +92,4 @@ export default function ToolRunView({
     </div>
   );
 }
+

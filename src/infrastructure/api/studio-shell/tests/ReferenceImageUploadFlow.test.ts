@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 
 describe("Reference image upload flow", () => {
   it("ingests uploaded files into the reference-image system input dataset instance", async () => {
@@ -41,3 +41,4 @@ describe("Reference image upload flow", () => {
     expect(upload.data?.image.height).toBeGreaterThan(0);
   });
 });
+

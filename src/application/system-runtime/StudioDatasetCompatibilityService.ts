@@ -1,4 +1,4 @@
-import type { DatasetPreviewSelectionSnapshot } from "../data-studio/DatasetPreviewSelectionModel";
+﻿import type { DatasetPreviewSelectionSnapshot } from "../data-studio/DatasetPreviewSelectionModel";
 import {
   createDatasetAssetReference,
   createDatasetInstanceReference,
@@ -6,8 +6,8 @@ import {
   type DatasetAssetReference,
   type DatasetInstanceReference,
   type DatasetRecordReference,
-} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/dataset-studio/contracts/StudioDatasetCompatibility";
+import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
 import type { DatasetInstanceImagePreviewList } from "./DatasetInstancePreviewService";
 import type { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 
@@ -82,3 +82,4 @@ export class StudioDatasetCompatibilityService {
     });
   }
 }
+

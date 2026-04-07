@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowInputBindingSourceKinds } from "../../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createImageWorkflowInputBindingConfiguration,
   duplicateImageWorkflowInputBindingConfiguration,
@@ -58,3 +58,4 @@ describe("ImageWorkflowInputBindingConfiguration", () => {
     expect(duplicate).not.toBe(config);
   });
 });
+

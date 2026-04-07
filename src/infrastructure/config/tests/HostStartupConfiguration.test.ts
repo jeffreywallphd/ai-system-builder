@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { HostCapabilityFlags } from "../../../domain/hosts/HostRuntimeDomain";
-import { createHostBootConfiguration } from "../../../application/common/HostCompositionContracts";
-import { HybridHostRuntime } from "../../../hosts/HostRuntimeCatalog";
+﻿import { describe, expect, it } from "bun:test";
+import { HostCapabilityFlags } from "@domain/hosts/HostRuntimeDomain";
+import { createHostBootConfiguration } from "@application/common/HostCompositionContracts";
+import { HybridHostRuntime } from "@hosts/HostRuntimeCatalog";
 import {
   HostDeploymentProfileIds,
   HostStartupConfigurationError,
@@ -100,3 +100,4 @@ describe("HostStartupConfiguration", () => {
     })).toThrow(HostStartupConfigurationError);
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DeviceFingerprintAlgorithms,
   DevicePairingMethods,
@@ -6,7 +6,7 @@ import {
   DeviceTrustStatuses,
   createDeviceFingerprint,
   createDeviceTrustMaterialRef,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -29,7 +29,7 @@ import {
   PairingTokenActorScopes,
   PairingTokenArtifactTypes,
   PairingTokenStatuses,
-} from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 
 describe("identity application shared contracts", () => {
   it("exposes stable lookup, id namespace, and credential material contract types", () => {
@@ -196,3 +196,4 @@ describe("identity application shared contracts", () => {
     expect(IdentityIdNamespaces.trustedDevicePairingToken).toBe("trusted-device-pairing-token");
   });
 });
+

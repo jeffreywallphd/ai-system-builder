@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodePeerCapabilities,
   NodePeerOperationClasses,
-} from "../../../application/security/ports/NodePeerCommunicationPolicyPorts";
+} from "@application/security/ports/NodePeerCommunicationPolicyPorts";
 import { StaticNodePeerCommunicationPolicyResolver } from "../StaticNodePeerCommunicationPolicyResolver";
 
 describe("StaticNodePeerCommunicationPolicyResolver", () => {
@@ -50,3 +50,4 @@ describe("StaticNodePeerCommunicationPolicyResolver", () => {
     expect(denied.peerChannelsEnabled).toBeFalse();
   });
 });
+

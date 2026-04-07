@@ -1,17 +1,17 @@
-import type { CrossStudioRegistryQueryService } from "../../../application/asset-registry/CrossStudioRegistryQueryService";
-import type { RegistryDependencyGraphService, RegistryDependencyTraversalOptions } from "../../../application/asset-registry/RegistryDependencyGraphService";
-import { ListPersistedWorkflowsUseCase } from "../../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
-import type { RegistryFilterParams } from "../../../application/asset-registry/RegistryQueryService";
+﻿import type { CrossStudioRegistryQueryService } from "@application/asset-registry/CrossStudioRegistryQueryService";
+import type { RegistryDependencyGraphService, RegistryDependencyTraversalOptions } from "@application/asset-registry/RegistryDependencyGraphService";
+import { ListPersistedWorkflowsUseCase } from "@application/workflow-persistence/ListPersistedWorkflowsUseCase";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
+import type { RegistryFilterParams } from "@application/asset-registry/RegistryQueryService";
 import {
   ExploreAssetQueryService,
   type ExploreSearchQuery,
   type ExploreSearchResult,
   type UnifiedExploreAssetLibrary,
-} from "../../../application/asset-registry/ExploreAssetQueryService";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import { AuthorizationPolicyEvaluationTargetKinds } from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@application/asset-registry/ExploreAssetQueryService";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 
 export interface RegistryApiError {
   readonly code: "not-found" | "invalid-request" | "internal";
@@ -280,3 +280,4 @@ export class RegistryBackendApi {
     return Object.freeze({ code: "internal", message });
   }
 }
+

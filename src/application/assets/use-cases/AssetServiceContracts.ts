@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Asset,
   AssetKind,
   AssetLifecycleState,
@@ -6,7 +6,7 @@ import type {
   AssetSharingPolicyReference,
   AssetStorageArea,
   AssetVisibility,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 
 export class AssetServiceContractError extends Error {
   constructor(message: string) {
@@ -663,3 +663,4 @@ export interface AssetMutationUseCaseContracts {
 }
 
 export interface IAssetManagementService extends AssetLookupUseCaseContracts, AssetMutationUseCaseContracts {}
+

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   InitiateTrustedDevicePairingApiResponse,
@@ -6,10 +6,10 @@ import type {
   TrustedDeviceSummaryApiResponse,
   ValidateTrustedDevicePairingApiResponse,
   TrustedDeviceTrustStatus,
-} from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 export default function TrustedDevicesPage(): JSX.Element {
   const authService = useMemo(() => new IdentityAuthService(), []);
@@ -562,3 +562,4 @@ function getValidationOutcomeMessage(response: ValidateTrustedDevicePairingApiRe
       return "Unable to validate the pairing artifact.";
   }
 }
+

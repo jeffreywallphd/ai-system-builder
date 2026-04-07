@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { CanonicalDataShapeKinds } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
-import { UnifiedPreparationAssetKinds } from "../../../domain/dataset-studio/UnifiedPreparationAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import { UnifiedPreparationAssetKinds } from "@domain/dataset-studio/UnifiedPreparationAsset";
 import { UnifiedPreparationPipelineService } from "../UnifiedPreparationPipelineService";
 
 function createDefinition() {
@@ -126,4 +126,5 @@ describe("UnifiedPreparationPipelineService", () => {
     );
   });
 });
+
 

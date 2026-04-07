@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretActorTypes,
   SecretScopes,
   createSecretScopeOwner,
   type SecretAccessActor,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   RetrieveSecretPlaintextResult,
   SecretRuntimeResolutionUseCaseContracts,
@@ -185,3 +185,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

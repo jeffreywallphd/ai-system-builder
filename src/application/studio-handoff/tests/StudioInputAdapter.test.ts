@@ -1,17 +1,17 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
-} from "../../../domain/studio-handoff/StudioHandoffContract";
+} from "@domain/studio-handoff/StudioHandoffContract";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   AtomicStudioInputAdapter,
   CompositeStudioInputAdapter,
@@ -385,3 +385,4 @@ describe("StudioInputAdapterLayer", () => {
     expect(second).toBe(first);
   });
 });
+

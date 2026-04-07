@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -10,7 +10,7 @@ import {
   NodeTrustStates,
   NodeTypes,
   createNodeCapabilityProfile,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   RuntimeTrustMaterialPackageViewSchema,
 } from "../security/CertificateAuthoritySchemaContracts";
@@ -736,3 +736,4 @@ export function parseNodeInventoryDetailResponseDto(payload: unknown): NodeInven
     payload,
   );
 }
+

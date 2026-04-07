@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { InMemoryAssetLineageGraphProjectionSink } from "../../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { InMemoryAssetLineageGraphProjectionSink } from "@infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
 import { VerifyAssetGraphProjectionUseCase } from "../VerifyAssetGraphProjectionUseCase";
 
 describe("InMemoryAssetLineageGraphProjectionSink", () => {
@@ -105,3 +105,4 @@ describe("InMemoryAssetLineageGraphProjectionSink", () => {
     expect(verification.checks.some((check) => check.code.startsWith("SCOPE_EDGE_PARITY_DETAIL:left:v1") && !check.matched)).toBeTrue();
   });
 });
+

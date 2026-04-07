@@ -1,4 +1,4 @@
-import type { ContextInspectionResult } from "../../../application/context/models/ContextInspectionResult";
+﻿import type { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
 
 export interface ContextBudgetPanelProps {
   readonly inspection?: ContextInspectionResult;
@@ -125,3 +125,4 @@ export default function ContextBudgetPanel({
     </section>
   );
 }
+

@@ -1,5 +1,5 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import { Model, ModelArtifact } from "../../domain/models/Model";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import { Model, ModelArtifact } from "@domain/models/Model";
 import type {
   IModelDownloadProgress,
   IModelDownloadRequest,
@@ -574,3 +574,4 @@ export class ModelInstaller implements IModelInstaller {
     }
   }
 }
+

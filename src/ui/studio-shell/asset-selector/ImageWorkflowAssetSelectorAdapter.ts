@@ -1,18 +1,18 @@
-import {
+﻿import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorUsageContexts,
   type AssetSelectorUsageContext,
-} from "../../../application/studio-entry/AssetSelectorCapabilityRegistry";
-import { TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@application/studio-entry/AssetSelectorCapabilityRegistry";
+import { TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
 import {
   createDefaultImageWorkflowAssetRegistry,
   type ImageWorkflowAssetRegistry,
-} from "../../../application/contracts/ImageWorkflowAssetRegistry";
+} from "@application/contracts/ImageWorkflowAssetRegistry";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 
 export interface ImageWorkflowAssetSelectorRequestInput {
@@ -113,3 +113,4 @@ export class ImageWorkflowAssetSelectorAdapter implements AssetSelectorDataProvi
     });
   }
 }
+

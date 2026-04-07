@@ -1,11 +1,11 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { Agent } from "../../domain/agents/Agent";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { Agent } from "@domain/agents/Agent";
 import {
   createAssetContractDescriptor,
   AssetContractShapeKinds,
   type AssetContractDescriptor,
   type AssetContractParameterDescriptor,
-} from "../../domain/contracts/AssetContract";
+} from "@domain/contracts/AssetContract";
 import type { ToolCapabilityDescriptor } from "../tools/models/ToolCapabilityDescriptor";
 import type { ContextPackage } from "../context/models/ContextPackage";
 import type { ContextRecipe } from "../context/models/ContextRecipe";
@@ -18,15 +18,15 @@ import type { IContextRecipeRepository } from "../ports/interfaces/IContextRecip
 import type { IInstalledModelCatalog } from "../ports/interfaces/IInstalledModelCatalog";
 import type { IRemoteModelCatalog } from "../ports/interfaces/IRemoteModelCatalog";
 import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   type CompositionTaxonomyDescriptor,
   type TaxonomyBehaviorKind,
   type TaxonomySemanticRole,
-} from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   aggregateSystemDependencies,
   buildNestedSystemReferences,
@@ -36,7 +36,7 @@ import {
   SystemBindingEndpointScopes,
   SystemComponentKinds,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 
 export interface IAssetContractResolver {
   resolveCanonicalEntityContract(entityType: CanonicalEntityType, entityId: string): Promise<AssetContractDescriptor | undefined>;
@@ -1016,3 +1016,4 @@ export class CompositionAssetContractResolver implements IAssetContractResolver 
     return contextRecipe ? this.resolveContextRecipeContract(contextRecipe) : undefined;
   }
 }
+

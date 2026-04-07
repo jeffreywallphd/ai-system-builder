@@ -1,4 +1,4 @@
-import {
+﻿import {
   createCipheriv,
   createDecipheriv,
   createHash,
@@ -10,9 +10,9 @@ import type {
   BeginAssetContentEncryptionRequest,
   BeginAssetContentEncryptionResult,
   IAssetContentCipherPort,
-} from "../../../application/assets/ports/AssetContentCipherPort";
-import { AssetContentCipherFormats } from "../../../application/assets/ports/AssetContentCipherPort";
-import type { IEncryptionKeyMaterialPort } from "../../../application/security/ports/ProtectedValueEncryptionPorts";
+} from "@application/assets/ports/AssetContentCipherPort";
+import { AssetContentCipherFormats } from "@application/assets/ports/AssetContentCipherPort";
+import type { IEncryptionKeyMaterialPort } from "@application/security/ports/ProtectedValueEncryptionPorts";
 
 const SUPPORTED_ALGORITHM = "aes-256-gcm";
 
@@ -159,3 +159,4 @@ function normalizeTimestamp(value: string, field: string): string {
   }
   return parsed.toISOString();
 }
+

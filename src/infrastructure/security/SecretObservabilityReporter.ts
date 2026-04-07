@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretOperationalOutcomes,
   sanitizeSecretOperationalEvent,
   type ISecretObservabilityPort,
   type ISecretOperationalLogger,
   type SecretOperationalLogEvent,
-} from "../../application/security/ports/SecretObservabilityPorts";
+} from "@application/security/ports/SecretObservabilityPorts";
 
 export interface SecretObservabilityReporterOptions {
   readonly logger?: ISecretOperationalLogger;
@@ -44,3 +44,4 @@ class ConsoleSecretOperationalLogger implements ISecretOperationalLogger {
     console.error(JSON.stringify(event));
   }
 }
+

@@ -1,22 +1,22 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { IEncryptionAtRestPolicyContextResolverPort } from "../../../../application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
-import { EncryptionPolicyEvaluationService } from "../../../../application/security/use-cases/EncryptionPolicyEvaluationService";
-import { EncryptionKeyResolutionService } from "../../../../application/security/use-cases/EncryptionKeyResolutionService";
-import { EncryptionKeyLifecycleStates } from "../../../../application/security/ports/EncryptionKeyResolutionPorts";
+import type { IEncryptionAtRestPolicyContextResolverPort } from "@application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
+import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
+import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
+import { EncryptionKeyLifecycleStates } from "@application/security/ports/EncryptionKeyResolutionPorts";
 import {
   createEncryptionAtRestPolicyDefinition,
   EncryptionKeyScopes,
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   SecretScopes,
   createSecretVersion,
-} from "../../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import { StaticEncryptionKeyCatalogPort } from "../../encryption/StaticEncryptionKeyCatalogPort";
 import { StaticEncryptionKeyMaterialPort } from "../../encryption/StaticEncryptionKeyMaterialPort";
 import { VersionedAesGcmProtectedValueEncryptionPort } from "../../encryption/VersionedAesGcmProtectedValueEncryptionPort";
@@ -121,3 +121,4 @@ describe("ProtectedValueSecretEncryptionPort", () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+

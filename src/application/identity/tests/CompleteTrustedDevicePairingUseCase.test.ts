@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DeviceFingerprintAlgorithms,
   DevicePairingMethods,
@@ -6,8 +6,8 @@ import {
   DeviceTrustStatuses,
   createDeviceFingerprint,
   createDeviceTrustMaterialRef,
-} from "../../../domain/identity/TrustedDeviceDomain";
-import { PairingSessionStatuses, PairingTokenStatuses } from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDeviceDomain";
+import { PairingSessionStatuses, PairingTokenStatuses } from "@domain/identity/TrustedDevicePairingDomain";
 import type {
   TrustedDevicePairingCompletionRequest,
   TrustedDevicePairingCompletionResponse,
@@ -99,3 +99,4 @@ describe("CompleteTrustedDevicePairingUseCase", () => {
     expect(result.trustedDevice.trustStatus).toBe(DeviceTrustStatuses.trusted);
   });
 });
+

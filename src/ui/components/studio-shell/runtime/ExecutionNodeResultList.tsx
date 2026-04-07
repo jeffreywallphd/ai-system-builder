@@ -1,4 +1,4 @@
-import type { RuntimeExecutionResultReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionResultReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 export function ExecutionNodeResultList({ result }: { readonly result: RuntimeExecutionResultReadModel }): JSX.Element {
   return (
@@ -27,7 +27,7 @@ export function ExecutionNodeResultList({ result }: { readonly result: RuntimeEx
         ) : (
           <ul className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem" }}>
             {result.nestedSystemResults.map((nested) => (
-              <li key={nested.nodeId}>{nested.nodeId}: {nested.status}{nested.outputSummary ? ` — ${nested.outputSummary}` : ""}</li>
+              <li key={nested.nodeId}>{nested.nodeId}: {nested.status}{nested.outputSummary ? ` â€” ${nested.outputSummary}` : ""}</li>
             ))}
           </ul>
         )}
@@ -35,3 +35,4 @@ export function ExecutionNodeResultList({ result }: { readonly result: RuntimeEx
     </div>
   );
 }
+

@@ -1,13 +1,13 @@
-import type { ITrustedDeviceManagementService } from "../../../application/identity/ports/ITrustedDeviceManagementService";
-import { DeviceTrustStatuses } from "../../domain/identity/TrustedDeviceDomain";
-import { NodeApprovalStatuses, NodeRevocationStates, NodeTrustStates } from "../../domain/nodes/NodeTrustDomain";
+﻿import type { ITrustedDeviceManagementService } from "@application/identity/ports/ITrustedDeviceManagementService";
+import { DeviceTrustStatuses } from "@domain/identity/TrustedDeviceDomain";
+import { NodeApprovalStatuses, NodeRevocationStates, NodeTrustStates } from "@domain/nodes/NodeTrustDomain";
 import {
   AuthenticatedTrustStates,
   type AuthenticatedTrustState,
-} from "../../domain/security/TransportSecurityDomain";
-import type { INodeTrustIdentityPersistenceRepository } from "../../application/nodes/ports/INodeTrustIdentityPersistenceRepository";
-import type { ICertificateRevocationStatusRegistry } from "../../application/security/ports/ICertificateRevocationStatusRegistry";
-import type { IIssuedCertificatePersistenceRepository } from "../../application/security/ports/IIssuedCertificatePersistenceRepository";
+} from "@domain/security/TransportSecurityDomain";
+import type { INodeTrustIdentityPersistenceRepository } from "@application/nodes/ports/INodeTrustIdentityPersistenceRepository";
+import type { ICertificateRevocationStatusRegistry } from "@application/security/ports/ICertificateRevocationStatusRegistry";
+import type { IIssuedCertificatePersistenceRepository } from "@application/security/ports/IIssuedCertificatePersistenceRepository";
 import type {
   ITransportNodeStateResolverPort,
   ITransportPeerCertificateStateResolverPort,
@@ -18,7 +18,7 @@ import type {
   ResolveTransportPeerCertificateStateResult,
   ResolveTransportTrustedDeviceStateInput,
   ResolveTransportTrustedDeviceStateResult,
-} from "../../application/security/ports/TransportTrustValidationPorts";
+} from "@application/security/ports/TransportTrustValidationPorts";
 
 interface ServerManagedTransportTrustStateResolverDependencies {
   readonly trustedDeviceManagementService?: Pick<ITrustedDeviceManagementService, "getTrustedDeviceById">;
@@ -297,4 +297,5 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+
 

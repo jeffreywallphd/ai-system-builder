@@ -1,6 +1,6 @@
-import type { AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import type { RegistryDependencyReference } from "../../../domain/asset-registry/RegistryAsset";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import type { RegistryDependencyReference } from "@domain/asset-registry/RegistryAsset";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 
 export interface RegistryGraphProjectionNodeRecord {
   readonly assetId: string;
@@ -46,3 +46,4 @@ export interface IRegistryGraphProjectionRepository {
   getProjectionState(): Promise<RegistryGraphProjectionState | undefined>;
   getCurrentSourceSignature?(): Promise<RegistryGraphProjectionSourceSignature>;
 }
+

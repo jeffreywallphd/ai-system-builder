@@ -1,4 +1,4 @@
-import {
+﻿import {
   createEnvironmentProvisioningPlan,
   createEnvironmentProvisioningRequest,
   createProvisionedDeploymentEnvironment,
@@ -6,7 +6,7 @@ import {
   type EnvironmentProvisioningInterface,
   type EnvironmentProvisioningRequest,
   type EnvironmentProvisioningResult,
-} from "../../domain/deployment/EnvironmentProvisioningDomain";
+} from "@domain/deployment/EnvironmentProvisioningDomain";
 import { EnvironmentProvisioningCompatibilityValidator } from "./EnvironmentProvisioningCompatibilityValidator";
 
 export class EnvironmentProvisioningService implements EnvironmentProvisioningInterface {
@@ -55,3 +55,4 @@ export class EnvironmentProvisioningService implements EnvironmentProvisioningIn
     });
   }
 }
+

@@ -1,8 +1,8 @@
-import { createHash, randomBytes } from "node:crypto";
+﻿import { createHash, randomBytes } from "node:crypto";
 import type {
   IdentitySessionTokenIssueResult,
   IIdentitySessionTokenService,
-} from "../../../application/identity/ports/IIdentitySessionTokenService";
+} from "@application/identity/ports/IIdentitySessionTokenService";
 
 const TOKEN_PREFIX = "loom_sess";
 const TOKEN_BYTES = 32;
@@ -26,3 +26,4 @@ export class OpaqueIdentitySessionTokenService implements IIdentitySessionTokenS
       .digest("base64url");
   }
 }
+

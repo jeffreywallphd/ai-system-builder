@@ -1,6 +1,6 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
-import type { ProjectedSection } from "../../../application/projection/models/ProjectedSection";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
+import type { ProjectedSection } from "@application/projection/models/ProjectedSection";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ProjectedFieldEditor from "./ProjectedFieldEditor";
 
@@ -43,3 +43,4 @@ export default function ProjectedSectionCard({
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionDetectionConfidenceLevels,
   UnifiedIngestionEvidenceKinds,
@@ -10,7 +10,7 @@ import {
   type UnifiedIngestionNormalizedSourceMetadata,
   type UnifiedIngestionSourceDetectionEvidence,
   type UnifiedIngestionSourceKind,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
@@ -382,3 +382,4 @@ export function createUnifiedSourceTypeDetectionService(options?: {
 }): IUnifiedIngestionSourceTypeDetector {
   return new UnifiedSourceTypeDetectionService(options);
 }
+

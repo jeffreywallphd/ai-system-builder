@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
-import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { McpNodeImplementationRegistry } from "../../../infrastructure/nodes/mcp/McpNodeImplementationRegistry";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+﻿import { describe, expect, it } from "bun:test";
+import { McpToolCallNodeConfigurationService } from "@application/mcp/McpToolCallNodeConfigurationService";
+import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { McpNodeImplementationRegistry } from "@infrastructure/nodes/mcp/McpNodeImplementationRegistry";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { WorkflowExecutionStore } from "../WorkflowExecutionStore";
 import { WorkflowStore } from "../WorkflowStore";
 
@@ -276,3 +276,4 @@ describe("ui/state interactions", () => {
   });
 
 });
+

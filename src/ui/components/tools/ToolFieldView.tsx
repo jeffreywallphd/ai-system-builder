@@ -1,4 +1,4 @@
-import type { ToolField } from "../../../application/projection/models/ToolField";
+﻿import type { ToolField } from "@application/projection/models/ToolField";
 import ProjectedFieldEditor from "../projection/ProjectedFieldEditor";
 
 export default function ToolFieldView({
@@ -10,3 +10,4 @@ export default function ToolFieldView({
 }): JSX.Element {
   return <ProjectedFieldEditor field={field} onChange={onChange} />;
 }
+

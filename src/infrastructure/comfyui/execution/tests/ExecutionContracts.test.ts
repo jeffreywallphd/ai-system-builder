@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { IWorkflowExecutor } from "../../../../application/ports/interfaces/IWorkflowExecutor";
+﻿import { describe, expect, it } from "bun:test";
+import type { IWorkflowExecutor } from "@application/ports/interfaces/IWorkflowExecutor";
 import { ComfyQueueExecutionAdapter, ComfyWorkflowExecutor } from "../ComfyWorkflowExecutor";
 
 describe("execution contracts", () => {
@@ -18,3 +18,4 @@ describe("execution contracts", () => {
     expect(typeof executor.execute).toBe("function");
   });
 });
+

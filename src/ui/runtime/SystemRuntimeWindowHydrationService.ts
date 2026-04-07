@@ -1,16 +1,16 @@
-import {
+﻿import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
   type ComfyImageManipulationConfig,
-} from "../../application/system-studio/ComfyImageManipulationPropertySchema";
-import { ImageManipulationSystemTemplate } from "../../application/system-studio/ImageManipulationSystemTemplate";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import {
   readComfyRuntimeSystemDiagnostics,
   type ComfyRuntimeSystemDiagnostics,
-} from "../../application/runtime/ComfyRuntimeSystemDiagnostics";
-import type { SystemRuntimeWindowLaunchContract } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
-import { parseSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
-import type { StudioShellSnapshotReadModel } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "@application/runtime/ComfyRuntimeSystemDiagnostics";
+import type { SystemRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
+import { parseSystemSerializationDocument } from "@domain/system-studio/SystemSerializationContract";
+import type { StudioShellSnapshotReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import { parseSystemStudioDraftDocument } from "../studio-shell/system/SystemStudioDraftDocument";
 import type { ImageManipulationSelectionRole } from "../components/studio-shell/image-manipulation/ImageManipulationSelectionState";
 
@@ -431,3 +431,4 @@ export class SystemRuntimeWindowHydrationService {
     });
   }
 }
+

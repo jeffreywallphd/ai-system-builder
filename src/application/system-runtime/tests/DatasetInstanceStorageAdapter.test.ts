@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
-import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createDatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   StorageBackedDatasetInstanceRepository,
   type DatasetInstanceRepository,
@@ -98,3 +98,4 @@ describe("StorageBackedDatasetInstanceRepository", () => {
     }))).toThrow("invalid-request:Cannot save image record");
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -9,16 +9,16 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import { AssetManagementBackendApi } from "../AssetManagementBackendApi";
-import { AssetUploadInitiationService } from "../../../../application/assets/use-cases/AssetUploadInitiationService";
-import { AssetUploadIngestionService } from "../../../../application/assets/use-cases/AssetUploadIngestionService";
-import { AssetDiscoveryService } from "../../../../application/assets/use-cases/AssetDiscoveryService";
-import { AssetDetailService } from "../../../../application/assets/use-cases/AssetDetailService";
-import { AssetDownloadService } from "../../../../application/assets/use-cases/AssetDownloadService";
-import { AssetGeneratedOutputRegistrationService } from "../../../../application/assets/use-cases/AssetGeneratedOutputRegistrationService";
-import { AssetPreviewService } from "../../../../application/assets/use-cases/AssetPreviewService";
-import { AssetLifecycleService } from "../../../../application/assets/use-cases/AssetLifecycleService";
+import { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
+import { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "@application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "@application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "@application/assets/use-cases/AssetDownloadService";
+import { AssetGeneratedOutputRegistrationService } from "@application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
 
 class StubAssetUploadInitiationService {
   private readonly asset: Asset = createAsset({
@@ -746,3 +746,4 @@ describe("AssetManagementBackendApi", () => {
     expect(response.error.details?.reasonCode).toBe("policy-denied");
   });
 });
+

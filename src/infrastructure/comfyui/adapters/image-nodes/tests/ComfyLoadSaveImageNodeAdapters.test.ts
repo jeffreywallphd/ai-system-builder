@@ -1,19 +1,19 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "bun:test";
-import { StorageBackedDatasetInstanceRepository } from "../../../../../application/system-runtime/DatasetInstanceRepository";
-import type { DatasetInstanceStorageAdapter } from "../../../../../application/system-runtime/DatasetInstanceStorageAdapter";
-import { createImageRecord } from "../../../../../domain/dataset-studio/contracts/ImageRecord";
+import { StorageBackedDatasetInstanceRepository } from "@application/system-runtime/DatasetInstanceRepository";
+import type { DatasetInstanceStorageAdapter } from "@application/system-runtime/DatasetInstanceStorageAdapter";
+import { createImageRecord } from "@domain/dataset-studio/contracts/ImageRecord";
 import {
   createDatasetInstance,
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRuntimeStatuses,
-} from "../../../../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-runtime/DatasetInstanceDomain";
 import {
   createDatasetInstanceImageRecord,
   type DatasetInstanceImageRecord,
-} from "../../../../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import { ComfyLoadImageNodeAdapter } from "../ComfyLoadImageNodeAdapter";
 import { ComfySaveImageNodeAdapter } from "../ComfySaveImageNodeAdapter";
 
@@ -212,3 +212,4 @@ describe("Comfy load/save image node adapters", () => {
     expect(Object.keys(module).some((key) => key.toLowerCase().includes("comfy"))).toBe(false);
   });
 });
+

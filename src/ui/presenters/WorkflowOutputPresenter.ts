@@ -1,7 +1,7 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { AssetKind } from "../../domain/assets/interfaces/IAsset";
-import type { NodePortValueType } from "../../domain/nodes/interfaces/INodePort";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { AssetKind } from "@domain/assets/interfaces/IAsset";
+import type { NodePortValueType } from "@domain/nodes/interfaces/INodePort";
 import { AssetPresenter, type AssetDetailViewModel } from "./AssetPresenter";
 
 export type WorkflowOutputViewerType =
@@ -209,3 +209,4 @@ export class WorkflowOutputPresenter {
     return undefined;
   }
 }
+

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftStepKinds,
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   applyWorkflowCanvasConnection,
   applyWorkflowCanvasEdgeReconnect,
@@ -495,3 +495,4 @@ describe("WorkflowStudioCanvasViewModel", () => {
     expect(stepNode?.issueMessages).toEqual(["Step order must be contiguous."]);
   });
 });
+

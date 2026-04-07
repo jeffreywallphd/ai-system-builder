@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowRuntimeSelector } from "../../../../application/execution/WorkflowRuntimeSelector";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowRuntimeSelector } from "@application/execution/WorkflowRuntimeSelector";
 import { InterpretedWorkflowExecutionStrategy } from "../InterpretedWorkflowExecutionStrategy";
 import { DefaultNodeExecutionContextResolver } from "../DefaultNodeExecutionContextResolver";
 import { DefaultNodeOutputStore } from "../DefaultNodeOutputStore";
@@ -22,3 +22,4 @@ describe("Runtime selector interpreted interactions", () => {
     expect(selected.strategy.getDescriptor().runtime).toBe("langchain");
   });
 });
+

@@ -1,5 +1,5 @@
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 
 interface CompositionSummaryCardProps {
   readonly title: string;
@@ -18,7 +18,7 @@ export function CompositionSummaryCard(props: CompositionSummaryCardProps): JSX.
       </div>
       {props.contract ? (
         <div className="ui-text-small ui-text-secondary">
-          Contract {props.contract.id} v{props.contract.version} ·
+          Contract {props.contract.id} v{props.contract.version} Â·
           {` input=${props.contract.input.kind}, output=${props.contract.output.kind}, params=${props.contract.parameters.length}`}
         </div>
       ) : (
@@ -27,3 +27,4 @@ export function CompositionSummaryCard(props: CompositionSummaryCardProps): JSX.
     </section>
   );
 }
+

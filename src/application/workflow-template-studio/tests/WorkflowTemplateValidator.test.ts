@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import { WorkflowTemplateValidator } from "../WorkflowTemplateValidator";
 import { ValidatedAssetTypes } from "../../asset-validation/AssetValidationTypes";
@@ -106,3 +106,4 @@ describe("WorkflowTemplateValidator", () => {
     expect(result.errors[0]?.code).toBe("template.workflow-reference.missing");
   });
 });
+

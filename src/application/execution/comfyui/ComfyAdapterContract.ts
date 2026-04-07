@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 
 export type ComfyAdapterLifecycleStatus =
   | "queued"
@@ -154,3 +154,4 @@ export interface IComfyExecutionAdapter {
     waitForCompletion(): Promise<IComfyAdapterResult>;
   }>;
 }
+

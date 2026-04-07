@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   EnvironmentConfigValue,
   IEnvironmentConfigProvider,
-} from "../../application/ports/interfaces/IEnvironmentConfigProvider";
+} from "@application/ports/interfaces/IEnvironmentConfigProvider";
 import { EnvironmentConfig } from "./EnvironmentConfig";
 
 export class EnvironmentConfigProvider implements IEnvironmentConfigProvider {
@@ -57,3 +57,4 @@ export class EnvironmentConfigProvider implements IEnvironmentConfigProvider {
     return new EnvironmentConfigProvider(EnvironmentConfig.fromEnv(env));
   }
 }
+

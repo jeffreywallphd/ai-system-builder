@@ -1,5 +1,5 @@
-import DataPreviewSurface from "./DataPreviewSurface";
-import type { DataAssetExecutionResult } from "../../../application/dataset-studio/DataAssetExecutionFramework";
+﻿import DataPreviewSurface from "./DataPreviewSurface";
+import type { DataAssetExecutionResult } from "@application/dataset-studio/DataAssetExecutionFramework";
 
 export interface DataPreviewPanelProps {
   readonly title?: string;
@@ -117,4 +117,5 @@ export default function DataPreviewPanel({
     </section>
   );
 }
+
 

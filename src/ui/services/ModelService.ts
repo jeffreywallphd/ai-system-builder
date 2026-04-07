@@ -1,44 +1,44 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
-} from "../../application/ports/interfaces/IInstalledModelCatalog";
+} from "@application/ports/interfaces/IInstalledModelCatalog";
 import type {
   IRemoteModelCatalogItem,
   IRemoteModelCatalogSearchCriteria,
-} from "../../application/ports/interfaces/IRemoteModelCatalog";
+} from "@application/ports/interfaces/IRemoteModelCatalog";
 import type {
   IModelCompatibilityContext,
   IModelCompatibilityResult,
-} from "../../domain/services/interfaces/IModelCompatibilityService";
+} from "@domain/services/interfaces/IModelCompatibilityService";
 import {
   InstallModelUseCase,
   type IInstallModelRequest,
   type IInstallModelResult,
-} from "../../application/models/InstallModelUseCase";
+} from "@application/models/InstallModelUseCase";
 import {
   ListInstalledModelsUseCase,
   type IListInstalledModelsRequest,
   type IListInstalledModelsResult,
-} from "../../application/models/ListInstalledModelsUseCase";
+} from "@application/models/ListInstalledModelsUseCase";
 import {
   RemoveModelUseCase,
   type IRemoveModelRequest,
   type IRemoveModelResult,
-} from "../../application/models/RemoveModelUseCase";
+} from "@application/models/RemoveModelUseCase";
 import {
   ResolveModelCompatibilityUseCase,
   type IResolveModelCompatibilityRequest,
   type IResolveModelCompatibilityResult,
-} from "../../application/models/ResolveModelCompatibilityUseCase";
+} from "@application/models/ResolveModelCompatibilityUseCase";
 import {
   SearchRemoteModelsUseCase,
   type ISearchRemoteModelsRequest,
   type ISearchRemoteModelsResult,
-} from "../../application/models/SearchRemoteModelsUseCase";
-import type { ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
-import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
-import type { IModelInstallProgress } from "../../application/ports/interfaces/IModelInstaller";
+} from "@application/models/SearchRemoteModelsUseCase";
+import type { ManagedModelLibrarySnapshot } from "@application/models/ManagedModelLibrary";
+import type { IManagedModelLibrary } from "@application/ports/interfaces/IManagedModelLibrary";
+import type { IModelInstallProgress } from "@application/ports/interfaces/IModelInstaller";
 
 export interface IModelServiceOptions {
   readonly installModelUseCase: InstallModelUseCase;
@@ -179,3 +179,4 @@ export class ModelService {
     }).compatibility;
   }
 }
+

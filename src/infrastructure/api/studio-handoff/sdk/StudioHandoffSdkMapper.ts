@@ -1,6 +1,6 @@
-import type { StudioHandoffRouteDecision } from "../../../../application/studio-handoff/StudioHandoffRoutingService";
-import type { PersistedStudioHandoffRecord } from "../../../../application/studio-handoff/StudioHandoffPersistenceService";
-import type { StudioHandoffCompatibilityDecision } from "../../../../application/studio-handoff/StudioHandoffCompatibilityValidator";
+﻿import type { StudioHandoffRouteDecision } from "@application/studio-handoff/StudioHandoffRoutingService";
+import type { PersistedStudioHandoffRecord } from "@application/studio-handoff/StudioHandoffPersistenceService";
+import type { StudioHandoffCompatibilityDecision } from "@application/studio-handoff/StudioHandoffCompatibilityValidator";
 import type {
   StudioHandoffSdkInitiateResponse,
   StudioHandoffSdkRecordSummary,
@@ -106,3 +106,4 @@ export function toStudioHandoffSdkRetryResponse(input: {
     retryDecision: input.decision,
   });
 }
+

@@ -1,7 +1,7 @@
-import {
+﻿import {
   ImageRecordContractIdentifier,
   ImageRecordSchemaVersions,
-} from "../../domain/dataset-studio/contracts/ImageRecordVersioning";
+} from "@domain/dataset-studio/contracts/ImageRecordVersioning";
 
 export const WorkflowDatasetCompatibilityKinds = Object.freeze({
   datasetReference: "dataset-reference",
@@ -139,3 +139,4 @@ export function buildWorkflowDatasetCompatibilityContract(input: {
     selectedFieldKeys: inferSelectedMediaFieldKeys(input),
   } satisfies WorkflowMediaImageRecordsCompatibility);
 }
+

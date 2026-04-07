@@ -1,7 +1,7 @@
-﻿import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DataAssetDependencyReference } from "../../domain/dataset-studio/DataAssetBase";
+﻿import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import type { CanonicalDataShapeKind, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DataAssetDependencyReference } from "@domain/dataset-studio/DataAssetBase";
 import type { DataConverterResult, DataConverterSuccessResult } from "./DataConverterContracts";
 import { DataPreviewEngine, type DataPreviewEngineOptions, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import type { DataAssetExecutionResult } from "./DataAssetExecutionFramework";
@@ -176,4 +176,5 @@ export class DataAssetFactory {
     });
   }
 }
+
 

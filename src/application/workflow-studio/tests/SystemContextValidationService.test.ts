@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import { createWorkflowInputBindingDescriptor, WorkflowInputBindingSourceKinds } from "../../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
+import { createWorkflowInputBindingDescriptor, WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import { SystemContextValidationService } from "../SystemContextValidationService";
 
 describe("SystemContextValidationService", () => {
@@ -112,3 +112,4 @@ describe("SystemContextValidationService", () => {
     expect(result.blockingIssues.map((issue) => issue.code)).toContain("workflow-input-unresolved");
   });
 });
+

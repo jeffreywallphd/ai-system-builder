@@ -1,6 +1,6 @@
-import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
-import type { AssetTransformation } from "../../domain/assets/AssetTransformation";
+﻿import type { IAssetLineageGraphProjectionSink } from "@application/ports/interfaces/IAssetLineageGraphProjectionSink";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
+import type { AssetTransformation } from "@domain/assets/AssetTransformation";
 
 export class InMemoryAssetLineageGraphProjectionSink implements IAssetLineageGraphProjectionSink {
   private readonly publishedTransformationsStore: AssetTransformation[] = [];
@@ -74,3 +74,4 @@ export class InMemoryAssetLineageGraphProjectionSink implements IAssetLineageGra
     return adjacency;
   }
 }
+

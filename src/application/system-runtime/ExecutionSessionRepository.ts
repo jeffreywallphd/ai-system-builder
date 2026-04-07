@@ -1,4 +1,4 @@
-import type { ExecutionSession } from "../../domain/system-runtime/ExecutionSessionDomain";
+﻿import type { ExecutionSession } from "@domain/system-runtime/ExecutionSessionDomain";
 
 export interface ExecutionSessionRepository {
   save(session: ExecutionSession): ExecutionSession;
@@ -35,3 +35,4 @@ export class InMemoryExecutionSessionRepository implements ExecutionSessionRepos
     return sessionId ? this.sessions.get(sessionId) : undefined;
   }
 }
+

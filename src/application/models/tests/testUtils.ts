@@ -1,7 +1,7 @@
-import type { IInstalledModelCatalog } from "../../ports/interfaces/IInstalledModelCatalog";
+﻿import type { IInstalledModelCatalog } from "../../ports/interfaces/IInstalledModelCatalog";
 import type { IModelInstaller } from "../../ports/interfaces/IModelInstaller";
 import type { IRemoteModelCatalog } from "../../ports/interfaces/IRemoteModelCatalog";
-import type { IModelCompatibilityService } from "../../../domain/services/interfaces/IModelCompatibilityService";
+import type { IModelCompatibilityService } from "@domain/services/interfaces/IModelCompatibilityService";
 
 export function makeInstalledModelCatalog(overrides: Partial<IInstalledModelCatalog> = {}): IInstalledModelCatalog {
   return {
@@ -51,3 +51,4 @@ export function makeCompatibilityService(overrides: Partial<IModelCompatibilityS
     ...overrides,
   } as IModelCompatibilityService;
 }
+

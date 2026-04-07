@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   AtomicStudioOutputAdapter,
@@ -12,7 +12,7 @@ import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -153,3 +153,4 @@ describe("StudioOutputAdapterLayer", () => {
     expect(second).toBe(first);
   });
 });
+

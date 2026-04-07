@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from "bun:test";
-import type { IExecutionRunRecord } from "../../../../domain/execution/ExecutionRun";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../domain/execution/ExecutionPlan";
+﻿import { beforeEach, describe, expect, it } from "bun:test";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import { LocalStorageExecutionRunRepository } from "../LocalStorageExecutionRunRepository";
 
 function makeRun(overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {
@@ -128,3 +128,4 @@ describe("LocalStorageExecutionRunRepository", () => {
     expect(filtered.map((run) => run.runId)).toEqual(["run-2"]);
   });
 });
+

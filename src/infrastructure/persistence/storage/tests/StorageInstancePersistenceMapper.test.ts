@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -6,7 +6,7 @@ import {
   StorageLifecycleStates,
   StorageReplicationModes,
   createStorageInstance,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   mapStorageInstanceRowToDomain,
   mapStorageInstanceToRowValues,
@@ -113,3 +113,4 @@ describe("StorageInstancePersistenceMapper", () => {
     expect(normalizeStorageLookup("   ")).toBeUndefined();
   });
 });
+

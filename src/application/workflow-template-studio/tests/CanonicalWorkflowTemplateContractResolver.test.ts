@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { CanonicalWorkflowTemplateContractResolver } from "../CanonicalWorkflowTemplateContractResolver";
 
 class InMemoryWorkflowRepository implements IWorkflowRepository {
@@ -50,3 +50,4 @@ describe("CanonicalWorkflowTemplateContractResolver", () => {
     expect(contract?.parameters.some((entry) => entry.id === "executionPolicy")).toBeTrue();
   });
 });
+

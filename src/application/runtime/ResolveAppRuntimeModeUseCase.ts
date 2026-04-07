@@ -1,5 +1,5 @@
-import { type AppRuntimeMode } from "../../domain/runtime/AppRuntimeMode";
-import { getAppRuntimeProfile } from "../../domain/runtime/AppRuntimeProfile";
+﻿import { type AppRuntimeMode } from "@domain/runtime/AppRuntimeMode";
+import { getAppRuntimeProfile } from "@domain/runtime/AppRuntimeProfile";
 
 export interface ResolveAppRuntimeModeRequest {
   readonly hasDesktopHost: boolean;
@@ -13,3 +13,4 @@ export class ResolveAppRuntimeModeUseCase {
       : "browser-development").mode;
   }
 }
+

@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { AssetId } from "../../../domain/assets/AssetId";
-import { SqliteAgentRepository } from "../../../infrastructure/filesystem/agents/SqliteAgentRepository";
+import { AssetId } from "@domain/assets/AssetId";
+import { SqliteAgentRepository } from "@infrastructure/filesystem/agents/SqliteAgentRepository";
 import { ArchiveAgentUseCase } from "../ArchiveAgentUseCase";
 import { ConfigureAgentGoalsUseCase } from "../ConfigureAgentGoalsUseCase";
 import { ConfigureAgentPolicyUseCase } from "../ConfigureAgentPolicyUseCase";
@@ -163,3 +163,4 @@ describe("Agent authoring use cases (SQLite integration)", () => {
     repository.dispose();
   });
 });
+

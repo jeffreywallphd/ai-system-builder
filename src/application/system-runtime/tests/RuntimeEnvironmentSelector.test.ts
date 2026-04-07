@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RuntimeEnvironmentSelector } from "../RuntimeEnvironmentSelector";
-import { RuntimeEnvironmentKinds } from "../../../domain/system-runtime/RuntimeEnvironmentDomain";
+import { RuntimeEnvironmentKinds } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 
 describe("RuntimeEnvironmentSelector", () => {
   it("represents/selects runtime environments for atomic/composite/system execution", () => {
@@ -80,3 +80,4 @@ describe("RuntimeEnvironmentSelector", () => {
     expect(unsupported.reason).toContain("No runtime environment satisfies");
   });
 });
+

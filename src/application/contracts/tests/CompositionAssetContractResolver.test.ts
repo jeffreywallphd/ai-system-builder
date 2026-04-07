@@ -1,16 +1,16 @@
-import { describe, expect, it } from "bun:test";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { Agent } from "../../../domain/agents/Agent";
+﻿import { describe, expect, it } from "bun:test";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { Agent } from "@domain/agents/Agent";
 import { ContextPackage } from "../../context/models/ContextPackage";
 import { ContextRecipe } from "../../context/models/ContextRecipe";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
 import { CompositionAssetContractResolver } from "../CompositionAssetContractResolver";
 import {
   createSystemAsset,
   SystemBindingEndpointScopes,
   SystemComponentKinds,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 
 describe("CompositionAssetContractResolver", () => {
   const resolver = new CompositionAssetContractResolver();
@@ -379,3 +379,4 @@ describe("CompositionAssetContractResolver", () => {
     await expect(resolver.resolveCanonicalEntityContract("installed-model", "model-1")).resolves.toBeUndefined();
   });
 });
+

@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type SplitType } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import { buildDatasetWorkflowWizard } from "../../../application/tuning-datasets/buildDatasetWorkflowWizard";
-import { ChatCompletionExample, QuestionAnsweringExample } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+﻿import { useEffect, useMemo, useState } from "react";
+import { EXPORT_FORMATS, type ChatCompletionMessage, type ExampleStatus, type SplitType } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import { buildDatasetWorkflowWizard } from "@application/tuning-datasets/buildDatasetWorkflowWizard";
+import { ChatCompletionExample, QuestionAnsweringExample } from "@domain/tuning-datasets/TuningDatasetEntities";
 import { useUiDependencies } from "../../composition/AppProviders";
 import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
 import LinearWizard from "../wizard/LinearWizard";
 import type { TuningDatasetStoreState } from "../../state/TuningDatasetStore";
-import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 
 const fallbackState: TuningDatasetStoreState = Object.freeze({
   datasets: Object.freeze([]),
@@ -156,7 +156,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
             {selectedDataset ? (
               <div className="ui-meta-grid">
                 <div className="ui-meta-item"><span className="ui-meta-label">Task type</span><span className="ui-meta-value">{selectedDataset.taskType}</span></div>
-                <div className="ui-meta-item"><span className="ui-meta-label">Selected version</span><span className="ui-meta-value">v{selectedVersion?.versionNumber ?? "—"}</span></div>
+                <div className="ui-meta-item"><span className="ui-meta-label">Selected version</span><span className="ui-meta-value">v{selectedVersion?.versionNumber ?? "â€”"}</span></div>
                 <div className="ui-meta-item"><span className="ui-meta-label">Version status</span><span className="ui-meta-value">{selectedVersion?.status ?? "draft"}</span></div>
                 <div className="ui-meta-item"><span className="ui-meta-label">Workflow stage</span><span className="ui-meta-value">{workflow?.currentStage ?? "dataset_definition"}</span></div>
               </div>
@@ -220,8 +220,8 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                     <div className="ui-card__body ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
                       <div className="ui-stack ui-stack--2xs" style={{ flex: 1 }}>
                         <span><strong>{document.name}</strong></span>
-                        <span className="ui-text-secondary ui-text-small">{document.sourceType} · {document.segments.length} segments</span>
-                        <span className="ui-text-secondary ui-text-small">{document.content.slice(0, 220)}{document.content.length > 220 ? "…" : ""}</span>
+                        <span className="ui-text-secondary ui-text-small">{document.sourceType} Â· {document.segments.length} segments</span>
+                        <span className="ui-text-secondary ui-text-small">{document.content.slice(0, 220)}{document.content.length > 220 ? "â€¦" : ""}</span>
                       </div>
                       <input type="checkbox" checked={checked} onChange={(event) => setSelectedSourceIds((current) => event.target.checked ? [...current, document.id] : current.filter((id) => id !== document.id))} />
                     </div>
@@ -262,11 +262,11 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                         <strong>{batch.id}</strong>
                         <span className={`ui-badge ${batch.provenance.mode === "provider-model-backed" ? "ui-badge--success" : batch.provenance.mode === "python-runtime-local" ? "ui-badge--info" : "ui-badge--warning"}`}>{batch.provenance.mode}</span>
                       </div>
-                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provenance.provider} · Model: {batch.provenance.modelDisplayName ?? batch.provenance.modelId ?? "—"} · Examples: {batch.generatedCount} · Status: {batch.status} · Path: {batch.provenance.path}</div>
+                      <div className="ui-text-secondary ui-text-small">Provider: {batch.provenance.provider} Â· Model: {batch.provenance.modelDisplayName ?? batch.provenance.modelId ?? "â€”"} Â· Examples: {batch.generatedCount} Â· Status: {batch.status} Â· Path: {batch.provenance.path}</div>
                       {batch.provenance.detail ? <div className="ui-text-secondary ui-text-small">{batch.provenance.detail}</div> : null}
-                      <div className="ui-text-secondary ui-text-small">Execution kind: {batch.provenance.executionKind} · Fallback: {batch.provenance.isFallback ? "yes" : "no"} · Degraded: {batch.provenance.isDegraded ? "yes" : "no"}</div>
-                      {batch.provenance.fallback ? <div className="ui-text-secondary ui-text-small">Fallback: {batch.provenance.fallback.fromMode ?? "provider-model-backed"} → {batch.provenance.mode} · {batch.provenance.fallback.reason}</div> : null}
-                      {batch.provenance.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.provenance.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}${diagnostic.detail ? ` (${diagnostic.detail})` : ""}`).join(" · ")}</div> : null}
+                      <div className="ui-text-secondary ui-text-small">Execution kind: {batch.provenance.executionKind} Â· Fallback: {batch.provenance.isFallback ? "yes" : "no"} Â· Degraded: {batch.provenance.isDegraded ? "yes" : "no"}</div>
+                      {batch.provenance.fallback ? <div className="ui-text-secondary ui-text-small">Fallback: {batch.provenance.fallback.fromMode ?? "provider-model-backed"} â†’ {batch.provenance.mode} Â· {batch.provenance.fallback.reason}</div> : null}
+                      {batch.provenance.diagnostics.length > 0 ? <div className="ui-text-secondary ui-text-small">Diagnostics: {batch.provenance.diagnostics.map((diagnostic) => `${diagnostic.level}: ${diagnostic.message}${diagnostic.detail ? ` (${diagnostic.detail})` : ""}`).join(" Â· ")}</div> : null}
                     </div>
                   </div>
                 ))}
@@ -342,7 +342,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                         <input type="checkbox" checked={state.selectedExampleIds.includes(example.id)} onChange={() => tuningDatasetStore.toggleExampleSelection(example.id)} />
                         <div className="ui-stack ui-stack--2xs">
                           <strong>{example.id}</strong>
-                          <span className="ui-text-secondary ui-text-small">{example.taskType} · {example.status} · {example.split}</span>
+                          <span className="ui-text-secondary ui-text-small">{example.taskType} Â· {example.status} Â· {example.split}</span>
                         </div>
                       </div>
                       <div className="ui-row ui-row--wrap" style={{ gap: "var(--space-xs)" }}>
@@ -418,10 +418,10 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                   <div className="ui-meta-item"><span className="ui-meta-label">Split ready</span><span className="ui-meta-value">{String(state.validation.readiness.splitReady)}</span></div>
                 </div>
                 {state.duplicates.length > 0 ? (
-                  <div className="ui-card"><div className="ui-card__body ui-stack ui-stack--2xs"><strong>Duplicate detection integration</strong>{state.duplicates.map((duplicate) => <span key={duplicate.fingerprint} className="ui-text-secondary ui-text-small">{duplicate.fingerprint} · {duplicate.exampleIds.join(", ")}</span>)}</div></div>
+                  <div className="ui-card"><div className="ui-card__body ui-stack ui-stack--2xs"><strong>Duplicate detection integration</strong>{state.duplicates.map((duplicate) => <span key={duplicate.fingerprint} className="ui-text-secondary ui-text-small">{duplicate.fingerprint} Â· {duplicate.exampleIds.join(", ")}</span>)}</div></div>
                 ) : null}
                 {state.validation.issues.map((issue) => (
-                  <div key={issue.id} className="ui-card"><div className="ui-card__body ui-stack ui-stack--2xs"><strong>{issue.severity.toUpperCase()} · {issue.code}</strong><span className="ui-text-secondary">{issue.message}</span></div></div>
+                  <div key={issue.id} className="ui-card"><div className="ui-card__body ui-stack ui-stack--2xs"><strong>{issue.severity.toUpperCase()} Â· {issue.code}</strong><span className="ui-text-secondary">{issue.message}</span></div></div>
                 ))}
               </div>
             ) : <p className="ui-text-secondary">No validation run yet.</p>}
@@ -480,7 +480,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
             ) : null}
             <div className="ui-stack ui-stack--sm">
               {state.exports.map((artifact) => (
-                <div key={artifact.id} className="ui-card"><div className="ui-card__body ui-row ui-row--between ui-row--wrap"><div className="ui-stack ui-stack--2xs"><strong>{artifact.fileName}</strong><span className="ui-text-secondary ui-text-small">{artifact.format} · {artifact.byteLength} bytes</span></div><button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => downloadArtifact(artifact.fileName, artifact.content, artifact.contentType)}>Download</button></div></div>
+                <div key={artifact.id} className="ui-card"><div className="ui-card__body ui-row ui-row--between ui-row--wrap"><div className="ui-stack ui-stack--2xs"><strong>{artifact.fileName}</strong><span className="ui-text-secondary ui-text-small">{artifact.format} Â· {artifact.byteLength} bytes</span></div><button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => downloadArtifact(artifact.fileName, artifact.content, artifact.contentType)}>Download</button></div></div>
               ))}
             </div>
           </div>
@@ -529,7 +529,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                   <div className="ui-card__body ui-stack ui-stack--2xs">
                     <strong>{summary.dataset.name}</strong>
                     <span className="ui-text-secondary ui-text-small">{summary.dataset.taskType}</span>
-                    <span className="ui-text-secondary ui-text-small">Selected version: v{summary.selectedVersion?.versionNumber ?? summary.latestVersion?.versionNumber ?? "—"}</span>
+                    <span className="ui-text-secondary ui-text-small">Selected version: v{summary.selectedVersion?.versionNumber ?? summary.latestVersion?.versionNumber ?? "â€”"}</span>
                     <span className="ui-text-secondary ui-text-small">Status: {summary.selectedVersion?.status ?? summary.dataset.status}</span>
                   </div>
                 </button>
@@ -558,7 +558,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                   <select className="ui-input" value={state.selectedVersionId} onChange={(event) => void tuningDatasetStore.selectVersion(event.target.value).catch(() => undefined)}>
                     {state.selectedDataset.versions.map((version) => (
                       <option key={version.id} value={version.id}>
-                        v{version.versionNumber} · {version.kind} · {version.status}
+                        v{version.versionNumber} Â· {version.kind} Â· {version.status}
                       </option>
                     ))}
                   </select>
@@ -568,7 +568,7 @@ export default function FineTuningDatasetStudio(): JSX.Element {
                     <div key={version.id} className="ui-card">
                       <div className="ui-card__body ui-stack ui-stack--2xs">
                         <strong>v{version.versionNumber}</strong>
-                        <span className="ui-text-secondary ui-text-small">{version.kind} · {version.status}</span>
+                        <span className="ui-text-secondary ui-text-small">{version.kind} Â· {version.status}</span>
                         <span className="ui-text-secondary ui-text-small">{version.comparisonLabel ?? (version.parentVersionId ? `Derived from ${version.parentVersionId}` : "Initial version")}</span>
                       </div>
                     </div>
@@ -596,3 +596,4 @@ export default function FineTuningDatasetStudio(): JSX.Element {
     </section>
   );
 }
+

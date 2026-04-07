@@ -1,8 +1,8 @@
-import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
+﻿import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
 import type {
   SerializedSystemRuntimeDatasetInstancePersistedState,
   SerializedSystemRuntimeDatasetInstanceReference,
-} from "../../domain/system-studio/SystemSerializationContract";
+} from "@domain/system-studio/SystemSerializationContract";
 
 export interface CaptureSystemDatasetInstancePersistenceResult {
   readonly datasetInstances: ReadonlyArray<SerializedSystemRuntimeDatasetInstanceReference>;
@@ -194,3 +194,4 @@ export class SystemDatasetInstancePersistenceService {
     });
   }
 }
+

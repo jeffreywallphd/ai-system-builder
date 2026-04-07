@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import { ExecutionRunProjectionService } from "../ExecutionRunProjectionService";
 
 function makeRun(overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {
@@ -111,3 +111,4 @@ describe("ExecutionRunProjectionService", () => {
     expect(projection.progressLabel).toContain("step 20/40");
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -17,7 +17,7 @@ import {
   type RuntimeRepositoryUpdateResult,
   type RuntimeRepositoryValidationRequest,
   type RuntimeRepositoryValidationResult,
-} from "../../../application/runtime/RuntimeRepositoryInstallerContract";
+} from "@application/runtime/RuntimeRepositoryInstallerContract";
 import {
   createComfyRuntimeInstallerOrchestrationService,
 } from "../ComfyRuntimeInstallerComposition";
@@ -179,3 +179,4 @@ class HappyPathPythonRunner {
     return { command, args, exitCode: 0, stdout: "", stderr: "" };
   }
 }
+

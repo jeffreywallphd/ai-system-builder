@@ -1,5 +1,5 @@
-import { toAgentReadModel, updateAgent, type AgentReadModel } from "../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
+﻿import { toAgentReadModel, updateAgent, type AgentReadModel } from "@domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -30,3 +30,4 @@ export class ConfigureAgentMemoryUseCase {
     return toAgentReadModel(saved);
   }
 }
+

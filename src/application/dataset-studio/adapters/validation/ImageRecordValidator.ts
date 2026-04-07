@@ -1,17 +1,17 @@
-import { z } from "zod";
-import { AssetId } from "../../../../domain/assets/AssetId";
+﻿import { z } from "zod";
+import { AssetId } from "@domain/assets/AssetId";
 import {
   createImageRecord,
   type IImageRecordValidator,
   type ImageRecord,
-} from "../../../../domain/dataset-studio/contracts/ImageRecord";
-import { ImageOrientationKinds } from "../../../../domain/dataset-studio/contracts/ImageDerivedAttributes";
+} from "@domain/dataset-studio/contracts/ImageRecord";
+import { ImageOrientationKinds } from "@domain/dataset-studio/contracts/ImageDerivedAttributes";
 import {
   ImageAssetReferenceKinds,
   type ImageAssetReferenceInput,
-} from "../../../../domain/dataset-studio/contracts/ImageAssetReference";
-import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import { ImageAnnotationCoordinateSpaces } from "../../../../domain/dataset-studio/contracts/ImageAnnotations";
+} from "@domain/dataset-studio/contracts/ImageAssetReference";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { ImageAnnotationCoordinateSpaces } from "@domain/dataset-studio/contracts/ImageAnnotations";
 
 export const MediaImageFormatAllowList = Object.freeze([
   "png",
@@ -178,3 +178,4 @@ export function validateImageRecord(
 ): ImageRecord {
   return validator.validateImageRecord(input);
 }
+

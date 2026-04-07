@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createDatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
 import {
   createWorkflowOutputBindingDescriptor,
   WorkflowOutputBindingIntents,
   WorkflowOutputBindingWriteModes,
   WorkflowOutputTargetTypes,
-} from "../../../domain/workflow-studio/WorkflowOutputBindingDomain";
+} from "@domain/workflow-studio/WorkflowOutputBindingDomain";
 import type { SystemDatasetInstanceService } from "../../system-runtime/SystemDatasetInstanceService";
 import { resolveWorkflowOutputBindingWritePlan } from "../WorkflowOutputBindingResolutionService";
 
@@ -224,3 +224,4 @@ describe("resolveWorkflowOutputBindingWritePlan", () => {
   });
 
 });
+

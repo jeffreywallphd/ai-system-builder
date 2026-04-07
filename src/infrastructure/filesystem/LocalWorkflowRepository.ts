@@ -1,11 +1,11 @@
-import path from "node:path";
+﻿import path from "node:path";
 import type {
   IWorkflowRecordSummary,
   IWorkflowRepository,
-} from "../../application/ports/interfaces/IWorkflowRepository";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+} from "@application/ports/interfaces/IWorkflowRepository";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { WorkflowPersistenceCodec, type WorkflowRecord } from "../workflows/WorkflowPersistenceCodec";
 
 export class LocalWorkflowRepository implements IWorkflowRepository {
@@ -107,3 +107,4 @@ export class LocalWorkflowRepository implements IWorkflowRepository {
     return path.join(this.rootDirectory, `${workflowId}.json`);
   }
 }
+

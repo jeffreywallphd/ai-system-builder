@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { Node } from "../../../../domain/nodes/Node";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
-import { NodePort, NodePortCompatibilityProfile } from "../../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowConnection } from "../../../../domain/workflows/WorkflowConnection";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
+﻿import { describe, expect, it } from "bun:test";
+import { Node } from "@domain/nodes/Node";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { InterpretedWorkflowExecutor } from "../InterpretedWorkflowExecutor";
 
 function outputPort(id: string, type: "document" | "chunks"): NodePort {
@@ -107,3 +107,4 @@ describe("Interpreted document workflow", () => {
     expect((outputs?.display as { display?: unknown })?.display).toBeDefined();
   });
 });
+

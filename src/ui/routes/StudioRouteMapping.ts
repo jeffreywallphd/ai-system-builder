@@ -1,13 +1,13 @@
-import { ContextualStudioInitializer } from "../../application/studio-entry/ContextualStudioInitializer";
+﻿import { ContextualStudioInitializer } from "@application/studio-entry/ContextualStudioInitializer";
 import {
   StudioEntryModes,
   StudioInitializationSources,
   type StudioEntryContext,
   type StudioEntryRequest,
   type StudioEntryResolution,
-} from "../../application/studio-entry/StudioEntryContracts";
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+} from "@application/studio-entry/StudioEntryContracts";
+import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "./RouteConfig";
 
 const semanticRoleToStudioRoute: Readonly<Partial<Record<TaxonomySemanticRole, string>>> = Object.freeze({
@@ -188,3 +188,4 @@ export function buildStudioHandoffQuery(
   }
   return params.toString();
 }
+

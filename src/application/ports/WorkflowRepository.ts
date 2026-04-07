@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowRecordSummary,
   IWorkflowRepository,
@@ -105,3 +105,4 @@ export class WorkflowRepository implements IWorkflowRepository {
     return repository;
   }
 }
+

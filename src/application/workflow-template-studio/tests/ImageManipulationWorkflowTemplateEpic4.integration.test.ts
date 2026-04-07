@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../../ports/interfaces/IFileStorage";
 import { WorkflowTemplateAssetService } from "../WorkflowTemplateAssetService";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import { AssetValidationStatuses } from "../../../domain/contracts/AssetValidation";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import { AssetValidationStatuses } from "@domain/contracts/AssetValidation";
 import {
   ImageManipulationFaceIdSubworkflowAssetId,
   ImageManipulationWorkflowTemplate,
@@ -139,3 +139,4 @@ describe("ImageManipulationWorkflowTemplate epic-4 integration", () => {
     expect(ImageManipulationWorkflowTemplate.executionMetadata?.runtime.backendId).toBe("runtime:comfyui");
   });
 });
+

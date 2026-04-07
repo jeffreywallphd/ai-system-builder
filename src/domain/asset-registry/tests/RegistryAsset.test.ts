@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { createRegistryAsset } from "../RegistryAsset";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
 } from "../../taxonomy/CompositionTaxonomy";
-import { AssetLineageRelationshipType } from "../../../../domain/assets/AssetLineageEdge";
+import { AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 
 function createBaseRegistryAsset() {
   return createRegistryAsset({
@@ -116,3 +116,4 @@ describe("RegistryAsset", () => {
     expect(Object.isFrozen(registryAsset.provenance)).toBeTrue();
   });
 });
+

@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   CertificateAuthorityBootstrapConfiguration,
   ICertificateAuthorityBootstrapConfigurationProvider,
-} from "../../application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider";
+} from "@application/security/ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type {
   CertificateAuthoritySecretMetadata,
   ICertificateAuthorityBootstrapSecretService,
-} from "../../application/security/ports/ICertificateAuthorityBootstrapSecretService";
+} from "@application/security/ports/ICertificateAuthorityBootstrapSecretService";
 import {
   INTERNAL_CA_PROTECTED_SECRET_REF_PREFIX,
   type FileSystemProtectedSecretStore,
@@ -103,3 +103,4 @@ function normalizeRequired(value: string, field: string): string {
   }
   return normalized;
 }
+

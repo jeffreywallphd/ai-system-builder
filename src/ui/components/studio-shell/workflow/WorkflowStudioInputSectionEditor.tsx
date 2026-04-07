@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { WorkflowDraftInputSourceTypes } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft, WorkflowValidationIssue } from "@domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowDraftInputSourceTypes } from "@domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   type WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKinds,
-} from "../../../../domain/workflow-studio/WorkflowInputBindingDomain";
-import { previewWorkflowInputBindings } from "../../../../application/workflow-studio/WorkflowInputBindingPreviewService";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
+import { previewWorkflowInputBindings } from "@application/workflow-studio/WorkflowInputBindingPreviewService";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
-} from "../../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@application/studio-entry/AssetSelectorSessionStore";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
@@ -704,7 +704,7 @@ export default function WorkflowStudioInputSectionEditor({
                       </button>
                     </div>
                     <div className="ui-text-small ui-text-secondary">
-                      Validation: {previewItem?.diagnostics.length ? `${previewItem.diagnostics.length} issue(s)` : "no issues"} ·
+                      Validation: {previewItem?.diagnostics.length ? `${previewItem.diagnostics.length} issue(s)` : "no issues"} Â·
                       Preview: {previewItem?.resolved ? `${previewItem.valueSummary?.summary ?? "resolved"}` : "unresolved"}
                     </div>
                   </div>
@@ -734,3 +734,4 @@ export default function WorkflowStudioInputSectionEditor({
     </WizardSection>
   );
 }
+

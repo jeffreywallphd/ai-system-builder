@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { createSystemStudioTaxonomy } from "../../../domain/system-studio/SystemAssetDomain";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
 import { SystemRuntimeApplicationService } from "../SystemRuntimeApplicationService";
 import { InMemorySystemRuntimeExecutionStore } from "../SystemRuntimeExecutionStore";
 
@@ -240,3 +240,4 @@ describe("SystemRuntimeApplicationService", () => {
     })).rejects.toThrow("serialized-reference-unresolved-workflow-version");
   });
 });
+

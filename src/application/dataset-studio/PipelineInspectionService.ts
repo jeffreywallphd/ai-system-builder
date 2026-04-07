@@ -1,15 +1,15 @@
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   CanonicalDataShapeKinds,
   isCanonicalDataShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import type {
   PipelineGraph,
   PipelineGraphAssetNode,
   PipelineGraphNode,
   PipelineGraphStageNode,
-} from "../../domain/dataset-studio/PipelineGraphDomain";
-import { validatePipelineGraph } from "../../domain/dataset-studio/PipelineGraphDomain";
+} from "@domain/dataset-studio/PipelineGraphDomain";
+import { validatePipelineGraph } from "@domain/dataset-studio/PipelineGraphDomain";
 import {
   PipelineExecutionStatusKinds,
   validatePipelineInspectionResult,
@@ -20,13 +20,13 @@ import {
   type PipelinePreviewData,
   type PipelinePreviewEnvelope,
   type StageInspectionResult,
-} from "../../domain/dataset-studio/PipelineInspectionDomain";
+} from "@domain/dataset-studio/PipelineInspectionDomain";
 import {
   PipelineStageIds,
   type PipelineStageId,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { FeatureEngineeringOperationKinds, parseFeatureEngineeringStageConfigFromStageOptions } from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
-import { AnnotationStatusKinds, parseLabelingStageConfigFromStageOptions } from "../../domain/dataset-studio/LabelingStageDomain";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { FeatureEngineeringOperationKinds, parseFeatureEngineeringStageConfigFromStageOptions } from "@domain/dataset-studio/FeatureEngineeringStageDomain";
+import { AnnotationStatusKinds, parseLabelingStageConfigFromStageOptions } from "@domain/dataset-studio/LabelingStageDomain";
 
 export interface PipelineInspectionExecutionResult {
   readonly pipelineGraph?: PipelineGraph;
@@ -661,3 +661,4 @@ export function inspectAsset(
 ): AssetInspectionResult | undefined {
   return DefaultInspectionService.inspectAsset(assetId, executionResult);
 }
+

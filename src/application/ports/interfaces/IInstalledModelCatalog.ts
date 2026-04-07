@@ -1,9 +1,9 @@
-import type { IModel } from "../../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../../domain/models/interfaces/IModelCompatibility";
+} from "@domain/models/interfaces/IModelCompatibility";
 
 export interface IInstalledModelSearchCriteria {
   readonly query?: string;
@@ -49,3 +49,4 @@ export interface IInstalledModelCatalog {
    */
   isInstalled(id: string): Promise<boolean>;
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   AuthProviderCategories,
   AuthProviderKinds,
   AuthProviderStatuses,
@@ -15,9 +15,9 @@ import {
   type Session,
   type UserIdentity,
   type UserIdentityProviderLink,
-} from "../../../domain/identity/IdentityDomain";
-import type { IdentityCredentialMaterialRecord } from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IdentitySessionTokenMaterialRecord } from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@domain/identity/IdentityDomain";
+import type { IdentityCredentialMaterialRecord } from "@application/contracts/IdentityApplicationContracts";
+import type { IdentitySessionTokenMaterialRecord } from "@application/contracts/IdentityApplicationContracts";
 
 export interface UserIdentityRow {
   readonly user_identity_id: string;
@@ -531,3 +531,4 @@ function assertSessionAccessChannel(value: string): IdentitySessionAccessChannel
   }
   throw new Error(`Persisted identity session access channel '${value}' is invalid.`);
 }
+

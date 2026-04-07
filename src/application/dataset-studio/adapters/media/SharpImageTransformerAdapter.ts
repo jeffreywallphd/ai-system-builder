@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IImageTransformer,
   ImageTransformationOptions,
   ImageTransformationResult,
-} from "../../../../domain/dataset-studio/interfaces/ImageInspection";
+} from "@domain/dataset-studio/interfaces/ImageInspection";
 
 type SharpFactory = (input: Uint8Array) => SharpPipeline;
 
@@ -81,3 +81,4 @@ export class SharpImageTransformerAdapter implements IImageTransformer {
     }
   }
 }
+

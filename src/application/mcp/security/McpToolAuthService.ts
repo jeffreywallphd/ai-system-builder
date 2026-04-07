@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   IMcpToolSecretRepository,
   McpToolSecretScope,
   ResolvedMcpToolSecretRecord,
 } from "../../ports/interfaces/IMcpToolSecretRepository";
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
-import type { McpToolCredentialStatus } from "../../../domain/mcp/McpToolTrust";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
+import type { McpToolCredentialStatus } from "@domain/mcp/McpToolTrust";
 import type {
   McpCredentialResolutionContext,
   McpCredentialResolutionResult,
@@ -165,3 +165,4 @@ function validateCredentialFields(
   }
   return Object.freeze(issues);
 }
+

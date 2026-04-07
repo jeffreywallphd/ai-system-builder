@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
-import { createStudioHandoffContract, StudioHandoffAssetRoles, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContract, StudioHandoffAssetRoles, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   AtomicStudioInputAdapter,
   CompositeStudioInputAdapter,
@@ -24,7 +24,7 @@ import {
 import { StudioHandoffCompatibilityValidator } from "../StudioHandoffCompatibilityValidator";
 import { StudioHandoffOrchestrationService } from "../StudioHandoffOrchestrationService";
 import { InMemoryStudioHandoffAuditRepository, StudioHandoffAuditTrailService } from "../StudioHandoffAuditTrailService";
-import { StudioHandoffAuditEventKinds } from "../../../domain/studio-handoff/StudioHandoffAuditTrail";
+import { StudioHandoffAuditEventKinds } from "@domain/studio-handoff/StudioHandoffAuditTrail";
 import type { StudioCapabilityDescriptor } from "../StudioCapabilityRegistry";
 
 const resolver = new CompositionAssetContractResolver();
@@ -199,3 +199,4 @@ describe("StudioHandoffAuditTrailService integration", () => {
     expect(records.some((entry) => entry.eventKind === StudioHandoffAuditEventKinds.handoffFailed)).toBeTrue();
   });
 });
+

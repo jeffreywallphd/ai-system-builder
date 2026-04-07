@@ -1,11 +1,11 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetInstanceImageGenerationRoles,
   type DatasetInstanceImageGeneration,
   type DatasetInstanceImageGenerationRole,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
-import type { ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
+import type { ImageAssetReferenceInput } from "@domain/dataset-studio/contracts/ImageAssetReference";
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
   z.string(),
@@ -156,3 +156,4 @@ export function materializationAssetToDatasetGeneration(input: {
     tags: normalizeTags(asset.tags),
   });
 }
+

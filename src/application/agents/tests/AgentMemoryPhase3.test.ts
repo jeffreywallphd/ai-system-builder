@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetId } from "../../../domain/assets/AssetId";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { Agent } from "../../../domain/agents/Agent";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetId } from "@domain/assets/AssetId";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import type { Agent } from "@domain/agents/Agent";
 import { DefaultAgentMemoryRetrievalService } from "../services/AgentMemoryRetrievalService";
 import { AgentMemoryWriteService } from "../services/AgentMemoryWriteService";
 import { AssetBackedAgentMemoryStore } from "../services/AssetBackedAgentMemoryStore";
@@ -159,3 +159,4 @@ describe("Agent memory phase 3 services", () => {
     expect(result.skipped[1]?.reason).toBe("retention-cap-reached");
   });
 });
+

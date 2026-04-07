@@ -1,5 +1,5 @@
-import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
-import { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 
 export class GetAssetVersionHistoryUseCase {
   constructor(private readonly versionRepository: IAssetVersionRepository) {}
@@ -14,3 +14,4 @@ export class GetAssetVersionHistoryUseCase {
     return Object.freeze([...versions].sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()));
   }
 }
+

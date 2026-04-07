@@ -1,34 +1,34 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
-import { createModelAssetMetadata, createModelStudioTaxonomy } from "../../../domain/model-studio/ModelStudioDomain";
-import { createDatasetAssetMetadata, createDatasetStudioTaxonomy } from "../../../domain/dataset-studio/DatasetStudioDomain";
-import { createToolAssetMetadata, createToolStudioTaxonomy } from "../../../domain/tool-studio/ToolStudioDomain";
+import { createModelAssetMetadata, createModelStudioTaxonomy } from "@domain/model-studio/ModelStudioDomain";
+import { createDatasetAssetMetadata, createDatasetStudioTaxonomy } from "@domain/dataset-studio/DatasetStudioDomain";
+import { createToolAssetMetadata, createToolStudioTaxonomy } from "@domain/tool-studio/ToolStudioDomain";
 import {
   createPromptTemplateAssetMetadata,
   createPromptTemplateStudioTaxonomy,
-} from "../../../domain/prompt-template-studio/PromptTemplateStudioDomain";
+} from "@domain/prompt-template-studio/PromptTemplateStudioDomain";
 import {
   createEmbeddingIndexAssetMetadata,
   createEmbeddingIndexStudioTaxonomy,
-} from "../../../domain/embedding-index-studio/EmbeddingIndexStudioDomain";
+} from "@domain/embedding-index-studio/EmbeddingIndexStudioDomain";
 import {
   createConfigProfileAssetMetadata,
   createConfigProfileStudioTaxonomy,
-} from "../../../domain/config-profile-studio/ConfigProfileStudioDomain";
-import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
+} from "@domain/config-profile-studio/ConfigProfileStudioDomain";
+import { createAssetDraft, createAssetSession } from "@domain/studio-shell/StudioShellDomain";
 import {
   evaluateAtomicStudioDraftConsistency,
   evaluateCompositeStudioDraftConsistency,
   evaluateSystemStudioDraftConsistency,
   evaluateStudioDraftConsistency,
 } from "../AtomicStudioAssetEnforcement";
-import type { AssetMetadata } from "../../../domain/studio-shell/StudioShellDomain";
+import type { AssetMetadata } from "@domain/studio-shell/StudioShellDomain";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   SystemBindingEndpointScopes,
   SystemComponentKinds,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -618,3 +618,4 @@ describe("evaluateSystemStudioDraftConsistency", () => {
     expect(codes).toContain("contract-mismatch");
   });
 });
+

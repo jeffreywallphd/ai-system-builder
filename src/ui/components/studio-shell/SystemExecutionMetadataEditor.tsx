@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { SystemExecutionMetadata } from "../../../domain/system-studio/SystemAssetDomain";
+﻿import { useEffect, useState } from "react";
+import type { SystemExecutionMetadata } from "@domain/system-studio/SystemAssetDomain";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 
 interface SystemSpecContent {
@@ -448,3 +448,4 @@ export function SystemExecutionMetadataEditor({ context }: { readonly context: S
     </div>
   );
 }
+

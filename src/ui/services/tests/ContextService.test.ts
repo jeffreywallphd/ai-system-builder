@@ -1,19 +1,19 @@
-import { PreviewWorkflowContextUseCase } from "../../../application/context/PreviewWorkflowContextUseCase";
-import { PreviewToolContextUseCase } from "../../../application/context/PreviewToolContextUseCase";
-import { PreviewAgentContextUseCase } from "../../../application/context/PreviewAgentContextUseCase";
+﻿import { PreviewWorkflowContextUseCase } from "@application/context/PreviewWorkflowContextUseCase";
+import { PreviewToolContextUseCase } from "@application/context/PreviewToolContextUseCase";
+import { PreviewAgentContextUseCase } from "@application/context/PreviewAgentContextUseCase";
 import { describe, expect, it } from "bun:test";
 import { ContextService } from "../ContextService";
-import { CreateContextPackageUseCase } from "../../../application/context/CreateContextPackageUseCase";
-import { CreateContextRecipeUseCase } from "../../../application/context/CreateContextRecipeUseCase";
-import { UpdateContextPackageUseCase } from "../../../application/context/UpdateContextPackageUseCase";
-import { DeleteContextPackageUseCase } from "../../../application/context/DeleteContextPackageUseCase";
-import { ListContextPackagesUseCase } from "../../../application/context/ListContextPackagesUseCase";
-import { ListContextRecipesUseCase } from "../../../application/context/ListContextRecipesUseCase";
-import { LoadContextPackageUseCase } from "../../../application/context/LoadContextPackageUseCase";
-import { LoadContextRecipeUseCase } from "../../../application/context/LoadContextRecipeUseCase";
-import { SearchContextPackagesUseCase } from "../../../application/context/SearchContextPackagesUseCase";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { CreateContextPackageUseCase } from "@application/context/CreateContextPackageUseCase";
+import { CreateContextRecipeUseCase } from "@application/context/CreateContextRecipeUseCase";
+import { UpdateContextPackageUseCase } from "@application/context/UpdateContextPackageUseCase";
+import { DeleteContextPackageUseCase } from "@application/context/DeleteContextPackageUseCase";
+import { ListContextPackagesUseCase } from "@application/context/ListContextPackagesUseCase";
+import { ListContextRecipesUseCase } from "@application/context/ListContextRecipesUseCase";
+import { LoadContextPackageUseCase } from "@application/context/LoadContextPackageUseCase";
+import { LoadContextRecipeUseCase } from "@application/context/LoadContextRecipeUseCase";
+import { SearchContextPackagesUseCase } from "@application/context/SearchContextPackagesUseCase";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 describe("ContextService", () => {
   it("wraps context package and recipe use cases", async () => {
@@ -75,3 +75,4 @@ describe("ContextService", () => {
     expect(deleted.deleted).toBe(true);
   });
 });
+

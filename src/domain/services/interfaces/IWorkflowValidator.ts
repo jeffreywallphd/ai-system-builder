@@ -1,6 +1,6 @@
-import type { IWorkflow } from "../../workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "../../workflows/interfaces/IWorkflow";
 import type { IWorkflowGraph } from "../../workflows/interfaces/IWorkflowGraph";
-import type { INode } from "../../../../domain/nodes/interfaces/INode";
+import type { INode } from "@domain/nodes/interfaces/INode";
 import type { IWorkflowConnection } from "../../workflows/interfaces/IWorkflowConnection";
 
 export type WorkflowValidationSeverity = "error" | "warning" | "info";
@@ -162,3 +162,4 @@ export interface IWorkflowValidator {
     }
   ): IWorkflowValidationResult;
 }
+

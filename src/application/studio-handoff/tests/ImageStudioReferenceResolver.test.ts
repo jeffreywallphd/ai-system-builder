@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createImageCrossStudioHandoffContract } from "../../../domain/studio-handoff/ImageStudioHandoffContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createImageCrossStudioHandoffContract } from "@domain/studio-handoff/ImageStudioHandoffContract";
 import { ImageStudioReferenceResolver, ImageStudioReferenceResolutionIssueCodes } from "../ImageStudioReferenceResolver";
 
 function createContract() {
@@ -115,3 +115,4 @@ describe("ImageStudioReferenceResolver", () => {
     ]));
   });
 });
+

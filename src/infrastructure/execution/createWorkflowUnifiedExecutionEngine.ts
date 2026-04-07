@@ -1,5 +1,5 @@
-import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
-import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
+﻿import type { IExecutionRunRepository } from "@application/ports/interfaces/IExecutionRunRepository";
+import type { IWorkflowExecutor } from "@application/ports/interfaces/IWorkflowExecutor";
 import { createUnifiedExecutionInfrastructure } from "./createExecutionInfrastructure";
 
 export function createWorkflowUnifiedExecutionEngine(
@@ -11,3 +11,4 @@ export function createWorkflowUnifiedExecutionEngine(
     executionRunRepository,
   });
 }
+

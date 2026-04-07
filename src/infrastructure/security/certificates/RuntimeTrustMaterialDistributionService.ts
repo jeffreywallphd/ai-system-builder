@@ -1,25 +1,25 @@
-import {
+﻿import {
   CertificateDistributionEventStatuses,
   type CertificateDistributionTargetKind,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   CertificateSubjectReferenceKinds,
   TrustMaterialKinds,
   type CertificateSubjectReferenceKind,
-} from "../../../domain/security/CertificateAuthorityDomain";
-import type { ICertificateAuthorityRootPersistenceRepository } from "../../../application/security/ports/ICertificateAuthorityRootPersistenceRepository";
-import type { ICertificateAuthorityRootMaterialStorage } from "../../../application/security/ports/ICertificateAuthorityRootMaterialStorage";
-import type { ICertificateLifecycleEventPersistenceRepository } from "../../../application/security/ports/ICertificateLifecycleEventPersistenceRepository";
-import type { IIssuedCertificatePersistenceRepository } from "../../../application/security/ports/IIssuedCertificatePersistenceRepository";
+} from "@domain/security/CertificateAuthorityDomain";
+import type { ICertificateAuthorityRootPersistenceRepository } from "@application/security/ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateAuthorityRootMaterialStorage } from "@application/security/ports/ICertificateAuthorityRootMaterialStorage";
+import type { ICertificateLifecycleEventPersistenceRepository } from "@application/security/ports/ICertificateLifecycleEventPersistenceRepository";
+import type { IIssuedCertificatePersistenceRepository } from "@application/security/ports/IIssuedCertificatePersistenceRepository";
 import type {
   ITrustMaterialDistributionPort,
   PublishTrustBundleInput,
   PublishTrustBundleResult,
   ResolveRuntimeTrustMaterialPackageInput,
   ResolveRuntimeTrustMaterialPackageResult,
-} from "../../../application/security/ports/ITrustMaterialDistributionPort";
-import type { ITrustMaterialReferencePersistenceRepository } from "../../../application/security/ports/ITrustMaterialReferencePersistenceRepository";
-import type { TrustMaterialReferencePersistenceRecord } from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@application/security/ports/ITrustMaterialDistributionPort";
+import type { ITrustMaterialReferencePersistenceRepository } from "@application/security/ports/ITrustMaterialReferencePersistenceRepository";
+import type { TrustMaterialReferencePersistenceRecord } from "@shared/dto/security/CertificateAuthorityDtos";
 import { redactSecretRef } from "../secrets/FileSystemProtectedSecretStore";
 
 interface RuntimeTrustMaterialDistributionServiceDependencies {
@@ -507,3 +507,4 @@ function assertTargetReferenceIdForKind(
     throw new Error("server trust retrieval requires targetReferenceId to start with 'server:'.");
   }
 }
+

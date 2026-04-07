@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateAuthorityStatuses, CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateAuthorityStatuses, CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import { GetCertificateRenewalPlanningUseCase } from "../use-cases/GetCertificateRenewalPlanningUseCase";
@@ -15,7 +15,7 @@ import type {
   SupersedeIssuedCertificatePersistenceRecordInput,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 class InMemoryRenewalRepositories
   implements ICertificateAuthorityRootPersistenceRepository, IIssuedCertificatePersistenceRepository {
@@ -243,3 +243,4 @@ function createCertificate(input: {
     revision: 1,
   });
 }
+

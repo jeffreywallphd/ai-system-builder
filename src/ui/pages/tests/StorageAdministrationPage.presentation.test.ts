@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import type { GetStorageInstanceHealthApiResponse } from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
-import { StorageLifecycleStates, StorageReplicationModes } from "../../../domain/storage/StorageDomain";
-import { StorageSyncDeploymentAvailabilities, StorageSyncStatuses } from "../../../shared/contracts/storage/StorageTransportContracts";
+﻿import { describe, expect, it } from "bun:test";
+import type { GetStorageInstanceHealthApiResponse } from "@infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+import { StorageLifecycleStates, StorageReplicationModes } from "@domain/storage/StorageDomain";
+import { StorageSyncDeploymentAvailabilities, StorageSyncStatuses } from "@shared/contracts/storage/StorageTransportContracts";
 import { StorageAdministrationPagePresentation } from "../StorageAdministrationPage";
 
 describe("StorageAdministrationPage presentation", () => {
@@ -131,3 +131,4 @@ function createHealthResponse(
     ...overrides,
   };
 }
+

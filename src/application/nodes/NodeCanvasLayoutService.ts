@@ -1,5 +1,5 @@
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
@@ -212,3 +212,4 @@ function boundsIntersect(left: NodeBounds, right: NodeBounds): boolean {
     left.bottom > right.top
   );
 }
+

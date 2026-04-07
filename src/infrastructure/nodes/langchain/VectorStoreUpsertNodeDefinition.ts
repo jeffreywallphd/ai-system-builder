@@ -1,6 +1,6 @@
-import { NodePort, NodePortCompatibilityProfile } from "../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
+﻿import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
 
 export interface ILangChainNodeCatalogMetadataProjection {
   readonly group: string;
@@ -112,3 +112,4 @@ export const VECTOR_STORE_UPSERT_NODE_DEFINITION: ILangChainNodeCatalogDefinitio
   ]),
   projection,
 });
+

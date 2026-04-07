@@ -1,9 +1,9 @@
-import type { ManagedServiceDefinition } from "../../../application/services/ManagedServiceDefinition";
+﻿import type { ManagedServiceDefinition } from "@application/services/ManagedServiceDefinition";
 import {
   createManagedServiceDefinition,
   ManagedServiceSources,
-} from "../../../application/services/ManagedServiceDefinition";
-import type { IManagedServiceDefinitionRepository } from "../../../application/services/interfaces/IManagedServiceDefinitionRepository";
+} from "@application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRepository } from "@application/services/interfaces/IManagedServiceDefinitionRepository";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -61,3 +61,4 @@ export class LocalStorageManagedServiceDefinitionRepository implements IManagedS
     this.storage?.setItem(this.storageKey, JSON.stringify(next));
   }
 }
+

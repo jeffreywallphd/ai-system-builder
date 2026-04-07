@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import { createSystemContextWorkflowMappingConfiguration } from "../../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
+import { createSystemContextWorkflowMappingConfiguration } from "@domain/system-studio/SystemContextWorkflowMappingConfiguration";
 import { ReferenceImageSystemWorkflowContextMapping } from "../../system-studio/ReferenceImageSystemTemplate";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../SystemContextWorkflowInputMapper";
 
@@ -149,3 +149,4 @@ describe("SystemContextWorkflowInputMapper", () => {
     expect((metadata.runtimeContext as Record<string, unknown>).runtimeSessionId).toBe("runtime:reference-image");
   });
 });
+

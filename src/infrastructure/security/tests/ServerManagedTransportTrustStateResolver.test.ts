@@ -1,19 +1,19 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateTrustEvaluationStatuses,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
-import { AuthenticatedTrustStates } from "../../../domain/security/TransportSecurityDomain";
-import { DeviceTrustStatuses } from "../../../domain/identity/TrustedDeviceDomain";
+} from "@shared/dto/security/CertificateAuthorityDtos";
+import { AuthenticatedTrustStates } from "@domain/security/TransportSecurityDomain";
+import { DeviceTrustStatuses } from "@domain/identity/TrustedDeviceDomain";
 import {
   NodeApprovalStatuses,
   NodeRevocationStates,
   NodeTrustStates,
   type NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import type { ICertificateRevocationStatusRegistry } from "../../../application/security/ports/ICertificateRevocationStatusRegistry";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import type { ICertificateRevocationStatusRegistry } from "@application/security/ports/ICertificateRevocationStatusRegistry";
 import { ServerManagedTransportTrustStateResolver } from "../ServerManagedTransportTrustStateResolver";
 
 describe("ServerManagedTransportTrustStateResolver", () => {
@@ -142,3 +142,4 @@ function createNodeRecord(input: {
     revision: 1,
   });
 }
+

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowDraftUserTriggerScopes,
   WorkflowValidationIssueCodes,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   validateSingleWorkflowTriggerDefinition,
   validateWorkflowTriggerDefinitions,
@@ -130,3 +130,4 @@ describe("WorkflowTriggerValidationPipeline", () => {
     expect(result.issues[0]?.code).toBe(WorkflowValidationIssueCodes.triggerCollectionEmpty);
   });
 });
+

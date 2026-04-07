@@ -1,4 +1,4 @@
-import { AgentTriggerKinds, type AgentTriggerKind } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import { AgentTriggerKinds, type AgentTriggerKind } from "@application/agents/contracts/AgentRunContracts";
 
 interface TriggerSelectorProps {
   readonly value: AgentTriggerKind;
@@ -23,3 +23,4 @@ export function TriggerSelector(props: TriggerSelectorProps): JSX.Element {
     </>
   );
 }
+

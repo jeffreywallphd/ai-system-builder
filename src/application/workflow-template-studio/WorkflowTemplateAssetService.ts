@@ -1,12 +1,12 @@
-import path from "node:path";
-import { Asset } from "../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo } from "../../domain/assets/AssetMetadata";
+﻿import path from "node:path";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 import {
   createWorkflowTemplateDefinition,
   deserializeWorkflowTemplateDefinition,
   serializeWorkflowTemplateDefinition,
   type WorkflowTemplateDefinition,
-} from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+} from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
 import {
@@ -17,15 +17,15 @@ import {
 import { applyWorkflowTemplateParameterDefaults } from "./WorkflowTemplateParameterizationService";
 import { WorkflowTemplateInstantiationService, type InstantiateWorkflowTemplateCommand } from "./WorkflowTemplateInstantiationService";
 import { WorkflowTemplatePreviewService } from "./WorkflowTemplatePreviewService";
-import type { WorkflowTemplateInstance } from "../../domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
-import type { WorkflowTemplatePreview } from "../../domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
+import type { WorkflowTemplateInstance } from "@domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
+import type { WorkflowTemplatePreview } from "@domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
 import { WorkflowTemplateValidator } from "./WorkflowTemplateValidator";
 import { AssetValidationOrchestrator, type AggregatedAssetValidationResult } from "../asset-validation/AssetValidationOrchestrator";
 import { DatasetAssetValidator } from "../asset-validation/DatasetAssetValidator";
 import { WorkflowAssetValidator } from "../asset-validation/WorkflowAssetValidator";
 import { ValidatedAssetTypes } from "../asset-validation/AssetValidationTypes";
 import type { AssetValidator } from "../asset-validation/AssetValidationTypes";
-import type { AssetValidationResult } from "../../domain/contracts/AssetValidation";
+import type { AssetValidationResult } from "@domain/contracts/AssetValidation";
 
 export interface SaveWorkflowTemplateCommand {
   readonly definition: WorkflowTemplateDefinition;
@@ -179,3 +179,4 @@ export class WorkflowTemplateAssetService {
     });
   }
 }
+

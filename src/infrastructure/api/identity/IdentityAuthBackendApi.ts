@@ -1,63 +1,63 @@
-import { IdentityErrorCodes } from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
+﻿import { IdentityErrorCodes } from "@application/contracts/IdentityApplicationContracts";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
 import type {
   ChangeLocalPasswordCredentialUseCase,
   ChangeLocalPasswordCredentialErrorCode,
-} from "../../../application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+} from "@application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
 import type {
   LoginLocalAccountUseCase,
   LoginLocalAccountErrorCode,
-} from "../../../application/identity/use-cases/LoginLocalAccountUseCase";
+} from "@application/identity/use-cases/LoginLocalAccountUseCase";
 import type {
   ListLocalIdentityAccountsUseCase,
   ListLocalIdentityAccountsErrorCode,
-} from "../../../application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+} from "@application/identity/use-cases/ListLocalIdentityAccountsUseCase";
 import type {
   GetLocalIdentityAccountStatusUseCase,
   GetLocalIdentityAccountStatusErrorCode,
-} from "../../../application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
+} from "@application/identity/use-cases/GetLocalIdentityAccountStatusUseCase";
 import type {
   SetLocalIdentityAccountStatusUseCase,
   SetLocalIdentityAccountStatusErrorCode,
-} from "../../../application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+} from "@application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
 import type {
   LogoutIdentitySessionUseCase,
   LogoutIdentitySessionErrorCode,
-} from "../../../application/identity/use-cases/LogoutIdentitySessionUseCase";
+} from "@application/identity/use-cases/LogoutIdentitySessionUseCase";
 import type {
   RevokeIdentitySessionUseCase,
   RevokeIdentitySessionErrorCode,
-} from "../../../application/identity/use-cases/RevokeIdentitySessionUseCase";
+} from "@application/identity/use-cases/RevokeIdentitySessionUseCase";
 import type {
   ListTrustedDevicesUseCase,
   ListTrustedDevicesErrorCode,
-} from "../../../application/identity/use-cases/ListTrustedDevicesUseCase";
+} from "@application/identity/use-cases/ListTrustedDevicesUseCase";
 import type {
   GetTrustedDeviceUseCase,
   GetTrustedDeviceErrorCode,
-} from "../../../application/identity/use-cases/GetTrustedDeviceUseCase";
+} from "@application/identity/use-cases/GetTrustedDeviceUseCase";
 import type {
   RevokeTrustedDeviceUseCase,
   RevokeTrustedDeviceErrorCode,
-} from "../../../application/identity/use-cases/RevokeTrustedDeviceUseCase";
+} from "@application/identity/use-cases/RevokeTrustedDeviceUseCase";
 import type {
   UpdateTrustedDeviceDisplayNameUseCase,
   UpdateTrustedDeviceDisplayNameErrorCode,
-} from "../../../application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
+} from "@application/identity/use-cases/UpdateTrustedDeviceDisplayNameUseCase";
 import type {
   InitiateTrustedDevicePairingUseCase,
   InitiateTrustedDevicePairingErrorCode,
-} from "../../../application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
+} from "@application/identity/use-cases/InitiateTrustedDevicePairingUseCase";
 import type {
   ValidateTrustedDevicePairingUseCase,
   ValidateTrustedDevicePairingErrorCode,
-} from "../../../application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
-import type { CompleteTrustedDevicePairingUseCase } from "../../../application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
-import type { IdentitySessionAccessChannel } from "../../../domain/identity/IdentityDomain";
+} from "@application/identity/use-cases/ValidateTrustedDevicePairingUseCase";
+import type { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-cases/CompleteTrustedDevicePairingUseCase";
+import type { IdentitySessionAccessChannel } from "@domain/identity/IdentityDomain";
 import type {
   RegisterLocalAccountUseCase,
   RegisterLocalAccountErrorCode,
-} from "../../../application/identity/use-cases/RegisterLocalAccountUseCase";
+} from "@application/identity/use-cases/RegisterLocalAccountUseCase";
 import {
   type ChangeLocalPasswordCredentialApiRequest,
   type ChangeLocalPasswordCredentialApiResponse,
@@ -104,14 +104,14 @@ import {
   RoleAwareTrustedDeviceAdministrativeAuthorizationPolicy,
   TrustedDeviceAdministrativeActions,
   type TrustedDeviceAdministrativeAuthorizationPolicy,
-} from "../../../application/identity/use-cases/TrustedDeviceAdministrativeAuthorization";
+} from "@application/identity/use-cases/TrustedDeviceAdministrativeAuthorization";
 import { IdentityAuthObservability, type IdentityAuthObservabilityOptions } from "./IdentityAuthObservability";
-import { IdentityAuthenticatedSessionService } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
+import { IdentityAuthenticatedSessionService } from "@application/identity/services/IdentityAuthenticatedSessionService";
 import {
   IdentitySessionTrustRequirements,
   type IIdentitySessionTrustService,
   type IdentitySessionTrustRequirement,
-} from "../../../../application/identity/ports/IIdentitySessionTrustService";
+} from "@application/identity/ports/IIdentitySessionTrustService";
 import {
   serializeChangeLocalPasswordCredentialResponse,
   serializeCompleteTrustedDevicePairingResponse,
@@ -1426,3 +1426,4 @@ function resolveUserInputInvalidRequestMessage(message: string, fallback: string
   const normalized = message.trim();
   return normalized.length > 0 ? normalized : fallback;
 }
+

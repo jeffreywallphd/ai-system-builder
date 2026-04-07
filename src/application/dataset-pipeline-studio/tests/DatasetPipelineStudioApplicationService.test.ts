@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { DatasetPipelineStudioApplicationService } from "../DatasetPipelineStudioApplicationService";
-import { DatasetPipelineStudioIdentity } from "../../../domain/dataset-pipeline-studio/DatasetPipelineStudioDomain";
+import { DatasetPipelineStudioIdentity } from "@domain/dataset-pipeline-studio/DatasetPipelineStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -120,3 +120,4 @@ describe("DatasetPipelineStudioApplicationService", () => {
     })).rejects.toThrow("taxonomy-semantic-role-mismatch");
   });
 });
+

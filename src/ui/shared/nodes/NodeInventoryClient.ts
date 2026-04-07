@@ -1,20 +1,20 @@
-import type {
+﻿import type {
   GetNodeInventoryDetailApiResponse,
   ListNodeInventoryApiResponse,
   NodeTrustApiResponse,
   RevokeNodeTrustApiResponse,
-} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+} from "@infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
 import type {
   NodeInventoryOperationalState,
   NodeInventoryPresenceState,
   RevokeNodeTrustActionRequestDto,
-} from "../../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@shared/contracts/nodes/NodeTrustApiContracts";
 import type {
   NodeApprovalStatus,
   NodeEnrollmentRequestStatus,
   NodeRoleCapability,
   NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 
 export interface NodeInventoryClient {
   listNodeInventory(
@@ -162,3 +162,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

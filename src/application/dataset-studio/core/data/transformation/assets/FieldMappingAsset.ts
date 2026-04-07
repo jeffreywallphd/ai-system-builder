@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
@@ -6,7 +6,7 @@ import {
   type CanonicalRecordValue,
   type CanonicalTableColumn,
   type CanonicalTableRow,
-} from "../../../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import { BaseTransformationAsset } from "../BaseTransformationAsset";
 import {
   TransformationInputDataKinds,
@@ -337,3 +337,4 @@ export class FieldMappingAsset extends BaseTransformationAsset<
     });
   }
 }
+

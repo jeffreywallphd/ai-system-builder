@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
@@ -15,7 +15,7 @@ import {
   type WorkspaceMembership,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceIdNamespaces,
   type WorkspaceAuthorizationSnapshot,
@@ -23,8 +23,8 @@ import {
   type WorkspaceIdNamespace,
   type WorkspaceMembershipListQuery,
   type WorkspaceRoleAssignmentListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   AddWorkspaceMemberUseCase,
   WorkspaceMembershipAdditionErrorCodes,
@@ -963,3 +963,4 @@ describe("Workspace role administration use cases", () => {
     }
   });
 });
+

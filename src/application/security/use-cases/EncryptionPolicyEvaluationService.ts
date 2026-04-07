@@ -1,10 +1,10 @@
-import {
+﻿import {
   EncryptionAtRestPolicyDomainError,
   EncryptionModes,
   ProtectedDataClasses,
   evaluateEncryptionAtRestPolicy,
   type ProtectedDataClass,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type { IEncryptionAtRestPolicyContextResolverPort } from "../ports/EncryptionAtRestPolicyEvaluationPorts";
 import {
   EncryptionPolicyEvaluationErrorCodes,
@@ -303,3 +303,4 @@ function failure(
     }),
   };
 }
+

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { AppRuntimeConfig } from "../../../config/AppRuntimeConfig";
-import { RuntimeDependencyIds, RuntimeDependencyOperationalStates } from "../../../../application/runtime/RuntimeDependencyOrchestrator";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates } from "@application/runtime/RuntimeDependencyOrchestrator";
 import { RuntimeAwareModelCreationEnvironmentGateway } from "../RuntimeAwareModelCreationEnvironmentGateway";
 
 describe("RuntimeAwareModelCreationEnvironmentGateway", () => {
@@ -45,3 +45,4 @@ describe("RuntimeAwareModelCreationEnvironmentGateway", () => {
     expect(environment.runtimeRemediationHints).toContain("Wait for the runtime to finish starting.");
   });
 });
+

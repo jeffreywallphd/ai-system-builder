@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { PolicyDecisionOutcomes } from "../../../domain/authorization/AuthorizationDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { PolicyDecisionOutcomes } from "@domain/authorization/AuthorizationDomain";
 import type { AuthorizationPolicyDecision } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import {
   AuthorizationResponseAccessLevels,
@@ -87,3 +87,4 @@ function createAllowedDecision(reasonCode: string): AuthorizationPolicyDecision 
     matchedSharingGrantIds: Object.freeze([]),
   });
 }
+

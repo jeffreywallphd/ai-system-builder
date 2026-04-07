@@ -1,44 +1,44 @@
-import { describe, expect, it } from "bun:test";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
-import { SystemPackagingService } from "../../../../application/system-packaging/SystemPackagingService";
-import { DeploymentBuildPipeline } from "../../../../application/deployment/DeploymentBuildPipeline";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { SystemPackagingService } from "@application/system-packaging/SystemPackagingService";
+import { DeploymentBuildPipeline } from "@application/deployment/DeploymentBuildPipeline";
 import {
   DeploymentExecutionService,
   InMemoryDeploymentRecordRepository,
-} from "../../../../application/deployment/DeploymentExecutionService";
+} from "@application/deployment/DeploymentExecutionService";
 import {
   DeploymentDiagnosticsService,
   InMemoryDeploymentDiagnosticsRepository,
-} from "../../../../application/deployment/DeploymentDiagnosticsService";
+} from "@application/deployment/DeploymentDiagnosticsService";
 import {
   createDeploymentConfigurationContract,
   type DeploymentConfigurationContract,
-} from "../../../../domain/deployment/DeploymentConfigurationDomain";
+} from "@domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
   type DeploymentTarget,
-} from "../../../../domain/deployment/DeploymentTargetDomain";
+} from "@domain/deployment/DeploymentTargetDomain";
 import {
   DeploymentAccessEvaluator,
   RoleBasedDeploymentAccessPolicy,
   type DeploymentAccessContext,
-} from "../../../../application/deployment/DeploymentAccessControl";
-import { DeploymentQuotaEvaluator } from "../../../../application/deployment/DeploymentQuotaEvaluator";
-import { DeploymentVersionManager } from "../../../../application/deployment/DeploymentVersionManager";
+} from "@application/deployment/DeploymentAccessControl";
+import { DeploymentQuotaEvaluator } from "@application/deployment/DeploymentQuotaEvaluator";
+import { DeploymentVersionManager } from "@application/deployment/DeploymentVersionManager";
 import {
   InMemoryEndpointExposureRepository,
   SystemEndpointExposureService,
-} from "../../../../application/deployment/SystemEndpointExposureService";
-import { EndpointRoutingService } from "../../../../application/deployment/EndpointRoutingService";
-import { DeploymentHealthMonitor } from "../../../../application/deployment/DeploymentHealthMonitor";
-import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "../../../../application/deployment/DeploymentRollbackService";
+} from "@application/deployment/SystemEndpointExposureService";
+import { EndpointRoutingService } from "@application/deployment/EndpointRoutingService";
+import { DeploymentHealthMonitor } from "@application/deployment/DeploymentHealthMonitor";
+import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "@application/deployment/DeploymentRollbackService";
 import {
   DeploymentAuditTrailService,
   InMemoryDeploymentAuditRepository,
-} from "../../../../application/deployment/DeploymentAuditTrailService";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
+} from "@application/deployment/DeploymentAuditTrailService";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
 import { SystemRuntimeBackendApi } from "../../system-runtime/SystemRuntimeBackendApi";
 import { ExternalSystemRuntimeInterface } from "../../system-runtime/ExternalSystemRuntimeInterface";
 import { DeploymentEndpointRuntimeInvoker } from "../../system-runtime/DeploymentEndpointRuntimeInvoker";
@@ -346,3 +346,4 @@ describe("Deployment interop E2E", () => {
     expect(auditRecent.some((entry) => entry.deployment.rootSystemAssetId === "system:interop-parent" && entry.eventKind === "deployment-succeeded")).toBeTrue();
   });
 });
+

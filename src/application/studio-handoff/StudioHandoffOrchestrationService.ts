@@ -1,18 +1,18 @@
-import {
+﻿import {
   createStudioHandoffContract,
   type StudioHandoffContract,
   type StudioHandoffIntent,
   type StudioHandoffSource,
   type StudioHandoffTarget,
   type TargetStudioInputContract,
-} from "../../domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext, type StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
+} from "@domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext, type StudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffCompatibilityDecision } from "./StudioHandoffCompatibilityValidator";
 import type { StudioCapabilityDescriptor } from "./StudioCapabilityRegistry";
 import {
   StudioHandoffAuditEventKinds,
   StudioHandoffAuditOutcomes,
-} from "../../domain/studio-handoff/StudioHandoffAuditTrail";
+} from "@domain/studio-handoff/StudioHandoffAuditTrail";
 import type { StudioHandoffAuditTrailService } from "./StudioHandoffAuditTrailService";
 import type { AdaptedStudioInput, StudioInputAdapterLayer } from "./StudioInputAdapter";
 import type { AdaptedStudioOutput, StudioOutputAdapterLayer, StudioProducedOutput } from "./StudioOutputAdapter";
@@ -649,3 +649,4 @@ export class StudioHandoffOrchestrationService {
     });
   }
 }
+

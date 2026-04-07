@@ -1,16 +1,16 @@
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import type { IPythonRuntimeManager } from "../../../application/ports/interfaces/IPythonRuntimeManager";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
-import type { IManagedServiceManager } from "../../../application/services/interfaces/IManagedServiceManager";
-import type { IManagedServiceStatusRefresher } from "../../../application/services/interfaces/IManagedServiceStatusRefresher";
-import type { IManagedServiceSupervisor } from "../../../application/services/interfaces/IManagedServiceSupervisor";
-import type { IManagedServiceSupervisorClient } from "../../../application/services/interfaces/IManagedServiceSupervisorClient";
+﻿import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
+import type { IPythonRuntimeManager } from "@application/ports/interfaces/IPythonRuntimeManager";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources } from "@application/runtime/RuntimeEvent";
+import { ManagedServicePythonRuntimeManagerAdapter } from "@application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
+import type { IManagedServiceManager } from "@application/services/interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "@application/services/interfaces/IManagedServiceStatusRefresher";
+import type { IManagedServiceSupervisor } from "@application/services/interfaces/IManagedServiceSupervisor";
+import type { IManagedServiceSupervisorClient } from "@application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   ManagedServiceOwnership,
   ManagedServiceStates,
-} from "../../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/interfaces/ManagedServiceTypes";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { BrowserManagedServiceManager } from "../../services/BrowserManagedServiceManager";
 import { HttpManagedServiceManager } from "../../services/HttpManagedServiceManager";
@@ -116,3 +116,4 @@ export function createPythonManagedService(
     }),
   });
 }
+

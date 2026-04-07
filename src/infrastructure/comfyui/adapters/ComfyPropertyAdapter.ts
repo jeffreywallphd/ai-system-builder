@@ -1,4 +1,4 @@
-import type { INodeProperty } from "../../../../domain/nodes/interfaces/INodeProperty";
+﻿import type { INodeProperty } from "@domain/nodes/interfaces/INodeProperty";
 import type { ComfyPropertyDto } from "../dto/ComfyPropertyDto";
 
 export class ComfyPropertyAdapter {
@@ -75,3 +75,4 @@ export class ComfyPropertyAdapter {
     }
   }
 }
+

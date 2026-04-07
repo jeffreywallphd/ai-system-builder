@@ -1,8 +1,8 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type {
   IWorkflowExecutionEvent,
   WorkflowExecutionStatus,
-} from "../../application/ports/interfaces/IWorkflowExecutor";
+} from "@application/ports/interfaces/IWorkflowExecutor";
 import { toTitleCase } from "./PresenterFormatting";
 
 export interface WorkflowExecutionStatusViewModel {
@@ -32,25 +32,25 @@ export class WorkflowExecutionPresenter {
     const outputAssets = params.outputAssets ?? [];
 
     return Object.freeze({
-      executionId: event?.executionId ?? "—",
+      executionId: event?.executionId ?? "â€”",
       statusLabel: toTitleCase(status),
       statusTone: mapStatusTone(status),
-      currentNodeLabel: event?.nodeId ?? "—",
+      currentNodeLabel: event?.nodeId ?? "â€”",
       progressLabel:
         typeof event?.progress?.percent === "number"
           ? `${event.progress.percent}%`
           : params.isExecuting
             ? "In progress"
-            : "—",
+            : "â€”",
       executionPathLabel: provenance?.classification ? toTitleCase(provenance.classification) : "Awaiting runtime update",
       message: event?.message ?? (params.isExecuting ? "Workflow execution is in progress." : undefined),
       detail: provenance?.detail,
       selectionReason: provenance?.selectionReason,
       fallbackSummary: provenance?.fallback?.isActive
-        ? `${provenance.fallback.kind} — ${provenance.fallback.reason ?? "Fallback path active."}`
+        ? `${provenance.fallback.kind} â€” ${provenance.fallback.reason ?? "Fallback path active."}`
         : undefined,
       nodeTruthfulnessSummary: provenance?.nodeCounts
-        ? `real ${provenance.nodeCounts.real ?? 0} • delegated ${provenance.nodeCounts.delegated ?? 0} • hybrid ${provenance.nodeCounts.hybrid ?? 0} • scaffolded ${provenance.nodeCounts.scaffolded ?? 0} • unavailable ${provenance.nodeCounts.unavailable ?? 0}`
+        ? `real ${provenance.nodeCounts.real ?? 0} â€¢ delegated ${provenance.nodeCounts.delegated ?? 0} â€¢ hybrid ${provenance.nodeCounts.hybrid ?? 0} â€¢ scaffolded ${provenance.nodeCounts.scaffolded ?? 0} â€¢ unavailable ${provenance.nodeCounts.unavailable ?? 0}`
         : undefined,
       outputSummary:
         outputAssets.length > 0
@@ -78,3 +78,4 @@ function mapStatusTone(status: WorkflowExecutionStatus): WorkflowExecutionStatus
       return "info";
   }
 }
+

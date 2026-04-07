@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import type { IModelInstallProgress } from "../../../application/ports/interfaces/IModelInstaller";
+﻿import { useMemo, useState } from "react";
+import type { IModelInstallProgress } from "@application/ports/interfaces/IModelInstaller";
 import { formatBytes } from "../../presenters/PresenterFormatting";
 import type {
   ModelDownloadFileViewModel,
@@ -106,7 +106,7 @@ export default function ModelCard({
         <dl className="ui-model-card__summary">
           <div>
             <dt>Publisher</dt>
-            <dd>{model.subtitle ?? "—"}</dd>
+            <dd>{model.subtitle ?? "â€”"}</dd>
           </div>
           <div>
             <dt>Reference</dt>
@@ -158,7 +158,7 @@ export default function ModelCard({
                   <div>
                     <div className="ui-text-small ui-text-secondary">Download files</div>
                     <div className="ui-subtle ui-text-small">
-                      {selectedFiles.length} selected • {formatBytes(selectedTotalSizeBytes) ?? "Unknown"}
+                      {selectedFiles.length} selected â€¢ {formatBytes(selectedTotalSizeBytes) ?? "Unknown"}
                     </div>
                   </div>
 
@@ -201,7 +201,7 @@ export default function ModelCard({
                           </span>
                           <span className="ui-subtle ui-text-small">
                             .{file.extension}
-                            {file.sizeLabel ? ` • ${file.sizeLabel}` : ""}
+                            {file.sizeLabel ? ` â€¢ ${file.sizeLabel}` : ""}
                           </span>
                         </span>
                       </label>
@@ -211,7 +211,7 @@ export default function ModelCard({
                         disabled={isDownloadBusy}
                         onClick={() => onDownloadFile?.(model.id, file)}
                       >
-                        {isDownloadBusy ? "Working…" : "Download"}
+                        {isDownloadBusy ? "Workingâ€¦" : "Download"}
                       </button>
                     </div>
                   );
@@ -317,3 +317,4 @@ function badgeClassForInstallStatus(status: IModelInstallProgress["status"]): st
       return "ui-badge--neutral";
   }
 }
+

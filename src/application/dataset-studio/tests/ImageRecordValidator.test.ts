@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { AssetId } from "../../../domain/assets/AssetId";
-import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetId } from "@domain/assets/AssetId";
+import { ImageAssetReferenceKinds } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import { validateImageRecord, ZodImageRecordValidator } from "../adapters/validation/ImageRecordValidator";
 
 describe("ImageRecordValidator", () => {
@@ -169,3 +169,4 @@ describe("ImageRecordValidator", () => {
     })).toThrow();
   });
 });
+

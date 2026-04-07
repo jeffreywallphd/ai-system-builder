@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   SecretAccessActions,
   SecretActorTypes,
@@ -14,7 +14,7 @@ import {
   type SecretAccessActor,
   type SecretRecord,
   type SecretReference,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -895,3 +895,4 @@ describe("secret application contracts", () => {
     expect(lastDecision?.reason).toBe("scope-mismatch");
   });
 });
+

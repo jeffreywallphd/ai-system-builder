@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   NodeApprovalStatuses,
@@ -9,18 +9,18 @@ import {
   NodeTrustStates,
   type NodeRevocationReason,
   NodeTypes,
-} from "../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   NodeInventoryOperationalStates,
   NodeInventoryPresenceStates,
   type NodeCapabilityProfileDto,
   type NodeInventoryDetailDto,
   type NodeInventorySummaryDto,
-} from "../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@shared/contracts/nodes/NodeTrustApiContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeInventoryService } from "../services/NodeInventoryService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
-import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 
 interface NodeInventoryPageProps {
   readonly service?: NodeInventoryService;
@@ -727,3 +727,4 @@ function approvalStatusBadgeClass(status: NodeInventorySummaryDto["approvalStatu
       return "ui-badge--neutral";
   }
 }
+

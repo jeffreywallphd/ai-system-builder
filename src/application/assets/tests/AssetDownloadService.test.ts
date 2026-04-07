@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IStorageLogicalAccessResolutionService } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
@@ -13,7 +13,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -21,7 +21,7 @@ import {
   StorageLifecycleStates,
   createStorageInstance,
   createStoragePolicy,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import { AssetDownloadPurposes } from "../use-cases/AssetServiceContracts";
 import { AssetDownloadService } from "../use-cases/AssetDownloadService";
 import type { IEncryptionAtRestPolicyContextResolverPort } from "../../security/ports/EncryptionAtRestPolicyEvaluationPorts";
@@ -32,9 +32,9 @@ import {
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
-import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
-import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
+import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 import type { IEncryptionEnforcementObservabilityPort } from "../../security/ports/EncryptionEnforcementObservabilityPorts";
 
@@ -816,4 +816,5 @@ describe("AssetDownloadService", () => {
     ))).toBeTrue();
   });
 });
+
 

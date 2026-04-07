@@ -1,16 +1,16 @@
-import {
+﻿import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftSystemOutputRecordShapes,
   WorkflowDraftSystemOutputWriteModes,
   type WorkflowDraft,
   type WorkflowDraftOutput,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createDefaultWorkflowOutputTypeRegistry,
   type WorkflowOutputRegistryFieldMetadata,
   type WorkflowOutputTypeRegistryEntry,
-} from "../../../application/workflow-studio/WorkflowOutputTypeRegistry";
+} from "@application/workflow-studio/WorkflowOutputTypeRegistry";
 
 export const WorkflowOutputPresentationModes = Object.freeze({
   embedded: "embedded",
@@ -767,4 +767,5 @@ export function listWorkflowOutputSummaries(
       }),
   );
 }
+
 

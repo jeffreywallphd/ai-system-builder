@@ -1,11 +1,11 @@
-import type { CanonicalDataShape, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import type { CanonicalDataShape, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type {
   IMediaRecordValidator,
   IMediaDatasetValidator,
-} from "../../domain/dataset-studio/interfaces/MediaValidation";
-import type { IImageRecordValidator } from "../../domain/dataset-studio/contracts/ImageRecord";
-import type { IImageMetadataExtractor } from "../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
+import type { IImageRecordValidator } from "@domain/dataset-studio/contracts/ImageRecord";
+import type { IImageMetadataExtractor } from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import { createDefaultMediaAdapterBundle } from "../dataset-studio/adapters/media/MediaAdapterFactory";
 import {
   createSystemDatasetBinding,
@@ -14,7 +14,7 @@ import {
   mapSystemBindingRoleToDatasetInstanceRole,
   type SystemDatasetBinding,
   type SystemDatasetBindingRole,
-} from "../../domain/system-runtime/SystemDatasetBindingDomain";
+} from "@domain/system-runtime/SystemDatasetBindingDomain";
 import {
   attachDatasetInstanceAccessBinding,
   createDatasetInstance,
@@ -29,13 +29,13 @@ import {
   type DatasetInstance,
   type DatasetInstanceCleanupStatus,
   type DatasetInstanceRole,
-} from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-runtime/DatasetInstanceDomain";
 import {
   WorkflowOutputTargetTypes,
   getWorkflowOutputTargetDefinition,
   resolveWorkflowOutputTargetPurpose,
   type WorkflowOutputTargetType,
-} from "../../domain/system-runtime/WorkflowOutputTargetDomain";
+} from "@domain/system-runtime/WorkflowOutputTargetDomain";
 import {
   createDatasetInstanceImageRecord,
   deriveStorageReferenceFromImageRecord,
@@ -44,7 +44,7 @@ import {
   type DatasetInstanceImageRecordPatch,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import type { DatasetInstanceAssetCatalog } from "./DatasetInstanceAssetCatalog";
 import type { DatasetInstanceRepository } from "./DatasetInstanceRepository";
 import { createDefaultMediaValidationAdapters } from "../dataset-studio/adapters/validation/MediaValidationFactory";
@@ -54,7 +54,7 @@ import {
   createDatasetEventEnvelope,
   type DatasetEventPublisher,
 } from "../dataset-events/DatasetEventPublisher";
-import { DatasetEventActorKinds, DatasetEventTypes } from "../../domain/dataset-studio/contracts/DatasetEvent";
+import { DatasetEventActorKinds, DatasetEventTypes } from "@domain/dataset-studio/contracts/DatasetEvent";
 import { parseStorageLogicalReference, type StorageBindingArea } from "./StorageInstanceProvisioningContract";
 import { assertNoUserManagedStoragePaths } from "./StoragePathPolicyValidation";
 
@@ -1996,3 +1996,4 @@ function normalizeRequired(value: string, label: string): string {
   }
   return normalized;
 }
+

@@ -1,6 +1,6 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
-import { isMcpToolId, parseMcpToolId } from "../../../domain/mcp/McpToolIdentity";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentPlan } from "@domain/agents/AgentPlan";
+import { isMcpToolId, parseMcpToolId } from "@domain/mcp/McpToolIdentity";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
 import { McpToolPermissionPolicyService } from "../../mcp/security/McpToolPermissionPolicyService";
 import { McpToolApprovalPolicyService } from "../../mcp/security/McpToolApprovalPolicyService";
@@ -213,3 +213,4 @@ export class AgentMcpToolGovernanceService {
     });
   }
 }
+

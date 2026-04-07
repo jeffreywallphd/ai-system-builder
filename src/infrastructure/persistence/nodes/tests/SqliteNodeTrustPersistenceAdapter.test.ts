@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,7 +10,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteNodeTrustPersistenceAdapter } from "../SqliteNodeTrustPersistenceAdapter";
 
@@ -313,3 +313,4 @@ describe("SqliteNodeTrustPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

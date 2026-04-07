@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import {
@@ -11,13 +11,13 @@ import {
   type Workspace,
   type WorkspaceMembership,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
   WorkspaceListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   TransitionWorkspaceLifecycleUseCase,
   WorkspaceLifecycleActions,
@@ -442,3 +442,4 @@ describe("Workspace lifecycle use cases", () => {
     expect(unchanged.value.workspace.status).toBe(WorkspaceStatuses.active);
   });
 });
+

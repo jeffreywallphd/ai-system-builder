@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { createRuntimeCapabilityBindingContract } from "../RuntimeCapabilityBindingContract";
 import { runRuntimeCapabilityPreflight, RuntimeCapabilityFailureKinds } from "../RuntimeCapabilityExecutionPreflight";
 import { validatePersistedRuntimeCapabilityBindingEnvelope } from "../RuntimeCapabilityBindingPersistence";
-import { ComfyRuntimeCapabilityTranslator } from "../../../infrastructure/comfyui/execution/mappers/ComfyRuntimeCapabilityTranslator";
+import { ComfyRuntimeCapabilityTranslator } from "@infrastructure/comfyui/execution/mappers/ComfyRuntimeCapabilityTranslator";
 
 const binding = createRuntimeCapabilityBindingContract({
   bindingId: "runtime-binding:image-default",
@@ -150,3 +150,4 @@ describe("RuntimeCapabilityBinding end-to-end flow", () => {
     }
   });
 });
+

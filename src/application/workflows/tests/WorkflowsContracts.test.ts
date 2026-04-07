@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
 import type { IWorkflowExecutor } from "../../ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowValidator } from "../../../domain/services/interfaces/IWorkflowValidator";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
+import type { IWorkflowValidator } from "@domain/services/interfaces/IWorkflowValidator";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeWorkflowExecutor, makeWorkflowRepository, makeWorkflowValidator } from "./testUtils";
 
 describe("application/workflows contracts", () => {
@@ -16,3 +16,4 @@ describe("application/workflows contracts", () => {
     expect(validator.validateWorkflow(makeWorkflow({})).isValid).toBeTrue();
   });
 });
+

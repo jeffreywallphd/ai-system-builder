@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { buildReferenceImageStartRequest } from "../../../runtime/ReferenceImageExecutionRequestBuilder";
-import { createSystemContextContract } from "../../../../domain/system-studio/SystemContextContract";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 
 describe("ReferenceImageExperiencePanel", () => {
   it("builds system-start context from UI trigger mapping with selected image and settings", () => {
@@ -39,3 +39,4 @@ describe("ReferenceImageExperiencePanel", () => {
     expect(refs[0]?.instanceId).toBe("dataset-instance:reference-image:input");
   });
 });
+

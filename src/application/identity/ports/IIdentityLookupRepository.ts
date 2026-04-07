@@ -1,13 +1,13 @@
-import type {
+﻿import type {
   AuthProvider,
   CredentialPolicy,
   UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import type {
   IdentityPrincipalLookup,
   IdentityProviderSubjectReference,
   IdentityUserIdentityListQuery,
-} from "../../../shared/dto/identity/IdentityPersistenceDtos";
+} from "@shared/dto/identity/IdentityPersistenceDtos";
 
 export interface IIdentityLookupRepository {
   countUserIdentities(): Promise<number>;
@@ -20,3 +20,4 @@ export interface IIdentityLookupRepository {
   findAuthProviderById(providerId: string): Promise<AuthProvider | undefined>;
   findCredentialPolicyById(policyId: string): Promise<CredentialPolicy | undefined>;
 }
+

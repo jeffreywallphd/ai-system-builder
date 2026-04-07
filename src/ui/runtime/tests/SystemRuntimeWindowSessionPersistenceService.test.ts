@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createComfyImageManipulationDefaultConfig } from "../../../application/system-studio/ComfyImageManipulationPropertySchema";
-import { createImageManipulationRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
+﻿import { describe, expect, it } from "bun:test";
+import { createComfyImageManipulationDefaultConfig } from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import { createImageManipulationRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchResolver";
 import {
   RuntimeWindowSessionPersistenceVersion,
   SystemRuntimeWindowSessionPersistenceService,
@@ -91,3 +91,4 @@ describe("SystemRuntimeWindowSessionPersistenceService", () => {
     expect(restored).toBeUndefined();
   });
 });
+

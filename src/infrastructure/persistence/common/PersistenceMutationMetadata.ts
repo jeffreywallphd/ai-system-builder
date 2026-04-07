@@ -1,12 +1,12 @@
-import {
+﻿import {
   resolvePersistenceTimestamp,
   type PersistenceClock,
   SystemPersistenceClock,
-} from "../../../shared/persistence/PersistenceTimestamps";
+} from "@shared/persistence/PersistenceTimestamps";
 import {
   assertExpectedPersistenceRevision,
   nextPersistenceRevision,
-} from "../../../shared/persistence/PersistenceVersioning";
+} from "@shared/persistence/PersistenceVersioning";
 
 interface PersistenceAuditStampRecord {
   readonly createdAt: string;
@@ -55,3 +55,4 @@ export function resolvePersistenceMutationCreatedAt(
 ): string {
   return resolvePersistenceTimestamp(occurredAt, clock);
 }
+

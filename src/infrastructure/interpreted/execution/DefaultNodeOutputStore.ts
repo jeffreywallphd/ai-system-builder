@@ -1,4 +1,4 @@
-import type { INodeOutputStore } from "../../../application/ports/interfaces/INodeOutputStore";
+﻿import type { INodeOutputStore } from "@application/ports/interfaces/INodeOutputStore";
 
 export class DefaultNodeOutputStore implements INodeOutputStore {
   private readonly outputs = new Map<string, Readonly<Record<string, unknown>>>();
@@ -23,3 +23,4 @@ export class DefaultNodeOutputStore implements INodeOutputStore {
     this.outputs.clear();
   }
 }
+

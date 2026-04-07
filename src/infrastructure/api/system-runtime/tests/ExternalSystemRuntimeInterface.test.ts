@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+﻿import { describe, expect, it } from "bun:test";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
 import { ExternalSystemRuntimeInterface } from "../ExternalSystemRuntimeInterface";
 import {
@@ -9,10 +9,10 @@ import {
   type ExecutionAccessDecision,
   type ExecutionAccessPolicy,
   type ExecutionAccessRequest,
-} from "../../../../application/system-runtime/RuntimeAccessControlService";
+} from "@application/system-runtime/RuntimeAccessControlService";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
-import { ExecutionQuotaEvaluator } from "../../../../application/system-runtime/ExecutionQuotaEvaluator";
-import { RuntimeRateLimitEvaluator } from "../../../../application/system-runtime/RuntimeRateLimitEvaluator";
+import { ExecutionQuotaEvaluator } from "@application/system-runtime/ExecutionQuotaEvaluator";
+import { RuntimeRateLimitEvaluator } from "@application/system-runtime/RuntimeRateLimitEvaluator";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -707,3 +707,4 @@ describe("ExternalSystemRuntimeInterface", () => {
   });
 
 });
+

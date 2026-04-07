@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   RuntimeRepositoryInstallationStates,
   type IRuntimeRepositoryInstallerContract,
@@ -14,10 +14,10 @@ import {
   type RuntimeRepositoryUpdateResult,
   type RuntimeRepositoryValidationRequest,
   type RuntimeRepositoryValidationResult,
-} from "../../../application/runtime/RuntimeRepositoryInstallerContract";
-import { ComfyRuntimeInstallationAsset } from "../../../application/runtime/ComfyRuntimeInstallationAsset";
-import { ComfyRuntimeWorkflowProfiles } from "../../../application/runtime/ComfyRuntimeRequirements";
-import type { ComfyRuntimeOrchestrationContext } from "../../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+} from "@application/runtime/RuntimeRepositoryInstallerContract";
+import { ComfyRuntimeInstallationAsset } from "@application/runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "@application/runtime/ComfyRuntimeRequirements";
+import type { ComfyRuntimeOrchestrationContext } from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 import { ComfyRuntimeCustomNodeInstallationHooks } from "../ComfyRuntimeCustomNodeInstallationHooks";
 
 describe("ComfyRuntimeCustomNodeInstallationHooks", () => {
@@ -202,4 +202,5 @@ function createContext(workflowProfile: (typeof ComfyRuntimeWorkflowProfiles)[ke
     workflowProfile,
   });
 }
+
 

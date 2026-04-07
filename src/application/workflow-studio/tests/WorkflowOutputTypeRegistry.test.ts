@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
   WorkflowDraftOutputTypes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   WorkflowOutputTypeRegistry,
   WorkflowOutputRegistryFieldTargets,
@@ -131,3 +131,4 @@ describe("WorkflowOutputTypeRegistry", () => {
     }));
   });
 });
+

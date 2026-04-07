@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createCanonicalRecordsShape } from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../../../domain/dataset-studio/CanonicalDataAsset";
-import { DefaultDataAssetExecutionFramework } from "../../../../application/dataset-studio/DataAssetExecutionFramework";
+import { createCanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { DefaultDataAssetExecutionFramework } from "@application/dataset-studio/DataAssetExecutionFramework";
 import DataPreviewPanel from "../DataPreviewPanel";
 
 describe("DataPreviewPanel", () => {
@@ -38,3 +38,4 @@ describe("DataPreviewPanel", () => {
     expect(html).toContain("Validation");
   });
 });
+

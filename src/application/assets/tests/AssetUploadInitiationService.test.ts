@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
 import {
@@ -8,7 +8,7 @@ import {
   StorageLifecycleStates,
   createStorageInstance,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -19,7 +19,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IStorageInstanceRepository } from "../../storage/ports/IStorageInstanceRepository";
 import type { IStoragePolicyEvaluationPort } from "../../storage/ports/StoragePolicyEvaluationPort";
@@ -390,3 +390,4 @@ describe("AssetUploadInitiationService", () => {
     });
   });
 });
+

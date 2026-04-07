@@ -1,6 +1,6 @@
-import type { INodeCatalogProvider } from "../../ports/interfaces/INodeCatalogProvider";
-import type { IWorkflowValidator, IWorkflowValidationResult } from "../../../domain/services/interfaces/IWorkflowValidator";
-import type { INodeCompatibilityService } from "../../../domain/services/interfaces/INodeCompatibilityService";
+﻿import type { INodeCatalogProvider } from "../../ports/interfaces/INodeCatalogProvider";
+import type { IWorkflowValidator, IWorkflowValidationResult } from "@domain/services/interfaces/IWorkflowValidator";
+import type { INodeCompatibilityService } from "@domain/services/interfaces/INodeCompatibilityService";
 
 const validResult: IWorkflowValidationResult = {
   isValid: true,
@@ -44,3 +44,4 @@ export function makeNodeCompatibilityService(overrides: Partial<INodeCompatibili
     ...overrides,
   } as INodeCompatibilityService;
 }
+

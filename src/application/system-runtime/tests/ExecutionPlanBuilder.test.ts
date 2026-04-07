@@ -1,18 +1,18 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
 import { RuntimeBehaviorAlignmentService } from "../RuntimeBehaviorAlignment";
 import { resolveSystemRuntimeDependencies } from "../RuntimeDependencyResolution";
 import { mapSystemContractToRuntimeExecutionContract } from "../RuntimeExecutionContractMapping";
 import { ExecutionPlanBuilder } from "../ExecutionPlanBuilder";
 import { RuntimeEnvironmentSelector } from "../RuntimeEnvironmentSelector";
-import { RuntimeEnvironmentKinds } from "../../../domain/system-runtime/RuntimeEnvironmentDomain";
+import { RuntimeEnvironmentKinds } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 
 const resolver = new CompositionAssetContractResolver();
 const behaviorAlignment = new RuntimeBehaviorAlignmentService(new CompositionTaxonomyClassifier());
@@ -284,3 +284,4 @@ describe("ExecutionPlanBuilder", () => {
     expect(result.errors).toHaveLength(0);
   });
 });
+

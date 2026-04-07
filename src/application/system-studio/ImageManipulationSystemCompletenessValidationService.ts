@@ -1,13 +1,13 @@
-import {
+﻿import {
   AssetValidationLayers,
   AssetValidationSeverities,
   AssetValidationStatuses,
   createAssetValidationResult,
   type AssetValidationIssue,
   type AssetValidationResult,
-} from "../../domain/contracts/AssetValidation";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
-import { DatasetInstanceRoles } from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/contracts/AssetValidation";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
+import { DatasetInstanceRoles } from "@domain/system-runtime/DatasetInstanceDomain";
 import { parseStorageLogicalReference } from "../system-runtime/StorageInstanceProvisioningContract";
 import {
   ComfyImageManipulationPropertySchema,
@@ -1320,3 +1320,4 @@ export function assertImageManipulationTemplateRunnableDefaults(
     .map((issue) => `${issue.code}: ${issue.message}`);
   throw new Error(`Image manipulation template runnable-default validation failed (${topIssues.join(" | ")})`);
 }
+

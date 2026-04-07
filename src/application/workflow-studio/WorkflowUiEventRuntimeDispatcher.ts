@@ -1,4 +1,4 @@
-import { deserializeWorkflowDraft, type WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { deserializeWorkflowDraft, type WorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import type { ImageWorkflowUiTriggerBindingConfiguration } from "../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
 import type {
@@ -326,3 +326,4 @@ export class WorkflowUiEventRuntimeDispatcher {
     });
   }
 }
+

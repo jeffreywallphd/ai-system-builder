@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateAuthorityStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateAuthorityStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { CertificateAuthorityBootstrapConfiguration } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type { CertificateAuthoritySecretMetadata } from "../ports/ICertificateAuthorityBootstrapSecretService";
 import {
@@ -18,7 +18,7 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 class StubConfigurationProvider {
   public constructor(private readonly configuration: CertificateAuthorityBootstrapConfiguration) {}
@@ -355,3 +355,4 @@ function createTrustMaterial(
     revision: 1,
   });
 }
+

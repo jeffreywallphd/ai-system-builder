@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { PreviewWorkflowContextUseCase } from "../PreviewWorkflowContextUseCase";
 import { WorkflowContextService } from "../WorkflowContextService";
 import { ContextPackage } from "../models/ContextPackage";
 import { ContextRecipe } from "../models/ContextRecipe";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 function makeService() {
   return new WorkflowContextService(
@@ -64,3 +64,4 @@ describe("PreviewWorkflowContextUseCase", () => {
     ]);
   });
 });
+

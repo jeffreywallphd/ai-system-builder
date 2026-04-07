@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DeterministicToolCapabilityAgentOrchestrator } from "../DeterministicToolCapabilityAgentOrchestrator";
-import type { IToolCapabilityExecutor } from "../../../application/ports/interfaces/IToolCapabilityExecutor";
-import type { ToolCapabilityDescriptor } from "../../../application/tools/models/ToolCapabilityDescriptor";
-import type { ToolCapabilityInvocationRequest } from "../../../application/tools/models/ToolCapabilityInvocationRequest";
-import { ExecutionContextEnvelope } from "../../../application/context/models/ExecutionContextEnvelope";
+import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
+import type { ToolCapabilityInvocationRequest } from "@application/tools/models/ToolCapabilityInvocationRequest";
+import { ExecutionContextEnvelope } from "@application/context/models/ExecutionContextEnvelope";
 
 function makeCapability(overrides: Partial<ToolCapabilityDescriptor> & Pick<ToolCapabilityDescriptor, "id">): ToolCapabilityDescriptor {
   return {
@@ -100,3 +100,4 @@ describe("DeterministicToolCapabilityAgentOrchestrator", () => {
     expect(result.steps[0]?.errorMessage).toBe("boom");
   });
 });
+

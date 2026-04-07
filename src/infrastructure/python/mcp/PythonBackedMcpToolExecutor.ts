@@ -1,10 +1,10 @@
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
-import type { IMcpToolExecutor } from "../../../application/ports/interfaces/IMcpToolExecutor";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
-import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
-import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
+﻿import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpToolExecutor } from "@application/ports/interfaces/IMcpToolExecutor";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources } from "@application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "@application/runtime/RuntimeDiagnostics";
+import type { McpToolExecutionRequest } from "@application/mcp/models/McpToolExecutionRequest";
+import type { McpToolExecutionResult } from "@application/mcp/models/McpToolExecutionResult";
 
 export class PythonBackedMcpToolExecutor implements IMcpToolExecutor {
   constructor(
@@ -89,3 +89,4 @@ function sanitizeExecutionRequestForDiagnostics(request: McpToolExecutionRequest
     credentialKeys: request.resolvedCredentials ? Object.keys(request.resolvedCredentials) : [],
   });
 }
+

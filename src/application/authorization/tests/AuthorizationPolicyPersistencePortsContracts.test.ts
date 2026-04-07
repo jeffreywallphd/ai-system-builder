@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ResourceOwnershipScopes, ResourceVisibilities, RoleAssignmentScopes, RoleAssignmentStatuses } from "../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+﻿import { describe, expect, it } from "bun:test";
+import { ResourceOwnershipScopes, ResourceVisibilities, RoleAssignmentScopes, RoleAssignmentStatuses } from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationPersistenceResourceLocator,
@@ -16,12 +16,12 @@ import type {
   UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
   UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import {
   normalizeAuthorizationMutationOperationKey,
   toAuthorizationResourceLookupKey,
   toAuthorizationSharingSubjectLookupKey,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "../ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
 import type { IAuthorizationRoleAssignmentPersistenceRepository } from "../ports/IAuthorizationRoleAssignmentPersistenceRepository";
@@ -514,3 +514,4 @@ describe("authorization persistence repository contract assumptions", () => {
     expect(deletedMetadata[0]?.deletedAt).toBe("2026-04-05T12:05:00.000Z");
   });
 });
+

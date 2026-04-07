@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
-import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
+import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { LocalModelRepository } from "../LocalModelRepository";
 import { ManagedLocalModelLibrary } from "../ManagedLocalModelLibrary";
@@ -64,3 +64,4 @@ describe("ManagedLocalModelLibrary", () => {
     expect(states["orphan.bin"]).toBe("downloaded-but-unregistered");
   });
 });
+

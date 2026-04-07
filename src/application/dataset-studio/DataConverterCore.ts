@@ -1,4 +1,4 @@
-import {
+﻿import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTableShape,
@@ -11,7 +11,7 @@ import {
   type CanonicalRecordsShape,
   type CanonicalTableShape,
   type CanonicalTextItemsShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataConverterDiagnosticSeverities,
   DataConverterInputBoundaryKinds,
@@ -875,3 +875,4 @@ export type {
   DataConverterFailureResult,
   ResolvedDataSource,
 };
+

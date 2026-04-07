@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   createSession,
   type Session,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorCodes,
   IdentityIdNamespaces,
@@ -302,3 +302,4 @@ describe("IdentitySessionLifecycleService", () => {
     })).toThrow("inactivityTimeoutMinutes <= ttlMinutes");
   });
 });
+

@@ -1,5 +1,5 @@
-import type { INodeExecutionProvenance } from "./IWorkflowExecutor";
-import type { INode } from "../../../domain/nodes/interfaces/INode";
+﻿import type { INodeExecutionProvenance } from "./IWorkflowExecutor";
+import type { INode } from "@domain/nodes/interfaces/INode";
 import type { INodeExecutionContext } from "./INodeExecutionContextResolver";
 
 export interface INodeExecutionResult {
@@ -15,3 +15,4 @@ export interface INodeExecutor {
   canExecuteNode(node: INode, runtime?: string): boolean;
   executeNode(context: INodeExecutionContext): Promise<INodeExecutionResult>;
 }
+

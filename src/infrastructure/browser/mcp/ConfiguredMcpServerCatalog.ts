@@ -1,8 +1,8 @@
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { IMcpConfiguredServerRepository } from "../../../application/ports/interfaces/IMcpConfiguredServerRepository";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
+﻿import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpConfiguredServerRepository } from "@application/ports/interfaces/IMcpConfiguredServerRepository";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
 
 export class ConfiguredMcpServerCatalog implements IMcpServerCatalog {
   constructor(
@@ -78,3 +78,4 @@ export class ConfiguredMcpServerCatalog implements IMcpServerCatalog {
     }
   }
 }
+

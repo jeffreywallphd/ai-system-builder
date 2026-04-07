@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ChatCompletionMessage,
   Dataset,
   DatasetExample,
@@ -16,7 +16,7 @@ import type {
   ExampleStatus,
   ExportFormat,
   SplitType,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 export interface DatasetSummary {
   readonly dataset: Dataset;
@@ -301,3 +301,4 @@ export interface ExportDatasetVersionCommand {
 }
 
 export type StudioExample = DatasetExample;
+

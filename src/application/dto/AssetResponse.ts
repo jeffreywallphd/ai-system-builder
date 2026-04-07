@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   AssetKind,
   AssetLifecycleStatus,
   AssetSourceType,
-} from "../../domain/assets/interfaces/IAsset";
+} from "@domain/assets/interfaces/IAsset";
 
 export interface AssetResponse {
   readonly id: string;
@@ -65,3 +65,4 @@ export interface AssetResponse {
   readonly isDerived: boolean;
   readonly reference: string;
 }
+

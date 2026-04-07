@@ -1,5 +1,5 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   classifyExecutableBehavior,
   type RuntimeBehaviorProfile,
@@ -10,10 +10,10 @@ import {
   type SystemAsset,
   type SystemComponentReference,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
-import { RuntimeEnvironmentKinds } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
-import type { RuntimeEnvironment } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+import { RuntimeEnvironmentKinds } from "@domain/system-runtime/RuntimeEnvironmentDomain";
+import type { RuntimeEnvironment } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 import {
   ExecutionEnvironmentConfigurationValidator,
   type ExternalExecutionEnvironmentRequest,
@@ -30,7 +30,7 @@ import {
   type ExecutionStatusKind,
   type ExecutionTrace,
   type SystemExecution,
-} from "../../domain/system-runtime/SystemRuntimeDomain";
+} from "@domain/system-runtime/SystemRuntimeDomain";
 import { ExecutionPlanBuilder } from "./ExecutionPlanBuilder";
 import { ExecutionOrchestrationService } from "./ExecutionOrchestrationService";
 import type { StepExecutionResult } from "./StepExecutionEngine";
@@ -49,7 +49,7 @@ import {
   type PersistedExecutionRecord,
 } from "./SystemRuntimeExecutionStore";
 import { parsePersistedRuntimeCapabilityBindingEnvelope } from "./RuntimeCapabilityBindingPersistence";
-import { parseSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
+import { parseSystemSerializationDocument } from "@domain/system-studio/SystemSerializationContract";
 import {
   SerializedAssetReferenceResolutionIssueCodes,
   SerializedAssetReferenceResolutionService,
@@ -1175,3 +1175,4 @@ export class SystemRuntimeApplicationService {
     }
   }
 }
+

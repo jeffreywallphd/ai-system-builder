@@ -1,13 +1,13 @@
-import { useMemo, useState, type FormEvent } from "react";
+﻿import { useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type {
   IdentityAuthApiError,
   LoginLocalIdentityApiResponse,
-} from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
-import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "../shared/identity/IdentityAuthEnvironment";
-import { validateLoginForm } from "../shared/identity/IdentityAuthValidation";
+import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "@shared/identity/IdentityAuthEnvironment";
+import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
 
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => void;
@@ -178,3 +178,4 @@ function renderApiError(error: IdentityAuthApiError | undefined): string {
   const details = validationErrors.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
   return `${error?.message || "Login failed."} ${details}`;
 }
+

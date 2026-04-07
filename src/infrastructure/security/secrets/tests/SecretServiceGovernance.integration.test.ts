@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "../../../../domain/security/SecretDomain";
-import type { SecretAccessAuditEvent } from "../../../../application/security/ports/SecretServicePorts";
-import { SecretServiceErrorCodes } from "../../../../application/security/use-cases/SecretManagementServiceContracts";
+import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
+import type { SecretAccessAuditEvent } from "@application/security/ports/SecretServicePorts";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
 import { composeServerSecretService } from "../SecretServiceComposition";
 
 const createdRoots: string[] = [];
@@ -453,3 +453,4 @@ describe("Secret service governance integration", () => {
     }
   });
 });
+

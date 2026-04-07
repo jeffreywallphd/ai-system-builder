@@ -1,4 +1,4 @@
-import type { IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+﻿import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
 
 export interface IListRelatedExecutionRunsQuery {
@@ -37,3 +37,4 @@ export class ListRelatedExecutionRunsUseCase {
     });
   }
 }
+

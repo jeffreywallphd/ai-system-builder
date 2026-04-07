@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   TransportConnectionContext,
   TransportConnectionTrustValidationResult,
   TransportSecurityPolicy,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 
 export class TransportSecurityContractError extends Error {
   constructor(message: string) {
@@ -112,3 +112,4 @@ export function toTransportConnectionTrustValidationResultDto(
     scenario: value.scenario,
   });
 }
+

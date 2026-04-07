@@ -1,9 +1,9 @@
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+﻿import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import {
   deriveRequiredMcpToolPermissions,
   type McpToolExecutionPermissionDecision,
   type McpToolPermissionScope,
-} from "../../../domain/mcp/McpToolTrust";
+} from "@domain/mcp/McpToolTrust";
 
 export class McpToolPermissionPolicyService {
   public evaluate(tool: InstalledMcpToolRecord, contextGrantedPermissions: ReadonlyArray<McpToolPermissionScope> = []): McpToolExecutionPermissionDecision {
@@ -20,3 +20,4 @@ export class McpToolPermissionPolicyService {
     });
   }
 }
+

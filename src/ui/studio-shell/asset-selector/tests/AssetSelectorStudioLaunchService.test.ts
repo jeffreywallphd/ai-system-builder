@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorStudioLaunchService } from "../AssetSelectorStudioLaunchService";
 import { InlineAssetCreationService } from "../../../routes/InlineAssetCreation";
 
@@ -108,4 +108,5 @@ describe("AssetSelectorStudioLaunchService", () => {
     expect(firstHandoff?.launch.handoffId).not.toBe(secondHandoff?.launch.handoffId);
   });
 });
+
 

@@ -1,5 +1,5 @@
-import type { IMcpToolRegistryRepository } from "../../../application/ports/interfaces/IMcpToolRegistryRepository";
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+﻿import type { IMcpToolRegistryRepository } from "@application/ports/interfaces/IMcpToolRegistryRepository";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 
 const defaultStorageKey = "ai-loom-studio.mcp-installed-tools";
 
@@ -60,3 +60,4 @@ export class LocalStorageMcpToolRegistryRepository implements IMcpToolRegistryRe
 function deepCloneRecord(record: InstalledMcpToolRecord): InstalledMcpToolRecord {
   return Object.freeze(JSON.parse(JSON.stringify(record)) as InstalledMcpToolRecord);
 }
+

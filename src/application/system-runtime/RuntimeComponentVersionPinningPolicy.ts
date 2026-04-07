@@ -1,8 +1,8 @@
-import {
+﻿import {
   SystemComponentKinds,
   type SystemComponentReference,
-} from "../../domain/system-studio/SystemAssetDomain";
-import { TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/system-studio/SystemAssetDomain";
+import { TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
 
 export function requiresPinnedRuntimeComponentVersion(input: {
   readonly component: SystemComponentReference;
@@ -32,3 +32,4 @@ export function requiresPinnedRuntimeComponentVersion(input: {
 
   return !input.hasResolvedContract;
 }
+

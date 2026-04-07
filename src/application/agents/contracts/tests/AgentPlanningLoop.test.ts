@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createAgentPlan } from "../../../../domain/agents/AgentPlan";
+﻿import { describe, expect, it } from "bun:test";
+import { createAgentPlan } from "@domain/agents/AgentPlan";
 import {
   AgentPlanningStatuses,
   AgentReplanTriggerReasons,
@@ -70,3 +70,4 @@ describe("Agent planning loop contracts", () => {
     ).toThrow("unknown affected step");
   });
 });
+

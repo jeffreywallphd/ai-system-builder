@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowProjectionService } from "../WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../WorkflowToolProjectionService";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 function makeProjectedWorkflow() {
   const node = makeNode({
@@ -147,3 +147,4 @@ describe("WorkflowProjectionService", () => {
     expect(selectionField?.value).toEqual(["pkg-zeta", "pkg-beta"]);
   });
 });
+

@@ -1,7 +1,7 @@
-import { z } from "zod";
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalTextItemsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalTextItemsShape, type CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import { DataSourceReferenceKinds, type DataSourceReference, type ResolvedDataSource } from "./DataConverterContracts";
 import { DefaultDataSourceLocator, type IDataSourceLocator } from "./DataSourceLocator";
 import {
@@ -913,3 +913,4 @@ export function createDocumentPdfIngestorDataAsset(
     },
   });
 }
+

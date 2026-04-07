@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   IModelCompatibility,
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../domain/models/interfaces/IModelDependency";
+} from "@domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "@domain/models/interfaces/IModelDependency";
 
 /**
  * NodeCompatibilityProfile is a generic compatibility value object for nodes.
@@ -228,3 +228,4 @@ export class NodeCompatibilityProfile implements INodeCompatibilityProfile {
     });
   }
 }
+

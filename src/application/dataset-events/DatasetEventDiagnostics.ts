@@ -1,4 +1,4 @@
-import type { DatasetEvent, DatasetEventType } from "../../domain/dataset-studio/contracts/DatasetEvent";
+﻿import type { DatasetEvent, DatasetEventType } from "@domain/dataset-studio/contracts/DatasetEvent";
 
 export interface DatasetEventPreviewModel {
   readonly eventId: string;
@@ -110,3 +110,4 @@ export class InMemoryDatasetEventDiagnosticsStore {
     this.entries.length = 0;
   }
 }
+

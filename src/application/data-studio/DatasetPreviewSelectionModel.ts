@@ -1,9 +1,9 @@
-import type { ImageDatasetPreviewItem } from "./ImageDatasetPreviewBuilder";
+﻿import type { ImageDatasetPreviewItem } from "./ImageDatasetPreviewBuilder";
 import {
   createDatasetAssetReference,
   createDatasetRecordReference,
   type DatasetRecordReference,
-} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
+} from "@domain/dataset-studio/contracts/StudioDatasetCompatibility";
 
 export const DatasetPreviewSelectionModes = Object.freeze({
   single: "single",
@@ -101,3 +101,4 @@ export class DatasetPreviewSelectionState {
     });
   }
 }
+

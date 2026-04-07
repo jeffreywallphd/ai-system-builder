@@ -1,7 +1,7 @@
-import type { RuntimeAppState } from "../../state/RuntimeConsoleStore";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
+﻿import type { RuntimeAppState } from "../../state/RuntimeConsoleStore";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpToolDescriptor } from "@application/mcp/models/McpToolDescriptor";
 
 export interface McpRuntimeStatusPanelProps {
   readonly status?: McpConnectionStatus;
@@ -57,7 +57,7 @@ export default function McpRuntimeStatusPanel({
           </div>
           <div className="ui-meta-item">
             <div className="ui-meta-label">MCP runtime</div>
-            <div className="ui-meta-value">{status?.mcpRuntimeHealthy === true ? "Healthy" : status?.enabled ? "Degraded" : status ? "Disabled" : "—"}</div>
+            <div className="ui-meta-value">{status?.mcpRuntimeHealthy === true ? "Healthy" : status?.enabled ? "Degraded" : status ? "Disabled" : "â€”"}</div>
           </div>
           <div className="ui-meta-item">
             <div className="ui-meta-label">Discovered tools</div>
@@ -83,7 +83,7 @@ export default function McpRuntimeStatusPanel({
         </label>
 
         {error ? <p className="ui-muted">{error}</p> : null}
-        {isLoading ? <p className="ui-muted">Refreshing MCP tools and server status…</p> : null}
+        {isLoading ? <p className="ui-muted">Refreshing MCP tools and server statusâ€¦</p> : null}
         {runtimeAppState !== "ready" ? (
           <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "0.75rem" }}>
             <p className="ui-muted" style={{ margin: 0 }}>
@@ -117,14 +117,14 @@ export default function McpRuntimeStatusPanel({
                   <div>
                     <div className="ui-panel__title">{server.name}</div>
                     <div className="ui-panel__subtitle">
-                      {server.id} · {server.transport} · {(server.sourceType ?? "external-remote")} · {server.toolCount} tools · {server.resourceCount} resources
+                      {server.id} Â· {server.transport} Â· {(server.sourceType ?? "external-remote")} Â· {server.toolCount} tools Â· {server.resourceCount} resources
                     </div>
                   </div>
                   <span className="ui-badge ui-badge--info">{server.status}</span>
                 </div>
                 <div className="ui-panel__body">
                   {server.errorMessage ? <p className="ui-muted">{server.errorMessage}</p> : null}
-                  <p className="ui-muted">Config: {server.configValid === false ? "invalid" : "valid"} · Session: {server.sessionState ?? server.status} · Last sync: {server.lastSyncAt ?? "never"}</p>
+                  <p className="ui-muted">Config: {server.configValid === false ? "invalid" : "valid"} Â· Session: {server.sessionState ?? server.status} Â· Last sync: {server.lastSyncAt ?? "never"}</p>
                   <div className="ui-row" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
                     <button className="ui-button ui-button--secondary" type="button" onClick={() => onConnectServer?.(server.id, false)} disabled={isInteractionDisabled}>
                       Connect
@@ -153,3 +153,4 @@ export default function McpRuntimeStatusPanel({
     </section>
   );
 }
+

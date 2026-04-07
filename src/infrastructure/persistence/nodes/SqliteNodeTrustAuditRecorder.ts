@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { NodeTrustAuditEvent, NodeTrustAuditSink } from "../../../application/nodes/ports/NodeTrustAuditPorts";
+import type { NodeTrustAuditEvent, NodeTrustAuditSink } from "@application/nodes/ports/NodeTrustAuditPorts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   NODE_TRUST_PERSISTENCE_MIGRATIONS,
@@ -121,3 +121,4 @@ export class SqliteNodeTrustAuditRecorder implements NodeTrustAuditSink {
     return typeof row?.version === "number" ? row.version : 0;
   }
 }
+

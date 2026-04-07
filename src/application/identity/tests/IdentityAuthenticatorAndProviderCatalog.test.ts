@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
   AuthProviderStatuses,
   createAuthProvider,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import { IdentityAuthenticatorKinds } from "../ports/IIdentityCredentialAuthenticator";
 import type { ILocalPasswordCredentialService, LocalPasswordCredentialMaterial } from "../ports/ILocalPasswordCredentialService";
 import {
@@ -140,3 +140,4 @@ describe("LocalPasswordIdentityAuthenticator", () => {
     expect(isValid).toBe(true);
   });
 });
+

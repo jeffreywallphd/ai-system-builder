@@ -1,4 +1,4 @@
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import type { StorageInstance } from "@domain/storage/StorageDomain";
 
 export const StoragePolicyActions = Object.freeze({
   create: "create",
@@ -43,3 +43,4 @@ export interface IStoragePolicyEvaluationPort {
     input: StorageAccessibleInstanceResolutionRequest,
   ): Promise<ReadonlyArray<string>>;
 }
+

@@ -1,4 +1,4 @@
-import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
+﻿import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
 
 export interface RuntimeEventRowProps {
   readonly event: RuntimeEvent;
@@ -14,3 +14,4 @@ export default function RuntimeEventRow({ event }: RuntimeEventRowProps): JSX.El
     </li>
   );
 }
+

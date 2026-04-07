@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   WorkflowDraft,
   WorkflowEntity,
   WorkflowEntityMetadata,
   WorkflowLifecycleState,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
-import { transitionWorkflowEntityLifecycle } from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { transitionWorkflowEntityLifecycle } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createPersistedWorkflowRecord,
   type PersistedWorkflowRecord,
   type WorkflowPersistenceOwnershipContext,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
 import {
   WorkflowPersistenceConflictError,
@@ -141,3 +141,4 @@ export class UpdatePersistedWorkflowUseCase {
     }
   }
 }
+

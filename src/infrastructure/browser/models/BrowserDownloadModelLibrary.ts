@@ -1,6 +1,6 @@
-import type { ManagedModelLibrarySnapshot } from "../../../application/models/ManagedModelLibrary";
-import type { IInstalledModelCatalog } from "../../../application/ports/interfaces/IInstalledModelCatalog";
-import type { IManagedModelLibrary } from "../../../application/ports/interfaces/IManagedModelLibrary";
+﻿import type { ManagedModelLibrarySnapshot } from "@application/models/ManagedModelLibrary";
+import type { IInstalledModelCatalog } from "@application/ports/interfaces/IInstalledModelCatalog";
+import type { IManagedModelLibrary } from "@application/ports/interfaces/IManagedModelLibrary";
 
 export class BrowserDownloadModelLibrary implements IManagedModelLibrary {
   constructor(
@@ -33,3 +33,4 @@ export class BrowserDownloadModelLibrary implements IManagedModelLibrary {
     });
   }
 }
+

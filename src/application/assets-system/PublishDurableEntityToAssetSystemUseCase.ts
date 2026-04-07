@@ -1,8 +1,8 @@
-import { Asset } from "../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo, AssetTechnicalMetadata } from "../../domain/assets/AssetMetadata";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { DatasetVersion } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+﻿import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo, AssetTechnicalMetadata } from "@domain/assets/AssetMetadata";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { DatasetVersion } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import { RegisterAssetUseCase } from "./RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "./CreateAssetVersionUseCase";
 import type { ICanonicalAssetIdentityRepository } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
@@ -171,3 +171,4 @@ export class PublishDurableEntityToAssetSystemUseCase {
     return Object.freeze({ assetId, versionId });
   }
 }
+

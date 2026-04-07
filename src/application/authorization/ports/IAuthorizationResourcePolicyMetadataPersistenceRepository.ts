@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationPersistenceResourceLocator,
   AuthorizationResourcePolicyMetadataPersistenceLookupQuery,
   AuthorizationResourcePolicyMetadataPersistenceRecord,
   SoftDeleteAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 
 export interface IAuthorizationResourcePolicyMetadataPersistenceRepository {
   findResourcePolicyMetadata(
@@ -21,3 +21,4 @@ export interface IAuthorizationResourcePolicyMetadataPersistenceRepository {
     input: SoftDeleteAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   ): Promise<AuthorizationPersistenceMutationResult<AuthorizationResourcePolicyMetadataPersistenceRecord>>;
 }
+

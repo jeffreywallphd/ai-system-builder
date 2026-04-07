@@ -1,4 +1,4 @@
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole, type TaxonomyStructuralKind } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole, type TaxonomyStructuralKind } from "@domain/taxonomy/CompositionTaxonomy";
 
 export interface RegistryFilterState {
   readonly structuralKinds: ReadonlyArray<TaxonomyStructuralKind>;
@@ -135,3 +135,4 @@ export function AssetFilterPanel({ value, onChange, disabled }: AssetFilterPanel
     </div>
   );
 }
+

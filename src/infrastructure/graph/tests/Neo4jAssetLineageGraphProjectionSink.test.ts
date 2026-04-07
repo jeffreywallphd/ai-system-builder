@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
 import { Neo4jAssetLineageGraphProjectionSink } from "../Neo4jAssetLineageGraphProjectionSink";
 
 class CapturingExecutor {
@@ -49,3 +49,4 @@ describe("Neo4jAssetLineageGraphProjectionSink", () => {
     await expect(sink.hasVersionPath("a:v1", "c:v1", 4)).resolves.toBeTrue();
   });
 });
+

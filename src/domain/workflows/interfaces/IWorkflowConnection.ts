@@ -1,4 +1,4 @@
-import type { NodePortValueType } from "../../../../domain/nodes/interfaces/INodePort";
+﻿import type { NodePortValueType } from "@domain/nodes/interfaces/INodePort";
 import type { IModelCompatibility } from "../../models/interfaces/IModelCompatibility";
 
 /**
@@ -152,3 +152,4 @@ export interface IWorkflowConnection {
     snapshot: IWorkflowConnectionCompatibilitySnapshot | undefined
   ): IWorkflowConnection;
 }
+

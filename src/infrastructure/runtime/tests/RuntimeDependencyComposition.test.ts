@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import {
   createDependentRuntimeCapabilityRegistration,
   createRuntimeDependencyOrchestrator,
@@ -71,3 +71,4 @@ describe("RuntimeDependencyComposition", () => {
     expect(resolution.degraded).toBeTrue();
   });
 });
+

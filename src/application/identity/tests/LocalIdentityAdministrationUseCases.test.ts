@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -14,7 +14,7 @@ import {
   type CredentialPolicy,
   type Session,
   type UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventTypes,
   type IdentityLifecycleEvent,
@@ -295,3 +295,4 @@ describe("Local identity administration use cases", () => {
     expect(enabled.value.status).toBe(UserIdentityStatuses.active);
   });
 });
+

@@ -1,4 +1,4 @@
-import type { Agent } from "../../../domain/agents/Agent";
+﻿import type { Agent } from "@domain/agents/Agent";
 import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
@@ -6,7 +6,7 @@ import {
   type AgentExecutionStepOutcome,
   type AgentExecutionSession,
   type AgentExecutionTerminalState,
-} from "../../../domain/agents/AgentExecutionSession";
+} from "@domain/agents/AgentExecutionSession";
 import { mapAgentPlanToBackbone } from "../contracts/AgentExecutionMapping";
 import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
 import type { AgentMemoryRetrievalService } from "../contracts/AgentMemoryRetrieval";
@@ -22,8 +22,8 @@ import {
 import { AgentRuntimeEventTypes, type AgentRuntimeProgressEvent } from "../contracts/AgentRuntimeProgress";
 import { AgentWorkingMemoryService } from "./AgentWorkingMemoryService";
 import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMemoryWriteService";
-import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
-import { AssetId } from "../../../domain/assets/AssetId";
+import type { AgentWorkingMemory } from "@domain/agents/AgentWorkingMemory";
+import { AssetId } from "@domain/assets/AssetId";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
 import type { AgentRuntimeBinding } from "../contracts/AgentRunContracts";
 
@@ -567,3 +567,4 @@ export class AgentRunnerService {
     return persisted;
   }
 }
+

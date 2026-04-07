@@ -1,11 +1,11 @@
-import {
+﻿import {
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_ID_PROPERTY,
   MCP_TOOL_CALL_TOOL_NAME_PROPERTY,
   McpToolCallNodeConfigurationService,
-} from "../../../application/mcp/McpToolCallNodeConfigurationService";
-import type { IMcpToolDependencyScanner, McpToolDependencyReference } from "../../../application/ports/interfaces/IMcpToolDependencyScanner";
-import type { IWorkflowRepository } from "../../../application/ports/interfaces/IWorkflowRepository";
+} from "@application/mcp/McpToolCallNodeConfigurationService";
+import type { IMcpToolDependencyScanner, McpToolDependencyReference } from "@application/ports/interfaces/IMcpToolDependencyScanner";
+import type { IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
 
 export class WorkflowMcpToolDependencyScanner implements IMcpToolDependencyScanner {
   private readonly configurationService = new McpToolCallNodeConfigurationService();
@@ -56,3 +56,4 @@ export class WorkflowMcpToolDependencyScanner implements IMcpToolDependencyScann
     return Object.freeze(references);
   }
 }
+

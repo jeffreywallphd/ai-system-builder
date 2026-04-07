@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   toGetEffectiveEncryptionAtRestPolicyResponseDto,
   toValidateEncryptedMaterialDescriptorResponseDto,
@@ -57,3 +57,4 @@ describe("EncryptionAtRestPolicyDtos", () => {
     expect(noViolations.violations).toEqual([]);
   });
 });
+

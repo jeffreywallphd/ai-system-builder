@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   ICommonImageNodeContract,
   ICommonImageNodeInternalImage,
   ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -208,3 +208,4 @@ export class VaeDecodeNodeAdapter extends ComfyImageNodeAdapterBase {
     return Object.freeze({ ...(value as Record<string, unknown>) });
   }
 }
+

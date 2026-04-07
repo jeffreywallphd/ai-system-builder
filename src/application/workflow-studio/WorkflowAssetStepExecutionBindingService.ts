@@ -1,4 +1,4 @@
-import { WorkflowDraftStepKinds, WorkflowDraftStepTypes, type WorkflowDraftStepAssetReference } from "../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { WorkflowDraftStepKinds, WorkflowDraftStepTypes, type WorkflowDraftStepAssetReference } from "@domain/workflow-studio/WorkflowStudioDomain";
 import type {
   WorkflowExecutionAssetStepBinding,
   WorkflowExecutionContext,
@@ -180,4 +180,5 @@ export function buildWorkflowAssetStepExecutionBindings(
     issues: Object.freeze(issues),
   });
 }
+
 

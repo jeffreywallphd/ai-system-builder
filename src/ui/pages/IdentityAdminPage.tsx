@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   IdentityAdminAccountSummaryApiResponse,
   IdentityAdminAccountStatus,
   TrustedDeviceSummaryApiResponse,
-} from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 type AccountAction = "enable" | "disable";
 
@@ -497,3 +497,4 @@ function formatDate(value: string): string {
   }
   return new Date(parsed).toLocaleString();
 }
+

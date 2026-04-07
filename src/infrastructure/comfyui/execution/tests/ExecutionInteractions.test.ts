@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyQueueExecutionAdapter, ComfyWorkflowExecutor } from "../ComfyWorkflowExecutor";
 
 describe("execution interactions", () => {
@@ -28,3 +28,4 @@ describe("execution interactions", () => {
     expect(result.executionId).toBe("p1");
   });
 });
+

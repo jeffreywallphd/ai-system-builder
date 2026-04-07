@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import { AssetValidationOrchestrator } from "../AssetValidationOrchestrator";
 import { DatasetAssetValidator } from "../DatasetAssetValidator";
@@ -74,3 +74,4 @@ describe("AssetValidationOrchestrator", () => {
     expect(Object.keys(result.errorsByAsset).some((key) => key.startsWith("dataset:asset:dataset:missing:"))).toBeTrue();
   });
 });
+

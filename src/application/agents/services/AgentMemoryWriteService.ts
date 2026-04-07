@@ -1,7 +1,7 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentMemoryEntryReference, AgentMemoryStore, AgentMemoryType } from "../../../domain/agents/AgentMemory";
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
-import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentMemoryEntryReference, AgentMemoryStore, AgentMemoryType } from "@domain/agents/AgentMemory";
+import type { AgentPlan } from "@domain/agents/AgentPlan";
+import type { AgentWorkingMemory } from "@domain/agents/AgentWorkingMemory";
 
 export interface AgentMemoryWriteCandidate {
   readonly memoryType: AgentMemoryType;
@@ -127,3 +127,4 @@ export class AgentMemoryWriteService {
     return this.writeEntries(agent, [candidate]);
   }
 }
+

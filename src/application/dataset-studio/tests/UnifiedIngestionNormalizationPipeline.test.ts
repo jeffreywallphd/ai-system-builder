@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTextItemsShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionReferenceKinds,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { UnifiedIngestionNormalizationPipeline } from "../UnifiedIngestionNormalizationPipeline";
 
 function createSource() {
@@ -147,4 +147,5 @@ describe("UnifiedIngestionNormalizationPipeline", () => {
     }
   });
 });
+
 

@@ -1,4 +1,4 @@
-import {
+﻿import {
   AssetDomainError,
   AssetKinds,
   createAsset,
@@ -7,16 +7,16 @@ import {
   createAssetVersion,
   createContentDescriptor,
   createStorageInstanceRef,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   StorageAccessModes,
   StorageLifecycleStates,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoles,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type { IStorageInstanceRepository } from "../../storage/ports/IStorageInstanceRepository";
 import {
   StoragePolicyActions,
@@ -305,3 +305,4 @@ function isAssetAlreadyExistsError(error: unknown): boolean {
   }
   return error.message.toLowerCase().includes("already exists");
 }
+

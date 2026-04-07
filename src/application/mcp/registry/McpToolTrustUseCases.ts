@@ -1,4 +1,4 @@
-import {
+﻿import {
   createDefaultMcpToolSandboxPolicy,
   deriveRequiredMcpToolPermissions,
   type McpSandboxEnvironmentMode,
@@ -9,7 +9,7 @@ import {
   type McpToolPermissionScope,
   type McpToolSandboxPolicy,
   type McpToolTrustScope,
-} from "../../../domain/mcp/McpToolTrust";
+} from "@domain/mcp/McpToolTrust";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
 import type { IMcpToolExecutionAuditSink } from "../../ports/interfaces/IMcpToolExecutionAuditSink";
 import type { IMcpToolSecretRepository, McpToolSecretScope } from "../../ports/interfaces/IMcpToolSecretRepository";
@@ -446,3 +446,4 @@ function findLatestApproval(
     .filter((entry) => entry.scope.scopeType === scope.scopeType && entry.scope.scopeId === scope.scopeId)
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
 }
+

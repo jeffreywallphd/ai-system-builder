@@ -1,5 +1,5 @@
-import type { IMcpConfiguredServerRepository } from "../../../application/ports/interfaces/IMcpConfiguredServerRepository";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
+﻿import type { IMcpConfiguredServerRepository } from "@application/ports/interfaces/IMcpConfiguredServerRepository";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
 
 export interface IMcpConfiguredServerRepositoryRuntimeClient {
   listConfiguredServers(): Promise<ReadonlyArray<McpServerDescriptor>>;
@@ -31,3 +31,4 @@ export class RuntimeBackedMcpConfiguredServerRepository implements IMcpConfigure
     });
   }
 }
+

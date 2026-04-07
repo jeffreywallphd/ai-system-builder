@@ -1,11 +1,11 @@
-import {
+﻿import {
   WorkflowDraftUserTriggerScopes,
   validateWorkflowDraftTriggers,
   type WorkflowDraftTrigger,
   type WorkflowDraftTriggerKind,
   type WorkflowDraftTriggerType,
   type WorkflowValidationIssue,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 export interface WorkflowTriggerValidationPipelineInput {
   readonly triggers: ReadonlyArray<unknown>;
@@ -84,3 +84,4 @@ export function validateWorkflowTriggerTypeConfig(
     trigger,
   });
 }
+

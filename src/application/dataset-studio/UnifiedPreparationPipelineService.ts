@@ -1,6 +1,6 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { PipelineDefinition } from "../../domain/dataset-studio/PipelineDefinitionDomain";
-import type { PipelineGraph } from "../../domain/dataset-studio/PipelineGraphDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { PipelineDefinition } from "@domain/dataset-studio/PipelineDefinitionDomain";
+import type { PipelineGraph } from "@domain/dataset-studio/PipelineGraphDomain";
 import {
   PipelineStageConfigModes,
   PipelineStageIds,
@@ -8,14 +8,14 @@ import {
   type PipelineStageConfigMode,
   type PipelineStageId,
   type PipelineStageInstance,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   UnifiedPreparationStageActivationModes,
   createUnifiedPreparationAssetDefinition,
   type UnifiedPreparationAssetDefinition,
   type UnifiedPreparationStageConfig,
-} from "../../domain/dataset-studio/UnifiedPreparationAsset";
+} from "@domain/dataset-studio/UnifiedPreparationAsset";
 import type { StudioAuthoringGraphProjection } from "../studio-shell/StudioAuthoringGraph";
 import { buildPipelineGraph, type PipelineGraphTransition } from "./PipelineGraphConstructionService";
 import { PipelineValidationService } from "./PipelineValidationService";
@@ -275,3 +275,4 @@ export function createUnifiedPreparationPipelineService(input?: {
 }): UnifiedPreparationPipelineService {
   return new UnifiedPreparationPipelineService(input);
 }
+

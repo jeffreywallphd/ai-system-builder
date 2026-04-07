@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import { createImageWorkflowAssetPreview, type ImageWorkflowAssetPreview } from "./ImageWorkflowAssetPreview";
 import {
   createImageWorkflowOutputBindingConfiguration,
@@ -17,7 +17,7 @@ import {
   ImageWorkflowAssetIntentTypes,
   type ImageWorkflowAssetContract,
 } from "./ImageWorkflowAssetContract";
-import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+import { WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createReusableImagePipeline,
   ImageWorkflowCompositionStageKinds,
@@ -307,3 +307,4 @@ export function createImageToImageWorkflowAsset(input?: {
     }),
   });
 }
+

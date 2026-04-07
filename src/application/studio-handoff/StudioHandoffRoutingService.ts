@@ -1,4 +1,4 @@
-import {
+﻿import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
@@ -8,8 +8,8 @@ import {
   type StudioHandoffSource,
   type StudioHandoffTarget,
   type TargetStudioInputContract,
-} from "../../domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext, type StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
+} from "@domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext, type StudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffCompatibilityDecision, StudioHandoffCompatibilityValidator } from "./StudioHandoffCompatibilityValidator";
 import type { StudioCapabilityDescriptor, StudioCapabilityQueryService } from "./StudioCapabilityRegistry";
 import type { StudioProducedOutput } from "./StudioOutputAdapter";
@@ -503,3 +503,4 @@ export class StudioHandoffRoutingService {
     ].join("::");
   }
 }
+

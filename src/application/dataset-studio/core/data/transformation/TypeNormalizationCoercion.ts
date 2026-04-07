@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const TypeNormalizationTargetTypes = Object.freeze({
   string: "string",
@@ -222,3 +222,4 @@ export function coerceValueToType(input: CoerceValueInput): CoerceValueResult {
     status: normalized === originalValue ? "unchanged" : "converted",
   });
 }
+

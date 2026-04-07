@@ -1,7 +1,7 @@
-import type { DataPreviewEngineOptions, DataPreviewModel } from "../data-studio/DataPreviewEngine";
+﻿import type { DataPreviewEngineOptions, DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import { DataPreviewEngine } from "../data-studio/DataPreviewEngine";
-import type { CanonicalDataShape, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
+import type { CanonicalDataShape, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DataAssetBase } from "@domain/dataset-studio/DataAssetBase";
 import {
   DataLineageDiagnosticSeverities,
   DataLineageReferenceKinds,
@@ -15,7 +15,7 @@ import {
   type DataLineageExecutionStep,
   type DataLineageMetadata,
   type DataLineageReference,
-} from "../../domain/dataset-studio/DataLineageMetadata";
+} from "@domain/dataset-studio/DataLineageMetadata";
 import { DataConverterCore } from "./DataConverterCore";
 import {
   DataConverterDiagnosticSeverities,
@@ -940,3 +940,4 @@ export class DefaultDataAssetExecutionFramework {
     } satisfies DataAssetExecutionResult);
   }
 }
+

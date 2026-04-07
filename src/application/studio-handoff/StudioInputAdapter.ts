@@ -1,5 +1,5 @@
-import type { StudioHandoffContract, StudioHandoffPayload } from "../../domain/studio-handoff/StudioHandoffContract";
-import type { StudioHandoffContext } from "../../domain/studio-handoff/StudioHandoffContext";
+﻿import type { StudioHandoffContract, StudioHandoffPayload } from "@domain/studio-handoff/StudioHandoffContract";
+import type { StudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import {
   StudioHandoffCompatibilityIssueCodes,
   type StudioHandoffCompatibilityDecision,
@@ -418,3 +418,4 @@ export class StudioInputAdapterLayer {
     ].join("::");
   }
 }
+

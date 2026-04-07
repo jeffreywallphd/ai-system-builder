@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { McpToolContractValidationService } from "../McpToolContractValidationService";
-import type { McpToolDefinition } from "../../../../domain/mcp/McpToolCapability";
+import type { McpToolDefinition } from "@domain/mcp/McpToolCapability";
 
 const definition: McpToolDefinition = Object.freeze({
   id: "mcp:local:validator",
@@ -87,3 +87,4 @@ describe("McpToolContractValidationService", () => {
     expect(result.issues).toEqual([expect.objectContaining({ path: "output.warnings[1]", message: "Expected string value." })]);
   });
 });
+

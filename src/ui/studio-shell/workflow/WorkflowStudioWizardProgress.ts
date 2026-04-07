@@ -1,4 +1,4 @@
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import type { WorkflowDraft, WorkflowValidationIssue } from "@domain/workflow-studio/WorkflowStudioDomain";
 
 export const WorkflowWizardSectionIds = Object.freeze({
   trigger: "trigger",
@@ -237,3 +237,4 @@ export function deriveWorkflowWizardProgress(
     isWorkflowReady: readySectionCount === sections.length,
   });
 }
+

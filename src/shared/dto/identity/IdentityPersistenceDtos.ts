@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   IdentitySessionStatus,
   UserIdentityStatus,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
@@ -115,3 +115,4 @@ export interface IdentityPersistenceDeletionResult {
   readonly changed: boolean;
   readonly wasReplay: boolean;
 }
+

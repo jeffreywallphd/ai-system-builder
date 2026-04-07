@@ -1,7 +1,7 @@
-import type { INode } from "../../domain/nodes/interfaces/INode";
-import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinition";
-import type { INodePort } from "../../domain/nodes/interfaces/INodePort";
-import type { INodeProperty } from "../../domain/nodes/interfaces/INodeProperty";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { INodePort } from "@domain/nodes/interfaces/INodePort";
+import type { INodeProperty } from "@domain/nodes/interfaces/INodeProperty";
 
 export interface NodePaletteItemViewModel {
   readonly id: string;
@@ -303,3 +303,4 @@ function inferModelKind(
 function normalize(value: string): string {
   return value.trim().toLowerCase();
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   CanonicalRecordPrimitiveValue,
   CanonicalRecordValue,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
-import { ImageAssetReferenceKinds } from "../../domain/dataset-studio/contracts/ImageAssetReference";
-import { createImageAssetReference } from "../../domain/dataset-studio/contracts/ImageAssetReference";
-import { createImageRecord, type ImageRecord } from "../../domain/dataset-studio/contracts/ImageRecord";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import { ImageAssetReferenceKinds } from "@domain/dataset-studio/contracts/ImageAssetReference";
+import { createImageAssetReference } from "@domain/dataset-studio/contracts/ImageAssetReference";
+import { createImageRecord, type ImageRecord } from "@domain/dataset-studio/contracts/ImageRecord";
 
 export interface DatasetInstanceImageStorageReference {
   readonly reference: string;
@@ -603,3 +603,4 @@ export function matchesDatasetInstanceImageRecordQuery(
   }
   return true;
 }
+

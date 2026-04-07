@@ -1,4 +1,4 @@
-import {
+﻿import {
   StorageAccessModes,
   StorageAccessScopes,
   StorageBackendTypes,
@@ -17,7 +17,7 @@ import {
   type StorageLifecycleState,
   type StorageReplicationMode,
   type StorageRetentionExpiryAction,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export interface StorageInstanceRow {
   readonly storage_instance_id: string;
@@ -251,3 +251,4 @@ function assertStorageRetentionExpiryAction(value: string): StorageRetentionExpi
   }
   throw new Error(`Persisted storage retentionExpiryAction '${value}' is invalid.`);
 }
+

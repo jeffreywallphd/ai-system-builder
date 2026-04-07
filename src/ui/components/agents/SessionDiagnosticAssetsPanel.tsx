@@ -1,4 +1,4 @@
-import type { AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentSessionDetailReadModel } from "@application/agents/contracts/AgentRunContracts";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
 
@@ -34,3 +34,4 @@ export function SessionDiagnosticAssetsPanel(props: SessionDiagnosticAssetsPanel
     </section>
   );
 }
+

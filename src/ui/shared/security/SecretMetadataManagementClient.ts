@@ -1,14 +1,14 @@
-import type {
+﻿import type {
   CreateSecretMetadataApiResponse,
   DisableSecretMetadataApiResponse,
   GetSecretMetadataApiResponse,
   ListSecretMetadataApiResponse,
   RotateSecretMetadataApiResponse,
   SecretMetadataApiResponse,
-} from "../../../infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
-import type { SecretKind, SecretScope } from "../../../domain/security/SecretDomain";
-import type { SecretClassificationId } from "../../../shared/contracts/security/SecretClassificationContracts";
-import type { SecretRotationInstructionContract } from "../../../shared/contracts/security/SecretTransportContracts";
+} from "@infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
+import type { SecretKind, SecretScope } from "@domain/security/SecretDomain";
+import type { SecretClassificationId } from "@shared/contracts/security/SecretClassificationContracts";
+import type { SecretRotationInstructionContract } from "@shared/contracts/security/SecretTransportContracts";
 
 export interface SecretMetadataOwnerDraft {
   readonly scope: SecretScope;
@@ -235,3 +235,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

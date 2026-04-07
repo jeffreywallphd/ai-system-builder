@@ -1,14 +1,14 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   ICommonImageNodeContract,
   ICommonImageNodeInternalImage,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
-import type { DatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
-import { createImageRecord } from "../../../../domain/dataset-studio/contracts/ImageRecord";
-import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
-import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+import type { DatasetInstanceRepository } from "@application/system-runtime/DatasetInstanceRepository";
+import { createImageRecord } from "@domain/dataset-studio/contracts/ImageRecord";
+import { createDatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -215,3 +215,4 @@ export class ComfySaveImageNodeAdapter extends ComfyImageNodeAdapterBase {
     return Object.freeze(Object.fromEntries(entries) as Record<string, CanonicalRecordValue>);
   }
 }
+

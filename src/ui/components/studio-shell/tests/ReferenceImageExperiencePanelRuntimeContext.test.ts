@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../../domain/system-studio/SystemContextContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 import {
   persistReferenceImageRuntimeContext,
   readStoredReferenceImageRuntimeContext,
@@ -46,3 +46,4 @@ describe("ReferenceImageExperiencePanel runtime context persistence", () => {
     expect(loaded?.runtimeContext.parameters.resultCount).toBe(2);
   });
 });
+

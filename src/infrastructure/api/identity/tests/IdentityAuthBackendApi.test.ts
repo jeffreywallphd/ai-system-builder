@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SessionRevocationReasons, revokeSession } from "../../../../domain/identity/IdentityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SessionRevocationReasons, revokeSession } from "@domain/identity/IdentityDomain";
 import { createIdentityAuthTestHarness } from "./TestIdentityAuthHarness";
 import type {
   IdentityAuthAuditEvent,
@@ -833,3 +833,4 @@ describe("IdentityAuthBackendApi", () => {
     expect(revokeTrustedDevice.error?.code).toBe("forbidden");
   });
 });
+

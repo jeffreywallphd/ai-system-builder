@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpAuthorizationManagementClient,
   type AuthorizationManagementClient,
-} from "../shared/authorization/AuthorizationManagementClient";
+} from "@shared/authorization/AuthorizationManagementClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class AuthorizationManagementService {
@@ -38,3 +38,4 @@ function createDefaultAuthorizationManagementClient(): AuthorizationManagementCl
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpAuthorizationManagementClient(baseUrl);
 }
+

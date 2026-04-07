@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const ClassificationSemanticTypeGuesses = Object.freeze({
   email: "email",
@@ -400,3 +400,4 @@ export function classifyFieldByHeuristics(input: ClassificationHeuristicFieldInp
     sampleValues: collectSampleValues(input.values, input.maxSampleValuesPerField, normalizedTags),
   } satisfies ClassificationHeuristicFieldResult);
 }
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createPersistedWorkflowRecord,
   type PersistedWorkflowRecord,
   type PersistedWorkflowSummary,
-} from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
@@ -13,7 +13,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   type WorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import type {
   IWorkflowPersistenceRepository,
   WorkflowPersistenceListQuery,
@@ -448,3 +448,4 @@ describe("Workflow persistence use cases", () => {
     expect(record.revision.workflowRevision).toBe(1);
   });
 });
+

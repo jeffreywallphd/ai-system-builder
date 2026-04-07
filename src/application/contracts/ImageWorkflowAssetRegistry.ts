@@ -1,10 +1,10 @@
-import {
+﻿import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   createCompositionTaxonomyDescriptor,
   type CompositionTaxonomyDescriptor,
-} from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { createBatchTransformWorkflowAsset, type BatchTransformWorkflowAsset } from "./BatchTransformWorkflowAsset";
 import { createEnhanceUpscaleWorkflowAsset, type EnhanceUpscaleWorkflowAsset } from "./EnhanceUpscaleWorkflowAsset";
 import { createImageToImageWorkflowAsset, type ImageToImageWorkflowAsset } from "./ImageToImageWorkflowAsset";
@@ -128,3 +128,4 @@ export function listCoreImageWorkflowIntentTypes(): ReadonlyArray<string> {
     ImageWorkflowAssetIntentTypes.batchTransform,
   ]);
 }
+

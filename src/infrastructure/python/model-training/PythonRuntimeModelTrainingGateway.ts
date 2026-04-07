@@ -1,6 +1,6 @@
-import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../../application/ports/interfaces/IModelTrainingRuntime";
-import type { IPythonRuntimeClient, IPythonRuntimeFineTuningJobResponse } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import type { ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
+﻿import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "@application/ports/interfaces/IModelTrainingRuntime";
+import type { IPythonRuntimeClient, IPythonRuntimeFineTuningJobResponse } from "@application/ports/interfaces/IPythonRuntimeClient";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 
 export class PythonRuntimeModelTrainingGateway implements IModelTrainingRuntime {
   constructor(private readonly client: IPythonRuntimeClient) {}
@@ -156,3 +156,4 @@ function toDomainJob(response: IPythonRuntimeFineTuningJobResponse): ModelTraini
     }),
   });
 }
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ExecuteMcpToolUseCase } from "../ExecuteMcpToolUseCase";
 import type { IMcpToolExecutor } from "../../ports/interfaces/IMcpToolExecutor";
 import { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
@@ -10,9 +10,9 @@ import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecord
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 import type { IAssetTransformationRepository } from "../../ports/interfaces/IAssetTransformationRepository";
 import type { IAssetLineageRepository } from "../../ports/interfaces/IAssetLineageRepository";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
+import { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 
 const executionContext = new ExecutionContextEnvelope({
   packageReferences: [{ packageId: "pkg-mcp", alias: "MCP policy" }],
@@ -1327,3 +1327,4 @@ function toolRecordForAsset(
     },
   };
 }
+

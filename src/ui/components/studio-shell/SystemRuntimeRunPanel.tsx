@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
+﻿import { useEffect, useMemo, useState } from "react";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
 import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";
@@ -7,8 +7,8 @@ import { UxRuntimeService } from "../../runtime/UxRuntimeService";
 import SystemRuntimeInterfacePreview from "./system/SystemRuntimeInterfacePreview";
 import { workflowStudioSurfaceAssetDefinition } from "../../studio-shell/studio-assets/StudioSurfaceAssetDefinitions";
 import { imageManipulationEditorPageAssetDefinition } from "../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
-import { createImageManipulationRuntimeWindowLaunchRequest } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
-import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
+import { createImageManipulationRuntimeWindowLaunchRequest } from "@application/system-runtime/SystemRuntimeWindowLaunchResolver";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import { SystemRuntimeWindowRestoreService } from "../../runtime/SystemRuntimeWindowRestoreService";
 
 interface SystemRuntimeRunPanelProps {
@@ -208,3 +208,4 @@ export function SystemRuntimeRunPanel({ context }: SystemRuntimeRunPanelProps): 
     </div>
   );
 }
+

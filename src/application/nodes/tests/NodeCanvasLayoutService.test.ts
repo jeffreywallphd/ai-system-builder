@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { NodeCanvasLayoutService } from "../NodeCanvasLayoutService";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
 
 describe("NodeCanvasLayoutService", () => {
   it("keeps settle adjustments within the nearby settle search window when a gap is available", () => {
@@ -47,3 +47,4 @@ describe("NodeCanvasLayoutService", () => {
     expect(Math.abs(resolved.x - 210) + Math.abs(resolved.y - 146)).toBeGreaterThan(72);
   });
 });
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { SystemBuildTemplateCatalog } from "../../../../application/system-studio/SystemBuildTemplateCatalog";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { SystemBuildTemplateCatalog } from "@application/system-studio/SystemBuildTemplateCatalog";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 
 describe("Image manipulation default template runnable smoke", () => {
   it("creates a demo-ready seeded system draft that can run output persistence without manual storage setup", async () => {
@@ -239,3 +239,4 @@ describe("Image manipulation default template runnable smoke", () => {
     );
   });
 });
+

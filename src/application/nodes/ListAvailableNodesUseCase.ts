@@ -1,4 +1,4 @@
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
+﻿import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
 import type { INodeCatalogProvider } from "../ports/interfaces/INodeCatalogProvider";
 import type { INodeCatalogSearchCriteria } from "../ports/interfaces/INodeCatalogProvider";
 
@@ -29,3 +29,4 @@ export class ListAvailableNodesUseCase {
     });
   }
 }
+

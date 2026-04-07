@@ -1,5 +1,5 @@
-import { useMemo, useState, type JSX } from "react";
-import type { DataPreviewModel } from "../../../application/data-studio/DataPreviewEngine";
+﻿import { useMemo, useState, type JSX } from "react";
+import type { DataPreviewModel } from "@application/data-studio/DataPreviewEngine";
 import { DEFAULT_IMAGE_RENDER_OPTIONS, ImageRenderFrame, resolveSelectionForImage, type ImageUiViewModel } from "./image-system";
 
 export interface DataPreviewSurfaceProps {
@@ -215,7 +215,7 @@ function formatImageMetadata(value: Readonly<Record<string, unknown>>): string {
   return entries
     .slice(0, 3)
     .map(([key, entry]) => `${key}: ${typeof entry === "object" ? JSON.stringify(entry) : String(entry)}`)
-    .join(" · ");
+    .join(" Â· ");
 }
 
 function ImageCollectionPreviewSurface({
@@ -307,7 +307,7 @@ function ImageCollectionPreviewSurface({
                 />
               </div>
               <strong className="ui-text-small">{item.imageReference ?? item.imageId ?? item.itemId}</strong>
-              <span className="ui-text-small ui-text-secondary">{item.width !== undefined && item.height !== undefined ? `${item.width}x${item.height}` : "Unknown size"} · {item.format ?? "unknown"}</span>
+              <span className="ui-text-small ui-text-secondary">{item.width !== undefined && item.height !== undefined ? `${item.width}x${item.height}` : "Unknown size"} Â· {item.format ?? "unknown"}</span>
               <span className="ui-text-small ui-text-secondary">{formatImageMetadata(item.metadataSummary)}</span>
               {item.tags.length > 0 ? <span className="ui-text-small ui-text-secondary">Tags: {item.tags.join(", ")}</span> : null}
               {item.issues.length > 0 ? <span className="ui-text-small ui-text-danger">{item.issues.join(" ")}</span> : null}
@@ -355,3 +355,4 @@ export default function DataPreviewSurface({
     </section>
   );
 }
+

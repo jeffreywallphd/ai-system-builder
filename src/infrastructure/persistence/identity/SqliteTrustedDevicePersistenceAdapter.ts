@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   IdentityErrorCode,
@@ -10,24 +10,24 @@ import type {
   TrustedDevicePairingSessionRecord,
   TrustedDevicePairingTokenRecord,
   TrustedDeviceRevocationRequest,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
   identitySuccess,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ITrustedDevicePairingRepository } from "../../../../application/identity/ports/ITrustedDevicePairingRepository";
-import type { ITrustedDeviceRepository } from "../../../../application/identity/ports/ITrustedDeviceRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ITrustedDevicePairingRepository } from "@application/identity/ports/ITrustedDevicePairingRepository";
+import type { ITrustedDeviceRepository } from "@application/identity/ports/ITrustedDeviceRepository";
 import {
   DeviceTrustStatuses,
   revokeTrustedDevice,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   PairingSessionStatuses,
   PairingTokenStatuses,
-} from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   IDENTITY_PERSISTENCE_MIGRATIONS,
@@ -736,3 +736,4 @@ export class SqliteTrustedDevicePersistenceAdapter implements ITrustedDeviceRepo
     });
   }
 }
+

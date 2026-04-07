@@ -1,7 +1,7 @@
-import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "@application/ports/interfaces/IExecutionRunRepository";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import type { DesktopExecutionRunBridge } from "../../../electron/shared/DesktopContracts";
-import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
+import { freezeExecutionRunRecord } from "@application/execution/freezeExecutionRunRecord";
 
 export class DesktopBridgeExecutionRunRepository implements IExecutionRunRepository {
   constructor(private readonly bridge: DesktopExecutionRunBridge) {}
@@ -21,3 +21,4 @@ export class DesktopBridgeExecutionRunRepository implements IExecutionRunReposit
     return Object.freeze(rawRuns.map((runJson) => freezeExecutionRunRecord(JSON.parse(runJson) as IExecutionRunRecord)));
   }
 }
+

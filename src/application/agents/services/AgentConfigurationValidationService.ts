@@ -1,15 +1,15 @@
-import {
+﻿import {
   createAgent,
   type Agent,
   type AgentExecutionConfiguration,
   type AgentPlanningStrategy,
   AgentPlanningStrategyModes,
   SupportedAgentPlanningStrategies,
-} from "../../../domain/agents/Agent";
-import { isCanonicalAgentToolId } from "../../../domain/agents/AgentToolIdentity";
-import type { AgentGoal } from "../../../domain/agents/AgentGoal";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
-import type { AgentPolicy } from "../../../domain/agents/AgentPolicy";
+} from "@domain/agents/Agent";
+import { isCanonicalAgentToolId } from "@domain/agents/AgentToolIdentity";
+import type { AgentGoal } from "@domain/agents/AgentGoal";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
+import type { AgentPolicy } from "@domain/agents/AgentPolicy";
 import { AgentConfigurationValidationError } from "./AgentConfigurationValidationError";
 
 export interface AgentConfigurationValidationIssue {
@@ -640,3 +640,4 @@ export class AgentConfigurationValidationService {
     });
   }
 }
+

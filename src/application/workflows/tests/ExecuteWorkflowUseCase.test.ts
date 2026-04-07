@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses } from "../../../domain/execution/ExecutionPlan";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses } from "@domain/execution/ExecutionPlan";
 import { ExecuteWorkflowUseCase } from "../ExecuteWorkflowUseCase";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeWorkflowExecutor, makeWorkflowValidator } from "./testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { ContextPackage } from "../../context/models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 import { WorkflowContextService } from "../../context/WorkflowContextService";
 import { UnifiedExecutionEngine } from "../../execution/UnifiedExecutionEngine";
-import { WorkflowExecutionUnitHandler } from "../../../infrastructure/execution/WorkflowExecutionUnitHandler";
-import { ComfyWorkflowExecutor } from "../../../infrastructure/comfyui/execution/ComfyWorkflowExecutor";
+import { WorkflowExecutionUnitHandler } from "@infrastructure/execution/WorkflowExecutionUnitHandler";
+import { ComfyWorkflowExecutor } from "@infrastructure/comfyui/execution/ComfyWorkflowExecutor";
 
 describe("ExecuteWorkflowUseCase", () => {
   it("executes workflow and applies property overrides", async () => {
@@ -357,3 +357,4 @@ describe("ExecuteWorkflowUseCase", () => {
   });
 
 });
+

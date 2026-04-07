@@ -1,9 +1,9 @@
-import {
+﻿import {
   createSystemContextContract,
   type SystemContextContract,
   type SystemContextDatasetReference,
   type SystemContextImageReference,
-} from "../../domain/system-studio/SystemContextContract";
+} from "@domain/system-studio/SystemContextContract";
 
 export interface SystemStudioSelectedImageState {
   readonly selectionId?: string;
@@ -187,3 +187,4 @@ export function createDefaultSystemStudioContextExtractor(): SystemStudioContext
     },
   });
 }
+

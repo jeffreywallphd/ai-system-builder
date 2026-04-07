@@ -1,21 +1,21 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   ICertificateAuthorityRootMaterialStorage,
   LoadCertificateAuthorityRootMaterialsInput,
   LoadedCertificateAuthorityProtectedMaterial,
   PersistCertificateAuthorityRootMaterialsInput,
   CertificateAuthorityProtectedMaterialDescriptor,
-} from "../../../../../application/security/ports/ICertificateAuthorityRootMaterialStorage";
-import type { ICertificateAuthorityRootPersistenceRepository } from "../../../../../application/security/ports/ICertificateAuthorityRootPersistenceRepository";
-import type { ICertificateLifecycleEventPersistenceRepository } from "../../../../../application/security/ports/ICertificateLifecycleEventPersistenceRepository";
-import type { IIssuedCertificatePersistenceRepository } from "../../../../../application/security/ports/IIssuedCertificatePersistenceRepository";
-import type { ITrustMaterialReferencePersistenceRepository } from "../../../../../application/security/ports/ITrustMaterialReferencePersistenceRepository";
+} from "@application/security/ports/ICertificateAuthorityRootMaterialStorage";
+import type { ICertificateAuthorityRootPersistenceRepository } from "@application/security/ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateLifecycleEventPersistenceRepository } from "@application/security/ports/ICertificateLifecycleEventPersistenceRepository";
+import type { IIssuedCertificatePersistenceRepository } from "@application/security/ports/IIssuedCertificatePersistenceRepository";
+import type { ITrustMaterialReferencePersistenceRepository } from "@application/security/ports/ITrustMaterialReferencePersistenceRepository";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -40,7 +40,7 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import { RuntimeTrustMaterialDistributionService } from "../RuntimeTrustMaterialDistributionService";
 
 class InMemoryCertificateAuthorityRepository implements ICertificateAuthorityRootPersistenceRepository {
@@ -435,3 +435,4 @@ function createTrustMaterialRecord(input: {
     revision: 1,
   });
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DatasetSchemaIntentIds,
   type DatasetSchemaIntentId,
-} from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import {
@@ -12,7 +12,7 @@ import {
 import { InMemoryWorkflowOutputArtifactStorage } from "../WorkflowOutputArtifactStorage";
 import { InMemoryWorkflowOutputProvenanceRepository } from "../WorkflowOutputProvenanceRepository";
 import { WorkflowOutputMaterializationService } from "../WorkflowOutputMaterializationService";
-import { ComfyExecutionResultMaterializationMapper } from "../../../infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
+import { ComfyExecutionResultMaterializationMapper } from "@infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public resolveAsset(input: { readonly assetId: string; readonly versionId?: string }) {
@@ -191,3 +191,4 @@ describe("Workflow output persistence integration", () => {
     expect(persisted).toHaveLength(0);
   });
 });
+

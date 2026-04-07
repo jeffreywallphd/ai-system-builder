@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
+﻿import { describe, expect, it } from "bun:test";
+import { AppRuntimeModes } from "@domain/runtime/AppRuntimeMode";
 import {
   AppDistributionTargets,
   AppHostKinds,
   AppLifecycleStages,
   RendererDeliveryModes,
   getAppRuntimeProfile,
-} from "../../../domain/runtime/AppRuntimeProfile";
+} from "@domain/runtime/AppRuntimeProfile";
 
 describe("getAppRuntimeProfile", () => {
   it("describes browser development as browser-hosted dev-server distribution", () => {
@@ -37,3 +37,4 @@ describe("getAppRuntimeProfile", () => {
     expect(profile.supportsBrowserWorkspaceStorage).toBe(false);
   });
 });
+

@@ -1,17 +1,17 @@
-import { aggregateWorkflowProvenance, ensureNodeExecutionProvenance } from "../../../application/execution/ExecutionTruth";
-import { WorkflowExecutionEvent, WorkflowExecutionResult } from "../../../application/ports/WorkflowExecutor";
+﻿import { aggregateWorkflowProvenance, ensureNodeExecutionProvenance } from "@application/execution/ExecutionTruth";
+import { WorkflowExecutionEvent, WorkflowExecutionResult } from "@application/ports/WorkflowExecutor";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
-} from "../../../application/ports/interfaces/IWorkflowExecutor";
-import type { INodeExecutionContextResolver } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
-import type { INodeExecutor } from "../../../application/ports/interfaces/INodeExecutor";
-import type { INodeOutputStore } from "../../../application/ports/interfaces/INodeOutputStore";
+} from "@application/ports/interfaces/IWorkflowExecutor";
+import type { INodeExecutionContextResolver } from "@application/ports/interfaces/INodeExecutionContextResolver";
+import type { INodeExecutor } from "@application/ports/interfaces/INodeExecutor";
+import type { INodeOutputStore } from "@application/ports/interfaces/INodeOutputStore";
 import type {
   IWorkflowExecutionStrategy,
   IWorkflowExecutionStrategyDescriptor,
-} from "../../../application/ports/interfaces/IWorkflowExecutionStrategy";
+} from "@application/ports/interfaces/IWorkflowExecutionStrategy";
 
 export interface IInfrastructureInterpretedWorkflowExecutionStrategyOptions {
   readonly runtime?: string;
@@ -147,3 +147,4 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
     return result;
   }
 }
+

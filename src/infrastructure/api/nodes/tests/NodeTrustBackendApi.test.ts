@@ -1,20 +1,20 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { ApproveNodeEnrollmentUseCase } from "../../../../application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
-import { GetNodeInventoryDetailUseCase } from "../../../../application/nodes/use-cases/GetNodeInventoryDetailUseCase";
-import { GetNodeEnrollmentDetailUseCase } from "../../../../application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
-import { ListNodeInventoryUseCase } from "../../../../application/nodes/use-cases/ListNodeInventoryUseCase";
-import { ListTrustedNodeInventoryUseCase } from "../../../../application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
-import { RecordNodeHeartbeatUseCase } from "../../../../application/nodes/use-cases/RecordNodeHeartbeatUseCase";
-import { RecordNodeOperationalUpdateUseCase } from "../../../../application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
-import { RegisterNodeEnrollmentRequestUseCase } from "../../../../application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
-import { RejectNodeEnrollmentUseCase } from "../../../../application/nodes/use-cases/RejectNodeEnrollmentUseCase";
-import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "../../../../application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
-import { ResolveNodeMutualTlsTransportIdentityUseCase } from "../../../../application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
-import { RevokeNodeTrustUseCase } from "../../../../application/nodes/use-cases/RevokeNodeTrustUseCase";
-import { ReviewPendingNodeEnrollmentUseCase } from "../../../../application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
+import { ApproveNodeEnrollmentUseCase } from "@application/nodes/use-cases/ApproveNodeEnrollmentUseCase";
+import { GetNodeInventoryDetailUseCase } from "@application/nodes/use-cases/GetNodeInventoryDetailUseCase";
+import { GetNodeEnrollmentDetailUseCase } from "@application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
+import { ListNodeInventoryUseCase } from "@application/nodes/use-cases/ListNodeInventoryUseCase";
+import { ListTrustedNodeInventoryUseCase } from "@application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { RecordNodeHeartbeatUseCase } from "@application/nodes/use-cases/RecordNodeHeartbeatUseCase";
+import { RecordNodeOperationalUpdateUseCase } from "@application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
+import { RegisterNodeEnrollmentRequestUseCase } from "@application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
+import { RejectNodeEnrollmentUseCase } from "@application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
+import { ResolveNodeMutualTlsTransportIdentityUseCase } from "@application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
+import { RevokeNodeTrustUseCase } from "@application/nodes/use-cases/RevokeNodeTrustUseCase";
+import { ReviewPendingNodeEnrollmentUseCase } from "@application/nodes/use-cases/ReviewPendingNodeEnrollmentUseCase";
 import {
   NodeApprovalStatuses,
   NodeHeartbeatStatuses,
@@ -23,9 +23,9 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../../domain/nodes/NodeTrustDomain";
-import { SqliteNodeTrustPersistenceAdapter } from "../../../../infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
-import { SqliteNodeTrustAuditRecorder } from "../../../../infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
+} from "@domain/nodes/NodeTrustDomain";
+import { SqliteNodeTrustPersistenceAdapter } from "@infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "@infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
 import { NodeTrustBackendApi } from "../NodeTrustBackendApi";
 import type {
   ITrustMaterialDistributionPort,
@@ -33,8 +33,8 @@ import type {
   PublishTrustBundleResult,
   ResolveRuntimeTrustMaterialPackageInput,
   ResolveRuntimeTrustMaterialPackageResult,
-} from "../../../../application/security/ports/ITrustMaterialDistributionPort";
-import { ResolveRuntimeTrustMaterialPackageUseCase } from "../../../../application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
+} from "@application/security/ports/ITrustMaterialDistributionPort";
+import { ResolveRuntimeTrustMaterialPackageUseCase } from "@application/security/use-cases/ResolveRuntimeTrustMaterialPackageUseCase";
 
 const cleanupPaths: string[] = [];
 const disposers: Array<() => void> = [];
@@ -913,3 +913,4 @@ class StubRuntimeTrustMaterialDistributionPort implements ITrustMaterialDistribu
     });
   }
 }
+

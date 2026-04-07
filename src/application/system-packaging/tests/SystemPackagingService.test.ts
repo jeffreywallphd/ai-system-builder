@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { createSystemStudioTaxonomy } from "../../../domain/system-studio/SystemAssetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
 import { SystemPackagingService } from "../SystemPackagingService";
 
 class PackagingRepository {
@@ -141,3 +141,4 @@ describe("SystemPackagingService", () => {
     expect(packaged.manifest.dependencyGraph.nodes.some((node) => node.assetId === "system:child")).toBe(true);
   });
 });
+

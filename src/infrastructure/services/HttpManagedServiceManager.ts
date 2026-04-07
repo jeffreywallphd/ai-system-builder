@@ -1,18 +1,18 @@
-import type { IRuntimeEventSink } from "../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources, type RuntimeEventSource } from "../../application/runtime/RuntimeEvent";
+﻿import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources, type RuntimeEventSource } from "@application/runtime/RuntimeEvent";
 import {
   mapSupervisorLogLevelToManagedServiceLogLevel,
   mapSupervisorServiceToManagedServiceStatus,
-} from "../../application/services/adapters/ManagedServiceSupervisorCompatibility";
+} from "@application/services/adapters/ManagedServiceSupervisorCompatibility";
 import {
   toManagedServiceDescriptor,
   type ManagedServiceDefinition,
-} from "../../application/services/ManagedServiceDefinition";
-import type { IManagedServiceDefinitionRegistry } from "../../application/services/interfaces/IManagedServiceDefinitionRegistry";
-import type { IManagedServiceManager } from "../../application/services/interfaces/IManagedServiceManager";
-import type { IManagedServiceStatusRefresher } from "../../application/services/interfaces/IManagedServiceStatusRefresher";
-import type { IManagedServiceSupervisor } from "../../application/services/interfaces/IManagedServiceSupervisor";
-import type { IManagedServiceSupervisorClient } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+} from "@application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRegistry } from "@application/services/interfaces/IManagedServiceDefinitionRegistry";
+import type { IManagedServiceManager } from "@application/services/interfaces/IManagedServiceManager";
+import type { IManagedServiceStatusRefresher } from "@application/services/interfaces/IManagedServiceStatusRefresher";
+import type { IManagedServiceSupervisor } from "@application/services/interfaces/IManagedServiceSupervisor";
+import type { IManagedServiceSupervisorClient } from "@application/services/interfaces/IManagedServiceSupervisorClient";
 import {
   ManagedServiceOwnership,
   ManagedServiceStartPolicies,
@@ -23,7 +23,7 @@ import {
   type ManagedServiceStatus,
   type ManagedServiceStatusListener,
   type ManagedServiceSubscription,
-} from "../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/interfaces/ManagedServiceTypes";
 
 export interface HttpManagedServiceRegistration {
   readonly serviceId: string;
@@ -276,3 +276,4 @@ function createInitialStatus(
     detail: detail?.trim() || undefined,
   });
 }
+

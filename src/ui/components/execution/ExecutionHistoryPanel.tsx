@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import type { ExecutionRunDetailProjection } from "../../../application/execution/ExecutionRunDetailProjectionService";
-import type { ExecutionRelatedRunClusterProjection } from "../../../application/execution/ExecutionRelatedRunClusterProjectionService";
-import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
+﻿import { useEffect, useState } from "react";
+import type { ExecutionRunDetailProjection } from "@application/execution/ExecutionRunDetailProjectionService";
+import type { ExecutionRelatedRunClusterProjection } from "@application/execution/ExecutionRelatedRunClusterProjectionService";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import type { ExecutionHistoryService } from "../../services/ExecutionHistoryService";
 import ExecutionRunDetailPanel from "./ExecutionRunDetailPanel";
 
@@ -109,7 +109,7 @@ export default function ExecutionHistoryPanel({
                     <span className={`ui-badge ui-badge--${item.statusTone}`}>{item.statusLabel}</span>
                   </div>
                   <div className="ui-text-secondary ui-text-small">
-                    {item.progressLabel} · {item.executionPathLabel} · {item.durationSummary}
+                    {item.progressLabel} Â· {item.executionPathLabel} Â· {item.durationSummary}
                   </div>
                   {item.currentUnitLabel ? (
                     <div className="ui-text-secondary ui-text-small">Current unit: {item.currentUnitLabel}</div>
@@ -145,3 +145,4 @@ export default function ExecutionHistoryPanel({
     </section>
   );
 }
+

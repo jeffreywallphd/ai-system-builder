@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowExecutionResult } from "../../../application/ports/WorkflowExecutor";
-import type { IWorkflowExecutionInput } from "../../../application/ports/interfaces/IWorkflowExecutor";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowExecutionResult } from "@application/ports/WorkflowExecutor";
+import type { IWorkflowExecutionInput } from "@application/ports/interfaces/IWorkflowExecutor";
 import { TruthfulWorkflowExecutor } from "../TruthfulWorkflowExecutor";
 
 describe("TruthfulWorkflowExecutor", () => {
@@ -66,3 +66,4 @@ describe("TruthfulWorkflowExecutor", () => {
     expect(result.provenance?.detail).toContain("execution via scaffold-langchain");
   });
 });
+

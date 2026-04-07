@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { WorkflowInputBindingSourceKinds } from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import { z } from "zod";
+import { WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createImageWorkflowInputBindingConfiguration,
   type ImageWorkflowInputBindingConfiguration,
@@ -216,3 +216,4 @@ export function createRestyleWorkflowAsset(input?: {
     }),
   });
 }
+

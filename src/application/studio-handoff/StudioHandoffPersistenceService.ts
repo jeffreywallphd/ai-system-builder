@@ -1,10 +1,10 @@
-import type { StudioHandoffContract, StudioHandoffAssetRole } from "../../domain/studio-handoff/StudioHandoffContract";
+﻿import type { StudioHandoffContract, StudioHandoffAssetRole } from "@domain/studio-handoff/StudioHandoffContract";
 import {
   StudioHandoffAuditEventKinds,
   StudioHandoffAuditOutcomes,
-} from "../../domain/studio-handoff/StudioHandoffAuditTrail";
+} from "@domain/studio-handoff/StudioHandoffAuditTrail";
 import type { StudioHandoffAuditTrailService } from "./StudioHandoffAuditTrailService";
-import type { StudioHandoffContext, StudioHandoffSourceReference } from "../../domain/studio-handoff/StudioHandoffContext";
+import type { StudioHandoffContext, StudioHandoffSourceReference } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffDependencyRecord } from "./CrossStudioDependencyGraph";
 import type { StudioHandoffLineageRecord } from "./StudioHandoffLineageTracker";
 import type {
@@ -305,3 +305,4 @@ export class StudioHandoffQueryService {
     return Math.min(StudioHandoffQueryService.MAX_LIST_LIMIT, Math.max(0, raw));
   }
 }
+

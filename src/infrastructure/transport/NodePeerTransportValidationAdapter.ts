@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   AuthorizeNodePeerCommunicationOutcome,
   AuthorizeNodePeerCommunicationUseCase,
-} from "../../application/security/use-cases/AuthorizeNodePeerCommunicationUseCase";
+} from "@application/security/use-cases/AuthorizeNodePeerCommunicationUseCase";
 
 export const NodePeerTransportValidationErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -77,3 +77,4 @@ export class NodePeerTransportValidationAdapter {
     });
   }
 }
+

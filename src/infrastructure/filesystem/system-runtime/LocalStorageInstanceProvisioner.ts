@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import {
   createStorageInstanceProvisioningRequest,
@@ -8,7 +8,7 @@ import {
   type StorageInstanceProvisioningContract,
   type StorageInstanceProvisioningRequest,
   type StorageInstanceProvisioningResult,
-} from "../../../application/system-runtime/StorageInstanceProvisioningContract";
+} from "@application/system-runtime/StorageInstanceProvisioningContract";
 
 export interface LocalStorageInstanceProvisionerOptions {
   readonly storageRootDirectory: string;
@@ -89,3 +89,4 @@ function sanitizeSegment(value: string): string {
   }
   return normalized;
 }
+

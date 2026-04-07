@@ -1,8 +1,8 @@
-import type { AssetContractDescriptor } from "../contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import { createAssetContractDescriptor } from "../contracts/AssetContract";
 import { AssetLineageRelationshipType } from "../assets/AssetLineageEdge";
 import { AssetVersion } from "../assets/AssetVersion";
-import type { AssetSourceType } from "../../../domain/assets/interfaces/IAsset";
+import type { AssetSourceType } from "@domain/assets/interfaces/IAsset";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 import { assertAllowedCompositionTaxonomyCombination, createCompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 
@@ -545,3 +545,4 @@ export function attachDraftToSession(session: AssetSession, draft: AssetDraft, n
     updatedAt: now.toISOString(),
   });
 }
+

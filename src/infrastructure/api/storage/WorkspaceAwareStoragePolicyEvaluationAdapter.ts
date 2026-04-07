@@ -1,13 +1,13 @@
-import type {
+﻿import type {
   IStoragePolicyEvaluationPort,
   StorageAccessibleInstanceResolutionRequest,
   StoragePolicyDecision,
   StoragePolicyEvaluationRequest,
-} from "../../../application/storage/ports/StoragePolicyEvaluationPort";
-import { StoragePolicyActions } from "../../../application/storage/ports/StoragePolicyEvaluationPort";
-import { StorageAccessScopes } from "../../../domain/storage/StorageDomain";
-import { WorkspaceMembershipStatuses, WorkspaceRoles } from "../../../domain/workspaces/WorkspaceDomain";
-import type { IWorkspaceAuthorizationReadRepository } from "../../../application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+} from "@application/storage/ports/StoragePolicyEvaluationPort";
+import { StoragePolicyActions } from "@application/storage/ports/StoragePolicyEvaluationPort";
+import { StorageAccessScopes } from "@domain/storage/StorageDomain";
+import { WorkspaceMembershipStatuses, WorkspaceRoles } from "@domain/workspaces/WorkspaceDomain";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 
 export interface WorkspaceAwareStoragePolicyEvaluationAdapterDependencies {
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
@@ -165,3 +165,4 @@ export class WorkspaceAwareStoragePolicyEvaluationAdapter implements IStoragePol
     });
   }
 }
+

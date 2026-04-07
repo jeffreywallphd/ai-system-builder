@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { TemplateService } from "../TemplateService";
 import {
   StageExecutionDispositions,
@@ -8,8 +8,8 @@ import {
   createUnifiedIngestionStageOutputFromResult,
   toStageRecordFromUnifiedIngestionOutput,
 } from "../StageIntegrationContracts";
-import { createInitialStageFlowRuntimeState, withStageOutput } from "../../../domain/dataset-studio/StageFlowDefinition";
-import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionReferenceKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+import { createInitialStageFlowRuntimeState, withStageOutput } from "@domain/dataset-studio/StageFlowDefinition";
+import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionReferenceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 describe("StageExecutionPolicy", () => {
   it("skips extraction when ingestion output is already structured", () => {
@@ -272,3 +272,4 @@ describe("StageExecutionPolicy", () => {
     expect(decision.autoConfiguration.lineageId).toBe("lineage-1");
   });
 });
+

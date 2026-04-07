@@ -1,13 +1,13 @@
-import type {
+﻿import type {
   IImageDerivedAttributeCalculator,
   ImageDerivedAttributeCalculationInput,
-} from "../../../domain/dataset-studio/interfaces/IImageDerivedAttributeCalculator";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/interfaces/IImageDerivedAttributeCalculator";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   ImageOrientationKinds,
   createImageDerivedAttributes,
   type ImageDerivedAttributesRecord,
-} from "../../../domain/dataset-studio/contracts/ImageDerivedAttributes";
+} from "@domain/dataset-studio/contracts/ImageDerivedAttributes";
 
 function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
@@ -59,3 +59,4 @@ export class DefaultImageDerivedAttributeCalculator implements IImageDerivedAttr
     return createImageDerivedAttributes(derived);
   }
 }
+

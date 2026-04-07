@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { UnifiedIngestionOutputTargetKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { UnifiedIngestionOutputTargetKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { resolveUnifiedIngestionConfiguration } from "../UnifiedIngestionConfiguration";
 
 describe("UnifiedIngestionConfiguration", () => {
@@ -79,3 +79,4 @@ describe("UnifiedIngestionConfiguration", () => {
     }
   });
 });
+

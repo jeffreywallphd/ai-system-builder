@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   IImageDimensionReader,
   ImageDimensions,
-} from "../../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 
 type ImageSizeFunction = (input: Uint8Array) => {
   readonly width?: number;
@@ -37,3 +37,4 @@ export class ImageSizeDimensionReaderAdapter implements IImageDimensionReader {
     });
   }
 }
+

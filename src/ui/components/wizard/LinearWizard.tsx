@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import type { LinearWizardDefinition } from "../../../application/wizards/contracts";
+﻿import type { ReactNode } from "react";
+import type { LinearWizardDefinition } from "@application/wizards/contracts";
 
 export interface LinearWizardProps<StepId extends string = string> {
   readonly wizard: LinearWizardDefinition<StepId>;
@@ -109,3 +109,4 @@ export function LinearWizard<StepId extends string>(props: LinearWizardProps<Ste
 }
 
 export default LinearWizard;
+

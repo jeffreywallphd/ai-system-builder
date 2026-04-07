@@ -1,5 +1,5 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
 
 const classifier = new CompositionTaxonomyClassifier();
@@ -12,3 +12,4 @@ const classifier = new CompositionTaxonomyClassifier();
 export function classifyAgentTaxonomy(agent: Agent): CompositionTaxonomyDescriptor {
   return classifier.classifyAgent(agent);
 }
+

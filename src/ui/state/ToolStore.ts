@@ -1,8 +1,8 @@
-import type { CapabilitySearchResult } from "../../application/research/models/CapabilitySearchResult";
-import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
-import type { ToolDefinition } from "../../application/projection/models/ToolDefinition";
-import type { ToolRunResult } from "../../application/projection/models/ToolRunResult";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { CapabilitySearchResult } from "@application/research/models/CapabilitySearchResult";
+import type { ToolSearchCriteria } from "@application/dto/ToolSearchCriteria";
+import type { ToolDefinition } from "@application/projection/models/ToolDefinition";
+import type { ToolRunResult } from "@application/projection/models/ToolRunResult";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 import { ToolService } from "../services/ToolService";
 
 export interface ToolStoreState {
@@ -130,3 +130,4 @@ export class ToolStore {
     for (const listener of this.listeners) listener(this.state);
   }
 }
+

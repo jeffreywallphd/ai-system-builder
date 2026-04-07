@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CreateWorkflowUseCase } from "../../../application/workflows/CreateWorkflowUseCase";
+﻿import { describe, expect, it } from "bun:test";
+import { CreateWorkflowUseCase } from "@application/workflows/CreateWorkflowUseCase";
 import { PreviewWorkflowExecutor } from "../execution/PreviewWorkflowExecutor";
 
 describe("PreviewWorkflowExecutor", () => {
@@ -22,3 +22,4 @@ describe("PreviewWorkflowExecutor", () => {
     expect(events).toContain("workflow-completed");
   });
 });
+

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   NodeApprovalStatus,
   NodeEnrollmentRequestStatus,
   NodeInventoryDetailDto,
@@ -21,12 +21,12 @@ import type {
   RevokeNodeTrustActionRequestDto,
   ResolveNodeRuntimeTrustMaterialRequestDto,
   RejectNodeEnrollmentActionRequestDto,
-} from "../../../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@shared/contracts/nodes/NodeTrustApiContracts";
 import {
   NodeEnrollmentRequestStatuses,
   type NodeRoleCapability,
   type NodeType,
-} from "../../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 
 export const NodeTrustApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -164,3 +164,4 @@ export interface GetNodeInventoryDetailApiRequest {
 export interface GetNodeInventoryDetailApiResponse {
   readonly node: NodeInventoryDetailDto;
 }
+

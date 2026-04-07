@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { PythonBackedMcpToolCatalog } from "../PythonBackedMcpToolCatalog";
 
 describe("PythonBackedMcpToolCatalog", () => {
@@ -83,3 +83,4 @@ describe("PythonBackedMcpToolCatalog", () => {
     expect(descriptor?.tags).toEqual(["text"]);
   });
 });
+

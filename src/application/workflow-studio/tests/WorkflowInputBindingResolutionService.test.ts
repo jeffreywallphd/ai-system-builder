@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createWorkflowInputBindingDescriptor,
   WorkflowInputBindingSourceKinds,
-} from "../../../domain/workflow-studio/WorkflowInputBindingDomain";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import { resolveWorkflowInputBindings } from "../WorkflowInputBindingResolutionService";
 
 describe("resolveWorkflowInputBindings", () => {
@@ -416,3 +416,4 @@ describe("resolveWorkflowInputBindings", () => {
     ]));
   });
 });
+

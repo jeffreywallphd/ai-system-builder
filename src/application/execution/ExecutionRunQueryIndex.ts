@@ -1,5 +1,5 @@
-import type { ExecutionUnitKind } from "../../domain/execution/ExecutionPlan";
-import type { IExecutionRunProvenance, IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+﻿import type { ExecutionUnitKind } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunProvenance, IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 
 export interface IExecutionRunQueryIndex {
   readonly executionKind?: string;
@@ -41,3 +41,4 @@ function findFirstProvenance(run: IExecutionRunRecord): IExecutionRunProvenance 
   }
   return undefined;
 }
+

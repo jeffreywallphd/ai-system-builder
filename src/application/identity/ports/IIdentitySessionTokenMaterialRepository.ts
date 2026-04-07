@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   IdentityPersistenceMutationContext,
   IdentityPersistenceMutationResult,
   IdentitySessionTokenMaterialLookupQuery,
   IdentitySessionTokenMaterialRecord,
-} from "../../../shared/dto/identity/IdentityPersistenceDtos";
+} from "@shared/dto/identity/IdentityPersistenceDtos";
 
 export interface IIdentitySessionTokenMaterialQueryRepository {
   getSessionTokenMaterialBySessionId(
@@ -31,3 +31,4 @@ export interface IIdentitySessionTokenMaterialWriteRepository {
 
 export interface IIdentitySessionTokenMaterialRepository
   extends IIdentitySessionTokenMaterialQueryRepository, IIdentitySessionTokenMaterialWriteRepository {}
+

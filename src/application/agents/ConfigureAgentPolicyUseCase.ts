@@ -1,9 +1,9 @@
-import { toAgentReadModel, updateAgent, type AgentReadModel } from "../../domain/agents/Agent";
+﻿import { toAgentReadModel, updateAgent, type AgentReadModel } from "@domain/agents/Agent";
 import {
   applyAgentPolicyConfiguration,
   type AgentPolicyConfigurationOperation,
-} from "../../domain/agents/AgentPolicyConfiguration";
-import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
+} from "@domain/agents/AgentPolicyConfiguration";
+import type { AgentPolicy } from "@domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -60,3 +60,4 @@ export class ConfigureAgentPolicyUseCase {
     return requestOrAgentId;
   }
 }
+

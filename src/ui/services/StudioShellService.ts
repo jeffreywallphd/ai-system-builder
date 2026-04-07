@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   CreateAssetDraftCommand,
   PublishAssetDraftVersionCommand,
   TransitionAssetDraftLifecycleCommand,
   UpdateAssetDraftCommand,
   UpdateAssetDraftDependenciesCommand,
-} from "../../application/studio-shell/contracts";
+} from "@application/studio-shell/contracts";
 import type {
   AssessWorkflowStudioExecutionReadinessRequest,
   DuplicatePersistedWorkflowRequest,
@@ -39,9 +39,9 @@ import type {
   GetReferenceImageDatasetItemRequest,
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
-} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import type { ImageRunHistoryListing } from "../../application/system-runtime/ImageRunHistoryDataContract";
-import type { OutputGalleryItem, OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { ImageRunHistoryListing } from "@application/system-runtime/ImageRunHistoryDataContract";
+import type { OutputGalleryItem, OutputGalleryListing } from "@application/system-runtime/OutputGalleryDataContract";
 import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
@@ -49,11 +49,11 @@ import type {
   RuntimeExecutionStatusReadModel,
   RuntimeExecutionTraceReadModel,
   RuntimeExecutionResultReadModel,
-} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
   LaunchSystemRuntimeWindowReadModel,
   LaunchSystemRuntimeWindowRequest,
-} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+} from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import type {
   AddSystemChildComponentRequest,
   ListSystemChildComponentsRequest,
@@ -69,7 +69,7 @@ import type {
   LoadSystemDefinitionRequest,
   DuplicateSystemDefinitionRequest,
   ModifySystemDefinitionRequest,
-} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+} from "@infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
 
@@ -342,3 +342,4 @@ export class StudioShellService {
     return JSON.parse(raw) as SystemRuntimeApiResponse<LaunchSystemRuntimeWindowReadModel>;
   }
 }
+

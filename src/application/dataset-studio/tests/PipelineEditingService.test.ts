@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { validatePipelineDefinition } from "../../../domain/dataset-studio/PipelineDefinitionDomain";
-import { CanonicalDataShapeKinds } from "../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { validatePipelineDefinition } from "@domain/dataset-studio/PipelineDefinitionDomain";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createPipelineStageInstance,
   PipelineStageConfigModes,
   PipelineStageIds,
-} from "../../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   PipelineEditError,
   PipelineEditErrorCodes,
@@ -150,3 +150,4 @@ describe("PipelineEditingService", () => {
     expect(() => service.reorderStage(base, PipelineStageIds.Transformation, 1)).toThrow();
   });
 });
+

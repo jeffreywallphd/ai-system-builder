@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { createDeploymentConfigurationContract } from "../../../domain/deployment/DeploymentConfigurationDomain";
-import { createSystemPackage, type SystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createDeploymentConfigurationContract } from "@domain/deployment/DeploymentConfigurationDomain";
+import { createSystemPackage, type SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentExecutionService, InMemoryDeploymentRecordRepository } from "../DeploymentExecutionService";
 import { DeploymentVersionManager } from "../DeploymentVersionManager";
 import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "../DeploymentRollbackService";
 import { DeploymentDiagnosticsService, InMemoryDeploymentDiagnosticsRepository } from "../DeploymentDiagnosticsService";
 import { buildSampleBundle, createSampleConfiguration, createSamplePackage, createSampleTarget } from "./testUtils";
-import { DeploymentActivationStates } from "../../../domain/deployment/DeploymentExecutionDomain";
+import { DeploymentActivationStates } from "@domain/deployment/DeploymentExecutionDomain";
 
 function createVersionedPackage(base: SystemPackage, input: { readonly rootVersionId: string; readonly packageId: string }): SystemPackage {
   return createSystemPackage({
@@ -304,3 +304,4 @@ describe("DeploymentRollbackService", () => {
     expect(rollbackActions[0]?.decision.code).toBe("candidate-not-found");
   });
 });
+

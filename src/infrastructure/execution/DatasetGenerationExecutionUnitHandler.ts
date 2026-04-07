@@ -1,20 +1,20 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import type {
   DatasetGenerationRequest,
   DatasetGenerationResult,
   DatasetGenerationService,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import {
   createDatasetGenerationExecutionArtifact,
   DatasetGenerationExecutionArtifacts,
   toDatasetGenerationExecutionProvenance,
-} from "../../application/execution/DatasetGenerationExecutionAdapter";
+} from "@application/execution/DatasetGenerationExecutionAdapter";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
-} from "../../application/execution/UnifiedExecutionEngine";
-import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
+} from "@application/execution/UnifiedExecutionEngine";
+import type { ExecutionAssetLineageRecorder } from "@application/assets-system/ExecutionAssetLineageRecorder";
 
 function toExecutionStatus(result: DatasetGenerationResult): IExecutionUnitExecutionResult["status"] {
   switch (result.status) {
@@ -83,3 +83,4 @@ export class DatasetGenerationExecutionUnitHandler implements IExecutionUnitHand
     });
   }
 }
+

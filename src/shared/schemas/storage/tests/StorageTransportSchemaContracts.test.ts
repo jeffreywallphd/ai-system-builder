@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -7,7 +7,7 @@ import {
   StorageManagedActions,
   StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageSyncDeploymentAvailabilities,
   StorageSyncStatuses,
@@ -490,3 +490,4 @@ describe("StorageTransportSchemaContracts", () => {
     })).toThrow(StorageTransportSchemaValidationError);
   });
 });
+

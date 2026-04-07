@@ -1,7 +1,7 @@
-import {
+﻿import {
   normalizeCertificateAuthorityMutationOperationKey,
   type CertificateDistributionTargetKind,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type {
   CertificateRuntimeTrustMaterialAuthorizationHook,
 } from "../ports/CertificateRuntimeTrustMaterialAuthorizationPort";
@@ -487,3 +487,4 @@ function toErrorSummary(error: unknown): string {
   const message = normalizeObservabilityOptional(error.message);
   return message ? `${name}: ${message}` : name;
 }
+

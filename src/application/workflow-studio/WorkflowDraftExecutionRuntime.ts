@@ -1,7 +1,7 @@
-import {
+﻿import {
   WorkflowDraftComparisonOperators,
   type WorkflowDraftConditionDefinition,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   deliverWorkflowExecutionOutputs,
   type WorkflowExecutionOutputDeliveryHandler,
@@ -868,3 +868,4 @@ export class WorkflowDraftExecutionRuntime {
     });
   }
 }
+

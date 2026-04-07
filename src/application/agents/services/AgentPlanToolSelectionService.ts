@@ -1,12 +1,12 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentGoal } from "../../../domain/agents/AgentGoal";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentGoal } from "@domain/agents/AgentGoal";
 import type {
   AgentPlanToolCompatibilityIssue,
   AgentPlanToolSelectionRequest,
   AgentPlanToolSelectionResult,
   AgentPlanToolSelectionService,
 } from "../contracts/AgentPlanningStrategy";
-import { isMcpToolId } from "../../../domain/mcp/McpToolIdentity";
+import { isMcpToolId } from "@domain/mcp/McpToolIdentity";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
 
@@ -114,3 +114,4 @@ export class DefaultAgentPlanToolSelectionService implements AgentPlanToolSelect
     return "denied";
   }
 }
+

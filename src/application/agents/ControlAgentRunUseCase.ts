@@ -1,7 +1,7 @@
-import {
+﻿import {
   AgentExecutionSessionStatuses,
   transitionAgentExecutionSession,
-} from "../../domain/agents/AgentExecutionSession";
+} from "@domain/agents/AgentExecutionSession";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import type { IAgentExecutionSessionRepository } from "../ports/interfaces/IAgentExecutionSessionRepository";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
@@ -55,3 +55,4 @@ export class ControlAgentRunUseCase {
     }));
   }
 }
+

@@ -1,4 +1,4 @@
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
+﻿import type { AgentPlan } from "@domain/agents/AgentPlan";
 
 export const AgentPlanningStatuses = Object.freeze({
   planned: "planned",
@@ -113,3 +113,4 @@ export function createPlanningOutcome(plan: AgentPlan, evaluation: AgentPlanEval
     evaluation: normalizedEvaluation,
   });
 }
+

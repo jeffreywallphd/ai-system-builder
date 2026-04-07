@@ -1,6 +1,6 @@
-import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
-import type { CanonicalDataShape, CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
+﻿import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
+import type { CanonicalDataShape, CanonicalDataShapeKind, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DataAssetBase } from "@domain/dataset-studio/DataAssetBase";
 import {
   DataAssetConfigFieldKinds,
   type DataAssetConfigSchema,
@@ -818,3 +818,4 @@ export function summarizeIssueCountByShapeKind(
     "image-metadata-records": shape.kind === "image-metadata-records" ? shape.items.length : 0,
   });
 }
+

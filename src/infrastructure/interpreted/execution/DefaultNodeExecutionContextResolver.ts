@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   INodeExecutionContext,
   INodeExecutionContextResolveInput,
   INodeExecutionContextResolver,
-} from "../../../application/ports/interfaces/INodeExecutionContextResolver";
+} from "@application/ports/interfaces/INodeExecutionContextResolver";
 
 export class DefaultNodeExecutionContextResolver
   implements INodeExecutionContextResolver
@@ -39,3 +39,4 @@ export class DefaultNodeExecutionContextResolver
     });
   }
 }
+

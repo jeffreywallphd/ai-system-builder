@@ -1,20 +1,20 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { SqliteAssetSystemRepository } from "../../../infrastructure/filesystem/SqliteAssetSystemRepository";
+import { SqliteAssetSystemRepository } from "@infrastructure/filesystem/SqliteAssetSystemRepository";
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
 import { PublishDurableEntityToAssetSystemUseCase } from "../PublishDurableEntityToAssetSystemUseCase";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
-import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
-import { TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
+import { TuningDatasetVersion } from "@domain/tuning-datasets/TuningDatasetEntities";
 import { ExplainCanonicalVersionExistenceUseCase, GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, GetCanonicalVersionDependencyUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase, LoadCanonicalAssetSummaryUseCase } from "../CanonicalAssetReadUseCases";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 import { GetAssetImpactAnalysisUseCase } from "../GetAssetImpactAnalysisUseCase";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
 
 function buildModel(id: string): Model {
   return new Model({
@@ -117,3 +117,4 @@ describe("Canonical asset system integration", () => {
     }
   });
 });
+

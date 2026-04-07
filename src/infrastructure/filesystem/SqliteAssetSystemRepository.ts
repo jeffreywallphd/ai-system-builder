@@ -1,26 +1,26 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { Asset } from "../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "../../domain/assets/AssetMetadata";
-import { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
-import { AssetTransformation } from "../../domain/assets/AssetTransformation";
-import { AssetVersion } from "../../domain/assets/AssetVersion";
-import { createCompositionTaxonomyDescriptor, type CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { AssetLineageDirection, IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
-import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
-import type { IAssetTransformationRepository } from "../../application/ports/interfaces/IAssetTransformationRepository";
-import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
-import type { ICanonicalAssetIdentityRepository, CanonicalAssetIdentityRecord, CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
-import type { CanonicalAssetQueryCriteria, IAssetSystemQueryRepository } from "../../application/ports/interfaces/IAssetSystemQueryRepository";
-import type { CanonicalDependencyStateSummary } from "../../application/assets-system/CanonicalDependencyStateUseCase";
-import type { ICanonicalDependencyStateRepository } from "../../application/ports/interfaces/ICanonicalDependencyStateRepository";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "@domain/assets/AssetMetadata";
+import { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { createCompositionTaxonomyDescriptor, type CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { AssetLineageDirection, IAssetLineageRepository } from "@application/ports/interfaces/IAssetLineageRepository";
+import type { IAssetRecordRepository } from "@application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetTransformationRepository } from "@application/ports/interfaces/IAssetTransformationRepository";
+import type { IAssetVersionRepository } from "@application/ports/interfaces/IAssetVersionRepository";
+import type { ICanonicalAssetIdentityRepository, CanonicalAssetIdentityRecord, CanonicalEntityType } from "@application/ports/interfaces/ICanonicalAssetIdentityRepository";
+import type { CanonicalAssetQueryCriteria, IAssetSystemQueryRepository } from "@application/ports/interfaces/IAssetSystemQueryRepository";
+import type { CanonicalDependencyStateSummary } from "@application/assets-system/CanonicalDependencyStateUseCase";
+import type { ICanonicalDependencyStateRepository } from "@application/ports/interfaces/ICanonicalDependencyStateRepository";
 import type {
   IRegistryGraphProjectionRepository,
   RegistryGraphProjectionSnapshot,
   RegistryGraphProjectionState,
-} from "../../application/ports/interfaces/IRegistryGraphProjectionRepository";
+} from "@application/ports/interfaces/IRegistryGraphProjectionRepository";
 
 interface AssetRow { readonly asset_json: string; }
 interface AssetVersionRow {
@@ -993,3 +993,4 @@ export class SqliteAssetSystemRepository implements
     });
   }
 }
+

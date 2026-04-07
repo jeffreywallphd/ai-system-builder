@@ -1,8 +1,8 @@
-import { IdentitySessionAccessChannels } from "../../domain/identity/IdentityDomain";
+﻿import { IdentitySessionAccessChannels } from "@domain/identity/IdentityDomain";
 import type {
   IdentitySessionLifecyclePolicies,
   IdentitySessionLifecyclePolicy,
-} from "../../application/identity/services/IdentitySessionLifecycleService";
+} from "@application/identity/services/IdentitySessionLifecycleService";
 
 export interface IdentitySessionPolicyConfigValues {
   readonly desktop?: Partial<IdentitySessionLifecyclePolicy>;
@@ -121,3 +121,4 @@ function parseBoolean(value: string | undefined): boolean | undefined {
 
   throw new Error(`Identity session policy value '${value}' must be a boolean.`);
 }
+

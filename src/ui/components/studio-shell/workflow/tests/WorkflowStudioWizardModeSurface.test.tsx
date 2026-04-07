@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioWizardModeSurface from "../WorkflowStudioWizardExperienceSurface";
 import {
   WorkflowStudioHandoffFlowKinds,
@@ -129,3 +129,4 @@ describe("WorkflowStudioWizardModeSurface", () => {
     expect(html).toContain("Waiting for Dataset Studio handoff return.");
   });
 });
+

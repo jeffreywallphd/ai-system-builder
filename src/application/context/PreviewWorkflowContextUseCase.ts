@@ -1,8 +1,8 @@
-import type { DynamicContextSourceInput } from "./models/ContextAssemblyRequest";
+﻿import type { DynamicContextSourceInput } from "./models/ContextAssemblyRequest";
 import type { ContextPreviewResult } from "./models/ContextPreview";
 import { WorkflowContextService, type IResolveWorkflowContextRequest } from "./WorkflowContextService";
 import { createBasePreviewResult, createDeliveryTargets } from "./ContextPreviewSupport";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 
 export interface IPreviewWorkflowContextRequest
   extends Omit<IResolveWorkflowContextRequest, "workflow"> {
@@ -34,3 +34,4 @@ export class PreviewWorkflowContextUseCase {
     });
   }
 }
+

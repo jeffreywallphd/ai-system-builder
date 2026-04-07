@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import type { WorkflowOutputMaterializationPayload } from "./WorkflowOutputMaterializationContract";
 
 export interface WorkflowOutputProvenanceRecord {
@@ -95,3 +95,4 @@ export class InMemoryWorkflowOutputProvenanceRepository implements WorkflowOutpu
     return Object.freeze([...bounded]);
   }
 }
+

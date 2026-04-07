@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
+﻿import { describe, expect, it } from "bun:test";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
 import {
   addSchemaEntityToDocument,
   addSchemaFieldToEntityInDocument,
@@ -331,3 +331,4 @@ describe("SchemaStudioDomain", () => {
     expect(parsed.issues.some((issue) => issue.code === SchemaValidationIssueCodes.schemaMalformed)).toBeTrue();
   });
 });
+

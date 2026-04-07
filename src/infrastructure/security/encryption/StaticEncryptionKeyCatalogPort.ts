@@ -1,7 +1,7 @@
-import {
+﻿import {
   EncryptionKeyScopes,
   type EncryptionKeyScope,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionKeyLifecycleStates,
   type EncryptionKeyDescriptor,
@@ -9,7 +9,7 @@ import {
   type IEncryptionKeyCatalogPort,
   type ResolveActiveEncryptionKeyRequest,
   type ResolveEncryptionKeyByReferenceRequest,
-} from "../../../application/security/ports/EncryptionKeyResolutionPorts";
+} from "@application/security/ports/EncryptionKeyResolutionPorts";
 
 export class StaticEncryptionKeyCatalogPort implements IEncryptionKeyCatalogPort {
   private readonly keysByReferenceId = new Map<string, EncryptionKeyDescriptor>();
@@ -204,4 +204,5 @@ function normalizeOptionalTimestamp(value: string | undefined, field: string): s
   }
   return normalizeTimestamp(value, field);
 }
+
 

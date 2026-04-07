@@ -1,4 +1,4 @@
-import type { AgentAuthoringApiReadModel } from "../../../infrastructure/api/agents/AgentAuthoringBackendApi";
+﻿import type { AgentAuthoringApiReadModel } from "@infrastructure/api/agents/AgentAuthoringBackendApi";
 
 interface AgentListPanelProps {
   readonly agents: ReadonlyArray<AgentAuthoringApiReadModel>;
@@ -30,7 +30,7 @@ export function AgentListPanel(props: AgentListPanelProps): JSX.Element {
             </button>
             <div className="ui-text-small ui-text-secondary">
               {entry.taxonomy.structuralKind}/{entry.taxonomy.semanticRole}/{entry.taxonomy.behaviorKind}
-              {entry.contract ? ` · ${entry.contract.id}@${entry.contract.version}` : ""}
+              {entry.contract ? ` Â· ${entry.contract.id}@${entry.contract.version}` : ""}
             </div>
           </li>
         ))}
@@ -38,3 +38,4 @@ export function AgentListPanel(props: AgentListPanelProps): JSX.Element {
     </aside>
   );
 }
+

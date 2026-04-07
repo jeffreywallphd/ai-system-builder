@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowDeserializationRequest,
   IWorkflowSerializationRequest,
@@ -108,3 +108,4 @@ export class WorkflowSerializer implements IWorkflowSerializer {
     return serializer;
   }
 }
+

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createComfyImageManipulationDefaultConfig } from "../../../application/system-studio/ComfyImageManipulationPropertySchema";
-import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createComfyImageManipulationDefaultConfig } from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
 import { mapImageManipulationRuntimeStateToExecutionRequest } from "../ImageManipulationRuntimeExecutionRequestMapper";
 
 function createGalleryItem(input: {
@@ -187,3 +187,4 @@ describe("ImageManipulationRuntimeExecutionRequestMapper", () => {
     expect(result.code).toBe("missing-reference-image");
   });
 });
+

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { ToolStudioApplicationService } from "../ToolStudioApplicationService";
-import { ToolStudioIdentity } from "../../../domain/tool-studio/ToolStudioDomain";
+import { ToolStudioIdentity } from "@domain/tool-studio/ToolStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -124,3 +124,4 @@ describe("ToolStudioApplicationService", () => {
     })).rejects.toThrow("taxonomy-semantic-role-mismatch");
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   StudioHandoffCompatibilityValidator,
@@ -10,13 +10,13 @@ import {
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
-} from "../../../domain/studio-handoff/StudioHandoffContract";
+} from "@domain/studio-handoff/StudioHandoffContract";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -372,3 +372,4 @@ describe("StudioHandoffCompatibilityValidator", () => {
     expect(second).toBe(first);
   });
 });
+

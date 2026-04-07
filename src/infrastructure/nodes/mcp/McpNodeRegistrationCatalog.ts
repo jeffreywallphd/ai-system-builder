@@ -1,14 +1,14 @@
-import { NodePort, NodePortCompatibilityProfile } from "../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
-import type { NodePortValueType } from "../../../domain/nodes/interfaces/INodePort";
+﻿import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { NodePortValueType } from "@domain/nodes/interfaces/INodePort";
 import type {
   NodePropertyType,
   NodePropertyValue,
-} from "../../../domain/nodes/interfaces/INodeProperty";
-import type { INodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
-import { toNodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
-import type { NodeExecutionStyle } from "../shared/NodeImplementationDescriptor";
+} from "@domain/nodes/interfaces/INodeProperty";
+import type { INodeCatalogDefinitionDescriptor } from "@shared/NodeCatalogDefinitionDescriptor";
+import { toNodeCatalogDefinitionDescriptor } from "@shared/NodeCatalogDefinitionDescriptor";
+import type { NodeExecutionStyle } from "@shared/NodeImplementationDescriptor";
 
 export interface IMcpNodeRegistrationDescriptor {
   readonly nodeTypeId: string;
@@ -441,3 +441,4 @@ export function buildMcpNodeCatalogDescriptor(
     projection: metadata.projection,
   });
 }
+

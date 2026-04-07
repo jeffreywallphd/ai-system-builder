@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createDeploymentConfigurationContract,
-} from "../../../domain/deployment/DeploymentConfigurationDomain";
+} from "@domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
-} from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentBuildPipeline } from "../DeploymentBuildPipeline";
 
 function createSamplePackage() {
@@ -168,3 +168,4 @@ describe("DeploymentBuildPipeline", () => {
     expect(buildClockCalls).toBe(1);
   });
 });
+

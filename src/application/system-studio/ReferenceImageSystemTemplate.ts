@@ -1,16 +1,16 @@
-import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   createSystemContextWorkflowMappingConfiguration,
   type SystemContextWorkflowMappingConfiguration,
-} from "../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
+} from "@domain/system-studio/SystemContextWorkflowMappingConfiguration";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   SystemBindingEndpointScopes,
   type SystemAsset,
-} from "../../domain/system-studio/SystemAssetDomain";
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
-import { DatasetInstanceRoles, type DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-studio/SystemAssetDomain";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
+import { DatasetInstanceRoles, type DatasetInstanceRole } from "@domain/system-runtime/DatasetInstanceDomain";
 import type { EnsureRoleDatasetInstanceRequest } from "../system-runtime/SystemDatasetInstanceService";
 import type { StorageBindingArea } from "../system-runtime/StorageInstanceProvisioningContract";
 import {
@@ -407,3 +407,4 @@ export function buildReferenceImageDatasetInstanceRequests(
       }),
     })));
 }
+

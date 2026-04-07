@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { makeAsset } from "../../../assets/tests/testUtils";
 import { createComfyExecutionContext } from "../ComfyExecutionContext";
 
@@ -42,3 +42,4 @@ describe("createComfyExecutionContext", () => {
     expect(context.trigger?.source).toBe("workflow-studio-manual");
   });
 });
+

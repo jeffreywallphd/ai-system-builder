@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   IUnifiedIngestionFileSignatureSniffer,
   UnifiedIngestionFileSignature,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 interface FileTypeResult {
   readonly ext?: string;
@@ -59,3 +59,4 @@ export class FileTypeSignatureSniffer implements IUnifiedIngestionFileSignatureS
     });
   }
 }
+

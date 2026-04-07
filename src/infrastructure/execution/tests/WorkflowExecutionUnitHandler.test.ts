@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import { WorkflowExecutionUnitHandler } from "../WorkflowExecutionUnitHandler";
-import { WorkflowRunStatuses } from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+import { WorkflowRunStatuses } from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 describe("WorkflowExecutionUnitHandler", () => {
   it("wraps the existing workflow executor and preserves provenance", async () => {
@@ -182,3 +182,4 @@ describe("WorkflowExecutionUnitHandler", () => {
   });
 
 });
+

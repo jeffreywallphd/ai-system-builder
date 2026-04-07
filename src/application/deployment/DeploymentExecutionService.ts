@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import {
   createDeploymentExecutionRequest,
   createDeploymentLifecycleRequest,
@@ -9,19 +9,19 @@ import {
   type DeploymentExecutionResult,
   type DeploymentLifecycleRequest,
   type DeploymentRecord,
-} from "../../domain/deployment/DeploymentExecutionDomain";
-import { DeploymentLogLevels } from "../../domain/deployment/DeploymentDiagnosticsDomain";
+} from "@domain/deployment/DeploymentExecutionDomain";
+import { DeploymentLogLevels } from "@domain/deployment/DeploymentDiagnosticsDomain";
 import {
   deriveDeploymentIsolationIds,
   type DeploymentEnvironmentContext,
   type IsolatedDeploymentScope,
-} from "../../domain/deployment/DeploymentIsolationDomain";
+} from "@domain/deployment/DeploymentIsolationDomain";
 import {
   EnvironmentProvisioningStatuses,
   type EnvironmentProvisioningInterface,
   type ProvisionedDeploymentEnvironment,
-} from "../../domain/deployment/EnvironmentProvisioningDomain";
-import { DeploymentStates, type DeploymentStateSnapshot, type DeploymentStateTransition } from "../../domain/deployment/DeploymentStateDomain";
+} from "@domain/deployment/EnvironmentProvisioningDomain";
+import { DeploymentStates, type DeploymentStateSnapshot, type DeploymentStateTransition } from "@domain/deployment/DeploymentStateDomain";
 import { DeploymentDiagnosticsService, InMemoryDeploymentDiagnosticsRepository } from "./DeploymentDiagnosticsService";
 import { EnvironmentProvisioningCompatibilityValidator } from "./EnvironmentProvisioningCompatibilityValidator";
 import { EnvironmentProvisioningService } from "./EnvironmentProvisioningService";
@@ -36,7 +36,7 @@ import {
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
-import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "@domain/deployment/DeploymentAuditTrailDomain";
 import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export interface DeploymentRecordRepository {
@@ -904,3 +904,4 @@ export class DeploymentExecutionService {
     });
   }
 }
+

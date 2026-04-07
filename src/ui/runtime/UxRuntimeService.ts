@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   RuntimeExecutionResultReadModel,
   RuntimeExecutionStatusReadModel,
   RuntimeExecutionTraceReadModel,
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
   SystemRuntimeApiResponse,
-} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { RunContextKinds, RunInterfaceService, type RunLaunchRequest } from "../routes/RunInterface";
 
 export const UxRunActionKinds = Object.freeze({
@@ -237,3 +237,4 @@ export class UxRuntimeService {
     });
   }
 }
+

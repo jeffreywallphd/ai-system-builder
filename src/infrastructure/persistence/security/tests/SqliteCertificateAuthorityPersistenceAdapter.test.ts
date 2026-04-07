@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { CertificateAuthorityStatuses, CertificateRevocationReasons, CertificateStatuses, CertificateSubjectReferenceKinds, CertificateUsageKinds } from "../../../../domain/security/CertificateAuthorityDomain";
+import { CertificateAuthorityStatuses, CertificateRevocationReasons, CertificateStatuses, CertificateSubjectReferenceKinds, CertificateUsageKinds } from "@domain/security/CertificateAuthorityDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "../SqliteCertificateAuthorityPersistenceAdapter";
 
@@ -267,3 +267,4 @@ describe("SqliteCertificateAuthorityPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

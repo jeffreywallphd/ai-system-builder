@@ -1,6 +1,6 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
-import { AssetSelectorSelectionModes } from "../../../../domain/studio-shell/AssetSelectorContract";
-import type { AssetSelectorSessionState } from "../../../../application/studio-entry/AssetSelectorSessionStore";
+﻿import { useMemo, useState, type KeyboardEvent } from "react";
+import { AssetSelectorSelectionModes } from "@domain/studio-shell/AssetSelectorContract";
+import type { AssetSelectorSessionState } from "@application/studio-entry/AssetSelectorSessionStore";
 import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
 
 export interface AssetSelectorShellProps {
@@ -224,3 +224,4 @@ export default function AssetSelectorShell({
     </section>
   );
 }
+

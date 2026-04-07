@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import {
   ManagedServiceRestartPolicies,
   ManagedServiceTransports,
-} from "../../../application/services/ManagedServiceDefinition";
+} from "@application/services/ManagedServiceDefinition";
 import {
   ManagedServiceKinds,
   ManagedServiceOwnership,
   ManagedServiceStartPolicies,
   ManagedServiceStates,
-} from "../../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/interfaces/ManagedServiceTypes";
 import { NodeProcessRuntimeEventSink } from "../../python/runtime/NodeProcessRuntimeEventSink";
 import { BrowserManagedServiceManager } from "../BrowserManagedServiceManager";
 import { InMemoryManagedServiceDefinitionRegistry } from "../InMemoryManagedServiceDefinitionRegistry";
@@ -129,3 +129,4 @@ describe("BrowserManagedServiceManager", () => {
     expect(stoppedStatus.state).toBe("disabled");
   });
 });
+

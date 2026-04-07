@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   ICommonImageNodeContract,
   ICommonImageNodeInternalImage,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -268,3 +268,4 @@ export class ComfyResizeUpscaleNodeAdapter extends ComfyImageNodeAdapterBase {
     return undefined;
   }
 }
+

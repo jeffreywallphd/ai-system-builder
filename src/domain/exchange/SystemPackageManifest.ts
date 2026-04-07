@@ -1,6 +1,6 @@
-import type { AssetContractDescriptor } from "../contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import { createAssetContractDescriptor } from "../contracts/AssetContract";
-import { AssetId } from "../../../domain/assets/AssetId";
+import { AssetId } from "@domain/assets/AssetId";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
 import {
   TaxonomyStructuralKinds,
@@ -358,3 +358,4 @@ export function createSystemPackageManifest(input: {
     }),
   });
 }
+

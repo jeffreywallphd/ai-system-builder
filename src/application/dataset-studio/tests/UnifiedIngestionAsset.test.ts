@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { UnifiedIngestionReferenceKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { UnifiedIngestionReferenceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import {
   UnifiedIngestionAssetExecutionWrapper,
   UnifiedIngestionAssetId,
@@ -352,3 +352,4 @@ describe("UnifiedIngestionAssetExecutionWrapper", () => {
     expect(result.result.lineage.lineageId).toBe("batch-lineage-1");
   });
 });
+

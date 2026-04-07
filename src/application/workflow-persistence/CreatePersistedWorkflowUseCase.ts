@@ -1,13 +1,13 @@
-import type { WorkflowEntityMetadata, WorkflowLifecycleState } from "../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import type { WorkflowEntityMetadata, WorkflowLifecycleState } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createPersistedWorkflowRecord,
   type PersistedWorkflowRecord,
   type WorkflowPersistenceOwnershipContext,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
 import { WorkflowPersistenceConflictError, toWorkflowPersistenceFailureError } from "./WorkflowPersistenceErrors";
 import { assertWorkflowDraftValid, normalizeRequired } from "./WorkflowPersistenceValidation";
-import type { WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   resolveWorkflowWorkspaceScoping,
   type ProtectedResourceActorContext,
@@ -69,3 +69,4 @@ export class CreatePersistedWorkflowUseCase {
     }
   }
 }
+

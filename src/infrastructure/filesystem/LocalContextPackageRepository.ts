@@ -1,13 +1,13 @@
-import path from "node:path";
-import { ContextPackage } from "../../application/context/models/ContextPackage";
-import { ContextFragment } from "../../application/context/models/ContextFragment";
-import { ContextPackageReference } from "../../application/context/models/ContextPackageReference";
+﻿import path from "node:path";
+import { ContextPackage } from "@application/context/models/ContextPackage";
+import { ContextFragment } from "@application/context/models/ContextFragment";
+import { ContextPackageReference } from "@application/context/models/ContextPackageReference";
 import type {
   IContextPackageListCriteria,
   IContextPackageRepository,
   IContextPackageSummary,
-} from "../../application/ports/interfaces/IContextPackageRepository";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/interfaces/IContextPackageRepository";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 
 interface ContextPackageRecord {
   readonly id: string;
@@ -239,3 +239,4 @@ export class LocalContextPackageRepository implements IContextPackageRepository 
     });
   }
 }
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetPipelineStageKinds } from "../../../domain/dataset-studio/StagePipelineDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetPipelineStageKinds } from "@domain/dataset-studio/StagePipelineDomain";
 import { StageAssetMappingService } from "../StageAssetMappingService";
 import {
   listStageTransformationConfigDescriptors,
@@ -80,3 +80,4 @@ describe("Transformation config UX contracts", () => {
     expect(transformationStageDescriptors.every((entry) => entry.descriptor.contractVersion === "1.0.0")).toBeTrue();
   });
 });
+

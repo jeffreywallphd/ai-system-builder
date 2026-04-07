@@ -1,6 +1,6 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
-import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
+import type { ProjectedField } from "@application/projection/models/ProjectedField";
 import NodePropertyField from "../nodes/NodePropertyField";
 import type { NodePropertyFieldViewModel } from "../../presenters/NodePresenter";
 import { attachInstalledModelOptions, type InstalledModelOption } from "../../models/buildInstalledModelOptions";
@@ -69,3 +69,4 @@ export default function ProjectedFieldEditor({
     />
   );
 }
+

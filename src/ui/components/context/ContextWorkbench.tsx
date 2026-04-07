@@ -1,5 +1,5 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { ContextPreviewResult } from "../../../application/context/models/ContextPreview";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { ContextPreviewResult } from "@application/context/models/ContextPreview";
 import ContextBudgetPanel from "./ContextBudgetPanel";
 import ContextPreviewPanel from "./ContextPreviewPanel";
 import ContextProvenanceTable from "./ContextProvenanceTable";
@@ -159,10 +159,11 @@ export default function ContextWorkbench({
       />
 
       {error ? <div className="ui-banner ui-banner--danger">{error}</div> : null}
-      {isLoading ? <div className="ui-text-secondary">Refreshing preview…</div> : null}
+      {isLoading ? <div className="ui-text-secondary">Refreshing previewâ€¦</div> : null}
 
       <ContextPreviewPanel preview={preview} />
       <ContextProvenanceTable preview={preview} />
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IModelInstaller } from "../../ports/interfaces/IModelInstaller";
 import type { IInstalledModelCatalog } from "../../ports/interfaces/IInstalledModelCatalog";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeInstalledModelCatalog, makeModelInstaller } from "./testUtils";
 
 describe("application/models interface contracts", () => {
@@ -13,3 +13,4 @@ describe("application/models interface contracts", () => {
     expect(await catalog.listInstalled()).toEqual([]);
   });
 });
+

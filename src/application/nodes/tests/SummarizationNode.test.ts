@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { LangChainNodeImplementationRegistry } from "../../../infrastructure/nodes/langchain/LangChainNodeImplementationRegistry";
-import { LangChainNodeExecutor } from "../../../infrastructure/interpreted/execution/LangChainNodeExecutor";
+﻿import { describe, expect, it } from "bun:test";
+import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { LangChainNodeImplementationRegistry } from "@infrastructure/nodes/langchain/LangChainNodeImplementationRegistry";
+import { LangChainNodeExecutor } from "@infrastructure/interpreted/execution/LangChainNodeExecutor";
 
 function createProvider() {
   return new ImplementationRegistryNodeCatalogProvider(new LangChainNodeImplementationRegistry());
@@ -33,3 +33,4 @@ describe("SummarizationNode", () => {
     expect(result.outputs.summary).toBe("[summary-model] Refined summary: Alpha Beta Gamma");
   });
 });
+

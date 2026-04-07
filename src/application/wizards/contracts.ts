@@ -1,4 +1,4 @@
-import type { WorkflowStageStatus } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+﻿import type { WorkflowStageStatus } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 export interface LinearWizardStep<StepId extends string = string> {
   readonly id: StepId;
@@ -61,3 +61,4 @@ export function buildLinearWizardDefinition<StepId extends string>(params: {
     canGoNext: typeof nextStepId === "string",
   });
 }
+

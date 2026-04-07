@@ -1,6 +1,6 @@
-import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
+﻿import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
-import type { AssetTransformation } from "../../domain/assets/AssetTransformation";
+import type { AssetTransformation } from "@domain/assets/AssetTransformation";
 
 interface AssetTransformationHistoryRepository extends IAssetTransformationRepository {
   listTransformationsByAssetId?(assetId: string): Promise<ReadonlyArray<AssetTransformation>>;
@@ -67,3 +67,4 @@ export class GetAssetTransformationHistoryUseCase {
     return Object.freeze([...byId.values()]);
   }
 }
+

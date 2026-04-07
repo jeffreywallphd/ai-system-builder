@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ApproveNodeEnrollmentUseCase,
   GetNodeInventoryDetailUseCase,
   GetNodeEnrollmentDetailUseCase,
@@ -12,12 +12,12 @@ import type {
   ResolveNodeMutualTlsTransportIdentityUseCase,
   RevokeNodeTrustUseCase,
   ReviewPendingNodeEnrollmentUseCase,
-} from "../../../application/nodes/use-cases";
+} from "@application/nodes/use-cases";
 import type {
   NodeInventoryDetailReadModel,
   NodeInventorySummaryReadModel,
-} from "../../../application/nodes/use-cases/NodeInventoryReadModels";
-import { NodeTrustUseCaseErrorCodes } from "../../../application/nodes/use-cases/NodeTrustUseCaseShared";
+} from "@application/nodes/use-cases/NodeInventoryReadModels";
+import { NodeTrustUseCaseErrorCodes } from "@application/nodes/use-cases/NodeTrustUseCaseShared";
 import {
   toNodeInventoryDetailDto,
   toNodeInventorySummaryDto,
@@ -28,11 +28,11 @@ import {
   type NodeInternalInventorySummaryDto,
   type NodeInternalDetailDto,
   type NodeInternalEnrollmentDetailDto,
-} from "../../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@shared/contracts/nodes/NodeTrustApiContracts";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   type ApproveNodeEnrollmentApiRequest,
   type ApproveNodeEnrollmentApiResponse,
@@ -652,3 +652,4 @@ export class NodeTrustBackendApi {
     }
   }
 }
+

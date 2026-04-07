@@ -1,4 +1,4 @@
-import { createUiTriggerEvent, type UiTriggerEvent } from "../../../../application/workflow-studio/UiTriggerEventContract";
+﻿import { createUiTriggerEvent, type UiTriggerEvent } from "@application/workflow-studio/UiTriggerEventContract";
 import type { ImageUiEvent } from "./ImageUiContracts";
 
 function mapImageContextToUiReferences(event: ImageUiEvent): UiTriggerEvent["context"] {
@@ -92,3 +92,4 @@ export function mapImageUiEventToUiTriggerEvent(imageEvent: ImageUiEvent): UiTri
 
   return undefined;
 }
+

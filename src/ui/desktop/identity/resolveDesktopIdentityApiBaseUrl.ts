@@ -1,8 +1,8 @@
-import {
+﻿import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
-} from "../../../infrastructure/config/HostSecureTransportConfig";
+} from "@infrastructure/config/HostSecureTransportConfig";
 
 export function resolveDesktopIdentityApiBaseUrl(): string | undefined {
   if (typeof window === "undefined") {
@@ -19,3 +19,4 @@ export function resolveDesktopIdentityApiBaseUrl(): string | undefined {
     hostAddress: "127.0.0.1",
   }));
 }
+

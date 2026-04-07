@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { InstallModelUseCase } from "../InstallModelUseCase";
 import { ListInstalledModelsUseCase } from "../ListInstalledModelsUseCase";
 import { RemoveModelUseCase } from "../RemoveModelUseCase";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeInstalledModelCatalog, makeModelInstaller } from "./testUtils";
 
 describe("application/models interactions", () => {
@@ -25,3 +25,4 @@ describe("application/models interactions", () => {
     expect(removed.removed).toBeTrue();
   });
 });
+

@@ -1,4 +1,4 @@
-import type { ProtectedDataClass } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+﻿import type { ProtectedDataClass } from "@domain/security/EncryptionAtRestPolicyDomain";
 
 export const EncryptionEnforcementOutcomes = Object.freeze({
   succeeded: "succeeded",
@@ -135,3 +135,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

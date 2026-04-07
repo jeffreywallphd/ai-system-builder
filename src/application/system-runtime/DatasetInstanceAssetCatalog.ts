@@ -1,5 +1,5 @@
-import type { CanonicalDataShapeKind } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import type { CanonicalDataShapeKind } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { DataAssetRegistry } from "../dataset-studio/DataAssetRegistry";
 
 export interface DatasetInstanceAssetDefinition {
@@ -44,3 +44,4 @@ export class DataAssetRegistryDatasetInstanceAssetCatalog implements DatasetInst
     });
   }
 }
+

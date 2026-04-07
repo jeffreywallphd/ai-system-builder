@@ -1,4 +1,4 @@
-import type { AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentSessionDetailReadModel } from "@application/agents/contracts/AgentRunContracts";
 
 interface SessionOperationalSummaryProps {
   readonly session: AgentSessionDetailReadModel;
@@ -24,3 +24,4 @@ export function SessionOperationalSummary(props: SessionOperationalSummaryProps)
     </section>
   );
 }
+

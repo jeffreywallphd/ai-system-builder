@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import AuthorizationSharingManagementPage from "../AuthorizationSharingManagementPage";
 import type { AuthorizationManagementService } from "../../services/AuthorizationManagementService";
-import type { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 describe("AuthorizationSharingManagementPage", () => {
   it("renders sign-in guidance when there is no local session", () => {
@@ -53,3 +53,4 @@ describe("AuthorizationSharingManagementPage", () => {
     expect(html).toContain("/settings/sharing/thin?resourceFamily=asset&amp;resourceType=asset+type&amp;resourceId=asset%3A1&amp;workspaceId=workspace%3A1");
   });
 });
+

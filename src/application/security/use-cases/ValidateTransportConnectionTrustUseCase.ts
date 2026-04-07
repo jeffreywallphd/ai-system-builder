@@ -1,8 +1,8 @@
-import {
+﻿import {
   AuthenticatedTrustStates,
   TransportConnectionRejectionReasons,
   type TransportConnectionContext,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type {
   TransportTrustValidationFailureReason,
   TransportTrustValidationPorts,
@@ -352,4 +352,5 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+
 

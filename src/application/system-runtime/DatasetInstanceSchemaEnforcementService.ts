@@ -1,12 +1,12 @@
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createMediaValidationResult,
   type IMediaDatasetValidator,
   type IMediaRecordValidator,
   type MediaValidationResult,
-} from "../../domain/dataset-studio/interfaces/MediaValidation";
-import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
 import type {
   DatasetInstanceAssetCatalog,
   DatasetInstanceAssetDefinition,
@@ -131,3 +131,4 @@ export class DatasetInstanceSchemaEnforcementService {
     return asset;
   }
 }
+

@@ -1,6 +1,6 @@
-import type { ManagedServiceDefinition } from "../../application/services/ManagedServiceDefinition";
-import type { IManagedServiceDefinitionRepository } from "../../application/services/interfaces/IManagedServiceDefinitionRepository";
-import type { IManagedServiceSupervisorClient } from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+﻿import type { ManagedServiceDefinition } from "@application/services/ManagedServiceDefinition";
+import type { IManagedServiceDefinitionRepository } from "@application/services/interfaces/IManagedServiceDefinitionRepository";
+import type { IManagedServiceSupervisorClient } from "@application/services/interfaces/IManagedServiceSupervisorClient";
 
 export class HttpManagedServiceDefinitionRepository implements IManagedServiceDefinitionRepository {
   public constructor(
@@ -21,3 +21,4 @@ export class HttpManagedServiceDefinitionRepository implements IManagedServiceDe
     await this.client.deleteDefinition(serviceId);
   }
 }
+

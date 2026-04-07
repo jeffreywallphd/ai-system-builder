@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { DataStudioPreparationTemplateRegistry } from "../DataStudioPreparationTemplates";
 
 describe("DataStudioPreparationTemplateRegistry", () => {
@@ -37,3 +37,4 @@ describe("DataStudioPreparationTemplateRegistry", () => {
     ).toBeUndefined();
   });
 });
+

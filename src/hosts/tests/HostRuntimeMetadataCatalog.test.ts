@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { HostCapabilityFlags, HostRuntimeKinds } from "../../domain/hosts/HostRuntimeDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { HostCapabilityFlags, HostRuntimeKinds } from "@domain/hosts/HostRuntimeDomain";
 import {
   advertiseHostRuntimeMetadata,
   listHostRuntimeMetadataCatalog,
@@ -46,3 +46,4 @@ describe("HostRuntimeMetadataCatalog", () => {
     ]);
   });
 });
+

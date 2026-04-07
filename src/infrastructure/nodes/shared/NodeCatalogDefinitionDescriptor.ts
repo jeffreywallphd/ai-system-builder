@@ -1,10 +1,10 @@
-import { NodeDefinition, NodeDefinitionCapabilityProfile } from "../../../../domain/nodes/NodeDefinition";
+﻿import { NodeDefinition, NodeDefinitionCapabilityProfile } from "@domain/nodes/NodeDefinition";
 import type {
   INodeDefinition,
   NodeExecutionKind,
-} from "../../../../domain/nodes/interfaces/INodeDefinition";
-import type { INodePort } from "../../../../domain/nodes/interfaces/INodePort";
-import type { INodeProperty } from "../../../../domain/nodes/interfaces/INodeProperty";
+} from "@domain/nodes/interfaces/INodeDefinition";
+import type { INodePort } from "@domain/nodes/interfaces/INodePort";
+import type { INodeProperty } from "@domain/nodes/interfaces/INodeProperty";
 
 export interface INodeCatalogProjectionMetadata {
   readonly group?: string;
@@ -111,3 +111,4 @@ export function toCategoryLabel(providerId: string): string {
     .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
     .join(" ");
 }
+

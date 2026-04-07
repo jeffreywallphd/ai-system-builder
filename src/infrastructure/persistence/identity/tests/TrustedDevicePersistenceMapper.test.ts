@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { DevicePairingMethods, DeviceTrustStatuses } from "../../../../domain/identity/TrustedDeviceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DevicePairingMethods, DeviceTrustStatuses } from "@domain/identity/TrustedDeviceDomain";
 import {
   PairingSessionStatuses,
   PairingTokenArtifactTypes,
   PairingTokenStatuses,
-} from "../../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import {
   mapPairingSessionRowToRecord,
   mapPairingTokenRowToRecord,
@@ -114,3 +114,4 @@ describe("TrustedDevicePersistenceMapper", () => {
     expect(mappedToken.actorBinding.scope).toBe("same-user");
   });
 });
+

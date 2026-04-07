@@ -1,7 +1,7 @@
-import type { ExecutionStatus, ExecutionUnitKind } from "../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+﻿import type { ExecutionStatus, ExecutionUnitKind } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunProvenance } from "../../domain/execution/ExecutionRun";
+import type { IExecutionRunProvenance } from "@domain/execution/ExecutionRun";
 
 export interface IListExecutionRunsQuery {
   readonly planId?: string;
@@ -38,3 +38,4 @@ export class ListExecutionRunsUseCase {
     });
   }
 }
+

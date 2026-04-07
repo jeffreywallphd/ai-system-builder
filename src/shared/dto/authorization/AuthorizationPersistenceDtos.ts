@@ -1,14 +1,14 @@
-import type {
+﻿import type {
   ResourceOwnershipScope,
   ResourceVisibility,
   RoleAssignmentScope,
   RoleAssignmentStatus,
   SharingPolicyMode,
   SharingSubject,
-} from "../../../domain/authorization/AuthorizationDomain";
-import type { AuthorizationRoleKey } from "../../../domain/authorization/AuthorizationDomain";
-import type { PermissionKey } from "../../../domain/authorization/AuthorizationDomain";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import type { AuthorizationRoleKey } from "@domain/authorization/AuthorizationDomain";
+import type { PermissionKey } from "@domain/authorization/AuthorizationDomain";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export interface AuthorizationPersistenceAuditStamp {
@@ -198,3 +198,4 @@ export function normalizeAuthorizationMutationOperationKey(operationKey: string)
     throw new Error("Authorization persistence mutation operationKey is required.");
   }
 }
+

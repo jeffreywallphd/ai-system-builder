@@ -1,4 +1,4 @@
-import type { OutputGalleryItem, OutputGalleryListing } from "../../../../application/system-runtime/OutputGalleryDataContract";
+﻿import type { OutputGalleryItem, OutputGalleryListing } from "@application/system-runtime/OutputGalleryDataContract";
 import type { ImageInterfaceState } from "./ImageSystemStateIntegration";
 import type { ImageUiViewModel } from "./ImageUiContracts";
 
@@ -6,7 +6,7 @@ export function mapOutputGalleryItemToImageViewModel(item: OutputGalleryItem): I
   return Object.freeze({
     imageId: item.image.recordId,
     title: item.workflow
-      ? `${item.workflow.workflowAssetId} · ${item.workflow.workflowRunId}`
+      ? `${item.workflow.workflowAssetId} Â· ${item.workflow.workflowRunId}`
       : item.image.recordId,
     subtitle: item.workflow?.generationRole,
     sourceUrl: item.image.imageReference,
@@ -59,3 +59,4 @@ export function mapOutputGalleryListingToImageInterfaceState(listing: OutputGall
     }),
   });
 }
+

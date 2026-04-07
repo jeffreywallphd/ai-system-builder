@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AssetId } from "../../../../domain/assets/AssetId";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetId } from "@domain/assets/AssetId";
 import { createAgentWorkingMemory, updateAgentWorkingMemory } from "../AgentWorkingMemory";
 
 describe("AgentWorkingMemory", () => {
@@ -50,3 +50,4 @@ describe("AgentWorkingMemory", () => {
     expect(updated.executionOutputs).toHaveLength(2);
   });
 });
+

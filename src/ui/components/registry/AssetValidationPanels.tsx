@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+﻿import type { ReactNode } from "react";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 
 function DetailPanel({
   title,
@@ -37,7 +37,7 @@ export function AssetValidationSummary({ asset }: { readonly asset: RegistryAsse
       <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
         <span className="ui-badge">{toStatusLabel(validation?.status)}</span>
         <span className="ui-text-small ui-text-secondary">
-          {validation?.errorCount ?? 0} error(s) · {validation?.warningCount ?? 0} warning(s)
+          {validation?.errorCount ?? 0} error(s) Â· {validation?.warningCount ?? 0} warning(s)
         </span>
       </div>
       <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
@@ -47,7 +47,7 @@ export function AssetValidationSummary({ asset }: { readonly asset: RegistryAsse
       </p>
       {(validation?.issues ?? []).slice(0, 3).map((issue) => (
         <p key={`${issue.code}:${issue.path ?? ""}`} className="ui-text-small" style={{ margin: 0 }}>
-          <strong>{issue.severity.toUpperCase()}</strong> · {issue.message}
+          <strong>{issue.severity.toUpperCase()}</strong> Â· {issue.message}
         </p>
       ))}
     </DetailPanel>
@@ -80,3 +80,4 @@ export function DependencyCompatibilityPanel({ asset }: { readonly asset: Regist
     </DetailPanel>
   );
 }
+

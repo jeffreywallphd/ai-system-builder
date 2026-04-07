@@ -1,9 +1,9 @@
-import type { DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+﻿import type { DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyUnavailableError,
   type IRuntimeDependencyOrchestrator,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { createRuntimeDependencyDetail } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export class OrchestratedDatasetGenerationService implements DatasetGenerationService {
@@ -24,3 +24,4 @@ export class OrchestratedDatasetGenerationService implements DatasetGenerationSe
     return this.delegate.generate(request);
   }
 }
+

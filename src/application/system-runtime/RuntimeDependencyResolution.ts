@@ -1,10 +1,10 @@
-import {
+﻿import {
   buildNestedSystemReferences,
   collectSystemDirectDependencies,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
+} from "@domain/system-studio/SystemAssetDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
 
 export interface ResolvedRuntimeDependency {
   readonly assetId: string;
@@ -178,3 +178,4 @@ export async function resolveSystemRuntimeDependencies(input: {
     }),
   });
 }
+

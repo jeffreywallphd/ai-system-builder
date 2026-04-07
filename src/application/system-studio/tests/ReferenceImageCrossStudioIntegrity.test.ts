@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 import { validateReferenceImageCrossStudioContext } from "../ReferenceImageCrossStudioIntegrity";
 
 describe("ReferenceImageCrossStudioIntegrity", () => {
@@ -53,3 +53,4 @@ describe("ReferenceImageCrossStudioIntegrity", () => {
     expect(result.warningIssues.map((issue) => issue.code)).toContain("output-target-missing");
   });
 });
+

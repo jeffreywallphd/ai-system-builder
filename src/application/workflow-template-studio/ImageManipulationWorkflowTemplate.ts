@@ -1,4 +1,4 @@
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import { createComfyImageManipulationDefaultConfig } from "../system-studio/ComfyImageManipulationPropertySchema";
 import {
   ComfyImageManipulationBaseGraphAssetId,
@@ -271,3 +271,4 @@ export const ImageManipulationWorkflowTemplate: WorkflowTemplateDefinition = Obj
     defaultFaceIdEnabled: String(defaultConfig.faceId.enabled),
   }),
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   PermissionEffects,
   PermissionGrantScopes,
@@ -12,7 +12,7 @@ import {
   createResourcePolicyContext,
   createRoleAssignment,
   createSharingGrant,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import { EffectivePermissionResolutionService } from "../use-cases/EffectivePermissionResolutionService";
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
@@ -361,3 +361,4 @@ describe("EffectivePermissionResolutionService", () => {
     ]);
   });
 });
+

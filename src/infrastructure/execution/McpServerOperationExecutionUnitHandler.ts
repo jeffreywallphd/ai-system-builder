@@ -1,16 +1,16 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
-import type { IExecutionEngineEvent } from "../../application/execution/ExecutionContracts";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IMcpServerManager } from "@application/ports/interfaces/IMcpServerManager";
+import type { IExecutionEngineEvent } from "@application/execution/ExecutionContracts";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
-} from "../../application/execution/UnifiedExecutionEngine";
+} from "@application/execution/UnifiedExecutionEngine";
 import type {
   McpServerOperationAction,
   McpServerOperationExecutionInput,
   McpServerOperationExecutionResult,
-} from "../../application/execution/McpServerOperationExecutionPlanFactory";
+} from "@application/execution/McpServerOperationExecutionPlanFactory";
 import {
   createMcpServerOperationExecutionArtifact,
   freezeMcpServerOperationResult,
@@ -19,7 +19,7 @@ import {
   toMcpServerOperationExecutionProvenance,
   toMcpServerOperationOutputMetadata,
   toMcpServerOperationOutputSummary,
-} from "../../application/execution/McpServerOperationExecutionAdapter";
+} from "@application/execution/McpServerOperationExecutionAdapter";
 
 function toExecutionStatus(
   action: McpServerOperationAction,
@@ -138,3 +138,4 @@ function describeOutcomeMismatch(
 
   return undefined;
 }
+

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { McpNodeImplementationRegistry } from "../../../infrastructure/nodes/mcp/McpNodeImplementationRegistry";
+﻿import { describe, expect, it } from "bun:test";
+import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { McpNodeImplementationRegistry } from "@infrastructure/nodes/mcp/McpNodeImplementationRegistry";
 import {
   McpToolCallNodeConfigurationService,
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
@@ -146,3 +146,4 @@ describe("McpToolCallNodeConfigurationService", () => {
     });
   });
 });
+

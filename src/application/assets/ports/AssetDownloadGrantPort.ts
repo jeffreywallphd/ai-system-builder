@@ -1,4 +1,4 @@
-import type { AssetStorageArea } from "../../../domain/assets/AssetDomain";
+﻿import type { AssetStorageArea } from "@domain/assets/AssetDomain";
 import type { AssetDownloadPurpose } from "../use-cases/AssetServiceContracts";
 
 export interface IssueAssetDownloadGrantRequest {
@@ -52,4 +52,5 @@ export interface IAssetDownloadGrantPort {
   issueDownloadGrant(request: IssueAssetDownloadGrantRequest): Promise<IssueAssetDownloadGrantResult>;
   resolveDownloadGrant(request: ResolveAssetDownloadGrantRequest): Promise<AssetDownloadGrantClaims | undefined>;
 }
+
 

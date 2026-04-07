@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SecretScopes } from "../../../domain/security/SecretDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretScopes } from "@domain/security/SecretDomain";
 import {
   SecretServiceErrorCodes,
   type RetrieveSecretPlaintextRequest,
@@ -203,3 +203,4 @@ describe("SecretRuntimeConsumptionAdapters", () => {
     expect(runtimeUseCase.calls).toHaveLength(1);
   });
 });
+

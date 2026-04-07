@@ -1,5 +1,5 @@
-import path from "node:path";
-import { FileStorageEntryInfo, FileStorageReadResult } from "../../../application/ports/FileStorage";
+﻿import path from "node:path";
+import { FileStorageEntryInfo, FileStorageReadResult } from "@application/ports/FileStorage";
 import type {
   IFileStorage,
   IFileStorageCopyRequest,
@@ -8,7 +8,7 @@ import type {
   IFileStorageMoveRequest,
   IFileStorageReadResult,
   IFileStorageWriteRequest,
-} from "../../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/interfaces/IFileStorage";
 import type { DesktopModelFileBridge } from "../../../electron/shared/DesktopContracts";
 
 export class DesktopBridgeFileStorage implements IFileStorage {
@@ -115,3 +115,4 @@ export class DesktopBridgeFileStorage implements IFileStorage {
     });
   }
 }
+

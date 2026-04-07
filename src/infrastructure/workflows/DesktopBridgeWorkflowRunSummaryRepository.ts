@@ -1,15 +1,15 @@
-import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
+﻿import type { IWorkflowRunSummaryRepository } from "@application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
   WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
   normalizeWorkflowRunSummaryRecord,
   normalizeWorkflowRunDetailRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type { DesktopWorkflowRunSummaryBridge } from "../../electron/shared/DesktopContracts";
 
 export class DesktopBridgeWorkflowRunSummaryRepository implements IWorkflowRunSummaryRepository {
@@ -66,3 +66,4 @@ export class DesktopBridgeWorkflowRunSummaryRepository implements IWorkflowRunSu
     });
   }
 }
+

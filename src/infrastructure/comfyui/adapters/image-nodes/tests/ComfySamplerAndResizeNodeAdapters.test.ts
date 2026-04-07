@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   ICommonImageNodeInternalImage,
   ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
   ICommonImageNodePromptConditioning,
-} from "../../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import { ComfySamplerWrapperNodeAdapter } from "../ComfySamplerWrapperNodeAdapter";
 import { ComfyResizeUpscaleNodeAdapter } from "../ComfyResizeUpscaleNodeAdapter";
 
@@ -159,3 +159,4 @@ describe("Comfy sampler wrapper and resize/upscale node adapters", () => {
     expect(Object.keys(module).some((key) => key.toLowerCase().includes("comfy"))).toBe(false);
   });
 });
+

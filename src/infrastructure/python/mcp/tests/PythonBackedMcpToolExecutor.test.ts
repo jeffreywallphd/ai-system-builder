@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { PythonBackedMcpToolExecutor } from "../PythonBackedMcpToolExecutor";
 
 describe("PythonBackedMcpToolExecutor", () => {
@@ -67,3 +67,4 @@ describe("PythonBackedMcpToolExecutor", () => {
     expect(result.errorMessage).toContain("Sandbox denied");
   });
 });
+

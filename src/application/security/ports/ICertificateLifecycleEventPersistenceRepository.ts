@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AppendCertificateStatusHistoryPersistenceRecordInput,
   CertificateAuthorityPersistenceMutationResult,
   CertificateDistributionEventLookupQuery,
@@ -9,7 +9,7 @@ import type {
   CertificateStatusHistoryPersistenceRecord,
   SaveCertificateDistributionEventPersistenceRecordInput,
   SaveCertificateRevocationHistoryPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface ICertificateLifecycleEventPersistenceRepository {
   findLatestStatusEventBySerialNumber(
@@ -39,3 +39,4 @@ export interface ICertificateLifecycleEventPersistenceRepository {
     input: SaveCertificateDistributionEventPersistenceRecordInput,
   ): Promise<CertificateAuthorityPersistenceMutationResult<CertificateDistributionEventPersistenceRecord>>;
 }
+

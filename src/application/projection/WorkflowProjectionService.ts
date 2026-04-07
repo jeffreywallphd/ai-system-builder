@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { FormSchema } from "./models/FormSchema";
 import { WorkflowApplicationProjectionService } from "./WorkflowApplicationProjectionService";
 
@@ -24,3 +24,4 @@ export class WorkflowProjectionService {
     return this.applicationProjectionService.applyInput(workflow, values);
   }
 }
+

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BuildEntryService, BuildIntents, type BuildIntent } from "../routes/BuildEntry";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
-import { SystemBuildTemplateCatalog } from "../../application/system-studio/SystemBuildTemplateCatalog";
+import { SystemBuildTemplateCatalog } from "@application/system-studio/SystemBuildTemplateCatalog";
 
 export interface BuildTemplateCard {
   readonly id: string;
@@ -215,3 +215,4 @@ export default function BuildPage(): JSX.Element {
     </section>
   );
 }
+

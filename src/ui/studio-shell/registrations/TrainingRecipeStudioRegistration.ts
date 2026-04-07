@@ -1,7 +1,7 @@
-import {
+﻿import {
   createTrainingRecipeStudioTaxonomy,
   TrainingRecipeStudioIdentity,
-} from "../../../domain/training-recipe-studio/TrainingRecipeStudioDomain";
+} from "@domain/training-recipe-studio/TrainingRecipeStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -70,3 +70,4 @@ export const trainingRecipeStudioRegistration: CompositeStudioRegistration = Obj
     },
   ]),
 });
+

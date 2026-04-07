@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import ModelBrowser from "../components/models/ModelBrowser";
 import PageTabs from "../components/navigation/PageTabs";
 import type { ModelSearchBarValue } from "../components/models/ModelSearchBar";
 import { useUiDependencies } from "../composition/AppProviders";
-import { Model, ModelArtifact } from "../../domain/models/Model";
+import { Model, ModelArtifact } from "@domain/models/Model";
 import { ModelPresenter, type ModelDownloadFileViewModel } from "../presenters/ModelPresenter";
 import { formatBytes } from "../presenters/PresenterFormatting";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { IModelStoreState, ModelStore } from "../state/ModelStore";
 import type { UiSettingsState } from "../settings/UiSettingsStore";
-import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
-import type { ManagedModelLibraryItem } from "../../application/models/ManagedModelLibrary";
+import type { IRemoteModelCatalogItem } from "@application/ports/interfaces/IRemoteModelCatalog";
+import type { ManagedModelLibraryItem } from "@application/models/ManagedModelLibrary";
 import ModelTrainingStudio from "../components/models/ModelTrainingStudio";
 
 type ModelsTabId = "download" | "create";
@@ -82,7 +82,7 @@ export default function ModelsPage(): JSX.Element {
             <Link to={ROUTE_PATHS.settings}>Settings</Link> whenever you want AI Loom Studio to share a library with other tools.
           </p>
           <p className="ui-text-secondary ui-text-small">
-            Library mode: <strong>{state.managedLibrary?.mode ?? "unknown"}</strong> — {state.managedLibrary?.detail ?? "Model library state has not been inspected yet."}
+            Library mode: <strong>{state.managedLibrary?.mode ?? "unknown"}</strong> â€” {state.managedLibrary?.detail ?? "Model library state has not been inspected yet."}
           </p>
         </div>
       </div>
@@ -118,11 +118,11 @@ export default function ModelsPage(): JSX.Element {
           </div>
           <div className="ui-text-secondary ui-text-small">
             Source of truth: <strong>{state.managedLibrary?.sourceOfTruth ?? "unknown"}</strong>
-            {state.managedLibrary?.recordedAt ? ` · Checked ${state.managedLibrary.recordedAt.toLocaleString()}` : ""}
+            {state.managedLibrary?.recordedAt ? ` Â· Checked ${state.managedLibrary.recordedAt.toLocaleString()}` : ""}
           </div>
           <div className="ui-text-secondary ui-text-small">
             {state.managedLibrary?.items.length
-              ? state.managedLibrary.items.map((item) => `${item.name}: ${item.state}`).join(" · ")
+              ? state.managedLibrary.items.map((item) => `${item.name}: ${item.state}`).join(" Â· ")
               : "No managed model library entries have been detected yet."}
           </div>
         </div>
@@ -206,11 +206,11 @@ export default function ModelsPage(): JSX.Element {
                       </div>
                       <div className="ui-text-secondary">{item.detail}</div>
                       <div className="ui-text-secondary ui-text-small">
-                        Registration: <strong>{item.registered ? "catalog present" : "catalog missing"}</strong> · Verification: <strong>{item.verified ? "verified" : "not verified"}</strong> · Source: <strong>{item.sourceOfTruth}</strong>
+                        Registration: <strong>{item.registered ? "catalog present" : "catalog missing"}</strong> Â· Verification: <strong>{item.verified ? "verified" : "not verified"}</strong> Â· Source: <strong>{item.sourceOfTruth}</strong>
                       </div>
                       <div className="ui-text-secondary ui-text-small">
                         Artifacts: <strong>{item.presentArtifactCount ?? 0}</strong> present / <strong>{item.artifactCount ?? 0}</strong> recorded
-                        {item.missingArtifactCount ? ` · Missing ${item.missingArtifactCount}` : ""}
+                        {item.missingArtifactCount ? ` Â· Missing ${item.missingArtifactCount}` : ""}
                       </div>
                       {item.verificationErrors && item.verificationErrors.length > 0 ? (
                         <ul className="ui-text-secondary ui-text-small">
@@ -446,3 +446,4 @@ function createInstallationModel(
 function sanitizePathSegment(value: string): string {
   return value.replace(/[^a-z0-9._-]+/gi, "-");
 }
+

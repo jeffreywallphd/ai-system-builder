@@ -1,8 +1,8 @@
-import { useMemo, useState, type FormEvent } from "react";
+﻿import { useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
-import { validateRegisterForm } from "../shared/identity/IdentityAuthValidation";
+import { validateRegisterForm } from "@shared/identity/IdentityAuthValidation";
 
 export default function RegisterPage(): JSX.Element {
   const authService = useMemo(() => new IdentityAuthService(), []);
@@ -150,3 +150,4 @@ function renderApiError(
   const details = validationErrors.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
   return `${message || "Registration failed."} ${details}`;
 }
+

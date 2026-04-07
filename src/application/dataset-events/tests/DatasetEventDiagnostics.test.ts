@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetEventTypes } from "@domain/dataset-studio/contracts/DatasetEvent";
 import { createDatasetEventEnvelope, InMemoryDatasetEventPublisher } from "../DatasetEventPublisher";
 import { buildDatasetEventPreviewModel, InMemoryDatasetEventDiagnosticsStore } from "../DatasetEventDiagnostics";
 
@@ -85,3 +85,4 @@ describe("DatasetEventDiagnostics", () => {
     expect(diagnostics.list()[0]?.eventId).toBe("event-e2e");
   });
 });
+

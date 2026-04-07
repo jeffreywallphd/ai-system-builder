@@ -1,10 +1,10 @@
-import {
+﻿import {
   DeploymentLogLevels,
   type DeploymentLogEntry,
   type DeploymentDiagnosticRecord,
   type DeploymentLogLevel,
-} from "../../domain/deployment/DeploymentDiagnosticsDomain";
-import type { DeploymentStateTransition } from "../../domain/deployment/DeploymentStateDomain";
+} from "@domain/deployment/DeploymentDiagnosticsDomain";
+import type { DeploymentStateTransition } from "@domain/deployment/DeploymentStateDomain";
 
 export interface DeploymentDiagnosticsRepository {
   appendLog(entry: DeploymentLogEntry): DeploymentLogEntry;
@@ -152,3 +152,4 @@ export class DeploymentDiagnosticsService {
     return Math.min(normalized, MAX_QUERY_LIMIT);
   }
 }
+

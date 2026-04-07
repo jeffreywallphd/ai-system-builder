@@ -1,14 +1,14 @@
-import type { ListAuthorizationEffectiveAccessUseCase } from "../../../application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
-import type { GrantAuthorizationSharingAccessUseCase } from "../../../application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
-import type { RevokeAuthorizationSharingAccessUseCase } from "../../../application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
-import type { UpdateAuthorizationVisibilityUseCase } from "../../../application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
-import type { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import type { IAuthorizationSharingGrantPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
-import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
-import type { IAuthorizationRoleAssignmentPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository";
-import { AuthorizationPolicyEvaluationTargetKinds } from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import { AuthorizationAdministrationErrorCodes } from "../../../application/authorization/use-cases/AuthorizationAdministrationUseCaseShared";
+﻿import type { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
+import type { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import type { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
+import type { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import type { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import type { IAuthorizationSharingGrantPersistenceRepository } from "@application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
+import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
+import type { IAuthorizationRoleAssignmentPersistenceRepository } from "@application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository";
+import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationAdministrationErrorCodes } from "@application/authorization/use-cases/AuthorizationAdministrationUseCaseShared";
 import {
   AuthorizationManagementApiErrorCodes,
   type AuthorizationAccessStateApiRequest,
@@ -740,3 +740,4 @@ function normalizeRecentLimit(value: number | undefined): number {
 
   return Math.min(Math.max(value as number, 1), 100);
 }
+

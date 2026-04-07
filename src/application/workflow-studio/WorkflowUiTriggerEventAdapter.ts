@@ -1,4 +1,4 @@
-import { WorkflowDraftTriggerTypes, type WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { WorkflowDraftTriggerTypes, type WorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   matchesUiTriggerBindingEvent,
   type ImageWorkflowUiTriggerBindingConfiguration,
@@ -130,3 +130,4 @@ export function mapUiTriggerEventToWorkflowTriggerEntries(input: {
     issues: Object.freeze([]),
   });
 }
+

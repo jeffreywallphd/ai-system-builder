@@ -1,12 +1,12 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import {
   createDatasetAssetMetadata,
   createDatasetStudioTaxonomy,
   DatasetStudioIdentity,
-} from "../../domain/dataset-studio/DatasetStudioDomain";
+} from "@domain/dataset-studio/DatasetStudioDomain";
 import type { StudioShellApplicationService } from "../studio-shell/StudioShellApplicationService";
 import type {
   AssetDraftResult,
@@ -140,3 +140,4 @@ export class DatasetStudioApplicationService {
     });
   }
 }
+

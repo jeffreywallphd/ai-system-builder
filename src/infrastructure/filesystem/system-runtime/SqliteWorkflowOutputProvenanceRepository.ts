@@ -1,10 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   WorkflowOutputProvenanceQuery,
   WorkflowOutputProvenanceRecord,
   WorkflowOutputProvenanceRepository,
-} from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
+} from "@application/system-runtime/WorkflowOutputProvenanceRepository";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface Row { readonly record_json: string }
@@ -161,3 +161,4 @@ export class SqliteWorkflowOutputProvenanceRepository implements WorkflowOutputP
     `).run(overflow);
   }
 }
+

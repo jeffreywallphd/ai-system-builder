@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   CertificateAuthorityStatuses,
   CertificateRevocationReasons,
@@ -8,7 +8,7 @@ import {
   TrustMaterialKinds,
   createCertificateSubjectDescriptor,
   createCertificateValidityWindow,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateAuthorityIntrospectionDiagnosticSeverities,
   CertificateAuthorityIntrospectionStates,
@@ -635,3 +635,4 @@ export function parseRuntimeTrustMaterialPackageView(
     payload,
   );
 }
+

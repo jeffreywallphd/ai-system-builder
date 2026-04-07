@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetPreviewPort } from "../ports/AssetPreviewPort";
 import {
@@ -11,7 +11,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { AssetPreviewService } from "../use-cases/AssetPreviewService";
 import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
@@ -350,3 +350,4 @@ describe("AssetPreviewService", () => {
     expect(auditSink.events[0]?.outcome).toBe("success");
   });
 });
+

@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IAsset,
   AssetKind,
   AssetLifecycleStatus,
-} from "../../../domain/assets/interfaces/IAsset";
+} from "@domain/assets/interfaces/IAsset";
 
 export interface IAssetSearchCriteria {
   readonly query?: string;
@@ -46,3 +46,4 @@ export interface IAssetCatalog {
    */
   exists(id: string): Promise<boolean>;
 }
+

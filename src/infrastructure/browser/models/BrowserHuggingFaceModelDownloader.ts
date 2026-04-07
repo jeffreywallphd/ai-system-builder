@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   IModelDownloadHandle,
   IModelDownloadProgress,
   IModelDownloadRequest,
   IModelDownloadResult,
   IModelDownloader,
-} from "../../../application/ports/interfaces/IModelDownloader";
+} from "@application/ports/interfaces/IModelDownloader";
 import {
   ModelDownloadHandle,
   ModelDownloadProgress,
   ModelDownloadResult,
-} from "../../../application/ports/ModelDownloader";
+} from "@application/ports/ModelDownloader";
 import { HuggingFaceApiClient } from "../../huggingface/HuggingFaceApiClient";
 
 function normalize(value: string): string {
@@ -279,3 +279,4 @@ export class BrowserHuggingFaceModelDownloader implements IModelDownloader {
     }
   }
 }
+

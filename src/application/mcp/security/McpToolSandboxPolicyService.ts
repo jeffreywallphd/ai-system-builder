@@ -1,11 +1,11 @@
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+﻿import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import {
   createDefaultMcpToolSandboxEnforcementSummary,
   createDefaultMcpToolSandboxPolicy,
   deriveRequiredMcpToolPermissions,
   type McpToolSandboxCapabilityRequest,
   type McpToolExecutionSandboxDecision,
-} from "../../../domain/mcp/McpToolTrust";
+} from "@domain/mcp/McpToolTrust";
 
 export class McpToolSandboxPolicyService {
   public evaluate(
@@ -102,3 +102,4 @@ export class McpToolSandboxPolicyService {
     });
   }
 }
+

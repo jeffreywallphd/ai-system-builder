@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IWorkflow,
   IWorkflowMetadata,
   WorkflowStatus,
-} from "../../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/workflows/interfaces/IWorkflow";
 
 export interface IWorkflowRecordSummary {
   /**
@@ -64,3 +64,4 @@ export interface IWorkflowRepository {
    */
   list(): Promise<ReadonlyArray<IWorkflowRecordSummary>>;
 }
+

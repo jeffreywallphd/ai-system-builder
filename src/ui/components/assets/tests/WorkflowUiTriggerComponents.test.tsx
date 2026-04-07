@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createUiTriggerEvent,
   UiTriggerEventKinds,
-} from "../../../../application/workflow-studio/UiTriggerEventContract";
-import { WorkflowUiEventRuntimeDispatcher } from "../../../../application/workflow-studio/WorkflowUiEventRuntimeDispatcher";
+} from "@application/workflow-studio/UiTriggerEventContract";
+import { WorkflowUiEventRuntimeDispatcher } from "@application/workflow-studio/WorkflowUiEventRuntimeDispatcher";
 import {
   createWorkflowUiTriggerDispatchAdapter,
   createWorkflowUiTriggerEvent,
@@ -126,3 +126,4 @@ describe("WorkflowUiTriggerComponents", () => {
     expect(((context.metadata as Record<string, unknown>).systemFormValues as Record<string, unknown>).instruction).toBe("enhance image");
   });
 });
+

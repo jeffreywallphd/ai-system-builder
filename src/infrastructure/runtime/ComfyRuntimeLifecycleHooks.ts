@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+﻿import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -9,12 +9,12 @@ import {
   createComfyRuntimeLifecycleResult,
   type ComfyRuntimeLifecycleOperation,
   type ComfyRuntimeLifecycleResult,
-} from "../../application/runtime/ComfyRuntimeLifecycleContract";
+} from "@application/runtime/ComfyRuntimeLifecycleContract";
 import type {
   ComfyRuntimeOrchestrationContext,
   ComfyRuntimeOrchestrationPhaseHookResult,
   IComfyRuntimeStartStopValidationHook,
-} from "../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+} from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 
 interface RuntimeChildHandle {
   readonly pid?: number;
@@ -504,3 +504,4 @@ function stripArgPair(args: ReadonlyArray<string>, key: string): ReadonlyArray<s
   copy.splice(index, 2);
   return copy;
 }
+

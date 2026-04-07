@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   SecretKind,
   SecretRecordState,
   SecretReference,
   SecretReferenceMetadata,
   SecretScope,
   SecretScopeOwner,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type { SecretClassificationId } from "../../contracts/security/SecretClassificationContracts";
 import type { SecretRotationInstructionContract } from "../../contracts/security/SecretTransportContracts";
 
@@ -104,3 +104,4 @@ export function toSecretMetadataQueryDto(reference: SecretReference): SecretMeta
     updatedAt: reference.updatedAt,
   });
 }
+

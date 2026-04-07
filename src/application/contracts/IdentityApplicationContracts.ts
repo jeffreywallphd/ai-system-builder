@@ -1,5 +1,5 @@
-import type { IdentitySessionStatus } from "../../domain/identity/IdentityDomain";
-import type { UserIdentityStatus } from "../../domain/identity/IdentityDomain";
+﻿import type { IdentitySessionStatus } from "@domain/identity/IdentityDomain";
+import type { UserIdentityStatus } from "@domain/identity/IdentityDomain";
 import type {
   DeviceDisplayName,
   DeviceFingerprint,
@@ -7,7 +7,7 @@ import type {
   DeviceRevocationReason,
   DeviceTrustMaterialRef,
   DeviceTrustStatus,
-} from "../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import type {
   PairingPinnedTrustMaterialRegistration,
   PairingSessionRejectionReason,
@@ -17,7 +17,7 @@ import type {
   PairingTokenInvalidationReason,
   PairingTokenIssuanceMetadata,
   PairingTokenStatus,
-} from "../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 
 export const IdentityPrincipalLookupKinds = Object.freeze({
   username: "username",
@@ -419,3 +419,4 @@ export function identityFailure<TCode extends IdentityErrorCode>(
     error,
   });
 }
+

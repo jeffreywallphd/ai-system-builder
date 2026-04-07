@@ -1,12 +1,12 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   IStorageInstanceRepository,
   StorageInstanceListQuery,
   StorageInstanceMutationContext,
   StorageInstanceMutationResult,
-} from "../../../application/storage/ports/IStorageInstanceRepository";
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+} from "@application/storage/ports/IStorageInstanceRepository";
+import type { StorageInstance } from "@domain/storage/StorageDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapStorageInstanceRowToDomain,
@@ -370,3 +370,4 @@ export class SqliteStorageInstancePersistenceAdapter implements IStorageInstance
     return normalized;
   }
 }
+

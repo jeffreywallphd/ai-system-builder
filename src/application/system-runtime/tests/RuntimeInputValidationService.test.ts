@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createAssetContractDescriptor } from "../../../domain/contracts/AssetContract";
-import { createSystemStudioTaxonomy } from "../../../domain/system-studio/SystemAssetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createAssetContractDescriptor } from "@domain/contracts/AssetContract";
+import { createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
 import {
   RuntimeExecutionInterfaceKinds,
   type RuntimeExecutionContract,
@@ -122,3 +122,4 @@ describe("RuntimeInputValidationService", () => {
     expect(codes.has("unsupported-config-key")).toBeTrue();
   });
 });
+

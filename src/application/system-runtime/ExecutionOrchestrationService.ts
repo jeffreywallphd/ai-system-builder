@@ -1,4 +1,4 @@
-import {
+﻿import {
   appendExecutionTraceEvent,
   attachExecutionNode,
   decideRecoveryAction,
@@ -19,9 +19,9 @@ import {
   type ExecutionEnvironmentRef,
   type ExecutionOutputEnvelope,
   type SystemExecution,
-} from "../../domain/system-runtime/SystemRuntimeDomain";
-import type { SystemAsset } from "../../domain/system-studio/SystemAssetDomain";
-import { RuntimeEnvironmentKinds, type RuntimeEnvironment, type RuntimeEnvironmentKind } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+} from "@domain/system-runtime/SystemRuntimeDomain";
+import type { SystemAsset } from "@domain/system-studio/SystemAssetDomain";
+import { RuntimeEnvironmentKinds, type RuntimeEnvironment, type RuntimeEnvironmentKind } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 import { ExecutionPlanBuilder, type ExecutionPlan } from "./ExecutionPlanBuilder";
 import type { RuntimeBehaviorProfile } from "./RuntimeBehaviorAlignment";
 import type { RuntimeDependencyResolutionResult } from "./RuntimeDependencyResolution";
@@ -779,3 +779,4 @@ export class ExecutionOrchestrationService {
     return result.plan;
   }
 }
+

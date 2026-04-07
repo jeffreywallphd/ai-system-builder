@@ -1,19 +1,19 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createDefaultPipelineTemplates,
   toPipelineTemplateUiDescriptor,
   type PipelineTemplate,
   type PipelineTemplateUiDescriptor,
-} from "../../domain/dataset-studio/PipelineTemplateDomain";
+} from "@domain/dataset-studio/PipelineTemplateDomain";
 import {
   createInitialStageFlowRuntimeState,
   createStageFlowDefinition,
   reorderFlowStages,
   type StageFlowDefinition,
   type StageFlowRuntimeState,
-} from "../../domain/dataset-studio/StageFlowDefinition";
-import { DatasetPipelineStageExecutionModes } from "../../domain/dataset-studio/StagePipelineDomain";
-import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionSourceKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/StageFlowDefinition";
+import { DatasetPipelineStageExecutionModes } from "@domain/dataset-studio/StagePipelineDomain";
+import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionSourceKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 
 export interface PipelineTemplateInstantiationRequest {
@@ -159,3 +159,4 @@ export function createTemplateService(
 ): TemplateService {
   return new TemplateService(templates, mappingService);
 }
+

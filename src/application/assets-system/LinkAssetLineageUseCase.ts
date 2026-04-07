@@ -1,4 +1,4 @@
-import { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+﻿import { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetLineageGraphProjectionSink } from "../ports/interfaces/IAssetLineageGraphProjectionSink";
 
@@ -15,3 +15,4 @@ export class LinkAssetLineageUseCase {
     return edge;
   }
 }
+

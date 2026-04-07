@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses, createAssetSession, createStudio } from "../../../domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses, createAssetSession, createStudio } from "@domain/studio-shell/StudioShellDomain";
 import { DefaultStudioShellApplicationService } from "../DefaultStudioShellApplicationService";
 import {
   StudioShellConflictError,
@@ -450,3 +450,4 @@ describe("DefaultStudioShellApplicationService", () => {
     await expect(service.loadAssetDraft({ studioId: studio.id, draftId: "draft-d" })).rejects.toBeInstanceOf(StudioShellNotFoundError);
   });
 });
+

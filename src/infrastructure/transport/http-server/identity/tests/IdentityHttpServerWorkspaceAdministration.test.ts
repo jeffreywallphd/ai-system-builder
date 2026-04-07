@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -8,7 +8,7 @@ import type { Server } from "node:http";
 import { WorkspaceInvitationBackendApi } from "../../../../api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "../../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { SqliteWorkspacePersistenceAdapter } from "../../../../../infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -17,37 +17,37 @@ import {
   createWorkspace,
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
-} from "../../../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
   type WorkspaceInvitationIssuanceIdGenerator,
   type WorkspaceInvitationTokenIssuer,
   type WorkspaceInvitationTokenReference,
-} from "../../../../../application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
+} from "@application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
 import {
   ResolveWorkspaceInvitationLifecycleUseCase,
   type WorkspaceInvitationLifecycleClock,
   type WorkspaceInvitationLifecycleIdGenerator,
-} from "../../../../../application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+} from "@application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
 import {
   ResolveAuthenticatedWorkspaceOnboardingUseCase,
   type AuthenticatedWorkspaceOnboardingClock,
-} from "../../../../../application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
-import type { WorkspaceIdNamespace } from "../../../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceAdministrationQueryService } from "../../../../../application/workspaces/use-cases/WorkspaceAdministrationQueryService";
-import { CreateWorkspaceUseCase } from "../../../../../application/workspaces/use-cases/CreateWorkspaceUseCase";
-import { UpdateWorkspaceUseCase } from "../../../../../application/workspaces/use-cases/UpdateWorkspaceUseCase";
-import { TransitionWorkspaceLifecycleUseCase } from "../../../../../application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
-import { AddWorkspaceMemberUseCase } from "../../../../../application/workspaces/use-cases/AddWorkspaceMemberUseCase";
-import { ChangeWorkspaceMembershipStatusUseCase } from "../../../../../application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
-import { RemoveWorkspaceMemberUseCase } from "../../../../../application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
-import { AssignWorkspaceRoleUseCase } from "../../../../../application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
-import { ReassignWorkspaceRoleUseCase } from "../../../../../application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
-import { RevokeWorkspaceRoleUseCase } from "../../../../../application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
-import { WorkspaceAuthorizationPolicyReadAdapter } from "../../../../../infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
+} from "@application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceAdministrationQueryService } from "@application/workspaces/use-cases/WorkspaceAdministrationQueryService";
+import { CreateWorkspaceUseCase } from "@application/workspaces/use-cases/CreateWorkspaceUseCase";
+import { UpdateWorkspaceUseCase } from "@application/workspaces/use-cases/UpdateWorkspaceUseCase";
+import { TransitionWorkspaceLifecycleUseCase } from "@application/workspaces/use-cases/TransitionWorkspaceLifecycleUseCase";
+import { AddWorkspaceMemberUseCase } from "@application/workspaces/use-cases/AddWorkspaceMemberUseCase";
+import { ChangeWorkspaceMembershipStatusUseCase } from "@application/workspaces/use-cases/ChangeWorkspaceMembershipStatusUseCase";
+import { RemoveWorkspaceMemberUseCase } from "@application/workspaces/use-cases/RemoveWorkspaceMemberUseCase";
+import { AssignWorkspaceRoleUseCase } from "@application/workspaces/use-cases/AssignWorkspaceRoleUseCase";
+import { ReassignWorkspaceRoleUseCase } from "@application/workspaces/use-cases/ReassignWorkspaceRoleUseCase";
+import { RevokeWorkspaceRoleUseCase } from "@application/workspaces/use-cases/RevokeWorkspaceRoleUseCase";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 
 class FixedClock implements WorkspaceInvitationIssuanceClock, WorkspaceInvitationLifecycleClock, AuthenticatedWorkspaceOnboardingClock {
@@ -532,3 +532,4 @@ describe("IdentityHttpServer workspace administration routes", () => {
     expect(memberListBody.data.workspaces[0].actorAccess.capabilities.canManageRoles).toBe(false);
   });
 });
+

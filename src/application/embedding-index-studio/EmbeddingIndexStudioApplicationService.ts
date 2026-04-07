@@ -1,7 +1,7 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -15,7 +15,7 @@ import {
   createEmbeddingIndexAssetMetadata,
   createEmbeddingIndexStudioTaxonomy,
   EmbeddingIndexStudioIdentity,
-} from "../../domain/embedding-index-studio/EmbeddingIndexStudioDomain";
+} from "@domain/embedding-index-studio/EmbeddingIndexStudioDomain";
 
 export interface EnsureEmbeddingIndexStudioResult {
   readonly initialized: boolean;
@@ -140,3 +140,4 @@ export class EmbeddingIndexStudioApplicationService {
     });
   }
 }
+

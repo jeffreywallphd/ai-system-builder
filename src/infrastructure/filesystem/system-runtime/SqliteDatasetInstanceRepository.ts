@@ -1,22 +1,22 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { DatasetInstanceStorageAdapter } from "../../../application/system-runtime/DatasetInstanceStorageAdapter";
+import type { DatasetInstanceStorageAdapter } from "@application/system-runtime/DatasetInstanceStorageAdapter";
 import {
   createDatasetInstance,
   type DatasetInstance,
   type DatasetInstanceRole,
-} from "../../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-runtime/DatasetInstanceDomain";
 import {
   createDatasetInstanceImageRecord,
   matchesDatasetInstanceImageRecordQuery,
   normalizeDatasetInstanceImageRecordQuery,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
-} from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import type {
   QueryDatasetInstanceImageRecordPageBySystemIdRequest,
   QueryDatasetInstanceImageRecordPageResult,
-} from "../../../application/system-runtime/DatasetInstanceRepository";
+} from "@application/system-runtime/DatasetInstanceRepository";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface DatasetInstanceRow {
@@ -677,3 +677,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

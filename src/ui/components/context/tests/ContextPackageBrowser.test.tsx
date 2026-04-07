@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ContextPackageBrowser from "../ContextPackageBrowser";
-import { ContextPackage } from "../../../../application/context/models/ContextPackage";
+import { ContextPackage } from "@application/context/models/ContextPackage";
 
 describe("ContextPackageBrowser", () => {
   it("renders search controls, package cards, and the editor", () => {
@@ -38,3 +38,4 @@ describe("ContextPackageBrowser", () => {
     expect(html).toContain("Edit prompt pack");
   });
 });
+

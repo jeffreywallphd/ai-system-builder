@@ -1,6 +1,6 @@
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { createCanonicalImageMetadataRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
+﻿import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { createCanonicalImageMetadataRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import {
   DataAssetRuntimeAccessPatterns,
   DataAssetRuntimeInstanceOwnershipKinds,
@@ -9,7 +9,7 @@ import {
   DataAssetRuntimeUsabilityModes,
   DataAssetRuntimeWriteBehaviorKinds,
   type DataAssetBase,
-} from "../../domain/dataset-studio/DataAssetBase";
+} from "@domain/dataset-studio/DataAssetBase";
 import {
   DataAssetDiscoverabilityScopes,
   DataAssetRegistrySpecializations,
@@ -212,3 +212,4 @@ export function registerImageManipulationDatasetAssets(
 
   return Object.freeze([inputEntry, outputEntry, faceIdReferenceEntry]);
 }
+

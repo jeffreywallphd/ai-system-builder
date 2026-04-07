@@ -1,27 +1,27 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createIntentDefinition,
   type IntentDefinition,
-} from "../../domain/dataset-studio/IntentDomain";
+} from "@domain/dataset-studio/IntentDomain";
 import {
   DatasetIngestionStageAssetIds,
   DatasetPipelineStageExecutionModes,
   DatasetPipelineStageKinds,
   type DatasetPipelineStageDefinition,
   type DatasetPipelineStageKind,
-} from "../../domain/dataset-studio/StagePipelineDomain";
+} from "@domain/dataset-studio/StagePipelineDomain";
 import {
   createStageFlowDefinition,
   insertStageInFlow,
   removeStageFromFlow,
   reorderFlowStages,
   type StageFlowDefinition,
-} from "../../domain/dataset-studio/StageFlowDefinition";
+} from "@domain/dataset-studio/StageFlowDefinition";
 import {
   CanonicalDataShapeKinds,
   type CanonicalDataShapeKind,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { PipelineTemplate } from "../../domain/dataset-studio/PipelineTemplateDomain";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import type { PipelineTemplate } from "@domain/dataset-studio/PipelineTemplateDomain";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 import {
   TemplateService,
@@ -373,3 +373,4 @@ export function createIntentService(
 ): IntentService {
   return new IntentService(templateService, mappingService, intents);
 }
+

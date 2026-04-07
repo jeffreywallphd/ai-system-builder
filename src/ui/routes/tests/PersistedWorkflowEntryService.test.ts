@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { ExploreSearchResult } from "../../../application/asset-registry/ExploreAssetQueryService";
+﻿import { describe, expect, it } from "bun:test";
+import type { ExploreSearchResult } from "@application/asset-registry/ExploreAssetQueryService";
 import { PersistedWorkflowEntryService } from "../PersistedWorkflowEntryService";
 
 describe("PersistedWorkflowEntryService", () => {
@@ -170,3 +170,4 @@ describe("PersistedWorkflowEntryService", () => {
     expect(result.error).toBe("Failed to load persisted workflows.");
   });
 });
+

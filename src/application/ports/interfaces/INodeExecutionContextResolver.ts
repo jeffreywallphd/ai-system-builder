@@ -1,6 +1,6 @@
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { INode } from "@domain/nodes/interfaces/INode";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { INodeOutputStore } from "./INodeOutputStore";
 
 export interface INodeExecutionContext {
@@ -25,3 +25,4 @@ export interface INodeExecutionContextResolveInput {
 export interface INodeExecutionContextResolver {
   resolve(input: INodeExecutionContextResolveInput): INodeExecutionContext;
 }
+

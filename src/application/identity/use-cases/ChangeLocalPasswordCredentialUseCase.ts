@@ -1,4 +1,4 @@
-import {
+﻿import {
   CredentialStatuses,
   UserIdentityStatuses,
   createLocalCredentialState,
@@ -7,12 +7,12 @@ import {
   type CredentialPolicy,
   type UserIdentity,
   type UserIdentityProviderLink,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
@@ -23,15 +23,15 @@ import {
   type IdentityCredentialMaterialRecord,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
 import type { IIdentityCredentialResetVerifier } from "../ports/IIdentityCredentialResetVerifier";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityPersistenceRepository } from "@application/identity/ports/IIdentityPersistenceRepository";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
@@ -641,3 +641,4 @@ export class ChangeLocalPasswordCredentialUseCase {
     return identityFailure(error);
   }
 }
+

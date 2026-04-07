@@ -1,5 +1,5 @@
-import type { HostBootConfiguration } from "../../application/common/HostCompositionContracts";
-import type { HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
+﻿import type { HostBootConfiguration } from "@application/common/HostCompositionContracts";
+import type { HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
 
 export class HostBootstrapPipelineError extends Error {
   constructor(message: string) {
@@ -344,3 +344,4 @@ export async function executeHostBootstrapPipeline(input: {
     executedStageIds: Object.freeze(executedStageIds),
   });
 }
+

@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpStorageAdministrationClient,
   type StorageAdministrationClient,
-} from "../shared/storage/StorageAdministrationClient";
+} from "@shared/storage/StorageAdministrationClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class StorageAdministrationService {
@@ -46,3 +46,4 @@ function createDefaultStorageAdministrationClient(): StorageAdministrationClient
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpStorageAdministrationClient(baseUrl);
 }
+

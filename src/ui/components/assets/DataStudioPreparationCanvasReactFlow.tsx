@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import {
   Background,
   Controls,
@@ -8,7 +8,7 @@ import {
   type Node,
   type NodeMouseHandler,
 } from "@xyflow/react";
-import type { DataStudioCanvasProjection } from "../../../application/data-studio/DataStudioWizardCanvasProjectionService";
+import type { DataStudioCanvasProjection } from "@application/data-studio/DataStudioWizardCanvasProjectionService";
 
 export interface DataStudioPreparationCanvasReactFlowProps {
   readonly projection: DataStudioCanvasProjection;
@@ -92,3 +92,4 @@ export default function DataStudioPreparationCanvasReactFlow(
     </section>
   );
 }
+

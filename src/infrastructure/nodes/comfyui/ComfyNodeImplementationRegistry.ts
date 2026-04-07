@@ -1,7 +1,7 @@
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
-import { toNodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
+﻿import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import type { INodeRuntimeImplementation } from "@shared/INodeRuntimeImplementation";
+import { toNodeCatalogDefinitionDescriptor } from "@shared/NodeCatalogDefinitionDescriptor";
 
 function comfyImplementation(
   nodeTypeId: string,
@@ -61,3 +61,4 @@ export class ComfyNodeImplementationRegistry extends NodeImplementationRegistry 
     super({ providerId: "comfyui", implementations: COMFY_IMPLEMENTATIONS });
   }
 }
+

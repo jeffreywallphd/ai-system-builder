@@ -1,6 +1,6 @@
-import type { IWorkflowRepository, IWorkflowRecordSummary } from "../../../application/ports/interfaces/IWorkflowRepository";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { INodeCatalogProvider } from "../../../application/ports/interfaces/INodeCatalogProvider";
+﻿import type { IWorkflowRepository, IWorkflowRecordSummary } from "@application/ports/interfaces/IWorkflowRepository";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
 import { WorkflowPersistenceCodec, type WorkflowRecord } from "../../workflows/WorkflowPersistenceCodec";
 
 interface StorageLike {
@@ -78,3 +78,4 @@ export class BrowserStorageWorkflowRepository implements IWorkflowRepository {
 }
 
 export class SqliteBackedWorkflowRepository extends BrowserStorageWorkflowRepository {}
+

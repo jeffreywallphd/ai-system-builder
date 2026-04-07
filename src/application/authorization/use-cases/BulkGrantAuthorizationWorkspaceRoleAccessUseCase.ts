@@ -1,10 +1,10 @@
-import { ResourceOwnershipScopes, ResourceVisibilities } from "../../../domain/authorization/AuthorizationDomain";
+﻿import { ResourceOwnershipScopes, ResourceVisibilities } from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationSharingGrantPersistenceRecord,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { toAuthorizationResourceLookupKey } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { parseAuthorizationBulkWorkspaceRoleSharingGrantRequest } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { toAuthorizationResourceLookupKey } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { parseAuthorizationBulkWorkspaceRoleSharingGrantRequest } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService, type AuthorizationPolicyMutationServiceClock } from "./AuthorizationPolicyMutationService";
@@ -19,8 +19,8 @@ import {
   createAuthorizationMutationEnvelope,
   mapAuthorizationSchemaValidationError,
 } from "./AuthorizationAdministrationUseCaseShared";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationRoleKey } from "../../../domain/authorization/AuthorizationDomain";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationRoleKey } from "@domain/authorization/AuthorizationDomain";
 
 export interface BulkGrantAuthorizationWorkspaceRoleAccessUseCaseInput {
   readonly request: unknown;
@@ -293,3 +293,4 @@ function dedupeResourcesInOrder(
 
   return Object.freeze(deduped);
 }
+

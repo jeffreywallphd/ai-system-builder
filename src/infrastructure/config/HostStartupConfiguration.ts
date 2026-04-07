@@ -1,6 +1,6 @@
-import type { HostBootConfiguration } from "../../application/common/HostCompositionContracts";
-import { HostCapabilityFlags, type HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
-import { createHostDeploymentProfile, type HostDeploymentProfile } from "../../hosts/bootstrap/HostBootstrapPipeline";
+﻿import type { HostBootConfiguration } from "@application/common/HostCompositionContracts";
+import { HostCapabilityFlags, type HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
+import { createHostDeploymentProfile, type HostDeploymentProfile } from "@hosts/bootstrap/HostBootstrapPipeline";
 
 export class HostStartupConfigurationError extends Error {
   constructor(message: string) {
@@ -215,3 +215,4 @@ export function resolveHostStartupConfiguration(input: {
     enabledCapabilities,
   });
 }
+

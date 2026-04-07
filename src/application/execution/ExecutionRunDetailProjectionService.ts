@@ -1,4 +1,4 @@
-import { ExecutionStatuses, type ExecutionStatus } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionStatuses, type ExecutionStatus } from "@domain/execution/ExecutionPlan";
 import type {
   IExecutionRunArtifact,
   IExecutionRunDiagnostics,
@@ -7,7 +7,7 @@ import type {
   IExecutionRunSummary,
   IExecutionRunTransitionRecord,
   IExecutionUnitRunRecord,
-} from "../../domain/execution/ExecutionRun";
+} from "@domain/execution/ExecutionRun";
 import { ExecutionRunProjectionService, type ExecutionRunProjection } from "./ExecutionRunProjectionService";
 
 export interface ExecutionRunArtifactSummaryProjection {
@@ -162,7 +162,7 @@ export class ExecutionRunDetailProjectionService {
       message: transition.message,
       provenanceDetail: transition.provenance?.detail,
       diagnosticsSummary: transition.diagnostics?.length
-        ? transition.diagnostics.map((diagnostic) => `${diagnostic.severity}: ${diagnostic.message}`).join(" • ")
+        ? transition.diagnostics.map((diagnostic) => `${diagnostic.severity}: ${diagnostic.message}`).join(" â€¢ ")
         : undefined,
       occurredAt: transition.occurredAt,
     });
@@ -243,7 +243,7 @@ function summarizeArtifacts(artifacts: ReadonlyArray<IExecutionRunArtifact>): Ex
 
 function joinSummary(summary: IExecutionRunSummary | undefined): string | undefined {
   return summary
-    ? [summary.headline, summary.detail].filter(Boolean).join(" — ")
+    ? [summary.headline, summary.detail].filter(Boolean).join(" â€” ")
     : undefined;
 }
 
@@ -300,3 +300,4 @@ function toTitleCase(value: string): string {
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   createHash,
   createPrivateKey,
   createPublicKey,
@@ -13,11 +13,11 @@ import {
   TrustMaterialKinds,
   type CertificateSubjectDescriptor,
   type CertificateUsageKind,
-} from "../../../domain/security/CertificateAuthorityDomain";
-import type { ICertificateAuthorityRootMaterialStorage } from "../../../application/security/ports/ICertificateAuthorityRootMaterialStorage";
-import type { ICertificateAuthorityRootPersistenceRepository } from "../../../application/security/ports/ICertificateAuthorityRootPersistenceRepository";
-import type { ICertificateAuthorityIssuerPort, InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult, IssueCertificateMaterialInput, IssueCertificateMaterialResult, RevokeCertificateMaterialInput, RevokeCertificateMaterialResult } from "../../../application/security/ports/ICertificateAuthorityIssuerPort";
-import type { ITrustMaterialReferencePersistenceRepository } from "../../../application/security/ports/ITrustMaterialReferencePersistenceRepository";
+} from "@domain/security/CertificateAuthorityDomain";
+import type { ICertificateAuthorityRootMaterialStorage } from "@application/security/ports/ICertificateAuthorityRootMaterialStorage";
+import type { ICertificateAuthorityRootPersistenceRepository } from "@application/security/ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateAuthorityIssuerPort, InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult, IssueCertificateMaterialInput, IssueCertificateMaterialResult, RevokeCertificateMaterialInput, RevokeCertificateMaterialResult } from "@application/security/ports/ICertificateAuthorityIssuerPort";
+import type { ITrustMaterialReferencePersistenceRepository } from "@application/security/ports/ITrustMaterialReferencePersistenceRepository";
 
 const OIDS = Object.freeze({
   commonName: "2.5.4.3",
@@ -753,3 +753,4 @@ function encodeKeyUsageBitString(flags: ReadonlyArray<string>): Buffer {
 
   return derBitString(bytes);
 }
+

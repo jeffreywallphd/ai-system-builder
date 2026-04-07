@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   ComfyAdapterErrorCode,
   ComfyAdapterLifecycleStatus,
   IComfyAdapterError,
   IComfyAdapterExecutionContext,
   IComfyAdapterLifecycleEvent,
-} from "../../../application/execution/comfyui/ComfyAdapterContract";
+} from "@application/execution/comfyui/ComfyAdapterContract";
 
 export type ComfyExecutionFailureStage =
   | "connection"
@@ -188,3 +188,4 @@ function classifyFailure(normalizedMessage: string): ComfyFailureClass {
   }
   return "runtime-execution";
 }
+

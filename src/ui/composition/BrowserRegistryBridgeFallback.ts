@@ -1,16 +1,16 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 import type { DesktopRegistryBridge } from "../../electron/shared/DesktopContracts";
-import type { IAssetRecordRepository } from "../../application/ports/interfaces/IAssetRecordRepository";
-import type { IAssetVersionRepository } from "../../application/ports/interfaces/IAssetVersionRepository";
-import type { IAssetLineageRepository } from "../../application/ports/interfaces/IAssetLineageRepository";
-import { ListPersistedWorkflowsUseCase } from "../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
-import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
-import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
-import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
-import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
+import type { IAssetRecordRepository } from "@application/ports/interfaces/IAssetRecordRepository";
+import type { IAssetVersionRepository } from "@application/ports/interfaces/IAssetVersionRepository";
+import type { IAssetLineageRepository } from "@application/ports/interfaces/IAssetLineageRepository";
+import { ListPersistedWorkflowsUseCase } from "@application/workflow-persistence/ListPersistedWorkflowsUseCase";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
+import { CrossStudioRegistryQueryService } from "@application/asset-registry/CrossStudioRegistryQueryService";
+import { RegistryQueryService } from "@application/asset-registry/RegistryQueryService";
+import { RegistryDependencyGraphService } from "@application/asset-registry/RegistryDependencyGraphService";
+import { RegistryBackendApi } from "@infrastructure/api/registry/RegistryBackendApi";
 import { resolveBrowserWorkflowPersistenceRepository } from "./BrowserFallbackRepositories";
 
 class EmptyAssetRecordRepository implements IAssetRecordRepository {
@@ -89,3 +89,4 @@ export function resolveBrowserRegistryBridgeFallback(): DesktopRegistryBridge {
 
   return fallbackBridge;
 }
+

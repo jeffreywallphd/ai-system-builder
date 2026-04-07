@@ -1,5 +1,5 @@
-import type { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
-import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest } from "../../../domain/mcp/McpToolTrust";
+﻿import type { ExecutionContextEnvelope } from "../../context/models/ExecutionContextEnvelope";
+import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest } from "@domain/mcp/McpToolTrust";
 
 export interface McpToolExecutionRequest {
   readonly toolId?: string;
@@ -17,3 +17,4 @@ export interface McpToolExecutionRequest {
     readonly userId?: string;
   };
 }
+

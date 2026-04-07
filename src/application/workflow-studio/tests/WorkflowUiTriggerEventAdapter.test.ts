@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { createImageWorkflowUiTriggerBindingConfiguration } from "../../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import { UiTriggerEventKinds, createUiTriggerEvent } from "../UiTriggerEventContract";
 import { mapUiTriggerEventToWorkflowTriggerEntries } from "../WorkflowUiTriggerEventAdapter";
@@ -154,3 +154,4 @@ describe("WorkflowUiTriggerEventAdapter", () => {
     expect(mapped.issues[0]?.code).toBe("ui-trigger-invalid");
   });
 });
+

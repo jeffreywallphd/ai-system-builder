@@ -1,10 +1,10 @@
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import type { IExecutionProvenance } from "../execution/ExecutionContracts";
 import type {
   IExecutionPlanResult,
   IExecutionUnitExecutionResult,
 } from "../execution/UnifiedExecutionEngine";
-import type { PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
+import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
 import type { DataStudioPipelineState } from "./DataStudioPipelineState";
 
 export const DataStudioPipelineExecutionArtifacts = Object.freeze({
@@ -152,3 +152,4 @@ export function requireDataStudioPipelineExecutionResult(
 export function isDataStudioPipelineExecutionSuccessful(planResult: IExecutionPlanResult): boolean {
   return planResult.status === ExecutionStatuses.completed;
 }
+

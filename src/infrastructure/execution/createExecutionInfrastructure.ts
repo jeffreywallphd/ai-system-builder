@@ -1,19 +1,19 @@
-import { UnifiedExecutionEngine, type IExecutionUnitHandler } from "../../application/execution/UnifiedExecutionEngine";
-import { ExecutionRunDetailProjectionService } from "../../application/execution/ExecutionRunDetailProjectionService";
-import { ExecutionRunProjectionService } from "../../application/execution/ExecutionRunProjectionService";
-import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
-import { ListExecutionRunsUseCase } from "../../application/execution/ListExecutionRunsUseCase";
-import { ListRelatedExecutionRunsUseCase } from "../../application/execution/ListRelatedExecutionRunsUseCase";
-import type { IExecutionRunRepository } from "../../application/ports/interfaces/IExecutionRunRepository";
-import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
-import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
-import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import type { DatasetGenerationService } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import type { IModelTrainingRuntime } from "../../application/ports/interfaces/IModelTrainingRuntime";
+﻿import { UnifiedExecutionEngine, type IExecutionUnitHandler } from "@application/execution/UnifiedExecutionEngine";
+import { ExecutionRunDetailProjectionService } from "@application/execution/ExecutionRunDetailProjectionService";
+import { ExecutionRunProjectionService } from "@application/execution/ExecutionRunProjectionService";
+import { GetExecutionRunDetailUseCase } from "@application/execution/GetExecutionRunDetailUseCase";
+import { ListExecutionRunsUseCase } from "@application/execution/ListExecutionRunsUseCase";
+import { ListRelatedExecutionRunsUseCase } from "@application/execution/ListRelatedExecutionRunsUseCase";
+import type { IExecutionRunRepository } from "@application/ports/interfaces/IExecutionRunRepository";
+import type { IWorkflowRunSummaryRepository } from "@application/ports/interfaces/IWorkflowRunSummaryRepository";
+import type { IMcpServerManager } from "@application/ports/interfaces/IMcpServerManager";
+import type { IWorkflowExecutor } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { DatasetGenerationService } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { IModelTrainingRuntime } from "@application/ports/interfaces/IModelTrainingRuntime";
 import type { DesktopExecutionRunBridge, DesktopWorkflowRunSummaryBridge } from "../../electron/shared/DesktopContracts";
-import { LocalStorageExecutionRunRepository } from "../../infrastructure/browser/execution/LocalStorageExecutionRunRepository";
-import { DesktopBridgeExecutionRunRepository } from "../../infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
+import { LocalStorageExecutionRunRepository } from "@infrastructure/browser/execution/LocalStorageExecutionRunRepository";
+import { DesktopBridgeExecutionRunRepository } from "@infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
 import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../filesystem/execution/SqliteExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";
@@ -22,9 +22,9 @@ import { McpServerOperationExecutionUnitHandler } from "./McpServerOperationExec
 import { ModelPreparationExecutionUnitHandler } from "./ModelPreparationExecutionUnitHandler";
 import { ModelTrainingExecutionUnitHandler } from "./ModelTrainingExecutionUnitHandler";
 import { WorkflowExecutionUnitHandler } from "./WorkflowExecutionUnitHandler";
-import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
-import type { WorkflowRunHistoryService } from "../../application/workflow-run-history/WorkflowRunHistoryService";
-import type { WorkflowRuntimeOutputPersistenceService } from "../../application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
+import type { ExecutionAssetLineageRecorder } from "@application/assets-system/ExecutionAssetLineageRecorder";
+import type { WorkflowRunHistoryService } from "@application/workflow-run-history/WorkflowRunHistoryService";
+import type { WorkflowRuntimeOutputPersistenceService } from "@application/workflow-studio/WorkflowRuntimeOutputPersistenceService";
 import { DesktopBridgeWorkflowRunSummaryRepository } from "../workflows/DesktopBridgeWorkflowRunSummaryRepository";
 import { LocalStorageWorkflowRunSummaryRepository } from "../workflows/LocalStorageWorkflowRunSummaryRepository";
 import { InMemoryWorkflowRunSummaryRepository } from "../workflows/InMemoryWorkflowRunSummaryRepository";
@@ -186,3 +186,4 @@ export function createExecutionApplicationInfrastructure(
     getExecutionRunDetailUseCase: history.getExecutionRunDetailUseCase,
   });
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   CertificateAuthorityProtectedMaterialDescriptor,
   ICertificateAuthorityRootMaterialStorage,
   LoadCertificateAuthorityRootMaterialsInput,
   LoadedCertificateAuthorityProtectedMaterial,
   PersistCertificateAuthorityRootMaterialsInput,
-} from "../../../application/security/ports/ICertificateAuthorityRootMaterialStorage";
+} from "@application/security/ports/ICertificateAuthorityRootMaterialStorage";
 import {
   FileSystemProtectedSecretStore,
   INTERNAL_CA_PROTECTED_SECRET_REF_PREFIX,
@@ -130,3 +130,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

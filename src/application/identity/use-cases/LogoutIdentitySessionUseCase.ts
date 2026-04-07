@@ -1,9 +1,9 @@
-import { SessionRevocationReasons } from "../../../domain/identity/IdentityDomain";
+﻿import { SessionRevocationReasons } from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,
@@ -12,7 +12,7 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
 import { type IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
@@ -110,3 +110,4 @@ function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }
+

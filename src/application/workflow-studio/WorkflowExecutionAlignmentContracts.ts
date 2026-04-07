@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   WorkflowDraft,
   WorkflowDraftInput,
   WorkflowDraftInputSourceType,
@@ -9,7 +9,7 @@ import type {
   WorkflowDraftStepKind,
   WorkflowDraftStepType,
   WorkflowValidationIssue,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   buildWorkflowDatasetCompatibilityContract,
   type WorkflowDatasetCompatibilityContract,
@@ -396,3 +396,4 @@ export function mapWorkflowInputToExecutionBinding(input: WorkflowDraftInput): W
     metadata: input.metadata,
   });
 }
+

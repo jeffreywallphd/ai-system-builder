@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DeploymentExecutionService,
   InMemoryDeploymentRecordRepository,
@@ -11,7 +11,7 @@ import {
 } from "../DeploymentAuditTrailService";
 import { DeploymentAutoscalingService, InMemoryDeploymentScalingRepository } from "../DeploymentAutoscalingService";
 import { buildSampleBundle, createSampleConfiguration } from "./testUtils";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 
 const caller = Object.freeze({
   callerKind: "user",
@@ -208,3 +208,4 @@ describe("Deployment audit trail", () => {
     expect(query[0]?.metadata?.stage).toBe("request");
   });
 });
+

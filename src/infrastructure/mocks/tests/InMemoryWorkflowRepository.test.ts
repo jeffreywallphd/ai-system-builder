@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CreateWorkflowUseCase } from "../../../application/workflows/CreateWorkflowUseCase";
+﻿import { describe, expect, it } from "bun:test";
+import { CreateWorkflowUseCase } from "@application/workflows/CreateWorkflowUseCase";
 import { InMemoryWorkflowRepository } from "../repositories/InMemoryWorkflowRepository";
 
 describe("InMemoryWorkflowRepository", () => {
@@ -16,3 +16,4 @@ describe("InMemoryWorkflowRepository", () => {
     expect(await repository.load(workflow.id)).toBeUndefined();
   });
 });
+

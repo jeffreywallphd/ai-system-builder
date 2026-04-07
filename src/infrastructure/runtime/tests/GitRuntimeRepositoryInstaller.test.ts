@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { RuntimeRepositoryInstallerKinds } from "../../../application/runtime/RuntimeRepositoryInstallerContract";
+import { RuntimeRepositoryInstallerKinds } from "@application/runtime/RuntimeRepositoryInstallerContract";
 import {
   GitRuntimeRepositoryInstaller,
   type GitCommandRunner,
@@ -272,3 +272,4 @@ describe("GitRuntimeRepositoryInstaller", () => {
     expect(validation.issues.some((issue) => issue.code === "revision-mismatch")).toBeTrue();
   });
 });
+

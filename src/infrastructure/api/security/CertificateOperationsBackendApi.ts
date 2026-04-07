@@ -1,26 +1,26 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import {
   GetIssuedCertificateMetadataErrorCodes,
   type GetIssuedCertificateMetadataUseCase,
-} from "../../../application/security/use-cases/GetIssuedCertificateMetadataUseCase";
-import type { GetCertificateAuthorityStatusIntrospectionUseCase } from "../../../application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
+} from "@application/security/use-cases/GetIssuedCertificateMetadataUseCase";
+import type { GetCertificateAuthorityStatusIntrospectionUseCase } from "@application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
 import {
   ListIssuedCertificateMetadataErrorCodes,
   type ListIssuedCertificateMetadataUseCase,
-} from "../../../application/security/use-cases/ListIssuedCertificateMetadataUseCase";
+} from "@application/security/use-cases/ListIssuedCertificateMetadataUseCase";
 import {
   IssuedCertificateAlreadyRevokedError,
   RevokeIssuedCertificateInvalidRequestError,
   type RevokeIssuedCertificateUseCase,
-} from "../../../application/security/use-cases/RevokeIssuedCertificateUseCase";
+} from "@application/security/use-cases/RevokeIssuedCertificateUseCase";
 import {
   CertificateIssuancePolicyViolationError,
-} from "../../../application/security/use-cases/IssueCertificateForSubjectUseCase";
+} from "@application/security/use-cases/IssueCertificateForSubjectUseCase";
 import {
   IssuedCertificateRenewalNotAllowedError,
   RenewIssuedCertificateInvalidRequestError,
   type RenewIssuedCertificateUseCase,
-} from "../../../application/security/use-cases/RenewIssuedCertificateUseCase";
+} from "@application/security/use-cases/RenewIssuedCertificateUseCase";
 import {
   CertificateOperationsApiErrorCodes,
   type CertificateOperationsApiError,
@@ -476,3 +476,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
 }
+

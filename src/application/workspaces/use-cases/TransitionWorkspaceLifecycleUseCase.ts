@@ -1,4 +1,4 @@
-import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
+﻿import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import {
   WorkspaceDomainError,
@@ -9,7 +9,7 @@ import {
   transitionWorkspaceStatus,
   type Workspace,
   type WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -251,3 +251,4 @@ export class TransitionWorkspaceLifecycleUseCase {
     };
   }
 }
+

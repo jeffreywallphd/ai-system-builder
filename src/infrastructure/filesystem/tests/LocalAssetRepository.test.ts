@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { LocalAssetRepository } from "../LocalAssetRepository";
 
@@ -29,3 +29,4 @@ describe("LocalAssetRepository", () => {
     }
   });
 });
+

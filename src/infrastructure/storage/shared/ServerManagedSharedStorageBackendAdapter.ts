@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type {
@@ -6,21 +6,21 @@ import type {
   StorageBackendCapabilitySnapshot,
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
-} from "../../../application/storage/ports/StorageCapabilityInspectionPort";
-import { StorageBackendHealthStatuses } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
+} from "@application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "@application/storage/ports/StorageCapabilityInspectionPort";
 import type {
   IStorageProvisioningPort,
   StorageProvisioningReceipt,
   StorageProvisioningRequest,
-} from "../../../application/storage/ports/StorageProvisioningPort";
-import { StorageProvisioningOperationStatuses } from "../../../application/storage/ports/StorageProvisioningPort";
+} from "@application/storage/ports/StorageProvisioningPort";
+import { StorageProvisioningOperationStatuses } from "@application/storage/ports/StorageProvisioningPort";
 import {
   StorageAccessModes,
   StorageBackendTypes,
   StorageReplicationModes,
   type StorageInstance,
   type StorageReplicationMode,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export const SharedStorageProvisioningReasonCodes = Object.freeze({
   backendUnsupported: "shared-backend-unsupported",
@@ -692,3 +692,4 @@ export class ServerManagedSharedStorageBackendAdapter implements IStorageProvisi
     });
   }
 }
+

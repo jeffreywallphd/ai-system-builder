@@ -1,9 +1,9 @@
-import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
+﻿import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import { GetCanonicalLatestVersionUseCase, GetCanonicalProvenanceSummaryUseCase, LoadCanonicalAssetSummaryUseCase } from "./CanonicalAssetReadUseCases";
 import type { GetCanonicalDependencyStateUseCase, CanonicalDependencyStateSummary } from "./CanonicalDependencyStateUseCase";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 
 export interface CanonicalEntityReadResolution {
@@ -98,3 +98,4 @@ export class CanonicalEntityReadResolver {
     });
   }
 }
+

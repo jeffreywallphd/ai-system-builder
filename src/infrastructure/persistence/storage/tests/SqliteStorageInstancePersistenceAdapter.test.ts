@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -11,7 +11,7 @@ import {
   createStorageAttribution,
   createStorageInstance,
   transitionStorageLifecycle,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteStorageInstancePersistenceAdapter } from "../SqliteStorageInstancePersistenceAdapter";
 
@@ -261,3 +261,4 @@ describe("SqliteStorageInstancePersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

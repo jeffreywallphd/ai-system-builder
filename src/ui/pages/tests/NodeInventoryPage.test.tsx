@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import NodeInventoryPage from "../NodeInventoryPage";
-import type { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 describe("NodeInventoryPage", () => {
   it("renders sign-in guidance when there is no local session", () => {
@@ -46,3 +46,4 @@ describe("NodeInventoryPage", () => {
     expect(html).toContain("No nodes matched the current inventory filters.");
   });
 });
+

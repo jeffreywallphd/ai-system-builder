@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpNodeEnrollmentReviewClient,
   type NodeEnrollmentReviewClient,
-} from "../shared/nodes/NodeEnrollmentReviewClient";
+} from "@shared/nodes/NodeEnrollmentReviewClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class NodeEnrollmentReviewService {
@@ -34,3 +34,4 @@ function createDefaultNodeEnrollmentReviewClient(): NodeEnrollmentReviewClient {
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpNodeEnrollmentReviewClient(baseUrl);
 }
+

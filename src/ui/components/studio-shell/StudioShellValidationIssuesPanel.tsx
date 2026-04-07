@@ -1,4 +1,4 @@
-import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+﻿import type { StudioShellValidationIssue } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellPanel } from "./StudioShellPanel";
 
 export interface StudioShellValidationIssuesPanelProps {
@@ -30,3 +30,4 @@ export function StudioShellValidationIssuesPanel({ operationError, validationIss
     </StudioShellPanel>
   );
 }
+

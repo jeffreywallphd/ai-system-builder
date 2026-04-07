@@ -1,10 +1,10 @@
-import type { Session } from "../../../domain/identity/IdentityDomain";
+﻿import type { Session } from "@domain/identity/IdentityDomain";
 import type {
   IdentityPersistenceDeletionResult,
   IdentityPersistenceMutationContext,
   IdentityPersistenceMutationResult,
   IdentitySessionListQuery,
-} from "../../../shared/dto/identity/IdentityPersistenceDtos";
+} from "@shared/dto/identity/IdentityPersistenceDtos";
 
 export interface IIdentitySessionQueryRepository {
   getSessionById(sessionId: string): Promise<Session | undefined>;
@@ -24,3 +24,4 @@ export interface IIdentitySessionWriteRepository {
 
 export interface IIdentitySessionRepository
   extends IIdentitySessionQueryRepository, IIdentitySessionWriteRepository {}
+

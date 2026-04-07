@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createPublishablePackage } from "../../../domain/exchange/PublishablePackage";
+﻿import { describe, expect, it } from "bun:test";
+import { createPublishablePackage } from "@domain/exchange/PublishablePackage";
 import {
   InMemoryLocalExchangeCatalogEntryStore,
   LocalExchangeCatalog,
@@ -177,3 +177,4 @@ describe("LocalExchangeCatalog", () => {
     expect(filtered[0]?.packageId.value).toBe("package:secure:v1");
   });
 });
+

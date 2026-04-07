@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React, { type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
@@ -9,7 +9,7 @@ import {
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioModePanel from "../../../components/studio-shell/workflow/WorkflowStudioModePanel";
 import WorkflowStudioDraftAuthoringBoundary from "../../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { resolveWorkflowStudioModeRoute } from "../WorkflowStudioModeRouting";
@@ -905,4 +905,5 @@ describe("WorkflowStudioModeSystem integration seams", () => {
     expect(markup).toContain("Prepare for Run");
   });
 });
+
 

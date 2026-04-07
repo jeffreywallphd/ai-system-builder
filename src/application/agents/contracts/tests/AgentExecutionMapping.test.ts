@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AssetId } from "../../../../domain/assets/AssetId";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetId } from "@domain/assets/AssetId";
 import {
   buildAgentExecutionUnitPayload,
   mapAgentExecutionToBackbone,
@@ -10,8 +10,8 @@ import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
-} from "../../../../domain/agents/AgentExecutionSession";
-import { createAgentPlan } from "../../../../domain/agents/AgentPlan";
+} from "@domain/agents/AgentExecutionSession";
+import { createAgentPlan } from "@domain/agents/AgentPlan";
 
 describe("Agent execution backbone mapping", () => {
   it("maps ordered agent plan steps into the unified execution plan contract", () => {
@@ -216,3 +216,4 @@ describe("Agent execution backbone mapping", () => {
     expect(() => mapAgentPlanToBackbone({ session, plan: wrongAgentPlan })).toThrow("must match session agentId");
   });
 });
+

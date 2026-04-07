@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DataStudioPreparationWizardStateAdapter,
   DataStudioWizardPersistenceStorageKey,
@@ -22,8 +22,8 @@ import {
 } from "../../assets/data-studio/DataStudioStageUxComponents";
 import { StudioAssetRenderModes, type StudioAssetRenderMode } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { StudioEmbeddedIntentKinds, createStudioIntentEvent, type StudioEmbeddedEvent } from "../../../studio-shell/studio-assets/StudioEmbeddedEventContracts";
-import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import { UnifiedPreparationStageActivationModes } from "../../../../domain/dataset-studio/UnifiedPreparationAsset";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { UnifiedPreparationStageActivationModes } from "@domain/dataset-studio/UnifiedPreparationAsset";
 
 interface DatasetStudioDraftAuthoringBoundaryProps {
   readonly content: string;
@@ -439,3 +439,4 @@ export default function DatasetStudioDraftAuthoringBoundary({
     </>
   );
 }
+

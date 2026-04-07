@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DefaultFileIngestionApplicationService } from "../DefaultFileIngestionApplicationService";
 import { createFileIngestionProfile } from "../IngestionProfiles";
-import { FileIngestionPolicyService } from "../../../domain/ingestion/FileIngestionServices";
+import { FileIngestionPolicyService } from "@domain/ingestion/FileIngestionServices";
 
 const profile = createFileIngestionProfile({
   id: "dataset-source",
@@ -90,3 +90,4 @@ describe("DefaultFileIngestionApplicationService", () => {
     })).rejects.toMatchObject({ code: "runtime_unavailable" });
   });
 });
+

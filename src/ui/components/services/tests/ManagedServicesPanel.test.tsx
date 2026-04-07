@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import React from "react";
-import { createRuntimeEvent, RuntimeEventSources } from "../../../../application/runtime/RuntimeEvent";
+import { createRuntimeEvent, RuntimeEventSources } from "@application/runtime/RuntimeEvent";
 import ManagedServicesPanel from "../ManagedServicesPanel";
 
 describe("ManagedServicesPanel", () => {
@@ -115,3 +115,4 @@ describe("ManagedServicesPanel", () => {
     expect(html).toContain("stderr: traceback line");
   });
 });
+

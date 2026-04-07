@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "../../workflow-studio/WorkflowStudioApplicationService";
 import {
@@ -9,16 +9,16 @@ import {
   serializeWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowDatasetEventNames, mapDatasetEventToWorkflowTriggerEntries } from "../../workflow-studio/WorkflowDatasetEventTriggerAdapter";
 import { InMemoryDatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
-import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import { SystemDatasetInstanceService } from "../SystemDatasetInstanceService";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import type { SystemDatasetOwnershipValidator } from "../SystemDatasetInstanceService";
-import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+import { DatasetEventTypes } from "@domain/dataset-studio/contracts/DatasetEvent";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -271,3 +271,4 @@ describe("Dataset event -> workflow trigger integration", () => {
     expect(run.executionStatus.state).toBe("completed");
   });
 });
+

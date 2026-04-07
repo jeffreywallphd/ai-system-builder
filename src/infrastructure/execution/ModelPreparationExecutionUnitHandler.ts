@@ -1,15 +1,15 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../application/ports/interfaces/IModelTrainingRuntime";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "@application/ports/interfaces/IModelTrainingRuntime";
 import {
   createModelPreparationExecutionArtifact,
   ModelPreparationExecutionArtifacts,
   toModelPreparationExecutionProvenance,
-} from "../../application/execution/ModelPreparationExecutionAdapter";
+} from "@application/execution/ModelPreparationExecutionAdapter";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
-} from "../../application/execution/UnifiedExecutionEngine";
+} from "@application/execution/UnifiedExecutionEngine";
 
 export class ModelPreparationExecutionUnitHandler implements IExecutionUnitHandler {
   constructor(private readonly modelTrainingRuntime: IModelTrainingRuntime) {}
@@ -77,3 +77,4 @@ function mapJobStatus(status: string): IExecutionUnitExecutionResult["status"] {
       return ExecutionStatuses.completed;
   }
 }
+

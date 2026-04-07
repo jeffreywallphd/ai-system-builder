@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
-import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
-import type { ImageRunHistoryRecord } from "../../../application/system-runtime/ImageRunHistoryDataContract";
-import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
-import { createSystemContextContract, type SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
+import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "@application/system-studio/ReferenceImageCrossStudioIntegrity";
+import type { ImageRunHistoryRecord } from "@application/system-runtime/ImageRunHistoryDataContract";
+import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
+import { createSystemContextContract, type SystemContextContract } from "@domain/system-studio/SystemContextContract";
+import type { FileIngestionPolicy } from "@domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageOutputGallery } from "../assets/image-system/ImageOutputGallery";
 import { ImageViewer } from "../assets/image-system/ImageViewer";
@@ -345,7 +345,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
             }))
             .then((response) => {
               if (!response.ok || !response.data) {
-              setStatus(response.error?.message ?? "We couldn’t upload this image.");
+              setStatus(response.error?.message ?? "We couldnâ€™t upload this image.");
                 return;
               }
               setSelectedRecordId(response.data.recordId);
@@ -524,7 +524,7 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
           <div className="ui-stack ui-stack--2xs">
             {flowSteps.map((step) => (
               <p key={step.stepId} className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                {step.userLabel}: {step.status.replace("-", " ")}{step.details ? ` — ${step.details}` : ""}
+                {step.userLabel}: {step.status.replace("-", " ")}{step.details ? ` â€” ${step.details}` : ""}
               </p>
             ))}
           </div>
@@ -703,3 +703,4 @@ export function ReferenceImageExperiencePanel({ context }: ReferenceImageExperie
     </section>
   );
 }
+

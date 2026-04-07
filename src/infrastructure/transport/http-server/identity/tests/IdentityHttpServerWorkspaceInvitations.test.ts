@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import type { Server } from "node:http";
 import { WorkspaceInvitationBackendApi } from "../../../../api/workspaces/WorkspaceInvitationBackendApi";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { SqliteWorkspacePersistenceAdapter } from "../../../../../infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -16,25 +16,25 @@ import {
   createWorkspace,
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
-} from "../../../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
   type WorkspaceInvitationIssuanceIdGenerator,
   type WorkspaceInvitationTokenIssuer,
   type WorkspaceInvitationTokenReference,
-} from "../../../../../application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
+} from "@application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
 import {
   ResolveWorkspaceInvitationLifecycleUseCase,
   type WorkspaceInvitationLifecycleClock,
   type WorkspaceInvitationLifecycleIdGenerator,
-} from "../../../../../application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
+} from "@application/workspaces/use-cases/ResolveWorkspaceInvitationLifecycleUseCase";
 import {
   ResolveAuthenticatedWorkspaceOnboardingUseCase,
   type AuthenticatedWorkspaceOnboardingClock,
-} from "../../../../../application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
-import type { WorkspaceIdNamespace } from "../../../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 
 class FixedClock implements WorkspaceInvitationIssuanceClock, WorkspaceInvitationLifecycleClock, AuthenticatedWorkspaceOnboardingClock {
@@ -364,3 +364,4 @@ describe("IdentityHttpServer workspace invitation routes", () => {
     expect(joinBody.error.code).toBe("invalid-invite");
   });
 });
+

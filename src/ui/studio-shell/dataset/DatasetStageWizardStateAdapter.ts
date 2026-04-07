@@ -1,26 +1,26 @@
-import {
+﻿import {
   StageExecutionPolicy,
-} from "../../../application/dataset-studio/StageExecutionPolicy";
+} from "@application/dataset-studio/StageExecutionPolicy";
 import {
   StageCanvasEditingService,
   type StageCanvasEditResult,
-} from "../../../application/dataset-studio/StageCanvasEditingService";
+} from "@application/dataset-studio/StageCanvasEditingService";
 import {
   StageCanvasGraphProjectionService,
   type StageCanvasGraphModel,
-} from "../../../application/dataset-studio/StageCanvasGraphProjectionService";
+} from "@application/dataset-studio/StageCanvasGraphProjectionService";
 import {
   StagePipelinePersistenceService,
   type PersistedStagePipelineDocument,
-} from "../../../application/dataset-studio/StagePipelinePersistenceService";
+} from "@application/dataset-studio/StagePipelinePersistenceService";
 import {
   StageOutputInspectionService,
   type StageOutputInspectionModel,
-} from "../../../application/dataset-studio/StageOutputInspectionService";
-import { TemplateService } from "../../../application/dataset-studio/TemplateService";
-import { WizardFlowEngine } from "../../../application/dataset-studio/WizardFlowEngine";
-import type { DatasetPipelineStageKind } from "../../../domain/dataset-studio/StagePipelineDomain";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@application/dataset-studio/StageOutputInspectionService";
+import { TemplateService } from "@application/dataset-studio/TemplateService";
+import { WizardFlowEngine } from "@application/dataset-studio/WizardFlowEngine";
+import type { DatasetPipelineStageKind } from "@domain/dataset-studio/StagePipelineDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import type { WizardStageStatus } from "../wizard/WizardStageContracts";
 
 export type DatasetStageWizardStageStatus = WizardStageStatus;
@@ -255,3 +255,4 @@ export class DatasetStageWizardStateAdapter {
     return this.persistenceService.decode(persisted);
   }
 }
+

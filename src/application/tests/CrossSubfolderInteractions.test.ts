@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowRepository } from "../ports/WorkflowRepository";
 import { SaveWorkflowUseCase } from "../workflows/SaveWorkflowUseCase";
 import { LoadWorkflowUseCase } from "../workflows/LoadWorkflowUseCase";
@@ -7,8 +7,8 @@ import { InstalledModelCatalog } from "../ports/InstalledModelCatalog";
 import { InstallModelUseCase } from "../models/InstallModelUseCase";
 import { RemoveModelUseCase } from "../models/RemoveModelUseCase";
 import { ListInstalledModelsUseCase } from "../models/ListInstalledModelsUseCase";
-import { makeModel, makeWorkflow } from "../../domain/services/tests/testUtils";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import { makeModel, makeWorkflow } from "@domain/services/tests/testUtils";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowRecordSummary,
   IWorkflowRepository,
@@ -167,3 +167,4 @@ describe("Application cross-subfolder interactions", () => {
     expect(await installedCatalog.isInstalled("vision-1")).toBeFalse();
   });
 });
+

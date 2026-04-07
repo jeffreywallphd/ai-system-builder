@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ComfyRuntimeInstallationAsset } from "../../../application/runtime/ComfyRuntimeInstallationAsset";
-import { ComfyRuntimeWorkflowProfiles } from "../../../application/runtime/ComfyRuntimeRequirements";
-import type { ComfyRuntimeOrchestrationContext } from "../../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+import { ComfyRuntimeInstallationAsset } from "@application/runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "@application/runtime/ComfyRuntimeRequirements";
+import type { ComfyRuntimeOrchestrationContext } from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 import { ComfyRuntimeAssetValidationHook } from "../ComfyRuntimeAssetValidationHook";
 
 let tempRoot = "";
@@ -158,3 +158,4 @@ function createContext(input: {
     workflowProfile: input.workflowProfile,
   });
 }
+

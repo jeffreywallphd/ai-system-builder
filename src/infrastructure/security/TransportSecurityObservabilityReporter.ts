@@ -1,8 +1,8 @@
-import {
+﻿import {
   AuthenticatedTrustStates,
   TransportConnectionRejectionReasons,
-} from "../../domain/security/TransportSecurityDomain";
-import type { ITransportConnectionPolicyAuditPort, TransportConnectionPolicyDecisionAuditEvent } from "../../application/security/ports/TransportSecurityPorts";
+} from "@domain/security/TransportSecurityDomain";
+import type { ITransportConnectionPolicyAuditPort, TransportConnectionPolicyDecisionAuditEvent } from "@application/security/ports/TransportSecurityPorts";
 import {
   publishTransportSecurityAuditEventBestEffort,
   sanitizeTransportSecurityAuditEvent,
@@ -12,7 +12,7 @@ import {
   type TransportSecurityEventReporter,
   type TransportSecurityLogEvent,
   type TransportSecurityLogger,
-} from "../../application/security/ports/TransportSecurityAuditPorts";
+} from "@application/security/ports/TransportSecurityAuditPorts";
 
 export interface TransportSecurityObservabilityReporterOptions {
   readonly logger?: TransportSecurityLogger;
@@ -119,3 +119,4 @@ class ConsoleTransportSecurityLogger implements TransportSecurityLogger {
     console.error(JSON.stringify(event));
   }
 }
+

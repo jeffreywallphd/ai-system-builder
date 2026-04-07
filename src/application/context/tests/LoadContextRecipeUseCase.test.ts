@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LoadContextRecipeUseCase } from "../LoadContextRecipeUseCase";
 import { ContextRecipe } from "../models/ContextRecipe";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 describe("LoadContextRecipeUseCase", () => {
   it("loads a reusable recipe with guidance intact", async () => {
@@ -35,3 +35,4 @@ describe("LoadContextRecipeUseCase", () => {
     expect(result.contextRecipe).toBeUndefined();
   });
 });
+

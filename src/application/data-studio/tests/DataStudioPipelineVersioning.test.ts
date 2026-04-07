@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DataStudioPreparationWizard } from "../DataStudioPreparationWizard";
 import {
   createDataStudioPipelineVersionMetadata,
   parseDataStudioPipelineVersionMetadata,
 } from "../DataStudioPipelineVersioning";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 
 describe("DataStudioPipelineVersioning", () => {
   it("creates inspectable version metadata with a canonical serialized pipeline payload", () => {
@@ -33,3 +33,4 @@ describe("DataStudioPipelineVersioning", () => {
     expect(parseDataStudioPipelineVersionMetadata({ kind: "unsupported" })).toBeUndefined();
   });
 });
+

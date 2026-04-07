@@ -1,4 +1,4 @@
-import { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import { AssetVersion } from "@domain/assets/AssetVersion";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 
 export class CreateAssetVersionUseCase {
@@ -15,3 +15,4 @@ export class CreateAssetVersionUseCase {
     return version;
   }
 }
+

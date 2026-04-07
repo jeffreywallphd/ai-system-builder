@@ -1,5 +1,5 @@
-import type { ExecutionRunDetailProjection } from "../../../application/execution/ExecutionRunDetailProjectionService";
-import type { ExecutionRelatedRunClusterProjection } from "../../../application/execution/ExecutionRelatedRunClusterProjectionService";
+﻿import type { ExecutionRunDetailProjection } from "@application/execution/ExecutionRunDetailProjectionService";
+import type { ExecutionRelatedRunClusterProjection } from "@application/execution/ExecutionRelatedRunClusterProjectionService";
 
 export interface ExecutionRunDetailPanelProps {
   readonly detail?: ExecutionRunDetailProjection;
@@ -67,7 +67,7 @@ export default function ExecutionRunDetailPanel({
         <div className="ui-stack ui-stack--2xs">
           <strong>Related runs</strong>
           <div className="ui-text-secondary ui-text-small">
-            {relatedRunCluster.groupLabel} · {relatedRunCluster.orderingLabel}
+            {relatedRunCluster.groupLabel} Â· {relatedRunCluster.orderingLabel}
           </div>
           <div className="ui-stack ui-stack--2xs">
             {relatedRunCluster.runs.map((entry) => (
@@ -100,12 +100,12 @@ export default function ExecutionRunDetailPanel({
               <div className="ui-row ui-row--between ui-row--wrap" style={{ gap: "var(--space-sm)" }}>
                 <div className="ui-stack ui-stack--3xs">
                   <strong>{unit.label}</strong>
-                  <span className="ui-text-secondary ui-text-small">{unit.kind} · {unit.unitId}</span>
+                  <span className="ui-text-secondary ui-text-small">{unit.kind} Â· {unit.unitId}</span>
                 </div>
                 <span className={`ui-badge ui-badge--${unit.statusTone}`}>{unit.statusLabel}</span>
               </div>
               {unit.outputSummary ? <div className="ui-text-secondary ui-text-small">Summary: {unit.outputSummary}</div> : null}
-              {unit.provenanceLabel ? <div className="ui-text-secondary ui-text-small">Path: {unit.provenanceLabel}{unit.provenanceDetail ? ` — ${unit.provenanceDetail}` : ""}</div> : null}
+              {unit.provenanceLabel ? <div className="ui-text-secondary ui-text-small">Path: {unit.provenanceLabel}{unit.provenanceDetail ? ` â€” ${unit.provenanceDetail}` : ""}</div> : null}
               {unit.errorMessage ? <div className="ui-text-secondary ui-text-small">Error: {unit.errorMessage}</div> : null}
               {unit.dependsOn.length > 0 ? <div className="ui-text-secondary ui-text-small">Depends on: {unit.dependsOn.join(", ")}</div> : null}
               {unit.artifactSummary ? <div className="ui-text-secondary ui-text-small">Artifacts: {unit.artifactSummary.count} ({unit.artifactSummary.labels.join(", ")})</div> : null}
@@ -129,8 +129,8 @@ export default function ExecutionRunDetailPanel({
             <ul className="ui-text-secondary ui-text-small">
               {detail.timeline.map((entry, index) => (
                 <li key={`${entry.unitId}:${entry.occurredAt}:${index}`}>
-                  <strong>{entry.unitLabel}</strong>: {entry.fromStatus ? `${entry.fromStatus} → ` : ""}{entry.toStatus}
-                  {entry.message ? ` — ${entry.message}` : ""}
+                  <strong>{entry.unitLabel}</strong>: {entry.fromStatus ? `${entry.fromStatus} â†’ ` : ""}{entry.toStatus}
+                  {entry.message ? ` â€” ${entry.message}` : ""}
                 </li>
               ))}
             </ul>
@@ -145,7 +145,7 @@ export default function ExecutionRunDetailPanel({
               {detail.diagnostics.map((diagnostic) => (
                 <li key={`${diagnostic.source}:${diagnostic.code}:${diagnostic.message}`}>
                   <strong>{diagnostic.severity}</strong>: {diagnostic.message}
-                  {diagnostic.detail ? ` — ${diagnostic.detail}` : ""}
+                  {diagnostic.detail ? ` â€” ${diagnostic.detail}` : ""}
                 </li>
               ))}
             </ul>
@@ -157,3 +157,4 @@ export default function ExecutionRunDetailPanel({
     </article>
   );
 }
+

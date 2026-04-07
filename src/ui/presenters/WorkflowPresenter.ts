@@ -1,7 +1,7 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowValidationResult } from "../../domain/services/interfaces/IWorkflowValidator";
-import type { WorkflowResponse } from "../../application/dto/WorkflowResponse";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IWorkflowExecutionEvent } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IWorkflowValidationResult } from "@domain/services/interfaces/IWorkflowValidator";
+import type { WorkflowResponse } from "@application/dto/WorkflowResponse";
 import { ValidationPresenter, type ValidationSummaryViewModel } from "./ValidationPresenter";
 import { NodePresenter, type NodeDetailViewModel } from "./NodePresenter";
 import { toTitleCase } from "./PresenterFormatting";
@@ -307,3 +307,4 @@ export class WorkflowPresenter {
     });
   }
 }
+

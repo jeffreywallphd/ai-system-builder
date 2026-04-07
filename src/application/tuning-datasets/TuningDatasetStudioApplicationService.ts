@@ -1,11 +1,11 @@
-import type { ChatCompletionExample, QuestionAnsweringExample } from "../../domain/tuning-datasets/TuningDatasetEntities";
+﻿import type { ChatCompletionExample, QuestionAnsweringExample } from "@domain/tuning-datasets/TuningDatasetEntities";
 import type {
   DatasetExportArtifact,
   DatasetStatistics,
   DatasetValidationResult,
   DatasetVersion,
   DatasetWorkflowState,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type {
   AddExampleCommand,
   ArchiveDatasetCommand,
@@ -75,3 +75,4 @@ export interface TuningDatasetStudioApplicationService {
   exportDatasetVersion(command: ExportDatasetVersionCommand): Promise<DatasetExportArtifact>;
   listExports(datasetId: string, versionId: string): Promise<ReadonlyArray<DatasetExportArtifact>>;
 }
+

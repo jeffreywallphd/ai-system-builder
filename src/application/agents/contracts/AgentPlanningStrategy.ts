@@ -1,6 +1,6 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentGoal } from "../../../domain/agents/AgentGoal";
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentGoal } from "@domain/agents/AgentGoal";
+import type { AgentPlan } from "@domain/agents/AgentPlan";
 
 export interface AgentPlanningStrategyRequest {
   readonly agent: Agent;
@@ -43,3 +43,4 @@ export interface AgentPlanToolSelectionService {
 }
 
 export type AgentPlanningInterface = AgentPlanningStrategy;
+

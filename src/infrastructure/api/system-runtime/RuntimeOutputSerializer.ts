@@ -1,4 +1,4 @@
-import type { RuntimeExecutionResultReadModel } from "../../../application/system-runtime/SystemRuntimeApplicationService";
+﻿import type { RuntimeExecutionResultReadModel } from "@application/system-runtime/SystemRuntimeApplicationService";
 
 export interface SerializedExecutionOutput {
   readonly outputId: string;
@@ -90,3 +90,4 @@ export class RuntimeOutputSerializer {
     } satisfies SerializedExecutionResult);
   }
 }
+

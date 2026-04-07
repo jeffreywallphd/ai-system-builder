@@ -1,5 +1,5 @@
-import type { SecretRuntimeConsumptionAdapters } from "../../../application/security/services/SecretRuntimeConsumptionAdapters";
-import type { SecretServiceResult } from "../../../application/security/use-cases/SecretManagementServiceContracts";
+﻿import type { SecretRuntimeConsumptionAdapters } from "@application/security/services/SecretRuntimeConsumptionAdapters";
+import type { SecretServiceResult } from "@application/security/use-cases/SecretManagementServiceContracts";
 
 export const ServerPlatformProviderIds = Object.freeze({
   openAi: "openai",
@@ -91,3 +91,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+﻿import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type {
   IdentityMutationOutcome,
   IdentityOperationResult,
@@ -46,7 +46,7 @@ import {
   rejectPairingSession,
   type PairingSession,
   type PairingToken,
-} from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import {
   DeviceTrustMaterialKinds,
   DeviceTrustStatuses,
@@ -55,7 +55,7 @@ import {
   pairTrustedDevice,
   type DeviceTrustMaterialRef,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   mapPairingSessionRecord,
   mapPairingTokenRecord,
@@ -704,3 +704,4 @@ function isSameTrustMaterialRef(left: DeviceTrustMaterialRef, right: DeviceTrust
     && left.issuedAt === right.issuedAt
     && left.expiresAt === right.expiresAt;
 }
+

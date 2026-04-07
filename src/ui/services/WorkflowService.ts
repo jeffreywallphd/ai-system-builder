@@ -1,29 +1,29 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionResult,
-} from "../../application/ports/interfaces/IWorkflowExecutor";
+} from "@application/ports/interfaces/IWorkflowExecutor";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
-} from "../../domain/services/interfaces/IWorkflowValidator";
+} from "@domain/services/interfaces/IWorkflowValidator";
 import {
   CreateWorkflowUseCase,
   type ICreateWorkflowRequest,
   type ICreateWorkflowResult,
-} from "../../application/workflows/CreateWorkflowUseCase";
+} from "@application/workflows/CreateWorkflowUseCase";
 import {
   ExecuteWorkflowUseCase,
   type IExecuteWorkflowRequest,
   type IExecuteWorkflowResult,
-} from "../../application/workflows/ExecuteWorkflowUseCase";
+} from "@application/workflows/ExecuteWorkflowUseCase";
 import {
   ValidateWorkflowUseCase,
   type IValidateWorkflowRequest,
   type IValidateWorkflowResult,
-} from "../../application/workflows/ValidateWorkflowUseCase";
-import { LoadWorkflowUseCase, type ILoadWorkflowResult } from "../../application/workflows/LoadWorkflowUseCase";
+} from "@application/workflows/ValidateWorkflowUseCase";
+import { LoadWorkflowUseCase, type ILoadWorkflowResult } from "@application/workflows/LoadWorkflowUseCase";
 
 export interface IWorkflowServiceOptions {
   readonly createWorkflowUseCase: CreateWorkflowUseCase;
@@ -220,3 +220,4 @@ export class WorkflowService {
     ]);
   }
 }
+

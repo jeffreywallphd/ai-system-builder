@@ -1,16 +1,16 @@
-import {
+﻿import {
   AssetValidationLayers,
   AssetValidationSeverities,
   AssetValidationStatuses,
   createAssetValidationResult,
   type AssetValidationIssue,
   type AssetValidationResult,
-} from "../../domain/contracts/AssetValidation";
+} from "@domain/contracts/AssetValidation";
 import {
   createWorkflowTemplateDefinition,
   type WorkflowTemplateDefinition,
-} from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+} from "@domain/workflow-template-studio/WorkflowTemplateDomain";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { WorkflowTemplateWorkflowContractResolver } from "./WorkflowTemplateCompositionResolver";
 import { ValidatedAssetTypes, type AssetValidator, type ValidatedAssetRef } from "../asset-validation/AssetValidationTypes";
@@ -299,3 +299,4 @@ export class WorkflowTemplateValidator implements AssetValidator {
       });
   }
 }
+

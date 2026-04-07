@@ -1,4 +1,4 @@
-import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
+﻿import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowRunSummaryRepository } from "../ports/interfaces/IWorkflowRunSummaryRepository";
 import {
   createWorkflowRunDetailRecord,
@@ -21,7 +21,7 @@ import {
   type WorkflowRunSummaryListQuery,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
   toWorkflowRunHistoryError,
   WorkflowRunHistoryInvalidRequestError,
@@ -574,3 +574,4 @@ export class WorkflowRunHistoryService {
     } satisfies WorkflowRunDiagnosticRecord)]);
   }
 }
+

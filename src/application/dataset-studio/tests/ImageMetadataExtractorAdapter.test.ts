@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   IImageDimensionReader,
   IImageExifReader,
   IImageFormatDetector,
-} from "../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import {
   ExifrImageExifReaderAdapter,
   ImageMetadataExtractorAdapter,
@@ -100,3 +100,4 @@ describe("ExifrImageExifReaderAdapter", () => {
     expect(result).toBeUndefined();
   });
 });
+

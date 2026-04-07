@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { NodeEnrollmentRequestStatuses } from "../../../../domain/nodes/NodeTrustDomain";
-import { NodeRoleCapabilities, NodeTrustStates } from "../../../../domain/nodes/NodeTrustDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { NodeEnrollmentRequestStatuses } from "@domain/nodes/NodeTrustDomain";
+import { NodeRoleCapabilities, NodeTrustStates } from "@domain/nodes/NodeTrustDomain";
 import {
   NodeTrustPersistenceQueryPresets,
   normalizeNodeTrustMutationOperationKey,
@@ -34,3 +34,4 @@ describe("NodeTrustPersistenceDtos", () => {
     expect(normalizeNodeTrustMutationOperationKey("  OP-NODE-101  ")).toBe("op-node-101");
   });
 });
+

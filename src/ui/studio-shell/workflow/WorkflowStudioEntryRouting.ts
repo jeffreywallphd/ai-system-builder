@@ -1,4 +1,4 @@
-import { StudioEntryModes } from "../../../application/studio-entry/StudioEntryContracts";
+﻿import { StudioEntryModes } from "@application/studio-entry/StudioEntryContracts";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export const WorkflowStudioEntryPaths = Object.freeze({
@@ -137,3 +137,4 @@ export function buildWorkflowStudioDuplicatePath(workflowId: string): string {
     workflowId,
   });
 }
+

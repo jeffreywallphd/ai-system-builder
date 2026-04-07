@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ISecretRecordPersistenceRepository,
   ISecretReEncryptionOperationRepository,
   SecretConditionalSaveResult,
@@ -6,19 +6,19 @@ import type {
   SecretListQuery,
   SecretMutationResult,
   SecretReEncryptionOperationRecord,
-} from "../../../application/security/ports/SecretServicePorts";
+} from "@application/security/ports/SecretServicePorts";
 import type {
   IEncryptionKeyResolutionService,
-} from "../../../application/security/use-cases/EncryptionKeyResolutionServiceContracts";
+} from "@application/security/use-cases/EncryptionKeyResolutionServiceContracts";
 import {
   EncryptionMaterialClasses,
-} from "../../../application/security/use-cases/EncryptionKeyResolutionServiceContracts";
+} from "@application/security/use-cases/EncryptionKeyResolutionServiceContracts";
 import type {
   IProtectedValueEncryptionPort,
   ProtectedValuePayload,
-} from "../../../application/security/ports/ProtectedValueEncryptionPorts";
-import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
-import type { SecretRecord, SecretReference } from "../../../domain/security/SecretDomain";
+} from "@application/security/ports/ProtectedValueEncryptionPorts";
+import { ProtectedDataClasses } from "@domain/security/EncryptionAtRestPolicyDomain";
+import type { SecretRecord, SecretReference } from "@domain/security/SecretDomain";
 
 const ProtectedMetadataDescriptionPrefix = "protected-value:v1:";
 
@@ -309,3 +309,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

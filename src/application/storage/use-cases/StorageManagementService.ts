@@ -1,4 +1,4 @@
-import {
+﻿import {
   StorageDomainError,
   StorageLifecycleTransitionError,
   StorageLifecycleStates,
@@ -9,7 +9,7 @@ import {
   transitionStorageLifecycle,
   updateStoragePolicy,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type { IStorageCapabilityInspectionPort, StorageBackendCapabilitySnapshot } from "../ports/StorageCapabilityInspectionPort";
 import { StorageBackendHealthStatuses } from "../ports/StorageCapabilityInspectionPort";
 import type { StorageInstanceAccessSummary } from "../ports/StorageAccessSummaryPort";
@@ -949,3 +949,4 @@ export class StorageManagementService implements IStorageManagementService {
     });
   }
 }
+

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
-import { DataStudioPreparationWizard } from "../../../application/data-studio/DataStudioPreparationWizard";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionPlan, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import { DataStudioPreparationWizard } from "@application/data-studio/DataStudioPreparationWizard";
 import {
   DataStudioPipelineExecutionArtifacts,
   type DataStudioPipelineExecutionUnitInput,
-} from "../../../application/data-studio/DataStudioPipelineExecution";
+} from "@application/data-studio/DataStudioPipelineExecution";
 import { DataStudioPipelineExecutionUnitHandler } from "../DataStudioPipelineExecutionUnitHandler";
 
 function createExecutionInput(): DataStudioPipelineExecutionUnitInput {
@@ -60,3 +60,4 @@ describe("DataStudioPipelineExecutionUnitHandler", () => {
     expect(result.outputMetadata?.pipelineId).toContain("data-studio-pipeline:");
   });
 });
+

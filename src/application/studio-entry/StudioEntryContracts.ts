@@ -1,5 +1,5 @@
-import type { StudioHandoffContract } from "../../domain/studio-handoff/StudioHandoffContract";
-import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { StudioHandoffContract } from "@domain/studio-handoff/StudioHandoffContract";
+import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 
 export const StudioEntryModes = Object.freeze({
   blank: "blank",
@@ -89,3 +89,4 @@ export interface StudioEntryResolution {
   readonly mode: StudioEntryMode;
   readonly initializationPayload: StudioInitializationPayload;
 }
+

@@ -1,7 +1,7 @@
-import { WorkflowDraftOutputDestinationTypes } from "../../domain/workflow-studio/WorkflowStudioDomain";
-import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IExecuteWorkflowRequest, IExecuteWorkflowResult } from "../../application/workflows/ExecuteWorkflowUseCase";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import { WorkflowDraftOutputDestinationTypes } from "@domain/workflow-studio/WorkflowStudioDomain";
+import type { IWorkflowExecutionEvent } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IExecuteWorkflowRequest, IExecuteWorkflowResult } from "@application/workflows/ExecuteWorkflowUseCase";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { WorkflowService } from "../services/WorkflowService";
 import {
   evaluateWorkflowConversationEligibility,
@@ -554,3 +554,4 @@ function resolveAssistantResponse(
 
   return undefined;
 }
+

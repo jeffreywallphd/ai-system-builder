@@ -1,5 +1,5 @@
-import type { Asset } from "../../domain/assets/Asset";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { Asset } from "@domain/assets/Asset";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import { CoreImageStarterWorkflowTemplates } from "./CoreImageStarterWorkflowTemplates";
 import type { WorkflowTemplateAssetService } from "./WorkflowTemplateAssetService";
 
@@ -19,3 +19,4 @@ export class WorkflowTemplateStarterKitService {
     return Object.freeze(saved);
   }
 }
+

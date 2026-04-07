@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { RegistryService } from "../../services/RegistryService";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
@@ -160,7 +160,7 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
           <div key={`${component.assetId}:${component.versionId ?? ""}:${index}`} className="ui-card">
             <div className="ui-card__body ui-stack ui-stack--2xs">
               <div><strong>{component.alias ?? `${component.componentKind}:${index + 1}`}</strong></div>
-              <div className="ui-text-small">{component.componentKind} · {component.assetId} · {component.versionId ?? "unpinned"}</div>
+              <div className="ui-text-small">{component.componentKind} Â· {component.assetId} Â· {component.versionId ?? "unpinned"}</div>
               <div className="ui-stack ui-stack--xs" style={{ flexDirection: "row", flexWrap: "wrap" }}>
                 <Link
                   className="ui-button ui-button--ghost ui-button--small"
@@ -265,12 +265,12 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
           <span className="ui-text-small">Browse candidate assets</span>
           <input className="ui-input" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search registry assets" />
         </label>
-        {isLoadingCandidates && <span className="ui-text-small ui-text-secondary">Loading candidates…</span>}
+        {isLoadingCandidates && <span className="ui-text-small ui-text-secondary">Loading candidatesâ€¦</span>}
         {candidateError && <span className="ui-text-small" style={{ color: "var(--ui-color-danger-600, #b42318)" }}>{candidateError}</span>}
         <div className="ui-stack ui-stack--2xs">
           {candidates.slice(0, 12).map((asset) => (
             <div key={`${asset.assetId}:${asset.versionId}`} className="ui-row ui-row--wrap" style={{ justifyContent: "space-between", gap: "0.5rem" }}>
-              <span className="ui-text-small">{asset.name} · {labelResolver.resolveCreateInlineLabel(asset.taxonomy)}</span>
+              <span className="ui-text-small">{asset.name} Â· {labelResolver.resolveCreateInlineLabel(asset.taxonomy)}</span>
               <button
                 className="ui-button"
                 disabled={!sessionId || !draft || !asset.versionId}
@@ -302,7 +302,7 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
         <ul className="ui-stack ui-stack--2xs">
           {components.filter((entry) => entry.componentKind === "system").map((entry, index) => (
             <li key={`${entry.assetId}:${entry.versionId ?? ""}:${index}`} className="ui-text-small">
-              {entry.alias ?? `system-${index + 1}`} → {entry.assetId} ({entry.versionId ?? "unpinned"}){" "}
+              {entry.alias ?? `system-${index + 1}`} â†’ {entry.assetId} ({entry.versionId ?? "unpinned"}){" "}
               <Link
                 to={`${ROUTE_PATHS.systemStudio}?${buildStudioHandoffQuery(
                   { assetId: entry.assetId, versionId: entry.versionId },
@@ -327,3 +327,4 @@ export function SystemCompositionEditor({ context }: { readonly context: StudioS
     </div>
   );
 }
+

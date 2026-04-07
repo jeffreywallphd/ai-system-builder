@@ -1,9 +1,9 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+﻿import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 import type {
   ILocalPasswordCredentialService,
   LocalPasswordCredentialMaterial,
-} from "../../../application/identity/ports/ILocalPasswordCredentialService";
+} from "@application/identity/ports/ILocalPasswordCredentialService";
 
 const scrypt = promisify(scryptCallback);
 const PHC_ID = "scrypt";
@@ -199,3 +199,4 @@ function calculateRecommendedScryptMemoryBytes(costFactor: number, blockSize: nu
     requiredBytes * SCRYPT_MEMORY_HEADROOM_MULTIPLIER,
   );
 }
+

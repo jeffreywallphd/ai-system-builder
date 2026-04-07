@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RunToolUseCase } from "../RunToolUseCase";
 import { LoadToolDefinitionUseCase } from "../LoadToolDefinitionUseCase";
-import { InMemoryWorkflowRepository } from "../../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
+import { InMemoryWorkflowRepository } from "@infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { WorkflowContextService } from "../../context/WorkflowContextService";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 import { ContextPackage } from "../../context/models/ContextPackage";
-import { createWorkflowUnifiedExecutionEngine } from "../../../infrastructure/execution/createWorkflowUnifiedExecutionEngine";
+import { createWorkflowUnifiedExecutionEngine } from "@infrastructure/execution/createWorkflowUnifiedExecutionEngine";
 import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult } from "../../ports/WorkflowExecutor";
 
 describe("RunToolUseCase", () => {
@@ -140,3 +140,4 @@ describe("RunToolUseCase", () => {
     expect(workflowContext?.assembledContext?.promptText).toContain("Be friendly.");
   });
 });
+

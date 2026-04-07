@@ -1,9 +1,9 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   AssetContractShapeKinds,
   createAssetContractDescriptor,
   type AssetContractDescriptor,
-} from "../../domain/contracts/AssetContract";
+} from "@domain/contracts/AssetContract";
 
 export const ImageWorkflowAssetIntentTypes = Object.freeze({
   imageToImage: "image-to-image",
@@ -294,3 +294,4 @@ export function buildAssetContractForImageWorkflowIntent(intentType: ImageWorkfl
     },
   });
 }
+

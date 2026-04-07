@@ -1,13 +1,13 @@
-import { createHash } from "node:crypto";
-import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import { createHash } from "node:crypto";
+import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import {
   type RollbackActionRecord,
   type RollbackDecision,
   type RollbackRequest,
   type RollbackResult,
-} from "../../domain/deployment/DeploymentRollbackDomain";
-import { DeploymentStates } from "../../domain/deployment/DeploymentStateDomain";
-import { DeploymentLogLevels } from "../../domain/deployment/DeploymentDiagnosticsDomain";
+} from "@domain/deployment/DeploymentRollbackDomain";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
+import { DeploymentLogLevels } from "@domain/deployment/DeploymentDiagnosticsDomain";
 import { type DeploymentVersionManager } from "./DeploymentVersionManager";
 import type { DeploymentDiagnosticsService } from "./DeploymentDiagnosticsService";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
@@ -21,8 +21,8 @@ import {
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
-import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
-import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import type { DeploymentEnvironmentContext } from "@domain/deployment/DeploymentIsolationDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "@domain/deployment/DeploymentAuditTrailDomain";
 import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export interface DeploymentRollbackActionRepository {
@@ -393,3 +393,4 @@ export class DeploymentRollbackService {
     return "unknown";
   }
 }
+

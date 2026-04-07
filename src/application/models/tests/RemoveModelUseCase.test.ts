@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RemoveModelUseCase } from "../RemoveModelUseCase";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeInstalledModelCatalog, makeModelInstaller } from "./testUtils";
 
 describe("RemoveModelUseCase", () => {
@@ -24,3 +24,4 @@ describe("RemoveModelUseCase", () => {
     await expect(useCase.execute({ model: makeModel("bad") })).rejects.toThrow("cannot be uninstalled");
   });
 });
+

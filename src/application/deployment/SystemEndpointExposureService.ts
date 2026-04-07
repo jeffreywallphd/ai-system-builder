@@ -1,17 +1,17 @@
-import { createHash } from "node:crypto";
-import type { DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import { createHash } from "node:crypto";
+import type { DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import type {
   DeployedSystemEndpoint,
   EndpointCallableMetadata,
   EndpointExposureRecord,
   ResolvedEndpointDeployment,
   SystemEndpointId,
-} from "../../domain/deployment/SystemEndpointExposureDomain";
+} from "@domain/deployment/SystemEndpointExposureDomain";
 import type { DeploymentVersionManager } from "./DeploymentVersionManager";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
 import type { DeploymentAccessContext } from "./DeploymentAccessControl";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
-import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
+import type { DeploymentEnvironmentContext } from "@domain/deployment/DeploymentIsolationDomain";
 
 export interface EndpointExposureRepository {
   save(record: EndpointExposureRecord): EndpointExposureRecord;
@@ -227,3 +227,4 @@ export class SystemEndpointExposureService {
     });
   }
 }
+

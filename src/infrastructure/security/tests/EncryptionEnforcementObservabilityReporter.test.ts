@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { EncryptionEnforcementObservabilityReporter } from "../EncryptionEnforcementObservabilityReporter";
-import type { EncryptionEnforcementEvent } from "../../../application/security/ports/EncryptionEnforcementObservabilityPorts";
+import type { EncryptionEnforcementEvent } from "@application/security/ports/EncryptionEnforcementObservabilityPorts";
 
 class RecordingLogger {
   public readonly infoEvents: EncryptionEnforcementEvent[] = [];
@@ -58,3 +58,4 @@ describe("EncryptionEnforcementObservabilityReporter", () => {
     expect(logger.errorEvents).toHaveLength(1);
   });
 });
+

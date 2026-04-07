@@ -1,6 +1,6 @@
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
-import type { AssetMetadataPatch } from "../../../domain/studio-shell/StudioShellDomain";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
+import type { AssetMetadataPatch } from "@domain/studio-shell/StudioShellDomain";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 
 const contractResolver = new CompositionAssetContractResolver();
 
@@ -53,3 +53,4 @@ export function createSystemStudioMetadataPatch(input: {
 }): AssetMetadataPatch {
   return createStudioMetadataPatch(input);
 }
+

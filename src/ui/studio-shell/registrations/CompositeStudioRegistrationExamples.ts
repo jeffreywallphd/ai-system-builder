@@ -1,9 +1,9 @@
-import {
+﻿import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -124,3 +124,4 @@ export const toolChainStudioRegistrationExample = createCompositeRegistration({
   contentTemplate: { toolChainSpec: { toolRefs: [] } },
   summary: "Composite tool-chain draft authored through shared Studio Shell registration.",
 });
+

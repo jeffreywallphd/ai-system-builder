@@ -1,6 +1,6 @@
-import type { TargetStudioInputContract } from "../../domain/studio-handoff/StudioHandoffContract";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { TargetStudioInputContract } from "@domain/studio-handoff/StudioHandoffContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 
 export interface AcceptedStudioInputCapability {
   readonly capabilityId: string;
@@ -191,3 +191,4 @@ export class StudioCapabilityQueryService {
     return this.registry.list();
   }
 }
+

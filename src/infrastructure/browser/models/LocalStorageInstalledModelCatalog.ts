@@ -1,12 +1,12 @@
-import type { IModel } from "../../../domain/models/interfaces/IModel";
-import { Model, ModelArtifact, ModelResourceProfile, ModelSource } from "../../../domain/models/Model";
-import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
-import { ModelDependency } from "../../../domain/models/ModelDependency";
-import { ModelRequirement } from "../../../domain/models/ModelRequirement";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import { Model, ModelArtifact, ModelResourceProfile, ModelSource } from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
+import { ModelDependency } from "@domain/models/ModelDependency";
+import { ModelRequirement } from "@domain/models/ModelRequirement";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
-} from "../../../application/ports/interfaces/IInstalledModelCatalog";
+} from "@application/ports/interfaces/IInstalledModelCatalog";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -376,3 +376,4 @@ export class LocalStorageInstalledModelCatalog implements IInstalledModelCatalog
     });
   }
 }
+

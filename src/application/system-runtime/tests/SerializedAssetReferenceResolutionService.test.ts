@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { createSystemStudioTaxonomy } from "../../../domain/system-studio/SystemAssetDomain";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
 import { SerializedAssetReferenceResolutionService } from "../SerializedAssetReferenceResolutionService";
 
 class Repo implements IStudioShellRepository {
@@ -77,3 +77,4 @@ describe("SerializedAssetReferenceResolutionService", () => {
     expect(result.issues[0]?.code).toBe("unsupported-serialized-version");
   });
 });
+

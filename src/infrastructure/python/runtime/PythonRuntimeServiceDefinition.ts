@@ -1,12 +1,12 @@
-import {
+﻿import {
   ManagedServiceRestartPolicies,
   ManagedServiceSources,
   ManagedServiceTransports,
   type ManagedServiceDefinition,
-} from "../../../application/services/ManagedServiceDefinition";
-export { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../../../application/services/ManagedServiceIds";
-import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "../../../application/services/ManagedServiceIds";
-import { ManagedServiceKinds, ManagedServiceStartPolicies } from "../../../application/services/interfaces/ManagedServiceTypes";
+} from "@application/services/ManagedServiceDefinition";
+export { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "@application/services/ManagedServiceIds";
+import { PYTHON_RUNTIME_MANAGED_SERVICE_ID } from "@application/services/ManagedServiceIds";
+import { ManagedServiceKinds, ManagedServiceStartPolicies } from "@application/services/interfaces/ManagedServiceTypes";
 import { PythonRuntimeMode } from "../../config/PythonRuntimeMode";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 
@@ -79,3 +79,4 @@ function resolveLaunchTarget(baseUrl?: string): { host: string; port: number } {
     return { host: DEFAULT_HOST, port: DEFAULT_PORT };
   }
 }
+

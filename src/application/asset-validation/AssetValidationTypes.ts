@@ -1,4 +1,4 @@
-import type { AssetValidationResult } from "../../domain/contracts/AssetValidation";
+﻿import type { AssetValidationResult } from "@domain/contracts/AssetValidation";
 
 export const ValidatedAssetTypes = Object.freeze({
   template: "template",
@@ -20,3 +20,4 @@ export interface AssetValidator {
   readonly assetType: ValidatedAssetType;
   validate(asset: ValidatedAssetRef): Promise<AssetValidationResult>;
 }
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DatasetInstanceImageGenerationRoles,
-} from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   materializationAssetToDatasetGeneration,
   validateWorkflowOutputMaterializationPayload,
@@ -123,3 +123,4 @@ describe("WorkflowOutputMaterializationContract", () => {
     expect(payload.producedAssets).toHaveLength(0);
   });
 });
+

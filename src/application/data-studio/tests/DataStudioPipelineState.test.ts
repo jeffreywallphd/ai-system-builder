@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DataStudioPreparationWizard } from "../DataStudioPreparationWizard";
 import {
   createDataStudioPipelineState,
   deserializeDataStudioPipelineState,
   serializeDataStudioPipelineState,
 } from "../DataStudioPipelineState";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 
 describe("DataStudioPipelineState", () => {
   it("builds a valid persistent state from wizard snapshots and round-trips serialization", () => {
@@ -66,3 +66,4 @@ describe("DataStudioPipelineState", () => {
     expect(restored.stages.find((stage) => stage.stageId === PipelineStageIds.SourceSelection)?.options.sourceKind).toBe("document");
   });
 });
+

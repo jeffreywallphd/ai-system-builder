@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
-import { createAssetDraft, createAssetSession } from "../../../domain/studio-shell/StudioShellDomain";
-import { createModelStudioTaxonomy } from "../../../domain/model-studio/ModelStudioDomain";
-import { createDatasetStudioTaxonomy } from "../../../domain/dataset-studio/DatasetStudioDomain";
-import { createToolStudioTaxonomy } from "../../../domain/tool-studio/ToolStudioDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createAssetDraft, createAssetSession } from "@domain/studio-shell/StudioShellDomain";
+import { createModelStudioTaxonomy } from "@domain/model-studio/ModelStudioDomain";
+import { createDatasetStudioTaxonomy } from "@domain/dataset-studio/DatasetStudioDomain";
+import { createToolStudioTaxonomy } from "@domain/tool-studio/ToolStudioDomain";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   type CompositionTaxonomyDescriptor,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { buildStudioShellValidationIssues } from "../StudioShellValidation";
 
 function createDraftWithTaxonomy(
@@ -246,3 +246,4 @@ describe("buildStudioShellValidationIssues", () => {
     expect(issues.some((issue) => issue.code === "composite-dependency-semantic-role-disallowed")).toBeFalse();
   });
 });
+

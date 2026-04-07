@@ -1,4 +1,4 @@
-import type { OutputGalleryItem } from "../../application/system-runtime/OutputGalleryDataContract";
+﻿import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
 import {
   createInitialImageManipulationSelectionState,
   reconcileImageManipulationSelection,
@@ -177,4 +177,5 @@ export class ImageManipulationRuntimeDatasetBindingService {
     });
   }
 }
+
 

@@ -1,7 +1,7 @@
-import {
+﻿import {
   ConfigProfileStudioIdentity,
   createConfigProfileStudioTaxonomy,
-} from "../../../domain/config-profile-studio/ConfigProfileStudioDomain";
+} from "@domain/config-profile-studio/ConfigProfileStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -53,3 +53,4 @@ export const configProfileStudioRegistration: AtomicStudioRegistration = Object.
     },
   ]),
 });
+

@@ -1,4 +1,4 @@
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import {
   createDefaultLocalRuntimeEnvironment,
   createExecutionEnvironmentResolution,
@@ -8,7 +8,7 @@ import {
   type ExecutionEnvironmentResolution,
   type RuntimeEnvironment,
   type RuntimeEnvironmentKind,
-} from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+} from "@domain/system-runtime/RuntimeEnvironmentDomain";
 
 export interface RuntimeEnvironmentSelectionRequest {
   readonly requestedEnvironmentId?: string;
@@ -92,3 +92,4 @@ export class RuntimeEnvironmentSelector implements IRuntimeEnvironmentSelector {
     });
   }
 }
+

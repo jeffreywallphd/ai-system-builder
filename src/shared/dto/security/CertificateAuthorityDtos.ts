@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   CertificateAuthorityStatus,
   CertificateRevocationReason,
   CertificateStatus,
   CertificateSubjectReferenceKind,
   CertificateUsageKind,
   TrustMaterialKind,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 
 export interface CertificateAuthorityPersistenceAuditStamp {
   readonly createdAt: string;
@@ -528,3 +528,4 @@ export function normalizeCertificateAuthorityMutationOperationKey(operationKey: 
   }
   return normalized;
 }
+

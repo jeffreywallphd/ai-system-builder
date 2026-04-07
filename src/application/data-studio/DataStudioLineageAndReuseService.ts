@@ -1,6 +1,6 @@
-import type { PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageIds } from "../../domain/dataset-studio/PipelineStageDomain";
-import type { UnifiedPreparationAssetDefinition } from "../../domain/dataset-studio/UnifiedPreparationAsset";
+﻿import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import type { UnifiedPreparationAssetDefinition } from "@domain/dataset-studio/UnifiedPreparationAsset";
 import type {
   PreparedDatasetLineageAssetReference,
   PreparedDatasetLineagePipelineReference,
@@ -8,7 +8,7 @@ import type {
   PreparedDatasetLineageSourceReference,
   PreparedDatasetLineageStageReference,
   PreparedDatasetReuseReference,
-} from "../../domain/dataset-studio/PreparedDatasetLineage";
+} from "@domain/dataset-studio/PreparedDatasetLineage";
 import type {
   DataStudioPipelineAuthoringFlowState,
   DataStudioPipelineIdentity,
@@ -279,3 +279,4 @@ export class InMemoryPreparedDatasetReuseCatalog {
     return Object.freeze([...this.byAssetId.values()]);
   }
 }
+

@@ -1,6 +1,6 @@
-/// <reference types="node" />
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { createUnifiedIngestionStagePipelineDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
+﻿/// <reference types="node" />
+import type { CanonicalDataShape } from "@domain/dataset-studio/CanonicalDataShapes";
+import { createUnifiedIngestionStagePipelineDefinition } from "@domain/dataset-studio/StagePipelineDomain";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -20,8 +20,8 @@ import {
   type UnifiedIngestionRouteResult,
   type UnifiedIngestionRouteResolution,
   type UnifiedIngestionSourceReference,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionExecutionStages,
   classifyUnifiedIngestionFailure,
@@ -1270,3 +1270,4 @@ export class UnifiedIngestionOrchestrationService {
     return fsPromises.readFile(source.reference, "utf-8");
   }
 }
+

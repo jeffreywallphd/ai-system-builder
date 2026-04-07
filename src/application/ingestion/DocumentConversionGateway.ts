@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   ConversionMetadata,
   FileDescriptor,
   FileIngestionWarning,
   FileIngestionOutputFormat,
-} from "../../domain/ingestion/interfaces/IFileIngestion";
+} from "@domain/ingestion/interfaces/IFileIngestion";
 
 export interface DocumentConversionRequest {
   readonly file: FileDescriptor;
@@ -23,3 +23,4 @@ export interface DocumentConversionResult {
 export interface DocumentConversionGateway {
   convert(request: DocumentConversionRequest): Promise<DocumentConversionResult>;
 }
+

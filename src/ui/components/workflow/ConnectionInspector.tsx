@@ -1,4 +1,4 @@
-import type { WorkflowResponse } from "../../application/dto/WorkflowResponse";
+﻿import type { WorkflowResponse } from "@application/dto/WorkflowResponse";
 
 export interface ConnectionInspectorProps {
   readonly connection?: WorkflowResponse["connections"][number];
@@ -67,7 +67,7 @@ export default function ConnectionInspector({
 
               <div className="ui-meta-item">
                 <div className="ui-meta-label">Label</div>
-                <div className="ui-meta-value">{connection.metadata?.label ?? "—"}</div>
+                <div className="ui-meta-value">{connection.metadata?.label ?? "â€”"}</div>
               </div>
             </div>
 
@@ -106,3 +106,4 @@ export default function ConnectionInspector({
     </section>
   );
 }
+

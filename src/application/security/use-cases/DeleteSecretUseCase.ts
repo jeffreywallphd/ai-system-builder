@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretDomainError,
   archiveSecretRecord,
   softDeleteSecretRecord,
   type SecretScope,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -322,3 +322,4 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
+

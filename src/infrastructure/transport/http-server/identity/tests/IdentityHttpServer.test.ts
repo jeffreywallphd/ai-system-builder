@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
-import { SessionRevocationReasons, revokeSession } from "../../../../../domain/identity/IdentityDomain";
+import { SessionRevocationReasons, revokeSession } from "@domain/identity/IdentityDomain";
 import {
   createIdentityHttpServer,
   type IdentityHttpServerLogEvent,
@@ -1219,3 +1219,4 @@ describe("IdentityHttpServer", () => {
     expect(revokeBody.data.revoked).toBe(true);
   });
 });
+

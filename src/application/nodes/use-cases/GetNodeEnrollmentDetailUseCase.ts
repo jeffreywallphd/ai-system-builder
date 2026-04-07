@@ -1,4 +1,4 @@
-import type { NodeEnrollmentRequestPersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+﻿import type { NodeEnrollmentRequestPersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
@@ -71,3 +71,4 @@ export class GetNodeEnrollmentDetailUseCase {
     };
   }
 }
+

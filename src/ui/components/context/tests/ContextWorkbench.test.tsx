@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { makeWorkflow } from "../../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { ContextInspectionResult } from "../../../../application/context/models/ContextInspectionResult";
-import { ContextAssemblyResult } from "../../../../application/context/models/ContextAssemblyResult";
-import { AssembledContext } from "../../../../application/context/models/AssembledContext";
-import { ExecutionContextEnvelope } from "../../../../application/context/models/ExecutionContextEnvelope";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
+import { ContextAssemblyResult } from "@application/context/models/ContextAssemblyResult";
+import { AssembledContext } from "@application/context/models/AssembledContext";
+import { ExecutionContextEnvelope } from "@application/context/models/ExecutionContextEnvelope";
 import ContextWorkbench from "../ContextWorkbench";
-import type { ContextPreviewResult } from "../../../../application/context/models/ContextPreview";
+import type { ContextPreviewResult } from "@application/context/models/ContextPreview";
 
 function makePreview(overrides: Partial<ContextPreviewResult> = {}): ContextPreviewResult {
   const inspection = new ContextInspectionResult({
@@ -130,3 +130,4 @@ describe("ContextWorkbench", () => {
     expect(html).toContain("Provenance &amp; Ordering");
   });
 });
+

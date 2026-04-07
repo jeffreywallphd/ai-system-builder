@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CreateNodeUseCase } from "../CreateNodeUseCase";
 import { UpdateNodePropertyUseCase } from "../UpdateNodePropertyUseCase";
 import { ConnectNodesUseCase } from "../ConnectNodesUseCase";
 import { RemoveNodeUseCase } from "../RemoveNodeUseCase";
-import { makeNode, makeNodePort, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
-import { NodePort } from "../../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
+import { makeNode, makeNodePort, makeWorkflow } from "@domain/services/tests/testUtils";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodePort } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import { makeNodeCatalogProvider, makeNodeCompatibilityService } from "./testUtils";
 
 describe("application/nodes interactions", () => {
@@ -35,3 +35,4 @@ describe("application/nodes interactions", () => {
     expect(removed.removedConnectionIds).toEqual(["conn"]);
   });
 });
+

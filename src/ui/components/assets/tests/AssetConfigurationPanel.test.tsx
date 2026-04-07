@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import AssetConfigurationPanel from "../AssetConfigurationPanel";
@@ -6,7 +6,7 @@ import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,
   createDataAssetConfigSchema,
-} from "../../../../application/dataset-studio/DataAssetConfiguration";
+} from "@application/dataset-studio/DataAssetConfiguration";
 
 describe("AssetConfigurationPanel", () => {
   it("renders empty state when config schema is missing", () => {
@@ -114,3 +114,4 @@ describe("AssetConfigurationPanel", () => {
     expect(html).toContain("Encoding");
   });
 });
+

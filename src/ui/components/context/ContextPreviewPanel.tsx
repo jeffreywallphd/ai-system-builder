@@ -1,4 +1,4 @@
-import type { ContextPreviewResult } from "../../../application/context/models/ContextPreview";
+﻿import type { ContextPreviewResult } from "@application/context/models/ContextPreview";
 
 export interface ContextPreviewPanelProps {
   readonly preview?: ContextPreviewResult;
@@ -72,3 +72,4 @@ export default function ContextPreviewPanel({ preview }: ContextPreviewPanelProp
     </section>
   );
 }
+

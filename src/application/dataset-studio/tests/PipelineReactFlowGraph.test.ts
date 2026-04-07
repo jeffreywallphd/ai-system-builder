@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createPipelineStageInstance,
   PipelineStageConfigModes,
   PipelineStageIds,
-} from "../../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import { buildPipelineGraph } from "../PipelineGraphConstructionService";
 import { buildReactFlowGraph } from "../PipelineReactFlowGraph";
 
@@ -95,3 +95,4 @@ describe("PipelineReactFlowGraph", () => {
     expect(labelingNode?.data.stageSpecialization?.annotationMode).toBe("manual");
   });
 });
+

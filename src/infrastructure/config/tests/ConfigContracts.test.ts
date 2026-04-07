@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { IEnvironmentConfigProvider } from "../../../application/ports/interfaces/IEnvironmentConfigProvider";
+﻿import { describe, expect, it } from "bun:test";
+import type { IEnvironmentConfigProvider } from "@application/ports/interfaces/IEnvironmentConfigProvider";
 import { EnvironmentConfig } from "../EnvironmentConfig";
 import { EnvironmentConfigProvider } from "../EnvironmentConfigProvider";
 
@@ -15,3 +15,4 @@ describe("config contracts", () => {
     expect(await provider.has("key")).toBe(true);
   });
 });
+

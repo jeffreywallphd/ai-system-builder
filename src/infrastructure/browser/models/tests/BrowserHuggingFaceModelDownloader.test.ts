@@ -1,6 +1,6 @@
-import { describe, expect, it, mock } from "bun:test";
+﻿import { describe, expect, it, mock } from "bun:test";
 import { BrowserHuggingFaceModelDownloader } from "../BrowserHuggingFaceModelDownloader";
-import { makeModel } from "../../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 
 describe("BrowserHuggingFaceModelDownloader", () => {
   it("downloads the selected artifact through the browser and reports size", async () => {
@@ -67,3 +67,4 @@ describe("BrowserHuggingFaceModelDownloader", () => {
     }
   });
 });
+

@@ -1,5 +1,5 @@
-import { PipelineStageIds, type PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+﻿import { PipelineStageIds, type PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import type {
   DataStudioPipelineStageState,
   DataStudioPipelineState,
@@ -692,3 +692,4 @@ export class DataStudioPipelineValidationService {
     }
   }
 }
+

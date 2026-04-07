@@ -1,13 +1,13 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../domain/studio-shell/AssetSelectorContract";
-import { AssetSelectorSessionStore } from "../../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@domain/studio-shell/AssetSelectorContract";
+import { AssetSelectorSessionStore } from "@application/studio-entry/AssetSelectorSessionStore";
 import {
   AssetSelectorUsageContexts,
-} from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
+} from "@application/studio-entry/AssetSelectorCapabilityRegistry";
 import { InlineAssetCreationService, InlineAssetReturnStatuses } from "../../../routes/InlineAssetCreation";
 import { createStudioLaunchHandoffContract, serializeStudioLaunchHandoffContract } from "../../../routes/StudioHandoffContract";
 import { AssetSelectorReturnHandoffService } from "../AssetSelectorReturnHandoffService";
@@ -340,3 +340,4 @@ describe("AssetSelectorReturnHandoffService", () => {
     expect(store.getSession("selector:steps")?.lifecycleState).toBe("active");
   });
 });
+

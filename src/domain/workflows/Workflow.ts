@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   IWorkflow,
   IWorkflowAuditInfo,
   IWorkflowMetadata,
@@ -7,7 +7,7 @@ import type {
   WorkflowExecutionPolicy,
   WorkflowStatus,
 } from "./interfaces/IWorkflow";
-import type { INode } from "../../../domain/nodes/interfaces/INode";
+import type { INode } from "@domain/nodes/interfaces/INode";
 import type { IWorkflowConnection } from "./interfaces/IWorkflowConnection";
 import type { IWorkflowGraph } from "./interfaces/IWorkflowGraph";
 import { WorkflowAuditInfo, WorkflowMetadata, WorkflowRuntimeProfile } from "./WorkflowMetadata";
@@ -321,3 +321,4 @@ export class Workflow implements IWorkflow {
     });
   }
 }
+

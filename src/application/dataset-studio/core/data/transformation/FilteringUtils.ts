@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   normalizeComparableValue,
   toComparableString,
@@ -229,3 +229,4 @@ export function evaluateFilteringConditionGroup(
     conditionEvaluations: Object.freeze(conditionEvaluations),
   });
 }
+

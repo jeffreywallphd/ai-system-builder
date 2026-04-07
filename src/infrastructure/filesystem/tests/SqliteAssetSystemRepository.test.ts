@@ -1,13 +1,13 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteAssetSystemRepository } from "../SqliteAssetSystemRepository";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 
 describe("SqliteAssetSystemRepository", () => {
   it("persists asset, version, lineage edges, and transformations", async () => {
@@ -125,3 +125,4 @@ describe("SqliteAssetSystemRepository", () => {
     }
   });
 });
+

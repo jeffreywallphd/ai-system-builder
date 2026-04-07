@@ -1,12 +1,12 @@
-import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
-import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
-import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
-import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
+﻿import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "@application/mcp/models/LocalMcpServerCreateResult";
+import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerManager } from "@application/ports/interfaces/IMcpServerManager";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources } from "@application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "@application/runtime/RuntimeDiagnostics";
+import type { McpServerConnectionRequest } from "@application/mcp/models/McpServerConnectionRequest";
+import type { McpServerConnectionResult } from "@application/mcp/models/McpServerConnectionResult";
 
 export interface IMcpServerManagerRuntimeClient {
   connectServer(request: McpServerConnectionRequest): Promise<McpServerConnectionResult>;
@@ -98,3 +98,4 @@ export class PythonBackedMcpServerManager implements IMcpServerManager {
     }
   }
 }
+

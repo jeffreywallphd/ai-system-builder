@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   WorkspaceAdminListItemApiRecord,
   WorkspaceInvitationApiRecord,
   WorkspaceMembershipApiRecord,
   WorkspaceRoleAssignmentApiRecord,
-} from "../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 const roleOptions = Object.freeze(["admin", "member", "viewer"] as const);
 const membershipStatusOptions = Object.freeze(["pending", "active", "suspended", "removed"] as const);
@@ -254,3 +254,4 @@ function parseRoleCsv(
   }
   return Object.freeze({ ok: true, roles: roles as Array<"admin" | "member" | "viewer"> });
 }
+

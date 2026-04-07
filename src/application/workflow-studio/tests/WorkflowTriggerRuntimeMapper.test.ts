@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerTypes,
   WorkflowDraftUserTriggerScopes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   inferWorkflowDraftTriggerRuntimeReadiness,
   mapWorkflowDraftTriggerToRuntimeDescriptor,
@@ -164,3 +164,4 @@ describe("WorkflowTriggerRuntimeMapper", () => {
     })).toThrow("five-field cron expression");
   });
 });
+

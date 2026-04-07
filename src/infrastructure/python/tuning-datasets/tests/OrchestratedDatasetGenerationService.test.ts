@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "../../../../application/runtime/RuntimeDependencyOrchestrator";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "@application/runtime/RuntimeDependencyOrchestrator";
 import { OrchestratedDatasetGenerationService } from "../OrchestratedDatasetGenerationService";
 
 describe("OrchestratedDatasetGenerationService", () => {
@@ -102,3 +102,4 @@ describe("OrchestratedDatasetGenerationService", () => {
     })).rejects.toBeInstanceOf(RuntimeDependencyUnavailableError);
   });
 });
+

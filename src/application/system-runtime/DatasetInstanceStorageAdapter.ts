@@ -1,5 +1,5 @@
-import type { DatasetInstance, DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
-import type { DatasetInstanceImageRecord } from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+﻿import type { DatasetInstance, DatasetInstanceRole } from "@domain/system-runtime/DatasetInstanceDomain";
+import type { DatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
 
 export interface DatasetInstanceStorageAdapter {
   saveInstance(instance: DatasetInstance): DatasetInstance;
@@ -37,3 +37,4 @@ export interface DatasetInstanceStorageAdapter {
     readonly instanceId: string;
   }): ReadonlyArray<DatasetInstanceImageRecord>;
 }
+

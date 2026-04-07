@@ -1,5 +1,5 @@
-import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
-import type { WorkflowResponse } from "../../application/dto/WorkflowResponse";
+﻿import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
+import type { WorkflowResponse } from "@application/dto/WorkflowResponse";
 import ReactFlowCanvas from "./reactflow/ReactFlowCanvas";
 
 export interface WorkflowCanvasProps {
@@ -88,3 +88,4 @@ export default function WorkflowCanvas({
     </section>
   );
 }
+

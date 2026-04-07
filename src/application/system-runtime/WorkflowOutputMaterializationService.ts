@@ -1,14 +1,14 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { ImageAssetReferenceInput } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import type {
   DatasetInstanceImageGeneration,
   DatasetInstanceImageRecord,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   findDatasetInstanceStorageBinding,
   resolveDatasetInstanceStorageBinding,
   type DatasetInstanceStorageBinding,
-} from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-runtime/DatasetInstanceDomain";
 import type { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 import type { WorkflowOutputArtifactStorage } from "./WorkflowOutputArtifactStorage";
 import type { WorkflowOutputProvenanceRepository } from "./WorkflowOutputProvenanceRepository";
@@ -485,3 +485,4 @@ export class WorkflowOutputMaterializationService {
     return normalized.split("/")[1]?.trim() || undefined;
   }
 }
+

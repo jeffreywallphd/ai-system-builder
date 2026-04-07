@@ -1,9 +1,9 @@
-import {
+﻿import {
   getWorkflowOutputTargetDefinition,
   type WorkflowOutputTargetDefinition,
-} from "../../domain/system-runtime/WorkflowOutputTargetDomain";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
-import type { WorkflowOutputBindingDescriptor } from "../../domain/workflow-studio/WorkflowOutputBindingDomain";
+} from "@domain/system-runtime/WorkflowOutputTargetDomain";
+import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
+import type { WorkflowOutputBindingDescriptor } from "@domain/workflow-studio/WorkflowOutputBindingDomain";
 import type { SystemDatasetInstanceService } from "../system-runtime/SystemDatasetInstanceService";
 
 export interface ResolveWorkflowOutputBindingWritePlanRequest {
@@ -198,3 +198,4 @@ export async function resolveWorkflowOutputBindingWritePlan(
     issues: Object.freeze(issues),
   });
 }
+

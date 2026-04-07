@@ -1,10 +1,10 @@
-import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../../application/ports/interfaces/IModelTrainingRuntime";
+﻿import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "@application/ports/interfaces/IModelTrainingRuntime";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyUnavailableError,
   type IRuntimeDependencyOrchestrator,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
-import type { ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import { createRuntimeDependencyDetail } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export class OrchestratedModelTrainingRuntime implements IModelTrainingRuntime {
@@ -53,3 +53,4 @@ export class OrchestratedModelTrainingRuntime implements IModelTrainingRuntime {
     }
   }
 }
+

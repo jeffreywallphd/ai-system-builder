@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   ChangeLocalPasswordCredentialApiRequest,
   ChangeLocalPasswordCredentialApiResponse,
@@ -40,7 +40,7 @@ import {
   DesktopTrustedDeviceBootstrapFailureReasons,
 } from "../../../security/DesktopTrustedDeviceTransportBootstrap";
 import { DesktopTrustedDeviceIdentityAuthClient } from "../DesktopTrustedDeviceIdentityAuthClient";
-import type { IdentityAuthClient } from "../../../../../ui/shared/identity/IdentityAuthClient";
+import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
 
 describe("DesktopTrustedDeviceIdentityAuthClient", () => {
   it("blocks login when trusted-device bootstrap fails", async () => {
@@ -230,3 +230,4 @@ function createStubClient(overrides: {
 
   return { client, loginRequests, logoutTokens };
 }
+

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
@@ -7,7 +7,7 @@ import { createIdentityHttpServer } from "../IdentityHttpServer";
 import type {
   IStorageManagementService,
   StorageManagementResult,
-} from "../../../../../application/storage/use-cases/StorageManagementServiceContracts";
+} from "@application/storage/use-cases/StorageManagementServiceContracts";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -16,7 +16,7 @@ import {
   StorageManagedActions,
   createStorageInstance,
   type StorageInstance,
-} from "../../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 const servers: Server[] = [];
 
@@ -344,3 +344,4 @@ describe("IdentityHttpServer storage management routes", () => {
     expect(invalidListResponse.status).toBe(400);
   });
 });
+

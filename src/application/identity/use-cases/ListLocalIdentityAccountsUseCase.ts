@@ -1,8 +1,8 @@
-import {
+﻿import {
   CredentialStatuses,
   type CredentialState,
   type UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -10,9 +10,9 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
 import type { IdentityAdministrativeActionContext } from "./IdentityAdministrativeContext";
 
 export interface ListLocalIdentityAccountsInput {
@@ -155,3 +155,4 @@ function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }
+

@@ -1,12 +1,12 @@
-import {
+﻿import {
   validatePipelineDefinition,
   type PipelineDefinition,
-} from "../../domain/dataset-studio/PipelineDefinitionDomain";
+} from "@domain/dataset-studio/PipelineDefinitionDomain";
 import {
   createPipelineStageInstance,
   type PipelineStageId,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   buildPipelineGraph,
   type PipelineGraphTransition,
@@ -133,3 +133,4 @@ export function createPipelineValidationService(input?: {
 }): PipelineValidationService {
   return new PipelineValidationService(input);
 }
+

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { once } from "node:events";
@@ -12,12 +12,12 @@ import type {
   StorageObjectReference,
   StorageObjectWriteRequest,
   StorageObjectWriteResult,
-} from "../../../application/storage/ports/StorageObjectPort";
+} from "@application/storage/ports/StorageObjectPort";
 import {
   StorageObjectAccessError,
   StorageObjectErrorCodes,
-} from "../../../application/storage/ports/StorageObjectPort";
-import { StorageBackendTypes } from "../../../domain/storage/StorageDomain";
+} from "@application/storage/ports/StorageObjectPort";
+import { StorageBackendTypes } from "@domain/storage/StorageDomain";
 
 export interface LocalStorageObjectAdapterConfiguration {
   readonly managedStorageRootPath: string;
@@ -442,3 +442,4 @@ export class ServerManagedLocalStorageObjectAdapter implements IStorageObjectPor
     return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST";
   }
 }
+

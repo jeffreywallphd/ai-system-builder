@@ -1,5 +1,5 @@
-import type { JSX } from "react";
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import type { JSX } from "react";
+import type { WorkflowDraft, WorkflowValidationIssue } from "@domain/workflow-studio/WorkflowStudioDomain";
 import type {
   WizardExperienceAssetDefinition,
 } from "../experience-assets/ConfigurableWizardSurfaceContracts";
@@ -180,7 +180,7 @@ function renderOutputsTerminalArea(context: WorkflowWizardExperienceContext): JS
                 <li key={summary.outputId} className="ui-workflow-wizard__output-summary-item">
                   <div><strong>{summary.order}. {summary.displayLabel}</strong> <span className="ui-text-secondary">({summary.typeLabel})</span></div>
                   {summary.detailLines.length > 0 ? (
-                    <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" · ")}</div>
+                    <div className="ui-text-small ui-text-secondary">{summary.detailLines.join(" Â· ")}</div>
                   ) : (
                     <div className="ui-text-small ui-text-secondary">No additional output details configured.</div>
                   )}
@@ -300,3 +300,4 @@ export function buildWorkflowWizardExperienceAdapterModel(
     firstIncompleteSectionId: progress.firstIncompleteSectionId,
   });
 }
+

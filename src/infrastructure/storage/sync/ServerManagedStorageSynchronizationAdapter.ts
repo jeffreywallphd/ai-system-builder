@@ -1,5 +1,5 @@
-import type { StorageBackendCapabilitySnapshot } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
-import { StorageBackendTypes, StorageReplicationModes, type StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import type { StorageBackendCapabilitySnapshot } from "@application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendTypes, StorageReplicationModes, type StorageInstance } from "@domain/storage/StorageDomain";
 
 export const StorageSyncDeploymentAvailabilities = Object.freeze({
   active: "active",
@@ -196,3 +196,4 @@ export class ServerManagedStorageSynchronizationAdapter implements StorageSynchr
     return "pending";
   }
 }
+

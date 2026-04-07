@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListInstalledModelsUseCase } from "../ListInstalledModelsUseCase";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeInstalledModelCatalog } from "./testUtils";
 import { CanonicalAssetIdentityService } from "../../assets-system/CanonicalAssetIdentityService";
 
@@ -129,3 +129,4 @@ describe("ListInstalledModelsUseCase", () => {
     expect(result.canonicalByModelId?.m?.fallbackReason).toContain("No canonical identity mapping");
   });
 });
+

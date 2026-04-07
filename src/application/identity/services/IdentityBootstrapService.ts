@@ -1,4 +1,4 @@
-import {
+﻿import {
   AuthProviderCategories,
   AuthProviderKinds,
   AuthProviderStatuses,
@@ -8,7 +8,7 @@ import {
   createLocalCredentialState,
   createUserIdentity,
   type AuthProvider,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
@@ -342,3 +342,4 @@ export class IdentityBootstrapService {
     return identityFailure(error);
   }
 }
+

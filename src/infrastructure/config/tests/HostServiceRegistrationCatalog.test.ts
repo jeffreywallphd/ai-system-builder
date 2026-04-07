@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthoritativeServerHostRuntime,
   DesktopHostRuntime,
   HybridHostRuntime,
   WebHostRuntime,
   WorkerHostRuntime,
-} from "../../../hosts/HostRuntimeCatalog";
+} from "@hosts/HostRuntimeCatalog";
 import {
   HostComposableServiceKinds,
   HostServiceRegistrationError,
@@ -137,3 +137,4 @@ describe("HostServiceRegistration", () => {
     ])).toThrow(HostServiceRegistrationError);
   });
 });
+

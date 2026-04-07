@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
+﻿import { describe, expect, it } from "bun:test";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 import { LocalFileStorage } from "../LocalFileStorage";
 
 describe("filesystem contracts", () => {
@@ -10,3 +10,4 @@ describe("filesystem contracts", () => {
     expect(typeof storage.list).toBe("function");
   });
 });
+

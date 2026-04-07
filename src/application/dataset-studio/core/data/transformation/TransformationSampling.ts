@@ -1,10 +1,10 @@
-import {
+﻿import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   type CanonicalRecordItem,
   type CanonicalRecordsShape,
   type CanonicalTableRow,
-} from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import type { TransformationInputData } from "./TransformationContracts";
 
 function normalizeSampleSize(sampleSize: number | undefined, totalCount: number): number {
@@ -47,3 +47,4 @@ export function sampleTransformationInputData(
     metadata: data.metadata,
   });
 }
+

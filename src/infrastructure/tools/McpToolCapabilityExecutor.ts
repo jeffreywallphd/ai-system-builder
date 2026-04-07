@@ -1,7 +1,7 @@
-import type { IMcpToolExecutor } from "../../application/ports/interfaces/IMcpToolExecutor";
-import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
-import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
-import type { ToolCapabilityInvocationResult } from "../../application/tools/models/ToolCapabilityInvocationResult";
+﻿import type { IMcpToolExecutor } from "@application/ports/interfaces/IMcpToolExecutor";
+import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
+import type { ToolCapabilityInvocationRequest } from "@application/tools/models/ToolCapabilityInvocationRequest";
+import type { ToolCapabilityInvocationResult } from "@application/tools/models/ToolCapabilityInvocationResult";
 
 export class McpToolCapabilityExecutor implements IToolCapabilityExecutor {
   constructor(private readonly executor: IMcpToolExecutor) {}
@@ -44,3 +44,4 @@ export class McpToolCapabilityExecutor implements IToolCapabilityExecutor {
     });
   }
 }
+

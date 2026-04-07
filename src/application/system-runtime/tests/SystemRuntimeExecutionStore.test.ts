@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemExecution } from "../../../domain/system-runtime/SystemRuntimeDomain";
-import { createSystemStudioTaxonomy } from "../../../domain/system-studio/SystemAssetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemExecution } from "@domain/system-runtime/SystemRuntimeDomain";
+import { createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
 import { InMemorySystemRuntimeExecutionStore } from "../SystemRuntimeExecutionStore";
 
 function createExecution(executionId: string, startedAt: string) {
@@ -51,3 +51,4 @@ describe("InMemorySystemRuntimeExecutionStore", () => {
     expect(store.getExecutionRecord("exec:3")).toBeDefined();
   });
 });
+

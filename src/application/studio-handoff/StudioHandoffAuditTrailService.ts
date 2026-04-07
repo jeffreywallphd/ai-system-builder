@@ -1,9 +1,9 @@
-import {
+﻿import {
   createStudioHandoffAuditRecord,
   type StudioHandoffAuditEventKind,
   type StudioHandoffAuditOutcome,
   type StudioHandoffAuditRecord,
-} from "../../domain/studio-handoff/StudioHandoffAuditTrail";
+} from "@domain/studio-handoff/StudioHandoffAuditTrail";
 
 export interface StudioHandoffAuditRepository {
   save(record: StudioHandoffAuditRecord): StudioHandoffAuditRecord;
@@ -78,3 +78,4 @@ export class StudioHandoffAuditTrailService {
     return this.repository.listByHandoffId(handoffId, limit);
   }
 }
+

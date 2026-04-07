@@ -1,4 +1,4 @@
-import type { PersistedWorkflowSummary } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+﻿import type { PersistedWorkflowSummary } from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import type {
   IWorkflowPersistenceRepository,
   WorkflowPersistenceListQuery,
@@ -16,3 +16,4 @@ export class ListPersistedWorkflowsUseCase {
     }
   }
 }
+

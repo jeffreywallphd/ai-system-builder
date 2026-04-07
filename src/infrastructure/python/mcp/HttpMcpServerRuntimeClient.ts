@@ -1,15 +1,15 @@
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
-import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { McpServerConnectionRequest } from "../../../application/mcp/models/McpServerConnectionRequest";
-import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
-import type { McpServerDescriptor, McpServerValidationResult } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerDiagnosticsSnapshot } from "../../../application/mcp/models/McpServerDiagnosticsSnapshot";
-import type { McpServerTestConnectionResult } from "../../../application/mcp/models/McpServerTestConnectionResult";
-import type { McpSyncResult } from "../../../application/mcp/models/McpSyncResult";
-import type { McpExportResult, McpImportResult, McpServerImportExportRecord } from "../../../application/mcp/models/McpImportExport";
-import type { McpToolInvocationTrace } from "../../../application/mcp/models/McpToolExecutionResult";
+﻿import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "@application/mcp/models/LocalMcpServerCreateResult";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpServerConnectionRequest } from "@application/mcp/models/McpServerConnectionRequest";
+import type { McpServerConnectionResult } from "@application/mcp/models/McpServerConnectionResult";
+import type { McpServerDescriptor, McpServerValidationResult } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerDiagnosticsSnapshot } from "@application/mcp/models/McpServerDiagnosticsSnapshot";
+import type { McpServerTestConnectionResult } from "@application/mcp/models/McpServerTestConnectionResult";
+import type { McpSyncResult } from "@application/mcp/models/McpSyncResult";
+import type { McpExportResult, McpImportResult, McpServerImportExportRecord } from "@application/mcp/models/McpImportExport";
+import type { McpToolInvocationTrace } from "@application/mcp/models/McpToolExecutionResult";
 import { HttpMcpRuntimeClient } from "./HttpMcpRuntimeClient";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 
@@ -90,3 +90,4 @@ export class HttpMcpServerRuntimeClient {
     return this.runtimeClient.getInvocationHistory!(serverId);
   }
 }
+

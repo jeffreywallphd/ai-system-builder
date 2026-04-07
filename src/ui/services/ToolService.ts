@@ -1,13 +1,13 @@
-import type { CapabilitySearchQuery } from "../../application/research/models/CapabilitySearchQuery";
-import { SearchCapabilitiesUseCase } from "../../application/research/SearchCapabilitiesUseCase";
-import type { ToolSearchCriteria } from "../../application/dto/ToolSearchCriteria";
-import type { ToolRunRequest } from "../../application/projection/models/ToolRunRequest";
-import { ListToolCapabilitiesUseCase } from "../../application/tools/ListToolCapabilitiesUseCase";
-import { LoadToolDefinitionUseCase } from "../../application/tools/LoadToolDefinitionUseCase";
-import { InvokeToolCapabilityUseCase } from "../../application/tools/InvokeToolCapabilityUseCase";
-import { ListPublishedToolsUseCase } from "../../application/tools/ListPublishedToolsUseCase";
-import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
-import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
+﻿import type { CapabilitySearchQuery } from "@application/research/models/CapabilitySearchQuery";
+import { SearchCapabilitiesUseCase } from "@application/research/SearchCapabilitiesUseCase";
+import type { ToolSearchCriteria } from "@application/dto/ToolSearchCriteria";
+import type { ToolRunRequest } from "@application/projection/models/ToolRunRequest";
+import { ListToolCapabilitiesUseCase } from "@application/tools/ListToolCapabilitiesUseCase";
+import { LoadToolDefinitionUseCase } from "@application/tools/LoadToolDefinitionUseCase";
+import { InvokeToolCapabilityUseCase } from "@application/tools/InvokeToolCapabilityUseCase";
+import { ListPublishedToolsUseCase } from "@application/tools/ListPublishedToolsUseCase";
+import { RunToolUseCase } from "@application/tools/RunToolUseCase";
+import type { ToolCapabilityInvocationRequest } from "@application/tools/models/ToolCapabilityInvocationRequest";
 
 export class ToolService {
   constructor(
@@ -43,3 +43,4 @@ export class ToolService {
     return this.invokeToolCapabilityUseCase.execute(request);
   }
 }
+

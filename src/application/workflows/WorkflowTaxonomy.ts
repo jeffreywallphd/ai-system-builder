@@ -1,5 +1,5 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { CompositionTaxonomyDescriptor, TaxonomyBehaviorKind } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { CompositionTaxonomyDescriptor, TaxonomyBehaviorKind } from "@domain/taxonomy/CompositionTaxonomy";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
 
 const classifier = new CompositionTaxonomyClassifier();
@@ -10,3 +10,4 @@ export function classifyWorkflowTaxonomy(
 ): CompositionTaxonomyDescriptor {
   return classifier.classifyWorkflow(workflow, behaviorKind);
 }
+

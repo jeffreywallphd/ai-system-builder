@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
@@ -7,8 +7,8 @@ import {
   type IdentityOperationResult,
   type TrustedDeviceDisplayNameUpdate,
   type TrustedDeviceRecord,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ITrustedDeviceManagementService } from "../../../../application/identity/ports/ITrustedDeviceManagementService";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ITrustedDeviceManagementService } from "@application/identity/ports/ITrustedDeviceManagementService";
 
 export type UpdateTrustedDeviceDisplayNameErrorCode =
   | typeof IdentityErrorCodes.invalidRequest
@@ -89,3 +89,4 @@ function normalizeErrorMessage(error: unknown): string {
   }
   return "Trusted device update failed.";
 }
+

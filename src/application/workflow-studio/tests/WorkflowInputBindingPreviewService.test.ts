@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createWorkflowInputBindingDescriptor, WorkflowInputBindingSourceKinds } from "../../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createWorkflowInputBindingDescriptor, WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import { previewWorkflowInputBindings } from "../WorkflowInputBindingPreviewService";
 
 describe("previewWorkflowInputBindings", () => {
@@ -127,3 +127,4 @@ describe("previewWorkflowInputBindings", () => {
     expect(preview.diagnostics.some((diagnostic) => diagnostic.code === "source-value-missing")).toBeFalse();
   });
 });
+

@@ -1,10 +1,10 @@
-import {
+﻿import {
   WorkflowInputBindingContractVersion,
   WorkflowInputBindingDescriptorSchema,
   createWorkflowInputBindingDescriptor,
   validateWorkflowInputBindingDefinitions,
   type WorkflowInputBindingDescriptor,
-} from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
 
 export interface ImageWorkflowInputBindingConfiguration {
   readonly contractVersion: string;
@@ -44,3 +44,4 @@ export function duplicateImageWorkflowInputBindingConfiguration(
     bindings: input.bindings,
   });
 }
+

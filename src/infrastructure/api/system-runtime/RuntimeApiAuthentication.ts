@@ -1,4 +1,4 @@
-import { ExecutionCallerKinds, type ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
+﻿import { ExecutionCallerKinds, type ExecutionAccessContext } from "@application/system-runtime/RuntimeAccessControlService";
 
 export interface RuntimeApiAuthenticationRequest {
   readonly bearerToken?: string;
@@ -99,3 +99,4 @@ export class StaticTokenRuntimeApiAuthenticator implements RuntimeApiAuthenticat
     });
   }
 }
+

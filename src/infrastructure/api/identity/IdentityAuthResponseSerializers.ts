@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   CompleteTrustedDevicePairingApiResponse,
   ChangeLocalPasswordCredentialApiResponse,
   GetIdentityAdminAccountStatusApiResponse,
@@ -17,18 +17,18 @@ import type {
   UpdateTrustedDeviceDisplayNameApiResponse,
   ValidateTrustedDevicePairingApiResponse,
 } from "./sdk/PublicIdentityAuthApiContract";
-import type { ChangeLocalPasswordCredentialResult } from "../../../application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
-import type { LocalIdentityAccountSummary } from "../../../application/identity/use-cases/ListLocalIdentityAccountsUseCase";
-import type { SetLocalIdentityAccountStatusResult } from "../../../application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
-import type { IssueAuthenticatedSessionResult } from "../../../application/identity/services/IdentityAuthenticatedSessionService";
-import type { LoginLocalAccountResult } from "../../../application/identity/use-cases/LoginLocalAccountUseCase";
-import type { SessionDeviceTrustContext } from "../../../domain/identity/IdentityDomain";
+import type { ChangeLocalPasswordCredentialResult } from "@application/identity/use-cases/ChangeLocalPasswordCredentialUseCase";
+import type { LocalIdentityAccountSummary } from "@application/identity/use-cases/ListLocalIdentityAccountsUseCase";
+import type { SetLocalIdentityAccountStatusResult } from "@application/identity/use-cases/SetLocalIdentityAccountStatusUseCase";
+import type { IssueAuthenticatedSessionResult } from "@application/identity/services/IdentityAuthenticatedSessionService";
+import type { LoginLocalAccountResult } from "@application/identity/use-cases/LoginLocalAccountUseCase";
+import type { SessionDeviceTrustContext } from "@domain/identity/IdentityDomain";
 import type {
   TrustedDevicePairingCompletionResponse,
   TrustedDevicePairingInitiationResponse,
   TrustedDevicePairingValidationResponse,
   TrustedDeviceRecord,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 
 export function serializeRegisterLocalIdentityResponse(value: RegisterLocalIdentityApiResponse): RegisterLocalIdentityApiResponse {
   return Object.freeze({
@@ -357,3 +357,4 @@ function mapDomainSessionDeviceTrustContext(
     trustMarker: value.trustMarker,
   });
 }
+

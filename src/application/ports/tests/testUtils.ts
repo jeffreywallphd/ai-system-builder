@@ -1,7 +1,7 @@
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import type { IModel } from "../../../domain/models/interfaces/IModel";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 
 export function makeModel(overrides: Partial<IModel> = {}): IModel {
   const base: IModel = {
@@ -122,3 +122,4 @@ export function makeAsset(overrides: Partial<IAsset> = {}): IAsset {
     ...overrides,
   } as IAsset;
 }
+

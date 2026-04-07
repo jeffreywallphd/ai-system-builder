@@ -1,29 +1,29 @@
-import type { IModelExecutor } from "../../../application/ports/interfaces/IModelExecutor";
-import type { INodeExecutor, INodeExecutionResult } from "../../../application/ports/interfaces/INodeExecutor";
-import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import { InspectContextAssemblyUseCase } from "../../../application/context/InspectContextAssemblyUseCase";
-import type { IAssembledContextFragment } from "../../../application/context/models/AssembledContext";
-import type { ContextFragmentKind } from "../../../application/context/models/ContextFragment";
-import type { IContextBudget } from "../../../application/context/models/ContextBudget";
-import type { IContextTrimmingPolicy } from "../../../application/context/models/ContextTrimmingPolicy";
-import { deriveMcpExecutionProvenance } from "../../../application/execution/ExecutionTruth";
-import { ExecuteMcpToolUseCase } from "../../../application/mcp/ExecuteMcpToolUseCase";
+﻿import type { IModelExecutor } from "@application/ports/interfaces/IModelExecutor";
+import type { INodeExecutor, INodeExecutionResult } from "@application/ports/interfaces/INodeExecutor";
+import type { INodeExecutionContext } from "@application/ports/interfaces/INodeExecutionContextResolver";
+import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
+import { InspectContextAssemblyUseCase } from "@application/context/InspectContextAssemblyUseCase";
+import type { IAssembledContextFragment } from "@application/context/models/AssembledContext";
+import type { ContextFragmentKind } from "@application/context/models/ContextFragment";
+import type { IContextBudget } from "@application/context/models/ContextBudget";
+import type { IContextTrimmingPolicy } from "@application/context/models/ContextTrimmingPolicy";
+import { deriveMcpExecutionProvenance } from "@application/execution/ExecutionTruth";
+import { ExecuteMcpToolUseCase } from "@application/mcp/ExecuteMcpToolUseCase";
 import {
   McpToolCallNodeConfigurationService,
   MCP_TOOL_CALL_TOOL_ID_PROPERTY,
-} from "../../../application/mcp/McpToolCallNodeConfigurationService";
-import { McpToolRegistryError } from "../../../application/mcp/registry/McpToolRegistryErrors";
-import type { McpToolPermissionScope } from "../../../domain/mcp/McpToolTrust";
-import type { INode } from "../../../../domain/nodes/interfaces/INode";
+} from "@application/mcp/McpToolCallNodeConfigurationService";
+import { McpToolRegistryError } from "@application/mcp/registry/McpToolRegistryErrors";
+import type { McpToolPermissionScope } from "@domain/mcp/McpToolTrust";
+import type { INode } from "@domain/nodes/interfaces/INode";
 import type {
   ChatMessage,
   Document,
   ToolCall,
   ToolDefinition,
-} from "../../../../domain/nodes/WorkflowDataTypes";
+} from "@domain/nodes/WorkflowDataTypes";
 
 interface UploadedDocument {
   readonly name?: string;
@@ -2122,3 +2122,4 @@ Used tool '${chosenTool?.name}' and observed: ${normalizeText(executedTool.toolR
     };
   }
 }
+

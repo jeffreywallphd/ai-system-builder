@@ -1,19 +1,19 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
-import { DatasetPipelineStageKinds, type DatasetPipelineStageKind } from "../../domain/dataset-studio/StagePipelineDomain";
-import { PipelineStageIds, type PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
-import { createDataStudioPipelineExecutionProvenance, DataStudioPipelineExecutionArtifacts, type DataStudioPipelineExecutionResult, type DataStudioPipelineExecutionStageRecord, type DataStudioPipelineExecutionUnitInput } from "../../application/data-studio/DataStudioPipelineExecution";
+﻿import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import { DatasetPipelineStageKinds, type DatasetPipelineStageKind } from "@domain/dataset-studio/StagePipelineDomain";
+import { PipelineStageIds, type PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
+import { createDataStudioPipelineExecutionProvenance, DataStudioPipelineExecutionArtifacts, type DataStudioPipelineExecutionResult, type DataStudioPipelineExecutionStageRecord, type DataStudioPipelineExecutionUnitInput } from "@application/data-studio/DataStudioPipelineExecution";
 import {
   buildPreparedDatasetLineage,
   buildPreparedDatasetReuseReference,
   validatePreparedDatasetLineageLinks,
-} from "../../application/data-studio/DataStudioLineageAndReuseService";
-import { PreparedStorageStageService } from "../../application/dataset-studio/PreparedStorageStageService";
-import { StageAssetMappingService } from "../../application/dataset-studio/StageAssetMappingService";
+} from "@application/data-studio/DataStudioLineageAndReuseService";
+import { PreparedStorageStageService } from "@application/dataset-studio/PreparedStorageStageService";
+import { StageAssetMappingService } from "@application/dataset-studio/StageAssetMappingService";
 import type {
   IExecutionUnitExecutionRequest,
   IExecutionUnitExecutionResult,
   IExecutionUnitHandler,
-} from "../../application/execution/UnifiedExecutionEngine";
+} from "@application/execution/UnifiedExecutionEngine";
 
 const StageKindByPipelineStageId: Readonly<Record<PipelineStageId, DatasetPipelineStageKind | undefined>> = Object.freeze({
   [PipelineStageIds.SourceSelection]: DatasetPipelineStageKinds.sourceSelection,
@@ -287,3 +287,4 @@ export class DataStudioPipelineExecutionUnitHandler implements IExecutionUnitHan
     });
   }
 }
+

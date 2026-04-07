@@ -1,25 +1,25 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../../domain/agents/Agent";
-import { createAgent } from "../../../../domain/agents/Agent";
-import { AssetId } from "../../../../domain/assets/AssetId";
-import type { IAgentRepository } from "../../../../application/ports/interfaces/IAgentRepository";
-import type { IAgentExecutionSessionRepository, AgentExecutionSessionTransitionRecord } from "../../../../application/ports/interfaces/IAgentExecutionSessionRepository";
-import type { AgentExecutionSession } from "../../../../domain/agents/AgentExecutionSession";
-import { AgentExecutionSessionStatuses, createAgentExecutionSession, transitionAgentExecutionSession } from "../../../../domain/agents/AgentExecutionSession";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import { createAgent } from "@domain/agents/Agent";
+import { AssetId } from "@domain/assets/AssetId";
+import type { IAgentRepository } from "@application/ports/interfaces/IAgentRepository";
+import type { IAgentExecutionSessionRepository, AgentExecutionSessionTransitionRecord } from "@application/ports/interfaces/IAgentExecutionSessionRepository";
+import type { AgentExecutionSession } from "@domain/agents/AgentExecutionSession";
+import { AgentExecutionSessionStatuses, createAgentExecutionSession, transitionAgentExecutionSession } from "@domain/agents/AgentExecutionSession";
 import { AgentStudioBackendApi } from "../AgentStudioBackendApi";
-import { AgentRunControlActions } from "../../../../application/agents/contracts/AgentRunContracts";
-import { AgentRunnerService } from "../../../../application/agents/services/AgentRunnerService";
-import { DeterministicAgentPlanningService } from "../../../../application/agents/services/AgentPlanningInterface";
-import { ExecuteAgentToolsUseCase } from "../../../../application/agents/ExecuteAgentToolsUseCase";
-import { DefaultAgentMemoryRetrievalService } from "../../../../application/agents/services/AgentMemoryRetrievalService";
-import { AgentMemoryWriteService } from "../../../../application/agents/services/AgentMemoryWriteService";
-import { AssetBackedAgentMemoryStore } from "../../../../application/agents/services/AssetBackedAgentMemoryStore";
-import type { IToolCapabilityCatalog } from "../../../../application/ports/interfaces/IToolCapabilityCatalog";
-import type { IAgentToolOrchestrator } from "../../../../application/ports/interfaces/IAgentToolOrchestrator";
-import type { IAssetCatalog } from "../../../../application/ports/interfaces/IAssetCatalog";
-import type { IAssetVersionRepository } from "../../../../application/ports/interfaces/IAssetVersionRepository";
-import { Asset } from "../../../../domain/assets/Asset";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
+import { AgentRunControlActions } from "@application/agents/contracts/AgentRunContracts";
+import { AgentRunnerService } from "@application/agents/services/AgentRunnerService";
+import { DeterministicAgentPlanningService } from "@application/agents/services/AgentPlanningInterface";
+import { ExecuteAgentToolsUseCase } from "@application/agents/ExecuteAgentToolsUseCase";
+import { DefaultAgentMemoryRetrievalService } from "@application/agents/services/AgentMemoryRetrievalService";
+import { AgentMemoryWriteService } from "@application/agents/services/AgentMemoryWriteService";
+import { AssetBackedAgentMemoryStore } from "@application/agents/services/AssetBackedAgentMemoryStore";
+import type { IToolCapabilityCatalog } from "@application/ports/interfaces/IToolCapabilityCatalog";
+import type { IAgentToolOrchestrator } from "@application/ports/interfaces/IAgentToolOrchestrator";
+import type { IAssetCatalog } from "@application/ports/interfaces/IAssetCatalog";
+import type { IAssetVersionRepository } from "@application/ports/interfaces/IAssetVersionRepository";
+import { Asset } from "@domain/assets/Asset";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 
 class InMemoryAgentRepository implements IAgentRepository {
   private readonly store = new Map<string, Agent>();
@@ -222,3 +222,4 @@ describe("AgentStudioBackendApi", () => {
     expect(trigger.data?.binding.trigger.kind).toBe("backend");
   });
 });
+

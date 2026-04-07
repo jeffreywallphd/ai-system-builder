@@ -1,8 +1,8 @@
-import { ExecutionPlan, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionPlan, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import type {
   DatasetGenerationRequest,
   DatasetGenerationResult,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getDatasetGenerationResult } from "./DatasetGenerationExecutionAdapter";
 import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
@@ -66,3 +66,4 @@ export function requireDatasetGenerationResultFromUnitResult(
   }
   return datasetGenerationResult;
 }
+

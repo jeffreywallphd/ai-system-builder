@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "../../../domain/assets/AssetMetadata";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "@domain/assets/AssetMetadata";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 import {
@@ -659,3 +659,4 @@ describe("Asset export services", () => {
     expect(metadataText).toContain("\"exchangeProvenance\"");
   });
 });
+

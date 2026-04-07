@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   canMoveWorkflowTrigger,
@@ -202,3 +202,4 @@ describe("WorkflowWizardTriggers", () => {
     expect(getWorkflowTriggerKindLabel(WorkflowDraftTriggerKinds.state)).toBe("State");
   });
 });
+

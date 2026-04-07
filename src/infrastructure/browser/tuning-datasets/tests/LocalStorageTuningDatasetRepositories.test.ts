@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ChatCompletionExample, DatasetExportRecord, TuningDataset, TuningDatasetVersion, QuestionAnsweringExample, SourceDocumentReference } from "../../../../domain/tuning-datasets/TuningDatasetEntities";
+﻿import { describe, expect, it } from "bun:test";
+import { ChatCompletionExample, DatasetExportRecord, TuningDataset, TuningDatasetVersion, QuestionAnsweringExample, SourceDocumentReference } from "@domain/tuning-datasets/TuningDatasetEntities";
 import { LocalStorageTuningDatasetRepository } from "../LocalStorageTuningDatasetRepository";
 import { LocalStorageTuningDatasetVersionRepository } from "../LocalStorageTuningDatasetVersionRepository";
 
@@ -105,3 +105,4 @@ describe("LocalStorage tuning dataset repositories", () => {
     expect(workflow?.currentStage).toBe("source_ingestion");
   });
 });
+

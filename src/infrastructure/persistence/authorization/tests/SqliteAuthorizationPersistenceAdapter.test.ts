@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,8 +9,8 @@ import {
   RoleAssignmentStatuses,
   SharingPolicyModes,
   SharingSubjectKinds,
-} from "../../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteAuthorizationPersistenceAdapter } from "../SqliteAuthorizationPersistenceAdapter";
 
@@ -504,3 +504,4 @@ describe("SqliteAuthorizationPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

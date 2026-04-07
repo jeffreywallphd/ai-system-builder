@@ -1,17 +1,17 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { AssetManagementBackendApi } from "../../../../api/assets/AssetManagementBackendApi";
-import { AssetUploadInitiationService } from "../../../../../application/assets/use-cases/AssetUploadInitiationService";
-import { AssetUploadIngestionService } from "../../../../../application/assets/use-cases/AssetUploadIngestionService";
-import { AssetDiscoveryService } from "../../../../../application/assets/use-cases/AssetDiscoveryService";
-import { AssetDetailService } from "../../../../../application/assets/use-cases/AssetDetailService";
-import { AssetDownloadService } from "../../../../../application/assets/use-cases/AssetDownloadService";
-import { AssetGeneratedOutputRegistrationService } from "../../../../../application/assets/use-cases/AssetGeneratedOutputRegistrationService";
-import { AssetPreviewService } from "../../../../../application/assets/use-cases/AssetPreviewService";
-import { AssetLifecycleService } from "../../../../../application/assets/use-cases/AssetLifecycleService";
+import { AssetUploadInitiationService } from "@application/assets/use-cases/AssetUploadInitiationService";
+import { AssetUploadIngestionService } from "@application/assets/use-cases/AssetUploadIngestionService";
+import { AssetDiscoveryService } from "@application/assets/use-cases/AssetDiscoveryService";
+import { AssetDetailService } from "@application/assets/use-cases/AssetDetailService";
+import { AssetDownloadService } from "@application/assets/use-cases/AssetDownloadService";
+import { AssetGeneratedOutputRegistrationService } from "@application/assets/use-cases/AssetGeneratedOutputRegistrationService";
+import { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewService";
+import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
 import {
   AssetKinds,
   AssetVisibilities,
@@ -22,7 +22,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 
 const servers: Server[] = [];
 
@@ -878,3 +878,4 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(deleteBody.data.asset.assetId).toBe("asset-upload-001");
   });
 });
+

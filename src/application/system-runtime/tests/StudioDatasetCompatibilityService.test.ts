@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DatasetPreviewSelectionModes, DatasetPreviewSelectionState } from "../../data-studio/DatasetPreviewSelectionModel";
 import type { ImageDatasetPreviewItem } from "../../data-studio/ImageDatasetPreviewBuilder";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
@@ -130,3 +130,4 @@ describe("StudioDatasetCompatibilityService", () => {
     })).toThrow("does not match required dataset asset");
   });
 });
+

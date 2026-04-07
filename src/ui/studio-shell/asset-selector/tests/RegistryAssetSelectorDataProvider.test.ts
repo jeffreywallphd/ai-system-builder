@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../domain/studio-shell/AssetSelectorContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "@domain/studio-shell/AssetSelectorContract";
 import { RegistryAssetSelectorDataProvider } from "../RegistryAssetSelectorDataProvider";
 
 describe("RegistryAssetSelectorDataProvider", () => {
@@ -108,3 +108,4 @@ describe("RegistryAssetSelectorDataProvider", () => {
     expect(result.error).toContain("bridge unavailable");
   });
 });
+

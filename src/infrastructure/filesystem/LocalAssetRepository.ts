@@ -1,6 +1,6 @@
-import path from "node:path";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../domain/assets/Asset";
+﻿import path from "node:path";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
 import {
   AssetAuditInfo,
   AssetLocation,
@@ -8,12 +8,12 @@ import {
   AssetSemanticMetadata,
   AssetSourceInfo,
   AssetTechnicalMetadata,
-} from "../../domain/assets/AssetMetadata";
+} from "@domain/assets/AssetMetadata";
 import type {
   IAssetCatalog,
   IAssetSearchCriteria,
-} from "../../application/ports/interfaces/IAssetCatalog";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/interfaces/IAssetCatalog";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 
 interface AssetRecord {
   readonly id: string;
@@ -356,3 +356,4 @@ export class LocalAssetRepository implements IAssetCatalog {
     });
   }
 }
+

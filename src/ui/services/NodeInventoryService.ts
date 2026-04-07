@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpNodeInventoryClient,
   type NodeInventoryClient,
-} from "../shared/nodes/NodeInventoryClient";
+} from "@shared/nodes/NodeInventoryClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class NodeInventoryService {
@@ -30,3 +30,4 @@ function createDefaultNodeInventoryClient(): NodeInventoryClient {
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpNodeInventoryClient(baseUrl);
 }
+

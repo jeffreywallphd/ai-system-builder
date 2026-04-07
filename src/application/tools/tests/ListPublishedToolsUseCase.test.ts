@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListPublishedToolsUseCase } from "../ListPublishedToolsUseCase";
-import { InMemoryWorkflowRepository } from "../../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
+import { InMemoryWorkflowRepository } from "@infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 describe("ListPublishedToolsUseCase", () => {
   it("returns tool summaries with classified types", async () => {
@@ -92,3 +92,4 @@ describe("ListPublishedToolsUseCase", () => {
   });
 
 });
+

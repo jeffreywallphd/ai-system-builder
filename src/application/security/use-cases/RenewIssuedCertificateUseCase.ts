@@ -1,5 +1,5 @@
-import { CertificateStatuses, type CertificateStatus } from "../../../domain/security/CertificateAuthorityDomain";
-import { CertificateSubjectProfileKinds, type CertificateSubjectProfileKind } from "../../../domain/security/CertificateIssuancePolicyDomain";
+﻿import { CertificateStatuses, type CertificateStatus } from "@domain/security/CertificateAuthorityDomain";
+import { CertificateSubjectProfileKinds, type CertificateSubjectProfileKind } from "@domain/security/CertificateIssuancePolicyDomain";
 import type { ICertificateAuthorityIssuerPort } from "../ports/ICertificateAuthorityIssuerPort";
 import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertificateAuthorityRootMaterialStorage";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
@@ -14,7 +14,7 @@ import {
   CertificateIssuancePolicyViolationError,
   IssueCertificateForSubjectUseCase,
 } from "./IssueCertificateForSubjectUseCase";
-import { normalizeCertificateAuthorityMutationOperationKey, type IssuedCertificatePersistenceRecord } from "../../../shared/dto/security/CertificateAuthorityDtos";
+import { normalizeCertificateAuthorityMutationOperationKey, type IssuedCertificatePersistenceRecord } from "@shared/dto/security/CertificateAuthorityDtos";
 
 const MillisecondsPerDay = 24 * 60 * 60 * 1000;
 
@@ -453,3 +453,4 @@ function toAuditDetails(event: CertificateRenewalAuditEvent): Readonly<Record<st
       return Object.freeze({});
   }
 }
+

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   WorkflowRunDiagnosticScopes,
@@ -8,12 +8,12 @@ import {
   type WorkflowRunStatus,
   type WorkflowRunDiagnosticRecord,
   type WorkflowStepRunRecord,
-} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type {
   WorkflowRunDetailReadModel,
   WorkflowRunDiagnosticReadModel,
   WorkflowRunSummaryReadModel,
-} from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../../../services/StudioShellService";
 import {
   buildWorkflowStudioRunDetailPath,
@@ -1066,3 +1066,4 @@ export default function WorkflowStudioRunHistoryPanel({
     </div>
   );
 }
+

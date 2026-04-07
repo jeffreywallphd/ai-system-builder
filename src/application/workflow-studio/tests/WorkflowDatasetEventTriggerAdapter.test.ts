@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetEventTypes } from "@domain/dataset-studio/contracts/DatasetEvent";
 import {
   createEmptyWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
 import {
   WorkflowDatasetEventNames,
@@ -191,3 +191,4 @@ describe("WorkflowDatasetEventTriggerAdapter", () => {
     expect(mapped.issues[0]?.code).toBe("dataset-event-malformed");
   });
 });
+

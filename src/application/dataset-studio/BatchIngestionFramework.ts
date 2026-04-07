@@ -1,8 +1,8 @@
-/// <reference types="node" />
+﻿/// <reference types="node" />
 import { z } from "zod";
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalDataShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalRecordsShape, type CanonicalDataShape, type CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import {
   DataConverterCore,
@@ -63,7 +63,7 @@ import {
   UnifiedIngestionSourceKinds,
   type IUnifiedIngestionRouter,
   type IUnifiedIngestionSourceTypeDetector,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { createUnifiedIngestionRoutingService } from "./UnifiedIngestionRoutingService";
 import { createUnifiedSourceTypeDetectionService } from "./UnifiedSourceTypeDetectionService";
 
@@ -1307,3 +1307,4 @@ export function createBatchIngestionDataAsset(
     },
   });
 }
+

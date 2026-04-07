@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { PersistenceTenancyScopes } from "../../../../shared/dto/persistence/PersistenceBoundaryDtos";
+﻿import { describe, expect, it } from "bun:test";
+import { PersistenceTenancyScopes } from "@shared/dto/persistence/PersistenceBoundaryDtos";
 import {
   createPersistenceTenancyMetadataFromLookup,
   normalizePersistenceLookup,
@@ -38,3 +38,4 @@ describe("PersistenceMapperUtilities", () => {
     expect(platform.scope).toBe(PersistenceTenancyScopes.platform);
   });
 });
+

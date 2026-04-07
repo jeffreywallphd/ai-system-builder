@@ -1,17 +1,17 @@
-import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
-import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
-import type { IModelDownloader } from "../../application/ports/interfaces/IModelDownloader";
-import type { IModelInstaller } from "../../application/ports/interfaces/IModelInstaller";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import { DesktopBridgeFileStorage } from "../../infrastructure/browser/filesystem/DesktopBridgeFileStorage";
-import { BrowserDownloadModelLibrary } from "../../infrastructure/browser/models/BrowserDownloadModelLibrary";
-import { BrowserHuggingFaceModelDownloader } from "../../infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
-import { LocalStorageInstalledModelCatalog } from "../../infrastructure/browser/models/LocalStorageInstalledModelCatalog";
-import { FilesystemModelInstaller } from "../../infrastructure/filesystem/FilesystemModelInstaller";
-import { LocalModelRepository } from "../../infrastructure/filesystem/LocalModelRepository";
-import { ManagedLocalModelLibrary } from "../../infrastructure/filesystem/ManagedLocalModelLibrary";
-import { HuggingFaceApiClient } from "../../infrastructure/huggingface/HuggingFaceApiClient";
-import { HuggingFaceModelDownloader } from "../../infrastructure/huggingface/HuggingFaceModelDownloader";
+﻿import type { IInstalledModelCatalog } from "@application/ports/interfaces/IInstalledModelCatalog";
+import type { IManagedModelLibrary } from "@application/ports/interfaces/IManagedModelLibrary";
+import type { IModelDownloader } from "@application/ports/interfaces/IModelDownloader";
+import type { IModelInstaller } from "@application/ports/interfaces/IModelInstaller";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import { DesktopBridgeFileStorage } from "@infrastructure/browser/filesystem/DesktopBridgeFileStorage";
+import { BrowserDownloadModelLibrary } from "@infrastructure/browser/models/BrowserDownloadModelLibrary";
+import { BrowserHuggingFaceModelDownloader } from "@infrastructure/browser/models/BrowserHuggingFaceModelDownloader";
+import { LocalStorageInstalledModelCatalog } from "@infrastructure/browser/models/LocalStorageInstalledModelCatalog";
+import { FilesystemModelInstaller } from "@infrastructure/filesystem/FilesystemModelInstaller";
+import { LocalModelRepository } from "@infrastructure/filesystem/LocalModelRepository";
+import { ManagedLocalModelLibrary } from "@infrastructure/filesystem/ManagedLocalModelLibrary";
+import { HuggingFaceApiClient } from "@infrastructure/huggingface/HuggingFaceApiClient";
+import { HuggingFaceModelDownloader } from "@infrastructure/huggingface/HuggingFaceModelDownloader";
 import type { DesktopModelFileBridge } from "../../electron/shared/DesktopContracts";
 
 export interface ModelManagementDependencies {
@@ -74,3 +74,4 @@ export function createModelManagementDependencies(options: {
     }),
   });
 }
+

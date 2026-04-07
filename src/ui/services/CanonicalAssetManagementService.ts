@@ -1,11 +1,11 @@
-import type { CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
+﻿import type { CanonicalEntityType } from "@application/ports/interfaces/ICanonicalAssetIdentityRepository";
 import type {
   CanonicalAssetDetailReadModel,
   CanonicalDependencyStateReadModel,
   CanonicalProjectionVerificationReadModel,
   CanonicalReconciliationReadModel,
   CanonicalVersionChainItemReadModel,
-} from "../../application/assets-system/AssetManagementReadModels";
+} from "@application/assets-system/AssetManagementReadModels";
 
 export interface CanonicalAssetManagementServiceOptions {
   readonly listAssets?: () => Promise<ReadonlyArray<CanonicalAssetDetailReadModel>>;
@@ -191,3 +191,4 @@ export class CanonicalAssetManagementService {
     });
   }
 }
+

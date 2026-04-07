@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
+﻿import { useEffect, useState } from "react";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import ExecutionHistoryPanel from "../components/execution/ExecutionHistoryPanel";
 import McpLocalServerComposer from "../components/mcp/McpLocalServerComposer";
 import McpServerBrowser from "../components/mcp/McpServerBrowser";
@@ -127,3 +127,4 @@ export default function McpPage(): JSX.Element {
     </section>
   );
 }
+

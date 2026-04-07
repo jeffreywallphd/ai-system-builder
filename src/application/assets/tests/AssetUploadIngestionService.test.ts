@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { describe, expect, it } from "bun:test";
 import {
   AssetKinds,
@@ -10,7 +10,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -18,7 +18,7 @@ import {
   StorageLifecycleStates,
   createStorageInstance,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type {
   AssetUploadSessionRecord,
@@ -44,9 +44,9 @@ import {
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
-import { DeterministicScopeEncryptionKeyPort } from "../../../infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
-import { AesGcmAssetContentCipherPort } from "../../../infrastructure/security/encryption/AesGcmAssetContentCipherPort";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
+import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
+import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 import type { IEncryptionEnforcementObservabilityPort } from "../../security/ports/EncryptionEnforcementObservabilityPorts";
 
 class InMemoryAssetRepository implements IAssetRepository {
@@ -793,3 +793,4 @@ describe("AssetUploadIngestionService", () => {
     ))).toBeTrue();
   });
 });
+

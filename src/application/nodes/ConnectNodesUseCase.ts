@@ -1,15 +1,15 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowConnection,
   IWorkflowConnectionCompatibilitySnapshot,
   IWorkflowConnectionMetadata,
   WorkflowConnectionKind,
   WorkflowConnectionState,
-} from "../../domain/workflows/interfaces/IWorkflowConnection";
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { INodePort, NodePortValueType } from "../../../domain/nodes/interfaces/INodePort";
-import type { INodeCompatibilityService } from "../../domain/services/interfaces/INodeCompatibilityService";
-import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
+} from "@domain/workflows/interfaces/IWorkflowConnection";
+import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodePort, NodePortValueType } from "@domain/nodes/interfaces/INodePort";
+import type { INodeCompatibilityService } from "@domain/services/interfaces/INodeCompatibilityService";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
 
 export interface IConnectNodesRequest {
   readonly workflow: IWorkflow;
@@ -223,3 +223,4 @@ function defaultIdFactory(): string {
 
   return `connection_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
+

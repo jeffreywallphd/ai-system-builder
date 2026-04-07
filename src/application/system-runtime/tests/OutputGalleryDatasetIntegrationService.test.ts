@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import type { SystemDatasetOwnershipValidator } from "../SystemDatasetInstanceService";
@@ -144,3 +144,4 @@ describe("OutputGalleryDatasetIntegrationService", () => {
     expect(item.image.imageReference?.startsWith("generated-output:storage-instance://")).toBeTrue();
   });
 });
+

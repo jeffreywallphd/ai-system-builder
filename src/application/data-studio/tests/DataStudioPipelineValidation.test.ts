@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+﻿import { describe, expect, it } from "bun:test";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { DataStudioPreparationWizard } from "../DataStudioPreparationWizard";
 import { createDataStudioPipelineState } from "../DataStudioPipelineState";
 import { DataStudioPipelineValidationService } from "../DataStudioPipelineValidation";
@@ -117,3 +117,4 @@ describe("DataStudioPipelineValidationService", () => {
     expect(result.issues.some((issue) => issue.code === "data-pipeline.prepared-storage.missing-destination")).toBeTrue();
   });
 });
+

@@ -1,12 +1,12 @@
-import type {
+﻿import type {
   CanonicalImageMetadataRecordsShape,
   CanonicalImageStructuredItem,
   CanonicalRecordValue,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createImageAssetReference,
   ImageAssetReferenceKinds,
-} from "../../domain/dataset-studio/contracts/ImageAssetReference";
+} from "@domain/dataset-studio/contracts/ImageAssetReference";
 import {
   createDataConverterDiagnostic,
   DataConverterDiagnosticSeverities,
@@ -325,3 +325,4 @@ export function buildImageDatasetPreview(
     limit,
   });
 }
+

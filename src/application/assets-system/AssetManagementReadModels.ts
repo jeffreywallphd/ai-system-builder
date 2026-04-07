@@ -1,5 +1,5 @@
-import type { CanonicalDependencyLifecycleState } from "./CanonicalDependencyStateUseCase";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { CanonicalDependencyLifecycleState } from "./CanonicalDependencyStateUseCase";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 
 export interface CanonicalAssetDetailReadModel {
   readonly assetId: string;
@@ -68,3 +68,4 @@ export interface CanonicalProjectionVerificationReadModel {
     readonly actions: ReadonlyArray<string>;
   };
 }
+

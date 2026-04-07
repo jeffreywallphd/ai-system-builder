@@ -1,13 +1,13 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../domain/studio-shell/AssetSelectorContract";
-import { AssetSelectorSessionStore } from "../../../../application/studio-entry/AssetSelectorSessionStore";
-import { AssetSelectorUsageContexts } from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "@domain/studio-shell/AssetSelectorContract";
+import { AssetSelectorSessionStore } from "@application/studio-entry/AssetSelectorSessionStore";
+import { AssetSelectorUsageContexts } from "@application/studio-entry/AssetSelectorCapabilityRegistry";
 import {
   createDatasetAssetSelectorRequest,
 } from "../DatasetAssetSelectorAdapter";
@@ -654,3 +654,4 @@ describe("AssetSelectorFramework integration", () => {
     expect(store.getSession("workflow:rehydrate:steps")?.selectedAssets[0]?.assetId).toBe("asset:agent:rehydrated");
   });
 });
+

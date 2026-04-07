@@ -1,4 +1,4 @@
-import type { AgentMemoryEntryReference, AgentMemoryStore, AgentMemoryType } from "../../../domain/agents/AgentMemory";
+﻿import type { AgentMemoryEntryReference, AgentMemoryStore, AgentMemoryType } from "@domain/agents/AgentMemory";
 import type { AgentMemoryRetrievalRequest, AgentMemoryRetrievalService } from "../contracts/AgentMemoryRetrieval";
 
 function normalizeList(values: ReadonlyArray<string> | undefined): ReadonlyArray<string> {
@@ -48,3 +48,4 @@ export class DefaultAgentMemoryRetrievalService implements AgentMemoryRetrievalS
     });
   }
 }
+

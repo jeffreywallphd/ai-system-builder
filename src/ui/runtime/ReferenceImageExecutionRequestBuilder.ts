@@ -1,8 +1,8 @@
-import { ReferenceImageSystemTemplate } from "../../application/system-studio/ReferenceImageSystemTemplate";
-import { createDefaultUiTriggerSystemContextMapper } from "../../application/workflow-studio/UiTriggerSystemContextMapper";
-import { createDefaultWorkflowSystemContextBindingAdapter } from "../../application/workflow-studio/SystemContextWorkflowInputMapper";
-import { createUiTriggerEvent } from "../../application/workflow-studio/UiTriggerEventContract";
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
+import { createDefaultUiTriggerSystemContextMapper } from "@application/workflow-studio/UiTriggerSystemContextMapper";
+import { createDefaultWorkflowSystemContextBindingAdapter } from "@application/workflow-studio/SystemContextWorkflowInputMapper";
+import { createUiTriggerEvent } from "@application/workflow-studio/UiTriggerEventContract";
+import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 
 export function buildReferenceImageStartRequest(input: {
   readonly studioId: string;
@@ -56,3 +56,4 @@ export function buildReferenceImageStartRequest(input: {
     }),
   });
 }
+

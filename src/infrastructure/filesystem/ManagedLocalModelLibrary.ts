@@ -1,9 +1,9 @@
-import path from "node:path";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { ManagedModelLibraryItem, ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
-import type { IInstalledModelCatalog } from "../../application/ports/interfaces/IInstalledModelCatalog";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
+﻿import path from "node:path";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { ManagedModelLibraryItem, ManagedModelLibrarySnapshot } from "@application/models/ManagedModelLibrary";
+import type { IInstalledModelCatalog } from "@application/ports/interfaces/IInstalledModelCatalog";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { IManagedModelLibrary } from "@application/ports/interfaces/IManagedModelLibrary";
 
 interface ArtifactInspection {
   readonly artifactName: string;
@@ -240,3 +240,4 @@ async function sha256Hex(content: Uint8Array): Promise<string> {
   const { createHash } = await import("node:crypto");
   return createHash("sha256").update(content).digest("hex").toLowerCase();
 }
+

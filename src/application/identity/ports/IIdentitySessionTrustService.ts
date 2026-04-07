@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IdentitySessionAccessChannel,
   SessionClientContext,
   SessionDeviceTrustContext,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import type {
   IIdentitySessionTrustEvaluator,
   IdentitySessionTrustEvaluationResult,
@@ -47,3 +47,4 @@ export type ResolveSessionIssuanceTrustResult =
 export interface IIdentitySessionTrustService extends IIdentitySessionTrustEvaluator {
   resolveSessionIssuanceTrust(input: ResolveSessionIssuanceTrustInput): Promise<ResolveSessionIssuanceTrustResult>;
 }
+

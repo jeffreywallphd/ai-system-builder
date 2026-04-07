@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataProfilingAsset,
   FieldMappingAsset,
@@ -192,3 +192,4 @@ describe("FieldMappingAsset", () => {
     })).rejects.toThrow();
   });
 });
+

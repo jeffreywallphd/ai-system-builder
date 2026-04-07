@@ -1,8 +1,8 @@
-import { toAgentReadModel, updateAgent, type AgentReadModel } from "../../domain/agents/Agent";
+﻿import { toAgentReadModel, updateAgent, type AgentReadModel } from "@domain/agents/Agent";
 import {
   applyAgentGoalConfiguration,
   type AgentGoalConfigurationOperation,
-} from "../../domain/agents/AgentGoalConfiguration";
+} from "@domain/agents/AgentGoalConfiguration";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -40,3 +40,4 @@ export class ConfigureAgentGoalsUseCase {
     return toAgentReadModel(saved);
   }
 }
+

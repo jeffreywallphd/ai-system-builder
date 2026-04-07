@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { SearchRemoteModelsUseCase } from "../SearchRemoteModelsUseCase";
-import { makeModel } from "../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 import { makeRemoteModelCatalog } from "./testUtils";
 
 describe("SearchRemoteModelsUseCase", () => {
@@ -14,3 +14,4 @@ describe("SearchRemoteModelsUseCase", () => {
     expect(result.nextCursor).toBe("n");
   });
 });
+

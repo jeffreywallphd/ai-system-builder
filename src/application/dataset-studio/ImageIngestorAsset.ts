@@ -1,18 +1,18 @@
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalImageMetadataRecordsShape, type CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { createImageRecord, type IImageRecordValidator } from "../../domain/dataset-studio/contracts/ImageRecord";
-import type { IImageDerivedAttributeCalculator } from "../../domain/dataset-studio/interfaces/IImageDerivedAttributeCalculator";
+﻿import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalImageMetadataRecordsShape, type CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { createImageRecord, type IImageRecordValidator } from "@domain/dataset-studio/contracts/ImageRecord";
+import type { IImageDerivedAttributeCalculator } from "@domain/dataset-studio/interfaces/IImageDerivedAttributeCalculator";
 import {
   ImageAssetReferenceKinds,
   type ImageAssetReferenceInput,
-} from "../../domain/dataset-studio/contracts/ImageAssetReference";
+} from "@domain/dataset-studio/contracts/ImageAssetReference";
 import type {
   IImageDimensionReader,
   IImageExifReader as IImageExifExtractionReader,
   IImageFormatDetector,
   IImageMetadataExtractor,
-} from "../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import { DataSourceReferenceKinds, type DataSourceReference, type ResolvedDataSource } from "./DataConverterContracts";
 import { DefaultDataSourceLocator, type IDataSourceLocator } from "./DataSourceLocator";
 import {
@@ -883,3 +883,4 @@ export function createImageIngestorDataAsset(config: Readonly<Record<string, Can
     },
   });
 }
+

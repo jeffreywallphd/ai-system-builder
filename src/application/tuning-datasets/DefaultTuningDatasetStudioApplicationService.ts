@@ -1,18 +1,18 @@
-import {
+﻿import {
   ChatCompletionExample,
   ExampleLineage,
   QuestionAnsweringExample,
   TuningDataset,
   TuningDatasetVersion,
   type SourceDocumentReference,
-} from "../../domain/tuning-datasets/TuningDatasetEntities";
+} from "@domain/tuning-datasets/TuningDatasetEntities";
 import {
   DatasetLineageService,
   DatasetStatisticsService,
   ReleaseManifestService,
   TuningDatasetFactory,
   createReviewAnnotation,
-} from "../../domain/tuning-datasets/TuningDatasetServices";
+} from "@domain/tuning-datasets/TuningDatasetServices";
 import type {
   Dataset,
   DatasetDuplicationPolicy,
@@ -32,7 +32,7 @@ import type {
   DatasetVersion,
   DatasetVersionRepository,
   DatasetWorkflowService,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type {
   AddExampleCommand,
   ArchiveDatasetCommand,
@@ -63,7 +63,7 @@ import type {
 } from "./contracts";
 import type { TuningDatasetStudioApplicationService } from "./TuningDatasetStudioApplicationService";
 import type { FileIngestionApplicationService } from "../ingestion/FileIngestionApplicationService";
-import type { FileIngestionProfile } from "../../domain/ingestion/interfaces/IFileIngestion";
+import type { FileIngestionProfile } from "@domain/ingestion/interfaces/IFileIngestion";
 import { DatasetSourceIngestionProfile } from "./DatasetSourceIngestionProfile";
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
 import {
@@ -816,3 +816,4 @@ export class DefaultTuningDatasetStudioApplicationService implements TuningDatas
     await this.datasetVersionRepository.saveWorkflowState(workflow);
   }
 }
+

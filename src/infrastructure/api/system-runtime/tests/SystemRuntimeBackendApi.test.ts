@@ -1,23 +1,23 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
-import { DefaultStudioShellApplicationService } from "../../../../application/studio-shell/DefaultStudioShellApplicationService";
-import { SystemStudioApplicationService } from "../../../../application/system-studio/SystemStudioApplicationService";
-import { SystemStudioIdentity, createSystemStudioTaxonomy } from "../../../../domain/system-studio/SystemAssetDomain";
-import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
+import { SystemStudioApplicationService } from "@application/system-studio/SystemStudioApplicationService";
+import { SystemStudioIdentity, createSystemStudioTaxonomy } from "@domain/system-studio/SystemAssetDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
-import { SqliteStudioShellRepository } from "../../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteSystemRuntimeExecutionStore } from "../../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { SqliteStudioShellRepository } from "@infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteSystemRuntimeExecutionStore } from "@infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import type { ExecutionCallbackDispatcher, ExecutionCallbackPayload } from "../ExecutionCallbackDispatcher";
 import { ExecutionUpdateEventKinds } from "../ExecutionUpdateStream";
 import { StaticTokenRuntimeApiAuthenticator } from "../RuntimeApiAuthentication";
-import { InMemoryExecutionAuditRepository } from "../../../../application/system-runtime/ExecutionAuditRepository";
-import { ExecutionAuditEventKinds } from "../../../../domain/system-runtime/ExecutionAuditTrailDomain";
-import { RuntimeRateLimitEvaluator } from "../../../../application/system-runtime/RuntimeRateLimitEvaluator";
+import { InMemoryExecutionAuditRepository } from "@application/system-runtime/ExecutionAuditRepository";
+import { ExecutionAuditEventKinds } from "@domain/system-runtime/ExecutionAuditTrailDomain";
+import { RuntimeRateLimitEvaluator } from "@application/system-runtime/RuntimeRateLimitEvaluator";
 
 class RecordingCallbackDispatcher implements ExecutionCallbackDispatcher {
   public readonly deliveries: Array<{ payload: ExecutionCallbackPayload; targetUrl: string }> = [];
@@ -1129,3 +1129,4 @@ describe("SystemRuntimeBackendApi", () => {
   });
 
 });
+

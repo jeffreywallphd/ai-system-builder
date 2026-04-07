@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { RuntimeExecutionResultReadModel } from "../../../../application/system-runtime/SystemRuntimeApplicationService";
+﻿import { describe, expect, it } from "bun:test";
+import type { RuntimeExecutionResultReadModel } from "@application/system-runtime/SystemRuntimeApplicationService";
 import { RuntimeOutputSerializer } from "../RuntimeOutputSerializer";
 
 function createResultModel(): RuntimeExecutionResultReadModel {
@@ -63,3 +63,4 @@ describe("RuntimeOutputSerializer", () => {
     expect(serialized.diagnostics.warningCount).toBe(1);
   });
 });
+
