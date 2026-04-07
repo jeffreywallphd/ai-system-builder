@@ -12,7 +12,7 @@ import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionSt
 import {
   SessionOversightPanel,
   TrustedDeviceOversightPanel,
-} from "@shared/identity/IdentityTrustOversightPanels";
+} from "@ui/shared/identity/IdentityTrustOversightPanels";
 
 type AccountAction = "enable" | "disable";
 

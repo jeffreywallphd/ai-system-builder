@@ -15,7 +15,7 @@ import {
   SessionOversightPanel,
   TrustedDeviceOversightPanel,
   formatDisplayDate,
-} from "@shared/identity/IdentityTrustOversightPanels";
+} from "@ui/shared/identity/IdentityTrustOversightPanels";
 
 interface TrustedDevicesPageProps {
   readonly authService?: IdentityAuthService;
