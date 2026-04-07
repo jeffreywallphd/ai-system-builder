@@ -7,9 +7,15 @@ import {
   AuditRecordKinds,
 } from "@domain/audit/AuditDomain";
 import type {
-  AuditLedgerAppendMutationDto,
-  AuditLedgerListQueryDto,
-} from "@shared/dto/audit/AuditEventDtos";
+  AuditLedgerAppendContext,
+  IAuditLedgerRepository,
+} from "./ports/AuditLedgerPersistencePorts";
+export type {
+  AuditLedgerAppendContext,
+  AuditLedgerAppendResult,
+  AuditLedgerQuery,
+  IAuditLedgerRepository,
+} from "./ports/AuditLedgerPersistencePorts";
 
 export const AuditLedgerStreamKinds = Object.freeze({
   audit: "audit",
@@ -17,31 +23,6 @@ export const AuditLedgerStreamKinds = Object.freeze({
 });
 
 export type AuditLedgerStreamKind = typeof AuditLedgerStreamKinds[keyof typeof AuditLedgerStreamKinds];
-
-export interface AuditLedgerAppendContext extends AuditLedgerAppendMutationDto {}
-
-export interface AuditLedgerAppendResult {
-  readonly changed: boolean;
-  readonly wasReplay: boolean;
-  readonly sequence: number;
-  readonly event: CanonicalAuditEvent;
-}
-
-export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
-  readonly actorId?: string;
-  readonly category?: AuditEventCategory;
-  readonly actionPrefix?: string;
-  readonly eventType?: string;
-  readonly occurredAfter?: string;
-  readonly occurredBefore?: string;
-  readonly limit?: number;
-  readonly offset?: number;
-}
-
-export interface IAuditLedgerRepository {
-  appendAuditEvent(event: CanonicalAuditEvent, context: AuditLedgerAppendContext): Promise<AuditLedgerAppendResult>;
-  listAuditEvents(query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>>;
-}
 
 export interface IOperationalEventLogRepository {
   appendOperationalEvent(input: {

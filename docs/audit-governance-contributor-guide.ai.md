@@ -10,6 +10,7 @@ Canonical human doc: `docs/audit-governance-contributor-guide.md`
 
 - taxonomy/domain: `src/domain/audit/AuditDomain.ts`, `src/application/audit/AuditApplicationContracts.ts`
 - authoritative capture: `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`, `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
+- durable ledger persistence: `src/application/audit/ports/AuditLedgerPersistencePorts.ts`, `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
 - shared contracts: `src/shared/contracts/audit/AuditEventContracts.ts`, `src/shared/dto/audit/AuditEventDtos.ts`, `src/shared/schemas/audit/AuditEventSchemaContracts.ts`
 - source adapters: `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`, `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
 

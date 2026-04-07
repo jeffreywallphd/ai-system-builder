@@ -26,6 +26,8 @@ import { SqliteAssetUploadSessionPersistenceAdapter } from "./assets/SqliteAsset
 import { ASSET_UPLOAD_SESSION_PERSISTENCE_MIGRATIONS } from "./assets/SqliteAssetUploadSessionPersistenceMigrations";
 import { SqlitePlatformPersistenceAdapter } from "./platform/SqlitePlatformPersistenceAdapter";
 import { PLATFORM_PERSISTENCE_MIGRATIONS } from "./platform/SqlitePlatformPersistenceMigrations";
+import { SqliteAuditLedgerRepository } from "./audit/SqliteAuditLedgerRepository";
+import { AUDIT_LEDGER_PERSISTENCE_MIGRATIONS } from "./audit/SqliteAuditLedgerPersistenceMigrations";
 
 interface VersionedMigrationSource {
   readonly domainId: string;
@@ -49,6 +51,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly assetAuditRecorder: SqliteAssetAuditRecorder;
   readonly assetUploadSessionRepository: SqliteAssetUploadSessionPersistenceAdapter;
   readonly platformPersistenceRepository: SqlitePlatformPersistenceAdapter;
+  readonly auditLedgerRepository: SqliteAuditLedgerRepository;
   dispose(): void;
 }
 
@@ -92,6 +95,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     domainId: "platform",
     migrationTableName: "platform_repository_migrations",
     migrations: PLATFORM_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "audit-ledger",
+    migrationTableName: "audit_ledger_repository_migrations",
+    migrations: AUDIT_LEDGER_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "certificate-authority",
@@ -211,6 +219,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const assetAuditRecorder = new SqliteAssetAuditRecorder(databasePath);
   const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(databasePath);
   const platformPersistenceRepository = new SqlitePlatformPersistenceAdapter(databasePath);
+  const auditLedgerRepository = new SqliteAuditLedgerRepository(databasePath);
 
   return Object.freeze({
     databasePath,
@@ -228,6 +237,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     assetAuditRecorder,
     assetUploadSessionRepository,
     platformPersistenceRepository,
+    auditLedgerRepository,
     dispose(): void {
       identityRepository.dispose();
       trustedDeviceRepository.dispose();
@@ -243,6 +253,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       assetAuditRecorder.dispose();
       assetUploadSessionRepository.dispose();
       platformPersistenceRepository.dispose();
+      auditLedgerRepository.dispose();
     },
   });
 }

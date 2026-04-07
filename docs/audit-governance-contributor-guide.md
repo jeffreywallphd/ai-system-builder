@@ -11,6 +11,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - `docs/architecture/audit-reference-normalization-layer.md`
 - `docs/architecture/audit-authoritative-recording-service-and-ports.md`
 - `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
 ## Required implementation path
 
@@ -24,12 +25,16 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 3. Emit through authoritative service contracts:
    - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
    - `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
-4. Add/update source adapter mapping in infrastructure:
+   - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
+4. Add/update durable ledger persistence implementation:
+   - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
+   - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
+5. Add/update source adapter mapping in infrastructure:
    - `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
    - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
    - `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
    - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
-5. Validate review-surface compatibility:
+6. Validate review-surface compatibility:
    - `src/ui/services/GovernanceAuditReviewService.ts`
    - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
 
