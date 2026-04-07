@@ -188,6 +188,11 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly preparedAt: string;
     readonly dispatchMetadata: Readonly<Record<string, unknown>>;
   }): Promise<AuthoritativeRunNodeClaimResult>;
+  requeueAssignedRunForRecovery?(input: {
+    readonly runId: string;
+    readonly requeuedAt: string;
+    readonly eligibilityMarker?: RunQueueEligibilityMarker;
+  }): Promise<boolean>;
   recordDispatchAttemptResult(input: {
     readonly runId: string;
     readonly attemptId: string;

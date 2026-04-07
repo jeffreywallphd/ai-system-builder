@@ -659,5 +659,116 @@ describe("SqlitePlatformPersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("supports guarded recovery requeue for stale assigned queue entries", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-recovery-requeue-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await adapter.createRun({
+      runId: "run-recovery-1",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:recovery",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      metadata: {
+        canonicalRun: {
+          identity: {
+            runId: "run-recovery-1",
+            workflowId: "workflow:recovery",
+            workspaceId: "workspace-alpha",
+          },
+          submission: {
+            source: "api",
+            submittedAt: "2026-04-06T12:00:00.000Z",
+          },
+          state: "assigned",
+          queue: {
+            queueId: "queue:default",
+            enteredAt: "2026-04-06T12:00:00.000Z",
+            position: null,
+            positionAsOf: "2026-04-06T12:05:00.000Z",
+            dequeuedAt: "2026-04-06T12:05:00.000Z",
+          },
+          assignment: {
+            status: "assigned",
+            assignedNodeId: "node:trusted-a",
+            assignedAt: "2026-04-06T12:05:00.000Z",
+          },
+          execution: {
+            outcome: "none",
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 1,
+          },
+          updatedAt: "2026-04-06T12:05:00.000Z",
+        },
+      },
+      revision: 0,
+    }, {
+      operationKey: "op-run-recovery-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    await adapter.enqueueRunForAssignment({
+      runId: "run-recovery-1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:00:00.000Z",
+      orderKey: "2026-04-06T12:00:00.000Z:run-recovery-1",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:00:00.000Z",
+      updatedAt: "2026-04-06T12:00:00.000Z",
+    }, {
+      operationKey: "op-run-recovery-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    const reservation = await adapter.claimAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:00.000Z",
+      reservationOwner: "orchestrator:alpha",
+      reservationTtlSeconds: 600,
+      limit: 1,
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+    });
+    const claimToken = reservation[0]?.claimToken;
+    expect(claimToken).toBeDefined();
+
+    const claimed = await adapter.claimQueuedRunForNodeDispatch({
+      runId: "run-recovery-1",
+      nodeId: "node:trusted-a",
+      reservationOwner: "orchestrator:alpha",
+      claimToken: claimToken!,
+      dispatchAttemptId: "dispatch-attempt:recovery-1",
+      preparedAt: "2026-04-06T12:05:00.000Z",
+      dispatchMetadata: Object.freeze({
+        runId: "run-recovery-1",
+      }),
+    });
+    expect(claimed.outcome).toBe("claimed");
+
+    const requeued = await adapter.requeueAssignedRunForRecovery?.({
+      runId: "run-recovery-1",
+      requeuedAt: "2026-04-06T12:10:00.000Z",
+      eligibilityMarker: "ready",
+    });
+    expect(requeued).toBeTrue();
+
+    const queueEntry = await adapter.getQueueEntryByRunId("run-recovery-1");
+    expect(queueEntry?.lifecycleState).toBe("queued");
+    expect(queueEntry?.assignmentNodeId).toBeUndefined();
+    expect(queueEntry?.dequeuedAt).toBeUndefined();
+    expect(queueEntry?.claimToken).toBeUndefined();
+    expect(queueEntry?.lastDispatchAttemptId).toBeUndefined();
+
+    adapter.dispose();
+  });
 });
 

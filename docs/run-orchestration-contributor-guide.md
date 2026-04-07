@@ -18,6 +18,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md`
 - `docs/architecture/run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md`
 - `docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md`
+- `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 - `docs/architecture/run-orchestration-operational-visibility-projections.md`
 
 ## Required implementation path
@@ -75,6 +76,14 @@ Provide an implementation checklist for contributors extending the authoritative
 3. Reuse `ValidateRunSubmissionUseCase` + `CreateAuthoritativeRunUseCase` for retried submissions instead of writing run records directly.
 4. Preserve lineage explicitly on the retried run (`retry.previousRunId`, incremented `retry.attempt`, optional `retryReason`).
 5. Restrict retry eligibility to explicit policy states (currently `failed` and `cancelled`) and return clear ineligible semantics for all other states.
+
+## Extending startup recovery and reconciliation
+
+1. Keep startup recovery orchestration in `RecoverRunOrchestrationStartupStateUseCase`.
+2. Preserve guarded behavior: only requeue stale `assigned` state where queue persistence supports explicit guarded requeue semantics.
+3. Keep stale `dispatching`/`running` timeout transitions explicit and auditable (no silent auto-correction).
+4. Always emit recovery audit intent records for both applied and manual-follow-up outcomes.
+5. Document deferred/manual follow-up recovery cases explicitly rather than silently ignoring them.
 
 ## Invariants and non-negotiable boundaries
 
