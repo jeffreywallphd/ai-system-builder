@@ -2,7 +2,7 @@ import { sanitizePersistenceDiagnostics } from "@infrastructure/logging/Persiste
 
 export const RUN_OBSERVABILITY_REDACTED_VALUE = "[REDACTED]";
 
-const SensitiveRunObservabilityFieldPattern = /(prompt|parameter|payload|request[-_]?body|response[-_]?body|backend[-_]?payload|raw[-_]?path|raw[-_]?prompt|internal[-_]?diagnostic)/i;
+const SensitiveRunObservabilityFieldPattern = /(prompt|parameter|payload|request[-_]?body|response[-_]?body|backend[-_]?(payload|detail|details|response)|unsafe[-_]?backend|raw[-_]?path|raw[-_]?prompt|internal[-_]?diagnostic)/i;
 
 export function sanitizeRunOrchestrationObservabilityEvent<TValue>(value: TValue): TValue {
   const baselineSanitized = sanitizePersistenceDiagnostics(value);

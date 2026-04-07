@@ -7,6 +7,12 @@ import type {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 import { PlatformSchedulingGovernanceEventSink } from "../PlatformSchedulingGovernanceEventSink";
+import {
+  RunOrchestrationObservability,
+  type RunOrchestrationMetricsEvent,
+  type RunOrchestrationObservabilityLogEvent,
+  type RunOrchestrationObservabilityLogger,
+} from "../RunOrchestrationObservability";
 
 class InMemoryPlatformAuditRepository implements IPlatformAuditEventRepository {
   public readonly events: PlatformAuditEventRecord[] = [];
@@ -25,6 +31,24 @@ class InMemoryPlatformAuditRepository implements IPlatformAuditEventRepository {
 
   public async listAuditEvents(_query: PlatformAuditEventListQuery): Promise<ReadonlyArray<PlatformAuditEventRecord>> {
     return Object.freeze([...this.events]);
+  }
+}
+
+class CapturingRunOrchestrationLogger implements RunOrchestrationObservabilityLogger {
+  public readonly infoEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly warnEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly errorEvents: RunOrchestrationObservabilityLogEvent[] = [];
+
+  public info(event: RunOrchestrationObservabilityLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: RunOrchestrationObservabilityLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: RunOrchestrationObservabilityLogEvent): void {
+    this.errorEvents.push(event);
   }
 }
 
@@ -118,5 +142,58 @@ describe("PlatformSchedulingGovernanceEventSink", () => {
       eventKind: "scheduling-assignment-materialized",
       status: "assignment-pending",
     });
+  });
+
+  it("emits scheduler governance observability with counters, markers, and redaction", async () => {
+    const repository = new InMemoryPlatformAuditRepository();
+    const logger = new CapturingRunOrchestrationLogger();
+    const metrics: RunOrchestrationMetricsEvent[] = [];
+    const observability = new RunOrchestrationObservability({
+      logger,
+      metricsSink: {
+        emit: async (event) => {
+          metrics.push(event);
+        },
+      },
+    });
+    const sink = new PlatformSchedulingGovernanceEventSink(repository, undefined, observability);
+
+    await sink.recordSchedulingGovernanceEvent(Object.freeze({
+      channel: "operational",
+      type: "scheduling-deferred-no-placement",
+      occurredAt: "2026-04-07T23:09:00.000Z",
+      outcome: "deferred",
+      decisionId: "decision:123",
+      workspaceId: "workspace-z",
+      runId: "run:deferred",
+      nodeId: "node:beta",
+      details: Object.freeze({
+        reasonCodes: Object.freeze(["role-priority-preempted", "remote-scheduling-unsupported"]),
+        exclusionReasonCodes: Object.freeze(["node-missing-capability"]),
+        rawPath: "C:\\runtime\\unsafe\\path",
+        backendDetails: Object.freeze({
+          prompt: "do not leak",
+        }),
+      }),
+    }));
+
+    expect(repository.events).toHaveLength(0);
+    expect(logger.warnEvents).toHaveLength(1);
+    const event = logger.warnEvents[0];
+    expect(event.operation).toBe("scheduling.governance-event");
+    expect(event.runId).toBe("run:deferred");
+    expect(event.workspaceId).toBe("workspace-z");
+    expect(event.nodeId).toBe("node:beta");
+    expect(event.markers).toContain("defer-no-placement");
+    expect(event.counters?.scheduling_governance_events_total).toBe(1);
+    expect(event.counters?.scheduling_defer_no_placement_total).toBe(1);
+    expect(event.counters?.scheduling_reason_role_priority_preempted_total).toBe(1);
+    expect(event.counters?.scheduling_reason_node_missing_capability_total).toBe(1);
+    expect(JSON.stringify(event.details)).not.toContain("C:\\\\runtime\\\\unsafe\\\\path");
+    expect(JSON.stringify(event.details)).not.toContain("do not leak");
+    expect(JSON.stringify(event.details)).toContain("[REDACTED]");
+
+    expect(metrics.some((metric) => metric.name === "run_orchestration_scheduling_defer_no_placement_total")).toBeTrue();
+    expect(metrics.some((metric) => metric.name === "run_orchestration_scheduling_reason_remote_scheduling_unsupported_total")).toBeTrue();
   });
 });

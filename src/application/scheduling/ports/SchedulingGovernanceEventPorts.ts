@@ -37,7 +37,7 @@ export interface ISchedulingGovernanceEventSink {
   recordSchedulingGovernanceEvent(event: SchedulingGovernanceEvent): Promise<void>;
 }
 
-const SensitiveSchedulingDetailKeyPattern = /(prompt|parameter|payload|token|secret|diagnostic|internal|claim[-_]?token)/i;
+const SensitiveSchedulingDetailKeyPattern = /(prompt|parameter|payload|token|secret|diagnostic|internal|claim[-_]?token|raw[-_]?path|path|file|directory|backend[-_]?(payload|detail|details|response))/i;
 const MaxSchedulingGovernanceStringLength = 256;
 const MaxSchedulingGovernanceArrayLength = 20;
 const MaxSchedulingGovernanceObjectEntries = 24;
