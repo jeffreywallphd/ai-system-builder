@@ -335,6 +335,33 @@ describe("System runtime operational authorization", () => {
     expect(deniedStatus.ok).toBeFalse();
     expect(deniedStatus.error?.code).toBe("forbidden");
 
+    const deniedCancel = await runtimeApi.cancelExecution({
+      executionId: runAllowed,
+      requestContext: {
+        accessContext: { callerKind: "user", callerId: "user-denied", metadata: { workspaceId: "workspace-alpha" } },
+      },
+    });
+    expect(deniedCancel.ok).toBeFalse();
+    expect(deniedCancel.error?.code).toBe("forbidden");
+
+    const deniedDequeue = await runtimeApi.dequeueQueueItem({
+      queueItemId: `runtime-queue:${runAllowed}`,
+      requestContext: {
+        accessContext: { callerKind: "user", callerId: "user-denied", metadata: { workspaceId: "workspace-alpha" } },
+      },
+    });
+    expect(deniedDequeue.ok).toBeFalse();
+    expect(deniedDequeue.error?.code).toBe("forbidden");
+
+    const ownerDequeue = await runtimeApi.dequeueQueueItem({
+      queueItemId: `runtime-queue:${runAllowed}`,
+      requestContext: {
+        accessContext: { callerKind: "user", callerId: "user-owner", metadata: { workspaceId: "workspace-alpha" } },
+      },
+    });
+    expect(ownerDequeue.ok).toBeTrue();
+    expect(ownerDequeue.data?.queueItemId).toBe(`runtime-queue:${runAllowed}`);
+
     const deniedTrace = await runtimeApi.getExecutionTrace({
       executionId: runPrivateOther,
       requestContext: {

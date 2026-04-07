@@ -67,11 +67,14 @@ import {
   type RuntimeRealtimeSubscriptionRequest,
 } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
 import {
+  type RuntimeCancelRunResponse,
+  type RuntimeDequeueResponse,
   RuntimeQueueItemStatuses,
   type RuntimeQueueItem,
   type RuntimeQueueItemStatus,
   type RuntimeQueueListResponse,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
 import { AuthoritativeRuntimeEventStream } from "./AuthoritativeRuntimeEventStream";
 import {
   HttpExecutionCallbackDispatcher,
@@ -183,6 +186,22 @@ export interface ListRuntimeQueueItemsRequest {
   readonly requestContext?: RuntimeApiRequestContext;
 }
 
+export interface CancelRuntimeExecutionRequest {
+  readonly executionId: string;
+  readonly reason?: string;
+  readonly cancelledAt?: string;
+  readonly idempotencyKey?: string;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
+export interface DequeueRuntimeQueueItemRequest {
+  readonly queueItemId: string;
+  readonly reason?: string;
+  readonly dequeuedAt?: string;
+  readonly idempotencyKey?: string;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
 export interface ExecutionCallbackRegistrationRequest {
   readonly callbackId?: string;
   readonly targetUrl: string;
@@ -233,6 +252,7 @@ const RuntimeExecutionResultPartialRedactionRules = Object.freeze([
 export class SystemRuntimeBackendApi {
   private static readonly EXTERNAL_POLL_RESPONSE_CACHE_TTL_MS = 75;
   private static readonly EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS = 75;
+  private static readonly MUTATION_IDEMPOTENCY_TTL_MS = 5 * 60 * 1000;
   private static readonly STREAM_EMIT_MIN_INTERVAL_MS = 50;
   private static readonly MAX_IN_FLIGHT_ASYNC_RUNS = 500;
   private static readonly MAX_CALLBACK_REGISTRATIONS_PER_SESSION = 20;
@@ -257,6 +277,10 @@ export class SystemRuntimeBackendApi {
   private readonly cachedExternalStatusByKey = new Map<string, {
     readonly expiresAtMs: number;
     readonly response: RuntimeExecutionStatusReadModel;
+  }>();
+  private readonly cachedMutationResponsesByKey = new Map<string, {
+    readonly expiresAtMs: number;
+    readonly response: SystemRuntimeApiResponse<unknown>;
   }>();
   private readonly tenantIsolationPolicy = new TenantExecutionIsolationPolicy();
   private readonly auditTrailService: ExecutionAuditTrailService;
@@ -805,6 +829,144 @@ export class SystemRuntimeBackendApi {
         totalCount: items.length,
       });
     });
+  }
+
+  public async cancelExecution(input: CancelRuntimeExecutionRequest): Promise<SystemRuntimeApiResponse<RuntimeCancelRunResponse>> {
+    return this.withMutationIdempotency(
+      "runtime-cancel",
+      input.executionId,
+      input.idempotencyKey,
+      () => this.wrap(async () => {
+        const executionId = input.executionId.trim();
+        if (!executionId) {
+          throw new Error("invalid-request:executionId is required.");
+        }
+        this.assertExecutionWorkspaceScope({
+          executionId,
+          requestContext: input.requestContext,
+        });
+        const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+        const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext });
+        this.assertExternalRateLimit({
+          requestContext: input.requestContext,
+          callerContext,
+          tenantId: tenantContext?.tenantId,
+          operation: "cancel-execution",
+        });
+        const status = this.service.getExecutionStatus(executionId);
+        this.assertExecutionAccess({
+          accessContext: callerContext,
+          systemId: status.rootAssetId,
+          versionId: status.rootVersionId,
+        });
+        this.assertTenantIsolation({
+          access: { caller: callerContext, tenant: tenantContext },
+          resourceTenantId: this.readExecutionTenantId(executionId),
+        });
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.cancel",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
+        });
+
+        const operationTimestamp = this.resolveMutationTimestamp(input.cancelledAt, "cancelledAt");
+        const cancelledStatus = this.service.cancelExecution({
+          executionId,
+          cancelledAt: operationTimestamp,
+        });
+        const changed = cancelledStatus.status === RuntimeQueueItemStatuses.cancelled && status.status !== RuntimeQueueItemStatuses.cancelled;
+        const mutation = this.createMutationResult({
+          operation: "runtime-cancel",
+          targetId: executionId,
+          changed,
+          occurredAt: operationTimestamp,
+          idempotencyKey: input.idempotencyKey,
+        });
+        this.emitExecutionUpdateFromSnapshot({ executionId });
+        return Object.freeze({
+          executionId,
+          status: cancelledStatus.status,
+          mutation,
+        });
+      }),
+    );
+  }
+
+  public async dequeueQueueItem(input: DequeueRuntimeQueueItemRequest): Promise<SystemRuntimeApiResponse<RuntimeDequeueResponse>> {
+    return this.withMutationIdempotency(
+      "runtime-dequeue",
+      input.queueItemId,
+      input.idempotencyKey,
+      () => this.wrap(async () => {
+        const queueItemId = input.queueItemId.trim();
+        if (!queueItemId) {
+          throw new Error("invalid-request:queueItemId is required.");
+        }
+        const executionId = this.resolveExecutionIdFromQueueItemId(queueItemId);
+        this.assertExecutionWorkspaceScope({
+          executionId,
+          requestContext: input.requestContext,
+        });
+        const callerContext = this.resolveCallerContext({ requestContext: input.requestContext });
+        const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext });
+        this.assertExternalRateLimit({
+          requestContext: input.requestContext,
+          callerContext,
+          tenantId: tenantContext?.tenantId,
+          operation: "dequeue-execution",
+        });
+        const priorStatus = this.service.getExecutionStatus(executionId);
+        this.assertExecutionAccess({
+          accessContext: callerContext,
+          systemId: priorStatus.rootAssetId,
+          versionId: priorStatus.rootVersionId,
+        });
+        this.assertTenantIsolation({
+          access: { caller: callerContext, tenant: tenantContext },
+          resourceTenantId: this.readExecutionTenantId(executionId),
+        });
+        const queueResourceId = this.createQueueResourceId(priorStatus.rootAssetId, priorStatus.rootVersionId);
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "queue.dequeue",
+          resourceFamily: AuthorizationResourceFamilies.queue,
+          resourceType: this.queueProtectedResourceType,
+          resourceId: queueResourceId,
+        });
+        await this.assertOperationalResourceAuthorized({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.cancel",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: executionId,
+        });
+
+        const operationTimestamp = this.resolveMutationTimestamp(input.dequeuedAt, "dequeuedAt");
+        const cancelledStatus = this.service.cancelExecution({
+          executionId,
+          cancelledAt: operationTimestamp,
+        });
+        const changed = cancelledStatus.status === RuntimeQueueItemStatuses.cancelled
+          && priorStatus.status !== RuntimeQueueItemStatuses.cancelled;
+        const queueStatus = mapExecutionStatusToQueueItemStatus(cancelledStatus.status) ?? RuntimeQueueItemStatuses.cancelled;
+        const mutation = this.createMutationResult({
+          operation: "runtime-dequeue",
+          targetId: queueItemId,
+          changed,
+          occurredAt: operationTimestamp,
+          idempotencyKey: input.idempotencyKey,
+        });
+        this.emitExecutionUpdateFromSnapshot({ executionId });
+        return Object.freeze({
+          queueItemId,
+          executionId,
+          status: queueStatus,
+          mutation,
+        });
+      }),
+    );
   }
 
   public async listRecentExecutionsForSystem(input: {
@@ -1595,7 +1757,7 @@ export class SystemRuntimeBackendApi {
 
   private async assertOperationalResourceAuthorized(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1610,7 +1772,7 @@ export class SystemRuntimeBackendApi {
 
   private async isOperationalResourceAllowed(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1624,7 +1786,7 @@ export class SystemRuntimeBackendApi {
 
   private async resolveOperationalResourceAccessLevel(input: {
     readonly requestContext?: RuntimeApiRequestContext;
-    readonly requiredPermissionKey: "run.read" | "queue.read" | "log.read";
+    readonly requiredPermissionKey: "run.read" | "run.cancel" | "queue.read" | "queue.dequeue" | "log.read";
     readonly resourceFamily:
       | typeof AuthorizationResourceFamilies.run
       | typeof AuthorizationResourceFamilies.queue
@@ -1833,6 +1995,97 @@ export class SystemRuntimeBackendApi {
   private rememberExternalStatusCache(cacheKey: string, response: RuntimeExecutionStatusReadModel): void {
     this.cachedExternalStatusByKey.set(cacheKey, Object.freeze({
       expiresAtMs: Date.now() + SystemRuntimeBackendApi.EXTERNAL_STATUS_RESPONSE_CACHE_TTL_MS,
+      response,
+    }));
+  }
+
+  private async withMutationIdempotency<T>(
+    operation: string,
+    targetId: string,
+    idempotencyKey: string | undefined,
+    action: () => Promise<SystemRuntimeApiResponse<T>>,
+  ): Promise<SystemRuntimeApiResponse<T>> {
+    const normalizedIdempotencyKey = idempotencyKey?.trim();
+    if (!normalizedIdempotencyKey) {
+      return action();
+    }
+    const cacheKey = `${operation.trim()}:${targetId.trim()}:${normalizedIdempotencyKey}`;
+    const cached = this.readMutationCache(cacheKey);
+    if (cached) {
+      return cached as SystemRuntimeApiResponse<T>;
+    }
+    const response = await action();
+    if (response.ok) {
+      this.rememberMutationCache(cacheKey, response as SystemRuntimeApiResponse<unknown>);
+    }
+    return response;
+  }
+
+  private resolveMutationTimestamp(value: string | undefined, label: string): string {
+    if (!value) {
+      return this.now().toISOString();
+    }
+    const normalized = value.trim();
+    if (!normalized) {
+      return this.now().toISOString();
+    }
+    const parsed = Date.parse(normalized);
+    if (!Number.isFinite(parsed)) {
+      throw new Error(`invalid-request:${label} must be an ISO-8601 timestamp with offset.`);
+    }
+    return new Date(parsed).toISOString();
+  }
+
+  private createMutationResult(input: {
+    readonly operation: string;
+    readonly targetId: string;
+    readonly changed: boolean;
+    readonly occurredAt: string;
+    readonly idempotencyKey?: string;
+  }): SharedApiMutationResult {
+    const operation = input.operation.trim() || "runtime-mutation";
+    const targetId = input.targetId.trim() || "unknown-target";
+    const normalizedIdempotencyKey = input.idempotencyKey?.trim();
+    return Object.freeze({
+      changed: input.changed,
+      mutationId: normalizedIdempotencyKey
+        ? `${operation}:${targetId}:${normalizedIdempotencyKey}`
+        : `${operation}:${targetId}:${input.occurredAt}`,
+      occurredAt: input.occurredAt,
+    });
+  }
+
+  private resolveExecutionIdFromQueueItemId(queueItemId: string): string {
+    const normalized = queueItemId.trim();
+    if (!normalized) {
+      throw new Error("invalid-request:queueItemId is required.");
+    }
+    const prefix = "runtime-queue:";
+    const executionId = normalized.startsWith(prefix)
+      ? normalized.slice(prefix.length)
+      : normalized;
+    const trimmedExecutionId = executionId.trim();
+    if (!trimmedExecutionId) {
+      throw new Error("invalid-request:queueItemId is invalid.");
+    }
+    return trimmedExecutionId;
+  }
+
+  private readMutationCache(cacheKey: string): SystemRuntimeApiResponse<unknown> | undefined {
+    const cached = this.cachedMutationResponsesByKey.get(cacheKey);
+    if (!cached) {
+      return undefined;
+    }
+    if (Date.now() > cached.expiresAtMs) {
+      this.cachedMutationResponsesByKey.delete(cacheKey);
+      return undefined;
+    }
+    return cached.response;
+  }
+
+  private rememberMutationCache(cacheKey: string, response: SystemRuntimeApiResponse<unknown>): void {
+    this.cachedMutationResponsesByKey.set(cacheKey, Object.freeze({
+      expiresAtMs: Date.now() + SystemRuntimeBackendApi.MUTATION_IDEMPOTENCY_TTL_MS,
       response,
     }));
   }
