@@ -9,6 +9,17 @@
   justify-content: flex-end;
 }
 
+.ui-action-strip--density-comfortable,
+.ui-action-list--density-comfortable {
+  gap: var(--space-sm);
+}
+
+.ui-action-strip--interaction-touch .ui-button,
+.ui-action-list--interaction-touch .ui-button,
+.ui-action-menu--interaction-touch .ui-button {
+  min-height: var(--touch-target-min);
+}
+
 .ui-action-menu {
   position: relative;
 }
@@ -46,6 +57,11 @@
 .ui-action-menu__button,
 .ui-action-list__button {
   justify-content: flex-start;
+}
+
+.ui-action-menu--layout-sheet .ui-action-menu__list {
+  position: static;
+  min-width: 0;
 }
 
 @media (max-width: 720px) {

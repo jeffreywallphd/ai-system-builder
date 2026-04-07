@@ -8,6 +8,7 @@ import {
   createSurfaceActionContext,
   type SurfaceActionDescriptor,
 } from "../actions";
+import { createSurfaceResponsiveProfile } from "../responsive";
 
 const descriptors: ReadonlyArray<SurfaceActionDescriptor> = Object.freeze([
   {
@@ -88,16 +89,41 @@ describe("SurfaceActionComponents", () => {
       surface: "thin-client",
       surfaceCapabilities: Object.freeze(["inline-actions", "bulk-actions"]),
     });
+    const responsiveProfile = createSurfaceResponsiveProfile({ viewportWidthPx: 420 });
 
     const html = renderToStaticMarkup(
       React.createElement(SurfaceActionList, {
         actions: descriptors,
         context,
+        responsiveProfile,
       }),
     );
 
     expect(html).toContain("ui-action-list");
+    expect(html).toContain("ui-action-list--interaction-touch");
+    expect(html).toContain("data-action-layout=\"sheet\"");
     expect(html).toContain("Refresh");
     expect(html).toContain("Delete");
+  });
+
+  it("renders menu with responsive sheet class when mobile conventions apply", () => {
+    const context = createSurfaceActionContext({
+      actorPermissionIds: Object.freeze(["nodes:view"]),
+      surface: "mobile",
+      surfaceCapabilities: Object.freeze(["menu-actions"]),
+    });
+    const responsiveProfile = createSurfaceResponsiveProfile({ viewportWidthPx: 390 });
+
+    const html = renderToStaticMarkup(
+      React.createElement(SurfaceActionMenu, {
+        triggerLabel: "Actions",
+        actions: descriptors,
+        context,
+        responsiveProfile,
+      }),
+    );
+
+    expect(html).toContain("ui-action-menu--layout-sheet");
+    expect(html).toContain("data-action-layout=\"sheet\"");
   });
 });

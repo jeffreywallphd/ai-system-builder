@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import type { SurfaceResponsiveProfile } from "@ui/shared/responsive";
 import {
   invokeSurfaceAction,
   resolveSurfaceActionDescriptors,
@@ -20,6 +21,7 @@ export interface SurfaceActionRenderProps<
   readonly scope?: SurfaceActionScope;
   readonly className?: string;
   readonly execution?: SurfaceActionExecutionOptions;
+  readonly responsiveProfile?: SurfaceResponsiveProfile;
 }
 
 function joinClasses(...tokens: Array<string | undefined | false>): string {
@@ -76,7 +78,15 @@ export function SurfaceActionButtonStrip<
   }
 
   return (
-    <div className={joinClasses("ui-action-strip", props.className)}>
+    <div
+      className={joinClasses(
+        "ui-action-strip",
+        props.responsiveProfile ? `ui-action-strip--interaction-${props.responsiveProfile.interactionMode}` : undefined,
+        props.responsiveProfile ? `ui-action-strip--density-${props.responsiveProfile.density}` : undefined,
+        props.className,
+      )}
+      data-action-layout={props.responsiveProfile?.actionMenuLayout}
+    >
       {actions.map((action) => (
         <button
           key={action.id}
@@ -114,7 +124,15 @@ export function SurfaceActionMenu<
   }
 
   return (
-    <details className={joinClasses("ui-action-menu", props.className)}>
+    <details
+      className={joinClasses(
+        "ui-action-menu",
+        props.responsiveProfile ? `ui-action-menu--layout-${props.responsiveProfile.actionMenuLayout}` : undefined,
+        props.responsiveProfile ? `ui-action-menu--interaction-${props.responsiveProfile.interactionMode}` : undefined,
+        props.className,
+      )}
+      data-action-layout={props.responsiveProfile?.actionMenuLayout}
+    >
       <summary className="ui-button ui-button--ghost ui-button--sm">{props.triggerLabel ?? "Actions"}</summary>
       <ul className="ui-action-menu__list">
         {actions.map((action) => (
@@ -148,7 +166,15 @@ export function SurfaceActionList<
   }
 
   return (
-    <div className={joinClasses("ui-action-list", props.className)}>
+    <div
+      className={joinClasses(
+        "ui-action-list",
+        props.responsiveProfile ? `ui-action-list--interaction-${props.responsiveProfile.interactionMode}` : undefined,
+        props.responsiveProfile ? `ui-action-list--density-${props.responsiveProfile.density}` : undefined,
+        props.className,
+      )}
+      data-action-layout={props.responsiveProfile?.actionMenuLayout}
+    >
       {actions.map((action) => (
         <button
           key={action.id}

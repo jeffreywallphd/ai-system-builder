@@ -11,9 +11,11 @@ import {
   SurfaceRegionLayout,
   SurfaceStatusRegion,
 } from "../components/shell";
+import { createSurfaceResponsiveProfile } from "../responsive";
 
 describe("Surface shell primitives", () => {
   it("renders frame, header, and regions with shared classes", () => {
+    const responsiveProfile = createSurfaceResponsiveProfile({ viewportWidthPx: 1000 });
     const html = renderToStaticMarkup(
       React.createElement(
         SurfaceFrame,
@@ -24,7 +26,7 @@ describe("Surface shell primitives", () => {
         }),
         React.createElement(
           SurfaceRegionLayout,
-          undefined,
+          { responsiveProfile },
           React.createElement(SurfaceNavigationRegion, { title: "Navigation" }, "nav"),
           React.createElement(SurfaceContentRegion, { title: "Content" }, "content"),
           React.createElement(SurfaceDetailPane, { title: "Detail" }, "detail"),
@@ -37,6 +39,8 @@ describe("Surface shell primitives", () => {
     expect(html).toContain("Navigation");
     expect(html).toContain("Content");
     expect(html).toContain("Detail");
+    expect(html).toContain("ui-responsive-panel-layout--split-with-collapsed-detail");
+    expect(html).toContain("data-navigation-mode=\"collapsible\"");
   });
 
   it("renders permission fallback and unavailable messaging", () => {

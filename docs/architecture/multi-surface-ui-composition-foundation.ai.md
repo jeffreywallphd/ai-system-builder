@@ -69,3 +69,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared action semantics now live in `src/ui/shared/actions/*` and are documented in `docs/architecture/multi-surface-ui-action-model.md`.
 - New admin/operational page actions should be descriptor-driven and rendered via shared wrappers (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) rather than page-local action branching.
 - Permission, surface-capability, confirmation, and telemetry behavior should be declared in action descriptors so desktop/thin surfaces reuse one operation model.
+
+## Story 15.1.6 update
+- Shared responsive tokens, breakpoints, and interaction profile helpers now live in `src/ui/shared/responsive/*` and are documented in `docs/architecture/multi-surface-ui-responsive-conventions.md`.
+- Shared responsive wrappers for table/form/status/action container conventions now live in `src/ui/shared/components/shell/SurfaceResponsiveConventions.tsx`.
+- Shell and action primitives now accept shared responsive profiles so desktop and thin-client compositions can apply one density/stacking/navigation behavior model across viewport classes.

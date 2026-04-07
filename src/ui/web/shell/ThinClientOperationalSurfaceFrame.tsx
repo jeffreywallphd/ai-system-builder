@@ -8,6 +8,7 @@ import {
   SurfaceRegionLayout,
   SurfaceStatusRegion,
 } from "@ui/shared/components/shell";
+import { useSurfaceResponsiveProfile } from "@ui/shared/responsive";
 import ThinClientSurfaceShell from "./ThinClientSurfaceShell";
 
 export interface ThinClientSurfaceNotice {
@@ -38,6 +39,10 @@ export default function ThinClientOperationalSurfaceFrame({
   content,
   detail,
 }: ThinClientOperationalSurfaceFrameProps): JSX.Element {
+  const responsiveProfile = useSurfaceResponsiveProfile({
+    preferDesktopComfortableDensity: true,
+  });
+
   return (
     <ThinClientSurfaceShell title={title} subtitle={subtitle} actions={actions}>
       <PermissionGuardContainer
@@ -56,7 +61,7 @@ export default function ThinClientOperationalSurfaceFrame({
           </SurfaceStatusRegion>
         ))}
 
-        <SurfaceRegionLayout>
+        <SurfaceRegionLayout responsiveProfile={responsiveProfile}>
           {navigation ? (
             <SurfaceNavigationRegion title="Context">
               {navigation}

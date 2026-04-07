@@ -9,6 +9,12 @@ export {
   SurfaceRegionLayout,
   SurfaceStatusRegion,
 } from "./SurfaceShellPrimitives";
+export {
+  SurfaceResponsiveActionMenuContainer,
+  SurfaceResponsiveFormLayout,
+  SurfaceResponsiveStatusCardGroup,
+  SurfaceResponsiveTableContainer,
+} from "./SurfaceResponsiveConventions";
 
 export type {
   PermissionGuardContainerProps,

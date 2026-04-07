@@ -143,6 +143,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 14 / Epic 14.1 Story 14.1.8 authoritative API surface baseline, prohibited pattern rules, extension workflow, and legacy-path migration guidance: `docs/architecture/unified-api-authoritative-surface.md`
 - Feature 14 / Epic 14.2 Story 14.2.8 endpoint-level route-family map, shared contract/client traceability, auth expectations, and realtime topic model: `docs/architecture/unified-api-endpoint-reference.md`
 - Canonical multi-surface UI layering and composition rules (desktop/thin-client/mobile-responsive): `docs/architecture/multi-surface-ui-composition-foundation.md`
+- Canonical multi-surface responsive interaction rules for breakpoints/density/touch-target/stacking: `docs/architecture/multi-surface-ui-responsive-conventions.md`
 - Contributor implementation checklist for converged API additions (shared contracts/schemas/backend/transport/client wiring): `docs/unified-api-contributor-guide.md`
 
 ## Direction 4 (Phase 1) foundation

@@ -1,4 +1,8 @@
 import type { ReactNode } from "react";
+import {
+  DEFAULT_DESKTOP_RESPONSIVE_PROFILE,
+  type SurfaceResponsiveProfile,
+} from "@ui/shared/responsive";
 
 function joinClasses(...tokens: Array<string | undefined | false>): string {
   return tokens.filter((token): token is string => typeof token === "string" && token.length > 0).join(" ");
@@ -68,20 +72,28 @@ export interface SurfaceRegionLayoutProps {
   readonly children: ReactNode;
   readonly className?: string;
   readonly collapseOnNarrow?: boolean;
+  readonly responsiveProfile?: SurfaceResponsiveProfile;
 }
 
 export function SurfaceRegionLayout({
   children,
   className,
   collapseOnNarrow = true,
+  responsiveProfile = DEFAULT_DESKTOP_RESPONSIVE_PROFILE,
 }: SurfaceRegionLayoutProps): JSX.Element {
   return (
     <div
       className={joinClasses(
         "ui-shell-regions",
+        "ui-responsive-panel-layout",
+        `ui-responsive-panel-layout--${responsiveProfile.panelLayout}`,
+        `ui-responsive-panel-layout--density-${responsiveProfile.density}`,
+        `ui-responsive-panel-layout--interaction-${responsiveProfile.interactionMode}`,
         collapseOnNarrow ? "ui-shell-regions--collapse" : undefined,
         className,
       )}
+      data-navigation-mode={responsiveProfile.navigationMode}
+      data-scroll-region={responsiveProfile.scrollRegionMode}
     >
       {children}
     </div>
