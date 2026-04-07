@@ -143,6 +143,65 @@ export type AuthoritativeRunNodeClaimResult =
   | AuthoritativeRunNodeClaimSuccess
   | AuthoritativeRunNodeClaimConflictResult;
 
+export const RunNodePlacementHoldConflictReasons = Object.freeze({
+  heldByAnotherOwner: "held-by-another-owner",
+});
+
+export type RunNodePlacementHoldConflictReason =
+  typeof RunNodePlacementHoldConflictReasons[keyof typeof RunNodePlacementHoldConflictReasons];
+
+export interface AuthoritativeRunNodePlacementHoldRecord {
+  readonly holdToken: string;
+  readonly runId: string;
+  readonly queueId: string;
+  readonly nodeId: string;
+  readonly reservationOwner: string;
+  readonly claimToken: string;
+  readonly decisionId?: string;
+  readonly heldAt: string;
+  readonly expiresAt: string;
+}
+
+export interface AuthoritativeRunNodePlacementHoldConflict {
+  readonly reason: RunNodePlacementHoldConflictReason;
+  readonly nodeId: string;
+  readonly message: string;
+  readonly currentHold: AuthoritativeRunNodePlacementHoldRecord;
+}
+
+export interface AuthoritativeRunNodePlacementHoldAcquired {
+  readonly outcome: "acquired";
+  readonly hold: AuthoritativeRunNodePlacementHoldRecord;
+}
+
+export interface AuthoritativeRunNodePlacementHoldConflictResult {
+  readonly outcome: "conflict";
+  readonly conflict: AuthoritativeRunNodePlacementHoldConflict;
+}
+
+export type AuthoritativeRunNodePlacementHoldResult =
+  | AuthoritativeRunNodePlacementHoldAcquired
+  | AuthoritativeRunNodePlacementHoldConflictResult;
+
+export interface IRunNodePlacementHoldRepository {
+  acquireNodePlacementHold(input: {
+    readonly holdToken: string;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly decisionId?: string;
+    readonly heldAt: string;
+    readonly expiresAt: string;
+  }): Promise<AuthoritativeRunNodePlacementHoldResult>;
+  releaseNodePlacementHold(input: {
+    readonly nodeId: string;
+    readonly holdToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean>;
+}
+
 export interface IRunOrchestrationQueuePersistenceRepository {
   getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined>;
   listQueueEntries?(query: {

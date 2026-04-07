@@ -40,15 +40,19 @@ import {
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
+  AuthoritativeRunNodePlacementHoldRecord,
+  AuthoritativeRunNodePlacementHoldResult,
   AuthoritativeRunDispatchAttemptResult,
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   AuthoritativeRunNodeClaimResult,
+  IRunNodePlacementHoldRepository,
   IRunOrchestrationQueuePersistenceRepository,
   RunQueueEligibilityMarker,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type { RunLifecycleState } from "@domain/runs/RunDomain";
+import { RunNodePlacementHoldConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
 
@@ -87,12 +91,27 @@ interface PlatformRunDispatchAttemptRow {
   readonly dispatch_result_json: string | null;
 }
 
+interface PlatformRunNodePlacementHoldRow {
+  readonly node_id: string;
+  readonly hold_token: string;
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly reservation_owner: string;
+  readonly claim_token: string;
+  readonly decision_id: string | null;
+  readonly held_at: string;
+  readonly expires_at: string;
+  readonly updated_at: string;
+  readonly created_at: string;
+}
+
 export class SqlitePlatformPersistenceAdapter
   extends SafeSqliteRepositoryBase
   implements
     IPlatformRunRecordRepository,
     IPlatformAuditEventRepository,
     IPlatformTransactionManager,
+    IRunNodePlacementHoldRepository,
     IRunOrchestrationQueuePersistenceRepository {
   private database?: SqliteCompatDatabase;
   private initialized = false;
@@ -544,6 +563,152 @@ export class SqlitePlatformPersistenceAdapter
     ));
 
     return mutationResult.changes === 1;
+  }
+
+  public async acquireNodePlacementHold(input: {
+    readonly holdToken: string;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly decisionId?: string;
+    readonly heldAt: string;
+    readonly expiresAt: string;
+  }): Promise<AuthoritativeRunNodePlacementHoldResult> {
+    const holdToken = normalizePlatformLookup(input.holdToken);
+    const runId = normalizePlatformLookup(input.runId);
+    const queueId = normalizePlatformLookup(input.queueId);
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const reservationOwner = normalizePlatformLookup(input.reservationOwner);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    const decisionId = normalizePlatformLookup(input.decisionId ?? "") ?? null;
+    if (!holdToken || !runId || !queueId || !nodeId || !reservationOwner || !claimToken) {
+      throw new Error(
+        "Node placement hold acquisition requires holdToken, runId, queueId, nodeId, reservationOwner, and claimToken.",
+      );
+    }
+
+    const heldAt = input.heldAt.trim();
+    const expiresAt = input.expiresAt.trim();
+    if (!heldAt || Number.isNaN(Date.parse(heldAt)) || !expiresAt || Number.isNaN(Date.parse(expiresAt))) {
+      throw new Error("Node placement hold timestamps must be valid ISO strings.");
+    }
+    if (Date.parse(expiresAt) <= Date.parse(heldAt)) {
+      throw new Error("Node placement hold expiresAt must be after heldAt.");
+    }
+
+    const acquireResult = this.getDatabase().transaction(() => {
+      this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND expires_at <= ?
+      `).run(nodeId, heldAt);
+
+      const existing = this.getNodePlacementHoldRowByNodeId(nodeId);
+      if (existing && existing.expires_at > heldAt && existing.hold_token !== holdToken) {
+        return Object.freeze({
+          outcome: "conflict" as const,
+          currentHold: this.mapNodePlacementHoldRowToRecord(existing),
+        });
+      }
+
+      this.getDatabase().prepare(`
+        INSERT INTO platform_run_node_placement_holds (
+          node_id,
+          hold_token,
+          run_id,
+          queue_id,
+          reservation_owner,
+          claim_token,
+          decision_id,
+          held_at,
+          expires_at,
+          updated_at,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(node_id) DO UPDATE SET
+          hold_token = excluded.hold_token,
+          run_id = excluded.run_id,
+          queue_id = excluded.queue_id,
+          reservation_owner = excluded.reservation_owner,
+          claim_token = excluded.claim_token,
+          decision_id = excluded.decision_id,
+          held_at = excluded.held_at,
+          expires_at = excluded.expires_at,
+          updated_at = excluded.updated_at
+      `).run(
+        nodeId,
+        holdToken,
+        runId,
+        queueId,
+        reservationOwner,
+        claimToken,
+        decisionId,
+        heldAt,
+        expiresAt,
+        heldAt,
+        heldAt,
+      );
+
+      const acquired = this.getNodePlacementHoldRowByNodeId(nodeId);
+      if (!acquired) {
+        throw new Error(`Failed to acquire node placement hold for node '${nodeId}'.`);
+      }
+      return Object.freeze({
+        outcome: "acquired" as const,
+        hold: this.mapNodePlacementHoldRowToRecord(acquired),
+      });
+    })();
+
+    if (acquireResult.outcome === "conflict") {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodePlacementHoldConflictReasons.heldByAnotherOwner,
+          nodeId,
+          message: `Node '${nodeId}' already has an active placement hold.`,
+          currentHold: acquireResult.currentHold,
+        }),
+      });
+    }
+
+    return Object.freeze({
+      outcome: "acquired",
+      hold: acquireResult.hold,
+    });
+  }
+
+  public async releaseNodePlacementHold(input: {
+    readonly nodeId: string;
+    readonly holdToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const holdToken = normalizePlatformLookup(input.holdToken);
+    if (!nodeId || !holdToken) {
+      return false;
+    }
+
+    const releasedAt = input.releasedAt.trim();
+    const mutationResult = this.executeMutation("release node placement hold", () => this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE node_id = ?
+          AND hold_token = ?
+      `).run(
+      nodeId,
+      holdToken,
+    ));
+    if (mutationResult.changes === 0) {
+      return false;
+    }
+
+    this.executeMutation("cleanup expired node placement holds", () => this.getDatabase().prepare(`
+        DELETE FROM platform_run_node_placement_holds
+        WHERE expires_at <= ?
+      `).run(releasedAt));
+
+    return true;
   }
 
   public async claimQueuedRunForNodeDispatch(input: {
@@ -1287,6 +1452,26 @@ export class SqlitePlatformPersistenceAdapter
     `).get(runId) as PlatformRunQueueRow | undefined;
   }
 
+  private getNodePlacementHoldRowByNodeId(nodeId: string): PlatformRunNodePlacementHoldRow | undefined {
+    return this.getDatabase().prepare(`
+      SELECT
+        node_id,
+        hold_token,
+        run_id,
+        queue_id,
+        reservation_owner,
+        claim_token,
+        decision_id,
+        held_at,
+        expires_at,
+        updated_at,
+        created_at
+      FROM platform_run_node_placement_holds
+      WHERE node_id = ?
+      LIMIT 1
+    `).get(nodeId) as PlatformRunNodePlacementHoldRow | undefined;
+  }
+
   private mapQueueRowToRecord(row: PlatformRunQueueRow): AuthoritativeRunQueueEntryRecord {
     return Object.freeze({
       runId: row.run_id,
@@ -1325,6 +1510,20 @@ export class SqlitePlatformPersistenceAdapter
       dispatchResult: row.dispatch_result_json
         ? Object.freeze(JSON.parse(row.dispatch_result_json) as AuthoritativeRunDispatchAttemptResult)
         : undefined,
+    });
+  }
+
+  private mapNodePlacementHoldRowToRecord(row: PlatformRunNodePlacementHoldRow): AuthoritativeRunNodePlacementHoldRecord {
+    return Object.freeze({
+      holdToken: row.hold_token,
+      runId: row.run_id,
+      queueId: row.queue_id,
+      nodeId: row.node_id,
+      reservationOwner: row.reservation_owner,
+      claimToken: row.claim_token,
+      decisionId: normalizePlatformLookup(row.decision_id ?? ""),
+      heldAt: row.held_at,
+      expiresAt: row.expires_at,
     });
   }
 
