@@ -36,19 +36,46 @@ describe("RuntimeOperationsService", () => {
     const service = new RuntimeOperationsService(client, sessionStore);
     await service.listQueueItems({ statuses: ["queued"], limit: 5, offset: 2 });
     await service.getRunStatus("execution-1");
+    await service.startRun({
+      systemId: "system:demo",
+      versionId: "system:demo:v1",
+      trigger: "manual",
+      approvedParameters: Object.freeze({ maxRuntimeSeconds: 120 }),
+    });
     await service.cancelRun({ executionId: "execution-1", reason: "cancelled" });
     await service.dequeueQueueItem({ queueItemId: "runtime-queue:execution-1" });
+    await service.inspectRun({ executionId: "execution-1", diagnosticsLimit: 5, eventLimit: 6, logLimit: 7 });
 
     expect(client.listQueueItems).toHaveBeenCalledTimes(1);
-    expect(client.getRunStatus).toHaveBeenCalledTimes(1);
+    expect(client.getRunStatus).toHaveBeenCalledTimes(2);
+    expect(client.startRun).toHaveBeenCalledTimes(1);
     expect(client.cancelRun).toHaveBeenCalledTimes(1);
     expect(client.dequeueQueueItem).toHaveBeenCalledTimes(1);
+    expect(client.getRunResult).toHaveBeenCalledTimes(1);
+    expect(client.getRunTrace).toHaveBeenCalledTimes(1);
     expect(client.listQueueItems).toHaveBeenCalledWith({
       workspaceId: "workspace-resolved",
       statuses: ["queued"],
       limit: 5,
       offset: 2,
       systemId: undefined,
+    }, "token-1");
+    expect(client.startRun).toHaveBeenCalledWith({
+      workspaceId: "workspace-resolved",
+      systemId: "system:demo",
+      versionId: "system:demo:v1",
+      async: undefined,
+      inputPayload: undefined,
+      executionId: undefined,
+      idempotencyKey: undefined,
+      context: {
+        trigger: "manual",
+        metadata: {
+          approvedParameters: {
+            maxRuntimeSeconds: 120,
+          },
+        },
+      },
     }, "token-1");
   });
 
