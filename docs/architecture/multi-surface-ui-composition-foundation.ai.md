@@ -50,3 +50,8 @@ Dependency direction:
 
 See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 
+
+## Story 15.1.2 update
+- Shared shell primitives + responsive region layouts are now documented in docs/architecture/multi-surface-ui-shell-primitives.md and implemented in src/ui/shared/components/shell/* with desktop/thin wrappers in src/ui/desktop/shell/* and src/ui/web/shell/*.
+- New admin/operational pages should compose these primitives for header/regions/status/empty/guard containers rather than ad hoc shell structures.
+

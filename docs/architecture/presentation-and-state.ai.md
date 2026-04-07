@@ -927,3 +927,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - download authorization,
   - preview resolution.
 - Renderer state for this flow is logical and path-free (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`) to preserve protected-asset boundary posture.
+
+## Story 15.1.2 shell update
+- Shared shell primitives: src/ui/shared/components/shell/SurfaceShellPrimitives.tsx (frame/header/regions/status/empty/permission-guard).
+- Desktop/thin assemblies: src/ui/desktop/shell/DesktopAdminSurfaceFrame.tsx and src/ui/web/shell/ThinClientOperationalSurfaceFrame.tsx.
+- Usage guide: docs/architecture/multi-surface-ui-shell-primitives.md.
+

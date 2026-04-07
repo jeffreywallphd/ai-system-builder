@@ -18,6 +18,7 @@
 @import "./components/wizard.css";
 @import "./components/asset-selector.css";
 @import "./components/workflow-runs.css";
+@import "./components/shell.css";
 
 @import "./layout/container.css";
 @import "./layout/grid.css";
@@ -1437,3 +1438,5 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+
