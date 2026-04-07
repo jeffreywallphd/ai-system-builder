@@ -42,6 +42,10 @@ import type {
   ValidateTrustedDevicePairingApiResponse,
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 export type * from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+export {
+  ChangeLocalPasswordCredentialVerificationModes,
+  IdentityAuthApiErrorCodes,
+} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import type {
   WorkspaceMembershipStatus,
   WorkspaceRole,

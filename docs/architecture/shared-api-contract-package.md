@@ -73,6 +73,7 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 - Server-side imports:
   - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
   - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
+- Shared transport contracts re-export stable runtime constants from compatibility SDK contracts (for example, `IdentityAuthApiErrorCodes`) so backend and client imports remain centered on `src/shared/contracts/*`.
 
 ## Migration notes
 
