@@ -33,6 +33,9 @@ The governance review surface aggregates prioritized governance and security eve
 - trusted-device revocation events
 - node approval events
 - permission/share mutation events
+- storage metadata/policy/lifecycle governance events
+- protected asset download access events
+- secret access-decision and secret-operation governance events
 - runtime run governance events
 
 ## Shared review behavior

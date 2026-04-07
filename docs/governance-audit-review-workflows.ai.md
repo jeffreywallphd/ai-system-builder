@@ -23,6 +23,7 @@ Story 15.3.6 admin-facing audit/governance review surfaces for prioritized secur
 - Desktop route is dense review-first (filter + table + detail)
 - Thin route is compact and filtered to thin-safe event classes
 - Event detail always displays redacted payload values
+- Coverage includes identity/trust events, authorization mutation events, storage configuration events, protected asset access events, and secret governance events
 
 ## Access control contract
 
