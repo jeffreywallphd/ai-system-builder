@@ -7,6 +7,29 @@ import { RunSubmissionValidationErrorCodes } from "@application/runs/use-cases/R
 import { AuthoritativeRunSubmissionBackendApi } from "../AuthoritativeRunSubmissionBackendApi";
 import { AssetBackedRunSubmissionTargetResolver } from "../AssetBackedRunSubmissionTargetResolver";
 import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
+import {
+  RunOrchestrationObservability,
+  type RunOrchestrationObservabilityLogEvent,
+  type RunOrchestrationObservabilityLogger,
+} from "../RunOrchestrationObservability";
+
+class CapturingRunObservabilityLogger implements RunOrchestrationObservabilityLogger {
+  public readonly infoEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly warnEvents: RunOrchestrationObservabilityLogEvent[] = [];
+  public readonly errorEvents: RunOrchestrationObservabilityLogEvent[] = [];
+
+  public info(event: RunOrchestrationObservabilityLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: RunOrchestrationObservabilityLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: RunOrchestrationObservabilityLogEvent): void {
+    this.errorEvents.push(event);
+  }
+}
 
 describe("AuthoritativeRunSubmissionBackendApi", () => {
   it("returns canonical run submission acceptance payload when validation passes", async () => {
@@ -172,6 +195,54 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
 
     expect(response.ok).toBe(false);
     expect(response.error?.code).toBe("conflict");
+  });
+
+  it("emits correlatable and redacted observability records for validation-denied submission", async () => {
+    const logger = new CapturingRunObservabilityLogger();
+    const observability = new RunOrchestrationObservability({ logger });
+    const backend = new AuthoritativeRunSubmissionBackendApi({
+      validateRunSubmissionUseCase: {
+        execute: async () => Object.freeze({
+          ok: false as const,
+          error: Object.freeze({
+            code: RunSubmissionValidationErrorCodes.invalidRequest,
+            message: "payload invalid",
+            validationIssues: Object.freeze([]),
+          }),
+        }),
+      } as any,
+      createAuthoritativeRunUseCase: {
+        execute: async () => {
+          throw new Error("should not execute");
+        },
+      } as any,
+      observability,
+    });
+
+    const response = await backend.submitRun({
+      actorUserIdentityId: "user:1",
+      workspaceId: "workspace-alpha",
+      submission: Object.freeze({
+        clientRequestId: "client-request-1",
+        correlationId: "corr-123",
+        runtimeTarget: Object.freeze({
+          systemId: "system-demo",
+          versionId: "version-1",
+          async: true,
+        }),
+        parameters: Object.freeze({
+          prompt: "should never be logged",
+        }),
+      }),
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(logger.warnEvents).toHaveLength(1);
+    expect(logger.warnEvents[0]?.correlationId).toBe("corr-123");
+    expect(logger.warnEvents[0]?.requestId).toBe("client-request-1");
+    const serialized = JSON.stringify(logger.warnEvents[0]);
+    expect(serialized).not.toContain("should never be logged");
+    expect(serialized).toContain("[REDACTED]");
   });
 });
 

@@ -37,6 +37,7 @@ import {
   SharedApiErrorCodes,
   type SharedApiResponseEnvelope,
 } from "@shared/contracts/api/SharedApiContractPrimitives";
+import { RunOrchestrationObservability } from "./RunOrchestrationObservability";
 
 const AuthoritativeRunResourceType = "authoritative-run";
 
@@ -82,6 +83,7 @@ export interface AuthoritativeRunQueryBackendApiDependencies {
   readonly queueRepository?: IRunOrchestrationQueuePersistenceRepository;
   readonly auditEventRepository?: IPlatformAuditEventRepository;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly observability?: RunOrchestrationObservability;
   readonly now?: () => Date;
 }
 
@@ -97,11 +99,27 @@ export class AuthoritativeRunQueryBackendApi {
   ): Promise<SharedApiResponseEnvelope<RunListReadResponse>> {
     const workspaceId = request.workspaceId.trim();
     if (!workspaceId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-runs.completed",
+        operation: "query.list-runs",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId is required.");
     }
 
     const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
     if (!actorUserIdentityId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-runs.completed",
+        operation: "query.list-runs",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["forbidden"]),
+      });
       return this.forbidden("Run visibility requires an authenticated actor.");
     }
 
@@ -127,6 +145,25 @@ export class AuthoritativeRunQueryBackendApi {
     const offset = Math.max(0, request.offset ?? 0);
     const limit = Math.max(1, request.limit ?? 50);
     const paged = visible.slice(offset, offset + limit);
+    const stateCounters = countByState(paged.map((run) => run.state));
+    await this.recordObservability({
+      event: "run.orchestration.query.list-runs.completed",
+      operation: "query.list-runs",
+      outcome: "success",
+      severity: "info",
+      workspaceId,
+      counters: Object.freeze({
+        listed_total: all.items.length,
+        listed_visible_total: visible.length,
+        listed_page_total: paged.length,
+        ...stateCounters,
+      }),
+      details: Object.freeze({
+        hasSearch: Boolean(request.search?.trim()),
+        sortBy: request.sortBy,
+        sortDirection: request.sortDirection,
+      }),
+    });
 
     return Object.freeze({
       ok: true,
@@ -142,6 +179,14 @@ export class AuthoritativeRunQueryBackendApi {
   ): Promise<SharedApiResponseEnvelope<RunQueueStatusReadResponse>> {
     const workspaceId = request.workspaceId.trim();
     if (!workspaceId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-queue-status.completed",
+        operation: "query.list-queue-status",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId is required.");
     }
 
@@ -162,6 +207,22 @@ export class AuthoritativeRunQueryBackendApi {
         visibleItems.push(item);
       }
     }
+    const queueStateCounters = countByState(visibleItems.map((item) => item.state));
+    await this.recordObservability({
+      event: "run.orchestration.query.list-queue-status.completed",
+      operation: "query.list-queue-status",
+      outcome: "success",
+      severity: "info",
+      workspaceId,
+      counters: Object.freeze({
+        queue_items_total: queue.items.length,
+        queue_visible_items_total: visibleItems.length,
+        ...queueStateCounters,
+      }),
+      details: Object.freeze({
+        asOf: queue.asOf,
+      }),
+    });
 
     return Object.freeze({
       ok: true,
@@ -179,6 +240,15 @@ export class AuthoritativeRunQueryBackendApi {
     const workspaceId = request.workspaceId.trim();
     const runId = request.runId.trim();
     if (!workspaceId || !runId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-detail.completed",
+        operation: "query.get-run-detail",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId and runId are required.");
     }
 
@@ -187,6 +257,15 @@ export class AuthoritativeRunQueryBackendApi {
       workspaceId,
     });
     if (!detail) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-detail.completed",
+        operation: "query.get-run-detail",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["not-found"]),
+      });
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
@@ -194,17 +273,54 @@ export class AuthoritativeRunQueryBackendApi {
       authorization: request.authorization,
       runId,
     })) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-detail.completed",
+        operation: "query.get-run-detail",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["not-found-or-forbidden"]),
+      });
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
     const record = await this.dependencies.runRepository.findRunById(runId);
     if (!record) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-detail.completed",
+        operation: "query.get-run-detail",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["not-found"]),
+      });
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
     const audience = await this.resolveOperationalAudience(request.authorization, runId);
     const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
     const dispatchAttempts = await this.getDispatchAttempts(runId);
+    await this.recordObservability({
+      event: "run.orchestration.query.get-run-detail.completed",
+      operation: "query.get-run-detail",
+      outcome: "success",
+      severity: "info",
+      runId,
+      workspaceId,
+      correlationId: detail.submission.correlationId,
+      lifecycleState: detail.state,
+      counters: Object.freeze({
+        status_timeline_entries_total: timeline.length,
+        dispatch_attempts_total: dispatchAttempts.length,
+      }),
+      markers: Object.freeze([
+        audience === OperationalVisibilityAudiences.admin
+          ? "admin-diagnostics-eligible"
+          : "user-visibility",
+      ]),
+    });
 
     return Object.freeze({
       ok: true,
@@ -225,11 +341,29 @@ export class AuthoritativeRunQueryBackendApi {
     const workspaceId = request.workspaceId.trim();
     const runId = request.runId.trim();
     if (!workspaceId || !runId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-status.completed",
+        operation: "query.get-run-status",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
       return this.invalidRequest("workspaceId and runId are required.");
     }
 
     const record = await this.dependencies.runRepository.findRunById(runId);
     if (!record || record.workspaceId !== workspaceId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-status.completed",
+        operation: "query.get-run-status",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["not-found"]),
+      });
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
@@ -237,6 +371,15 @@ export class AuthoritativeRunQueryBackendApi {
       authorization: request.authorization,
       runId,
     })) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-run-status.completed",
+        operation: "query.get-run-status",
+        outcome: "failure",
+        severity: "warn",
+        runId,
+        workspaceId,
+        markers: Object.freeze(["not-found-or-forbidden"]),
+      });
       return this.notFound(`Run '${runId}' was not found.`);
     }
 
@@ -244,6 +387,24 @@ export class AuthoritativeRunQueryBackendApi {
     const audience = await this.resolveOperationalAudience(request.authorization, runId);
     const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
     const dispatchAttempts = await this.getDispatchAttempts(runId);
+    await this.recordObservability({
+      event: "run.orchestration.query.get-run-status.completed",
+      operation: "query.get-run-status",
+      outcome: "success",
+      severity: "info",
+      runId,
+      workspaceId,
+      lifecycleState: status.state,
+      counters: Object.freeze({
+        status_timeline_entries_total: timeline.length,
+        dispatch_attempts_total: dispatchAttempts.length,
+      }),
+      markers: Object.freeze([
+        audience === OperationalVisibilityAudiences.admin
+          ? "admin-diagnostics-eligible"
+          : "user-visibility",
+      ]),
+    });
     return Object.freeze({
       ok: true,
       data: mergeOperationalStatusProjection({
@@ -394,4 +555,30 @@ export class AuthoritativeRunQueryBackendApi {
       }),
     });
   }
+
+  private async recordObservability(
+    event: Parameters<RunOrchestrationObservability["record"]>[0],
+  ): Promise<void> {
+    if (!this.dependencies.observability) {
+      return;
+    }
+    try {
+      await this.dependencies.observability.record(event);
+    } catch {
+      // Observability failures are intentionally non-blocking.
+    }
+  }
+}
+
+function countByState(states: ReadonlyArray<string>): Record<string, number> {
+  const counters: Record<string, number> = {};
+  for (const state of states) {
+    const normalized = state.trim();
+    if (!normalized) {
+      continue;
+    }
+    const key = `state_${normalized.replace(/[^a-z0-9]+/gi, "_").toLowerCase()}_total`;
+    counters[key] = (counters[key] ?? 0) + 1;
+  }
+  return counters;
 }

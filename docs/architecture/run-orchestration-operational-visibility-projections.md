@@ -5,6 +5,7 @@
 - Feature 16: Run Submission and Orchestration Core
 - Epic 16.3: Implement Operational Control, Recovery Behavior, and Cross-Surface Orchestration Visibility
 - Story 16.3.5: Implement run history, status timeline, and failure-summary presentation data
+- Story 16.3.7: Integrate orchestration metrics, logging, and redaction for operational diagnosis
 
 ## Purpose
 
@@ -20,6 +21,8 @@ Provide purpose-built authoritative read projections for operational surfaces so
   - `src/application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase.ts`
 - Authoritative read API:
   - `src/infrastructure/api/runs/AuthoritativeRunQueryBackendApi.ts`
+  - `src/infrastructure/api/runs/RunOrchestrationObservability.ts`
+  - `src/infrastructure/api/runs/RunOrchestrationObservabilityRedaction.ts`
   - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Queue persistence read support:
   - `src/application/runs/ports/RunOrchestrationPersistencePorts.ts`
@@ -74,6 +77,33 @@ Queue visibility projections (`GET /api/v1/runtime/queue`) now return queue-focu
 - `GET /api/v1/runtime/queue`
   - queue visibility projection purpose-built for operational queue surfaces.
 
+## Operational diagnostics and metrics posture
+
+- Authoritative run API boundaries now emit structured run-orchestration operational events for:
+  - submission acceptance/denial paths
+  - cancellation and retry mutation outcomes
+  - lifecycle update ingestion outcomes
+  - list/detail/status/queue query outcomes
+- Emitted events include correlatable context where safe:
+  - `runId`, `workspaceId`, `nodeId` (when available)
+  - run lifecycle markers and dispatch-failure markers
+  - submission/request correlation fields (`clientRequestId`, `correlationId`) when present
+- Queue/run counters are emitted as structured counters and mirrored to optional metrics hooks, including:
+  - operation totals
+  - queue-visible run counts
+  - state-bucket counts for list/queue reads
+  - dispatch-attempt/timeline counters for detail/status reads
+
+## Redaction boundaries for orchestration observability
+
+- Redaction is centralized in `RunOrchestrationObservabilityRedaction.ts` and composes persistence diagnostics redaction (`sanitizePersistenceDiagnostics(...)`).
+- Operational event payloads are sanitized before logging/metrics emission to prevent leakage of:
+  - prompts and raw prompt-bearing payload fields
+  - secrets/tokens/credentials/auth headers
+  - absolute filesystem/raw path values
+  - backend request/response payload fields and internal diagnostics blobs
+- Observability emission remains best-effort and non-blocking, so diagnostics failures do not change authoritative orchestration behavior.
+
 ## Invariants
 
 - Action eligibility must be derived from authoritative lifecycle/queue state only.
@@ -87,6 +117,9 @@ Queue visibility projections (`GET /api/v1/runtime/queue`) now return queue-focu
 - `src/application/runs/tests/ListAuthoritativeRunQueueStatusUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/AuthoritativeRunQueryBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunReadApi.test.ts`
+- `src/infrastructure/api/runs/tests/RunOrchestrationObservability.test.ts`
+- `src/infrastructure/api/runs/tests/AuthoritativeRunSubmissionBackendApi.test.ts`
+- `src/infrastructure/api/runs/tests/AuthoritativeRunExecutionUpdateBackendApi.test.ts`
 - `src/shared/contracts/runtime/tests/RunOrchestrationTransportContracts.test.ts`
 - `src/shared/schemas/runtime/tests/RunOrchestrationTransportSchemaContracts.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`

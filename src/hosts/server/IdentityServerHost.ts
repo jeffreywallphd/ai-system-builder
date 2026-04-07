@@ -59,6 +59,7 @@ import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/A
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
+import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
@@ -966,9 +967,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     auditSink: runSubmissionAuditSink,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
+  const runOrchestrationObservability = new RunOrchestrationObservability({
+    logger: createRunOrchestrationOperationalLogger(options.logger),
+  });
   const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
     validateRunSubmissionUseCase,
     createAuthoritativeRunUseCase,
+    observability: runOrchestrationObservability,
   });
   const authoritativeRunQueryBackendApi = new AuthoritativeRunQueryBackendApi({
     listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(
@@ -985,6 +990,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     runRepository: persistentPlatformServices.platformPersistenceRepository,
     auditEventRepository: persistentPlatformServices.platformPersistenceRepository,
     authorizationDecisionEvaluator,
+    observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
@@ -1003,6 +1009,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       now: () => workspaceClock.now(),
     }),
     authorizationDecisionEvaluator,
+    observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
   const authoritativeRunExecutionUpdateBackendApi = new AuthoritativeRunExecutionUpdateBackendApi({
@@ -1013,6 +1020,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),
     }),
+    observability: runOrchestrationObservability,
   });
   const runStartupRecovery = await new RecoverRunOrchestrationStartupStateUseCase({
     runRepository: persistentPlatformServices.platformPersistenceRepository,
@@ -1351,6 +1359,55 @@ function createSecretOperationalLogger(logger: IdentityHttpServerLogger | undefi
         requestId: resolveOptionalString(event.secretId) ?? resolveOptionalString(event.actorId),
         details: Object.freeze({
           secret: event,
+        }),
+      });
+    },
+  });
+}
+
+function createRunOrchestrationOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Record<string, unknown>): void;
+  warn(event: Record<string, unknown>): void;
+  error(event: Record<string, unknown>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Record<string, unknown>) => {
+      logger.info({
+        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.runId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          orchestration: event,
+        }),
+      });
+    },
+    warn: (event: Record<string, unknown>) => {
+      logger.warn({
+        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.runId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          orchestration: event,
+        }),
+      });
+    },
+    error: (event: Record<string, unknown>) => {
+      logger.error({
+        event: resolveOptionalString(event.event) ?? "run.orchestration.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.runId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          orchestration: event,
         }),
       });
     },
