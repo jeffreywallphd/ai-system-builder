@@ -15,6 +15,12 @@ import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "../AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "../AuthoritativeNodeTrustAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "../AuthoritativeAuthorizationPolicyEventRecorder";
+import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorageManagementAuditSink";
+import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
+import {
+  composeBestEffortSecretAuditHooks,
+  createAuthoritativeSecretAccessAuditHook,
+} from "../AuthoritativeSecretAccessAuditHook";
 
 class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public readonly events: CanonicalAuditEvent[] = [];
@@ -145,5 +151,143 @@ describe("Authoritative security audit adapters", () => {
     expect(event?.scope.workspaceId).toBe("workspace:primary");
     expect(event?.protectedResource?.resourceRef).toBe("asset-record:asset:123");
     expect((event?.payload.adminOnlyDetails?.details as Record<string, unknown>)?.apiToken).toBe("[REDACTED]");
+  });
+
+  it("records storage policy and metadata changes through authoritative storage/policy categories", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T18:30:00.000Z"),
+      idGenerator: () => "storage-1",
+    });
+    const sink = new AuthoritativeStorageManagementAuditSink(recorder);
+
+    await sink.recordStorageManagementEvent({
+      type: "storage-policy-updated",
+      actorUserIdentityId: "user:storage-admin",
+      workspaceId: "workspace:primary",
+      storageInstanceId: "storage:alpha",
+      occurredAt: "2026-04-07T18:30:00.000Z",
+      correlationId: "corr:storage:policy:1",
+      outcome: "success",
+      details: Object.freeze({
+        policyId: "policy-storage-alpha",
+        keyReferenceId: "kms://workspace-alpha/keys/one",
+      }),
+    });
+    await sink.recordStorageManagementEvent({
+      type: "storage-metadata-updated",
+      actorUserIdentityId: "user:storage-admin",
+      workspaceId: "workspace:primary",
+      storageInstanceId: "storage:alpha",
+      occurredAt: "2026-04-07T18:30:01.000Z",
+      outcome: "already-applied",
+      details: Object.freeze({
+        changedMetadataFields: Object.freeze(["displayName"]),
+      }),
+    });
+
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[0]?.category).toBe("policy");
+    expect(repository.events[0]?.action).toBe("policy.storage.updated");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("storage-instance:storage:alpha");
+    expect((repository.events[0]?.payload.userSafeDetails as Record<string, unknown>)?.keyReferenceId).toBe("[REDACTED]");
+    expect(repository.events[1]?.category).toBe("administrative");
+    expect(repository.events[1]?.action).toBe("storage.metadata.updated");
+  });
+
+  it("records protected download access outcomes through authoritative protected-data taxonomy", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T18:40:00.000Z"),
+      idGenerator: () => "asset-1",
+    });
+    const sink = new AuthoritativeProtectedAssetAuditSink(recorder);
+
+    await sink.recordAssetEvent({
+      type: "asset-download-authorized",
+      occurredAt: "2026-04-07T18:40:00.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:analyst",
+      correlationId: "corr:asset:download:1",
+      outcome: "success",
+      asset: Object.freeze({
+        assetId: "asset:protected-1",
+        versionId: "asset:protected-1:v2",
+      }),
+      details: Object.freeze({
+        purpose: "download",
+      }),
+    });
+    await sink.recordAssetEvent({
+      type: "asset-download-opened",
+      occurredAt: "2026-04-07T18:40:02.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:analyst",
+      outcome: "rejected",
+      asset: Object.freeze({
+        assetId: "asset:protected-1",
+      }),
+      details: Object.freeze({
+        reasonCode: "invalid-download-grant",
+      }),
+    });
+
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[0]?.category).toBe("protected-data");
+    expect(repository.events[0]?.action).toBe("asset.protected.download.authorized");
+    expect(repository.events[1]?.outcome).toBe("rejected");
+    expect(repository.events[1]?.action).toBe("asset.protected.download.opened");
+  });
+
+  it("records secret operation and access-decision events through authoritative secret hooks", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T18:50:00.000Z"),
+      idGenerator: () => "secret-1",
+    });
+    const hook = composeBestEffortSecretAuditHooks(
+      createAuthoritativeSecretAccessAuditHook(recorder),
+    );
+
+    await hook(Object.freeze({
+      eventKind: "secret.access-decision",
+      action: "create",
+      decision: "allowed",
+      reason: "allowed",
+      actor: Object.freeze({
+        actorId: "user:security-admin",
+        actorType: "server-admin",
+      }),
+      target: Object.freeze({
+        secretId: "secret:server:provider:openai",
+        scope: "server",
+      }),
+      occurredAt: "2026-04-07T18:50:00.000Z",
+    }));
+    await hook(Object.freeze({
+      eventKind: "secret.operation",
+      operation: "rotate",
+      status: "succeeded",
+      reasonCode: "operation-succeeded",
+      actor: Object.freeze({
+        actorId: "user:security-admin",
+        actorType: "server-admin",
+      }),
+      target: Object.freeze({
+        secretId: "secret:server:provider:openai",
+        scope: "server",
+      }),
+      occurredAt: "2026-04-07T18:50:01.000Z",
+    }));
+
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[0]?.action).toBe("secret.create.access-evaluated");
+    expect(repository.events[0]?.category).toBe("protected-data");
+    expect(repository.events[1]?.action).toBe("secret.rotate.operation-recorded");
+    expect(repository.events[1]?.outcome).toBe("succeeded");
+    expect(repository.events[1]?.scope.kind).toBe("global");
   });
 });

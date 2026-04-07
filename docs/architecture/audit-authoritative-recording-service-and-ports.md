@@ -1,6 +1,6 @@
 # Authoritative Audit Recording Service and Ports
 
-This note captures Story 18.1.3 and Story 18.1.5 for Feature 18 / Epic 18.1.
+This note captures Story 18.1.3, Story 18.1.5, and Story 18.1.6 for Feature 18 / Epic 18.1.
 
 ## Scope
 
@@ -24,6 +24,12 @@ Story 18.1.5 extends this with baseline production wiring for high-risk security
 - node trust approval/revocation and related trust-administration mutation events
 - authorization sharing/permission mutation events
 
+Story 18.1.6 extends this with baseline governance capture for storage, protected-data access, and secret configuration changes:
+
+- storage metadata/policy/lifecycle administrative events
+- protected asset download authorization/open events
+- secret access-decision and secret operation events (create/rotate/disable/delete/re-encryption/runtime retrieval)
+
 ## Canonical files
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
@@ -32,6 +38,9 @@ Story 18.1.5 extends this with baseline production wiring for high-risk security
 - `src/infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher.ts`
 - `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder.ts`
+- `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeProtectedAssetAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -96,6 +105,13 @@ Story 18.1.5 integration uses application-boundary adapters and host composition
 - `AuthoritativeAuthorizationPolicyEventRecorder` wires authorization mutation/evaluation recorder output into authoritative sharing/permission audit workflows.
 - Emission remains in application services/use cases, not transport/UI controllers.
 
+Story 18.1.6 integration adds governance-oriented fan-out and mapping adapters:
+
+- `FanoutStorageManagementAuditSink` and `AuthoritativeStorageManagementAuditSink` preserve legacy storage audit records while emitting canonical authoritative storage/policy events.
+- `FanoutAssetAuditSink` and `AuthoritativeProtectedAssetAuditSink` preserve legacy asset audit records while emitting canonical protected-data download access events.
+- `createAuthoritativeSecretAccessAuditHook(...)` translates secret access-decision and operation events into authoritative canonical secret events, and host composition uses best-effort secret audit hook fan-out to keep secret workflows non-blocking.
+- Mapping intentionally records logical resource references (`storage-instance`, `asset-record`, `secret`) and safe summaries, never plaintext secret material or raw storage/object paths.
+
 ## Tests
 
 `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts` covers:
@@ -111,3 +127,6 @@ Story 18.1.5 integration uses application-boundary adapters and host composition
 - identity lifecycle adapter emission into authoritative audit records
 - node trust adapter emission for approval/revocation-style events with sensitive-field redaction
 - authorization mutation adapter emission for sharing/permission changes with redaction-safe admin payload boundaries
+- storage metadata/policy adapter emission with canonical administrative vs policy category mapping
+- protected asset download adapter emission with canonical protected-data taxonomy mapping
+- secret audit-hook adapter emission for secret access-decision and operation events

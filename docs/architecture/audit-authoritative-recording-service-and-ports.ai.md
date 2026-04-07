@@ -4,6 +4,7 @@
 
 Story 18.1.3 introduces an application-layer authoritative audit recording service so audited features can emit canonical events through one reusable port instead of per-feature ad hoc sinks.
 Story 18.1.5 wires this service into baseline high-risk security flows.
+Story 18.1.6 expands baseline governance capture for storage, protected asset access, and secret configuration events.
 
 ## Canonical files
 
@@ -13,6 +14,9 @@ Story 18.1.5 wires this service into baseline high-risk security flows.
 - `src/infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher.ts`
 - `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder.ts`
+- `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeProtectedAssetAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -51,6 +55,13 @@ Story 18.1.5 composition/wiring now:
 - wires authorization policy mutation recorder to authoritative sharing/permission audit recording
 - keeps emission at application use-case/service boundaries
 
+Story 18.1.6 composition/wiring now:
+
+- fans out storage management audit events to legacy storage audit persistence plus authoritative storage/policy category recording
+- fans out asset audit events to legacy asset audit persistence plus authoritative protected download-access recording
+- fans out secret access audit hooks to legacy operational logging plus authoritative canonical secret event recording
+- records logical protected-resource references and safe summary details without raw secret values or raw path/object-key payloads
+
 ## Why this matters
 
 - Audit recording is now a reusable application capability.
@@ -64,3 +75,6 @@ Story 18.1.5 composition/wiring now:
 - cross-feature recorder usage examples
 - source/action mismatch guardrails
 - adapter integration tests for identity auth/session, trusted-device lifecycle, node trust, and authorization sharing/permission mutation recording
+- adapter integration tests for storage metadata/policy governance events
+- adapter integration tests for protected asset download access events
+- adapter integration tests for secret access-decision and operation event mapping

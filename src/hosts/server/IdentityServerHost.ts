@@ -48,11 +48,19 @@ import { CompleteTrustedDevicePairingUseCase } from "@application/identity/use-c
 import { SqliteIdentityLifecycleEventPublisher } from "@infrastructure/persistence/identity/SqliteIdentityLifecycleEventPublisher";
 import {
   FanoutIdentityLifecycleEventPublisher,
+  FanoutStorageManagementAuditSink,
+  FanoutAssetAuditSink,
   FanoutNodeTrustAuditSink,
 } from "@infrastructure/audit/AuditFanoutPublishers";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
+import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
+import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
+import {
+  composeBestEffortSecretAuditHooks,
+  createAuthoritativeSecretAccessAuditHook,
+} from "@infrastructure/audit/AuthoritativeSecretAccessAuditHook";
 import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
@@ -355,12 +363,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   let secretService: ServerComposedSecretService | undefined;
   try {
+    const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
+      repository: persistentPlatformServices.platformPersistenceRepository,
+    });
+    const legacySecretAccessAuditHook = createSecretAccessAuditHook(options.logger);
     const protectedSecretStore = createFileSystemProtectedSecretStoreFromEnvironment(env);
     secretService = composeServerSecretService({
       databasePath: options.databasePath,
       env,
       observabilityLogger: createSecretOperationalLogger(options.logger),
-      auditHook: createSecretAccessAuditHook(options.logger),
+      auditHook: composeBestEffortSecretAuditHooks(
+        legacySecretAccessAuditHook
+          ? (event) => legacySecretAccessAuditHook(event as unknown as Record<string, unknown>)
+          : undefined,
+        createAuthoritativeSecretAccessAuditHook(authoritativeAuditRecorder),
+      ),
     });
     await assertSystemSecretBootstrapSafe({
       env,
@@ -378,9 +395,6 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     const sessionPolicies = options.sessionPolicies
       ?? IdentitySessionPolicyConfig.fromEnv(env).policies;
     const sessionTrustPolicies = IdentitySessionTrustPolicyConfig.fromEnv(env).policies;
-    const authoritativeAuditRecorder = new AuthoritativeAuditRecordingService({
-      repository: persistentPlatformServices.platformPersistenceRepository,
-    });
     const baseIdentityLifecyclePublisher = options.eventPublisher ?? new SqliteIdentityLifecycleEventPublisher(databasePath);
     const eventPublisher = new FanoutIdentityLifecycleEventPublisher([
       baseIdentityLifecyclePublisher,
@@ -866,8 +880,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     policyPort: workspaceAwareStoragePolicyEvaluationAdapter,
     provisioningPort: storageProvisioningOrchestrator,
     capabilityPort: storageProvisioningOrchestrator,
-    auditSink: storageManagementAuditRecorder,
+    auditSink: new FanoutStorageManagementAuditSink([
+      storageManagementAuditRecorder,
+      new AuthoritativeStorageManagementAuditSink(authoritativeAuditRecorder),
+    ]),
   });
+  const assetAuditSink = new FanoutAssetAuditSink([
+    assetAuditRecorder,
+    new AuthoritativeProtectedAssetAuditSink(authoritativeAuditRecorder),
+  ]);
   const storageManagementBackendApi = new StorageManagementBackendApi({
     storageManagementService,
     capabilityInspectionPort: storageProvisioningOrchestrator,
@@ -879,14 +900,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetGeneratedOutputRegistrationService = new AssetGeneratedOutputRegistrationService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const storageLogicalAccessResolutionService = new StorageLogicalAccessResolutionService({
     repository: storageInstanceRepository,
@@ -924,17 +945,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     encryptionKeyResolutionService: assetEncryptionKeyResolutionService,
     assetContentCipherPort,
     encryptionObservabilityPort: encryptionObservabilityReporter,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetDiscoveryService = new AssetDiscoveryService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetDetailService = new AssetDetailService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetDownloadGrantAdapter = new EncryptedAssetDownloadGrantAdapter({
     secret: resolveAssetDownloadGrantSecret(env),
@@ -947,17 +968,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
     assetContentCipherPort,
     encryptionObservabilityPort: encryptionObservabilityReporter,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetPreviewService = new AssetPreviewService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetLifecycleService = new AssetLifecycleService({
     repository: assetRepository,
     workspaceAuthorizationReadRepository: workspaceRepository,
-    auditSink: assetAuditRecorder,
+    auditSink: assetAuditSink,
   });
   const assetManagementBackendApi = new AssetManagementBackendApi({
     uploadInitiationService: assetUploadInitiationService,
