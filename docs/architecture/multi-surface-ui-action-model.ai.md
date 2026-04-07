@@ -40,3 +40,8 @@ Story 15.1.5 introduces one shared action semantic model for page, row, and bulk
   - menus expose `aria-haspopup` + `role="menu"` + `role="menuitem"`
   - menus support Escape close and directional keyboard traversal (`ArrowUp`, `ArrowDown`, `Home`, `End`)
 - New admin/operational pages should consume this shared menu behavior instead of custom menu keyboard wiring.
+
+## Story 15.2.3 update
+- Queue visibility surfaces in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx` now use shared action descriptors for queue row/detail operations.
+- Queue action descriptors are permission-aware for inspect/cancel/dequeue/refresh and reuse shared wrappers across desktop/thin surfaces.
+- Queue action-flow coverage now lives in `src/ui/shared/tests/OperationalQueueVisibilityActions.test.tsx`.

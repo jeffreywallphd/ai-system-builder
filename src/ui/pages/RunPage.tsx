@@ -26,9 +26,14 @@ import {
   type OperationalWorkspaceRecentOutputSummary,
 } from "../presenters/OperationalWorkspaceDashboardPresenter";
 import {
+  OperationalQueueDetailPanel,
+  OperationalQueueVisibilityPanel,
   OperationalRunDetailStatusPanel,
   OperationalRunListPanel,
   OperationalWorkspaceDashboard,
+  QueueVisibilityScopes,
+  resolveQueueVisibilityStatuses,
+  type OperationalQueueFilters,
 } from "../shared/operations";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import RunDesktopOperationalDashboardPage from "./RunDesktopOperationalDashboardPage";
@@ -104,6 +109,12 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
   const [history, setHistory] = useState<ReadonlyArray<ExecutionRunProjection>>([]);
   const [runtimeQueueItems, setRuntimeQueueItems] = useState<ReadonlyArray<RuntimeQueueItem>>([]);
+  const [selectedQueueItemId, setSelectedQueueItemId] = useState<string | undefined>();
+  const [queueFilters, setQueueFilters] = useState<OperationalQueueFilters>(Object.freeze({
+    visibilityScope: QueueVisibilityScopes.active,
+    systemIdFilter: "",
+    queryFilter: "",
+  }));
   const [nodeInventory, setNodeInventory] = useState<ReadonlyArray<NodeInventorySummaryDto>>([]);
   const [recentOutputs, setRecentOutputs] = useState<ReadonlyArray<OperationalWorkspaceRecentOutputSummary>>([]);
 
@@ -151,9 +162,13 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
   const refreshRuntimeQueue = useCallback(async (): Promise<void> => {
     setIsRuntimeQueueLoading(true);
+    const statusFilters = resolveQueueVisibilityStatuses(queueFilters.visibilityScope);
+    const normalizedSystemId = queueFilters.systemIdFilter.trim() || undefined;
+    const normalizedQuery = queueFilters.queryFilter.trim().toLowerCase();
     const response = await runtimeOperationsService.listQueueItems({
-      limit: 20,
-      statuses: ["queued", "running"],
+      limit: 50,
+      statuses: statusFilters,
+      systemId: normalizedSystemId,
     });
     if (!response.ok || !response.data) {
       setRuntimeQueueItems([]);
@@ -162,10 +177,17 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       return;
     }
 
-    setRuntimeQueueItems(response.data.items);
+    const visibleItems = normalizedQuery.length > 0
+      ? response.data.items.filter((item) => (
+        item.executionId.toLowerCase().includes(normalizedQuery)
+        || item.queueItemId.toLowerCase().includes(normalizedQuery)
+      ))
+      : response.data.items;
+
+    setRuntimeQueueItems(visibleItems);
     setRuntimeQueueError(undefined);
     setIsRuntimeQueueLoading(false);
-  }, [runtimeOperationsService]);
+  }, [queueFilters.queryFilter, queueFilters.systemIdFilter, queueFilters.visibilityScope, runtimeOperationsService]);
 
   const inspectRuntimeExecution = useCallback(async (executionId: string): Promise<void> => {
     const normalizedExecutionId = executionId.trim();
@@ -294,6 +316,15 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       setIsRecentOutputsLoading(false);
     });
   }, [loadRecentOutputs]);
+
+  useEffect(() => {
+    if (!selectedQueueItemId) {
+      return;
+    }
+    if (!runtimeQueueItems.some((item) => item.queueItemId === selectedQueueItemId)) {
+      setSelectedQueueItemId(undefined);
+    }
+  }, [runtimeQueueItems, selectedQueueItemId]);
 
   useEffect(() => {
     const selectedExecutionId = runtimeExecutionId.trim() || runtimeExecutionState?.executionId;
@@ -585,6 +616,54 @@ export default function RunPage(props: RunPageProps): JSX.Element {
           });
         }}
       />
+      <OperationalQueueVisibilityPanel
+        queueItems={runtimeQueueItems}
+        totalCount={runtimeQueueItems.length}
+        selectedQueueItemId={selectedQueueItemId}
+        filters={queueFilters}
+        isLoading={isRuntimeQueueLoading}
+        error={runtimeQueueError}
+        responsiveProfile={responsiveProfile}
+        actorPermissionIds={actorPermissionIds}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
+        onFiltersChanged={(next) => {
+          setQueueFilters(next);
+        }}
+        onRefreshQueue={() => {
+          void refreshRuntimeQueue();
+        }}
+        onInspectRun={(executionId) => {
+          setRuntimeExecutionId(executionId);
+          void inspectRuntimeExecution(executionId);
+        }}
+        onCancelRun={(executionId) => {
+          void runtimeOperationsService.cancelRun({
+            executionId,
+            reason: "Cancelled from queue visibility panel.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onDequeue={(queueItemId) => {
+          void runtimeOperationsService.dequeueQueueItem({
+            queueItemId,
+            reason: "Dequeued from queue visibility panel.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onSelectQueueItem={(queueItemId) => {
+          setSelectedQueueItemId(queueItemId);
+        }}
+      />
     </div>
   );
 
@@ -683,6 +762,46 @@ export default function RunPage(props: RunPageProps): JSX.Element {
             }
             void inspectRuntimeExecution(executionId);
             void refreshRuntimeQueue();
+          });
+        }}
+      />
+      <OperationalQueueDetailPanel
+        queueItems={runtimeQueueItems}
+        selectedQueueItemId={selectedQueueItemId}
+        responsiveProfile={responsiveProfile}
+        actorPermissionIds={actorPermissionIds}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
+        isLoading={isRuntimeQueueLoading}
+        error={runtimeQueueError}
+        onRefreshQueue={() => {
+          void refreshRuntimeQueue();
+        }}
+        onInspectRun={(executionId) => {
+          setRuntimeExecutionId(executionId);
+          void inspectRuntimeExecution(executionId);
+        }}
+        onCancelRun={(executionId) => {
+          void runtimeOperationsService.cancelRun({
+            executionId,
+            reason: "Cancelled from queue detail panel.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onDequeue={(queueItemId) => {
+          void runtimeOperationsService.dequeueQueueItem({
+            queueItemId,
+            reason: "Dequeued from queue detail panel.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
+              return;
+            }
+            return refreshRuntimeQueue();
           });
         }}
       />
