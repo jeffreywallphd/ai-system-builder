@@ -36,14 +36,14 @@ export default defineConfig(async ({ mode }) => {
               find: "./modelManagementDependencies",
               replacement: path.resolve(
                 REPOSITORY_ROOT,
-                "ui/composition/modelManagementDependencies.browser.ts",
+                "src/ui/composition/modelManagementDependencies.browser.ts",
               ),
             },
             {
               find: "../../infrastructure/execution/createExecutionInfrastructure",
               replacement: path.resolve(
                 REPOSITORY_ROOT,
-                "infrastructure/execution/createExecutionInfrastructure.browser.ts",
+                "src/infrastructure/execution/createExecutionInfrastructure.browser.ts",
               ),
             },
             {
@@ -60,3 +60,4 @@ export default defineConfig(async ({ mode }) => {
     },
   };
 });
+
