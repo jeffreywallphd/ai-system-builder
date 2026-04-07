@@ -9,10 +9,10 @@ import {
 import { MockNodeCatalogProvider } from "@infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
 import { createCompositeNodeImplementationRegistry } from "@infrastructure/nodes/NodeProviderRegistryIndex";
-import basicRagPipeline from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
-import sampleImagePipeline from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
-import sampleTextAnalysis from "../../dev/workflow-data/workflows/sample-text-analysis.json";
-import documentChunkDisplayWorkflow from "../../dev/workflow-examples/document-chunk-display.workflow.json";
+import basicRagPipeline from "../../../dev/workflow-data/workflows/basic-rag-pipeline.json";
+import sampleImagePipeline from "../../../dev/workflow-data/workflows/sample-image-pipeline.json";
+import sampleTextAnalysis from "../../../dev/workflow-data/workflows/sample-text-analysis.json";
+import documentChunkDisplayWorkflow from "../../../dev/workflow-examples/document-chunk-display.workflow.json";
 
 const WORKFLOW_SEED_MODULES = [
   basicRagPipeline,

@@ -62,6 +62,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 ## Source import convention
 - `src/` is the canonical architecture root for `domain`, `application`, `infrastructure`, `hosts`, `shared`, and `ui`.
 - Cross-layer imports should use aliases (`@application/*`, `@domain/*`, `@hosts/*`, `@infrastructure/*`, `@shared/*`, `@ui/*`, `@src/*`) instead of deep relative traversal.
+- Legacy renderer/shared contract paths that still import from `@shared/*` are supported through compatibility re-export seams under `src/shared/*` (forwarding to canonical `src/ui/shared/*` or `src/infrastructure/nodes/shared/*` modules).
 
 ## Direction 6 boundary note: Identity domain foundation (story 1.1.1)
 - New inner-layer identity contracts live in `src/domain/identity/IdentityDomain.ts`.
