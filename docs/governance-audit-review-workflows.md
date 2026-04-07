@@ -2,6 +2,11 @@
 
 This document describes the admin-facing governance audit review surfaces introduced for Story 15.3.6.
 
+For extending canonical audit emission and taxonomy rules (not just reviewing events), use:
+
+- `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- `docs/audit-governance-contributor-guide.md`
+
 ## Entry points
 
 - Settings -> **Governance review** (desktop)
