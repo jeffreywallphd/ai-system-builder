@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 2;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 3;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -141,5 +141,30 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
     CREATE UNIQUE INDEX IF NOT EXISTS platform_run_orchestration_queue_claim_token_uidx
       ON platform_run_orchestration_queue(claim_token)
       WHERE claim_token IS NOT NULL;
+  `],
+  [3, `
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN assignment_node_id TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN assignment_claimed_at TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN dispatch_prepared_at TEXT;
+    ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_dispatch_attempt_id TEXT;
+
+    CREATE TABLE IF NOT EXISTS platform_run_dispatch_attempts (
+      attempt_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      queue_id TEXT NOT NULL,
+      workspace_id TEXT,
+      node_id TEXT NOT NULL,
+      reservation_owner TEXT NOT NULL,
+      claim_token TEXT NOT NULL,
+      prepared_at TEXT NOT NULL,
+      dispatch_metadata_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES platform_run_records(run_id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS platform_run_dispatch_attempts_run_idx
+      ON platform_run_dispatch_attempts(run_id, prepared_at DESC, attempt_id ASC);
+    CREATE UNIQUE INDEX IF NOT EXISTS platform_run_dispatch_attempts_claim_uidx
+      ON platform_run_dispatch_attempts(run_id, claim_token);
   `],
 ]);

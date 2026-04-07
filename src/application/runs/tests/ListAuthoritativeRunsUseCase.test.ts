@@ -34,6 +34,18 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
       record,
     });
   }
+
+  public async saveRun(
+    record: PlatformRunRecord,
+    _mutation: PlatformPersistenceMutationContext & { readonly expectedRevision?: number },
+  ): Promise<PlatformRunMutationResult> {
+    this.runs.set(record.runId, record);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      record,
+    });
+  }
 }
 
 function createRun(input: {
