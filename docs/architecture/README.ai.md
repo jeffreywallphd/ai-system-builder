@@ -149,6 +149,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 16 / Epic 16.1 Story 16.1.1 canonical run identity/lifecycle model, transition rules, and orchestration boundary ownership map: `docs/architecture/run-orchestration-domain-foundation.md`
 - Feature 16 / Epic 16.1 Story 16.1.2 shared run submission/mutation/status transport baseline and schema-validation contract maps: `docs/architecture/run-orchestration-transport-contracts.md`
 - Feature 16 / Epic 16.1 Story 16.1.7 run submission governance audit hooks for denied/accepted submission events and initial lifecycle transition emission: `docs/architecture/run-submission-lifecycle-audit-hooks.md`
+- Feature 16 / Epic 16.1 Story 16.1.8 end-to-end authoritative run-submission pipeline guardrails, extension points, and prohibited shortcuts: `docs/architecture/run-submission-pipeline-extension-guardrails.md`
+- Feature 16 / Epic 16.1 Story 16.1.8 contributor workflow and extension checklist for run-submission changes: `docs/run-submission-contributor-guide.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
