@@ -27,6 +27,7 @@ export interface SharedApiValidationIssue {
 export interface SharedApiErrorShape {
   readonly code: SharedApiErrorCode;
   readonly message: string;
+  readonly correlationId?: string;
   readonly userMessage?: string;
   readonly retryable?: boolean;
   readonly sharedCode?: SharedApiErrorCode;

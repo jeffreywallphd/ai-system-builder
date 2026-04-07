@@ -279,6 +279,53 @@ describe("IdentityHttpServer", () => {
     expect(typeof failedLoginBody.error.userMessage).toBe("string");
   });
 
+  it("propagates request/correlation identifiers in headers, error envelopes, and observability hooks", async () => {
+    const logger = new CapturingLogger();
+    const observedEvents: IdentityHttpServerLogEvent[] = [];
+    const { baseUrl } = await startServer(
+      logger,
+      {},
+      {
+        observability: {
+          onOperationalEvent: (event) => {
+            observedEvents.push(event);
+          },
+        },
+      },
+    );
+
+    const correlationId = "ui-debug-correlation-42";
+    const invalidResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-correlation-id": correlationId,
+      },
+      body: JSON.stringify({
+        username: "",
+        credential: {
+          candidate: "",
+        },
+      }),
+    });
+
+    expect(invalidResponse.status).toBe(400);
+    const requestIdHeader = invalidResponse.headers.get("x-request-id");
+    const correlationHeader = invalidResponse.headers.get("x-correlation-id");
+    expect(typeof requestIdHeader).toBe("string");
+    expect((requestIdHeader ?? "").length).toBeGreaterThan(10);
+    expect(correlationHeader).toBe(correlationId);
+
+    const invalidBody = await invalidResponse.json();
+    expect(invalidBody.ok).toBe(false);
+    expect(invalidBody.error.correlationId).toBe(correlationId);
+
+    expect(observedEvents.length).toBeGreaterThan(0);
+    const completedEvent = observedEvents.find((entry) => entry.event === "identity-http.request.completed");
+    expect(completedEvent).toBeDefined();
+    expect(completedEvent?.correlationId).toBe(correlationId);
+  });
+
   it("returns standardized not-found semantics for unknown routes", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);

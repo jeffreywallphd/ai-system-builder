@@ -48,3 +48,13 @@ Contributors adding or modifying protected client-facing operations for desktop,
 3. Route-family registration remains domain-oriented (not client-surface-oriented) and is wired from authoritative host composition.
 4. No prohibited pattern was introduced.
 5. Docs were updated (both `.md` and `.ai.md` where applicable).
+
+## Observability requirements for transport changes
+
+1. Emit structured transport events (request/upgrade/route failure/realtime failure) with `requestId`.
+2. Propagate `x-correlation-id`/`x-request-id` and return correlation metadata on safe client-visible errors.
+3. Ensure logs/hooks use centralized redaction and avoid secret, prompt, token, or raw storage leakage.
+4. Keep HTTP and websocket failure handling semantically consistent and safe.
+5. Validate with tests that cover correlation metadata and redaction behavior.
+
+Reference: `docs/unified-api-observability-troubleshooting.md`

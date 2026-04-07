@@ -265,6 +265,9 @@ const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
 const DefaultWebSocketTrustRevalidationIntervalMs = 30_000;
 const DEFAULT_API_CORS_ALLOWED_METHODS = Object.freeze(["GET", "POST", "OPTIONS"]);
 const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authorization"]);
+const REQUEST_ID_HEADER = "x-request-id";
+const CORRELATION_ID_HEADER = "x-correlation-id";
+const MAX_CORRELATION_ID_LENGTH = 128;
 const DEV_LOGIN_DEFAULT_PROVIDER_ID = "provider:local-password";
 const DEV_LOGIN_DEFAULT_USERNAME = "dev.local.user";
 const DEV_LOGIN_DEFAULT_PASSWORD = "DevOnlyPass!2026";
@@ -776,6 +779,7 @@ const AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema = z.object({
 export interface IdentityHttpServerLogEvent {
   readonly event: string;
   readonly requestId: string;
+  readonly correlationId?: string;
   readonly method?: string;
   readonly path?: string;
   readonly statusCode?: number;
@@ -860,6 +864,9 @@ export interface IdentityHttpServerOptions {
   readonly transportTrust?: IdentityHttpServerTransportTrustOptions;
   readonly webSocket?: IdentityHttpServerWebSocketOptions;
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
+  readonly observability?: {
+    onOperationalEvent?(event: IdentityHttpServerLogEvent): void;
+  };
   readonly development?: {
     readonly enableDevLoginRoute?: boolean;
   };
@@ -960,7 +967,10 @@ interface WebSocketUpgradeDeniedReason {
 }
 
 export function createIdentityHttpServer(options: IdentityHttpServerOptions): IdentityHttpServerInstance {
-  const logger = options.logger ?? new ConsoleIdentityHttpServerLogger();
+  const logger = createObservedIdentityHttpServerLogger(
+    options.logger ?? new ConsoleIdentityHttpServerLogger(),
+    options.observability?.onOperationalEvent,
+  );
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const serverFactory = options.serverFactory ?? ((requestListener: RequestListener) => createHttpServer(requestListener));
   const channelRegistry = options.webSocket?.channelRegistry ?? new InMemoryWebSocketChannelRegistry();
@@ -979,11 +989,14 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
   const server = serverFactory(async (request, response) => {
     const requestId = randomUUID();
+    const correlationId = resolveRequestCorrelationId(request, requestId);
+    setResponseCorrelationHeaders(response, requestId, correlationId);
     const path = new URL(request.url ?? "/", "http://localhost").pathname;
     const transportState = resolveInboundHttpTransportConnectionState(request);
     logger.info(Object.freeze({
       event: "identity-http.request.received",
       requestId,
+      correlationId,
       method: request.method,
       path,
     }));
@@ -1013,6 +1026,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           logger.info(Object.freeze({
             event: "identity-http.cors.preflight.accepted",
             requestId,
+            correlationId,
             method: request.method,
             path,
             statusCode: 204,
@@ -5884,6 +5898,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       logger.warn(Object.freeze({
         event: "identity-http.request.not-found",
         requestId,
+        correlationId,
         method: request.method,
         path,
         statusCode: 404,
@@ -5899,6 +5914,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       logger.error(Object.freeze({
         event: "identity-http.request.unhandled-error",
         requestId,
+        correlationId,
         method: request.method,
         path,
         statusCode: 500,
@@ -5922,9 +5938,12 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         webSocket: options.webSocket,
         channelRegistry,
       }).catch((error) => {
+        const requestId = randomUUID();
+        const correlationId = resolveRequestCorrelationId(request, requestId);
         logger.error(Object.freeze({
           event: "identity-websocket.upgrade.unhandled-error",
-          requestId: randomUUID(),
+          requestId,
+          correlationId,
           method: request.method,
           path: request.url,
           statusCode: 500,
@@ -5952,13 +5971,14 @@ async function handleWebSocketUpgrade(input: {
   readonly channelRegistry: WebSocketChannelRegistry;
 }): Promise<void> {
   const requestId = randomUUID();
+  const correlationId = resolveRequestCorrelationId(input.request, requestId);
   const requestUrl = new URL(input.request.url ?? "/", "http://localhost");
   const path = requestUrl.pathname;
   const channelPathPrefix = normalizeOptionalString(input.webSocket.channelPathPrefix ?? "/ws") ?? "/ws";
   const transportState = resolveInboundHttpTransportConnectionState(input.request);
 
   if (!path.startsWith(channelPathPrefix)) {
-    denyWebSocketUpgrade(input, requestId, 404, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 404, {
       code: "invalid-upgrade-request",
       message: "WebSocket endpoint was not found.",
     });
@@ -5970,19 +5990,19 @@ async function handleWebSocketUpgrade(input: {
     transportState,
   });
   if (!secureTransportDecision.ok) {
-    denyWebSocketUpgrade(input, requestId, secureTransportDecision.statusCode, secureTransportDecision.reason);
+    denyWebSocketUpgrade(input, requestId, correlationId, secureTransportDecision.statusCode, secureTransportDecision.reason);
     return;
   }
 
   const handshake = validateWebSocketUpgradeRequestHeaders(input.request);
   if (!handshake.ok) {
-    denyWebSocketUpgrade(input, requestId, handshake.statusCode, handshake.reason);
+    denyWebSocketUpgrade(input, requestId, correlationId, handshake.statusCode, handshake.reason);
     return;
   }
 
   const sessionToken = extractBearerToken(input.request.headers.authorization);
   if (!sessionToken) {
-    denyWebSocketUpgrade(input, requestId, 401, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 401, {
       code: "authentication-failed",
       closeCode: 4401,
       message: "Missing Authorization bearer token for websocket upgrade.",
@@ -5993,7 +6013,7 @@ async function handleWebSocketUpgrade(input: {
   const resolvedSession = await input.backendApi.resolveAuthenticatedSession({ sessionToken });
   if (!resolvedSession.ok) {
     const statusCode = mapStatusCode(resolvedSession);
-    denyWebSocketUpgrade(input, requestId, statusCode, {
+    denyWebSocketUpgrade(input, requestId, correlationId, statusCode, {
       code: "authentication-failed",
       closeCode: 4401,
       message: resolvedSession.error?.message ?? "WebSocket upgrade authentication failed.",
@@ -6004,7 +6024,7 @@ async function handleWebSocketUpgrade(input: {
     return;
   }
   if (!resolvedSession.data) {
-    denyWebSocketUpgrade(input, requestId, 500, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 500, {
       code: "authentication-failed",
       closeCode: 1011,
       message: "Session resolution returned no payload for websocket upgrade.",
@@ -6022,7 +6042,7 @@ async function handleWebSocketUpgrade(input: {
       transportState,
     });
     if (!originPolicy.accepted) {
-      denyWebSocketUpgrade(input, requestId, 403, {
+      denyWebSocketUpgrade(input, requestId, correlationId, 403, {
         code: "origin-not-allowed",
         closeCode: 4403,
         message: "WebSocket origin is not allowed for thin-client sessions.",
@@ -6039,7 +6059,7 @@ async function handleWebSocketUpgrade(input: {
   const requestedPurpose = normalizeOptionalString(requestUrl.searchParams.get("purpose"));
   const parsedPurpose = parseWebSocketChannelPurpose(requestedPurpose);
   if (requestedPurpose && !parsedPurpose) {
-    denyWebSocketUpgrade(input, requestId, 403, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 403, {
       code: "unsupported-channel-purpose",
       closeCode: 4403,
       message: "WebSocket channel purpose is not supported.",
@@ -6053,7 +6073,7 @@ async function handleWebSocketUpgrade(input: {
     ?? input.webSocket.defaultPurpose
     ?? WebSocketChannelPurposes.status;
   if (!supportedPurposes.includes(purpose)) {
-    denyWebSocketUpgrade(input, requestId, 403, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 403, {
       code: "unsupported-channel-purpose",
       closeCode: 4403,
       message: "WebSocket channel purpose is not allowed.",
@@ -6074,7 +6094,7 @@ async function handleWebSocketUpgrade(input: {
     input.transportTrust && shouldBypassTransportTrustValidation(transportState, input.transportTrust, transportRouting),
   );
   if (input.transportTrust && !input.transportTrust.websocketValidator && !bypassTransportTrustValidation) {
-    denyWebSocketUpgrade(input, requestId, 500, {
+    denyWebSocketUpgrade(input, requestId, correlationId, 500, {
       code: "transport-trust-rejected",
       closeCode: 1011,
       message: "WebSocket transport trust validation is not configured.",
@@ -6090,7 +6110,12 @@ async function handleWebSocketUpgrade(input: {
     });
     const transportValidation = await input.transportTrust.websocketValidator.validate(transportValidationRequest);
     if (!transportValidation.ok) {
-      denyWebSocketUpgrade(input, requestId, mapWebSocketCloseCodeToStatusCode(transportValidation.closeCode), {
+      denyWebSocketUpgrade(
+        input,
+        requestId,
+        correlationId,
+        mapWebSocketCloseCodeToStatusCode(transportValidation.closeCode),
+        {
         code: "transport-trust-rejected",
         closeCode: transportValidation.closeCode,
         message: transportValidation.reason,
@@ -6098,7 +6123,8 @@ async function handleWebSocketUpgrade(input: {
           errorCode: transportValidation.error.code,
           reasons: transportValidation.error.reasons,
         }),
-      });
+      },
+      );
       return;
     }
   }
@@ -6133,10 +6159,11 @@ async function handleWebSocketUpgrade(input: {
     input.channelRegistry.release(channelContext.channelId);
   });
 
-  input.socket.write(buildWebSocketUpgradeAcceptedResponse(handshake.websocketKey));
+  input.socket.write(buildWebSocketUpgradeAcceptedResponse(handshake.websocketKey, requestId, correlationId));
   input.logger.info(Object.freeze({
     event: "identity-websocket.upgrade.accepted",
     requestId,
+    correlationId,
     method: input.request.method,
     path,
     statusCode: 101,
@@ -6171,6 +6198,7 @@ async function handleWebSocketUpgrade(input: {
 
   initializeRuntimeRealtimeWebSocketChannel({
     requestId,
+    correlationId,
     logger: input.logger,
     socket: input.socket,
     channelContext,
@@ -6198,6 +6226,7 @@ interface ParsedWebSocketFrame {
 
 function initializeRuntimeRealtimeWebSocketChannel(input: {
   readonly requestId: string;
+  readonly correlationId: string;
   readonly logger: IdentityHttpServerLogger;
   readonly socket: Socket;
   readonly channelContext: WebSocketChannelContext;
@@ -6230,12 +6259,12 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
         }
         offset = frame.nextOffset;
         if (!frame.masked) {
-          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Client frames must be masked.");
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Client frames must be masked.");
           sendWebSocketCloseFrame(input.socket, 1002, "Protocol error");
           return;
         }
         if (!frame.fin) {
-          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Fragmented websocket frames are not supported.");
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Fragmented websocket frames are not supported.");
           sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
           return;
         }
@@ -6248,7 +6277,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
           continue;
         }
         if (frame.opcode !== 1) {
-          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Only text websocket frames are supported.");
+          sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Only text websocket frames are supported.");
           sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
           return;
         }
@@ -6256,6 +6285,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
         const payloadText = frame.payload.toString("utf8");
         void handleRuntimeRealtimeWebSocketTextFrame({
           requestId: input.requestId,
+          correlationId: input.correlationId,
           logger: input.logger,
           socket: input.socket,
           channelContext: input.channelContext,
@@ -6265,7 +6295,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
         });
       }
     } catch {
-      sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Websocket frame parsing failed.");
+      sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Websocket frame parsing failed.");
       sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
       return;
     }
@@ -6278,6 +6308,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
 
 async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   readonly requestId: string;
+  readonly correlationId: string;
   readonly logger: IdentityHttpServerLogger;
   readonly socket: Socket;
   readonly channelContext: WebSocketChannelContext;
@@ -6289,7 +6320,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   try {
     parsedPayload = JSON.parse(input.payloadText);
   } catch {
-    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Websocket payload must be valid JSON.");
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Websocket payload must be valid JSON.");
     sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
     return;
   }
@@ -6301,13 +6332,13 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
     const message = error instanceof RuntimeRealtimeSchemaValidationError
       ? error.message
       : "Realtime subscription payload is invalid.";
-    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", message);
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", message);
     sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
     return;
   }
 
   if (subscribeMessage.action !== RuntimeRealtimeWebSocketActions.subscribe) {
-    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Unsupported realtime websocket action.");
+    sendRuntimeRealtimeWebSocketError(input, "invalid-request", "Unsupported realtime websocket action.");
     sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
     return;
   }
@@ -6318,7 +6349,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   );
   if (hasDisallowedTopic) {
     sendRuntimeRealtimeWebSocketError(
-      input.socket,
+      input,
       "forbidden",
       `One or more realtime topics are not allowed for websocket purpose '${input.channelContext.purpose}'.`,
     );
@@ -6333,7 +6364,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
 
   if (requestedTopics.length < 1) {
     sendRuntimeRealtimeWebSocketError(
-      input.socket,
+      input,
       "forbidden",
       `No requested realtime topics are allowed for websocket purpose '${input.channelContext.purpose}'.`,
     );
@@ -6346,7 +6377,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
     return Boolean(actorWorkspaceId && topicWorkspaceId && actorWorkspaceId !== topicWorkspaceId);
   });
   if (workspaceMismatch) {
-    sendRuntimeRealtimeWebSocketError(input.socket, "forbidden", "Topic workspace scope must match websocket workspace scope.");
+    sendRuntimeRealtimeWebSocketError(input, "forbidden", "Topic workspace scope must match websocket workspace scope.");
     sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
     return;
   }
@@ -6393,7 +6424,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   if (!subscription.ok || !subscription.data) {
     const mappedCode = mapRuntimeRealtimeErrorCode(subscription.error?.code);
     const message = subscription.error?.message ?? "Realtime subscription failed.";
-    sendRuntimeRealtimeWebSocketError(input.socket, mappedCode, message);
+    sendRuntimeRealtimeWebSocketError(input, mappedCode, message);
     sendWebSocketCloseFrame(input.socket, mappedCode === "forbidden" ? 4403 : 4400, mappedCode);
     return;
   }
@@ -6416,6 +6447,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   input.logger.info(Object.freeze({
     event: "identity-websocket.runtime-realtime.subscription.accepted",
     requestId: input.requestId,
+    correlationId: input.correlationId,
     statusCode: 101,
     details: Object.freeze({
       channelId: input.channelContext.channelId,
@@ -6458,21 +6490,48 @@ function isRuntimeRealtimeTopicAllowedForPurpose(
 }
 
 function sendRuntimeRealtimeWebSocketError(
-  socket: Socket,
+  input: {
+    readonly socket: Socket;
+    readonly logger: IdentityHttpServerLogger;
+    readonly requestId: string;
+    readonly correlationId: string;
+    readonly channelContext: WebSocketChannelContext;
+  },
   code: "invalid-request" | "forbidden" | "internal",
   message: string,
 ): void {
-  if (socket.destroyed) {
+  if (input.socket.destroyed) {
     return;
   }
+  const normalizedEnvelope = normalizeSharedApiErrorEnvelope(Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code,
+      message: redactSensitiveText(message.trim() || "Realtime websocket operation failed."),
+    }),
+  })) as { readonly error?: { readonly message?: string } };
+  const safeMessage = normalizedEnvelope.error?.message ?? "Realtime websocket operation failed.";
   const payload = Object.freeze({
     type: RuntimeRealtimeWebSocketMessageTypes.error,
     error: Object.freeze({
       code,
-      message: message.trim() || "Realtime websocket operation failed.",
+      message: safeMessage,
+      correlationId: input.correlationId,
     }),
   });
-  socket.write(buildWebSocketTextFrame(JSON.stringify(payload)));
+  input.logger.warn(Object.freeze({
+    event: "identity-websocket.runtime-realtime.error",
+    requestId: input.requestId,
+    correlationId: input.correlationId,
+    statusCode: code === "forbidden" ? 403 : (code === "internal" ? 500 : 400),
+    details: Object.freeze({
+      channelId: input.channelContext.channelId,
+      purpose: input.channelContext.purpose,
+      code,
+      message: safeMessage,
+    }),
+  }));
+  input.socket.write(buildWebSocketTextFrame(JSON.stringify(payload)));
 }
 
 function sendWebSocketCloseFrame(socket: Socket, closeCode: number, reason: string): void {
@@ -7490,21 +7549,26 @@ function denyWebSocketUpgrade(
     readonly logger: IdentityHttpServerLogger;
   },
   requestId: string,
+  correlationId: string,
   statusCode: number,
   reason: WebSocketUpgradeDeniedReason,
 ): void {
+  const safeMessage = redactSensitiveText(reason.message);
   const payload = normalizeSharedApiErrorEnvelope(Object.freeze({
     ok: false,
     error: Object.freeze({
       code: reason.code,
-      message: reason.message,
+      message: safeMessage,
       closeCode: reason.closeCode,
+      correlationId,
     }),
   }));
   const body = JSON.stringify(payload);
   const responseLines = [
     `HTTP/1.1 ${statusCode} ${resolveHttpStatusText(statusCode)}`,
     "Connection: close",
+    `${REQUEST_ID_HEADER}: ${requestId}`,
+    `${CORRELATION_ID_HEADER}: ${correlationId}`,
     "Content-Type: application/json; charset=utf-8",
     `Content-Length: ${Buffer.byteLength(body)}`,
     "",
@@ -7514,6 +7578,7 @@ function denyWebSocketUpgrade(
   input.logger.warn(Object.freeze({
     event: "identity-websocket.upgrade.denied",
     requestId,
+    correlationId,
     method: input.request.method,
     path: input.request.url,
     statusCode,
@@ -7523,7 +7588,7 @@ function denyWebSocketUpgrade(
   }));
 }
 
-function buildWebSocketUpgradeAcceptedResponse(websocketKey: string): string {
+function buildWebSocketUpgradeAcceptedResponse(websocketKey: string, requestId: string, correlationId: string): string {
   const accept = createHash("sha1")
     .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, "utf8")
     .digest("base64");
@@ -7532,6 +7597,8 @@ function buildWebSocketUpgradeAcceptedResponse(websocketKey: string): string {
     "Upgrade: websocket",
     "Connection: Upgrade",
     `Sec-WebSocket-Accept: ${accept}`,
+    `${REQUEST_ID_HEADER}: ${requestId}`,
+    `${CORRELATION_ID_HEADER}: ${correlationId}`,
     "",
     "",
   ].join("\r\n");
@@ -9968,9 +10035,11 @@ function logResponse<TRequest extends Record<string, unknown>>(
   requestPayload: TRequest,
   responsePayload: unknown,
 ): void {
+  const correlationId = resolveRequestCorrelationId(request, requestId);
   const event = Object.freeze({
     event: "identity-http.request.completed",
     requestId,
+    correlationId,
     method: request.method,
     path: request.url,
     statusCode,
@@ -9999,8 +10068,91 @@ function normalizeError(error: unknown): string {
   return "Unknown error";
 }
 
+function setResponseCorrelationHeaders(response: ServerResponse, requestId: string, correlationId: string): void {
+  response.setHeader(REQUEST_ID_HEADER, requestId);
+  response.setHeader(CORRELATION_ID_HEADER, correlationId);
+}
+
+function resolveRequestCorrelationId(request: IncomingMessage, fallback: string): string {
+  const candidate = normalizeOptionalHeader(request.headers[CORRELATION_ID_HEADER])
+    ?? normalizeOptionalHeader(request.headers[REQUEST_ID_HEADER]);
+  if (!candidate) {
+    return fallback;
+  }
+
+  const normalized = candidate.trim().slice(0, MAX_CORRELATION_ID_LENGTH);
+  if (!normalized || !/^[A-Za-z0-9._:-]+$/.test(normalized)) {
+    return fallback;
+  }
+  return normalized;
+}
+
+function addCorrelationIdToErrorEnvelope(payload: unknown, correlationId: string | undefined): unknown {
+  if (!correlationId || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return payload;
+  }
+  const record = payload as Record<string, unknown>;
+  const error = asRecord(record.error);
+  if (!error) {
+    return payload;
+  }
+
+  return Object.freeze({
+    ...record,
+    error: Object.freeze({
+      ...error,
+      correlationId,
+    }),
+  });
+}
+
+function createObservedIdentityHttpServerLogger(
+  delegate: IdentityHttpServerLogger,
+  onOperationalEvent: ((event: IdentityHttpServerLogEvent) => void) | undefined,
+): IdentityHttpServerLogger {
+  const emit = (level: "info" | "warn" | "error", event: IdentityHttpServerLogEvent) => {
+    const sanitized = sanitizeIdentityHttpServerLogEvent(event);
+    try {
+      if (level === "info") {
+        delegate.info(sanitized);
+      } else if (level === "warn") {
+        delegate.warn(sanitized);
+      } else {
+        delegate.error(sanitized);
+      }
+    } catch {
+      // Keep request handling resilient even if external logger integration fails.
+    }
+    if (!onOperationalEvent) {
+      return;
+    }
+    try {
+      onOperationalEvent(sanitized);
+    } catch {
+      // Keep request handling resilient even if observability hook integration fails.
+    }
+  };
+
+  return Object.freeze({
+    info: (event) => emit("info", event),
+    warn: (event) => emit("warn", event),
+    error: (event) => emit("error", event),
+  });
+}
+
+function sanitizeIdentityHttpServerLogEvent(event: IdentityHttpServerLogEvent): IdentityHttpServerLogEvent {
+  return Object.freeze({
+    ...event,
+    details: redactSensitiveAuthPayload(event.details) as Readonly<Record<string, unknown>> | undefined,
+  });
+}
+
 function writeJson(response: ServerResponse, statusCode: number, payload: unknown): void {
-  const normalizedPayload = normalizeSharedApiErrorEnvelope(payload);
+  const correlationHeader = response.getHeader(CORRELATION_ID_HEADER);
+  const normalizedPayload = addCorrelationIdToErrorEnvelope(
+    normalizeSharedApiErrorEnvelope(payload),
+    normalizeResponseHeaderValue(correlationHeader),
+  );
   response.statusCode = statusCode;
   response.setHeader("content-type", "application/json; charset=utf-8");
   response.end(JSON.stringify(normalizedPayload));
@@ -10009,6 +10161,13 @@ function writeJson(response: ServerResponse, statusCode: number, payload: unknow
 function writeNoContent(response: ServerResponse, statusCode: number): void {
   response.statusCode = statusCode;
   response.end();
+}
+
+function normalizeResponseHeaderValue(value: number | string | string[] | undefined): string | undefined {
+  if (typeof value === "number") {
+    return undefined;
+  }
+  return normalizeOptionalHeader(value);
 }
 
 function normalizeSessionAssuranceLevel(

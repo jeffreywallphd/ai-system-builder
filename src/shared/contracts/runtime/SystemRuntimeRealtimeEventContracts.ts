@@ -193,6 +193,7 @@ export interface RuntimeRealtimeWebSocketErrorMessage {
   readonly error: {
     readonly code: "invalid-request" | "forbidden" | "internal";
     readonly message: string;
+    readonly correlationId?: string;
   };
 }
 
