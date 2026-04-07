@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { bindSafeFetch } from "@application/runtime/RuntimeDiagnostics";
 import {
   SharedApiErrorCodes,
   type SharedApiErrorCode,
@@ -144,7 +145,7 @@ export class SharedApiClient {
     }
 
     this.baseUrl = normalizedBaseUrl;
-    this.fetchImplementation = options.fetchImplementation ?? fetch;
+    this.fetchImplementation = bindSafeFetch(options.fetchImplementation ?? fetch);
     this.credentials = options.credentials;
     this.defaultHeaders = Object.freeze({
       ...(options.defaultHeaders ?? {}),

@@ -116,6 +116,37 @@ describe("SharedApiClient", () => {
     expect(diagnostics.length).toBeGreaterThan(0);
   });
 
+  it("binds fetch implementation to global context to avoid illegal invocation", async () => {
+    const guardedFetch = async function (
+      this: typeof globalThis,
+      _input: RequestInfo | URL,
+      _init?: RequestInit,
+    ): Promise<Response> {
+      if (this !== globalThis) {
+        throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
+      }
+
+      return new Response(JSON.stringify({ ok: true, data: { status: "ok" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const client = new SharedApiClient({
+      baseUrl: "http://127.0.0.1:8788",
+      fetchImplementation: guardedFetch as typeof fetch,
+    });
+
+    const response = await client.requestJson<{ ok: boolean; data?: { status: string } }>({
+      method: "POST",
+      path: "/api/v1/identity/dev-login",
+      body: { username: "dev-user" },
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(response.data?.status).toBe("ok");
+  });
+
   it("normalizes aborted requests", async () => {
     const fetchImplementation: typeof fetch = async (_input, init) => {
       if (init?.signal?.aborted) {
