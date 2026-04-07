@@ -35,3 +35,14 @@
 - `docs/architecture/unified-api-endpoint-reference.md`
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/unified-api-observability-troubleshooting.md`
+
+## Story 14.3.8 verification guardrails
+
+- Cross-surface regression baseline:
+  - `src/ui/shared/tests/UnifiedApiCrossSurfaceRegression.test.ts`
+  - Covers desktop/thin-client parity for bootstrap, representative reads/mutations, runtime realtime subscription behavior, authorization denials, and transport-failure normalization.
+- Contract drift guardrail:
+  - `src/infrastructure/transport/http-server/tests/UnifiedApiContractDriftVerification.test.ts`
+  - Verifies converged shared client route prefixes stay aligned with authoritative route-family registration and convergence contracts.
+- Keep route-family composition checks green:
+  - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`

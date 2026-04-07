@@ -44,3 +44,12 @@ Structured events cover:
 2. Locate matching server events by `correlationId` or `requestId`.
 3. Follow event sequence and status codes.
 4. Confirm redaction remains intact.
+
+## Story 14.3.8 readiness checks
+
+- Cross-surface parity regression:
+  - `src/ui/shared/tests/UnifiedApiCrossSurfaceRegression.test.ts`
+  - Verifies desktop and thin-client consistency for bootstrap, reads/mutations, realtime subscribe behavior, authorization denials, and transport failures.
+- Route/contract drift verification:
+  - `src/infrastructure/transport/http-server/tests/UnifiedApiContractDriftVerification.test.ts`
+  - Validates converged client route usage remains aligned with authoritative route-family registration and convergence contract domains.
