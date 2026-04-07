@@ -179,6 +179,7 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
       ruleOrder: Object.freeze(["rule:first", "rule:deny-viewer"]),
       candidateCount: 2,
       eligibleCandidateCount: 1,
+      affinityPreferredCandidateCount: 1,
     }));
   });
 
@@ -300,6 +301,142 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
 
     expect(bundle.decision.selected?.runId).toBe("run:a");
     expect(bundle.decision.selected?.nodeId).toBe("node:a");
+  });
+
+  it("excludes capability-ineligible nodes and applies placement affinity preference when eligible matches exist", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:capability-affinity",
+    });
+
+    const bundle = await useCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: Object.freeze([Object.freeze({
+        runId: "run:affinity",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T19:59:20.000Z",
+        eligibleAt: "2026-04-07T19:59:20.000Z",
+        claimToken: "claim:affinity",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:01:00.000Z",
+      })]),
+      runs: Object.freeze([Object.freeze({
+        runId: "run:affinity",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:member",
+        workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+        requirements: Object.freeze({
+          requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          requiresRemoteScheduling: true,
+          placementAffinity: Object.freeze({
+            preferredNodeIds: Object.freeze(["node:z-preferred"]),
+          }),
+        }),
+        queue: Object.freeze({
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:59:20.000Z",
+          eligibleAt: "2026-04-07T19:59:20.000Z",
+          claimToken: "claim:affinity",
+          claimOwner: "scheduler:alpha",
+        }),
+      })]),
+      nodes: Object.freeze([
+        Object.freeze({
+          nodeId: "node:a-ineligible",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+        Object.freeze({
+          nodeId: "node:a-eligible",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+        Object.freeze({
+          nodeId: "node:z-preferred",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+      ]),
+    }));
+
+    expect(bundle.decision.selected?.nodeId).toBe("node:z-preferred");
+    expect(
+      bundle.decision.evaluatedCandidates.find((candidate) => candidate.nodeId === "node:a-ineligible")?.eligible,
+    ).toBeFalse();
+    expect(
+      bundle.decision.evaluatedCandidates.find((candidate) => candidate.nodeId === "node:a-ineligible")
+        ?.denialReasons.some((reason) => reason.code === SchedulingCandidateDenialCodes.nodeMissingCapability),
+    ).toBeTrue();
+    expect(bundle.decision.reasons.some((reason) => reason.code === "placement-affinity-preference-applied")).toBeTrue();
+  });
+
+  it("falls back to normal arbitration when placement affinity preferences have no eligible matches", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:affinity-fallback",
+    });
+    const bundle = await useCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: Object.freeze([Object.freeze({
+        runId: "run:affinity-fallback",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T19:59:20.000Z",
+        eligibleAt: "2026-04-07T19:59:20.000Z",
+        claimToken: "claim:affinity-fallback",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:01:00.000Z",
+      })]),
+      runs: Object.freeze([Object.freeze({
+        runId: "run:affinity-fallback",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:member",
+        workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+        requirements: Object.freeze({
+          requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          requiresRemoteScheduling: true,
+          placementAffinity: Object.freeze({
+            preferredNodeIds: Object.freeze(["node:missing-preference"]),
+          }),
+        }),
+        queue: Object.freeze({
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:59:20.000Z",
+          eligibleAt: "2026-04-07T19:59:20.000Z",
+          claimToken: "claim:affinity-fallback",
+          claimOwner: "scheduler:alpha",
+        }),
+      })]),
+      nodes: Object.freeze([
+        Object.freeze({
+          nodeId: "node:z",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+        Object.freeze({
+          nodeId: "node:a",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+      ]),
+    }));
+
+    expect(bundle.decision.selected?.nodeId).toBe("node:a");
+    expect(bundle.decision.reasons.some((reason) => reason.code === "placement-affinity-preference-unmet")).toBeTrue();
   });
 
   it("defers hybrid-node remote assignments when reserved local capacity and local-user windows are active", async () => {

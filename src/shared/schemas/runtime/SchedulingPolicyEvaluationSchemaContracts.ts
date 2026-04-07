@@ -104,6 +104,11 @@ const SchedulingPolicyReasonSchema = z.object({
 const SchedulingRunRequirementsSchema = z.object({
   requiredCapabilities: z.array(NodeCapabilitySchema).max(64),
   requiresRemoteScheduling: z.boolean(),
+  placementAffinity: z.object({
+    preferredNodeIds: z.array(IdentifierSchema).max(64).optional(),
+    preferredNodeTypes: z.array(NodeTypeSchema).max(8).optional(),
+    preferredDeploymentProfileIds: z.array(IdentifierSchema).max(32).optional(),
+  }).strict().optional(),
 }).strict();
 
 const SchedulingRunQueueStateSchema = z.object({

@@ -19,6 +19,7 @@ import {
   RolePriorityQueueAgeSchedulingScorePolicy,
   SchedulingPolicyRulePipeline,
 } from "./SchedulingPolicyRulePipeline";
+import { applyBasicPlacementAffinityPreference } from "./SchedulingPlacementAffinityPreference";
 import {
   createRolePrioritySchedulingArbitrationReason,
   selectRolePrioritySchedulingCandidate,
@@ -53,8 +54,13 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
     const occurredAt = this.now().toISOString();
     const evaluatedCandidates = await this.evaluateCandidates(snapshot);
     const eligibleCandidates = evaluatedCandidates.filter((candidate) => candidate.eligible);
-    const selected = selectRolePrioritySchedulingCandidate({
+    const affinityPreference = applyBasicPlacementAffinityPreference({
       eligibleCandidates,
+      runs: snapshot.runs,
+      nodes: snapshot.nodes,
+    });
+    const selected = selectRolePrioritySchedulingCandidate({
+      eligibleCandidates: affinityPreference.eligibleCandidates,
       runs: snapshot.runs,
     });
 
@@ -66,13 +72,15 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
           ruleOrder: this.rulePipeline.getRuleOrder(),
           candidateCount: evaluatedCandidates.length,
           eligibleCandidateCount: eligibleCandidates.length,
+          affinityPreferredCandidateCount: affinityPreference.eligibleCandidates.length,
         }),
       }),
     ];
+    reasons.push(...affinityPreference.reasons);
     if (selected) {
       reasons.push(createRolePrioritySchedulingArbitrationReason({
         selected,
-        eligibleCandidateCount: eligibleCandidates.length,
+        eligibleCandidateCount: affinityPreference.eligibleCandidates.length,
       }));
     }
 

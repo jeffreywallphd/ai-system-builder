@@ -29,6 +29,11 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
         requirements: {
           requiredCapabilities: ["executor"],
           requiresRemoteScheduling: true,
+          placementAffinity: {
+            preferredNodeIds: ["node:1"],
+            preferredNodeTypes: ["compute"],
+            preferredDeploymentProfileIds: ["profile:1"],
+          },
         },
         queue: {
           queueId: "queue:default",
@@ -58,6 +63,7 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
     });
 
     expect(snapshot.runs[0]?.runId).toBe("run:1");
+    expect(snapshot.runs[0]?.requirements.placementAffinity?.preferredNodeIds).toEqual(["node:1"]);
     expect(snapshot.nodes[0]?.usageMode).toBe("idle");
     expect(snapshot.nodes[0]?.hybridLocalUseProtection?.reservedLocalCapacityUnits).toBe(1);
   });
