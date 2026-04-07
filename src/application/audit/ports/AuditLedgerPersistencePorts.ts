@@ -15,6 +15,37 @@ export interface AuditLedgerAppendResult {
   readonly event: CanonicalAuditEvent;
 }
 
+export const AuditLedgerWriteResolutionStatuses = Object.freeze({
+  committed: "committed",
+  notCommitted: "not-committed",
+  ambiguous: "ambiguous",
+});
+
+export type AuditLedgerWriteResolutionStatus =
+  typeof AuditLedgerWriteResolutionStatuses[keyof typeof AuditLedgerWriteResolutionStatuses];
+
+export interface AuditLedgerWriteResolution {
+  readonly status: AuditLedgerWriteResolutionStatus;
+  readonly sequence?: number;
+  readonly event?: CanonicalAuditEvent;
+  readonly repairedReplayMapping?: boolean;
+  readonly details?: string;
+}
+
+export interface AuditLedgerReconciliationIssue {
+  readonly kind: "orphaned-mutation-replay";
+  readonly operationKey: string;
+  readonly eventId: string;
+  readonly details: string;
+}
+
+export interface AuditLedgerReconciliationResult {
+  readonly checkedAt: string;
+  readonly repairedCount: number;
+  readonly manualFollowUpCount: number;
+  readonly issues: ReadonlyArray<AuditLedgerReconciliationIssue>;
+}
+
 export interface AuditLedgerQuery extends AuditLedgerListQueryDto {
   readonly actorId?: string;
   readonly category?: AuditEventCategory;
@@ -45,6 +76,14 @@ export interface IAuditLedgerRepository {
   listAuditEvents(query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>>;
   countAuditEvents(query: AuditLedgerQuery): Promise<number>;
   getAuditEventById(eventId: string): Promise<CanonicalAuditEvent | undefined>;
+  resolveAppendOutcome?(input: {
+    readonly eventId: string;
+    readonly context: AuditLedgerAppendContext;
+  }): Promise<AuditLedgerWriteResolution>;
+  reconcileWritePathAnomalies?(input?: {
+    readonly asOf?: string;
+    readonly limit?: number;
+  }): Promise<AuditLedgerReconciliationResult>;
 }
 
 export function normalizeAuditLedgerOperationKey(operationKey: string): string {

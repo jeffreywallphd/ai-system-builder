@@ -6,6 +6,7 @@ import {
   type CanonicalAuditEvent,
 } from "@domain/audit/AuditDomain";
 import type {
+  AuditLedgerWriteResolution,
   AuditLedgerAppendContext,
   AuditLedgerAppendResult,
   AuditLedgerQuery,
@@ -76,6 +77,48 @@ class ThrowingAuditLedgerRepository extends InMemoryAuditLedgerRepository {
     _context: AuditLedgerAppendContext,
   ): Promise<AuditLedgerAppendResult> {
     throw new Error("append failed token=secret-token path=C:\\secure\\ledger.db");
+  }
+}
+
+class InterruptedAppendAuditLedgerRepository extends InMemoryAuditLedgerRepository {
+  public override async appendAuditEvent(
+    event: CanonicalAuditEvent,
+    context: AuditLedgerAppendContext,
+  ): Promise<AuditLedgerAppendResult> {
+    this.events.push(event);
+    this.contexts.push(context);
+    throw new Error("network interruption after commit");
+  }
+
+  public async resolveAppendOutcome(input: {
+    readonly eventId: string;
+    readonly context: AuditLedgerAppendContext;
+  }): Promise<AuditLedgerWriteResolution> {
+    const resolvedEvent = this.events.find((event) => event.eventId === input.eventId);
+    if (!resolvedEvent) {
+      return {
+        status: "not-committed",
+      };
+    }
+
+    return {
+      status: "committed",
+      sequence: this.events.length,
+      event: resolvedEvent,
+      repairedReplayMapping: false,
+    };
+  }
+}
+
+class AmbiguousInterruptedAuditLedgerRepository extends InterruptedAppendAuditLedgerRepository {
+  public override async resolveAppendOutcome(_input: {
+    readonly eventId: string;
+    readonly context: AuditLedgerAppendContext;
+  }): Promise<AuditLedgerWriteResolution> {
+    return {
+      status: "ambiguous",
+      details: "operation replay row references missing event",
+    };
   }
 }
 
@@ -440,5 +483,48 @@ describe("AuthoritativeAuditRecordingService", () => {
     const serialized = JSON.stringify(observabilityPort.events[0]);
     expect(serialized).not.toContain("secret-token");
     expect(serialized).not.toContain("C:\\secure\\ledger.db");
+  });
+
+  it("recovers interrupted append outcomes when durable commit can be proven", async () => {
+    const repository = new InterruptedAppendAuditLedgerRepository();
+    const observabilityPort = new RecordingAuditWriteObservabilityPort();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      observabilityPort,
+      now: () => new Date("2026-04-07T16:37:00.000Z"),
+      idGenerator: () => "event-observe-3",
+    });
+
+    const result = await service.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:interrupted:1",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }));
+
+    expect(result.wasReplay).toBeTrue();
+    expect(result.changed).toBeFalse();
+    expect(observabilityPort.events).toHaveLength(1);
+    expect(observabilityPort.events[0]?.event).toBe("audit-ledger.write.recovered");
+  });
+
+  it("raises explicit ambiguity when interrupted append outcome cannot be proven", async () => {
+    const repository = new AmbiguousInterruptedAuditLedgerRepository();
+    const observabilityPort = new RecordingAuditWriteObservabilityPort();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      observabilityPort,
+      now: () => new Date("2026-04-07T16:38:00.000Z"),
+      idGenerator: () => "event-observe-4",
+    });
+
+    await expect(service.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:interrupted-ambiguous:1",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }))).rejects.toThrow("append outcome is ambiguous");
+
+    expect(observabilityPort.events).toHaveLength(1);
+    expect(observabilityPort.events[0]?.event).toBe("audit-ledger.write.failed");
+    expect(observabilityPort.events[0]?.details?.phase).toBe("append-outcome-ambiguous");
   });
 });

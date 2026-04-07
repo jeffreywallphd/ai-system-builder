@@ -28,7 +28,7 @@ Harden the audit stack itself so write/read paths emit structured diagnostics wi
 
 ## Structured diagnostics model
 
-- Write operations emit `audit-ledger.write.completed` / `audit-ledger.write.failed`.
+- Write operations emit `audit-ledger.write.completed`, `audit-ledger.write.failed`, `audit-ledger.write.recovered`, and `audit-ledger.write.reconciliation.completed`.
 - Query operations emit `audit-ledger.query.completed` / `audit-ledger.query.failed`.
 - Diagnostics include correlatable identifiers when available (`correlationId`, `requestId`, `workspaceId`, `eventId`, actor identity).
 - Counter-style metadata captures representative operational dimensions (for example returned rows, total rows, sequence, protected-data/redaction counts).
@@ -47,6 +47,9 @@ The authoritative write payload sanitizer additionally uses this string redactio
 ## Failure-handling posture
 
 - Authoritative append failures are explicit (`AuditDomainError("Authoritative audit append failed.")`) and emit sanitized failure diagnostics.
+- Interrupted append paths now attempt commit-state resolution (`resolveAppendOutcome(...)`):
+  - committed outcomes emit `audit-ledger.write.recovered`,
+  - ambiguous outcomes emit explicit failure diagnostics and raise `AuditDomainError("Authoritative audit append outcome is ambiguous and requires reconciliation.")`.
 - Query read failures in `AuditLedgerQueryService` return explicit `audit-ledger-query-failed` outcomes instead of bubbling unhandled exceptions.
 - `AuditLedgerBackendApi` maps query-failed outcomes to stable API `internal` responses and records structured failure diagnostics.
 - Observability/logging/metrics emissions are intentionally non-blocking and cannot alter authoritative write or read control flow.

@@ -67,6 +67,7 @@ import {
 import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases/AuthoritativeAuditRecordingService";
 import { AuditLedgerQueryService } from "@application/audit/use-cases/AuditLedgerQueryService";
 import { WorkspaceAuditLedgerReadAuthorizer } from "@application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer";
+import { ReconcileAuditLedgerStartupStateUseCase } from "@application/audit/use-cases/ReconcileAuditLedgerStartupStateUseCase";
 import { WorkspaceInvitationBackendApi } from "@infrastructure/api/workspaces/WorkspaceInvitationBackendApi";
 import { WorkspaceAdministrationBackendApi } from "@infrastructure/api/workspaces/WorkspaceAdministrationBackendApi";
 import { AuthorizationManagementBackendApi } from "@infrastructure/api/authorization/AuthorizationManagementBackendApi";
@@ -1130,6 +1131,24 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
         asOf: runStartupRecovery.asOf,
         appliedCount: runStartupRecovery.summary.appliedCount,
         manualFollowUpCount: runStartupRecovery.summary.manualFollowUpCount,
+      }),
+    });
+  }
+  const auditStartupReconciliation = await new ReconcileAuditLedgerStartupStateUseCase({
+    repository: persistentPlatformServices.auditLedgerRepository,
+    observabilityPort: auditLedgerObservability,
+    now: () => workspaceClock.now(),
+  }).execute();
+  if (auditStartupReconciliation.manualFollowUpCount > 0 || auditStartupReconciliation.repairedCount > 0) {
+    options.logger?.warn({
+      event: "audit-ledger.write-reconciliation.startup",
+      requestId: "server-startup",
+      details: Object.freeze({
+        checkedAt: auditStartupReconciliation.checkedAt,
+        supported: auditStartupReconciliation.supported,
+        repairedCount: auditStartupReconciliation.repairedCount,
+        manualFollowUpCount: auditStartupReconciliation.manualFollowUpCount,
+        issueCount: auditStartupReconciliation.issueCount,
       }),
     });
   }

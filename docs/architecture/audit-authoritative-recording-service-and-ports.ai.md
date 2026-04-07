@@ -6,11 +6,13 @@ Story 18.1.3 introduces an application-layer authoritative audit recording servi
 Story 18.1.5 wires this service into baseline high-risk security flows.
 Story 18.1.6 expands baseline governance capture for storage, protected asset access, and secret configuration events.
 Story 18.1.7 extends baseline orchestration/sharing governance capture for run launch/mutation and publication-related policy events.
+Story 18.3.4 adds interrupted-write outcome resolution and startup reconciliation seams for append-path reliability.
 
 ## Canonical files
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
 - `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
+- `src/application/audit/use-cases/ReconcileAuditLedgerStartupStateUseCase.ts`
 - `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts`
 - `src/infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher.ts`
 - `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
@@ -50,6 +52,8 @@ Story 18.1.7 extends baseline orchestration/sharing governance capture for run l
 - centralizes payload sanitization and sensitive-key redaction
 - computes protected-data/redaction metadata consistently
 - creates canonical events and appends through `IAuditLedgerRepository`
+- resolves interrupted append outcomes via `resolveAppendOutcome(...)` so commit-vs-failure ambiguity is explicit
+- emits recovery observability (`audit-ledger.write.recovered`) for proven commits after append interruption
 
 Story 18.1.5 composition/wiring now:
 

@@ -1,5 +1,9 @@
 export interface AuditLedgerWriteObservabilityEvent {
-  readonly event: "audit-ledger.write.completed" | "audit-ledger.write.failed";
+  readonly event:
+    | "audit-ledger.write.completed"
+    | "audit-ledger.write.failed"
+    | "audit-ledger.write.recovered"
+    | "audit-ledger.write.reconciliation.completed";
   readonly source: string;
   readonly outcome: "success" | "failure";
   readonly severity: "info" | "warn" | "error";

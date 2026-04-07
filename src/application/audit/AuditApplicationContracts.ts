@@ -13,8 +13,15 @@ import type {
 export type {
   AuditLedgerAppendContext,
   AuditLedgerAppendResult,
+  AuditLedgerReconciliationIssue,
+  AuditLedgerReconciliationResult,
   AuditLedgerQuery,
+  AuditLedgerWriteResolution,
+  AuditLedgerWriteResolutionStatus,
   IAuditLedgerRepository,
+} from "./ports/AuditLedgerPersistencePorts";
+export {
+  AuditLedgerWriteResolutionStatuses,
 } from "./ports/AuditLedgerPersistencePorts";
 
 export const AuditLedgerStreamKinds = Object.freeze({
