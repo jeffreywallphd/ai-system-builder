@@ -1,9 +1,14 @@
-﻿import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import AuthorizationSharingManagementPanel from "../components/authorization/AuthorizationSharingManagementPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { AuthorizationManagementService } from "../services/AuthorizationManagementService";
+import { IdentityAuthService } from "../services/IdentityAuthService";
+import {
+  IdentityAuthSessionCoordinator,
+  IdentitySessionBootstrapStatus,
+} from "@shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 import { buildAuthorizationSharingDesktopPath } from "../web/authorization/AuthorizationSharingRoutes";
@@ -14,8 +19,13 @@ interface AuthorizationSharingThinClientPageProps {
 }
 
 export default function AuthorizationSharingThinClientPage(props: AuthorizationSharingThinClientPageProps = {}): JSX.Element {
+  const authService = useMemo(() => new IdentityAuthService(), []);
   const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
-  const [session] = useState(() => sessionStore.getSession());
+  const sessionCoordinator = useMemo(
+    () => new IdentityAuthSessionCoordinator(sessionStore, authService),
+    [authService, sessionStore],
+  );
+  const [session, setSession] = useState(() => sessionStore.getSession());
   const [searchParams] = useSearchParams();
   const sessionToken = session?.sessionToken;
 
@@ -31,6 +41,27 @@ export default function AuthorizationSharingThinClientPage(props: AuthorizationS
       workspaceId: workspaceId || undefined,
     })
     : ROUTE_PATHS.authorizationSharing;
+  useEffect(() => {
+    if (!sessionToken) {
+      return;
+    }
+
+    let cancelled = false;
+    const refreshSessionContext = async (): Promise<void> => {
+      const result = await sessionCoordinator.bootstrap({ workspaceId: workspaceId || undefined });
+      if (cancelled) {
+        return;
+      }
+      if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+        setSession(result.session);
+      }
+    };
+
+    void refreshSessionContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionCoordinator, sessionToken, workspaceId]);
 
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (

@@ -42,6 +42,10 @@ export type IdentitySessionBootstrapResult =
     readonly error?: IdentitySessionBootstrapError;
   };
 
+export interface IdentitySessionBootstrapOptions {
+  readonly workspaceId?: string;
+}
+
 export class IdentityAuthSessionCoordinator {
   private readonly now: () => Date;
 
@@ -53,21 +57,21 @@ export class IdentityAuthSessionCoordinator {
     this.now = now;
   }
 
-  public async bootstrap(): Promise<IdentitySessionBootstrapResult> {
-    return this.resolveActiveSession();
+  public async bootstrap(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
+    return this.resolveActiveSession(options);
   }
 
-  public async refreshIfAuthenticated(): Promise<IdentitySessionBootstrapResult> {
+  public async refreshIfAuthenticated(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
     if (!this.sessionStore.hasSession()) {
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
         reason: IdentitySessionUnauthenticatedReason.missingSession,
       });
     }
-    return this.resolveActiveSession();
+    return this.resolveActiveSession(options);
   }
 
-  private async resolveActiveSession(): Promise<IdentitySessionBootstrapResult> {
+  private async resolveActiveSession(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
     const session = this.sessionStore.getSession();
     if (!session) {
       return Object.freeze({
@@ -104,6 +108,7 @@ export class IdentityAuthSessionCoordinator {
 
       const actorContext = await this.authService.resolveSessionActorContext({
         sessionToken: session.sessionToken,
+        workspaceId: normalizeWorkspaceId(options?.workspaceId),
       });
       if (!actorContext.ok || !actorContext.data) {
         if (actorContext.error?.code === IdentityAuthApiErrorCodes.authenticationFailed) {
@@ -169,6 +174,11 @@ export class IdentityAuthSessionCoordinator {
       });
     }
   }
+}
+
+function normalizeWorkspaceId(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
 function deriveInitialCapabilityState(

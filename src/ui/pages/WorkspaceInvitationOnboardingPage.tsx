@@ -1,16 +1,26 @@
-﻿import { useMemo, useState, type FormEvent } from "react";
+﻿import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { IdentityAuthService } from "../services/IdentityAuthService";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
+import {
+  IdentityAuthSessionCoordinator,
+  IdentitySessionBootstrapStatus,
+} from "@shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 export default function WorkspaceInvitationOnboardingPage(): JSX.Element {
   const { workspaceId, invitationToken } = useParams<{ workspaceId: string; invitationToken: string }>();
   const service = useMemo(() => new WorkspaceAdministrationService(), []);
+  const authService = useMemo(() => new IdentityAuthService(), []);
   const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const sessionCoordinator = useMemo(
+    () => new IdentityAuthSessionCoordinator(sessionStore, authService),
+    [authService, sessionStore],
+  );
   const location = useLocation();
 
-  const [session] = useState(() => sessionStore.getSession());
+  const [session, setSession] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
   const [tokenValue, setTokenValue] = useState(invitationToken ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -24,6 +34,28 @@ export default function WorkspaceInvitationOnboardingPage(): JSX.Element {
 
   const isAuthenticated = Boolean(sessionToken && session && !sessionStore.isSessionExpired(session));
   const normalizedWorkspaceId = workspaceId?.trim();
+  useEffect(() => {
+    if (!sessionToken || !normalizedWorkspaceId) {
+      return;
+    }
+
+    let cancelled = false;
+    const refreshSessionContext = async (): Promise<void> => {
+      const result = await sessionCoordinator.bootstrap({ workspaceId: normalizedWorkspaceId });
+      if (cancelled) {
+        return;
+      }
+      if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+        setSession(result.session);
+      }
+    };
+
+    void refreshSessionContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedWorkspaceId, sessionCoordinator, sessionToken]);
+
 
   const submitAcceptance = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();

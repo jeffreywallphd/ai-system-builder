@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import type {
   WorkspaceAdminListItemApiRecord,
   WorkspaceInvitationApiRecord,
@@ -7,7 +7,12 @@ import type {
 } from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
+import { IdentityAuthService } from "../services/IdentityAuthService";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
+import {
+  IdentityAuthSessionCoordinator,
+  IdentitySessionBootstrapStatus,
+} from "@shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import { buildWorkspaceInvitationAcceptPath } from "../web/workspaces/WorkspaceThinClientRoutes";
 
@@ -16,12 +21,19 @@ const membershipStatusOptions = Object.freeze(["pending", "active", "suspended",
 
 export default function WorkspaceMembershipThinClientPage(): JSX.Element {
   const service = useMemo(() => new WorkspaceAdministrationService(), []);
+  const authService = useMemo(() => new IdentityAuthService(), []);
   const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
-  const [session] = useState(() => sessionStore.getSession());
+  const sessionCoordinator = useMemo(
+    () => new IdentityAuthSessionCoordinator(sessionStore, authService),
+    [authService, sessionStore],
+  );
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedWorkspaceId = searchParams.get("workspaceId")?.trim() || undefined;
+  const [session, setSession] = useState(() => sessionStore.getSession());
   const sessionToken = session?.sessionToken;
 
   const [workspaces, setWorkspaces] = useState<ReadonlyArray<WorkspaceAdminListItemApiRecord>>(Object.freeze([]));
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>();
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>(() => requestedWorkspaceId ?? session?.workspaceContext?.resolvedWorkspaceId);
   const [memberships, setMemberships] = useState<ReadonlyArray<WorkspaceMembershipApiRecord>>(Object.freeze([]));
   const [invitations, setInvitations] = useState<ReadonlyArray<WorkspaceInvitationApiRecord>>(Object.freeze([]));
   const [membershipDrafts, setMembershipDrafts] = useState<Readonly<Record<string, WorkspaceMembershipApiRecord["status"]>>>(Object.freeze({}));
@@ -97,7 +109,9 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
       const workspaceId = preferredWorkspaceId
         ?? (selectedWorkspaceId && fetchedWorkspaces.some((entry) => entry.workspaceId === selectedWorkspaceId)
           ? selectedWorkspaceId
-          : fetchedWorkspaces[0]?.workspaceId);
+          : requestedWorkspaceId && fetchedWorkspaces.some((entry) => entry.workspaceId === requestedWorkspaceId)
+            ? requestedWorkspaceId
+            : fetchedWorkspaces[0]?.workspaceId);
       setSelectedWorkspaceId(workspaceId);
 
       if (!workspaceId) {
@@ -120,7 +134,33 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
       return;
     }
     void refresh();
-  }, [sessionToken]);
+  }, [requestedWorkspaceId, sessionToken]);
+
+  useEffect(() => {
+    if (!sessionToken) {
+      return;
+    }
+
+    let cancelled = false;
+    const syncSessionContext = async (): Promise<void> => {
+      const result = await sessionCoordinator.bootstrap({ workspaceId: requestedWorkspaceId });
+      if (cancelled) {
+        return;
+      }
+      if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+        setSession(result.session);
+        const resolvedWorkspaceId = result.session.workspaceContext?.resolvedWorkspaceId;
+        if (resolvedWorkspaceId && !selectedWorkspaceId) {
+          setSelectedWorkspaceId(resolvedWorkspaceId);
+        }
+      }
+    };
+
+    void syncSessionContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestedWorkspaceId, selectedWorkspaceId, sessionCoordinator, sessionToken]);
 
   const runMutation = async (action: () => Promise<void>): Promise<void> => {
     setIsMutating(true);
@@ -191,8 +231,28 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
                 const nextWorkspaceId = event.target.value || undefined;
                 setSelectedWorkspaceId(nextWorkspaceId);
                 if (nextWorkspaceId) {
+                  setSearchParams((current) => {
+                    const next = new URLSearchParams(current);
+                    next.set("workspaceId", nextWorkspaceId);
+                    return next;
+                  }, { replace: true });
+                  void sessionCoordinator.refreshIfAuthenticated({ workspaceId: nextWorkspaceId }).then((result) => {
+                    if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+                      setSession(result.session);
+                    }
+                  });
                   void refreshWorkspaceDetails(nextWorkspaceId);
                 } else {
+                  setSearchParams((current) => {
+                    const next = new URLSearchParams(current);
+                    next.delete("workspaceId");
+                    return next;
+                  }, { replace: true });
+                  void sessionCoordinator.refreshIfAuthenticated({ workspaceId: undefined }).then((result) => {
+                    if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+                      setSession(result.session);
+                    }
+                  });
                   setMemberships(Object.freeze([]));
                   setInvitations(Object.freeze([]));
                   setMembershipDrafts(Object.freeze({}));
