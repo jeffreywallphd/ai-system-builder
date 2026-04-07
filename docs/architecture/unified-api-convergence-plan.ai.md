@@ -23,14 +23,14 @@
 
 ## Domain-to-contract homes
 
-- Identity/session: proposed `src/shared/contracts/identity/*` and `src/shared/schemas/identity/*`
-- Workspace admin/invitations: proposed `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts` + schema peer
+- Identity/session: existing `src/shared/contracts/identity/IdentityTransportContracts.ts` and `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts`
+- Workspace admin/invitations: existing `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts` + `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - Authorization: existing `src/shared/contracts/authorization/*`, `src/shared/schemas/authorization/*`
 - Nodes: existing `src/shared/contracts/nodes/NodeTrustApiContracts.ts`, `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
 - Storage: existing `src/shared/contracts/storage/StorageTransportContracts.ts`, `src/shared/schemas/storage/StorageTransportSchemaContracts.ts`
 - Assets: existing `src/shared/contracts/assets/*`
 - Security metadata/certs: existing `src/shared/contracts/security/*`, `src/shared/schemas/security/*`
-- Runtime/deployment transport: proposed `src/shared/contracts/runtime/*`, `src/shared/contracts/deployment/*` plus schema peers
+- Runtime/deployment transport: existing `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`, `src/shared/contracts/deployment/DeploymentTransportContracts.ts` plus schema peers
 
 ## Internal-only paths that remain acceptable
 

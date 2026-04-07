@@ -99,7 +99,7 @@ import {
   type UpdateTrustedDeviceDisplayNameApiResponse,
   type ValidateTrustedDevicePairingApiRequest,
   type ValidateTrustedDevicePairingApiResponse,
-} from "./sdk/PublicIdentityAuthApiContract";
+} from "@shared/contracts/identity/IdentityTransportContracts";
 import {
   RoleAwareTrustedDeviceAdministrativeAuthorizationPolicy,
   TrustedDeviceAdministrativeActions,

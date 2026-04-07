@@ -1,3 +1,4 @@
+/* MIGRATION NOTE: prefer importing shared transport contracts from src/shared/contracts/* for new work. This SDK contract remains for compatibility during convergence. */
 export const RuntimeSdkErrorCodes = Object.freeze({
   unauthorized: "unauthorized",
   forbidden: "forbidden",

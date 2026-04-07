@@ -1,9 +1,11 @@
-﻿import type {
+import type {
   AddWorkspaceAdministrationMemberApiResponse,
+  AcceptWorkspaceInvitationOnboardingApiResponse,
   AssignWorkspaceAdministrationRoleApiResponse,
   CancelWorkspaceAdministrationInvitationApiResponse,
   ChangeWorkspaceAdministrationMemberStatusApiResponse,
   CreateWorkspaceAdministrationApiResponse,
+  IssueWorkspaceInvitationApiResponse,
   ListWorkspaceAdministrationInvitationsApiResponse,
   ListWorkspaceAdministrationMembershipsApiResponse,
   ListWorkspaceAdministrationRoleAssignmentsApiResponse,
@@ -15,13 +17,12 @@
   TransitionWorkspaceAdministrationLifecycleApiResponse,
   UpdateWorkspaceAdministrationApiResponse,
   WorkspaceAdministrationApiResponse,
-} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
-import type {
-  AcceptWorkspaceInvitationOnboardingApiResponse,
-  IssueWorkspaceInvitationApiResponse,
   WorkspaceInvitationApiResponse,
-} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+} from "@shared/contracts/workspaces/WorkspaceTransportContracts";
 
+/* MIGRATION NOTE: request DTOs in this client still include inline compatibility shapes.
+ * New features should consume request/response contracts directly from src/shared/contracts/workspaces.
+ */
 export interface WorkspaceAdministrationClient {
   listWorkspaces(
     request: {
