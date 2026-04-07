@@ -81,6 +81,7 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(status.queue?.queueId).toBe("queue-1");
     expect(status.execution?.heartbeatAt).toBe("2026-04-07T10:00:09.000Z");
     expect(status.execution?.progress?.percent).toBe(47);
+    expect(status.finalization).toBeUndefined();
   });
 
   it("normalizes optional submission source and lifecycle state", () => {

@@ -22,6 +22,7 @@ import {
   RunExecutionOutcomeKinds,
   RunLifecycleStates,
   RunSubmissionSources,
+  type RunLifecycleState,
   createCanonicalRunRecord,
 } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
@@ -158,6 +159,28 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     this.attempts.set(input.attemptId, Object.freeze({
       ...attempt,
       dispatchResult: input.result,
+    }));
+    return true;
+  }
+
+  public async finalizeRunQueueEntry(input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean> {
+    const entry = this.queue.get(input.runId);
+    if (!entry) {
+      return false;
+    }
+    this.queue.set(input.runId, Object.freeze({
+      ...entry,
+      lifecycleState: input.lifecycleState,
+      claimToken: undefined,
+      claimedBy: undefined,
+      claimedAt: undefined,
+      claimExpiresAt: undefined,
+      updatedAt: input.finalizedAt,
+      revision: entry.revision + 1,
     }));
     return true;
   }
@@ -309,6 +332,27 @@ function seedAssignedRun(runRepository: InMemoryRunRepository): void {
 }
 
 function seedDispatchAttempt(queueRepository: InMemoryQueueRepository): void {
+  queueRepository.queue.set("run-1", Object.freeze({
+    runId: "run-1",
+    queueId: "queue:default",
+    workspaceId: "workspace-alpha",
+    lifecycleState: "assigned",
+    enteredAt: "2026-04-07T09:00:00.000Z",
+    orderKey: "2026-04-07T09:00:00.000Z:run-1",
+    eligibilityMarker: "ready",
+    eligibleAt: "2026-04-07T09:00:00.000Z",
+    claimToken: "claim:run-1",
+    claimedBy: "orchestrator:alpha",
+    claimedAt: "2026-04-07T09:02:00.000Z",
+    claimExpiresAt: "2026-04-07T09:07:00.000Z",
+    assignmentNodeId: "node:trusted-a",
+    assignmentClaimedAt: "2026-04-07T09:02:00.000Z",
+    dispatchPreparedAt: "2026-04-07T09:02:00.000Z",
+    lastDispatchAttemptId: "dispatch-attempt:1",
+    dequeuedAt: "2026-04-07T09:02:00.000Z",
+    updatedAt: "2026-04-07T09:02:00.000Z",
+    revision: 1,
+  }));
   queueRepository.attempts.set("dispatch-attempt:1", Object.freeze({
     attemptId: "dispatch-attempt:1",
     runId: "run-1",
@@ -391,11 +435,15 @@ describe("HandleRunDispatchResultUseCase", () => {
     });
 
     expect(result.run.state).toBe("failed");
+    expect(result.run.assignment.status).toBe("released");
     expect(result.run.execution.errorCode).toBe("dispatch-failed-to-start");
     expect(result.run.execution.errorMessage).toBe("Run failed to start on the selected execution backend.");
+    expect(result.run.finalization?.outcome).toBe("failed");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.internalMessage)
       .toContain("Socket connection timeout");
+    expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("failed");
+    expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
     expect([...auditRepository.events.values()].length).toBe(2);
   });
 });

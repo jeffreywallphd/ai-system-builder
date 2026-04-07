@@ -977,6 +977,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const authoritativeRunExecutionUpdateBackendApi = new AuthoritativeRunExecutionUpdateBackendApi({
     ingestRunExecutionUpdateUseCase: new IngestRunExecutionUpdateUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),

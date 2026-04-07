@@ -19,7 +19,7 @@ import type {
   IRunNodeAssignmentEligibilityService,
   RunAssignmentEligibilityDecision,
 } from "@application/runs/ports/RunAssignmentEligibilityPorts";
-import { RunLifecycleStates, RunSubmissionSources, createCanonicalRunRecord } from "@domain/runs/RunDomain";
+import { RunLifecycleStates, RunSubmissionSources, type RunLifecycleState, createCanonicalRunRecord } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
 import { SelectAssignmentReadyRunsUseCase } from "../use-cases/SelectAssignmentReadyRunsUseCase";
 
@@ -182,6 +182,14 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly runId: string;
     readonly attemptId: string;
     readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async finalizeRunQueueEntry(_input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
   }): Promise<boolean> {
     return false;
   }

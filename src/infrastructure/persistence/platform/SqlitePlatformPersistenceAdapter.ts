@@ -712,6 +712,39 @@ export class SqlitePlatformPersistenceAdapter
     return mutationResult.changes === 1;
   }
 
+  public async finalizeRunQueueEntry(input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    if (!runId) {
+      return false;
+    }
+
+    const finalizedAt = input.finalizedAt.trim();
+    const mutationResult = this.executeMutation("finalize run queue entry", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          lifecycle_state = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          dequeued_at = COALESCE(dequeued_at, ?),
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+      `).run(
+      input.lifecycleState,
+      finalizedAt,
+      finalizedAt,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
   public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
     const normalizedRunId = normalizePlatformLookup(runId);
     if (!normalizedRunId) {

@@ -18,11 +18,11 @@ import type {
   RunStatusEnvelope,
   RunSubmissionSource,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
-import { toRunStatusEnvelope, type RunLifecycleState } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import type { RunLifecycleState } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import type { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import type { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
-import { mapPlatformRunRecordToCanonicalRun } from "@application/runs/use-cases/RunCreationPersistenceMapper";
+import { toRunStatusEnvelopeFromPlatformRecord } from "@application/runs/use-cases/RunCreationPersistenceMapper";
 
 const AuthoritativeRunResourceType = "authoritative-run";
 
@@ -165,7 +165,7 @@ export class AuthoritativeRunQueryBackendApi {
 
     return Object.freeze({
       ok: true,
-      data: toRunStatusEnvelope(mapPlatformRunRecordToCanonicalRun(record)),
+      data: toRunStatusEnvelopeFromPlatformRecord(record),
     });
   }
 

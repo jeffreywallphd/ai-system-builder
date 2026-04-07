@@ -108,6 +108,10 @@ export interface RunDetail extends RunSummary {
   readonly execution: RunExecutionState;
   readonly cancellation?: RunCancellationState;
   readonly retry: RunRetryState;
+  readonly finalization?: RunResultSummary & {
+    readonly finalizedAt: string;
+    readonly outcome: "completed" | "failed";
+  };
 }
 
 export interface RunSubmissionAcceptedResponse {
@@ -160,6 +164,7 @@ export interface RunStatusEnvelope {
     readonly maxAttempts: number;
     readonly queuedAt?: string;
   };
+  readonly finalization?: RunDetail["finalization"];
 }
 
 export interface RunExecutionProgressSnapshot {
@@ -167,6 +172,42 @@ export interface RunExecutionProgressSnapshot {
   readonly percent?: number;
   readonly stage?: string;
   readonly message?: string;
+}
+
+export const RunResultOutputReferenceKinds = Object.freeze({
+  asset: "asset",
+  storageObject: "storage-object",
+  url: "url",
+  inline: "inline",
+} as const);
+
+export type RunResultOutputReferenceKind =
+  typeof RunResultOutputReferenceKinds[keyof typeof RunResultOutputReferenceKinds];
+
+export interface RunResultOutputReference {
+  readonly outputId: string;
+  readonly kind: RunResultOutputReferenceKind;
+  readonly label?: string;
+  readonly assetId?: string;
+  readonly storageInstanceId?: string;
+  readonly objectKey?: string;
+  readonly objectVersionId?: string;
+  readonly uri?: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+}
+
+export interface RunResultRegistrationInput {
+  readonly summary?: string;
+  readonly externalResultId?: string;
+  readonly outputs?: ReadonlyArray<RunResultOutputReference>;
+  readonly metrics?: Readonly<Record<string, unknown>>;
+}
+
+export interface RunResultSummary {
+  readonly summary?: string;
+  readonly externalResultId?: string;
+  readonly outputs: ReadonlyArray<RunResultOutputReference>;
+  readonly metrics?: Readonly<Record<string, unknown>>;
 }
 
 export interface RunQueueStatusReadRequest {
@@ -221,6 +262,7 @@ export interface RunLifecycleUpdateRequest {
   readonly senderBackendRunId?: string;
   readonly heartbeatAt?: string;
   readonly progress?: RunExecutionProgressSnapshot;
+  readonly result?: RunResultRegistrationInput;
   readonly internalDiagnostics?: Readonly<Record<string, unknown>>;
   readonly queue?: RunQueueState;
   readonly assignment?: RunAssignmentState;

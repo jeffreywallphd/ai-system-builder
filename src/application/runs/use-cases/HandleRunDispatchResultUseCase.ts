@@ -7,6 +7,7 @@ import {
 import type {
   AuthoritativeRunDispatchAttemptResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunFinalizationResultRegistrationPort,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
@@ -14,11 +15,13 @@ import {
   RunLifecycleStates,
   type CanonicalRunRecord,
 } from "@domain/runs/RunDomain";
-import { toRunDetail, type RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import type { RunDetail } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
   mapPlatformRunRecordToCanonicalRun,
+  toRunDetailFromPlatformRecord,
   updatePlatformRunRecordCanonicalState,
 } from "./RunCreationPersistenceMapper";
+import { FinalizeRunExecutionOutcomeUseCase } from "./FinalizeRunExecutionOutcomeUseCase";
 import {
   transitionDispatchingRunToOutcome,
   transitionRunToDispatching,
@@ -43,6 +46,7 @@ interface HandleRunDispatchResultUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
+  readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
   readonly idGenerator?: {
@@ -103,12 +107,17 @@ export class HandleRunDispatchResultUseCase {
   private readonly idGenerator: {
     nextId(prefix: string): string;
   };
+  private readonly finalizationUseCase: FinalizeRunExecutionOutcomeUseCase;
 
   public constructor(private readonly dependencies: HandleRunDispatchResultUseCaseDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.idGenerator = dependencies.idGenerator ?? {
       nextId: (prefix) => `${prefix}:${randomUUID()}`,
     };
+    this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository: dependencies.queueRepository,
+      resultRegistrationPort: dependencies.resultRegistrationPort,
+    });
   }
 
   public async execute(request: HandleRunDispatchResultRequest): Promise<HandleRunDispatchResultResult> {
@@ -180,7 +189,15 @@ export class HandleRunDispatchResultUseCase {
         command: request.command,
         outcome: request.outcome,
       });
-      const finalRecord = updatePlatformRunRecordCanonicalState(activePersistedRun, finalRun);
+      const finalized = await this.finalizationUseCase.execute({
+        run: finalRun,
+        runRecord: activePersistedRun,
+        occurredAt: finalRun.updatedAt,
+        internalDiagnostics: request.outcome.status === "failed-to-start"
+          ? request.outcome.failure.details
+          : undefined,
+      });
+      const finalRecord = finalized.runRecord;
       const savedFinal = await this.dependencies.runRepository.saveRun({
         ...finalRecord,
         runId: activePersistedRun.runId,
@@ -208,7 +225,7 @@ export class HandleRunDispatchResultUseCase {
       });
 
       result = Object.freeze({
-        run: toRunDetail(mapPlatformRunRecordToCanonicalRun(savedFinal.record)),
+        run: toRunDetailFromPlatformRecord(savedFinal.record),
         fromState: currentRun.state,
         toState: finalRun.state,
         dispatchAttemptResult,

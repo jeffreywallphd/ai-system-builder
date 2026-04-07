@@ -21,6 +21,7 @@ import type {
 import type { CanonicalRunSubmissionCommand } from "../use-cases/RunSubmissionValidationContracts";
 import { CreateAuthoritativeRunUseCase } from "../use-cases/CreateAuthoritativeRunUseCase";
 import { GetAuthoritativeRunUseCase } from "../use-cases/GetAuthoritativeRunUseCase";
+import type { RunLifecycleState } from "@domain/runs/RunDomain";
 import {
   RunSubmissionAuditEventTypes,
   type RunSubmissionAuditEvent,
@@ -160,6 +161,14 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly runId: string;
     readonly attemptId: string;
     readonly result: AuthoritativeRunDispatchAttemptResult;
+  }): Promise<boolean> {
+    return false;
+  }
+
+  public async finalizeRunQueueEntry(_input: {
+    readonly runId: string;
+    readonly finalizedAt: string;
+    readonly lifecycleState: RunLifecycleState;
   }): Promise<boolean> {
     return false;
   }

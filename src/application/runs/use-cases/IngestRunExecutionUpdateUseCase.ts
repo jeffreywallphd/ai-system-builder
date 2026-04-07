@@ -6,7 +6,9 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunFinalizationResultRegistrationPort,
   IRunOrchestrationIntentRepository,
+  IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
   RunLifecycleUpdateRequest,
@@ -15,8 +17,6 @@ import type {
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
   RunMutationActions,
-  toRunDetail,
-  toRunStatusEnvelope,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
   RunExecutionOutcomeKinds,
@@ -26,8 +26,11 @@ import {
 } from "@domain/runs/RunDomain";
 import {
   mapPlatformRunRecordToCanonicalRun,
+  toRunDetailFromPlatformRecord,
+  toRunStatusEnvelopeFromPlatformRecord,
   updatePlatformRunRecordCanonicalState,
 } from "./RunCreationPersistenceMapper";
+import { FinalizeRunExecutionOutcomeUseCase } from "./FinalizeRunExecutionOutcomeUseCase";
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -92,7 +95,9 @@ export interface IngestRunExecutionUpdateResult {
 
 interface IngestRunExecutionUpdateUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
+  readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
+  readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
   readonly idGenerator?: {
@@ -112,12 +117,17 @@ export class IngestRunExecutionUpdateUseCase {
   private readonly idGenerator: {
     nextId(prefix: string): string;
   };
+  private readonly finalizationUseCase: FinalizeRunExecutionOutcomeUseCase;
 
   public constructor(private readonly dependencies: IngestRunExecutionUpdateUseCaseDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.idGenerator = dependencies.idGenerator ?? {
       nextId: (prefix) => `${prefix}:${randomUUID()}`,
     };
+    this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository: dependencies.queueRepository,
+      resultRegistrationPort: dependencies.resultRegistrationPort,
+    });
   }
 
   public async execute(request: IngestRunExecutionUpdateRequest): Promise<IngestRunExecutionUpdateResult> {
@@ -166,11 +176,22 @@ export class IngestRunExecutionUpdateUseCase {
       next = this.applyProgress(next, request.update.progress);
 
       const persistedCanonical = updatePlatformRunRecordCanonicalState(persisted, next);
-      const persistedWithDiagnostics = this.applyInternalDiagnosticsMetadata(
+      let persistedWithDiagnostics = this.applyInternalDiagnosticsMetadata(
         persistedCanonical,
         request,
         occurredAt,
       );
+      if (toState === RunLifecycleStates.completed || toState === RunLifecycleStates.failed) {
+        const finalized = await this.finalizationUseCase.execute({
+          run: next,
+          runRecord: persistedWithDiagnostics,
+          occurredAt,
+          lifecycleUpdate: request.update,
+          senderNodeId,
+          internalDiagnostics: request.update.internalDiagnostics,
+        });
+        persistedWithDiagnostics = finalized.runRecord;
+      }
 
       const saved = await this.dependencies.runRepository.saveRun(
         persistedWithDiagnostics,
@@ -197,18 +218,17 @@ export class IngestRunExecutionUpdateUseCase {
         idempotencyKey: request.update.idempotencyKey,
       });
 
-      const run = mapPlatformRunRecordToCanonicalRun(saved.record);
       result = Object.freeze({
         mutation: Object.freeze({
           action: RunMutationActions.lifecycleUpdate,
-          run: toRunDetail(run),
+          run: toRunDetailFromPlatformRecord(saved.record),
           mutation: Object.freeze({
             changed: true,
             mutationId: `run:execution-update:${runId}:${operationSuffix}`,
             occurredAt,
           }),
         }),
-        status: toRunStatusEnvelope(run),
+        status: toRunStatusEnvelopeFromPlatformRecord(saved.record),
       });
     });
 
