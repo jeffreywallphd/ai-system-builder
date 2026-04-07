@@ -1,4 +1,4 @@
-import type { RuntimeExecutionResultReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import type { RuntimeExecutionResultReadModel } from "../../../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 export function ExecutionDiagnosticsPanel({ result }: { readonly result: RuntimeExecutionResultReadModel }): JSX.Element {
   return (

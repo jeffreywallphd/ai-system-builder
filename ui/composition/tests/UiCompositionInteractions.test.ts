@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import { ManagedServicePythonRuntimeManagerAdapter } from "../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
 import { createUiDependencies } from "../createUiDependencies";
 

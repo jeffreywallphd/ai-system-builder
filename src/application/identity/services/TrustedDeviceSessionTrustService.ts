@@ -13,18 +13,18 @@ import {
   type SessionDeviceTrustInvalidationReason,
   type SessionDeviceTrustState,
 } from "../../../domain/identity/IdentityDomain";
-import type { ITrustedDeviceRepository } from "../../../../application/identity/ports/ITrustedDeviceRepository";
+import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
 import {
   IdentitySessionTrustRequirements,
   type IIdentitySessionTrustService,
   type IdentitySessionTrustRequirement,
   type ResolveSessionIssuanceTrustInput,
   type ResolveSessionIssuanceTrustResult,
-} from "../../../../application/identity/ports/IIdentitySessionTrustService";
+} from "../ports/IIdentitySessionTrustService";
 import type {
   IdentitySessionTrustEvaluationInput,
   IdentitySessionTrustEvaluationResult,
-} from "../../../../application/identity/ports/IIdentitySessionTrustEvaluator";
+} from "../ports/IIdentitySessionTrustEvaluator";
 
 export interface TrustedDeviceSessionTrustPolicies {
   readonly desktop: IdentitySessionTrustRequirement;

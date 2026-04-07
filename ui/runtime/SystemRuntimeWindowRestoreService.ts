@@ -13,7 +13,7 @@ import {
   SystemRuntimeWindowHydrationService,
   type SystemRuntimeHydratedState,
 } from "./SystemRuntimeWindowHydrationService";
-import type { StudioShellSnapshotReadModel } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellSnapshotReadModel } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 
 export type RuntimeWindowRestoreIssueSeverity = "warning" | "error";
 export type RuntimeWindowRestoreIssueSource = "launch" | "hydration" | "session-restore";

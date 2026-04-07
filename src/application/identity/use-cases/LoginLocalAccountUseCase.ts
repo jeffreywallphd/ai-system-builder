@@ -19,10 +19,10 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
+import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { validateIdentityProvider } from "../services/IdentityProviderCatalog";

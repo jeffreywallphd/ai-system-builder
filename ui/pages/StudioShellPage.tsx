@@ -14,7 +14,7 @@ import type {
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
   WorkflowExecutionReadinessReadModel,
-} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import StudioAssetHostBoundary from "../components/studio-shell/studio-assets/StudioAssetHostBoundary";
 import WorkflowStudioExecutionFeedbackPanel, {
   type WorkflowStudioRunFeedback,

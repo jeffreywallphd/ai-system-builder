@@ -39,7 +39,7 @@ import type {
   GetReferenceImageDatasetItemRequest,
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
-} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { ImageRunHistoryListing } from "../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryItem, OutputGalleryListing } from "../../application/system-runtime/OutputGalleryDataContract";
 import type {
@@ -49,7 +49,7 @@ import type {
   RuntimeExecutionStatusReadModel,
   RuntimeExecutionTraceReadModel,
   RuntimeExecutionResultReadModel,
-} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
   LaunchSystemRuntimeWindowReadModel,
   LaunchSystemRuntimeWindowRequest,
@@ -69,7 +69,7 @@ import type {
   LoadSystemDefinitionRequest,
   DuplicateSystemDefinitionRequest,
   ModifySystemDefinitionRequest,
-} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+} from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
 import { resolveDesktopStudioShellBridge } from "../composition/DesktopStudioShellBridgeAdapter";
 import { resolveBrowserStudioShellBridgeFallback } from "../composition/BrowserStudioShellBridgeFallback";
 

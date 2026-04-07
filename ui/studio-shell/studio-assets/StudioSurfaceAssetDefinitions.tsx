@@ -1,5 +1,5 @@
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
-import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellValidationIssue } from "../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioDraftAuthoringBoundaryProps } from "../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import WorkflowStudioDraftAuthoringBoundary from "../../components/studio-shell/workflow/WorkflowStudioDraftAuthoringBoundary";
 import { SystemStudioDraftAuthoringBoundary as SystemStudioDraftAuthoringSurface } from "../../components/studio-shell/system/SystemStudioDraftAuthoringBoundary";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "../../../src/infrastructure/config/AppRuntimeConfig";
 import {
   LocalStorageUiSettingsStorage,
   UiSettingsStore,

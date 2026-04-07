@@ -8,7 +8,7 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
+import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import { validateIdentityProvider } from "../services/IdentityProviderCatalog";

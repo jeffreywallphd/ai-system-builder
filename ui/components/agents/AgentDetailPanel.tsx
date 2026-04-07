@@ -18,7 +18,7 @@ import {
   type AgentToolAccessPolicy,
 } from "../../../src/domain/agents/AgentPolicy";
 import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
+import type { AgentStudioSnapshotReadModel } from "../../../src/infrastructure/api/agents/AgentStudioBackendApi";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { CompositionSummaryCard } from "./CompositionSummaryCard";
 import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";

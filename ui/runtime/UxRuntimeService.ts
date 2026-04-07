@@ -5,7 +5,7 @@ import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
   SystemRuntimeApiResponse,
-} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { RunContextKinds, RunInterfaceService, type RunLaunchRequest } from "../routes/RunInterface";
 
 export const UxRunActionKinds = Object.freeze({

@@ -11,8 +11,8 @@ import type {
 } from "../../application/agents/contracts/AgentRunContracts";
 import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
 import { resolveDesktopAgentBridge } from "../composition/DesktopAgentBridgeAdapter";
-import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
-import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
+import type { AgentAuthoringApiReadModel } from "../../src/infrastructure/api/agents/AgentAuthoringBackendApi";
+import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
 import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
 
 export class AgentStudioService {

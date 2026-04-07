@@ -13,7 +13,7 @@ import type {
   WorkflowRunDetailReadModel,
   WorkflowRunDiagnosticReadModel,
   WorkflowRunSummaryReadModel,
-} from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "../../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import { StudioShellService } from "../../../services/StudioShellService";
 import {
   buildWorkflowStudioRunDetailPath,

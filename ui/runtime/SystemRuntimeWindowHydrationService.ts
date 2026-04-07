@@ -10,7 +10,7 @@ import {
 } from "../../application/runtime/ComfyRuntimeSystemDiagnostics";
 import type { SystemRuntimeWindowLaunchContract } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { parseSystemSerializationDocument } from "../../src/domain/system-studio/SystemSerializationContract";
-import type { StudioShellSnapshotReadModel } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellSnapshotReadModel } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import { parseSystemStudioDraftDocument } from "../studio-shell/system/SystemStudioDraftDocument";
 import type { ImageManipulationSelectionRole } from "../components/studio-shell/image-manipulation/ImageManipulationSelectionState";
 

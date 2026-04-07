@@ -10,7 +10,7 @@ import { CompositionAssetContractResolver } from "../../application/contracts/Co
 import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
 import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
 import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
-import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
+import { RegistryBackendApi } from "../../src/infrastructure/api/registry/RegistryBackendApi";
 import { resolveBrowserWorkflowPersistenceRepository } from "./BrowserFallbackRepositories";
 
 class EmptyAssetRecordRepository implements IAssetRecordRepository {

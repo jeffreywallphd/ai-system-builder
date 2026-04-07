@@ -19,7 +19,7 @@ import { ModelService } from "../services/ModelService";
 import { WorkflowStore } from "../state/WorkflowStore";
 import { NodeStore } from "../state/NodeStore";
 import { ModelStore } from "../state/ModelStore";
-import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
 import { InMemoryWorkflowRepository } from "../../src/infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { MockNodeCatalogProvider } from "../../src/infrastructure/mocks/catalog/MockNodeCatalogProvider";
 import { CompositeNodeCatalogProvider } from "../../src/application/nodes/CompositeNodeCatalogProvider";
@@ -38,7 +38,7 @@ import type { IInstalledModelCatalog } from "../../application/ports/interfaces/
 import type { IManagedModelLibrary } from "../../application/ports/interfaces/IManagedModelLibrary";
 import { RuntimeEventBuffer } from "../../application/runtime/RuntimeEventBuffer";
 import { HttpPythonRuntimeClient } from "../../src/infrastructure/python/client/HttpPythonRuntimeClient";
-import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
+import { PythonRuntimeConfig } from "../../src/infrastructure/config/PythonRuntimeConfig";
 import { NodeProcessRuntimeEventSink } from "../../src/infrastructure/python/runtime/NodeProcessRuntimeEventSink";
 import { createPythonManagedService } from "../../src/infrastructure/python/runtime/createPythonManagedService";
 import { RuntimeConsoleStore } from "../state/RuntimeConsoleStore";

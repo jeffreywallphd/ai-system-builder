@@ -13,7 +13,7 @@ import {
   type IdentityOperationError,
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
 import { type IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
 

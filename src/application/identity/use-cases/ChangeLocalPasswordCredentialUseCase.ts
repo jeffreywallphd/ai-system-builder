@@ -25,11 +25,11 @@ import {
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
 import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
-import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
-import type { IIdentityCredentialResetVerifier } from "../../../../application/identity/ports/IIdentityCredentialResetVerifier";
-import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import type { IIdentityClock } from "../ports/IIdentityClock";
+import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
+import type { IIdentityCredentialResetVerifier } from "../ports/IIdentityCredentialResetVerifier";
+import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";

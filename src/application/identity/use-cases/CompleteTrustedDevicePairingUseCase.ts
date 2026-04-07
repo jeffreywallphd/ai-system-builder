@@ -2,7 +2,7 @@ import type {
   TrustedDevicePairingCompletionRequest,
   TrustedDevicePairingCompletionResponse,
 } from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ITrustedDevicePairingService } from "../../../../application/identity/ports/ITrustedDevicePairingService";
+import type { ITrustedDevicePairingService } from "../ports/ITrustedDevicePairingService";
 
 interface CompleteTrustedDevicePairingUseCaseDependencies {
   readonly pairingService: Pick<ITrustedDevicePairingService, "completePairing">;

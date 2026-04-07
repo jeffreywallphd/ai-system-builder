@@ -18,8 +18,8 @@ import {
   type IdentityOperationError,
   type IdentityOperationResult,
 } from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
+import type { IIdentityClock } from "../ports/IIdentityClock";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
 import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";

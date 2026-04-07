@@ -1,9 +1,9 @@
-import { EnvironmentConfig } from "../../../infrastructure/config/EnvironmentConfig";
-import { EnvironmentConfigProvider } from "../../../infrastructure/config/EnvironmentConfigProvider";
+import { EnvironmentConfig } from "../config/EnvironmentConfig";
+import { EnvironmentConfigProvider } from "../config/EnvironmentConfigProvider";
 import { HttpPythonRuntimeClient } from "../python/client/HttpPythonRuntimeClient";
 import { createRuntimeDependencyOrchestrator } from "../runtime/RuntimeDependencyComposition";
-import { McpRuntimeConfig } from "../../../infrastructure/config/McpRuntimeConfig";
-import { PythonRuntimeConfig } from "../../../infrastructure/config/PythonRuntimeConfig";
+import { McpRuntimeConfig } from "../config/McpRuntimeConfig";
+import { PythonRuntimeConfig } from "../config/PythonRuntimeConfig";
 import { LocalFileStorage } from "../filesystem/LocalFileStorage";
 import { LocalAssetRepository } from "../filesystem/LocalAssetRepository";
 import { LocalModelRepository } from "../filesystem/LocalModelRepository";

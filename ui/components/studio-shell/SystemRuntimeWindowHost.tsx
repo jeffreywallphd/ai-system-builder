@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import type { StudioShellSnapshotReadModel } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellSnapshotReadModel } from "../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import {
   parseSystemRuntimeWindowLaunchContract,
   SystemRuntimeWindowLaunchQueryParam,
