@@ -22,6 +22,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-reservation-aware-node-arbitration-and-placement-holds.md`
 - `docs/architecture/run-orchestration-scheduling-deterministic-candidate-arbitration.md`
 - `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
+- `docs/architecture/run-orchestration-scheduling-node-availability-and-eligibility-refresh.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`

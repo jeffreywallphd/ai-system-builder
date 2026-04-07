@@ -231,6 +231,61 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     expect(noEligible.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
   });
 
+  it("propagates node unschedulable reason codes from scheduling input into candidate denials", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:stale-node",
+    });
+    const bundle = await useCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: Object.freeze([Object.freeze({
+        runId: "run:stale-node",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T19:59:20.000Z",
+        eligibleAt: "2026-04-07T19:59:20.000Z",
+        claimToken: "claim:stale-node",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T20:01:00.000Z",
+      })]),
+      runs: Object.freeze([Object.freeze({
+        runId: "run:stale-node",
+        workspaceId: "workspace:1",
+        submittedByUserIdentityId: "user:owner",
+        workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.owner]),
+        requirements: Object.freeze({
+          requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          requiresRemoteScheduling: true,
+        }),
+        queue: Object.freeze({
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:59:20.000Z",
+          eligibleAt: "2026-04-07T19:59:20.000Z",
+          claimToken: "claim:stale-node",
+          claimOwner: "scheduler:alpha",
+        }),
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        nodeId: "node:stale",
+        nodeType: NodeTypes.compute,
+        schedulable: false,
+        unschedulableReason: Object.freeze({
+          code: SchedulingCandidateDenialCodes.nodeStateStale,
+          message: "Node heartbeat is stale for scheduler placement.",
+        }),
+        supportsRemoteScheduling: true,
+        enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+        usageMode: SchedulingNodeUsageModes.idle,
+      })]),
+    }));
+
+    expect(bundle.decision.outcome).toBe("no-placement");
+    expect(bundle.decision.evaluatedCandidates).toHaveLength(1);
+    expect(bundle.decision.evaluatedCandidates[0]?.eligible).toBeFalse();
+    expect(bundle.decision.evaluatedCandidates[0]?.denialReasons[0]?.code).toBe(
+      SchedulingCandidateDenialCodes.nodeStateStale,
+    );
+  });
+
   it("uses deterministic fallback ordering for non-privileged queues when role priority ties", async () => {
     const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
       now: () => new Date("2026-04-07T20:00:01.000Z"),
