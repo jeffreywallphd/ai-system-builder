@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { HttpRuntimeControlClient } from "../RuntimeControlClient";
 
 describe("HttpRuntimeControlClient", () => {
-  it("calls authoritative runtime mutation routes with shared payload contracts", async () => {
+  it("calls authoritative runtime read and mutation routes with shared payload contracts", async () => {
     const requests: Array<{ method: string; url: string; authorization?: string; body?: string }> = [];
     (globalThis as typeof globalThis & {
       fetch: (input: string, init?: RequestInit) => Promise<Response>;
@@ -27,6 +27,98 @@ describe("HttpRuntimeControlClient", () => {
               mutationId: "runtime-cancel:execution-1:idempotency-1",
               occurredAt: "2026-04-07T12:00:00.000Z",
             },
+          },
+        }));
+      }
+      if (url.includes("/status")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          data: {
+            executionId: "execution-1",
+            status: "running",
+            rootAssetId: "system:demo",
+            rootVersionId: "system:demo:v1",
+            startedAt: "2026-04-07T12:00:00.000Z",
+            updatedAt: "2026-04-07T12:00:01.000Z",
+            progress: {
+              totalNodeCount: 2,
+              completedNodeCount: 1,
+              failedNodeCount: 0,
+              runningNodeCount: 1,
+              updatedAt: "2026-04-07T12:00:01.000Z",
+            },
+            executedVersionMap: {
+              rootVersionId: "system:demo:v1",
+              nodeVersionIds: {},
+            },
+            nestedExecutionLineage: [],
+          },
+        }));
+      }
+      if (url.includes("/result")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          data: {
+            executionId: "execution-1",
+            status: "running",
+            rootAssetId: "system:demo",
+            rootVersionId: "system:demo:v1",
+            diagnostics: [],
+            outputSummary: {
+              hasOutput: false,
+              hasError: false,
+              outputFieldCount: 0,
+              contractOutputIds: [],
+            },
+            bounded: {
+              nodeResultsTruncated: false,
+              diagnosticsTruncated: false,
+            },
+            serialized: {
+              identity: {
+                executionId: "execution-1",
+                status: "running",
+                rootAssetId: "system:demo",
+                rootVersionId: "system:demo:v1",
+                startedAt: "2026-04-07T12:00:00.000Z",
+              },
+              summary: {
+                hasOutput: false,
+                hasError: false,
+                outputFieldCount: 0,
+                contractOutputIds: [],
+                diagnosticsCount: 0,
+                nodeResultCount: 0,
+                nestedSystemResultCount: 0,
+              },
+            },
+          },
+        }));
+      }
+      if (url.includes("/trace")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          data: {
+            executionId: "execution-1",
+            trace: {
+              events: [],
+              logs: [],
+            },
+          },
+        }));
+      }
+      if (url.includes("/runtime/queue?")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          data: {
+            items: [{
+              queueItemId: "runtime-queue:execution-1",
+              executionId: "execution-1",
+              systemId: "system:demo",
+              status: "queued",
+              enqueuedAt: "2026-04-07T12:00:00.000Z",
+            }],
+            totalCount: 1,
           },
         }));
       }
@@ -76,19 +168,49 @@ describe("HttpRuntimeControlClient", () => {
       reason: "cancel",
       idempotencyKey: "idempotency-1",
     }, "token-cancel");
+    await client.getRunStatus({
+      workspaceId: "workspace-alpha",
+      executionId: "execution-1",
+    }, "token-status");
+    await client.getRunResult({
+      workspaceId: "workspace-alpha",
+      executionId: "execution-1",
+      nodeResultLimit: 2,
+      diagnosticsLimit: 3,
+    }, "token-result");
+    await client.getRunTrace({
+      workspaceId: "workspace-alpha",
+      executionId: "execution-1",
+      eventLimit: 20,
+      logLimit: 25,
+    }, "token-trace");
+    await client.listQueueItems({
+      workspaceId: "workspace-alpha",
+      statuses: ["queued", "running"],
+      limit: 10,
+      offset: 5,
+    }, "token-queue");
     await client.dequeueQueueItem({
       workspaceId: "workspace-alpha",
       queueItemId: "runtime-queue:execution-1",
       idempotencyKey: "idempotency-2",
     }, "token-dequeue");
 
-    expect(requests.map((entry) => entry.method)).toEqual(["POST", "POST", "POST"]);
+    expect(requests.map((entry) => entry.method)).toEqual(["POST", "POST", "GET", "GET", "GET", "GET", "POST"]);
     expect(requests[0]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/start?workspaceId=workspace-alpha");
     expect(requests[1]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/cancel?workspaceId=workspace-alpha");
-    expect(requests[2]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue/runtime-queue%3Aexecution-1/dequeue?workspaceId=workspace-alpha");
+    expect(requests[2]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/status?workspaceId=workspace-alpha");
+    expect(requests[3]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/result?workspaceId=workspace-alpha&nodeResultLimit=2&diagnosticsLimit=3");
+    expect(requests[4]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/trace?workspaceId=workspace-alpha&eventLimit=20&logLimit=25");
+    expect(requests[5]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue?workspaceId=workspace-alpha&limit=10&offset=5&status=queued&status=running");
+    expect(requests[6]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue/runtime-queue%3Aexecution-1/dequeue?workspaceId=workspace-alpha");
     expect(requests[0]?.authorization).toBe("Bearer token-start");
     expect(requests[1]?.authorization).toBe("Bearer token-cancel");
-    expect(requests[2]?.authorization).toBe("Bearer token-dequeue");
+    expect(requests[2]?.authorization).toBe("Bearer token-status");
+    expect(requests[3]?.authorization).toBe("Bearer token-result");
+    expect(requests[4]?.authorization).toBe("Bearer token-trace");
+    expect(requests[5]?.authorization).toBe("Bearer token-queue");
+    expect(requests[6]?.authorization).toBe("Bearer token-dequeue");
   });
 });
 

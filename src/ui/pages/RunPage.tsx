@@ -10,12 +10,15 @@ import { useUiDependencies } from "../composition/AppProviders";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { RunContextKinds, RunInterfaceService } from "../routes/RunInterface";
 import { PersistedWorkflowEntryService, type PersistedWorkflowEntry } from "../routes/PersistedWorkflowEntryService";
+import { RuntimeOperationsService } from "../services/RuntimeOperationsService";
+import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 export default function RunPage(): JSX.Element {
   const location = useLocation();
   const { executionHistoryService } = useUiDependencies();
   const service = useMemo(() => new RunInterfaceService(), []);
   const persistedWorkflowEntryService = useMemo(() => new PersistedWorkflowEntryService(), []);
+  const runtimeOperationsService = useMemo(() => new RuntimeOperationsService(), []);
   const recommendationService = useMemo(() => new ContextualRecommendationService(), []);
   const recentAndFavoritesService = useMemo(() => new RecentAndFavoritesService(), []);
   const presentation = useMemo(() => service.resolvePresentation(location.search), [location.search, service]);
@@ -40,6 +43,18 @@ export default function RunPage(): JSX.Element {
   const [persistedWorkflows, setPersistedWorkflows] = useState<ReadonlyArray<PersistedWorkflowEntry>>([]);
   const [isPersistedWorkflowsLoading, setIsPersistedWorkflowsLoading] = useState(true);
   const [persistedWorkflowsError, setPersistedWorkflowsError] = useState<string | undefined>();
+  const [runtimeQueueItems, setRuntimeQueueItems] = useState<ReadonlyArray<RuntimeQueueItem>>([]);
+  const [runtimeQueueError, setRuntimeQueueError] = useState<string | undefined>();
+  const [isRuntimeQueueLoading, setIsRuntimeQueueLoading] = useState(false);
+  const [runtimeExecutionId, setRuntimeExecutionId] = useState("");
+  const [runtimeExecutionState, setRuntimeExecutionState] = useState<{
+    readonly status?: string;
+    readonly progressLabel?: string;
+    readonly diagnosticsCount?: number;
+    readonly traceEventCount?: number;
+    readonly traceLogCount?: number;
+  }>();
+  const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
 
   useEffect(() => {
     recentAndFavoritesService.recordRecentRunContext({ request: presentation.request, launchPath: presentation.launchPath });
@@ -83,6 +98,54 @@ export default function RunPage(): JSX.Element {
       active = false;
     };
   }, [persistedWorkflowEntryService]);
+
+  const refreshRuntimeQueue = (): Promise<void> => {
+    setIsRuntimeQueueLoading(true);
+    return runtimeOperationsService.listQueueItems({ limit: 20, statuses: ["queued", "running"] }).then((response) => {
+      if (!response.ok || !response.data) {
+        setRuntimeQueueItems([]);
+        setRuntimeQueueError(response.error?.message ?? "Failed to load runtime queue.");
+        return;
+      }
+      setRuntimeQueueItems(response.data.items);
+      setRuntimeQueueError(undefined);
+    }).finally(() => {
+      setIsRuntimeQueueLoading(false);
+    });
+  };
+
+  useEffect(() => {
+    void refreshRuntimeQueue();
+  }, [runtimeOperationsService]);
+
+  const inspectRuntimeExecution = async (executionId: string): Promise<void> => {
+    const normalizedExecutionId = executionId.trim();
+    if (!normalizedExecutionId) {
+      setRuntimeExecutionError("Execution id is required.");
+      setRuntimeExecutionState(undefined);
+      return;
+    }
+
+    const [status, result, trace] = await Promise.all([
+      runtimeOperationsService.getRunStatus(normalizedExecutionId),
+      runtimeOperationsService.getRunResult({ executionId: normalizedExecutionId, diagnosticsLimit: 20 }),
+      runtimeOperationsService.getRunTrace({ executionId: normalizedExecutionId, eventLimit: 20, logLimit: 20 }),
+    ]);
+    if (!status.ok || !status.data) {
+      setRuntimeExecutionState(undefined);
+      setRuntimeExecutionError(status.error?.message ?? "Failed to load runtime status.");
+      return;
+    }
+
+    setRuntimeExecutionState(Object.freeze({
+      status: status.data.status,
+      progressLabel: `${status.data.progress.completedNodeCount}/${status.data.progress.totalNodeCount} nodes`,
+      diagnosticsCount: result.ok ? result.data?.diagnostics.length : undefined,
+      traceEventCount: trace.ok ? trace.data?.trace.events.length : undefined,
+      traceLogCount: trace.ok ? trace.data?.trace.logs.length : undefined,
+    }));
+    setRuntimeExecutionError(undefined);
+  };
 
   return (
     <section className="ui-page ui-stack ui-stack--md" data-testid="run-page">
@@ -157,6 +220,110 @@ export default function RunPage(): JSX.Element {
               ))}
             </div>
           ) : null}
+        </div>
+      </div>
+
+      <div className="ui-card" data-testid="run-runtime-operations-panel">
+        <div className="ui-card__body ui-stack ui-stack--sm">
+          <h2>Runtime queue and run monitoring</h2>
+          <p className="ui-text-secondary">Desktop operational run visibility and control routed through authoritative runtime APIs.</p>
+          <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
+            <button className="ui-button ui-button--ghost ui-button--small" onClick={() => void refreshRuntimeQueue()}>
+              {isRuntimeQueueLoading ? "Refreshing queue..." : "Refresh queue"}
+            </button>
+          </div>
+          {runtimeQueueError ? <p role="alert">{runtimeQueueError}</p> : null}
+          {runtimeQueueItems.length === 0 ? (
+            <p className="ui-text-secondary">No queued or running executions are visible for this workspace.</p>
+          ) : (
+            <div className="ui-stack ui-stack--xs" data-testid="run-runtime-queue-list">
+              {runtimeQueueItems.map((item) => (
+                <article key={item.queueItemId} className="ui-card ui-card--interactive">
+                  <div className="ui-card__body ui-stack ui-stack--2xs">
+                    <div className="ui-row ui-row--between ui-row--wrap">
+                      <strong>{item.executionId}</strong>
+                      <span className="ui-badge ui-badge--neutral">{item.status}</span>
+                    </div>
+                    <p className="ui-text-small ui-text-secondary">{item.queueItemId}</p>
+                    <p className="ui-text-small ui-text-secondary">System: {item.systemId}</p>
+                    <div className="ui-row ui-row--wrap">
+                      <button
+                        className="ui-button ui-button--ghost ui-button--small"
+                        onClick={() => {
+                          setRuntimeExecutionId(item.executionId);
+                          void inspectRuntimeExecution(item.executionId);
+                        }}
+                      >
+                        Inspect run
+                      </button>
+                      <button
+                        className="ui-button ui-button--ghost ui-button--small"
+                        onClick={() => {
+                          void runtimeOperationsService.cancelRun({
+                            executionId: item.executionId,
+                            reason: "User cancelled from desktop operational panel.",
+                          }).then((response) => {
+                            if (!response.ok) {
+                              setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
+                              return;
+                            }
+                            return refreshRuntimeQueue();
+                          });
+                        }}
+                      >
+                        Cancel run
+                      </button>
+                      <button
+                        className="ui-button ui-button--ghost ui-button--small"
+                        onClick={() => {
+                          void runtimeOperationsService.dequeueQueueItem({
+                            queueItemId: item.queueItemId,
+                            reason: "User dequeued from desktop operational panel.",
+                          }).then((response) => {
+                            if (!response.ok) {
+                              setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
+                              return;
+                            }
+                            return refreshRuntimeQueue();
+                          });
+                        }}
+                      >
+                        Dequeue
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+          <div className="ui-stack ui-stack--xs">
+            <label className="ui-field">
+              <span className="ui-field__label">Execution id</span>
+              <input
+                className="ui-input"
+                value={runtimeExecutionId}
+                onChange={(event) => setRuntimeExecutionId(event.target.value)}
+                placeholder="execution-id"
+              />
+            </label>
+            <div className="ui-row ui-row--wrap">
+              <button
+                className="ui-button ui-button--secondary ui-button--small"
+                onClick={() => void inspectRuntimeExecution(runtimeExecutionId)}
+              >
+                Inspect execution
+              </button>
+            </div>
+            {runtimeExecutionError ? <p role="alert">{runtimeExecutionError}</p> : null}
+            {runtimeExecutionState ? (
+              <div className="ui-stack ui-stack--2xs ui-text-small">
+                <span>Status: {runtimeExecutionState.status}</span>
+                <span>Progress: {runtimeExecutionState.progressLabel}</span>
+                <span>Diagnostics: {runtimeExecutionState.diagnosticsCount ?? "-"}</span>
+                <span>Trace events/logs: {runtimeExecutionState.traceEventCount ?? "-"} / {runtimeExecutionState.traceLogCount ?? "-"}</span>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
