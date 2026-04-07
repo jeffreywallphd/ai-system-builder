@@ -129,6 +129,58 @@ describe("AuthoritativeAuditRecordingService", () => {
     expect(event?.payload.redactionReasons).toContain("token");
   });
 
+  it("normalizes actor/workspace/resource/correlation references and action context", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const service = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-07T16:12:00.000Z"),
+      idGenerator: () => "event-2b",
+    });
+
+    await service.recordSchedulingEvent(buildInput({
+      operationKey: "scheduling:dispatch:1",
+      eventType: "scheduling-dispatch-attempted",
+      action: "scheduling.dispatch.attempted",
+      actor: {
+        actorId: " service:runtime-dispatch ",
+        actorKind: AuditActorKinds.service,
+      },
+      scope: {
+        kind: AuditScopeKinds.workspace,
+        workspaceId: " workspace/prod-west ",
+      },
+      protectedResource: {
+        resourceType: " Runtime Queue ",
+        resourceId: " C:\\runtime\\queues\\primary ",
+        resourceRef: "sqlite://internal/queue_row_1",
+        sensitivityClass: "sensitive",
+      },
+      correlationId: " corr/runtime/dispatch-1 ",
+      requestId: " req/runtime/dispatch-1 ",
+      actionContext: {
+        nodeId: " node/gpu-west-1 ",
+        deviceId: " workstation/ci-runner-1 ",
+      },
+    }));
+
+    const event = repository.events[0];
+    expect(event).toBeDefined();
+    expect(event?.actor.actorId).toBe("service:runtime-dispatch");
+    expect(event?.actor.actorServiceId).toBe("service:runtime-dispatch");
+    expect(event?.scope.workspaceId).toBe("workspace:prod-west");
+    expect(event?.protectedResource?.resourceType).toBe("runtime-queue");
+    expect(event?.protectedResource?.resourceRef).toBe("runtime-queue:C:runtime:queues:primary");
+    expect(event?.protectedResource?.resourceRef).not.toContain("sqlite://internal/queue_row_1");
+    expect(event?.correlationId).toBe("corr:runtime:dispatch-1");
+    expect(event?.requestId).toBe("req:runtime:dispatch-1");
+    expect(
+      (event?.payload.userSafeDetails?.referenceContext as Record<string, unknown>)?.nodeRef,
+    ).toBe("node:gpu-west-1");
+    expect(
+      (event?.payload.userSafeDetails?.referenceContext as Record<string, unknown>)?.deviceRef,
+    ).toBe("device:workstation:ci-runner-1");
+  });
+
   it("exposes feature-scoped recorder helpers for cross-feature emission", async () => {
     const repository = new InMemoryAuditLedgerRepository();
     const service = new AuthoritativeAuditRecordingService({

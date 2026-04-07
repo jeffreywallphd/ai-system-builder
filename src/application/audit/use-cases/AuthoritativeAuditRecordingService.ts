@@ -18,6 +18,11 @@ import {
   type AuthoritativeAuditRecordingServiceDependencies,
   type AuthoritativeAuditStructuredPayload,
 } from "../ports/AuthoritativeAuditRecordingPorts";
+import {
+  AuditReferenceContextPayloadKey,
+  type NormalizedAuthoritativeAuditActionContext,
+  normalizeAuthoritativeAuditReferences,
+} from "../shared/AuditReferenceNormalization";
 
 const SensitiveAuditDetailKeyPattern = /(secret|token|password|credential|private[-_]?key|public[-_]?key|trust[-_]?material|attestation|pem|csr|raw|body|payload|content|bytes|blob|path|uri|url|connection[-_]?string|database[-_]?url|access[-_]?key|api[-_]?key|authorization)/i;
 const PersonalDataAuditDetailKeyPattern = /(email|phone|ssn|address|first[-_]?name|last[-_]?name|personal|pii|birth|dob)/i;
@@ -83,6 +88,14 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
     const operationKey = normalizeRequired(input.operationKey, "operationKey").toLowerCase();
     const action = normalizeRequired(input.action, "action").toLowerCase();
     this.assertActionPrefixForSource(source, action);
+    const normalizedReferences = normalizeAuthoritativeAuditReferences({
+      actor: input.actor,
+      scope: input.scope,
+      protectedResource: input.protectedResource,
+      correlationId: input.correlationId,
+      requestId: input.requestId,
+      actionContext: input.actionContext,
+    });
 
     const event = createCanonicalAuditEvent({
       eventId: `audit:${source}:${this.idGenerator()}`,
@@ -92,10 +105,10 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       outcome: input.outcome,
       occurredAt: input.occurredAt,
       recordedAt: this.now().toISOString(),
-      actor: input.actor,
-      scope: input.scope,
-      protectedResource: input.protectedResource,
-      payload: this.sanitizeStructuredPayload(input.payload),
+      actor: normalizedReferences.actor,
+      scope: normalizedReferences.scope,
+      protectedResource: normalizedReferences.protectedResource,
+      payload: this.sanitizeStructuredPayload(input.payload, normalizedReferences.actionContext),
       integrity: {
         schemaVersion: input.integrity?.schemaVersion?.trim() || "1.0",
         hashAlgorithm: input.integrity?.hashAlgorithm?.trim() || "sha-256",
@@ -104,8 +117,8 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
       },
       retention: input.retention,
       immutability: input.immutability,
-      correlationId: input.correlationId,
-      requestId: input.requestId,
+      correlationId: normalizedReferences.correlationId,
+      requestId: normalizedReferences.requestId,
     });
 
     return this.dependencies.repository.appendAuditEvent(event, {
@@ -127,10 +140,20 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
     );
   }
 
-  private sanitizeStructuredPayload(payload: AuthoritativeAuditStructuredPayload | undefined): SanitizedBoundaryPayload {
+  private sanitizeStructuredPayload(
+    payload: AuthoritativeAuditStructuredPayload | undefined,
+    actionContext: NormalizedAuthoritativeAuditActionContext | undefined,
+  ): SanitizedBoundaryPayload {
+    const userSafeDetailsInput = actionContext
+      ? {
+        ...(payload?.userSafeDetails ?? {}),
+        [AuditReferenceContextPayloadKey]: actionContext,
+      }
+      : payload?.userSafeDetails;
+
     const providedReasons = new Set<RedactionReason>(payload?.redactionReasons ?? []);
 
-    const userSafeResult = sanitizeAuditRecord(payload?.userSafeDetails, providedReasons);
+    const userSafeResult = sanitizeAuditRecord(userSafeDetailsInput, providedReasons);
     const adminOnlyResult = sanitizeAuditRecord(payload?.adminOnlyDetails, providedReasons);
 
     if (adminOnlyResult.sawAnyValue) {

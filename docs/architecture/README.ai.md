@@ -127,6 +127,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Workspace administration audit-hook architecture seam: `docs/architecture/workspace-administration-audit-hooks.md`
 - Canonical audit domain model/event taxonomy/invariants and audit-vs-operational boundary guidance: `docs/architecture/audit-domain-foundation.md`
 - Canonical shared audit event envelopes, category payload contracts, redacted summary/detail views, and schema-backed query/write validation: `docs/architecture/audit-shared-event-contracts.md`
+- Shared actor/workspace/resource/session/device/node reference normalization and authoritative recording integration: `docs/architecture/audit-reference-normalization-layer.md`
 - Cross-domain authoritative aggregate boundaries and repository target baseline for Feature 13: `docs/architecture/persistent-platform-domain-boundaries.md`
 - Contributor extension rules and integration-regression expectations for Feature 13 persistent platform services: `docs/architecture/persistent-platform-service-extension-guidance.md`
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`

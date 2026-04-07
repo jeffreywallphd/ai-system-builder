@@ -8,6 +8,7 @@ import type {
   AuditRetentionPosture,
   AuditScope,
 } from "@domain/audit/AuditDomain";
+import type { AuthoritativeAuditActionContextInput } from "../shared/AuditReferenceNormalization";
 import type {
   AuditLedgerAppendResult,
   IAuditLedgerRepository,
@@ -55,6 +56,7 @@ export interface AuthoritativeAuditRecordEventInput {
   }>;
   readonly correlationId?: string;
   readonly requestId?: string;
+  readonly actionContext?: AuthoritativeAuditActionContextInput;
 }
 
 export interface AuthoritativeAuditRecordingPort {
