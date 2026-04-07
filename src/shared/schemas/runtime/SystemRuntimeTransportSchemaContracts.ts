@@ -42,6 +42,7 @@ export const RuntimeStartRunRequestSchema = z.object({
 }).strict();
 
 export const RuntimeQueueListRequestSchema = z.object({
+  workspaceId: IdentifierSchema,
   systemId: IdentifierSchema.optional(),
   tenantId: IdentifierSchema.optional(),
   statuses: z.array(QueueItemStatusSchema).optional(),

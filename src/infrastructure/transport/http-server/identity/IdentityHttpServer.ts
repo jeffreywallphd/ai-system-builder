@@ -19,6 +19,7 @@ import type { StorageManagementBackendApi } from "../../../api/storage/StorageMa
 import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
+import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
   IdentityAuthApiErrorCodes,
@@ -113,6 +114,7 @@ import {
   type RegisterGeneratedOutputApiRequest,
   type ResolveAssetPreviewApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
+import { RuntimeQueueItemStatuses } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
@@ -823,6 +825,7 @@ export interface IdentityHttpServerOptions {
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
+  readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -4256,6 +4259,210 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               uploadSessionId: parsedRequest.uploadSessionId,
               contentType: parsedRequest.contentType,
             }, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/status")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/status");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionStatus(executionId, requestContext);
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/result")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/result");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const nodeResultLimit = parseOptionalInteger(searchParams.get("nodeResultLimit"));
+            const diagnosticsLimit = parseOptionalInteger(searchParams.get("diagnosticsLimit"));
+            if ((searchParams.get("nodeResultLimit") && nodeResultLimit === undefined)
+              || (searchParams.get("diagnosticsLimit") && diagnosticsLimit === undefined)) {
+              const invalid = buildRuntimeInvalidRequestResponse("nodeResultLimit and diagnosticsLimit must be integers.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), invalid);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionResultBounded({
+              executionId,
+              nodeResultLimit,
+              diagnosticsLimit,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              nodeResultLimit,
+              diagnosticsLimit,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/trace")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const executionId = decodePathTail(path, "/api/v1/runtime/runs/", "/trace");
+            if (!executionId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and executionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const eventLimit = parseOptionalInteger(searchParams.get("eventLimit"));
+            const logLimit = parseOptionalInteger(searchParams.get("logLimit"));
+            if ((searchParams.get("eventLimit") && eventLimit === undefined)
+              || (searchParams.get("logLimit") && logLimit === undefined)) {
+              const invalid = buildRuntimeInvalidRequestResponse("eventLimit and logLimit must be integers.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                executionId,
+                workspaceId: context.workspace.workspaceId,
+              }), invalid);
+              return;
+            }
+
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.getExecutionTrace({
+              executionId,
+              eventLimit,
+              logLimit,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              executionId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              eventLimit,
+              logLimit,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.systemRuntimeBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/runtime/queue"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateRuntimeQueueListRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+            const requestContext = buildRuntimeApiRequestContext(context);
+            const apiResponse = await options.systemRuntimeBackendApi.listQueueItems({
+              ...parsedRequest.data,
+              requestContext,
+            });
+            const statusCode = mapSystemRuntimeStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
           },
         );
         return;
@@ -7917,6 +8124,61 @@ function parseAndValidateAssetListRequest(
   };
 }
 
+function parseAndValidateRuntimeQueueListRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: {
+      readonly workspaceId: string;
+      readonly systemId?: string;
+      readonly statuses?: ReadonlyArray<typeof RuntimeQueueItemStatuses[keyof typeof RuntimeQueueItemStatuses]>;
+      readonly limit?: number;
+      readonly offset?: number;
+    };
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const statuses = parseOptionalMultiEnumList(
+    input.searchParams,
+    "status",
+    "statuses",
+    [
+      RuntimeQueueItemStatuses.queued,
+      RuntimeQueueItemStatuses.running,
+      RuntimeQueueItemStatuses.completed,
+      RuntimeQueueItemStatuses.failed,
+      RuntimeQueueItemStatuses.cancelled,
+    ] as const,
+  );
+  if (!statuses.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("status values are invalid."),
+    };
+  }
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      workspaceId: input.workspaceId,
+      systemId: normalizeOptionalString(input.searchParams.get("systemId")),
+      statuses: statuses.value,
+      limit: pagination.limit,
+      offset: pagination.offset,
+    }),
+  };
+}
+
 function parseAndValidateAssetPreviewRequest(
   actorUserIdentityId: string,
   workspaceId: string,
@@ -8318,6 +8580,29 @@ function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unkno
   }
 }
 
+function mapSystemRuntimeStatusCode(response: { readonly ok: boolean; readonly error?: { readonly code?: string } }): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case "invalid-request":
+      return 400;
+    case "unauthorized":
+      return 401;
+    case "forbidden":
+      return 403;
+    case "not-found":
+      return 404;
+    case "quota-exceeded":
+      return 429;
+    case "rate-limit-exceeded":
+      return 429;
+    default:
+      return 500;
+  }
+}
+
 function resolveRouteBackendAvailability(
   options: IdentityHttpServerOptions,
 ): Readonly<Record<AuthoritativeApiRouteBackendKey, boolean>> {
@@ -8331,6 +8616,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
     [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(options.assetManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
   });
 }
 
@@ -8459,6 +8745,27 @@ function parseSharedListPaginationFromQuery(
       }),
     };
   }
+}
+
+function buildRuntimeApiRequestContext(context: AuthenticatedWorkspaceRequestContext) {
+  return Object.freeze({
+    trustedInternal: true,
+    trustedInternalAuthorization: Object.freeze({
+      actorMode: "propagate-caller" as const,
+      systemActionId: "identity-http-authoritative-runtime-read",
+    }),
+    accessContext: Object.freeze({
+      callerKind: "user" as const,
+      callerId: context.actor.userIdentityId,
+      sessionId: context.session.sessionId,
+      metadata: Object.freeze({
+        workspaceId: context.workspace.workspaceId,
+        activeWorkspaceId: context.workspace.workspaceId,
+        authenticatedAt: context.session.issuedAt,
+        accessChannel: context.session.accessChannel,
+      }),
+    }),
+  });
 }
 
 function buildAdminContext(actorUserIdentityId: string): ListIdentityAdminAccountsApiRequest["context"] {
@@ -8693,6 +9000,22 @@ function buildAssetManagementInvalidRequestResponse(message: string): AssetManag
       code: AssetManagementApiErrorCodes.invalidRequest,
       message,
     },
+  });
+}
+
+function buildRuntimeInvalidRequestResponse(message: string): {
+  readonly ok: false;
+  readonly error: {
+    readonly code: "invalid-request";
+    readonly message: string;
+  };
+} {
+  return Object.freeze({
+    ok: false,
+    error: Object.freeze({
+      code: "invalid-request" as const,
+      message,
+    }),
   });
 }
 

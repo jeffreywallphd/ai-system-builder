@@ -34,6 +34,7 @@ export function composeAuthoritativeServerApiRouteRegistrationPlan(): Authoritat
       [AuthoritativeApiRouteBackendKeys.secretMetadata]: true,
       [AuthoritativeApiRouteBackendKeys.storageManagement]: true,
       [AuthoritativeApiRouteBackendKeys.assetManagement]: true,
+      [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
     }),
   });
 }

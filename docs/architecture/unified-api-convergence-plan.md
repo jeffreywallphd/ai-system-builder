@@ -79,6 +79,7 @@ These can remain implementation details as long as protected business actions fl
 - Inventory and plan are documented in architecture docs and tied to concrete source entry points.
 - Each target API domain has an identified shared contract home (existing or proposed path under `src/shared/contracts` or `src/shared/schemas`).
 - Violating raw/direct access pathways are explicitly enumerated for migration.
+- Authoritative runtime read/list endpoints now include protected run status/result/trace reads and workspace-scoped queue listing (`/api/v1/runtime/runs/*`, `/api/v1/runtime/queue`).
 
 ## Follow-on governance docs
 

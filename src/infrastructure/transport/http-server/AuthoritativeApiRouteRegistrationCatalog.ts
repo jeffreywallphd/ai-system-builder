@@ -12,6 +12,7 @@ import {
   SecuritySecretMetadataAuthoritativeApiRouteFamily,
 } from "./authoritative-route-families/SecurityAuthoritativeApiRoutes";
 import { StorageManagementAuthoritativeApiRouteFamily } from "./authoritative-route-families/StorageAuthoritativeApiRoutes";
+import { RuntimeAuthoritativeApiRouteFamily } from "./authoritative-route-families/RuntimeAuthoritativeApiRoutes";
 import {
   WorkspaceAdministrationAuthoritativeApiRouteFamily,
   WorkspaceInvitationAuthoritativeApiRouteFamily,
@@ -29,6 +30,7 @@ const RouteFamilies = Object.freeze<ReadonlyArray<AuthoritativeApiRouteFamilyReg
   SecuritySecretMetadataAuthoritativeApiRouteFamily,
   StorageManagementAuthoritativeApiRouteFamily,
   AssetManagementAuthoritativeApiRouteFamily,
+  RuntimeAuthoritativeApiRouteFamily,
 ]);
 
 export function composeAuthoritativeApiRouteRegistrationPlan(input: {

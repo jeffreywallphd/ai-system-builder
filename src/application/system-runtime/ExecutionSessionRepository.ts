@@ -4,6 +4,7 @@ export interface ExecutionSessionRepository {
   save(session: ExecutionSession): ExecutionSession;
   getById(sessionId: string): ExecutionSession | undefined;
   getByExecutionId(executionId: string): ExecutionSession | undefined;
+  list(): ReadonlyArray<ExecutionSession>;
 }
 
 export class InMemoryExecutionSessionRepository implements ExecutionSessionRepository {
@@ -33,6 +34,10 @@ export class InMemoryExecutionSessionRepository implements ExecutionSessionRepos
     }
     const sessionId = this.sessionIdByExecutionId.get(normalized);
     return sessionId ? this.sessions.get(sessionId) : undefined;
+  }
+
+  public list(): ReadonlyArray<ExecutionSession> {
+    return Object.freeze([...this.sessions.values()]);
   }
 }
 
