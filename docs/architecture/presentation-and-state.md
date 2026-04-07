@@ -1062,3 +1062,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Shared shell primitives and responsive region containers now live in src/ui/shared/components/shell/SurfaceShellPrimitives.tsx and are documented in docs/architecture/multi-surface-ui-shell-primitives.md.
 - Desktop and thin-client assembly wrappers now live in src/ui/desktop/shell/DesktopAdminSurfaceFrame.tsx and src/ui/web/shell/ThinClientOperationalSurfaceFrame.tsx so production pages can share layout vocabulary without duplicating host-neutral shell logic.
 
+## Multi-surface presentation-state update (story 15.1.4)
+
+- Shared presentation-state primitives now live in `src/ui/shared/components/presentation-state/`.
+- Shared state boundaries now provide canonical handling for `loading`, `empty`, `not-found`, `disconnected`, `error`, and `permission-denied` via `SurfaceStateBoundary` and `SurfaceStatePanel`.
+- API error normalization for these states is centralized via `toSurfacePresentationStateFromApiError`, aligned to shared API error semantics (`sharedCode`/`domainCode`) so converged screens do not duplicate error-to-UI mapping logic.
+- Foundational converged admin pages (`NodeInventoryPage`, `StorageAdministrationPage`) now consume these shared state seams for list/detail loading and error rendering.
+

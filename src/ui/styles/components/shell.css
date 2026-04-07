@@ -144,6 +144,34 @@
   gap: var(--space-sm);
 }
 
+.ui-surface-state {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ui-surface-state__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.ui-surface-state__message {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.ui-surface-state__details {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.ui-surface-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 @media (max-width: 1200px) {
   .ui-shell--desktop .ui-shell-regions {
     grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1fr);

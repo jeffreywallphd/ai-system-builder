@@ -57,3 +57,10 @@ Responsive layout is explicit in `shell.css`:
 - `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
 - `src/ui/desktop/shell/tests/DesktopAdminSurfaceFrame.test.tsx`
 - `src/ui/web/shell/tests/ThinClientOperationalSurfaceFrame.test.tsx`
+
+## Story 15.1.4 update
+
+- Shared presentation-state primitives now live in `src/ui/shared/components/presentation-state/*` and are re-exported from `src/ui/shared/components/shell/index.ts`.
+- Canonical states now include `loading`, `empty`, `not-found`, `disconnected`, `error`, and `permission-denied`.
+- Shared state boundaries (`SurfaceStateBoundary`) and panels (`SurfaceStatePanel`) are the preferred page-level rendering pattern for converged admin/operational list/detail surfaces.
+- API error mapping now aligns with shared envelope semantics through `toSurfacePresentationStateFromApiError`, including `forbidden`/`authentication-failed` -> permission denied, `not-found` -> not-found, and transport/temporarily unavailable classes -> disconnected.

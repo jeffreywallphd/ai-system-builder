@@ -17,6 +17,15 @@ import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { StorageAdministrationService } from "../services/StorageAdministrationService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
+import {
+  SurfaceStatePanel,
+  SurfaceStateBoundary,
+  createEmptyState,
+  createLoadingState,
+  toDisconnectedState,
+  toSurfacePresentationStateFromApiError,
+  type SurfacePresentationState,
+} from "../shared/components/presentation-state";
 
 interface StorageAdministrationPageProps {
   readonly service?: StorageAdministrationService;
@@ -65,12 +74,13 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
   const [selectedHealth, setSelectedHealth] = useState<GetStorageInstanceHealthApiResponse>();
   const [insightsByStorageId, setInsightsByStorageId] = useState<Readonly<Record<string, StorageListInsight>>>({});
   const [isLoadingList, setIsLoadingList] = useState(false);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isRefreshingInsights, setIsRefreshingInsights] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string>();
-  const [detailErrorMessage, setDetailErrorMessage] = useState<string>();
-
-  const selectedSummary = items.find((item) => item.storageInstanceId === selectedStorageInstanceId);
+  const [listState, setListState] = useState<SurfacePresentationState | undefined>(
+    createLoadingState("Loading storage instances", "Loading managed storage instances from the authoritative API."),
+  );
+  const [detailState, setDetailState] = useState<SurfacePresentationState | undefined>(
+    createEmptyState("Select storage detail", "Select a storage instance to inspect detailed policy and health posture."),
+  );
 
   const loadSelectionDetail = async (
     nextStorageInstanceId: string,
@@ -80,8 +90,7 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
       return;
     }
 
-    setIsLoadingDetail(true);
-    setDetailErrorMessage(undefined);
+    setDetailState(createLoadingState("Loading storage detail", "Loading lifecycle, policy, and health detail."));
     const [detailResult, healthResult] = await Promise.allSettled([
       service.getStorageInstanceDetail({
         workspaceId: targetWorkspaceId,
@@ -94,24 +103,25 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
       }, sessionToken),
     ]);
 
-    try {
-      if (detailResult.status === "fulfilled" && detailResult.value.ok && detailResult.value.data) {
-        setSelectedDetail(detailResult.value.data.storage);
+    if (detailResult.status === "fulfilled" && detailResult.value.ok && detailResult.value.data) {
+      setSelectedDetail(detailResult.value.data.storage);
+      setDetailState(undefined);
+    } else {
+      setSelectedDetail(undefined);
+      if (detailResult.status === "fulfilled") {
+        setDetailState(toSurfacePresentationStateFromApiError(detailResult.value.error, {
+          fallbackTitle: "Unable to load storage detail",
+          fallbackMessage: "Storage detail is currently unavailable.",
+        }));
       } else {
-        setSelectedDetail(undefined);
-        const message = detailResult.status === "fulfilled"
-          ? detailResult.value.error?.message ?? "Unable to load storage instance detail."
-          : "Storage detail request failed.";
-        setDetailErrorMessage(message);
+        setDetailState(toDisconnectedState("Storage detail unavailable", "Unable to reach the storage service."));
       }
+    }
 
-      if (healthResult.status === "fulfilled" && healthResult.value.ok && healthResult.value.data) {
-        setSelectedHealth(healthResult.value.data);
-      } else {
-        setSelectedHealth(undefined);
-      }
-    } finally {
-      setIsLoadingDetail(false);
+    if (healthResult.status === "fulfilled" && healthResult.value.ok && healthResult.value.data) {
+      setSelectedHealth(healthResult.value.data);
+    } else {
+      setSelectedHealth(undefined);
     }
   };
 
@@ -181,18 +191,20 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
 
     const normalizedWorkspaceId = workspaceId.trim();
     if (!normalizedWorkspaceId) {
-      setErrorMessage("Workspace id is required.");
       setItems(Object.freeze([]));
       setSelectedStorageInstanceId(undefined);
       setSelectedDetail(undefined);
       setSelectedHealth(undefined);
       setInsightsByStorageId({});
+      setListState(createEmptyState("Workspace id required", "Enter a workspace id before loading storage instances."));
+      setDetailState(createEmptyState("Select storage detail", "Select a storage instance to inspect detailed policy and health posture."));
       return;
     }
 
     setIsLoadingList(true);
-    setErrorMessage(undefined);
-    setDetailErrorMessage(undefined);
+    if (items.length < 1) {
+      setListState(createLoadingState("Loading storage instances", "Loading managed storage instances from the authoritative API."));
+    }
 
     try {
       const response = await service.listStorageInstances({
@@ -208,11 +220,20 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
         setSelectedDetail(undefined);
         setSelectedHealth(undefined);
         setInsightsByStorageId({});
-        setErrorMessage(response.error?.message ?? "Unable to load managed storage instances.");
+        setListState(toSurfacePresentationStateFromApiError(response.error, {
+          fallbackTitle: "Unable to load storage instances",
+          fallbackMessage: "Managed storage inventory is currently unavailable.",
+        }));
+        setDetailState(createEmptyState("Select storage detail", "Select a storage instance to inspect detailed policy and health posture."));
         return;
       }
 
       setItems(response.data.items);
+      if (response.data.items.length < 1) {
+        setListState(createEmptyState("No storage instances found", "No storage instances matched the current query."));
+      } else {
+        setListState(undefined);
+      }
       const nextSelectedStorageInstanceId = preferredStorageInstanceId
         ?? (
           selectedStorageInstanceId && response.data.items.some((item) => item.storageInstanceId === selectedStorageInstanceId)
@@ -224,6 +245,7 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
       if (!nextSelectedStorageInstanceId) {
         setSelectedDetail(undefined);
         setSelectedHealth(undefined);
+        setDetailState(createEmptyState("Select storage detail", "Select a storage instance to inspect detailed policy and health posture."));
       } else {
         await loadSelectionDetail(nextSelectedStorageInstanceId, normalizedWorkspaceId);
       }
@@ -234,7 +256,8 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
       setSelectedDetail(undefined);
       setSelectedHealth(undefined);
       setInsightsByStorageId({});
-      setErrorMessage("Managed storage request failed.");
+      setListState(toDisconnectedState("Storage inventory unavailable", "Unable to reach the storage service."));
+      setDetailState(createEmptyState("Select storage detail", "Select a storage instance to inspect detailed policy and health posture."));
     } finally {
       setIsLoadingList(false);
     }
@@ -250,17 +273,14 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-storage-admin-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Managed storage administration</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated admin account before reviewing managed storage instances and policy posture.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Managed storage administration",
+            message: "Sign in with an authenticated admin account before reviewing managed storage instances and policy posture.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }
@@ -288,9 +308,6 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
           </button>
         </div>
       </div>
-
-      {errorMessage ? <p className="ui-storage-admin-page__alert ui-storage-admin-page__alert--error" role="alert">{errorMessage}</p> : null}
-      {detailErrorMessage ? <p className="ui-storage-admin-page__alert ui-storage-admin-page__alert--error" role="alert">{detailErrorMessage}</p> : null}
 
       <StorageInstanceWorkflowPanel
         workspaceId={workspaceId}
@@ -387,9 +404,7 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
             </p>
           </div>
           <div className="ui-card__body">
-            {isLoadingList && items.length === 0 ? <p className="ui-text-secondary">Loading managed storage instances...</p> : null}
-            {!isLoadingList && items.length === 0 ? <p className="ui-text-secondary">No storage instances matched the current query.</p> : null}
-            {items.length > 0 ? (
+            <SurfaceStateBoundary state={listState}>
               <div className="ui-table-wrapper">
                 <table className="ui-table">
                   <thead>
@@ -454,7 +469,7 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                   </tbody>
                 </table>
               </div>
-            ) : null}
+            </SurfaceStateBoundary>
           </div>
         </section>
 
@@ -464,9 +479,8 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
             <p className="ui-card__subtitle">Lifecycle, access posture, policy controls, and replication health for the selected instance.</p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--md">
-            {!selectedSummary ? <p className="ui-text-secondary">Select a storage instance to inspect detailed policy and health posture.</p> : null}
-            {isLoadingDetail ? <p className="ui-text-secondary">Loading storage detail...</p> : null}
-            {selectedDetail ? (
+            <SurfaceStateBoundary state={detailState}>
+              {selectedDetail ? (
               <>
                 <div className="ui-storage-admin-page__detail-grid">
                   <div>
@@ -610,7 +624,8 @@ export default function StorageAdministrationPage(props: StorageAdministrationPa
                   <div className="ui-text-secondary">Sync lag seconds: {selectedDetail.replication.syncLagSeconds ?? "n/a"}</div>
                 </div>
               </>
-            ) : null}
+              ) : null}
+            </SurfaceStateBoundary>
           </div>
         </section>
       </div>
