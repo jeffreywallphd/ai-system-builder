@@ -11,7 +11,7 @@ import { CrossStudioRegistryQueryService } from "@application/asset-registry/Cro
 import { RegistryQueryService } from "@application/asset-registry/RegistryQueryService";
 import { RegistryDependencyGraphService } from "@application/asset-registry/RegistryDependencyGraphService";
 import { RegistryBackendApi } from "@infrastructure/api/registry/RegistryBackendApi";
-import { resolveBrowserWorkflowPersistenceRepository } from "./BrowserFallbackRepositories";
+import { resolveLegacyBrowserWorkflowPersistenceRepository } from "./legacy/LegacyBrowserFallbackRepositories";
 
 class EmptyAssetRecordRepository implements IAssetRecordRepository {
   public async save(_asset: IAsset): Promise<void> {}
@@ -71,7 +71,7 @@ export function resolveBrowserRegistryBridgeFallback(): DesktopRegistryBridge {
   const backendApi = new RegistryBackendApi(
     new CrossStudioRegistryQueryService(registryQueryService),
     new RegistryDependencyGraphService(registryQueryService, versions),
-    new ListPersistedWorkflowsUseCase(resolveBrowserWorkflowPersistenceRepository()),
+    new ListPersistedWorkflowsUseCase(resolveLegacyBrowserWorkflowPersistenceRepository()),
   );
 
   fallbackBridge = Object.freeze<DesktopRegistryBridge>({

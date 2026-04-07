@@ -41,6 +41,11 @@ Contributors adding or modifying protected client-facing operations for desktop,
 2. If touching direct managed-service side channels (`HttpManagedServiceSupervisorClient`, `ManagedServiceEventStream`), route external consumption through authoritative API authorization.
 3. If touching browser fallback repositories (`createUiDependencies.ts`, `BrowserFallbackRepositories.ts`), keep scope to degraded-mode-only and avoid protected/admin mutations.
 4. If touching compatibility SDK contracts (`src/infrastructure/api/*/sdk/Public*Contract.ts`), land new contract changes in shared contract/schema roots first.
+5. Keep remaining bypass helpers isolated under explicit legacy boundaries:
+   - managed-service bypass boundary: `src/ui/composition/legacy/LegacyManagedServiceBypassBoundary.ts`
+   - browser fallback boundary: `src/ui/composition/legacy/LegacyBrowserFallbackRepositories.ts`
+   - compatibility shim only: `src/ui/composition/BrowserFallbackRepositories.ts`
+6. Do not import managed-service or browser fallback bypass helpers directly into new feature modules; depend on shared API clients first and use legacy boundaries only when migration blockers are explicit.
 
 ## PR checklist
 
