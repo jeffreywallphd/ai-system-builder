@@ -168,3 +168,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Production contributor extension rules for new admin/operational screens now live in `docs/architecture/multi-surface-ui-extension-guidance.md`.
 - The extension guide defines canonical shared-vs-surface placement, metadata-first routing workflow, state/presentation/action seams, responsive/accessibility requirements, and prohibited anti-patterns.
 - For converged areas, bypassing shared presentation/state seams is now explicitly prohibited unless documented justification is provided in PR and architecture updates.
+
+## Story 15.2.2 update
+
+- Operational run visibility now includes shared run-monitoring presentational seams in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx` for run list visibility and run detail/status inspection.
+- `RunPage` now composes those shared panels with authoritative runtime queue/status/result/trace data, persisted execution-run detail projections, and realtime update subscriptions, while keeping desktop and thin-client surface frames unchanged.
+- Run monitoring actions now use shared action descriptors (`SurfaceActionButtonStrip` and `SurfaceActionMenu`) with permission-aware cancel/dequeue/refresh behavior so desktop and thin-client surfaces reuse one action contract.

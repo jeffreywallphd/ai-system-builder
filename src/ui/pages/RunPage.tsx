@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import type { ExecutionRunDetailProjection } from "@application/execution/ExecutionRunDetailProjectionService";
 import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import type { NodeInventorySummaryDto } from "@shared/contracts/nodes/NodeTrustApiContracts";
@@ -24,7 +25,11 @@ import {
   buildOperationalWorkspaceDashboardModel,
   type OperationalWorkspaceRecentOutputSummary,
 } from "../presenters/OperationalWorkspaceDashboardPresenter";
-import { OperationalWorkspaceDashboard } from "../shared/operations";
+import {
+  OperationalRunDetailStatusPanel,
+  OperationalRunListPanel,
+  OperationalWorkspaceDashboard,
+} from "../shared/operations";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import RunDesktopOperationalDashboardPage from "./RunDesktopOperationalDashboardPage";
 import RunThinClientOperationalDashboardPage from "./RunThinClientOperationalDashboardPage";
@@ -126,6 +131,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     readonly outputFieldCount?: number;
     readonly outputContractIds?: ReadonlyArray<string>;
   }>();
+  const [selectedRunDetail, setSelectedRunDetail] = useState<ExecutionRunDetailProjection | undefined>();
+  const [isRunDetailLoading, setIsRunDetailLoading] = useState(false);
   const [runtimeExecutionError, setRuntimeExecutionError] = useState<string | undefined>();
 
   const [runtimeLaunchSystemId, setRuntimeLaunchSystemId] = useState("");
@@ -161,8 +168,17 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   }, [runtimeOperationsService]);
 
   const inspectRuntimeExecution = useCallback(async (executionId: string): Promise<void> => {
+    const normalizedExecutionId = executionId.trim();
+    if (!normalizedExecutionId) {
+      setRuntimeExecutionState(undefined);
+      setSelectedRunDetail(undefined);
+      setRuntimeExecutionError("Execution id is required.");
+      return;
+    }
+
+    setIsRunDetailLoading(true);
     const summary = await runtimeOperationsService.inspectRun({
-      executionId,
+      executionId: normalizedExecutionId,
       diagnosticsLimit: 20,
       eventLimit: 20,
       logLimit: 20,
@@ -170,10 +186,14 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
     if (!summary.ok || !summary.data) {
       setRuntimeExecutionState(undefined);
+      setSelectedRunDetail(undefined);
       setRuntimeExecutionError(summary.error?.message ?? "Failed to load runtime status.");
+      setIsRunDetailLoading(false);
       return;
     }
 
+    const detail = await executionHistoryService.getRunDetail(normalizedExecutionId).catch(() => undefined);
+    setSelectedRunDetail(detail);
     setRuntimeExecutionState(Object.freeze({
       executionId: summary.data.executionId,
       status: summary.data.status,
@@ -185,7 +205,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
       outputContractIds: summary.data.outputContractIds,
     }));
     setRuntimeExecutionError(undefined);
-  }, [runtimeOperationsService]);
+    setIsRunDetailLoading(false);
+  }, [executionHistoryService, runtimeOperationsService]);
 
   const refreshNodeAvailability = useCallback(async (): Promise<void> => {
     if (!sessionToken) {
@@ -410,6 +431,22 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     realtime: runtimeRealtimeConnectionState,
   }), [history, nodeInventory, recentOutputs, runtimeQueueItems, runtimeRealtimeConnectionState]);
 
+  const actorPermissionIds = useMemo(() => {
+    const roles = new Set(session?.workspaceContext?.workspaces
+      .flatMap((workspace) => workspace.effectiveRoles ?? [])
+      ?? []);
+    const permissions = new Set<string>([
+      "runtime.run.inspect",
+      "runtime.queue.refresh",
+      "runtime.run.start",
+    ]);
+    if (roles.has("owner") || roles.has("admin") || session?.initialCapabilityState?.canAdministrate) {
+      permissions.add("runtime.run.cancel");
+      permissions.add("runtime.queue.manage");
+    }
+    return Object.freeze([...permissions]);
+  }, [session?.initialCapabilityState?.canAdministrate, session?.workspaceContext?.workspaces]);
+
   if (!session || !sessionToken || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page">
@@ -461,51 +498,94 @@ export default function RunPage(props: RunPageProps): JSX.Element {
   );
 
   const content = (
-    <OperationalWorkspaceDashboard
-      model={dashboardModel}
-      queueItems={runtimeQueueItems}
-      recentRuns={history}
-      recentOutputs={recentOutputs}
-      isQueueLoading={isRuntimeQueueLoading}
-      isRecentOutputsLoading={isRecentOutputsLoading}
-      queueError={runtimeQueueError}
-      recentOutputsError={recentOutputsError}
-      responsiveProfile={responsiveProfile}
-      onRefreshQueue={() => {
-        void refreshRuntimeQueue();
-      }}
-      onInspectRun={(executionId) => {
-        setRuntimeExecutionId(executionId);
-        void inspectRuntimeExecution(executionId);
-      }}
-      onCancelRun={(executionId) => {
-        void runtimeOperationsService.cancelRun({
-          executionId,
-          reason: "Cancelled from operational workspace dashboard.",
-        }).then((response) => {
-          if (!response.ok) {
-            setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
-            return;
-          }
-          return refreshRuntimeQueue();
-        });
-      }}
-      onDequeue={(queueItemId) => {
-        void runtimeOperationsService.dequeueQueueItem({
-          queueItemId,
-          reason: "Dequeued from operational workspace dashboard.",
-        }).then((response) => {
-          if (!response.ok) {
-            setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
-            return;
-          }
-          return refreshRuntimeQueue();
-        });
-      }}
-      onOpenNodeInventory={() => {
-        navigate(ROUTE_PATHS.nodeInventory);
-      }}
-    />
+    <div className="ui-stack ui-stack--md">
+      <OperationalWorkspaceDashboard
+        model={dashboardModel}
+        queueItems={runtimeQueueItems}
+        recentRuns={history}
+        recentOutputs={recentOutputs}
+        isQueueLoading={isRuntimeQueueLoading}
+        isRecentOutputsLoading={isRecentOutputsLoading}
+        queueError={runtimeQueueError}
+        recentOutputsError={recentOutputsError}
+        responsiveProfile={responsiveProfile}
+        onRefreshQueue={() => {
+          void refreshRuntimeQueue();
+        }}
+        onInspectRun={(executionId) => {
+          setRuntimeExecutionId(executionId);
+          void inspectRuntimeExecution(executionId);
+        }}
+        onCancelRun={(executionId) => {
+          void runtimeOperationsService.cancelRun({
+            executionId,
+            reason: "Cancelled from operational workspace dashboard.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onDequeue={(queueItemId) => {
+          void runtimeOperationsService.dequeueQueueItem({
+            queueItemId,
+            reason: "Dequeued from operational workspace dashboard.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onOpenNodeInventory={() => {
+          navigate(ROUTE_PATHS.nodeInventory);
+        }}
+      />
+      <OperationalRunListPanel
+        queueItems={runtimeQueueItems}
+        recentRuns={history}
+        selectedExecutionId={runtimeExecutionId || runtimeExecutionState?.executionId}
+        isQueueLoading={isRuntimeQueueLoading}
+        queueError={runtimeQueueError}
+        responsiveProfile={responsiveProfile}
+        actorPermissionIds={actorPermissionIds}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
+        onRefreshQueue={() => {
+          void refreshRuntimeQueue();
+        }}
+        onInspectRun={(executionId) => {
+          setRuntimeExecutionId(executionId);
+          void inspectRuntimeExecution(executionId);
+        }}
+        onCancelRun={(executionId) => {
+          void runtimeOperationsService.cancelRun({
+            executionId,
+            reason: "Cancelled from run list.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to cancel runtime execution.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+        onDequeue={(queueItemId) => {
+          void runtimeOperationsService.dequeueQueueItem({
+            queueItemId,
+            reason: "Dequeued from run list.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeQueueError(response.error?.message ?? "Failed to dequeue runtime item.");
+              return;
+            }
+            return refreshRuntimeQueue();
+          });
+        }}
+      />
+    </div>
   );
 
   const detail = (
@@ -560,8 +640,8 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
       <section className="ui-card">
         <div className="ui-card__header">
-          <h2 className="ui-card__title">Run oversight</h2>
-          <p className="ui-card__subtitle">Inspect run status, progress, diagnostics, trace, and output contract summary.</p>
+          <h2 className="ui-card__title">Direct run lookup</h2>
+          <p className="ui-card__subtitle">Inspect a specific execution id when it is outside the current run list window.</p>
         </div>
         <div className="ui-card__body ui-stack ui-stack--sm">
           <label className="ui-field">
@@ -574,19 +654,38 @@ export default function RunPage(props: RunPageProps): JSX.Element {
             </button>
           </div>
           {runtimeExecutionError ? <p role="alert">{runtimeExecutionError}</p> : null}
-          {runtimeExecutionState ? (
-            <div className="ui-stack ui-stack--2xs ui-text-small">
-              <span>Execution id: {runtimeExecutionState.executionId ?? runtimeExecutionId}</span>
-              <span>Status: {runtimeExecutionState.status}</span>
-              <span>Progress: {runtimeExecutionState.progressLabel}</span>
-              <span>Diagnostics: {runtimeExecutionState.diagnosticsCount ?? "-"}</span>
-              <span>Trace events/logs: {runtimeExecutionState.traceEventCount ?? "-"} / {runtimeExecutionState.traceLogCount ?? "-"}</span>
-              <span>Output fields: {runtimeExecutionState.outputFieldCount ?? "-"}</span>
-              <span>Output contracts: {runtimeExecutionState.outputContractIds?.join(", ") || "-"}</span>
-            </div>
-          ) : null}
         </div>
       </section>
+      <OperationalRunDetailStatusPanel
+        selectedExecutionId={runtimeExecutionId || runtimeExecutionState?.executionId}
+        inspection={runtimeExecutionState}
+        runDetail={selectedRunDetail}
+        isLoading={isRunDetailLoading}
+        error={runtimeExecutionError}
+        responsiveProfile={responsiveProfile}
+        actorPermissionIds={actorPermissionIds}
+        surface={isDesktopSurface ? "desktop" : "thin-client"}
+        onRefresh={() => {
+          const selectedId = runtimeExecutionId.trim() || runtimeExecutionState?.executionId;
+          if (!selectedId) {
+            return;
+          }
+          void inspectRuntimeExecution(selectedId);
+        }}
+        onCancel={(executionId) => {
+          void runtimeOperationsService.cancelRun({
+            executionId,
+            reason: "Cancelled from run detail.",
+          }).then((response) => {
+            if (!response.ok) {
+              setRuntimeExecutionError(response.error?.message ?? "Failed to cancel runtime execution.");
+              return;
+            }
+            void inspectRuntimeExecution(executionId);
+            void refreshRuntimeQueue();
+          });
+        }}
+      />
     </div>
   );
 
