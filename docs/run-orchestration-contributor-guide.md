@@ -18,6 +18,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md`
 - `docs/architecture/run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md`
 - `docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md`
+- `docs/architecture/run-orchestration-operational-visibility-projections.md`
 
 ## Required implementation path
 

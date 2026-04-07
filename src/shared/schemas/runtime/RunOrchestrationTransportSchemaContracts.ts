@@ -87,6 +87,31 @@ const RunExecutionOutcomeSchema = z.enum([
   RunExecutionOutcomeKinds.cancelled,
 ]);
 
+const RunActionEligibilitySchema = z.object({
+  allowed: z.boolean(),
+  reason: z.string().trim().min(1).max(512).optional(),
+}).strict();
+
+const RunActionAvailabilitySchema = z.object({
+  cancel: RunActionEligibilitySchema,
+  retry: RunActionEligibilitySchema,
+  dequeue: RunActionEligibilitySchema,
+}).strict();
+
+const RunFailureSummarySchema = z.object({
+  code: z.string().trim().min(1).max(256),
+  message: z.string().trim().min(1).max(2000),
+  retryable: z.boolean(),
+  occurredAt: TimestampSchema.optional(),
+}).strict();
+
+const RunStatusTimelineEntrySchema = z.object({
+  occurredAt: TimestampSchema,
+  state: RunLifecycleStateSchema,
+  source: z.enum(["run-state", "audit"]),
+  message: z.string().trim().min(1).max(1024).optional(),
+}).strict();
+
 const RuntimeTargetSchema = z.object({
   systemId: IdentifierSchema,
   versionId: IdentifierSchema,
@@ -142,6 +167,8 @@ const RunSummarySchema = z.object({
   submittedAt: TimestampSchema,
   updatedAt: TimestampSchema,
   queue: RunQueueStatusSnapshotSchema.optional(),
+  actionAvailability: RunActionAvailabilitySchema.optional(),
+  failureSummary: RunFailureSummarySchema.optional(),
 }).strict();
 
 const RunSubmissionMetadataSchema = z.object({
@@ -225,6 +252,7 @@ export const RunDetailSchema = RunSummarySchema.extend({
     finalizedAt: TimestampSchema,
     outcome: z.enum(["completed", "failed"]),
   }).strict().optional(),
+  statusTimeline: z.array(RunStatusTimelineEntrySchema).optional(),
 }).strict();
 
 export const RunListReadRequestSchema = z.object({
@@ -288,6 +316,9 @@ export const RunStatusEnvelopeSchema = z.object({
     finalizedAt: TimestampSchema,
     outcome: z.enum(["completed", "failed"]),
   }).strict().optional(),
+  actionAvailability: RunActionAvailabilitySchema.optional(),
+  failureSummary: RunFailureSummarySchema.optional(),
+  statusTimeline: z.array(RunStatusTimelineEntrySchema).optional(),
 }).strict();
 
 export const RunQueueStatusReadRequestSchema = z.object({
@@ -306,6 +337,8 @@ const RunQueueStatusItemSchema = z.object({
   assignmentStatus: RunAssignmentStatusSchema,
   executionOutcome: RunExecutionOutcomeSchema,
   updatedAt: TimestampSchema,
+  actionAvailability: RunActionAvailabilitySchema.optional(),
+  failureSummary: RunFailureSummarySchema.optional(),
 }).strict();
 
 export const RunQueueStatusReadResponseSchema = z.object({

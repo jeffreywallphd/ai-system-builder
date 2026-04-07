@@ -47,6 +47,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/identity");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/workspaces");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime/queue");
   });
 
   it("throws when required route family coverage is missing", () => {

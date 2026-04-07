@@ -20,6 +20,7 @@ Story 16.1.6 adds authoritative run read pathways for list/detail/status visibil
 - Adds canonical list endpoint contract: `GET /api/v1/runtime/runs`.
 - Adds authoritative detail endpoint handling: `GET /api/v1/runtime/runs/:runId`.
 - Adds authoritative lifecycle visibility handling: `GET /api/v1/runtime/runs/:runId/status`.
+- Adds authoritative queue visibility handling: `GET /api/v1/runtime/queue`.
 - Uses shared query conventions (`workspaceId`, `limit`, `offset`, `search`, `sortBy`, `sortDirection`) plus repeated `state` and `source` filters.
 
 ## Authorization posture
@@ -34,6 +35,7 @@ Story 16.1.6 adds authoritative run read pathways for list/detail/status visibil
 - List reads return canonical `RunSummary` projection only.
 - Detail reads return canonical `RunDetail`.
 - Status reads return canonical `RunStatusEnvelope`.
+- Queue reads return canonical `RunQueueStatusReadResponse`.
 - Internal persistence metadata/runtime internals are excluded.
 
 ## Route registration posture

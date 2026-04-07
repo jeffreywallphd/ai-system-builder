@@ -84,6 +84,31 @@ export interface RunQueueStatusSnapshot {
   readonly dequeuedAt?: string;
 }
 
+export interface RunActionEligibility {
+  readonly allowed: boolean;
+  readonly reason?: string;
+}
+
+export interface RunActionAvailability {
+  readonly cancel: RunActionEligibility;
+  readonly retry: RunActionEligibility;
+  readonly dequeue: RunActionEligibility;
+}
+
+export interface RunFailureSummary {
+  readonly code: string;
+  readonly message: string;
+  readonly retryable: boolean;
+  readonly occurredAt?: string;
+}
+
+export interface RunStatusTimelineEntry {
+  readonly occurredAt: string;
+  readonly state: RunLifecycleState;
+  readonly source: "run-state" | "audit";
+  readonly message?: string;
+}
+
 export interface RunSummary {
   readonly contractVersion: RunOrchestrationTransportContractVersion;
   readonly runId: string;
@@ -96,6 +121,8 @@ export interface RunSummary {
   readonly submittedAt: string;
   readonly updatedAt: string;
   readonly queue?: RunQueueStatusSnapshot;
+  readonly actionAvailability?: RunActionAvailability;
+  readonly failureSummary?: RunFailureSummary;
 }
 
 export interface RunDetail extends RunSummary {
@@ -112,6 +139,7 @@ export interface RunDetail extends RunSummary {
     readonly finalizedAt: string;
     readonly outcome: "completed" | "failed";
   };
+  readonly statusTimeline?: ReadonlyArray<RunStatusTimelineEntry>;
 }
 
 export interface RunSubmissionAcceptedResponse {
@@ -165,6 +193,9 @@ export interface RunStatusEnvelope {
     readonly queuedAt?: string;
   };
   readonly finalization?: RunDetail["finalization"];
+  readonly actionAvailability?: RunActionAvailability;
+  readonly failureSummary?: RunFailureSummary;
+  readonly statusTimeline?: ReadonlyArray<RunStatusTimelineEntry>;
 }
 
 export interface RunExecutionProgressSnapshot {
@@ -226,6 +257,8 @@ export interface RunQueueStatusItem {
   readonly assignmentStatus: typeof RunAssignmentStatuses[keyof typeof RunAssignmentStatuses];
   readonly executionOutcome: typeof RunExecutionOutcomeKinds[keyof typeof RunExecutionOutcomeKinds];
   readonly updatedAt: string;
+  readonly actionAvailability?: RunActionAvailability;
+  readonly failureSummary?: RunFailureSummary;
 }
 
 export interface RunQueueStatusReadResponse {
@@ -346,6 +379,8 @@ export function toRunSummary(run: CanonicalRunRecord): RunSummary {
     submittedAt: run.submission.submittedAt,
     updatedAt: run.updatedAt,
     queue: toRunQueueStatusSnapshot(run.queue),
+    actionAvailability: deriveRunActionAvailability(run),
+    failureSummary: deriveRunFailureSummary(run),
   });
 }
 
@@ -361,6 +396,11 @@ export function toRunDetail(run: CanonicalRunRecord): RunDetail {
     execution: run.execution,
     cancellation: run.cancellation,
     retry: run.retry,
+    statusTimeline: Object.freeze([Object.freeze({
+      occurredAt: run.updatedAt,
+      state: run.state,
+      source: "run-state" as const,
+    })]),
   });
 }
 
@@ -390,6 +430,64 @@ export function toRunStatusEnvelope(run: CanonicalRunRecord): RunStatusEnvelope 
       maxAttempts: run.retry.maxAttempts,
       queuedAt: run.retry.queuedAt,
     }),
+    actionAvailability: deriveRunActionAvailability(run),
+    failureSummary: deriveRunFailureSummary(run),
+    statusTimeline: Object.freeze([Object.freeze({
+      occurredAt: run.updatedAt,
+      state: run.state,
+      source: "run-state" as const,
+    })]),
+  });
+}
+
+export function deriveRunActionAvailability(run: CanonicalRunRecord): RunActionAvailability {
+  const state = run.state;
+  const terminal = state === RunLifecycleStates.completed
+    || state === RunLifecycleStates.failed
+    || state === RunLifecycleStates.cancelled;
+  const cancellationInFlight = state === RunLifecycleStates.cancelling;
+  const cancelAllowed = !terminal && !cancellationInFlight;
+  const retryAllowed = state === RunLifecycleStates.failed || state === RunLifecycleStates.cancelled;
+  const dequeueAllowed = Boolean(
+    run.queue
+      && !run.queue.dequeuedAt
+      && (state === RunLifecycleStates.queued || state === RunLifecycleStates.assignmentPending),
+  );
+
+  return Object.freeze({
+    cancel: Object.freeze({
+      allowed: cancelAllowed,
+      reason: cancelAllowed
+        ? undefined
+        : terminal
+          ? "Run is already terminal."
+          : "Cancellation is already in progress.",
+    }),
+    retry: Object.freeze({
+      allowed: retryAllowed,
+      reason: retryAllowed
+        ? undefined
+        : "Retry is available only for failed or cancelled runs.",
+    }),
+    dequeue: Object.freeze({
+      allowed: dequeueAllowed,
+      reason: dequeueAllowed
+        ? undefined
+        : "Run is not currently dequeue-eligible.",
+    }),
+  });
+}
+
+export function deriveRunFailureSummary(run: CanonicalRunRecord): RunFailureSummary | undefined {
+  if (run.execution.outcome !== RunExecutionOutcomeKinds.failed) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    code: run.execution.errorCode ?? "run-execution-failed",
+    message: run.execution.errorMessage ?? "Run execution failed.",
+    retryable: true,
+    occurredAt: run.execution.finishedAt ?? run.updatedAt,
   });
 }
 

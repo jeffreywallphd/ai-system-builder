@@ -37,6 +37,8 @@ Authoritative run read routes:
   - Canonical run detail read.
 - `GET /api/v1/runtime/runs/:runId/status`
   - Canonical lifecycle/status envelope read.
+- `GET /api/v1/runtime/queue`
+  - Canonical operational queue visibility read projection for run-control surfaces.
 
 Shared run transport contracts now include:
 
@@ -66,6 +68,7 @@ Authoritative reads project canonical run resources only:
 - list: `RunSummary`
 - detail: `RunDetail`
 - status: `RunStatusEnvelope`
+- queue: `RunQueueStatusReadResponse`
 
 Raw persistence metadata and runtime adapter internals are not returned.
 

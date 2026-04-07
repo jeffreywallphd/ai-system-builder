@@ -145,6 +145,14 @@ export type AuthoritativeRunNodeClaimResult =
 
 export interface IRunOrchestrationQueuePersistenceRepository {
   getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined>;
+  listQueueEntries?(query: {
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly lifecycleStates?: ReadonlyArray<RunLifecycleState>;
+    readonly includeDequeued?: boolean;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>>;
   enqueueRunForAssignment(
     record: Omit<
       AuthoritativeRunQueueEntryRecord,

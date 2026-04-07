@@ -207,6 +207,54 @@ export class SqlitePlatformPersistenceAdapter
     return row ? this.mapQueueRowToRecord(row) : undefined;
   }
 
+  public async listQueueEntries(query: {
+    readonly workspaceId?: string;
+    readonly queueId?: string;
+    readonly lifecycleStates?: ReadonlyArray<RunLifecycleState>;
+    readonly includeDequeued?: boolean;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.addEquals("workspace_id", normalizePlatformLookup(query.workspaceId ?? ""));
+    whereBuilder.addEquals("queue_id", normalizePlatformLookup(query.queueId ?? ""));
+    whereBuilder.addIn("lifecycle_state", query.lifecycleStates);
+    if (!query.includeDequeued) {
+      whereBuilder.add("dequeued_at IS NULL");
+    }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        run_id,
+        queue_id,
+        workspace_id,
+        lifecycle_state,
+        entered_at,
+        order_key,
+        eligibility_marker,
+        eligible_at,
+        claim_token,
+        claimed_by,
+        claimed_at,
+        claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
+        dequeued_at,
+        updated_at,
+        revision
+      FROM platform_run_orchestration_queue
+      ${where.sql}
+      ORDER BY eligible_at ASC, order_key ASC, entered_at ASC, run_id ASC
+      ${paging.sql}
+    `).all(...where.params, ...paging.params) as PlatformRunQueueRow[];
+
+    return Object.freeze(rows.map((row) => this.mapQueueRowToRecord(row)));
+  }
+
   public async enqueueRunForAssignment(
     record: Omit<
       AuthoritativeRunQueueEntryRecord,
