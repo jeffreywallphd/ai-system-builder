@@ -6,8 +6,14 @@ import {
   RuntimeRealtimeEventEnvelopeVersion,
   RuntimeRealtimeSubscriptionModes,
   RuntimeRealtimeTopics,
+  RuntimeRealtimeWebSocketActions,
+  RuntimeRealtimeWebSocketMessageTypes,
   type RuntimeRealtimeEventEnvelope,
   type RuntimeRealtimeSubscriptionRequest,
+  type RuntimeRealtimeWebSocketErrorMessage,
+  type RuntimeRealtimeWebSocketEventMessage,
+  type RuntimeRealtimeWebSocketSubscribeMessage,
+  type RuntimeRealtimeWebSocketSubscriptionAckMessage,
 } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
 
 export interface RuntimeRealtimeSchemaValidationIssue {
@@ -147,8 +153,63 @@ export const RuntimeRealtimeSubscriptionRequestSchema = z.object({
   }).strict().optional(),
 }).strict();
 
+const RuntimeRealtimeWebSocketSubscribeRequestSchema = z.object({
+  topics: z.array(z.object({
+    topic: TopicSchema,
+    workspaceId: IdentifierSchema.optional(),
+    executionId: IdentifierSchema.optional(),
+  }).strict()).min(1),
+  mode: z.enum([
+    RuntimeRealtimeSubscriptionModes.liveOnly,
+    RuntimeRealtimeSubscriptionModes.resumeFromCursor,
+  ]).optional(),
+  reconnect: z.object({
+    afterCursor: z.string().trim().regex(/^runtime-realtime:\d+$/).optional(),
+  }).strict().optional(),
+}).strict();
+
+export const RuntimeRealtimeWebSocketSubscribeMessageSchema = z.object({
+  action: z.literal(RuntimeRealtimeWebSocketActions.subscribe),
+  request: RuntimeRealtimeWebSocketSubscribeRequestSchema,
+}).strict();
+
+export const RuntimeRealtimeWebSocketSubscriptionAckMessageSchema = z.object({
+  type: z.literal(RuntimeRealtimeWebSocketMessageTypes.subscriptionAck),
+  subscriptionId: IdentifierSchema,
+  acceptedAt: TimestampSchema,
+  mode: z.enum([
+    RuntimeRealtimeSubscriptionModes.liveOnly,
+    RuntimeRealtimeSubscriptionModes.resumeFromCursor,
+  ]),
+  topics: z.array(z.object({
+    topic: TopicSchema,
+    workspaceId: IdentifierSchema.optional(),
+    executionId: IdentifierSchema.optional(),
+  }).strict()).min(1),
+  reconnect: z.object({
+    afterCursor: z.string().trim().regex(/^runtime-realtime:\d+$/).optional(),
+  }).strict().optional(),
+}).strict();
+
+export const RuntimeRealtimeWebSocketEventMessageSchema = z.object({
+  type: z.literal(RuntimeRealtimeWebSocketMessageTypes.event),
+  event: RuntimeRealtimeEventEnvelopeSchema,
+}).strict();
+
+export const RuntimeRealtimeWebSocketErrorMessageSchema = z.object({
+  type: z.literal(RuntimeRealtimeWebSocketMessageTypes.error),
+  error: z.object({
+    code: z.enum(["invalid-request", "forbidden", "internal"]),
+    message: z.string().trim().min(1).max(512),
+  }).strict(),
+}).strict();
+
 export type RuntimeRealtimeEventEnvelopePayload = z.infer<typeof RuntimeRealtimeEventEnvelopeSchema>;
 export type RuntimeRealtimeSubscriptionRequestPayload = z.infer<typeof RuntimeRealtimeSubscriptionRequestSchema>;
+export type RuntimeRealtimeWebSocketSubscribeMessagePayload = z.infer<typeof RuntimeRealtimeWebSocketSubscribeMessageSchema>;
+export type RuntimeRealtimeWebSocketSubscriptionAckMessagePayload = z.infer<typeof RuntimeRealtimeWebSocketSubscriptionAckMessageSchema>;
+export type RuntimeRealtimeWebSocketEventMessagePayload = z.infer<typeof RuntimeRealtimeWebSocketEventMessageSchema>;
+export type RuntimeRealtimeWebSocketErrorMessagePayload = z.infer<typeof RuntimeRealtimeWebSocketErrorMessageSchema>;
 
 function formatZodPath(path: ReadonlyArray<string | number>): string {
   if (path.length === 0) {
@@ -189,6 +250,40 @@ export function parseRuntimeRealtimeSubscriptionRequest(payload: unknown): Runti
   return parseRuntimeRealtimeSchema(
     "RuntimeRealtimeSubscriptionRequest",
     RuntimeRealtimeSubscriptionRequestSchema,
+    payload,
+  );
+}
+
+export function parseRuntimeRealtimeWebSocketSubscribeMessage(payload: unknown): RuntimeRealtimeWebSocketSubscribeMessage {
+  return parseRuntimeRealtimeSchema(
+    "RuntimeRealtimeWebSocketSubscribeMessage",
+    RuntimeRealtimeWebSocketSubscribeMessageSchema,
+    payload,
+  );
+}
+
+export function parseRuntimeRealtimeWebSocketSubscriptionAckMessage(
+  payload: unknown,
+): RuntimeRealtimeWebSocketSubscriptionAckMessage {
+  return parseRuntimeRealtimeSchema(
+    "RuntimeRealtimeWebSocketSubscriptionAckMessage",
+    RuntimeRealtimeWebSocketSubscriptionAckMessageSchema,
+    payload,
+  );
+}
+
+export function parseRuntimeRealtimeWebSocketEventMessage(payload: unknown): RuntimeRealtimeWebSocketEventMessage {
+  return parseRuntimeRealtimeSchema(
+    "RuntimeRealtimeWebSocketEventMessage",
+    RuntimeRealtimeWebSocketEventMessageSchema,
+    payload,
+  );
+}
+
+export function parseRuntimeRealtimeWebSocketErrorMessage(payload: unknown): RuntimeRealtimeWebSocketErrorMessage {
+  return parseRuntimeRealtimeSchema(
+    "RuntimeRealtimeWebSocketErrorMessage",
+    RuntimeRealtimeWebSocketErrorMessageSchema,
     payload,
   );
 }

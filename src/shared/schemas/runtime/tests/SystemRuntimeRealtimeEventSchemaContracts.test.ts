@@ -2,6 +2,10 @@ import { describe, expect, it } from "bun:test";
 import {
   parseRuntimeRealtimeEventEnvelope,
   parseRuntimeRealtimeSubscriptionRequest,
+  parseRuntimeRealtimeWebSocketErrorMessage,
+  parseRuntimeRealtimeWebSocketEventMessage,
+  parseRuntimeRealtimeWebSocketSubscribeMessage,
+  parseRuntimeRealtimeWebSocketSubscriptionAckMessage,
   RuntimeRealtimeSchemaValidationError,
 } from "../SystemRuntimeRealtimeEventSchemaContracts";
 
@@ -79,5 +83,58 @@ describe("SystemRuntimeRealtimeEventSchemaContracts", () => {
         changedAt: "2026-04-07T12:00:00.000Z",
       },
     })).toThrow(RuntimeRealtimeSchemaValidationError);
+  });
+
+  it("parses websocket subscribe/ack/event/error runtime realtime envelopes", () => {
+    const subscribe = parseRuntimeRealtimeWebSocketSubscribeMessage({
+      action: "runtime-realtime.subscribe",
+      request: {
+        topics: [{ topic: "runtime.queue", workspaceId: "workspace-a" }],
+        mode: "resume-from-cursor",
+        reconnect: { afterCursor: "runtime-realtime:2" },
+      },
+    });
+    expect(subscribe.action).toBe("runtime-realtime.subscribe");
+
+    const ack = parseRuntimeRealtimeWebSocketSubscriptionAckMessage({
+      type: "runtime-realtime.subscription-ack",
+      subscriptionId: "sub-1",
+      acceptedAt: "2026-04-07T12:00:00.000Z",
+      mode: "live-only",
+      topics: [{ topic: "runtime.queue", workspaceId: "workspace-a" }],
+    });
+    expect(ack.type).toBe("runtime-realtime.subscription-ack");
+
+    const event = parseRuntimeRealtimeWebSocketEventMessage({
+      type: "runtime-realtime.event",
+      event: {
+        eventId: "event-1",
+        schemaVersion: "2026-04-07",
+        emittedAt: "2026-04-07T12:00:00.000Z",
+        sequence: 1,
+        cursor: "runtime-realtime:1",
+        category: "queue-movement",
+        topic: "runtime.queue",
+        workspaceScope: { workspaceId: "workspace-a" },
+        actorScope: {},
+        runScope: { executionId: "exec-1" },
+        payload: {
+          queueItemId: "queue-1",
+          executionId: "exec-1",
+          status: "queued",
+          changedAt: "2026-04-07T12:00:00.000Z",
+        },
+      },
+    });
+    expect(event.type).toBe("runtime-realtime.event");
+
+    const error = parseRuntimeRealtimeWebSocketErrorMessage({
+      type: "runtime-realtime.error",
+      error: {
+        code: "forbidden",
+        message: "Workspace scope is not allowed.",
+      },
+    });
+    expect(error.error.code).toBe("forbidden");
   });
 });
