@@ -2,70 +2,68 @@
 
 ## Purpose
 
-Story 19.1.1 defines the canonical offline/local-mode authority model so desktop clients can work during disconnect without creating competing global truth.
+Feature 19 / Epic 19.1 defines limited local autonomy for desktop clients.  
+Story 19.1.3 adds explicit resource classification and policy-driven posture evaluation so offline behavior is never accidental.
 
 ## Canonical files
 
 - `src/domain/platform/OfflineLocalModeBoundaries.ts`
+- `src/application/common/OfflineResourceClassificationPolicy.ts`
 - `src/application/common/OfflineLocalModeResynchronization.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
-- `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
-- `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
-- `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
-- `docs/architecture/offline-sync-shared-contracts.md`
 
-## Story 19.1.2 shared contract additions
+## Story 19.1.3 additions
 
-Cross-surface offline synchronization contracts are now centralized in shared runtime contracts/schemas/DTO adapters for:
-- cached resource metadata
-- local draft/change tracking
-- queued pending operation envelopes
-- synchronization status summaries
-- conflict indicators and reconciliation outcomes
-- connectivity-aware offline surface state
-- full workspace offline-sync state snapshot payloads
+- Added explicit eligibility metadata per resource class (`OfflineResourceEligibilityMetadata`):
+  - behavior class
+  - max sensitivity
+  - trusted-device requirements
+  - visibility/sharing constraints
+- Added domain policy evaluator:
+  - `evaluateOfflineResourcePolicy(resourceClass, policyInput)`
+- Added application classification seam:
+  - `classifyOfflineResourceLocalModePolicy(...)`
+  - `classifyOfflineResourcePolicyMatrix(...)`
+- Added resource-policy matrix projection:
+  - `listOfflineResourceEligibilityPolicies()`
 
-## Core stance
+## Classification inputs
 
-- Authoritative control-plane state remains server-owned.
-- Desktop is a control-plane client and never an authoritative control-plane host.
-- Offline state is split into explicit buckets:
-  - offline cache
-  - local draft state
-  - mutation queue
-  - local ephemeral state
-  - server-authoritative-only
+- workspace visibility
+- workspace access role
+- workspace sharing posture
+- sensitivity marking
+- storage rule
+- device trust posture
 
-## Offline resource classes and capabilities
+## Classification outputs
 
-- `workspace-catalog`: cache/view only; server authoritative.
-- `workflow-definition`: cache/view only; server authoritative.
-- `workflow-draft`: local-draft authority; cache/view/edit + queue for explicit promotion.
-- `run-submission-intent`: queue-capable authoritative intent; requires reconnect reconciliation.
-- `local-runtime-session`: execute-capable local ephemeral state; never authoritative.
-- `secret-plaintext-material`: non-cacheable and non-offline.
+- explicit per-operation posture (`cache`, `read`, `edit`, `queueMutation`, `execute`)
+- deterministic allow/deny reason for each operation
+- `exclusionReasons` summary list
+- explicit unsupported-resource handling (`supportedResourceClass = false`)
 
-## Mutation and resync invariants
+## Production behavior classes
 
-- Offline authoritative intents must be queued as explicit mutation envelopes.
-- Queue envelopes require:
-  - baseline authoritative revision
-  - visible sync status (`queued-pending-sync` / `sync-conflict` / `sync-rejected`)
-  - divergence disclosure token
-- Queue envelopes cannot pre-mark themselves as globally applied.
+- `cached-read-only`
+- `local-draft`
+- `queued-authoritative-intent`
+- `local-ephemeral-execution`
+- `server-only`
 
-## Reconnect outcomes
+## Prohibited outcomes preserved
 
-`planOfflineResynchronization(...)` yields:
-- `apply-to-authoritative`
-- `conflict-requires-review`
-- `reject-not-allowed`
+- no silent global divergence
+- no local cache as authoritative source of truth
+- no unsignaled authoritative overwrite
 
-`assertResynchronizationPlanPreventsSilentGlobalDivergence(...)` enforces user-attention requirements for conflict/rejection paths.
+## Test coverage
 
-## Prohibited patterns
-
-- `silent-global-divergence`
-- `local-cache-as-global-authority`
-- `unsignaled-authoritative-overwrite`
+- `src/domain/platform/tests/OfflineLocalModeBoundaries.test.ts`
+  - matrix coverage
+  - unsupported resource exclusion
+  - policy-input gating (trust/sharing/sensitivity/storage)
+- `src/application/common/tests/OfflineResourceClassificationPolicy.test.ts`
+  - application seam behavior
+  - full matrix evaluation coverage

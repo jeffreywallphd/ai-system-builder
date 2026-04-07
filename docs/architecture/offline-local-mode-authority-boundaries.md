@@ -10,10 +10,12 @@ The objective is limited local autonomy with explicit authority boundaries:
 
 ## Canonical implementation seams
 
-- Domain boundary catalog:
+- Domain boundary catalog and policy evaluator:
   - `src/domain/platform/OfflineLocalModeBoundaries.ts`
 - Application resynchronization policy:
   - `src/application/common/OfflineLocalModeResynchronization.ts`
+- Application classification seam:
+  - `src/application/common/OfflineResourceClassificationPolicy.ts`
 - Desktop host profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - Shared offline-state and synchronization contracts:
@@ -24,7 +26,7 @@ The objective is limited local autonomy with explicit authority boundaries:
 
 ## Shared offline/sync contract package (Story 19.1.2)
 
-Canonical shared contracts now define stable cross-layer DTO/state shapes for:
+Canonical shared contracts define stable cross-layer DTO/state shapes for:
 - cached resource metadata
 - offline draft state and local change records
 - pending operation envelopes and queue state
@@ -34,6 +36,24 @@ Canonical shared contracts now define stable cross-layer DTO/state shapes for:
 - workspace snapshot payloads for offline/resync views
 
 This keeps offline/sync payload semantics consistent across desktop host logic, API DTO/schema validation, and UI surfaces without ad hoc local object shapes.
+
+## Resource classification model (Story 19.1.3)
+
+Offline behavior is now classified through explicit policy metadata and evaluators instead of implicit per-surface assumptions.
+
+Policy input dimensions:
+- workspace visibility: `private` / `team` / `public`
+- workspace access role: `owner` / `admin` / `member` / `viewer`
+- workspace sharing posture: `workspace-only` / `tenant-wide` / `external-shared` / `public-link`
+- sensitivity marking: `standard` / `sensitive` / `restricted` / `secret`
+- storage rule: `allow-offline-cache` / `require-encrypted-offline-cache` / `disallow-offline-cache`
+- device trust posture: `trusted` / `pending-verification` / `untrusted` / `revoked`
+
+Policy output:
+- deterministic operation posture for `cache`, `read`, `edit`, `queueMutation`, `execute`
+- explicit `allowed` + `reason` decision per operation
+- explicit `exclusionReasons` list for denied paths
+- explicit unsupported classification for unknown resource classes
 
 ## Authority model
 
@@ -46,16 +66,30 @@ This keeps offline/sync payload semantics consistent across desktop host logic, 
   - local ephemeral state (`local-ephemeral-state`): local runtime/session state that never becomes global truth
   - server-authoritative-only (`server-authoritative-only`): non-cacheable sensitive data
 
-## Offline-capable resource classes
+## Production resource-policy matrix
 
-| Resource class | Authority scope | Cache | View | Edit | Queue | Execute | Default bucket |
-|---|---|---|---|---|---|---|---|
-| `workspace-catalog` | `authoritative-server` | yes | yes | no | no | no | `offline-cache` |
-| `workflow-definition` | `authoritative-server` | yes | yes | no | no | no | `offline-cache` |
-| `workflow-draft` | `local-draft` | yes | yes | yes | yes | no | `local-draft-state` |
-| `run-submission-intent` | `authoritative-server` | yes | yes | yes | yes | no | `mutation-queue` |
-| `local-runtime-session` | `local-ephemeral` | yes | yes | yes | no | yes | `local-ephemeral-state` |
-| `secret-plaintext-material` | `authoritative-server` | no | no | no | no | no | `server-authoritative-only` |
+| Resource class | Behavior class | Authority scope | Cache | View | Edit | Queue | Execute | Default bucket |
+|---|---|---|---|---|---|---|---|---|
+| `workspace-catalog` | `cached-read-only` | `authoritative-server` | yes | yes | no | no | no | `offline-cache` |
+| `workflow-definition` | `cached-read-only` | `authoritative-server` | yes | yes | no | no | no | `offline-cache` |
+| `workflow-draft` | `local-draft` | `local-draft` | yes | yes | yes | yes | no | `local-draft-state` |
+| `run-submission-intent` | `queued-authoritative-intent` | `authoritative-server` | yes | yes | yes | yes | no | `mutation-queue` |
+| `local-runtime-session` | `local-ephemeral-execution` | `local-ephemeral` | yes | yes | yes | no | yes | `local-ephemeral-state` |
+| `secret-plaintext-material` | `server-only` | `authoritative-server` | no | no | no | no | no | `server-authoritative-only` |
+
+Unknown/unsupported resource classes are explicitly excluded:
+- `supportedResourceClass = false`
+- all operation posture values denied
+- exclusion reason indicates absence from the registered offline eligibility catalog
+
+## Policy-driven behavior examples
+
+- `workflow-draft` with trusted device and workspace-only sharing can remain editable and queue-capable offline.
+- `run-submission-intent` with `external-shared` or `public-link` posture is forced read-only (no edit/queue mutation).
+- `workflow-definition` with `sensitive` marking but non-encrypted cache policy is denied cache/read offline.
+- `restricted` resources deny offline posture when sharing is broader than workspace-only.
+- `untrusted` or `revoked` devices deny all offline operations across resource classes.
+- `secret` sensitivity marking always resolves to server-only posture.
 
 ## Draft vs synchronized mutations
 
@@ -86,7 +120,12 @@ This behavior is enforced by `planOfflineResynchronization(...)` and `assertResy
 
 ## Contributor extension rules
 
-- New offline-capable resource types must be added to `OfflineLocalModeBoundaries` with explicit capability matrix, authority scope, storage bucket, and reconnection policy.
+- New offline-capable resource types must be added to `OfflineLocalModeBoundaries` with:
+  - capability matrix,
+  - authority scope,
+  - storage bucket,
+  - behavior class and eligibility metadata.
+- New resource classes must be covered in policy-matrix tests and evaluator test cases.
 - If a resource can queue offline mutations, it must use queued mutation envelopes with visible status and divergence token.
 - Desktop/offline host changes must preserve `control-plane-client` posture in `DesktopOfflineLocalModeProfile`.
 - Do not add optimistic "auto-merged global success" paths that bypass explicit conflict/review signaling.
