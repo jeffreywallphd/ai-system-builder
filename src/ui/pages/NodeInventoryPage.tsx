@@ -81,6 +81,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     () => (session?.sessionAccessChannel === "desktop" ? "desktop" : "thin-client"),
     [session?.sessionAccessChannel],
   );
+  const allowTrustRevocation = surface === "desktop";
 
   const [filters, setFilters] = useState<InventoryFilterState>(defaultFilters);
   const [nodes, setNodes] = useState<ReadonlyArray<NodeInventorySummaryDto>>(Object.freeze([]));
@@ -446,6 +447,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                   actorPermissionIds={actorPermissionIds}
                   node={selectedNodeDetail}
                   selectedNodeId={selectedNodeId}
+                  allowTrustRevocation={allowTrustRevocation}
                   isRevoking={isRevoking}
                   revocationReason={revocationReason}
                   revocationNote={revocationNote}

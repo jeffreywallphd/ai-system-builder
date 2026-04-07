@@ -240,3 +240,10 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Node administration now uses shared multi-surface presentation seams in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx` for inventory list/detail/status/actions and enrollment review list/decision actions.
 - Desktop sessions render dense table/menu administration layouts, while thin/admin-lite sessions render compact card/list interaction wrappers over the same action semantics.
 - `NodeInventoryPage` and `NodeEnrollmentReviewPage` now compose those shared seams rather than page-local list/detail action implementations.
+
+## Story 15.3.7 update
+
+- Thin/admin-lite workflow refinement remains shared-first through `src/ui/shared/workspaces/WorkspaceAdministrationPanels.tsx` and `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`, avoiding page-local policy branching.
+- `WorkspaceMembershipThinClientPage` now composes shared membership panels in an `admin-lite` action profile that keeps thin surfaces focused on lightweight status operations while keeping full member/role mutation desktop-first.
+- `NodeInventoryPage` now composes shared node-detail panels with explicit thin-surface boundary behavior that keeps revocation/disable operations desktop-first and preserves thin review/inspection workflows.
+- `AdminLiteEntryPage` now acts as a production thin workflow hub with explicit allowed lightweight workflows and explicit desktop escalation boundaries for heavier administration tasks.

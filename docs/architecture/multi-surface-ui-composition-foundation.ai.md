@@ -150,3 +150,11 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared node administration presentation now lives in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx` for inventory + enrollment review list/detail/status/action composition.
 - Desktop uses dense table/menu wrappers while thin/admin-lite uses compact card/list wrappers, with one shared action contract for review and disable operations.
 - `NodeInventoryPage` and `NodeEnrollmentReviewPage` now consume that shared seam directly.
+
+## Story 15.3.7 update
+- Thin/admin-lite workflow hardening stays shared-first:
+  - workspace action-boundary profile in `src/ui/shared/workspaces/WorkspaceAdministrationPanels.tsx`,
+  - node detail boundary profile in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`.
+- `WorkspaceMembershipThinClientPage` now uses the shared `admin-lite` profile to keep thin-client membership flows limited to lightweight status-oriented operations.
+- `NodeInventoryPage` now composes shared node detail with thin-surface revocation exclusion so node disable/revocation remains desktop-first.
+- `AdminLiteEntryPage` now renders a production lightweight workflow catalog with explicit desktop-only escalation guidance.

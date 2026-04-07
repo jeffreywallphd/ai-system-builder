@@ -138,6 +138,7 @@ interface NodeInventoryDetailPanelProps {
   readonly actorPermissionIds: ReadonlyArray<string>;
   readonly node: NodeInventoryDetailDto;
   readonly selectedNodeId?: string;
+  readonly allowTrustRevocation?: boolean;
   readonly isRevoking: boolean;
   readonly revocationReason: NodeRevocationReason;
   readonly revocationNote: string;
@@ -153,6 +154,7 @@ export function NodeInventoryDetailPanel({
   actorPermissionIds,
   node,
   selectedNodeId,
+  allowTrustRevocation = true,
   isRevoking,
   revocationReason,
   revocationNote,
@@ -176,8 +178,8 @@ export function NodeInventoryDetailPanel({
   );
 
   const detailActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
-    () => Object.freeze([
-      {
+    () => {
+      const actions: Array<SurfaceActionDescriptor> = [{
         id: "node-detail-open-enrollment-review",
         label: "Open enrollment review",
         scope: "bulk",
@@ -191,43 +193,48 @@ export function NodeInventoryDetailPanel({
         onInvoke: () => {
           onOpenEnrollmentReview(node);
         },
-      } satisfies SurfaceActionDescriptor,
-      {
-        id: "node-detail-revoke-trust",
-        label: isRevoking ? "Disabling..." : "Disable node (revoke trust)",
-        scope: "bulk",
-        tone: "danger",
-        requiredPermissions: Object.freeze(["node.trust.revoke"]),
-        requiredSurfaceCapabilities: Object.freeze(["confirmations"]),
-        telemetry: Object.freeze({
-          eventName: "ui.nodeInventory.revokeTrust",
-          auditCategory: "node-trust-administration",
-        }),
-        confirmation: Object.freeze({
-          title: "Disable trusted node?",
-          message: `Revoke trust for ${node.displayName} (${node.nodeId}). This disables trusted runtime participation until re-enrollment.`,
-          confirmLabel: "Disable node",
-          cancelLabel: "Cancel",
+      } satisfies SurfaceActionDescriptor];
+
+      if (allowTrustRevocation) {
+        actions.push({
+          id: "node-detail-revoke-trust",
+          label: isRevoking ? "Disabling..." : "Disable node (revoke trust)",
+          scope: "bulk",
           tone: "danger",
-        }),
-        availability: () => {
-          if (node.revocation.state === NodeRevocationStates.revoked || node.trustState === NodeTrustStates.revoked) {
-            return Object.freeze({ disabled: true, disabledReason: "Node is already revoked." });
-          }
-          if (isRevoking) {
-            return Object.freeze({ disabled: true, disabledReason: "A revocation request is already running." });
-          }
-          if (revocationConfirmationNodeId.trim() !== node.nodeId) {
-            return Object.freeze({ disabled: true, disabledReason: "Type the exact node id in the confirmation field." });
-          }
-          return Object.freeze({});
-        },
-        onInvoke: async () => {
-          await onRevokeNodeTrust(node);
-        },
-      } satisfies SurfaceActionDescriptor,
-    ]),
-    [isRevoking, node, onOpenEnrollmentReview, onRevokeNodeTrust, revocationConfirmationNodeId],
+          requiredPermissions: Object.freeze(["node.trust.revoke"]),
+          requiredSurfaceCapabilities: Object.freeze(["confirmations"]),
+          telemetry: Object.freeze({
+            eventName: "ui.nodeInventory.revokeTrust",
+            auditCategory: "node-trust-administration",
+          }),
+          confirmation: Object.freeze({
+            title: "Disable trusted node?",
+            message: `Revoke trust for ${node.displayName} (${node.nodeId}). This disables trusted runtime participation until re-enrollment.`,
+            confirmLabel: "Disable node",
+            cancelLabel: "Cancel",
+            tone: "danger",
+          }),
+          availability: () => {
+            if (node.revocation.state === NodeRevocationStates.revoked || node.trustState === NodeTrustStates.revoked) {
+              return Object.freeze({ disabled: true, disabledReason: "Node is already revoked." });
+            }
+            if (isRevoking) {
+              return Object.freeze({ disabled: true, disabledReason: "A revocation request is already running." });
+            }
+            if (revocationConfirmationNodeId.trim() !== node.nodeId) {
+              return Object.freeze({ disabled: true, disabledReason: "Type the exact node id in the confirmation field." });
+            }
+            return Object.freeze({});
+          },
+          onInvoke: async () => {
+            await onRevokeNodeTrust(node);
+          },
+        } satisfies SurfaceActionDescriptor);
+      }
+
+      return Object.freeze(actions);
+    },
+    [allowTrustRevocation, isRevoking, node, onOpenEnrollmentReview, onRevokeNodeTrust, revocationConfirmationNodeId],
   );
 
   return (
@@ -273,9 +280,10 @@ export function NodeInventoryDetailPanel({
         <div className="ui-text-secondary">Revoked at: {formatTimestamp(node.revocation.revokedAt) ?? "n/a"}</div>
       </div>
 
-      {node.revocation.state === NodeRevocationStates.revoked || node.trustState === NodeTrustStates.revoked
+      {allowTrustRevocation && (node.revocation.state === NodeRevocationStates.revoked || node.trustState === NodeTrustStates.revoked)
         ? <p className="ui-text-secondary">This node is already disabled through trust revocation.</p>
-        : (
+        : null}
+      {allowTrustRevocation && node.revocation.state !== NodeRevocationStates.revoked && node.trustState !== NodeTrustStates.revoked ? (
           <>
             <label className="ui-field">
               <span className="ui-field__label">Revocation reason</span>
@@ -296,7 +304,12 @@ export function NodeInventoryDetailPanel({
               <input className="ui-input" value={revocationConfirmationNodeId} onChange={(event) => onRevocationConfirmationNodeIdChange(event.target.value)} placeholder={`Type ${node.nodeId} to confirm`} disabled={isRevoking} />
             </label>
           </>
-        )}
+        ) : null}
+      {!allowTrustRevocation ? (
+        <p className="ui-node-admin-shared__admin-lite-note" role="status">
+          Admin-lite boundary: node trust revocation is desktop-only. Use desktop administration for disable/revocation operations.
+        </p>
+      ) : null}
 
       <div className="ui-page__actions">
         <SurfaceActionButtonStrip scope="bulk" actions={detailActions} context={detailActionContext} />

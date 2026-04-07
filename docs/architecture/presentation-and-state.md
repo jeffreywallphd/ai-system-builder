@@ -1117,4 +1117,10 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - policy-governed disable action (trust revocation) with shared confirmation action modeling,
   - pending enrollment handoff action from node detail.
 - `NodeEnrollmentReviewPage` now composes shared pending-list and decision panels so approval/rejection workflows use one action contract across desktop and thin/admin-lite surfaces.
+
+## Thin admin-lite workflow boundary update (story 15.3.7)
+
+- `AdminLiteEntryPage` now presents a production lightweight workflow hub with explicit thin-safe workflows and explicit desktop-only escalation guidance.
+- `WorkspaceMembershipThinClientPage` now composes `WorkspaceMembershipAdministrationPanel` with an `admin-lite` action profile that restricts thin surfaces to lightweight member-status actions while keeping add/remove/role mutation desktop-first.
+- `NodeInventoryPage` now composes `NodeInventoryDetailPanel` with thin-surface revocation exclusion, so review/inspection remains available in admin-lite while trust revocation stays desktop-first.
 - Added shared panel regression coverage in `src/ui/shared/nodes/tests/NodeTrustAdministrationPanels.test.tsx`.

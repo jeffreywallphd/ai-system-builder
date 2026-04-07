@@ -985,3 +985,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - `NodeInventoryPage` now reuses those shared seams for desktop and thin/admin-lite sessions for heartbeat/last-seen, capabilities, pending-enrollment handoff, and trust-revocation disable actions.
 - `NodeEnrollmentReviewPage` now reuses shared pending-list + decision panels so approve/reject behavior stays one action contract across desktop and thin/admin-lite surfaces.
 - Added shared panel coverage in `src/ui/shared/nodes/tests/NodeTrustAdministrationPanels.test.tsx`.
+
+## Thin admin-lite workflow boundary update (story 15.3.7)
+
+- `AdminLiteEntryPage` now renders a bounded thin workflow catalog with explicit desktop-only escalation scope.
+- `WorkspaceMembershipThinClientPage` now composes shared workspace membership panels in an `admin-lite` action profile so thin-client membership actions remain lightweight.
+- `NodeInventoryPage` now composes shared node detail with thin-surface revocation exclusion so trust disable/revocation remains desktop-first.

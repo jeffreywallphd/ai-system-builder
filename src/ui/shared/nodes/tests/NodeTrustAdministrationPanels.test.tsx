@@ -122,6 +122,32 @@ describe("NodeTrustAdministrationPanels", () => {
     expect(html).toContain("Certificate internals are not exposed");
   });
 
+  it("enforces admin-lite boundary by hiding node revocation actions on thin surfaces", () => {
+    const html = renderToStaticMarkup(
+      <NodeInventoryDetailPanel
+        surface="thin-client"
+        actorPermissionIds={Object.freeze(["node.trust.revoke", "node.enrollment.review"])}
+        node={inventoryDetailNode}
+        selectedNodeId={inventoryDetailNode.nodeId}
+        allowTrustRevocation={false}
+        isRevoking={false}
+        revocationReason={NodeRevocationReasons.operatorAction}
+        revocationNote=""
+        revocationConfirmationNodeId={inventoryDetailNode.nodeId}
+        onRevocationReasonChange={() => undefined}
+        onRevocationNoteChange={() => undefined}
+        onRevocationConfirmationNodeIdChange={() => undefined}
+        onRevokeNodeTrust={() => undefined}
+        onOpenEnrollmentReview={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("Open enrollment review");
+    expect(html).toContain("Admin-lite boundary");
+    expect(html).not.toContain("Disable node (revoke trust)");
+    expect(html).not.toContain("Revocation reason");
+  });
+
   it("renders decision actions for selected pending enrollment", () => {
     const html = renderToStaticMarkup(
       <NodeEnrollmentDecisionPanel

@@ -43,3 +43,8 @@ Story 15.1.3 centralizes navigation grouping, surface eligibility, and route acc
   - desktop governance review: `owner|admin` + `log.read` + required workspace context
   - thin governance review: `owner|admin|member` + `system.read` + required workspace context
 - Strict route gating in `AppRouter.tsx` now covers governance review routes to block unauthorized direct-route access.
+
+## Story 15.3.7 update
+- Admin-lite entry (`src/ui/pages/AdminLiteEntryPage.tsx`) now renders a bounded lightweight workflow catalog only (approval, status review, limited membership actions, policy/governance inspection, trusted-device oversight).
+- Desktop-only administration areas remain intentionally excluded from admin-lite route discovery and are explicitly listed in entry-page escalation guidance.
+- Strict metadata + `SurfaceProtectedRoute` route access enforcement remains authoritative and unchanged; this story refines workflow clarity and boundary signaling for thin-client administration.
