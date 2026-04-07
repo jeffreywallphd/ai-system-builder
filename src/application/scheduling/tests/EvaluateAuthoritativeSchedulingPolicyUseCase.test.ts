@@ -112,6 +112,24 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     expect(bundle.decision.outcome).toBe("assignment-recommended");
     expect(bundle.decision.selected?.runId).toBe("run:owner");
     expect(bundle.decision.selected?.nodeId).toBe("node:compute:1");
+    const arbitrationReason = bundle.evaluation.reasons.find((reason) => reason.code === "role-priority-arbitration");
+    expect(arbitrationReason?.details).toEqual(Object.freeze({
+      tieBreakOrder: Object.freeze([
+        "role-priority-score",
+        "queue-age-seconds",
+        "run-id",
+        "node-id",
+      ]),
+      eligibleCandidateCount: 2,
+      selected: Object.freeze({
+        runId: "run:owner",
+        nodeId: "node:compute:1",
+        workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.owner]),
+        priorityBand: "critical",
+        rolePriorityScore: 4,
+        queueAgeSeconds: 40,
+      }),
+    }));
     expect(bundle.assignmentIntents).toEqual([
       Object.freeze({
         runId: "run:owner",
@@ -195,5 +213,92 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     expect(noEligible.decision.selected).toBeUndefined();
     expect(noEligible.assignmentIntents).toEqual([]);
     expect(noEligible.decision.reasons.some((reason) => reason.code === "no-eligible-candidates")).toBeTrue();
+  });
+
+  it("uses deterministic fallback ordering for non-privileged queues when role priority ties", async () => {
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:tie-break",
+    });
+    const bundle = await useCase.evaluate(Object.freeze({
+      asOf: "2026-04-07T20:00:00.000Z",
+      queueLeases: Object.freeze([
+        Object.freeze({
+          runId: "run:a",
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:55:20.000Z",
+          eligibleAt: "2026-04-07T19:55:20.000Z",
+          claimToken: "claim:a",
+          claimOwner: "scheduler:alpha",
+          claimExpiresAt: "2026-04-07T20:01:00.000Z",
+        }),
+        Object.freeze({
+          runId: "run:b",
+          queueId: "queue:default",
+          enteredAt: "2026-04-07T19:55:20.000Z",
+          eligibleAt: "2026-04-07T19:55:20.000Z",
+          claimToken: "claim:b",
+          claimOwner: "scheduler:alpha",
+          claimExpiresAt: "2026-04-07T20:01:00.000Z",
+        }),
+      ]),
+      runs: Object.freeze([
+        Object.freeze({
+          runId: "run:a",
+          workspaceId: "workspace:1",
+          submittedByUserIdentityId: "user:a",
+          workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+          requirements: Object.freeze({
+            requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+            requiresRemoteScheduling: true,
+          }),
+          queue: Object.freeze({
+            queueId: "queue:default",
+            enteredAt: "2026-04-07T19:55:20.000Z",
+            eligibleAt: "2026-04-07T19:55:20.000Z",
+            claimToken: "claim:a",
+            claimOwner: "scheduler:alpha",
+          }),
+        }),
+        Object.freeze({
+          runId: "run:b",
+          workspaceId: "workspace:1",
+          submittedByUserIdentityId: "user:b",
+          workspaceRoleKeys: Object.freeze([WorkspaceAuthorizationRoleKeys.member]),
+          requirements: Object.freeze({
+            requiredCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+            requiresRemoteScheduling: true,
+          }),
+          queue: Object.freeze({
+            queueId: "queue:default",
+            enteredAt: "2026-04-07T19:55:20.000Z",
+            eligibleAt: "2026-04-07T19:55:20.000Z",
+            claimToken: "claim:b",
+            claimOwner: "scheduler:alpha",
+          }),
+        }),
+      ]),
+      nodes: Object.freeze([
+        Object.freeze({
+          nodeId: "node:z",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+        Object.freeze({
+          nodeId: "node:a",
+          nodeType: NodeTypes.compute,
+          schedulable: true,
+          supportsRemoteScheduling: true,
+          enabledCapabilities: Object.freeze([NodeRoleCapabilities.executor]),
+          usageMode: SchedulingNodeUsageModes.idle,
+        }),
+      ]),
+    }));
+
+    expect(bundle.decision.selected?.runId).toBe("run:a");
+    expect(bundle.decision.selected?.nodeId).toBe("node:a");
   });
 });

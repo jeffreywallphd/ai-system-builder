@@ -13,13 +13,16 @@ import {
   SchedulingPolicySourceKinds,
   type SchedulingCandidateDecision,
   type SchedulingPolicyReason,
-  type SchedulingRunPolicyInput,
 } from "@domain/scheduling/SchedulingDomain";
 import {
   DefaultSchedulingPolicyRules,
   RolePriorityQueueAgeSchedulingScorePolicy,
   SchedulingPolicyRulePipeline,
 } from "./SchedulingPolicyRulePipeline";
+import {
+  createRolePrioritySchedulingArbitrationReason,
+  selectRolePrioritySchedulingCandidate,
+} from "./RolePrioritySchedulingArbitration";
 import type {
   ISchedulingCandidateScorePolicy,
   ISchedulingPolicyRule,
@@ -50,7 +53,10 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
     const occurredAt = this.now().toISOString();
     const evaluatedCandidates = await this.evaluateCandidates(snapshot);
     const eligibleCandidates = evaluatedCandidates.filter((candidate) => candidate.eligible);
-    const selected = chooseSelectedCandidate(eligibleCandidates, snapshot.runs);
+    const selected = selectRolePrioritySchedulingCandidate({
+      eligibleCandidates,
+      runs: snapshot.runs,
+    });
 
     const reasons: SchedulingPolicyReason[] = [
       Object.freeze({
@@ -63,6 +69,12 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
         }),
       }),
     ];
+    if (selected) {
+      reasons.push(createRolePrioritySchedulingArbitrationReason({
+        selected,
+        eligibleCandidateCount: eligibleCandidates.length,
+      }));
+    }
 
     let outcome = SchedulingDecisionOutcomes.assignmentRecommended;
     if (evaluatedCandidates.length === 0) {
@@ -138,35 +150,4 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
 
     return Object.freeze(results);
   }
-}
-
-function chooseSelectedCandidate(
-  candidates: ReadonlyArray<SchedulingCandidateDecision>,
-  runs: ReadonlyArray<SchedulingRunPolicyInput>,
-): Readonly<{ candidate: SchedulingCandidateDecision; run: SchedulingRunPolicyInput }> | undefined {
-  const runById = new Map(runs.map((run) => [run.runId, run] as const));
-  const sorted = [...candidates].sort((left, right) => {
-    if (left.scorecard.rolePriorityScore !== right.scorecard.rolePriorityScore) {
-      return right.scorecard.rolePriorityScore - left.scorecard.rolePriorityScore;
-    }
-    if (left.scorecard.queueAgeSeconds !== right.scorecard.queueAgeSeconds) {
-      return right.scorecard.queueAgeSeconds - left.scorecard.queueAgeSeconds;
-    }
-    if (left.runId !== right.runId) {
-      return left.runId.localeCompare(right.runId);
-    }
-    return left.nodeId.localeCompare(right.nodeId);
-  });
-
-  for (const candidate of sorted) {
-    const run = runById.get(candidate.runId);
-    if (run) {
-      return Object.freeze({
-        candidate,
-        run,
-      });
-    }
-  }
-
-  return undefined;
 }

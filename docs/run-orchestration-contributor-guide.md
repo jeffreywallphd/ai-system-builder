@@ -13,6 +13,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
 - `docs/architecture/run-orchestration-scheduling-policy-shared-contracts.md`
 - `docs/architecture/run-orchestration-scheduling-policy-framework-and-rule-pipeline.md`
+- `docs/architecture/run-orchestration-scheduling-role-priority-first-release.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
