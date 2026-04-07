@@ -71,6 +71,25 @@ Story 19.1.3 adds explicit resource classification and policy-driven posture eva
 - Added explicit deferred unsafe auto-merge posture:
   - non-comparable versions and unavailable authoritative snapshots are conflicted, not auto-resolved
 
+## Story 19.1.6 additions
+
+- Added explicit offline-safe local execution eligibility model:
+  - `evaluateOfflineLocalExecutionEligibility(...)`
+  - eligibility combines resource classification policy + device trust + node operational mode + workstation mode + policy flags
+- Added canonical supported-vs-out-of-scope execution class catalog:
+  - supported first production scope: `local-workflow-preview`, `local-workflow-validation`
+  - explicitly excluded for first production scope: `remote-orchestrated-run-replay`, `distributed-cluster-run`, `secret-materialized-execution`
+- Added explicit local execution metadata model:
+  - `createOfflineLocalExecutionRecord(...)`
+  - captures execution identity, actor, timing, input digest, output digests, node/workstation mode, and explicit local history scope
+- Added explicit reconnect registration envelope model:
+  - `createOfflineLocalExecutionRegistrationEnvelope(...)`
+  - registration queue state is distinct from authoritative orchestration success and requires divergence disclosure + replay descriptor
+- Added desktop host execution posture binding:
+  - `DesktopOfflineSupportedExecutionClasses`
+  - `evaluateDesktopOfflineLocalExecutionEligibility(...)`
+  - desktop remains control-plane-client and evaluates supported local execution classes only
+
 ## Classification inputs
 
 - workspace visibility
@@ -100,6 +119,7 @@ Story 19.1.3 adds explicit resource classification and policy-driven posture eva
 - no silent global divergence
 - no local cache as authoritative source of truth
 - no unsignaled authoritative overwrite
+- no silent conversion of offline local execution into authoritative remote orchestration history
 
 ## Test coverage
 

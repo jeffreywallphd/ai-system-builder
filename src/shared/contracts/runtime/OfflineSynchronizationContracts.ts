@@ -24,6 +24,59 @@ export const OfflineSyncResourceClasses = Object.freeze({
 export type OfflineSyncResourceClass =
   typeof OfflineSyncResourceClasses[keyof typeof OfflineSyncResourceClasses];
 
+export const OfflineExecutionClasses = Object.freeze({
+  localWorkflowPreview: "local-workflow-preview",
+  localWorkflowValidation: "local-workflow-validation",
+} as const);
+
+export type OfflineExecutionClass =
+  typeof OfflineExecutionClasses[keyof typeof OfflineExecutionClasses];
+
+export const OfflineNodeOperationalModes = Object.freeze({
+  workstationClient: "workstation-client",
+  managedWorkstationClient: "managed-workstation-client",
+  dedicatedExecutor: "dedicated-executor",
+  authoritativeControlPlane: "authoritative-control-plane",
+} as const);
+
+export type OfflineNodeOperationalMode =
+  typeof OfflineNodeOperationalModes[keyof typeof OfflineNodeOperationalModes];
+
+export const OfflineWorkstationModes = Object.freeze({
+  interactiveUserSession: "interactive-user-session",
+  managedBackgroundAgent: "managed-background-agent",
+  sharedKioskSession: "shared-kiosk-session",
+  headlessService: "headless-service",
+} as const);
+
+export type OfflineWorkstationMode =
+  typeof OfflineWorkstationModes[keyof typeof OfflineWorkstationModes];
+
+export const OfflineLocalExecutionOutcomes = Object.freeze({
+  succeeded: "succeeded",
+  failed: "failed",
+  cancelled: "cancelled",
+} as const);
+
+export type OfflineLocalExecutionOutcome =
+  typeof OfflineLocalExecutionOutcomes[keyof typeof OfflineLocalExecutionOutcomes];
+
+export const OfflineLocalExecutionHistoryScopes = Object.freeze({
+  explicitLocalActivity: "explicit-local-activity",
+} as const);
+
+export type OfflineLocalExecutionHistoryScope =
+  typeof OfflineLocalExecutionHistoryScopes[keyof typeof OfflineLocalExecutionHistoryScopes];
+
+export const OfflineLocalExecutionOutputClasses = Object.freeze({
+  logBundle: "log-bundle",
+  previewArtifact: "preview-artifact",
+  metricsSnapshot: "metrics-snapshot",
+} as const);
+
+export type OfflineLocalExecutionOutputClass =
+  typeof OfflineLocalExecutionOutputClasses[keyof typeof OfflineLocalExecutionOutputClasses];
+
 export const OfflineCacheFreshnessStates = Object.freeze({
   fresh: "fresh",
   stale: "stale",
@@ -93,6 +146,16 @@ export const OfflineSynchronizationStates = Object.freeze({
 
 export type OfflineSynchronizationState =
   typeof OfflineSynchronizationStates[keyof typeof OfflineSynchronizationStates];
+
+export const OfflineLocalExecutionRegistrationStatuses = Object.freeze({
+  queuedPendingRegistration: "queued-pending-registration",
+  registrationConflict: "registration-conflict",
+  registrationRejected: "registration-rejected",
+  registrationApplied: "registration-applied",
+} as const);
+
+export type OfflineLocalExecutionRegistrationStatus =
+  typeof OfflineLocalExecutionRegistrationStatuses[keyof typeof OfflineLocalExecutionRegistrationStatuses];
 
 export const OfflineConflictSeverities = Object.freeze({
   low: "low",
@@ -181,6 +244,40 @@ export interface OfflinePendingOperationReplayDescriptorDto {
   readonly payloadContentType?: string;
 }
 
+export interface OfflineLocalExecutionOutputDto {
+  readonly outputId: string;
+  readonly outputClass: OfflineLocalExecutionOutputClass;
+  readonly contentDigest: string;
+  readonly sizeBytes?: number;
+}
+
+export interface OfflineLocalExecutionRecordDto {
+  readonly executionId: string;
+  readonly executionClass: OfflineExecutionClass;
+  readonly resourceClass: OfflineSyncResourceClass;
+  readonly resourceId: string;
+  readonly startedAt: string;
+  readonly completedAt: string;
+  readonly executedByActorUserIdentityId: string;
+  readonly nodeOperationalMode: OfflineNodeOperationalMode;
+  readonly workstationMode: OfflineWorkstationMode;
+  readonly outcome: OfflineLocalExecutionOutcome;
+  readonly inputDigest: string;
+  readonly outputs: ReadonlyArray<OfflineLocalExecutionOutputDto>;
+  readonly historyScope: OfflineLocalExecutionHistoryScope;
+}
+
+export interface OfflineLocalExecutionRegistrationEnvelopeDto {
+  readonly registrationId: string;
+  readonly execution: OfflineLocalExecutionRecordDto;
+  readonly queuedAt: string;
+  readonly userVisibleRegistrationStatus: OfflineLocalExecutionRegistrationStatus;
+  readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflinePendingOperationReplayDescriptorDto;
+  readonly retryCount: number;
+  readonly lastAttemptedAt?: string;
+}
+
 export interface OfflinePendingOperationEnvelopeDto {
   readonly operationId: string;
   readonly targetResourceClass: OfflineSyncResourceClass;
@@ -235,6 +332,7 @@ export interface OfflineReconciliationOutcomeDto {
 export interface OfflineSyncQueueStateDto {
   readonly queueId: string;
   readonly operations: ReadonlyArray<OfflinePendingOperationEnvelopeDto>;
+  readonly localExecutionRegistrations: ReadonlyArray<OfflineLocalExecutionRegistrationEnvelopeDto>;
   readonly pendingRunSubmissions: ReadonlyArray<OfflinePendingRunSubmissionDto>;
   readonly outcomes: ReadonlyArray<OfflineReconciliationOutcomeDto>;
   readonly updatedAt: string;
@@ -279,27 +377,46 @@ export function deriveOfflineSynchronizationStatus(input: {
   const pendingOperationCount = input.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.queuedPendingSync)
     .length;
+  const pendingRegistrationCount = input.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus === OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration
+    ))
+    .length;
   const conflictCount = input.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.syncConflict)
+    .length;
+  const registrationConflictCount = input.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus === OfflineLocalExecutionRegistrationStatuses.registrationConflict
+    ))
     .length;
   const rejectedCount = input.queue.operations
     .filter((operation) => operation.userVisibleSyncStatus === OfflinePendingOperationStatuses.syncRejected)
     .length;
+  const registrationRejectedCount = input.queue.localExecutionRegistrations
+    .filter((registration) => (
+      registration.userVisibleRegistrationStatus === OfflineLocalExecutionRegistrationStatuses.registrationRejected
+    ))
+    .length;
+
+  const pendingTotalCount = pendingOperationCount + pendingRegistrationCount;
+  const conflictTotalCount = conflictCount + registrationConflictCount;
+  const rejectedTotalCount = rejectedCount + registrationRejectedCount;
 
   let state: OfflineSynchronizationState = OfflineSynchronizationStates.idle;
-  if (conflictCount > 0) {
+  if (conflictTotalCount > 0) {
     state = OfflineSynchronizationStates.blockedConflict;
-  } else if (input.connectivity.canResynchronize && pendingOperationCount > 0) {
+  } else if (input.connectivity.canResynchronize && pendingTotalCount > 0) {
     state = OfflineSynchronizationStates.synchronizing;
-  } else if (!input.connectivity.canResynchronize && pendingOperationCount > 0) {
+  } else if (!input.connectivity.canResynchronize && pendingTotalCount > 0) {
     state = OfflineSynchronizationStates.failed;
   }
 
   return Object.freeze({
     state,
-    pendingOperationCount,
-    conflictCount,
-    rejectedCount,
+    pendingOperationCount: pendingTotalCount,
+    conflictCount: conflictTotalCount,
+    rejectedCount: rejectedTotalCount,
     lastSynchronizedAt: input.lastSynchronizedAt,
     lastAttemptedAt: input.lastAttemptedAt,
     reasonCode: state === OfflineSynchronizationStates.failed ? "resynchronization-unavailable" : undefined,
@@ -404,6 +521,58 @@ export function transitionOfflinePendingOperationStatus(input: {
     userVisibleSyncStatus: input.nextStatus,
     retryCount: Math.max(input.operation.retryCount, Math.floor(input.retryCount ?? input.operation.retryCount)),
     lastAttemptedAt: input.lastAttemptedAt ?? input.operation.lastAttemptedAt,
+  });
+}
+
+function resolveAllowedOfflineLocalExecutionRegistrationStatusTransitions(
+  status: OfflineLocalExecutionRegistrationStatus,
+): ReadonlyArray<OfflineLocalExecutionRegistrationStatus> {
+  const transitions: Record<
+    OfflineLocalExecutionRegistrationStatus,
+    ReadonlyArray<OfflineLocalExecutionRegistrationStatus>
+  > = {
+    [OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration]: Object.freeze([
+      OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration,
+      OfflineLocalExecutionRegistrationStatuses.registrationConflict,
+      OfflineLocalExecutionRegistrationStatuses.registrationRejected,
+      OfflineLocalExecutionRegistrationStatuses.registrationApplied,
+    ]),
+    [OfflineLocalExecutionRegistrationStatuses.registrationConflict]: Object.freeze([
+      OfflineLocalExecutionRegistrationStatuses.registrationConflict,
+      OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration,
+      OfflineLocalExecutionRegistrationStatuses.registrationRejected,
+    ]),
+    [OfflineLocalExecutionRegistrationStatuses.registrationRejected]: Object.freeze([
+      OfflineLocalExecutionRegistrationStatuses.registrationRejected,
+      OfflineLocalExecutionRegistrationStatuses.queuedPendingRegistration,
+    ]),
+    [OfflineLocalExecutionRegistrationStatuses.registrationApplied]: Object.freeze([
+      OfflineLocalExecutionRegistrationStatuses.registrationApplied,
+    ]),
+  };
+  return transitions[status];
+}
+
+export function transitionOfflineLocalExecutionRegistrationStatus(input: {
+  readonly registration: OfflineLocalExecutionRegistrationEnvelopeDto;
+  readonly nextStatus: OfflineLocalExecutionRegistrationStatus;
+  readonly lastAttemptedAt?: string;
+  readonly retryCount?: number;
+}): OfflineLocalExecutionRegistrationEnvelopeDto {
+  const allowed = resolveAllowedOfflineLocalExecutionRegistrationStatusTransitions(
+    input.registration.userVisibleRegistrationStatus,
+  );
+  if (!allowed.includes(input.nextStatus)) {
+    throw new OfflineSynchronizationContractError(
+      `Local execution registration '${input.registration.registrationId}' cannot transition from '${input.registration.userVisibleRegistrationStatus}' to '${input.nextStatus}'.`,
+    );
+  }
+
+  return Object.freeze({
+    ...input.registration,
+    userVisibleRegistrationStatus: input.nextStatus,
+    retryCount: Math.max(input.registration.retryCount, Math.floor(input.retryCount ?? input.registration.retryCount)),
+    lastAttemptedAt: input.lastAttemptedAt ?? input.registration.lastAttemptedAt,
   });
 }
 

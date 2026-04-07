@@ -1,8 +1,14 @@
 import {
+  type OfflineLocalExecutionClass,
+  type OfflineLocalExecutionEligibilityEvaluation,
+  type OfflineLocalExecutionPolicyInput,
   type OfflineResourceAuthorityBoundary,
   type OfflineResourceClass,
   OfflineAuthorityScopes,
+  OfflineLocalExecutionClasses,
+  OfflineNodeOperationalModes,
   OfflineResourceClasses,
+  evaluateOfflineLocalExecutionEligibility,
   resolveOfflineResourceAuthorityBoundary,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import { inspectHostRuntimeRole } from "@domain/hosts/HostRuntimeDomain";
@@ -23,11 +29,17 @@ export const DesktopOfflineAllowedResourceClasses: ReadonlyArray<OfflineResource
   OfflineResourceClasses.localRuntimeSession,
 ]);
 
+export const DesktopOfflineSupportedExecutionClasses: ReadonlyArray<OfflineLocalExecutionClass> = Object.freeze([
+  OfflineLocalExecutionClasses.localWorkflowPreview,
+  OfflineLocalExecutionClasses.localWorkflowValidation,
+]);
+
 export interface DesktopOfflineLocalModeProfileInspection {
   readonly hostId: string;
   readonly isControlPlaneClient: boolean;
   readonly isAuthoritativeControlPlane: boolean;
   readonly allowedResourceClasses: ReadonlyArray<OfflineResourceClass>;
+  readonly supportedExecutionClasses: ReadonlyArray<OfflineLocalExecutionClass>;
   readonly authoritativeResourceClasses: ReadonlyArray<OfflineResourceClass>;
 }
 
@@ -54,7 +66,23 @@ export function inspectDesktopOfflineLocalModeProfile(): DesktopOfflineLocalMode
     isControlPlaneClient: roleInspection.isControlPlaneClient,
     isAuthoritativeControlPlane: roleInspection.isAuthoritativeControlPlane,
     allowedResourceClasses: DesktopOfflineAllowedResourceClasses,
+    supportedExecutionClasses: DesktopOfflineSupportedExecutionClasses,
     authoritativeResourceClasses: Object.freeze(authoritativeResourceClasses),
+  });
+}
+
+export function evaluateDesktopOfflineLocalExecutionEligibility(
+  input: Omit<OfflineLocalExecutionPolicyInput, "nodeOperationalMode">,
+): OfflineLocalExecutionEligibilityEvaluation {
+  if (!DesktopOfflineSupportedExecutionClasses.includes(input.executionClass as OfflineLocalExecutionClass)) {
+    throw new DesktopOfflineLocalModeProfileError(
+      `Desktop offline profile does not allow execution class '${input.executionClass}'.`,
+    );
+  }
+
+  return evaluateOfflineLocalExecutionEligibility({
+    ...input,
+    nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
   });
 }
 
