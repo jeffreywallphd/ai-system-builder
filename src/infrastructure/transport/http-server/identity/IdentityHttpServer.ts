@@ -225,6 +225,10 @@ import {
   mapToSharedApiErrorCode,
   normalizeSharedApiErrorEnvelope,
 } from "./IdentityHttpServerErrorTranslation";
+import type {
+  ResolveSessionActorContextApiResponse,
+  ResolveSessionActorWorkspaceContextApiRecord,
+} from "@shared/contracts/identity/IdentityTransportContracts";
 import {
   AuthoritativeApiRouteBackendKeys,
   type AuthoritativeApiRouteBackendKey,
@@ -1041,6 +1045,101 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               principal: context.principal,
               session: context.session,
               sessionToken: context.sessionToken,
+              transport: context.transport,
+            }), responseBody);
+          },
+        );
+        return;
+      }
+      if (request.method === "GET" && path === "/api/v1/identity/session/context") {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const url = new URL(request.url ?? "/", "http://localhost");
+            const requestedWorkspaceId = normalizeOptionalString(url.searchParams.get("workspaceId"));
+
+            const trustedDeviceId = context.session.deviceTrustContext?.trustedDeviceId
+              ?? context.session.trustedDeviceBindingId;
+            let trustedDevice: ResolveSessionActorContextApiResponse["trustedDevice"];
+            if (trustedDeviceId) {
+              const trustedDeviceResponse = await options.backendApi.getTrustedDevice({
+                trustedDeviceId,
+              });
+              if (
+                trustedDeviceResponse.ok
+                && trustedDeviceResponse.data
+                && trustedDeviceResponse.data.trustedDevice.userIdentityId === context.principal.userIdentityId
+              ) {
+                trustedDevice = trustedDeviceResponse.data.trustedDevice;
+              }
+            }
+
+            let workspaces: ReadonlyArray<ResolveSessionActorWorkspaceContextApiRecord> = Object.freeze([]);
+            if (options.workspaceAdministrationBackendApi) {
+              const workspaceResponse = await options.workspaceAdministrationBackendApi.listWorkspaces({
+                actorUserIdentityId: context.principal.userIdentityId,
+                limit: 200,
+                offset: 0,
+              });
+              if (workspaceResponse.ok && workspaceResponse.data) {
+                workspaces = Object.freeze(workspaceResponse.data.workspaces.map((workspace) => Object.freeze({
+                  workspaceId: workspace.workspaceId,
+                  slug: workspace.slug,
+                  displayName: workspace.displayName,
+                  status: workspace.status,
+                  visibility: workspace.visibility,
+                  membershipStatus: workspace.actorAccess.membershipStatus,
+                  effectiveRoles: workspace.actorAccess.effectiveRoles,
+                  canAdministrate: workspace.actorAccess.canAdministrate,
+                  isWorkspaceOwner: workspace.actorAccess.isWorkspaceOwner,
+                })));
+              }
+            }
+
+            const resolvedWorkspaceId = resolveSessionActorContextWorkspaceId(requestedWorkspaceId, workspaces);
+            const sessionAssuranceLevel = normalizeSessionAssuranceLevel(
+              context.session.deviceTrustContext?.sessionAssuranceLevel,
+            );
+
+            const responseBody: IdentityAuthApiResponse<ResolveSessionActorContextApiResponse> = Object.freeze({
+              ok: true,
+              data: Object.freeze({
+                actor: context.principal,
+                session: Object.freeze({
+                  sessionId: context.session.sessionId,
+                  providerId: context.session.providerId,
+                  accessChannel: context.session.accessChannel,
+                  deviceId: context.session.deviceId,
+                  issuedAt: context.session.issuedAt,
+                  expiresAt: context.session.expiresAt,
+                  assuranceLevel: sessionAssuranceLevel,
+                  trustedDeviceId: context.session.deviceTrustContext?.trustedDeviceId,
+                  issuedOnTrustedDevice: context.session.deviceTrustContext?.issuedOnTrustedDevice,
+                  trustState: context.session.deviceTrustContext?.trustStateSnapshot?.state,
+                  trustEvaluatedAt: context.session.deviceTrustContext?.trustStateSnapshot?.evaluatedAt,
+                  trustInvalidationReasons: context.session.deviceTrustContext?.invalidationReasons,
+                }),
+                trustedDevice,
+                workspaceContext: Object.freeze({
+                  requestedWorkspaceId,
+                  resolvedWorkspaceId,
+                  workspaces,
+                }),
+              }),
+            });
+
+            writeJson(response, 200, responseBody);
+            logResponse(logger, requestId, request, 200, Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              sessionId: context.session.sessionId,
+              requestedWorkspaceId,
+              resolvedWorkspaceId,
               transport: context.transport,
             }), responseBody);
           },
@@ -8863,6 +8962,18 @@ function isSessionAssuranceAllowed(
     "authenticated-trusted": 3,
   });
   return order[actual] >= order[minimum];
+}
+
+function resolveSessionActorContextWorkspaceId(
+  requestedWorkspaceId: string | undefined,
+  workspaces: ReadonlyArray<ResolveSessionActorWorkspaceContextApiRecord>,
+): string | undefined {
+  if (!requestedWorkspaceId) {
+    return workspaces[0]?.workspaceId;
+  }
+
+  const matched = workspaces.find((workspace) => workspace.workspaceId === requestedWorkspaceId);
+  return matched?.workspaceId ?? workspaces[0]?.workspaceId;
 }
 
 class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {

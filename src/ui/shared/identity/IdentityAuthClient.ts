@@ -26,6 +26,8 @@ import type {
   RevokeIdentitySessionApiRequest,
   RevokeIdentitySessionApiResponse,
   ResolveAuthenticatedSessionApiResponse,
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
   RegisterLocalIdentityApiRequest,
   RegisterLocalIdentityApiResponse,
   SetIdentityAdminAccountStatusApiRequest,
@@ -54,6 +56,9 @@ export interface IdentityAuthClient {
   resolveAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>>;
+  resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>>;
   logoutAuthenticatedSession(
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>>;
@@ -148,6 +153,15 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
     return this.get("/api/v1/identity/session", sessionToken);
+  }
+
+  public async resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    const query = new URLSearchParams();
+    appendSharedApiQueryValue(query, "workspaceId", request.workspaceId);
+    const suffix = toSharedApiQuerySuffix(query);
+    return this.get(`/api/v1/identity/session/context${suffix}`, request.sessionToken);
   }
 
   public async logoutAuthenticatedSession(

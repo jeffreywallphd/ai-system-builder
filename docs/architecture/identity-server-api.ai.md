@@ -8,6 +8,7 @@
   - `POST /api/v1/identity/dev-login` (development-only fallback login route)
 - Authenticated session validation endpoint and guard:
   - `GET /api/v1/identity/session` with `Authorization: Bearer <session-token>`
+  - `GET /api/v1/identity/session/context` with `Authorization: Bearer <session-token>`
 - Authenticated session termination and revocation endpoints:
   - `POST /api/v1/identity/logout`
   - `POST /api/v1/identity/session/revoke`
@@ -119,6 +120,10 @@ Trusted-device response serialization is now similarly allowlist-mapped and inte
 - pairing token hash material
 - internal trust-material persistence references
 
+Session actor-context bootstrap responses are allowlist-projected and intentionally exclude:
+- trusted-device trust-material refs and secret locators
+- legacy trust marker and trusted-device binding marker fields
+
 Certificate operations transport responses are metadata/action projected and intentionally exclude:
 - private key payloads and certificate PEM payloads
 - trust-material storage locators and protected secret references
@@ -200,6 +205,18 @@ Persisted session records now intentionally exclude:
 - Storage and asset converged routes now use this shared pipeline and preserve shared failure semantics:
   - unauthenticated requests return `401` + `authentication-failed`
   - authenticated requests missing required workspace scope return `400` + `invalid-request`
+
+## Converged session + actor-context bootstrap endpoint (story 14.2.2)
+
+- Added authenticated bootstrap endpoint: `GET /api/v1/identity/session/context`.
+- Optional query: `workspaceId` to request preferred workspace resolution.
+- Endpoint returns a unified bootstrap payload for desktop and thin clients:
+  - actor profile (`userIdentityId`, `username`, optional display/email)
+  - current session context (`sessionId`, provider/channel/device timing, assurance level)
+  - safe trusted-device projection for the current session when available
+  - workspace context projection (`requestedWorkspaceId`, `resolvedWorkspaceId`, and actor-visible workspace summaries)
+- Workspace context is resolved through the authoritative workspace administration backend API seam when composed in host runtime.
+- Endpoint is guarded by the same bearer-session validation pipeline as `GET /api/v1/identity/session`, so trust-invalid/revoked sessions are denied with the same authenticated failure semantics.
 
 ## Secure transport adapter setup (story 7.2.1)
 

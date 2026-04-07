@@ -36,11 +36,18 @@ import type {
   ValidateTrustedDevicePairingApiResponse,
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 export type * from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type {
+  WorkspaceMembershipStatus,
+  WorkspaceRole,
+  WorkspaceStatus,
+} from "@domain/workspaces/WorkspaceDomain";
+import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 
 export const IdentityTransportRoutes = Object.freeze({
   register: "/api/v1/identity/register",
   login: "/api/v1/identity/login",
   resolveSession: "/api/v1/identity/session",
+  resolveSessionActorContext: "/api/v1/identity/session/context",
   logout: "/api/v1/identity/logout",
   revokeSession: "/api/v1/identity/session/revoke",
   listAdminAccounts: "/api/v1/identity/admin/accounts",
@@ -70,12 +77,61 @@ export interface IdentitySessionTransportContract {
   readonly resolveAuthenticatedSession: {
     readonly response: IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>;
   };
+  readonly resolveSessionActorContext: {
+    readonly response: IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>;
+  };
   readonly logoutAuthenticatedSession: {
     readonly response: IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>;
   };
   readonly revokeIdentitySession: {
     readonly request: RevokeIdentitySessionApiRequest;
     readonly response: IdentityAuthApiResponse<RevokeIdentitySessionApiResponse>;
+  };
+}
+
+export interface ResolveSessionActorContextApiRequest {
+  readonly sessionToken: string;
+  readonly workspaceId?: string;
+}
+
+export interface ResolveSessionActorWorkspaceContextApiRecord {
+  readonly workspaceId: string;
+  readonly slug: string;
+  readonly displayName: string;
+  readonly status: WorkspaceStatus;
+  readonly visibility: WorkspaceVisibility;
+  readonly membershipStatus?: WorkspaceMembershipStatus;
+  readonly effectiveRoles: ReadonlyArray<WorkspaceRole>;
+  readonly canAdministrate: boolean;
+  readonly isWorkspaceOwner: boolean;
+}
+
+export interface ResolveSessionActorContextApiResponse {
+  readonly actor: AuthenticatedIdentityPrincipalApiResponse;
+  readonly session: {
+    readonly sessionId: string;
+    readonly providerId: string;
+    readonly accessChannel?: "desktop" | "thin-client";
+    readonly deviceId?: string;
+    readonly issuedAt: string;
+    readonly expiresAt: string;
+    readonly assuranceLevel: "authenticated-untrusted" | "authenticated-restricted" | "authenticated-trusted";
+    readonly trustedDeviceId?: string;
+    readonly issuedOnTrustedDevice?: boolean;
+    readonly trustState?: "unknown" | "untrusted" | "trusted" | "pending-pairing" | "revoked" | "expired";
+    readonly trustEvaluatedAt?: string;
+    readonly trustInvalidationReasons?: ReadonlyArray<
+      "trusted-device-revoked"
+      | "trusted-device-trust-lost"
+      | "trusted-device-expired"
+      | "trusted-device-mismatch"
+    >;
+  };
+  readonly trustedDevice?: GetTrustedDeviceApiResponse["trustedDevice"];
+  readonly workspaceContext: {
+    readonly requestedWorkspaceId?: string;
+    readonly resolvedWorkspaceId?: string;
+    readonly workspaces: ReadonlyArray<ResolveSessionActorWorkspaceContextApiRecord>;
   };
 }
 

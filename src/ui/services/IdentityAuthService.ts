@@ -39,6 +39,10 @@
 } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DesktopTrustedDeviceIdentityAuthClient } from "@infrastructure/transport/http-client/DesktopTrustedDeviceIdentityAuthClient";
 import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+import type {
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
+} from "@shared/contracts/identity/IdentityTransportContracts";
 import { HttpIdentityAuthClient, type IdentityAuthClient } from "@shared/identity/IdentityAuthClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
@@ -69,6 +73,12 @@ export class IdentityAuthService {
     request: ResolveAuthenticatedSessionApiRequest,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
     return this.client.resolveAuthenticatedSession(request.sessionToken);
+  }
+
+  public resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    return this.client.resolveSessionActorContext(request);
   }
 
   public logoutAuthenticatedSession(
