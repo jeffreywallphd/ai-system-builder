@@ -6,6 +6,7 @@
 - Epic: 14.1, Establish Shared API Contracts and Access Foundations
 - Story: 14.1.2, Create the shared API contract and schema package for multi-surface clients
 - Story: 14.1.3, Standardize API error, permission-denied, and not-found response semantics
+- Story: 14.1.5, Build a shared API client library for desktop and thin-client consumers
 
 ## Purpose
 
@@ -15,6 +16,10 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 
 - `src/shared/contracts/api/SharedApiContractPrimitives.ts`
   - Canonical identifier envelopes, pagination/filtering primitives, mutation result envelopes, and standardized error semantics.
+- `src/ui/shared/api/SharedApiClient.ts`
+  - Shared thin/desktop-ready transport client for authenticated JSON requests, retry/cancellation, response-envelope parsing, and error normalization.
+- `src/shared/api/SharedApiClient.ts`
+  - Shared re-export for non-UI consumers that need the same client contract.
 - `src/shared/contracts/identity/IdentityTransportContracts.ts`
   - Session, trusted-device, and identity admin-lite transport route catalog and typed operation contracts.
 - `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts`
@@ -61,3 +66,36 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 
 - Existing `src/infrastructure/api/*/sdk/Public*Contract.ts` files include migration notes and remain source-compatible for current consumers.
 - New contract additions for protected domains should land in `src/shared/contracts/*` with corresponding schema validators in `src/shared/schemas/*`.
+- New shared API domain clients should compose `SharedApiClient` instead of calling `fetch` directly.
+
+## Shared client usage notes (Story 14.1.5)
+
+1. Domain clients own route/query/body mapping and should delegate HTTP transport to `SharedApiClient`.
+2. `SharedApiClient` centralizes:
+   - bearer session propagation (`sessionToken`),
+   - host-specific transport configuration (`baseUrl`, credentials, timeouts, fetch implementation, retry policy),
+   - retry behavior for retryable GET requests,
+   - cancellation via `AbortSignal` and timeout controls,
+   - normalized error envelopes for transport and non-envelope failures.
+3. Domain-specific schema parsing can be injected per call with `parseResponse`.
+
+### Example: adding a new endpoint to a domain client
+
+```ts
+public async listSomething(
+  request: { readonly workspaceId: string; readonly limit?: number },
+  sessionToken: string,
+): Promise<WorkspaceAdministrationApiResponse<ListSomethingApiResponse>> {
+  const query = new URLSearchParams();
+  query.set("workspaceId", request.workspaceId);
+  if (typeof request.limit === "number") {
+    query.set("limit", String(request.limit));
+  }
+
+  return this.apiClient.requestJson({
+    method: "GET",
+    path: `/api/v1/workspaces/something?${query.toString()}`,
+    sessionToken,
+  });
+}
+```
