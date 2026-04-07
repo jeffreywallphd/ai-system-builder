@@ -12,7 +12,7 @@ These concerns remain separate and compatible.
 Specialized composite semantics remain explicit in these shared contracts: workflow = orchestrator, agent = decision unit, context-bundle = input preparer.
 
 ## Shared contract model
-- Inner-layer contract types live in `domain/contracts/AssetContract.ts`.
+- Inner-layer contract types live in `src/domain/contracts/AssetContract.ts`.
 - The model is intentionally compact:
   - input shape
   - output shape
@@ -20,7 +20,7 @@ Specialized composite semantics remain explicit in these shared contracts: workf
   - optional execution metadata
 
 ## Resolver/projection seam
-- `application/contracts/CompositionAssetContractResolver.ts` projects contracts from existing entities without requiring broad entity rewrites.
+- `src/application/contracts/CompositionAssetContractResolver.ts` projects contracts from existing entities without requiring broad entity rewrites.
 - Current grounded projections include:
   - workflows
   - agents
@@ -80,25 +80,25 @@ Not implemented in this slice:
 
 ## Direction 5 update: Runtime execution contract + dependency resolution foundation (stories 6.3–6.4)
 
-- Runtime now has an explicit execution-contract mapping seam in `application/system-runtime/RuntimeExecutionContractMapping.ts`.
+- Runtime now has an explicit execution-contract mapping seam in `src/application/system-runtime/RuntimeExecutionContractMapping.ts`.
 - Mapping stays derived from existing shared system contract truth (`CompositionAssetContractResolver.resolveSystemContract`) plus system definitions, rather than creating a second contract universe.
 - Runtime execution contract mapping now projects:
   - runtime execution inputs/outputs
   - runtime execution parameters/configuration (system-authored + contract-derived)
   - runtime-visible child component interface references for atomic/composite/system children
   - bounded recursive nested-system traversal status for system-of-systems readiness.
-- Runtime now has an explicit dependency-resolution seam in `application/system-runtime/RuntimeDependencyResolution.ts`.
+- Runtime now has an explicit dependency-resolution seam in `src/application/system-runtime/RuntimeDependencyResolution.ts`.
 - Dependency resolution reuses existing version-aware recursive dependency truth (`collectSystemDirectDependencies` + nested-system traversal) and does not create a second dependency graph model.
 - Recursive resolution is bounded and cycle-safe, producing deterministic runtime-oriented outputs (resolved component set, direct/transitive dependencies, ordering hints) suitable for later execution-plan construction without implementing the runtime planner/orchestrator in this slice.
 
 
 ## Direction 5 update: Runtime environment abstraction + execution plan builder (stories 6.5–6.6)
 
-- Runtime now includes a bounded environment abstraction in `domain/system-runtime/RuntimeEnvironmentDomain.ts` and `application/system-runtime/RuntimeEnvironmentSelector.ts`:
+- Runtime now includes a bounded environment abstraction in `src/domain/system-runtime/RuntimeEnvironmentDomain.ts` and `src/application/system-runtime/RuntimeEnvironmentSelector.ts`:
   - typed environment kinds (`local`, `mcp`, `remote`)
   - capability contracts for supported structural kinds, nested-system support, and MCP-mediated execution posture
   - deterministic resolution results (`resolved` vs `unsupported`) for plan-time environment targeting without infrastructure launch coupling.
-- Runtime plan-building now has an explicit seam in `application/system-runtime/ExecutionPlanBuilder.ts`:
+- Runtime plan-building now has an explicit seam in `src/application/system-runtime/ExecutionPlanBuilder.ts`:
   - deterministic `ExecutionPlan`/node/edge model derived from existing system structure + bindings + runtime contract/dependency outputs
   - environment assignment through the selector seam (no hardcoded single-host execution)
   - cycle-safe invalidation for binding/dependency cycles and truthful unsupported-environment surfacing
@@ -106,9 +106,9 @@ Not implemented in this slice:
 
 ## Direction 5 update: Runtime orchestration + step execution seams (stories 6.7–6.8)
 
-- Runtime now has a bounded orchestration seam in `application/system-runtime/ExecutionOrchestrationService.ts` that composes runtime-contract mapping, dependency resolution, environment selection, and plan progression into runtime execution lifecycle state.
+- Runtime now has a bounded orchestration seam in `src/application/system-runtime/ExecutionOrchestrationService.ts` that composes runtime-contract mapping, dependency resolution, environment selection, and plan progression into runtime execution lifecycle state.
 - Orchestration remains application-layer and delegates all per-node work to the step engine seam; it does not embed infrastructure-specific execution paths.
-- Runtime now has a bounded step engine seam in `application/system-runtime/StepExecutionEngine.ts` that executes plan nodes for atomic/composite/system components using runtime-domain status/output semantics.
+- Runtime now has a bounded step engine seam in `src/application/system-runtime/StepExecutionEngine.ts` that executes plan nodes for atomic/composite/system components using runtime-domain status/output semantics.
 - Bounded behavior handling is explicit:
   - deterministic steps execute fixed-pass
   - conditional/iterative/autonomous steps expose only truthful bounded markers/diagnostics currently supported
@@ -116,8 +116,8 @@ Not implemented in this slice:
 
 ## Direction 5 update: Runtime trace + bounded recovery semantics (stories 6.11–6.12)
 
-- Runtime execution state now carries typed trace/log artifacts (`ExecutionTrace`, `ExecutionTraceEvent`, `ExecutionLogEntry`) in `domain/system-runtime/SystemRuntimeDomain.ts`.
-- Trace events are emitted from authoritative seams in `application/system-runtime/ExecutionOrchestrationService.ts` for:
+- Runtime execution state now carries typed trace/log artifacts (`ExecutionTrace`, `ExecutionTraceEvent`, `ExecutionLogEntry`) in `src/domain/system-runtime/SystemRuntimeDomain.ts`.
+- Trace events are emitted from authoritative seams in `src/application/system-runtime/ExecutionOrchestrationService.ts` for:
   - execution lifecycle transitions
   - node attach/start/complete state transitions
   - bounded loop/planner progression (`iterate`, `replan`)
@@ -147,13 +147,13 @@ Not implemented in this slice:
 
 ## Direction 5 update: Runtime input validation + output serialization (stories 7.5–7.6)
 
-- External runtime execution now validates invocation payloads through a centralized seam (`application/system-runtime/RuntimeInputValidationService.ts`) before orchestration begins.
+- External runtime execution now validates invocation payloads through a centralized seam (`src/application/system-runtime/RuntimeInputValidationService.ts`) before orchestration begins.
 - Validation is derived from existing runtime execution contract truth (`RuntimeExecutionContractMapping` + resolved system contract) and stays bounded to current model expressiveness:
   - missing required inputs,
   - unsupported input keys where contract semantics are explicit,
   - bounded parameter/config object shape and declared type checks.
 - Validation failures are deterministic and structured (`RuntimeValidationError`) and are returned to runtime API consumers as `invalid-request` responses with machine-readable issue lists.
-- Runtime result retrieval now uses a transport-layer serialization seam (`infrastructure/api/system-runtime/RuntimeOutputSerializer.ts`) that projects:
+- Runtime result retrieval now uses a transport-layer serialization seam (`src/infrastructure/api/system-runtime/RuntimeOutputSerializer.ts`) that projects:
   - version-aware execution identity,
   - execution summary,
   - contract-labeled output payload entries,
@@ -163,7 +163,7 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: Core transformation assets foundation (stories 16.1-16.6)
 
-- Dataset Studio now has a dedicated transformation-asset seam in `application/dataset-studio/core/data/transformation/*` with explicit contracts:
+- Dataset Studio now has a dedicated transformation-asset seam in `src/application/dataset-studio/core/data/transformation/*` with explicit contracts:
   - `ITransformationAsset`
   - `ITransformationInput`
   - `ITransformationOutput`
@@ -220,29 +220,29 @@ Not implemented in this slice:
 ## Direction 5 extension update: Dataset schema intent + media contract foundation (stories 1.1.1-1.1.2)
 
 - Dataset asset registration now includes an explicit schema-intent seam with inspectable descriptors (`id`, `name`, `description`, `contractVersion`, supported shape kinds, and validation issues) on `DataAssetRegistry` entries.
-- A reusable schema-intent registry now exists in `application/dataset-studio/DatasetSchemaIntentRegistry.ts` with default intents (`tabular`, `document`, `semantic`, `media`) and shape-kind-based intent resolution for compatibility with existing assets.
+- A reusable schema-intent registry now exists in `src/application/dataset-studio/DatasetSchemaIntentRegistry.ts` with default intents (`tabular`, `document`, `semantic`, `media`) and shape-kind-based intent resolution for compatibility with existing assets.
 - Media is now a first-class schema intent through `MediaSchemaIntentAdapter`, with dataset-level validation hooks for image-oriented shapes and canonical media-contract checks where image-record fields are present.
-- Canonical image records are now domain-first contracts in `domain/dataset-studio/contracts/ImageRecord.ts` with structured image asset references (`domain/dataset-studio/contracts/ImageAssetReference.ts`) and library-agnostic interfaces (`ImageRecord`, `IImageRecordValidator`).
-- zod is now isolated behind adapter boundaries for this slice (`application/dataset-studio/adapters/validation/ImageRecordValidator.ts`), preserving domain/application contracts independent of validation library choice.
+- Canonical image records are now domain-first contracts in `src/domain/dataset-studio/contracts/ImageRecord.ts` with structured image asset references (`src/domain/dataset-studio/contracts/ImageAssetReference.ts`) and library-agnostic interfaces (`ImageRecord`, `IImageRecordValidator`).
+- zod is now isolated behind adapter boundaries for this slice (`src/application/dataset-studio/adapters/validation/ImageRecordValidator.ts`), preserving src/domain/application contracts independent of validation library choice.
 
 ## Direction 5 extension update: media asset-reference + metadata extraction refinement (stories 1.1.3-1.1.4)
 
 - Image asset references are now standardized through `ImageAssetReference` with explicit source kinds (`local-file`, `generated-output`, `external-uri`, canonical asset compatibility), stable identifiers, optional source context, and format/mime hints.
 - `ImageRecord` normalization now canonicalizes legacy string/object references at the boundary into that structured contract, keeping persisted/runtime image-record semantics inspectable and version-safe.
-- Image metadata extraction is now adapter-backed through internal interfaces in `domain/dataset-studio/interfaces/ImageMetadataExtraction.ts` (`IImageMetadataExtractor`, `IImageFormatDetector`, `IImageDimensionReader`, `IImageExifReader`).
-- Library integrations are confined to media adapter modules (`application/dataset-studio/adapters/media/*`) using `file-type`, `image-size`, and `exifr`; domain contracts remain library-independent.
+- Image metadata extraction is now adapter-backed through internal interfaces in `src/domain/dataset-studio/interfaces/ImageMetadataExtraction.ts` (`IImageMetadataExtractor`, `IImageFormatDetector`, `IImageDimensionReader`, `IImageExifReader`).
+- Library integrations are confined to media adapter modules (`src/application/dataset-studio/adapters/media/*`) using `file-type`, `image-size`, and `exifr`; domain contracts remain library-independent.
 - `ImageIngestorAsset` now composes extraction + normalization + image-record validation before producing canonical image metadata outputs, so ingestion reliably populates image-record fields (`assetRef`, dimensions, format, mime/exif hints) while degrading gracefully when EXIF data is absent.
 
 ## Direction 5 UI extension update: system/page asset contract + unified UI asset registration (stories 1.1.3-1.1.4)
 
-- Studio UI contracts now include a first-class `system-page` kind (`ui/studio-shell/studio-assets/StudioAssetContracts.ts`) so page/layout/navigation assets are explicit rather than overloaded as generic composed assets.
+- Studio UI contracts now include a first-class `system-page` kind (`src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`) so page/layout/navigation assets are explicit rather than overloaded as generic composed assets.
 - `SystemPageAssetContract` adds reusable page-level contract seams for:
   - page/layout structure (`layoutKind`, `regions`, `defaultRegionId`),
   - layout responsibilities and panel references,
   - navigation/runtime-relevant settings (`route`, deep-link posture, nav grouping),
   - renderer/persistence compatibility through shared studio-asset base fields.
 - `system-studio` now declares that `system-page` contract shape in `StudioSurfaceAssetDefinitions`, including explicit region definitions (`navigation`, `workspace`, `inspector`) and bounded nested-page composition metadata.
-- A shared registration/discovery seam now exists in `ui/studio-shell/studio-assets/StudioAssetRegistry.ts` and reuses existing studio asset definitions/contracts:
+- A shared registration/discovery seam now exists in `src/ui/studio-shell/studio-assets/StudioAssetRegistry.ts` and reuses existing studio asset definitions/contracts:
   - atomic UI primitives,
   - composed studio surfaces,
   - system/page surfaces.
@@ -250,7 +250,7 @@ Not implemented in this slice:
 
 ## Direction 5 UI extension update: shared UI asset metadata + runtime renderer resolution (stories 1.1.5-1.1.6)
 
-- Studio UI asset metadata is now normalized as one shared registration model across atomic primitives, composed studio assets, and system/page assets (`ui/studio-shell/studio-assets/StudioAssetContracts.ts`, `ui/studio-shell/studio-assets/StudioAssetRegistry.ts`).
+- Studio UI asset metadata is now normalized as one shared registration model across atomic primitives, composed studio assets, and system/page assets (`src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`, `src/ui/studio-shell/studio-assets/StudioAssetRegistry.ts`).
 - Metadata fields now consistently expose:
   - identity hooks (`metadata.id`, `metadata.assetType`)
   - display text (`title`, `summary`, `displayName`, `description`)
@@ -266,10 +266,10 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: derived attributes + media schema validation layer (stories 1.1.5-1.1.6)
 
-- Canonical image-record contracts now include a typed derived-attributes seam (`domain/dataset-studio/contracts/ImageDerivedAttributes.ts`) with bounded fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while preserving canonical record extensibility.
+- Canonical image-record contracts now include a typed derived-attributes seam (`src/domain/dataset-studio/contracts/ImageDerivedAttributes.ts`) with bounded fields (`aspectRatio`, `orientation`, `isAnimated`, `pixelCount`, `megapixels`) while preserving canonical record extensibility.
 - Derived-attribute computation is now explicit and swappable through an internal contract (`IImageDerivedAttributeCalculator`) with a default application-layer implementation (`DefaultImageDerivedAttributeCalculator`), keeping computation separate from ingestion extraction and validation plumbing.
 - `ImageIngestorAsset` now computes derived fields from canonical dimensions/format before record finalization, and outputs those derived values through canonical media metadata for downstream preview/runtime usage.
-- Media validation now has explicit domain-level contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) and normalized result/diagnostic payloads, with zod-backed adapter implementations confined to `application/dataset-studio/adapters/validation/*`.
+- Media validation now has explicit domain-level contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) and normalized result/diagnostic payloads, with zod-backed adapter implementations confined to `src/application/dataset-studio/adapters/validation/*`.
 - Media schema-intent validation now routes through that shared media dataset validator seam (no parallel validation stack), covering assetRef shape, dimensions, format allow-list alignment, metadata/tags compatibility, and derived-attribute shape checks.
 - Runtime canonical-shape validation now reuses the same media dataset validator seam for `image-metadata-records`, so ingestion/runtime validation behavior is inspectable and consistent.
 
@@ -277,7 +277,7 @@ Not implemented in this slice:
 
 - Media datasets continue to register/load through the same `DataAssetRegistry` and `CanonicalDataAsset` contracts; no media-only asset registry/runtime path was introduced.
 - Shared dataset inspectability metadata now derives preview-mode hints from schema-intent metadata (`previewHint`) when explicit preview modes are not configured, keeping preview capability discoverable through common descriptor contracts.
-- Image preview shaping now runs through the shared `DataPreviewEngine` using a dedicated mapper seam (`application/data-studio/ImageDatasetPreviewBuilder.ts`) instead of UI-local parsing logic.
+- Image preview shaping now runs through the shared `DataPreviewEngine` using a dedicated mapper seam (`src/application/data-studio/ImageDatasetPreviewBuilder.ts`) instead of UI-local parsing logic.
 - `image-metadata-records` previews now expose schema-aware image fields per item:
   - image reference/id
   - width/height
@@ -290,7 +290,7 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: media tagging/annotations + schema-aware image ingestion (stories 1.1.9-1.1.10)
 
-- Canonical image-record contracts now include first-class lightweight annotations (`domain/dataset-studio/contracts/ImageAnnotations.ts`) and integrate them into `ImageRecord` normalization/creation (`domain/dataset-studio/contracts/ImageRecord.ts`) alongside normalized tags.
+- Canonical image-record contracts now include first-class lightweight annotations (`src/domain/dataset-studio/contracts/ImageAnnotations.ts`) and integrate them into `ImageRecord` normalization/creation (`src/domain/dataset-studio/contracts/ImageRecord.ts`) alongside normalized tags.
 - Annotation support is intentionally bounded and inspectable for dataset/workflow/system interoperability:
   - optional `caption`, `description`, `note`
   - optional bounded `labels`
@@ -321,9 +321,9 @@ Not implemented in this slice:
   - revision,
   - published version id,
   - schema-intent contract version.
-- Canonical image-record version handling now has explicit bounded compatibility rules in a shared domain helper (`domain/dataset-studio/contracts/ImageRecordVersioning.ts`) that reuses existing dataset version parsing/comparison conventions instead of creating a media-only versioning stack.
+- Canonical image-record version handling now has explicit bounded compatibility rules in a shared domain helper (`src/domain/dataset-studio/contracts/ImageRecordVersioning.ts`) that reuses existing dataset version parsing/comparison conventions instead of creating a media-only versioning stack.
 - Media validation now enforces bounded image-record schema-version compatibility (invalid/incompatible versions fail validation) while preserving backward-safe defaults for legacy records with missing schema-version declarations.
-- Workflow dataset-input contracts now include an inspectable compatibility descriptor seam (`application/workflow-studio/WorkflowDatasetCompatibilityContracts.ts`) on the existing input-binding/context-assembly path (no parallel workflow pathway):
+- Workflow dataset-input contracts now include an inspectable compatibility descriptor seam (`src/application/workflow-studio/WorkflowDatasetCompatibilityContracts.ts`) on the existing input-binding/context-assembly path (no parallel workflow pathway):
   - generic dataset-reference compatibility for all dataset inputs,
   - media image-record compatibility contracts when inputs declare media intent (`schemaIntentId=media` / `shapeKind=image-metadata-records` / `recordContract=image-record`),
   - stable workflow-facing media fields: `assetRef`, `width`, `height`, `format`, `metadata`, `tags`, `derived`, `annotations`,
@@ -332,18 +332,18 @@ Not implemented in this slice:
 ## Direction 5 extension update: media adapter containment hardening (story 1.1.13)
 
 - Media library mechanics are now explicitly adapter-owned:
-  - `file-type` stays inside `application/dataset-studio/adapters/media/ImageFormatDetectorAdapter.ts`,
-  - `image-size` stays inside `application/dataset-studio/adapters/media/ImageDimensionReaderAdapter.ts`,
-  - `exifr` stays inside `application/dataset-studio/adapters/media/ImageMetadataExtractorAdapter.ts`,
-  - `sharp` stays inside `application/dataset-studio/adapters/media/SharpImageTransformerAdapter.ts`.
+  - `file-type` stays inside `src/application/dataset-studio/adapters/media/ImageFormatDetectorAdapter.ts`,
+  - `image-size` stays inside `src/application/dataset-studio/adapters/media/ImageDimensionReaderAdapter.ts`,
+  - `exifr` stays inside `src/application/dataset-studio/adapters/media/ImageMetadataExtractorAdapter.ts`,
+  - `sharp` stays inside `src/application/dataset-studio/adapters/media/SharpImageTransformerAdapter.ts`.
 - Image/media orchestration now resolves defaults through adapter composition (`MediaAdapterFactory`) instead of scattering concrete media-library adapter construction across ingestion and pipeline services.
 - Media validation defaults now resolve through validation composition (`MediaValidationFactory`), keeping validation contracts (`IMediaRecordValidator`, `IMediaDatasetValidator`) stable while zod-backed implementations remain behind adapter boundaries.
 - Mid-level image transformation services now depend on internal contracts (`IImageTransformer`) and consume normalized adapter outputs instead of calling `sharp` directly.
 
 ## Direction 5 extension update: dataset runtime instances + input image store foundation (stories 1.2.3-1.2.4)
 
-- Dataset runtime state now has an explicit system-runtime instance seam (`domain/system-runtime/DatasetInstanceDomain.ts`, `application/system-runtime/DatasetInstanceRepository.ts`) separate from dataset asset-definition metadata.
-- Persistence now includes a dedicated SQLite adapter (`infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`) with versioned migrations and round-trip rehydration through canonical dataset-instance normalization.
+- Dataset runtime state now has an explicit system-runtime instance seam (`src/domain/system-runtime/DatasetInstanceDomain.ts`, `src/application/system-runtime/DatasetInstanceRepository.ts`) separate from dataset asset-definition metadata.
+- Persistence now includes a dedicated SQLite adapter (`src/infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`) with versioned migrations and round-trip rehydration through canonical dataset-instance normalization.
 - Dataset instance creation/ensure flows now validate:
   - system ownership (through an ownership validator seam),
   - dataset asset linkage (through a dataset-asset catalog seam),
@@ -360,7 +360,7 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: system-owned binding + instance-level schema enforcement (stories 1.2.7-1.2.8)
 
-- System dataset ownership now has an explicit binding projection contract in `domain/system-runtime/SystemDatasetBindingDomain.ts`:
+- System dataset ownership now has an explicit binding projection contract in `src/domain/system-runtime/SystemDatasetBindingDomain.ts`:
   - stable system binding roles (`input`, `output`, `intermediate`) mapped from runtime dataset-instance roles,
   - explicit binding shape (`systemId`, `instanceId`, dataset asset linkage, role, purpose),
   - no duplication of ownership truth: bindings are projected from owned `DatasetInstance` entities.
@@ -371,7 +371,7 @@ Not implemented in this slice:
   - rejects cross-system binding attempts,
   - rejects binding-role mismatches against dataset-instance runtime role,
   - preserves role+purpose uniqueness semantics per system through existing repository contracts.
-- Instance-level schema enforcement is now centralized in `application/system-runtime/DatasetInstanceSchemaEnforcementService.ts` and consumed by `SystemDatasetInstanceService`:
+- Instance-level schema enforcement is now centralized in `src/application/system-runtime/DatasetInstanceSchemaEnforcementService.ts` and consumed by `SystemDatasetInstanceService`:
   - shape validation (`validateShapeForInstance`) and record-admission validation (`validateRecordForInstance`, `validateRecordsForInstance`) share one enforcement path,
   - admission gates (`admitRecordForInstance`, `admitRecordsForInstance`) reject invalid payloads with deterministic `invalid-request` errors,
   - enforcement resolves the linked dataset asset/schema intent from the instance boundary instead of relying on caller-local checks.
@@ -380,12 +380,12 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: image instance ingestion + query retrieval APIs (stories 1.2.9-1.2.10)
 
-- Dataset-instance runtime records now include an explicit image-record contract in `domain/system-runtime/DatasetInstanceRecordDomain.ts`:
+- Dataset-instance runtime records now include an explicit image-record contract in `src/domain/system-runtime/DatasetInstanceRecordDomain.ts`:
   - system-owned/runtime-scoped identity (`recordId`, `instanceId`, `systemId`, dataset asset linkage),
   - admitted canonical image payload (`ImageRecord`),
   - optional storage reference metadata (`reference`, `provider`),
   - bounded query criteria helpers (format/tag/dimension/asset-ref/metadata filters).
-- Dataset-instance persistence now supports image record durability alongside instance state through `application/system-runtime/DatasetInstanceRepository.ts` + `infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`:
+- Dataset-instance persistence now supports image record durability alongside instance state through `src/application/system-runtime/DatasetInstanceRepository.ts` + `src/infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`:
   - save/get/list/query image records by instance boundary,
   - SQLite schema migration adds `system_dataset_instance_image_records` with indexed instance/query fields,
   - rehydration uses canonical domain normalization (no raw cast-only payload reads).
@@ -407,7 +407,7 @@ Not implemented in this slice:
 
 ## AI Loom Image System vertical-slice update: output materialization + generated image records (stories 2.3.1-2.3.2)
 
-- Workflow output persistence now has a canonical system-owned materialization contract in `application/system-runtime/WorkflowOutputMaterializationContract.ts`:
+- Workflow output persistence now has a canonical system-owned materialization contract in `src/application/system-runtime/WorkflowOutputMaterializationContract.ts`:
   - workflow run reference (`runId`, `workflowAssetId`, optional `workflowAssetVersionId`),
   - source image reference (optional),
   - produced asset references (one-or-more), per-asset generation role (`primary` / `variant` / `intermediate`), tags, and metadata,
@@ -415,7 +415,7 @@ Not implemented in this slice:
   - timestamps (`requestedAt`, optional `startedAt`/`completedAt`, `updatedAt`),
   - lifecycle status (`pending` / `materialized` / `failed` / `partial`) and optional structured error envelope.
 - The materialization contract is system-centric and execution-adapter agnostic: no ComfyUI DTO/result shape leaks into this contract.
-- Dataset-instance image records now model generated outputs as first-class entry schema in `domain/system-runtime/DatasetInstanceRecordDomain.ts` via `generation` metadata:
+- Dataset-instance image records now model generated outputs as first-class entry schema in `src/domain/system-runtime/DatasetInstanceRecordDomain.ts` via `generation` metadata:
   - output asset reference,
   - optional source image linkage,
   - workflow asset/version,
@@ -427,16 +427,16 @@ Not implemented in this slice:
 
 ## AI Loom Image System vertical-slice update: materialization service + execution-result adapter (stories 2.3.3-2.3.4)
 
-- Output persistence now has an explicit application orchestration seam in `application/system-runtime/WorkflowOutputMaterializationService.ts`:
+- Output persistence now has an explicit application orchestration seam in `src/application/system-runtime/WorkflowOutputMaterializationService.ts`:
   - validates canonical `WorkflowOutputMaterializationPayload` requests,
   - assembles normalized image-record admission payloads from produced assets,
   - maps per-asset generation metadata via `materializationAssetToDatasetGeneration(...)`,
   - writes generated records into the target **system-owned dataset instance** through `SystemDatasetInstanceService` (not executor-specific adapters).
-- Executor-shape translation is now explicitly isolated in `infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper.ts`:
+- Executor-shape translation is now explicitly isolated in `src/infrastructure/comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper.ts`:
   - maps `IComfyAdapterResult` payloads into the canonical materialization contract,
   - supports multi-image outputs (`primary` + `variant` role assignment),
   - normalizes optional/unknown metadata into canonical record values,
-  - keeps ComfyUI-specific result semantics out of application/domain materialization contracts.
+  - keeps ComfyUI-specific result semantics out of src/application/domain materialization contracts.
 - Boundary direction remains clean for the image vertical slice:
   - backend-specific execution payloads are translated at infrastructure adapter boundaries,
   - application services consume only internal materialization contracts,
@@ -445,21 +445,21 @@ Not implemented in this slice:
 
 ## AI Loom Image System vertical-slice update: storage-instance provisioning contract + local filesystem provisioner (stories 2.1-2.2)
 
-- Added a reusable, versioned storage-instance provisioning seam in `application/system-runtime/StorageInstanceProvisioningContract.ts` so systems and embedded subsystems can request shareable storage instances without carrying raw filesystem path configuration in UI/application contracts.
+- Added a reusable, versioned storage-instance provisioning seam in `src/application/system-runtime/StorageInstanceProvisioningContract.ts` so systems and embedded subsystems can request shareable storage instances without carrying raw filesystem path configuration in UI/application contracts.
 - The contract keeps provisioning input compact/inspectable (`instanceId`, requested logical binding areas, metadata, contract version), supports deterministic binding references (`storage-instance://{instanceId}/{area}`), and returns logical area bindings (`input`/`output`/`intermediate`) suitable for downstream dataset/workflow binding flows.
-- Added a local filesystem implementation in `infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner.ts` that automatically provisions deterministic directories under a storage root (`/storage/{instanceId}/input|output|intermediate`) and returns local filesystem details only as an infrastructure-specific extension of the canonical contract result.
+- Added a local filesystem implementation in `src/infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner.ts` that automatically provisions deterministic directories under a storage root (`/storage/{instanceId}/input|output|intermediate`) and returns local filesystem details only as an infrastructure-specific extension of the canonical contract result.
 - `/systems/` remains available for ordinary system files, but storage-instance payload directories now model reusable storage attached by logical binding semantics rather than `systemId`-owned path assumptions.
 - This slice intentionally introduces the contract + local provisioner seam without forcing broad runtime rewiring yet; follow-on stories should integrate this seam into output artifact storage and dataset-instance provisioning orchestration paths.
 
 ## AI Loom Image System vertical-slice update: storage-instance metadata + initialization integration (stories 2.3-2.4)
 
-- Added an explicit storage-instance metadata contract in `application/system-runtime/StorageInstanceMetadataModel.ts` with:
+- Added an explicit storage-instance metadata contract in `src/application/system-runtime/StorageInstanceMetadataModel.ts` with:
   - stable identity + contract version (`instanceId`, `storageInstanceRef`, `provider`, `contractVersion`),
   - bounded display metadata (`name`, `summary`, `tags`),
   - lifecycle state/timestamps (`provisioning|ready|archived`),
   - logical bindings (`input|output|intermediate` references),
   - shareability flags and owner attachment records (`system` + `embedded-subsystem`).
-- Added an application initialization seam in `application/system-runtime/StorageInstanceInitializationService.ts` that composes the existing provisioning contract from stories 2.1/2.2 and metadata persistence:
+- Added an application initialization seam in `src/application/system-runtime/StorageInstanceInitializationService.ts` that composes the existing provisioning contract from stories 2.1/2.2 and metadata persistence:
   - supports `provision` (new instance) and `attach` (reuse shared instance),
   - ensures repeated attachment of an existing shared instance does not force reprovisioning,
   - enforces no user-managed filesystem/path configuration in initialization payloads.
@@ -486,7 +486,7 @@ Not implemented in this slice:
 - Shared attachment semantics are now explicit for subsystem reuse:
   - `initializeReferenceImageStorage` supports deterministic embedded subsystem owner identity (`{systemId}::subsystem:{embeddedSubsystemId}`) when owner kind is `embedded-subsystem`,
   - attach semantics continue to reuse existing provisioned instances without duplicate provisioning across multiple top-level systems and embedded subsystems.
-- Filesystem path resolution remains infrastructure-owned; application/domain layers exchange only logical storage-instance references.
+- Filesystem path resolution remains infrastructure-owned; src/application/domain layers exchange only logical storage-instance references.
 
 ## AI Loom Image System vertical-slice update: ingestion/retrieval binding resolution + storage lifecycle operations (stories 2.7-2.8)
 
@@ -511,7 +511,7 @@ Not implemented in this slice:
 
 ## AI Loom Image System vertical-slice update: explicit path-configuration rejection + storage-instance validation/test hardening (stories 2.9-2.10)
 
-- Added one reusable storage-path policy validator seam (`application/system-runtime/StoragePathPolicyValidation.ts`) and applied it in:
+- Added one reusable storage-path policy validator seam (`src/application/system-runtime/StoragePathPolicyValidation.ts`) and applied it in:
   - storage initialization orchestration (`StorageInstanceInitializationService`),
   - dataset-instance ensure/create orchestration (`SystemDatasetInstanceService`),
   - Studio Shell reference-image storage initialization request handling (`StudioShellBackendApi`).
@@ -527,18 +527,18 @@ Not implemented in this slice:
   - deterministic provisioning + cross-instance isolation,
   - shared attachment reuse across multiple systems and embedded subsystems,
   - lifecycle safe-delete behavior under shared attachments.
-- No UI/CSS changes were required for this slice; behavior is enforced in domain/application/backend contract layers.
+- No UI/CSS changes were required for this slice; behavior is enforced in src/domain, src/application, and backend contract layers.
 
 ## AI Loom Image System vertical-slice update: storage-instance-bound binary output storage + provenance persistence (stories 2.3.5-2.3.6)
 
-- Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
-- The filesystem implementation (`infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage.ts`) now governs pathing/naming under storage-instance logical bindings (`/storage/{instanceId}/{area}/...`) with:
+- Workflow output materialization now supports explicit binary artifact persistence through an internal storage seam (`src/application/system-runtime/WorkflowOutputArtifactStorage.ts`) rather than executor-specific paths.
+- The filesystem implementation (`src/infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage.ts`) now governs pathing/naming under storage-instance logical bindings (`/storage/{instanceId}/{area}/...`) with:
   - deterministic namespace segments (`workflowRunId`/`materializationId`),
   - filename normalization independent of backend names,
   - collision-safe suffixing,
   - stable generated output refs and inspectable storage metadata (`fileName`, `relativePath`, `sha256`, `sizeBytes`, collision index).
 - `WorkflowOutputMaterializationService` now optionally coordinates that artifact storage seam before dataset-instance ingestion and writes the resolved internal refs/metadata into the admitted image records.
-- Output lineage/provenance now persists through a dedicated repository seam (`application/system-runtime/WorkflowOutputProvenanceRepository.ts`) with both in-memory and SQLite implementations (`SqliteWorkflowOutputProvenanceRepository`).
+- Output lineage/provenance now persists through a dedicated repository seam (`src/application/system-runtime/WorkflowOutputProvenanceRepository.ts`) with both in-memory and SQLite implementations (`SqliteWorkflowOutputProvenanceRepository`).
 - Persisted provenance records capture output asset ref, source image refs, workflow asset/version, workflow run id, runtime parameter snapshot, execution capability/config snapshots, status, and timestamps so later history/inspection/comparison work can query without re-deriving from transient executor payloads.
 
 ## AI Loom Image System vertical-slice update: failure handling, partial success, idempotency, and end-to-end persistence tests (stories 2.3.9-2.3.10)
@@ -567,7 +567,7 @@ Not implemented in this slice:
   - record updates are patch-driven (image metadata/tags/derived/annotations, storage metadata, record metadata),
   - image payload mutation is normalized via canonical domain patch contracts (`patchDatasetInstanceImageRecord`),
   - all record updates are re-admitted through centralized instance schema enforcement (`DatasetInstanceSchemaEnforcementService`) before persistence.
-- Dataset-instance aggregate mutation/lifecycle now has canonical domain helpers in `domain/system-runtime/DatasetInstanceDomain.ts`:
+- Dataset-instance aggregate mutation/lifecycle now has canonical domain helpers in `src/domain/system-runtime/DatasetInstanceDomain.ts`:
   - immutable patch updates (`patchDatasetInstance`),
   - explicit lifecycle transition guards (`isDatasetInstanceLifecycleTransitionAllowed`, `transitionDatasetInstanceLifecycle`).
 - Lifecycle operations are now explicit in `SystemDatasetInstanceService` and remain role-agnostic across input/output/intermediate instances:
@@ -592,16 +592,16 @@ Not implemented in this slice:
   - image record identity is now instance-scoped (`PRIMARY KEY(instance_id, record_id)`) instead of globally keyed by `record_id`,
   - migration updates preserve existing rows and prevent cross-instance overwrite on shared record ids,
   - foreign-key enforcement is enabled at repository initialization.
-- Dataset-instance preview support is now available through a dedicated application seam (`application/system-runtime/DatasetInstancePreviewService.ts`):
+- Dataset-instance preview support is now available through a dedicated application seam (`src/application/system-runtime/DatasetInstancePreviewService.ts`):
   - preview listing is instance-boundary and ownership-aware,
   - preview payloads are lightweight and UI-oriented (preview/image reference, dimensions/format, tags, bounded metadata summary, mutation timestamps),
   - preview flow remains distinct from full retrieval while reusing existing validated instance/query contracts.
 
 ## Direction 5 extension update: storage adapter abstraction for dataset instances (story 1.2.15)
 
-- Dataset-instance persistence now depends on a narrow internal storage contract (`application/system-runtime/DatasetInstanceStorageAdapter.ts`) instead of tying repository semantics directly to SQLite concerns.
+- Dataset-instance persistence now depends on a narrow internal storage contract (`src/application/system-runtime/DatasetInstanceStorageAdapter.ts`) instead of tying repository semantics directly to SQLite concerns.
 - `StorageBackedDatasetInstanceRepository` now owns application-level repository behavior and delegates persistence concerns through that adapter seam.
-- The existing SQLite implementation (`infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`) now acts as a backend adapter, preserving current behavior while allowing alternate backends to be introduced without changing `SystemDatasetInstanceService` or preview/query flows.
+- The existing SQLite implementation (`src/infrastructure/filesystem/system-runtime/SqliteDatasetInstanceRepository.ts`) now acts as a backend adapter, preserving current behavior while allowing alternate backends to be introduced without changing `SystemDatasetInstanceService` or preview/query flows.
 - Image-record storage validation for system ownership is now centralized at the repository boundary, so adapter implementations can stay focused on backend persistence mechanics.
 
 ## Direction 5 extension update: runtime-operational dataset contracts + schema validation engine (stories 1.3.1-1.3.2)
@@ -647,13 +647,13 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: Data Studio ↔ System dataset compatibility (story 1.3.13)
 
-- Data Studio preview selection references and System runtime preview record references now reuse one shared contract seam in `domain/dataset-studio/contracts/StudioDatasetCompatibility.ts`.
+- Data Studio preview selection references and System runtime preview record references now reuse one shared contract seam in `src/domain/dataset-studio/contracts/StudioDatasetCompatibility.ts`.
 - Shared references now explicitly model:
   - dataset asset refs (`assetId` + optional `versionId`),
   - dataset instance refs (`systemId` + `instanceId` + dataset asset ref),
   - record/selection refs (`recordId` + `selectionId` + dataset + optional instance).
 - Data Studio selection snapshots and System runtime image-preview payloads now carry this same reference contract (no studio-private remapping of core dataset identifiers).
-- Bounded application-layer orchestration for handoff/selection continuity now lives in `application/system-runtime/StudioDatasetCompatibilityService.ts`:
+- Bounded application-layer orchestration for handoff/selection continuity now lives in `src/application/system-runtime/StudioDatasetCompatibilityService.ts`:
   - validates selection-to-instance dataset compatibility,
   - projects runtime previews into shared references,
   - resolves selected record ids through existing runtime query/read seams.
@@ -672,7 +672,7 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: high-level workflow asset contracts (stories 3.1.1-3.1.2)
 
-- High-level image workflow asset contracts are now defined in `application/contracts/ImageWorkflowAssetContract.ts` and validated with zod (`ImageWorkflowAssetContractSchema`).
+- High-level image workflow asset contracts are now defined in `src/application/contracts/ImageWorkflowAssetContract.ts` and validated with zod (`ImageWorkflowAssetContractSchema`).
 - The canonical contract keeps image workflows reusable/versioned/composable/inspectable without leaking backend node-level details:
   - identity/type (`workflow-asset` + `image-workflow` + intent type),
   - version envelope (`contractVersion`, optional `assetVersion`, `revision`),
@@ -689,7 +689,7 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: internal composition + image-to-image asset (stories 3.1.3-3.1.4)
 
-- High-level image workflows now have a first-class internal composition model in `application/contracts/ImageWorkflowComposition.ts`.
+- High-level image workflows now have a first-class internal composition model in `src/application/contracts/ImageWorkflowComposition.ts`.
 - The model is intentionally internal-facing and adapter-bounded:
   - reusable/versioned pipeline envelope (`compositionId`, `compositionVersion`, `revision`),
   - explicit stage/step structure (`bind-inputs`, `prepare-conditioning`, `transform`, `materialize-output`),
@@ -697,7 +697,7 @@ Not implemented in this slice:
   - explicit adapter boundary metadata (`image-workflow-execution-adapter` + contract version),
   - inspectability metadata (preview mode + inspectable stage ids + tags).
 - Composition steps are expressed through shared internal node kinds (`CommonImageNodeContracts`) rather than raw ComfyUI graph DTOs, preserving swappable low-level adapters.
-- The first concrete high-level asset now exists in `application/contracts/ImageToImageWorkflowAsset.ts`:
+- The first concrete high-level asset now exists in `src/application/contracts/ImageToImageWorkflowAsset.ts`:
   - bounded image-to-image config (`variationStrength`, `resultCount`, `preserveComposition`),
   - canonical source/prompt/output binding map (`sourceImage`, `instruction`, `images`),
   - composed internal stage pipeline using the composition model,
@@ -708,8 +708,8 @@ Not implemented in this slice:
 ## AI Loom Image Manipulation vertical-slice update: restyle + enhance/upscale assets (stories 3.1.5-3.1.6)
 
 - Added reusable high-level image workflow assets backed by the established 3.1.1-3.1.4 contract/composition seams:
-  - `application/contracts/RestyleWorkflowAsset.ts`
-  - `application/contracts/EnhanceUpscaleWorkflowAsset.ts`
+  - `src/application/contracts/RestyleWorkflowAsset.ts`
+  - `src/application/contracts/EnhanceUpscaleWorkflowAsset.ts`
 - Both assets preserve a small public contract surface while keeping execution internals adapter-bounded:
   - canonical input bindings (`sourceImage`, plus style input for restyle),
   - bounded configuration with zod validation,
@@ -718,18 +718,18 @@ Not implemented in this slice:
 - Internal composition reuses `ImageWorkflowComposition` and shared `CommonImageNodeContracts` node kinds (for example `prompt-input`, `sampler-wrapper`, `resize-upscale`, `save-image`) instead of exposing raw ComfyUI graph details in asset contracts.
 - `ImageWorkflowAssetRegistry` default discovery entries now include all three concrete assets (`image-to-image`, `restyle`, `enhance-upscale`) via the existing registry/discovery path.
 - Added focused contract/composition tests for both assets and expanded registry coverage:
-  - `application/contracts/tests/RestyleWorkflowAsset.test.ts`
-  - `application/contracts/tests/EnhanceUpscaleWorkflowAsset.test.ts`
-  - `application/contracts/tests/ImageToImageWorkflowAsset.test.ts`
+  - `src/application/contracts/tests/RestyleWorkflowAsset.test.ts`
+  - `src/application/contracts/tests/EnhanceUpscaleWorkflowAsset.test.ts`
+  - `src/application/contracts/tests/ImageToImageWorkflowAsset.test.ts`
 
 ## AI Loom Image Manipulation vertical-slice update: batch transform + inspectability coherence (stories 3.1.7-3.1.8)
 
-- Added a reusable high-level batch transform workflow asset in `application/contracts/BatchTransformWorkflowAsset.ts` on top of the existing image workflow contract/composition seams:
+- Added a reusable high-level batch transform workflow asset in `src/application/contracts/BatchTransformWorkflowAsset.ts` on top of the existing image workflow contract/composition seams:
   - uses the same `ImageWorkflowAssetContract` + `ImageWorkflowComposition` abstractions (no parallel model),
   - supports mixed batch items for direct image refs and dataset-backed image entries through one bounded `batchItems` input contract,
   - exposes bounded shared configuration (`concurrency`, `onItemFailure`, `groupOutputsBy`, `resultCountPerItem`),
   - preserves per-item output mapping metadata (`itemId`/`status`/`lineage`) for traceable downstream persistence/lineage usage.
-- Preview/inspection support for image workflow assets is now standardized through `application/contracts/ImageWorkflowAssetPreview.ts`:
+- Preview/inspection support for image workflow assets is now standardized through `src/application/contracts/ImageWorkflowAssetPreview.ts`:
   - shared preview metadata now includes intent/workflow summary, input/output summaries, bounded configuration summary, and high-level composition summary,
   - avoids leaking low-level graph/runtime details while remaining useful for studio authoring/inspection.
 - Existing image workflow assets (`image-to-image`, `restyle`, `enhance-upscale`) now consume that same preview builder, making preview/inspection metadata coherent across all high-level image workflow asset types.
@@ -737,86 +737,86 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: registry/authoring integration + boundary hardening (stories 3.1.9-3.1.10)
 
-- High-level image workflow assets now register through a dedicated shared registry seam in `application/contracts/ImageWorkflowAssetRegistry.ts` rather than ad-hoc in a single asset file.
+- High-level image workflow assets now register through a dedicated shared registry seam in `src/application/contracts/ImageWorkflowAssetRegistry.ts` rather than ad-hoc in a single asset file.
 - Registry entries expose stable workflow-taxonomy and authoring metadata (workflow semantic role, deterministic behavior, preview summaries, inspectable fields, and bounded configuration surface descriptors) for consistent discovery/selection/inspection/configuration flows.
-- Studio authoring selector compatibility is now explicit through `ui/studio-shell/asset-selector/ImageWorkflowAssetSelectorAdapter.ts` plus a dedicated usage-context capability mapping (`workflow-image-transform`) in `application/studio-entry/AssetSelectorCapabilityRegistry.ts`; this reuses the shared selector request/response contracts rather than introducing a parallel authoring contract model.
+- Studio authoring selector compatibility is now explicit through `src/ui/studio-shell/asset-selector/ImageWorkflowAssetSelectorAdapter.ts` plus a dedicated usage-context capability mapping (`workflow-image-transform`) in `src/application/studio-entry/AssetSelectorCapabilityRegistry.ts`; this reuses the shared selector request/response contracts rather than introducing a parallel authoring contract model.
 - Composition and boundary integrity hardening now validates the full 3.1 asset set through registry-centric tests:
-  - registry inclusion/discoverability + metadata/config surface exposure (`application/contracts/tests/ImageWorkflowAssetRegistry.test.ts`),
-  - authoring selector projection consistency (`ui/studio-shell/asset-selector/tests/ImageWorkflowAssetSelectorAdapter.test.ts`),
+  - registry inclusion/discoverability + metadata/config surface exposure (`src/application/contracts/tests/ImageWorkflowAssetRegistry.test.ts`),
+  - authoring selector projection consistency (`src/ui/studio-shell/asset-selector/tests/ImageWorkflowAssetSelectorAdapter.test.ts`),
   - existing preview/contract tests continue to enforce no ComfyUI leakage in high-level contracts and inspectable composition summaries.
 - `ImageWorkflowAssetRegistry` default discovery now includes `batch-transform` as a first-class inspectable asset entry.
 - Added test coverage for:
-  - batch-transform contract/composition/output mapping boundaries (`application/contracts/tests/BatchTransformWorkflowAsset.test.ts`),
-  - preview/inspection stability across all high-level image workflow assets (`application/contracts/tests/ImageWorkflowAssetPreview.test.ts`),
-  - contract descriptor alignment updates for batch input mapping (`application/contracts/tests/ImageWorkflowAssetContract.test.ts`).
+  - batch-transform contract/composition/output mapping boundaries (`src/application/contracts/tests/BatchTransformWorkflowAsset.test.ts`),
+  - preview/inspection stability across all high-level image workflow assets (`src/application/contracts/tests/ImageWorkflowAssetPreview.test.ts`),
+  - contract descriptor alignment updates for batch input mapping (`src/application/contracts/tests/ImageWorkflowAssetContract.test.ts`).
 
 
 ## AI Loom Image Manipulation vertical-slice update: system-aware input binding contracts + resolution service (stories 3.2.1-3.2.2)
 
-- Added a domain-first, versioned input-binding contract seam in `domain/workflow-studio/WorkflowInputBindingDomain.ts` with:
+- Added a domain-first, versioned input-binding contract seam in `src/domain/workflow-studio/WorkflowInputBindingDomain.ts` with:
   - normalized binding descriptors (`bindingId`, `inputId`, required/value type, ordered source candidates),
   - source kinds for UI form values, runtime parameters, trigger payloads, selected-image context, dataset-instance references, and constant values,
   - structured resolution diagnostics and inspectable preview metadata per resolved input.
-- Added an application-layer resolver in `application/workflow-studio/WorkflowInputBindingResolutionService.ts` that:
+- Added an application-layer resolver in `src/application/workflow-studio/WorkflowInputBindingResolutionService.ts` that:
   - resolves bindings deterministically by source priority with default fallback support,
   - returns normalized resolved values plus per-input resolution records,
   - emits structured diagnostics for missing source values and unresolved required/optional inputs.
 - `WorkflowExecutionContextAssemblyService` now consumes this resolver as an orchestration seam while preserving workflow-studio execution-context contracts.
 - Added focused contract/resolution tests:
-  - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
-  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+  - `src/domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
+  - `src/application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
 
 ## AI Loom Image Manipulation vertical-slice update: form-value + selected-image context binding hardening (stories 3.2.3-3.2.4)
 
-- Extended the existing input-binding resolver seam (`application/workflow-studio/WorkflowInputBindingResolutionService.ts`) with richer diagnostics and typed-resolution safeguards:
+- Extended the existing input-binding resolver seam (`src/application/workflow-studio/WorkflowInputBindingResolutionService.ts`) with richer diagnostics and typed-resolution safeguards:
   - explicit diagnostics for missing form-field references, invalid selected-image references, and resolved value type mismatches,
   - continued deterministic source-priority resolution with inspectable preview metadata.
 - `WorkflowExecutionContextAssemblyService` now supports explicit, persistable system-aware input binding metadata on workflow inputs (`input.metadata.systemInputBinding`) and maps it through the same canonical binding resolver (no parallel subsystem).
 - Assembly now also reads bounded System Studio form context (`metadata.systemFormValues` / `metadata.uiFormValues`) and selected-image context metadata, allowing image-context bindings to resolve asset refs and other selected-image paths through canonical contracts.
 - Invalid authored binding metadata now returns deterministic pre-execution issues (`invalid-binding-configuration`) rather than silent fallback.
 - Added focused tests for typed form binding, invalid binding configuration diagnostics, and selected-image binding resolution:
-  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
-  - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+  - `src/application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+  - `src/application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
 
 
 ## AI Loom Image Manipulation vertical-slice update: dataset-instance binding + validation diagnostics (stories 3.2.5-3.2.6)
 
-- Extended the canonical workflow input-binding contract seam (`domain/workflow-studio/WorkflowInputBindingDomain.ts`) for dataset-instance authoring with explicit dataset linkage and resolution shape metadata (`instance` / `record` / `collection`) plus bounded record-selection selectors.
+- Extended the canonical workflow input-binding contract seam (`src/domain/workflow-studio/WorkflowInputBindingDomain.ts`) for dataset-instance authoring with explicit dataset linkage and resolution shape metadata (`instance` / `record` / `collection`) plus bounded record-selection selectors.
 - Added reusable binding-definition validation in the domain (`validateWorkflowInputBindingDefinitions`) so malformed/ambiguous binding definitions are surfaced as structured diagnostics before runtime.
-- Extended runtime resolution (`application/workflow-studio/WorkflowInputBindingResolutionService.ts`) to:
+- Extended runtime resolution (`src/application/workflow-studio/WorkflowInputBindingResolutionService.ts`) to:
   - resolve dataset-bound inputs from declared dataset instance references (including metadata-provided `datasetInstanceReferences`),
   - support record-level and collection-level dataset resolution for image-workflow scenarios,
   - emit structured dataset diagnostics (`dataset-instance-missing`, `dataset-record-missing`, `dataset-schema-incompatible`, `dataset-resolution-shape-unsupported`) alongside existing source/type diagnostics.
 - Kept binding contracts inspectable/persistable and layer-safe: domain owns binding rules + diagnostics, application orchestrates resolution/assembly, and metadata adapters provide context payloads without leaking persistence internals.
 - Added focused coverage for dataset binding resolution + diagnostics and reusable validation output:
-  - `domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
-  - `application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
-  - `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
+  - `src/domain/workflow-studio/tests/WorkflowInputBindingDomain.test.ts`
+  - `src/application/workflow-studio/tests/WorkflowInputBindingResolutionService.test.ts`
+  - `src/application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`
 
 ## AI Loom Image Manipulation vertical-slice update: binding preview inspection + asset-definition integration (stories 3.2.7-3.2.8)
 
-- Added reusable binding preview/inspection orchestration in `application/workflow-studio/WorkflowInputBindingPreviewService.ts` on top of the existing canonical resolver:
+- Added reusable binding preview/inspection orchestration in `src/application/workflow-studio/WorkflowInputBindingPreviewService.ts` on top of the existing canonical resolver:
   - reports declared source metadata per workflow input (source id/kind/priority/required + declared source summary),
   - reports selected source and bounded resolved value summaries (shape + compact textual summary),
   - reports unresolved bindings and all structured validation/resolution diagnostics in one inspectable payload.
-- Added reusable image-workflow binding configuration seam in `application/contracts/ImageWorkflowInputBindingConfiguration.ts` so high-level image workflow assets can persist, duplicate, serialize, and inspect workflow input bindings through the same domain binding contract (`WorkflowInputBindingDomain`).
+- Added reusable image-workflow binding configuration seam in `src/application/contracts/ImageWorkflowInputBindingConfiguration.ts` so high-level image workflow assets can persist, duplicate, serialize, and inspect workflow input bindings through the same domain binding contract (`WorkflowInputBindingDomain`).
 - Integrated binding-aware configuration into high-level image workflow asset definitions (`image-to-image`, `restyle`, `enhance-upscale`, `batch-transform`) via `inputBindings`:
   - authorable binding descriptors now live inside the asset definition/configuration surface,
   - defaults include supported 3.2.x binding source kinds (UI form values, selected image context, dataset instances, constants/defaults).
-- Extended discovery/inspection projection in `application/contracts/ImageWorkflowAssetRegistry.ts` so registry entries expose serialized binding configuration for cross-system reuse and authoring-time inspection.
+- Extended discovery/inspection projection in `src/application/contracts/ImageWorkflowAssetRegistry.ts` so registry entries expose serialized binding configuration for cross-system reuse and authoring-time inspection.
 - Added focused tests for preview/inspection behavior and binding-aware asset configuration serialization/duplication:
-  - `application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`
-  - `application/contracts/tests/ImageWorkflowInputBindingConfiguration.test.ts`
-  - updated image workflow asset and registry tests under `application/contracts/tests/*`.
+  - `src/application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`
+  - `src/application/contracts/tests/ImageWorkflowInputBindingConfiguration.test.ts`
+  - updated image workflow asset and registry tests under `src/application/contracts/tests/*`.
 
 ## AI Loom Image Manipulation vertical-slice update: output binding contracts + target typing (stories 3.3.1-3.3.2)
 
-- Added a domain-first, versioned output-binding contract seam in `domain/workflow-studio/WorkflowOutputBindingDomain.ts` with:
+- Added a domain-first, versioned output-binding contract seam in `src/domain/workflow-studio/WorkflowOutputBindingDomain.ts` with:
   - canonical output target typing (`output-dataset`, `history-dataset`, `comparison-dataset`),
   - explicit binding intents and write modes (`publish-current-result`/`append-run-history`/`append-comparison-group`, `upsert`/`append`/`replace`),
   - structured record payload envelopes, lineage references, and persistence metadata for system-context dataset writes,
   - inspectable and composable binding descriptors that remain independent from ComfyUI/runtime-specific DTOs.
-- Added canonical system-runtime target definitions in `domain/system-runtime/WorkflowOutputTargetDomain.ts` with explicit semantics:
+- Added canonical system-runtime target definitions in `src/domain/system-runtime/WorkflowOutputTargetDomain.ts` with explicit semantics:
   - output dataset = current/published workflow results,
   - history dataset = append-oriented durable run history,
   - comparison dataset = grouped comparable outputs for inspection.
@@ -824,28 +824,28 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: output binding resolution + record materialization (stories 3.3.3-3.3.4)
 
-- Added a dedicated application-layer output target resolution seam in `application/workflow-studio/WorkflowOutputBindingResolutionService.ts`:
+- Added a dedicated application-layer output target resolution seam in `src/application/workflow-studio/WorkflowOutputBindingResolutionService.ts`:
   - resolves declared workflow output bindings into concrete system-owned dataset instances through `SystemDatasetInstanceService` (existing runtime contract reuse, no parallel dataset model),
   - validates target availability, grouping requirements, and dataset asset/version compatibility before writes,
   - emits an inspectable resolved write plan (`ResolvedWorkflowOutputWritePlanItem`) with only downstream materialization/writer fields.
-- Added canonical record materialization mapping in `application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`:
+- Added canonical record materialization mapping in `src/application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`:
   - transforms execution-produced images and resolved output plans into persistable dataset-image record envelopes,
   - includes run metadata, parameter context, target metadata, provenance, generation linkage, timestamps, and derived routing fields,
   - stays execution-adapter agnostic (no ComfyUI-specific DTO coupling).
-- Added focused tests under `application/workflow-studio/tests/*` for:
+- Added focused tests under `src/application/workflow-studio/tests/*` for:
   - successful binding resolution,
   - missing/incompatible target validation failures,
   - write-plan generation semantics,
   - canonical output-record materialization and metadata traceability.
 - Added focused target/binding coverage in:
-  - `domain/workflow-studio/tests/WorkflowOutputBindingDomain.test.ts`,
-  - `domain/system-runtime/tests/WorkflowOutputTargetDomain.test.ts`,
-  - `application/system-runtime/tests/SystemDatasetInstanceService.test.ts`.
+  - `src/domain/workflow-studio/tests/WorkflowOutputBindingDomain.test.ts`,
+  - `src/domain/system-runtime/tests/WorkflowOutputTargetDomain.test.ts`,
+  - `src/application/system-runtime/tests/SystemDatasetInstanceService.test.ts`.
 
 ## AI Loom Image Manipulation vertical-slice update: history/comparison dataset write behavior (stories 3.3.5-3.3.6)
 
-- Extended the existing output-binding write-plan contract (`application/workflow-studio/WorkflowOutputBindingResolutionService.ts`) so resolved targets now carry explicit grouping + semantic hints (`target.groupBy`, `targetSemantics`) instead of relying on implicit writer behavior.
-- Extended canonical output record materialization (`application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`) to keep output/history/comparison semantics distinct while staying on the same binding-resolution/materialization pipeline:
+- Extended the existing output-binding write-plan contract (`src/application/workflow-studio/WorkflowOutputBindingResolutionService.ts`) so resolved targets now carry explicit grouping + semantic hints (`target.groupBy`, `targetSemantics`) instead of relying on implicit writer behavior.
+- Extended canonical output record materialization (`src/application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`) to keep output/history/comparison semantics distinct while staying on the same binding-resolution/materialization pipeline:
   - output dataset: current-result semantics remain upsert-friendly,
   - history dataset: append-oriented record identity + history entry metadata (`historyEntryId`, `historyEntryType`) and run-scoped output grouping for durable per-run inspection,
   - comparison dataset: explicit comparison set/member association metadata (`comparisonSetId`, `comparisonMemberId`) and stable comparison-group routing (`groupBy`/lineage fallback).
@@ -858,7 +858,7 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: runtime output-persistence integration + validation coverage (stories 3.3.9-3.3.10)
 
-- Workflow runtime execution now integrates the same output-binding pipeline used in stories 3.3.1-3.3.8 through `application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts` (binding descriptors -> write-plan resolution -> record materialization -> dataset-instance persistence), instead of introducing a parallel runtime writer path.
+- Workflow runtime execution now integrates the same output-binding pipeline used in stories 3.3.1-3.3.8 through `src/application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts` (binding descriptors -> write-plan resolution -> record materialization -> dataset-instance persistence), instead of introducing a parallel runtime writer path.
 - Runtime output persistence is configuration-driven (`executionMetadata.workflowOutputPersistence.configuration`) and supports output/history/comparison dataset target behavior consistently via one orchestration seam.
 - Execution results now carry structured output-persistence summaries (`outputPersistence`) so downstream history/UI surfaces can inspect persisted-record counts, target counts, and bounded issues without infrastructure-specific DTO leakage.
 - Persistence failures after successful execution are bounded/predictable: execution result status is promoted to failed with structured persistence issue metadata, and write-plan/materialization denials fail before any dataset writes.
@@ -866,7 +866,7 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: output gallery data contract + output dataset retrieval (stories 4.4.1-4.4.2)
 
-- Added a canonical internal output-gallery contract in `application/system-runtime/OutputGalleryDataContract.ts`:
+- Added a canonical internal output-gallery contract in `src/application/system-runtime/OutputGalleryDataContract.ts`:
   - image asset/storage reference fields,
   - system-owned dataset instance reference fields,
   - workflow/run linkage,
@@ -875,7 +875,7 @@ Not implemented in this slice:
   - generation parameter summaries,
   - image metadata summaries,
   - tags + derived attributes for reusable filtering/inspection.
-- Added a dataset-backed retrieval seam in `application/system-runtime/OutputGalleryDatasetIntegrationService.ts` that:
+- Added a dataset-backed retrieval seam in `src/application/system-runtime/OutputGalleryDatasetIntegrationService.ts` that:
   - reads records from `SystemDatasetInstanceService` (existing system-owned dataset authority),
   - projects persisted dataset records into the gallery contract with paging and inspectable summaries,
   - keeps retrieval contract-first and storage-adapter agnostic.
@@ -883,12 +883,12 @@ Not implemented in this slice:
 
 ## AI Loom Image Manipulation vertical-slice update: run history contract + linked retrieval (stories 4.4.3-4.4.4)
 
-- Added a canonical image-run-history contract in `application/system-runtime/ImageRunHistoryDataContract.ts` aligned with output-gallery fields:
+- Added a canonical image-run-history contract in `src/application/system-runtime/ImageRunHistoryDataContract.ts` aligned with output-gallery fields:
   - system/workflow/run references,
   - input/output image references,
   - output dataset-instance references,
   - parameter summary, execution status, timestamps, and bounded lineage metadata.
-- Added repository/service seams in `application/system-runtime/ImageRunHistoryRepository.ts` and `application/system-runtime/ImageRunHistoryService.ts` so run history remains persisted/queryable system state rather than UI-local projections.
+- Added repository/service seams in `src/application/system-runtime/ImageRunHistoryRepository.ts` and `src/application/system-runtime/ImageRunHistoryService.ts` so run history remains persisted/queryable system state rather than UI-local projections.
 - Run-history detail retrieval now composes with the existing output-gallery dataset integration seam (`OutputGalleryDatasetIntegrationService`) to support durable history -> output linking and future lineage displays through shared contracts.
 
 ## AI Loom Image Manipulation vertical-slice update: output selection + history/output linkage contracts (stories 4.4.7-4.4.8)
@@ -903,24 +903,24 @@ Not implemented in this slice:
 
 ## AI Loom Image System vertical-slice update: system context contract + mapping seam (stories 4.3.1-4.3.2)
 
-- System context now has a formal internal contract in `domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:
+- System context now has a formal internal contract in `src/domain/system-studio/SystemContextContract.ts` with explicit, inspectable fields for:
   - selected image references,
   - parameter values,
   - dataset references,
   - runtime metadata,
   - and an extension bag for additive future context without breaking consumers.
-- Workflow input translation now uses a dedicated adapter seam in `application/workflow-studio/SystemContextWorkflowInputMapper.ts` (`WorkflowSystemContextBindingAdapter`) that maps the system-context contract into workflow execution context/input-binding metadata.
-- UI-trigger system-context gathering remains decoupled from workflow runtime internals via `application/workflow-studio/UiTriggerSystemContextMapper.ts`, which now produces the shared system-context contract before adapter-driven workflow binding translation.
+- Workflow input translation now uses a dedicated adapter seam in `src/application/workflow-studio/SystemContextWorkflowInputMapper.ts` (`WorkflowSystemContextBindingAdapter`) that maps the system-context contract into workflow execution context/input-binding metadata.
+- UI-trigger system-context gathering remains decoupled from workflow runtime internals via `src/application/workflow-studio/UiTriggerSystemContextMapper.ts`, which now produces the shared system-context contract before adapter-driven workflow binding translation.
 - This keeps the architecture aligned with shared composition principles: internal contracts first, UI/runtime adapters second, and no direct leakage of component-library or execution-engine-specific state shapes.
 
 ## AI Loom Image System vertical-slice update: reusable context mapping configuration (story 4.3.9)
 
-- Added a versioned reusable mapping contract for system-context -> workflow-binding translation in `domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`.
-- System asset execution metadata now includes bounded persisted mapping configuration (`workflowContextMapping`) in `domain/system-studio/SystemAssetDomain.ts`, enabling save/load/duplicate/inspection of context bindings at the system-asset layer.
+- Added a versioned reusable mapping contract for system-context -> workflow-binding translation in `src/domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`.
+- System asset execution metadata now includes bounded persisted mapping configuration (`workflowContextMapping`) in `src/domain/system-studio/SystemAssetDomain.ts`, enabling save/load/duplicate/inspection of context bindings at the system-asset layer.
 
 ## Direction 5 extension update: reference image system template + system-owned dataset instance plan (stories 5.1.1-5.1.2)
 
-- Added a first-class reference image manipulation **system template contract** (`application/system-studio/ReferenceImageSystemTemplate.ts`) that composes:
+- Added a first-class reference image manipulation **system template contract** (`src/application/system-studio/ReferenceImageSystemTemplate.ts`) that composes:
   - input image dataset asset boundary,
   - output image dataset asset boundary,
   - workflow-template boundary,
@@ -932,7 +932,7 @@ Not implemented in this slice:
   - role/purpose (`input-store`/`output-store`),
   - required media schema intent and canonical image metadata record shape (`image-metadata-records`).
 - Runtime provisioning is represented through `buildReferenceImageDatasetInstanceRequests(systemId)` to produce bounded `EnsureRoleDatasetInstanceRequest` contracts for `SystemDatasetInstanceService` reuse.
-- Image manipulation dataset contracts now include two additional concrete media dataset assets through the shared registry seam (`application/dataset-studio/ImageManipulationDatasetAssets.ts`):
+- Image manipulation dataset contracts now include two additional concrete media dataset assets through the shared registry seam (`src/application/dataset-studio/ImageManipulationDatasetAssets.ts`):
   - a generated output dataset asset (`asset:dataset:image-reference-output`) for run-produced image results, gallery listing, preview selection, and downstream output-to-input reuse,
   - an optional FaceID reference dataset asset (`asset:dataset:image-faceid-reference`) for one-or-more conditioning references without exposing user-managed raw path contracts.
 - The reference-image system template now composes the optional FaceID dataset as a first-class dataset component and marks its dataset-instance template entry as optional; provisioning remains explicit through `buildReferenceImageDatasetInstanceRequests(systemId, { includeOptionalReferenceDatasets })` so default system startup behavior is unchanged.
@@ -989,7 +989,7 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: system serialization + asset reference resolution seams (stories 5.3.1-5.3.2)
 
-- System draft/version content now uses a canonical serialization contract in `domain/system-studio/SystemSerializationContract.ts` (`ai-loom.system-serialization`, `schemaVersion=1.0.0`) with explicit sections for:
+- System draft/version content now uses a canonical serialization contract in `src/domain/system-studio/SystemSerializationContract.ts` (`ai-loom.system-serialization`, `schemaVersion=1.0.0`) with explicit sections for:
   - version/compatibility metadata,
   - system definition data (components, dependencies, interfaces, bindings, execution metadata),
   - asset reference projections (dataset/workflow references),
@@ -999,7 +999,7 @@ Not implemented in this slice:
   - unsupported serialized versions are rejected via explicit `unsupported-system-serialization-version:*` errors,
   - legacy `systemSpec` payloads remain loadable through compatibility backfill into the canonical contract shape.
 - System Studio draft create/update paths now serialize through that seam so persisted content carries explicit serialization metadata while preserving legacy fields that current UI/runtime flows still read.
-- Runtime now includes a reusable serialized asset-reference resolution layer in `application/system-runtime/SerializedAssetReferenceResolutionService.ts` that resolves `kind`/`assetId`/`versionId` references with structured result codes:
+- Runtime now includes a reusable serialized asset-reference resolution layer in `src/application/system-runtime/SerializedAssetReferenceResolutionService.ts` that resolves `kind`/`assetId`/`versionId` references with structured result codes:
   - `missing-asset`,
   - `incompatible-version`,
   - `invalid-reference`,
@@ -1105,7 +1105,7 @@ Not implemented in this slice:
 
 ## Direction 5 extension update: end-to-end execution flow validation + dataset runtime schema enforcement (stories 5.4.1-5.4.2)
 
-- Reference-image execution now runs through an explicit step-tracking service seam (`ui/runtime/ReferenceImageExecutionFlowService.ts`) that reports user-facing progress/failure states across:
+- Reference-image execution now runs through an explicit step-tracking service seam (`src/ui/runtime/ReferenceImageExecutionFlowService.ts`) that reports user-facing progress/failure states across:
   - run start,
   - runtime generation,
   - output saving,
@@ -1119,7 +1119,7 @@ Not implemented in this slice:
 
 ## Direction 5 UI extension update: UI asset contract versioning + architecture documentation baseline (stories 1.1.9-1.1.10)
 
-- UI asset contracts now include a first-class contract version marker (`contractVersion`) on the shared base contract in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`.
+- UI asset contracts now include a first-class contract version marker (`contractVersion`) on the shared base contract in `src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`.
 - Versioning remains taxonomy-aligned and shared across all UI asset kinds:
   - atomic UI assets,
   - composed UI assets,
@@ -1139,9 +1139,9 @@ Not implemented in this slice:
 
 ## Direction 5 UI extension update: asset library browsing + insertion flow foundation (stories 1.2.1-1.2.2)
 
-- A reusable Asset Library discovery projection now sits on top of the existing shared studio asset registry (`ui/studio-shell/studio-assets/StudioAssetLibrary.ts`) and preserves existing taxonomy/category groupings (`atomic-ui`, `composed-ui`, `system-page`) instead of introducing a parallel classification model.
-- A reusable library panel UI now renders grouped registered UI assets with metadata-first labels (display name, optional description, grouping/category, optional icon token) and optional insert actions (`ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`).
-- A generic insertion seam now creates instance nodes from registered definitions and inserts them into composition trees through existing slot/region contracts and validation rules (`ui/studio-shell/studio-assets/StudioAssetInsertion.ts`).
+- A reusable Asset Library discovery projection now sits on top of the existing shared studio asset registry (`src/ui/studio-shell/studio-assets/StudioAssetLibrary.ts`) and preserves existing taxonomy/category groupings (`atomic-ui`, `composed-ui`, `system-page`) instead of introducing a parallel classification model.
+- A reusable library panel UI now renders grouped registered UI assets with metadata-first labels (display name, optional description, grouping/category, optional icon token) and optional insert actions (`src/ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`).
+- A generic insertion seam now creates instance nodes from registered definitions and inserts them into composition trees through existing slot/region contracts and validation rules (`src/ui/studio-shell/studio-assets/StudioAssetInsertion.ts`).
 - Insertion outcomes are explicit and structured (`ok` success vs typed failure kinds for unknown asset/parent, invalid placement, and validation-denied insert), keeping the distinction between definition browsing and composition instantiation explicit.
 - Composition validation enforcement is reused from the existing registry-backed composition validator (`StudioAssetRegistry.validateCompositionTree`), including placement rules, allowed child kinds/types/categories, and cardinality checks.
 
@@ -1155,14 +1155,14 @@ Not implemented in this slice:
   - default values,
   - editor kinds (`text`, `textarea`, `number`, `boolean`, `select`, `json`),
   - optional hidden/read-only and conditional visibility rules.
-- Shared schema utilities (`ui/studio-shell/studio-assets/StudioAssetPropertySchema.ts`) provide default projection, visibility filtering, required-field validation, and nested field-path updates for instantiated asset config documents.
-- A reusable Asset Inspector panel (`ui/components/studio-shell/studio-assets/StudioAssetInspectorPanel.tsx`) now renders selected instance metadata and schema-driven property editors with validation feedback/unsupported-property messaging, and is surfaced alongside the existing library panel through optional selected-instance props (`StudioAssetLibraryPanel`).
+- Shared schema utilities (`src/ui/studio-shell/studio-assets/StudioAssetPropertySchema.ts`) provide default projection, visibility filtering, required-field validation, and nested field-path updates for instantiated asset config documents.
+- A reusable Asset Inspector panel (`src/ui/components/studio-shell/studio-assets/StudioAssetInspectorPanel.tsx`) now renders selected instance metadata and schema-driven property editors with validation feedback/unsupported-property messaging, and is surfaced alongside the existing library panel through optional selected-instance props (`StudioAssetLibraryPanel`).
 - Base property schemas are now registered for atomic UI primitives and current composed/system studio surfaces via existing definition registration seams (`StudioUiPrimitiveAssetContracts`, `StudioSurfaceAssetDefinitions`), preserving definition-vs-instance boundaries while enabling inspector-driven editing without hardcoded per-asset forms.
 
 
 ## Direction 5 UI extension update: selection-bound inspector editing + atomic preview rendering (stories 1.2.5-1.2.6)
 
-- Asset Inspector binding now reuses the existing authoring-selection pattern (root document + selected instance id) through a shared selection utility (`ui/studio-shell/studio-assets/StudioAssetSelection.ts`) instead of introducing inspector-local selection state.
+- Asset Inspector binding now reuses the existing authoring-selection pattern (root document + selected instance id) through a shared selection utility (`src/ui/studio-shell/studio-assets/StudioAssetSelection.ts`) instead of introducing inspector-local selection state.
 - Selection binding is definition/instance explicit:
   - registered asset definitions are still resolved from `StudioAssetRegistry`,
   - selected instantiated nodes are resolved from composition trees by node id,
@@ -1179,19 +1179,19 @@ Not implemented in this slice:
 
 ## Direction 5 UI extension update: default UI asset configuration + nested selection navigation (stories 1.2.7-1.2.8)
 
-- UI asset insertion now resolves instance configuration through one shared default-config seam (`ui/studio-shell/studio-assets/StudioAssetDefaults.ts`) derived from existing property-schema defaults, so atomic, composed, and system/page assets receive consistent initial config without a parallel defaults framework.
+- UI asset insertion now resolves instance configuration through one shared default-config seam (`src/ui/studio-shell/studio-assets/StudioAssetDefaults.ts`) derived from existing property-schema defaults, so atomic, composed, and system/page assets receive consistent initial config without a parallel defaults framework.
 - Insertion flows (`StudioAssetInsertion`) now apply those resolved defaults before composition validation/serialization, preserving existing composition-tree persistence, validation, and preview behavior while allowing caller-provided overrides.
 - Selection binding now supports nested hierarchy context (`path`, `focusedNode`, stale-selection detection) in `StudioAssetSelection`, so authoring surfaces can distinguish selected child instances from parent drill-in context and navigate back up safely.
 - Asset Inspector now renders breadcrumb-style hierarchy navigation and stale-selection guidance using the same shared selection model, keeping nested parent/child inspection behavior generic for current and future authoring surfaces.
 
 ## Direction 5 UI extension update: asset-library filter facets + replace-asset flow (stories 1.2.9-1.2.10)
 
-- Asset Library search/filter behavior remains registry-first and taxonomy-aligned (`ui/studio-shell/studio-assets/StudioAssetLibrary.ts`):
+- Asset Library search/filter behavior remains registry-first and taxonomy-aligned (`src/ui/studio-shell/studio-assets/StudioAssetLibrary.ts`):
   - query filtering now supports metadata facets (`group`, `contractCategory`, `tags`) in addition to existing keyword search and category scoping,
   - filter options are projected from currently registered assets (`listStudioAssetLibraryFilters`) so current and future studios share one metadata-driven filter model rather than UI-local hardcoded facets,
   - unsupported or missing metadata values are handled safely (empty facet options, no crashes) and the panel keeps non-technical primary labels (`Group`, `Asset type`, `Topic`).
-- Asset Library panel UI (`ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`) now exposes reusable search + facet controls over the same library query seam, preserving existing grouped taxonomy sections and empty-result behavior.
-- Replace-asset behavior is now implemented as a reusable composition utility (`ui/studio-shell/studio-assets/StudioAssetReplacement.ts`) rather than panel-local mutation logic:
+- Asset Library panel UI (`src/ui/components/studio-shell/studio-assets/StudioAssetLibraryPanel.tsx`) now exposes reusable search + facet controls over the same library query seam, preserving existing grouped taxonomy sections and empty-result behavior.
+- Replace-asset behavior is now implemented as a reusable composition utility (`src/ui/studio-shell/studio-assets/StudioAssetReplacement.ts`) rather than panel-local mutation logic:
   - candidate listing (`listCompatibleStudioAssetReplacements`) distinguishes compatible replacement definitions from incompatible entries with explicit compatibility reasons,
   - replacement execution (`replaceStudioAssetInCompositionTree`) swaps instantiated node asset identity/version while preserving node identity and reusing schema-default config projection,
   - safe config carry-forward keeps only overlapping schema field paths from the original instance, then re-validates through the existing registry composition validator.
@@ -1243,7 +1243,7 @@ Not implemented in this slice:
 
 ## Direction 5 UI extension update: panel empty states + persisted panel composition architecture (stories 2.2.9-2.2.10)
 
-- Panel composition state is now resolved through one shared helper (`resolvePanelCompositionState` in `ui/studio-shell/experience-assets/PanelAssetCompositionState.ts`) so embedded panel authoring and runtime preview use the same status model for:
+- Panel composition state is now resolved through one shared helper (`resolvePanelCompositionState` in `src/ui/studio-shell/experience-assets/PanelAssetCompositionState.ts`) so embedded panel authoring and runtime preview use the same status model for:
   - empty/new panels with no child assets,
   - configured layout/header panels with no content yet,
   - invalid/incomplete composition payloads,
@@ -1265,7 +1265,7 @@ Not implemented in this slice:
   - JSON-schema input/output payload posture,
   - schema metadata/definition compatibility,
   - inspectable parameters for modeling dialect and entity scale.
-- A canonical schema-domain contract now exists in `domain/schema-studio/SchemaStudioDomain.ts` and follows existing studio asset conventions:
+- A canonical schema-domain contract now exists in `src/domain/schema-studio/SchemaStudioDomain.ts` and follows existing studio asset conventions:
   - schema studio identity + taxonomy metadata helpers,
   - schema asset metadata construction aligned with shared draft metadata/provenance,
   - versioned schema-asset document contract (`schemaVersion=1.0.0`).
@@ -1325,7 +1325,7 @@ Not implemented in this slice:
 
 ## AI Loom image manipulation update: Build-flow system template registration + primary workflow binding hardening (stories 1.5-1.6)
 
-- Build now resolves image manipulation as a real **system build template asset entry** through `application/system-studio/SystemBuildTemplateCatalog.ts` instead of a detached page-local card definition.
+- Build now resolves image manipulation as a real **system build template asset entry** through `src/application/system-studio/SystemBuildTemplateCatalog.ts` instead of a detached page-local card definition.
 - Build-to-System-Studio handoff carries a stable `buildTemplateId` that resolves to seeded draft defaults (asset id, metadata, dependencies, and serialized system composition content) so first save persists the canonical system asset id (`asset:system:reference-image-manipulation`) via the existing studio-shell draft path.
 - Seeded system draft content composes the existing image input/output/optional FaceID datasets and binds the primary workflow template component (`asset:workflow-template:image-to-image:starter`) through normal system `components` + `bindings` structure.
 - This keeps workflow binding explicit and inspectable at the system asset layer, while deferring schema-to-node mapping/runtime adapter details to later stories.
@@ -1334,7 +1334,7 @@ Not implemented in this slice:
 
 - `ReferenceImageSystemTemplate` now declares explicit runtime execution intent metadata on the canonical `systemAsset.executionMetadata` seam (ComfyUI runtime environment, workflow-template-driven orchestration mode, and required runtime capability/hint descriptors).
 - This remains declarative metadata only (no runtime process start, install management, health polling, or execution adapter behavior is introduced in this slice).
-- Added reusable image-system template validation in `application/system-studio/ImageManipulationSystemTemplateValidation.ts` returning inspectable `AssetValidationResult` contracts.
+- Added reusable image-system template validation in `src/application/system-studio/ImageManipulationSystemTemplateValidation.ts` returning inspectable `AssetValidationResult` contracts.
 - Validation enforces required system identity metadata, required input/output dataset bindings, optional FaceID dataset semantics, required primary workflow template binding, and required Comfy runtime execution metadata/capabilities.
 
 ## AI Loom image manipulation update: property schema model + generation controls (stories 3.3-3.4)
@@ -1378,13 +1378,13 @@ Not implemented in this slice:
 - Preset resolution is first-class through `createComfyImageManipulationDefaultConfig({ presetId })` and `resolveComfyImageManipulationConfig(input, { presetId })`, preserving zero-input template execution while allowing optional user overrides.
 - Preset override payloads now have dedicated validation (`validateComfyImageManipulationPresetOverrides`) and runtime registration checks that enforce schema constraints, dataset-reference storage contracts, and cross-field correctness after merge.
 - Preview output now includes resolved preset identity metadata (`presetId`, `presetName`) for downstream schema-driven UIs while avoiding layout-specific behavior in the schema contract.
-- Automated tests in `application/system-studio/tests/ComfyImageManipulationPropertySchema.test.ts` now cover preset registration/resolution, override correctness, negative-path preset validation, and default template runnability with FaceID both enabled and disabled.
+- Automated tests in `src/application/system-studio/tests/ComfyImageManipulationPropertySchema.test.ts` now cover preset registration/resolution, override correctness, negative-path preset validation, and default template runnability with FaceID both enabled and disabled.
 
 ## AI Loom image manipulation update: concrete workflow template asset + Comfy base graph foundation (stories 4.1-4.2)
 
-- Added a first-class `ImageManipulationWorkflowTemplate` (`application/workflow-template-studio/ImageManipulationWorkflowTemplate.ts`) and registered it in `CoreImageStarterWorkflowTemplates` so it is versioned, inspectable, previewable, and composable through existing workflow-template asset seams.
+- Added a first-class `ImageManipulationWorkflowTemplate` (`src/application/workflow-template-studio/ImageManipulationWorkflowTemplate.ts`) and registered it in `CoreImageStarterWorkflowTemplates` so it is versioned, inspectable, previewable, and composable through existing workflow-template asset seams.
 - The template is composed from existing lower-level contracts/assets (workflow-definition contract surface, dataset assets, property schema defaults, and output binding contracts) rather than introducing a new image-specific template pipeline.
-- Added a concrete Comfy img2img base graph contract/resource (`application/system-studio/ComfyImageManipulationBaseGraph.ts`) with:
+- Added a concrete Comfy img2img base graph contract/resource (`src/application/system-studio/ComfyImageManipulationBaseGraph.ts`) with:
   - positive + negative prompt conditioning nodes,
   - source-image latent encode/decode flow,
   - bounded FaceID extension anchors for future composition,
@@ -1393,15 +1393,15 @@ Not implemented in this slice:
 
 ## AI Loom image manipulation update: Comfy property mapping asset + logical input dataset workflow binding (stories 4.3-4.4)
 
-- Added a dedicated Comfy property mapping asset (`application/system-studio/ComfyImageManipulationPropertyMappingAsset.ts`) with explicit asset identity/versioning, contract metadata, and inspectable schema-path -> graph-node/input bindings.
+- Added a dedicated Comfy property mapping asset (`src/application/system-studio/ComfyImageManipulationPropertyMappingAsset.ts`) with explicit asset identity/versioning, contract metadata, and inspectable schema-path -> graph-node/input bindings.
 - Mapping coverage is explicit for prompt, generation-control, model, and image binding groups against the current base graph structure, with extension-hook entries reserved for FaceID/advanced graph variants.
-- Added a dedicated logical dataset-binding asset (`application/system-studio/ComfyImageManipulationDatasetBindingAsset.ts`) that resolves source-image workflow binding from dataset runtime handles and rejects raw filesystem-path style values.
+- Added a dedicated logical dataset-binding asset (`src/application/system-studio/ComfyImageManipulationDatasetBindingAsset.ts`) that resolves source-image workflow binding from dataset runtime handles and rejects raw filesystem-path style values.
 - Updated image-manipulation system template contracts to pin these assets as first-class workflow composition dependencies (`ReferenceImageSystemTemplate.ts`, `ImageManipulationSystemTemplate.ts`) and enforce them in structural validation (`ImageManipulationSystemTemplateValidation.ts`).
 - Added focused tests for mapping resolution + dataset binding resolution and extended template-level assertions/validation coverage in:
-  - `application/system-studio/tests/ComfyImageManipulationPropertyMappingAsset.test.ts`
-  - `application/system-studio/tests/ComfyImageManipulationDatasetBindingAsset.test.ts`
-  - `application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
-  - `application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
+  - `src/application/system-studio/tests/ComfyImageManipulationPropertyMappingAsset.test.ts`
+  - `src/application/system-studio/tests/ComfyImageManipulationDatasetBindingAsset.test.ts`
+  - `src/application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
+  - `src/application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
 
 ## AI Loom image manipulation update: prompt conditioning + model/VAE workflow bindings (stories 4.5-4.6)
 
@@ -1450,7 +1450,7 @@ Not implemented in this slice:
 
 ## AI Loom image manipulation update: Epic 4 mapping/readiness regression coverage (story 4.12)
 
-- Added an Epic-4-scope integration test (`application/workflow-template-studio/tests/ImageManipulationWorkflowTemplateEpic4.integration.test.ts`) that validates:
+- Added an Epic-4-scope integration test (`src/application/workflow-template-studio/tests/ImageManipulationWorkflowTemplateEpic4.integration.test.ts`) that validates:
   - schema/default parameter readiness through template validation + instantiation,
   - workflow/dataset binding correctness through readiness + asset-graph checks,
   - prompt/model/VAE and FaceID mapping presence on instantiated workflow parameter bindings,
@@ -1467,14 +1467,14 @@ Not implemented in this slice:
 
 ## AI Loom image manipulation update: runtime configuration injection + execution lifecycle tracking (stories 5.5-5.6)
 
-- Added runtime configuration resolution seam in `application/system-studio/ComfyImageManipulationRuntimeResolution.ts` that composes:
+- Added runtime configuration resolution seam in `src/application/system-studio/ComfyImageManipulationRuntimeResolution.ts` that composes:
   - workflow-template runtime metadata,
   - runtime-environment metadata,
   - runtime capability binding contracts (when present),
   - dataset runtime handles (including storage-instance refs).
 - `ComfyImageManipulationGraphRequestBuilder` now consumes that seam directly and carries the normalized result in submission inspection metadata (`inspection.runtimeResolution`) so runtime launch decisions are inspectable/testable without introducing a separate runtime path.
 - Runtime endpoint/config resolution now fails fast when no valid endpoint is available from template/runtime metadata, keeping default-template runnability validation explicit.
-- Added reusable lifecycle normalization in `application/system-studio/ComfyImageManipulationExecutionLifecycle.ts` with stable statuses:
+- Added reusable lifecycle normalization in `src/application/system-studio/ComfyImageManipulationExecutionLifecycle.ts` with stable statuses:
   - `queued`,
   - `running`,
   - `succeeded`,
@@ -1516,7 +1516,7 @@ Not implemented in this slice:
 
 ## AI Loom image manipulation update: runtime window launch contract foundation (stories 8.1-8.2)
 
-- Added a dedicated versioned runtime window launch contract (`application/system-runtime/SystemRuntimeWindowLaunchContract.ts`) for opening runnable systems in separate windows.
+- Added a dedicated versioned runtime window launch contract (`src/application/system-runtime/SystemRuntimeWindowLaunchContract.ts`) for opening runnable systems in separate windows.
 - Contract fields are explicitly bounded to logical references and runtime bindings: launch target identity, system/template resolution inputs, runtime context payload, dataset/storage bindings, initial selection state, launch mode/window intent, and expected launch-result metadata.
 - Storage semantics remain non-exclusive by contract: bindings can declare shared ownership scope and use storage-instance logical references without raw filesystem paths.
 - Added a reusable resolver/mapper seam (`SystemRuntimeWindowLaunchResolver`) so callers can compose small inspectable launch requests while preserving default runnable behavior for image-manipulation templates.

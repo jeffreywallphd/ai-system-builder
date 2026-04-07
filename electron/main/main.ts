@@ -3,90 +3,105 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, ipcMain, safeStorage } from "electron";
-import { InitializeProductionStorageUseCase } from "../../application/runtime/InitializeProductionStorageUseCase";
-import { GetExecutionRunUseCase } from "../../application/execution/GetExecutionRunUseCase";
-import { resolveDesktopStoragePaths } from "../../infrastructure/desktop/DesktopAppPaths";
-import { DesktopStorageDatabase } from "../../infrastructure/desktop/DesktopStorageDatabase";
-import { DesktopWorkflowPersistence } from "../../infrastructure/desktop/DesktopWorkflowPersistence";
-import { SqliteExecutionRunRepository } from "../../infrastructure/filesystem/execution/SqliteExecutionRunRepository";
+import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
+import { InitializeProductionStorageUseCase } from "../../src/application/runtime/InitializeProductionStorageUseCase";
+import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
+import { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
+import { DesktopStorageDatabase } from "../../src/infrastructure/desktop/DesktopStorageDatabase";
+import { DesktopWorkflowPersistence } from "../../src/infrastructure/desktop/DesktopWorkflowPersistence";
+import { SqliteExecutionRunRepository } from "../../src/infrastructure/filesystem/execution/SqliteExecutionRunRepository";
 import {
   createExecutionHistoryInfrastructure,
   createExecutionRunRepository,
-} from "../../infrastructure/execution/createExecutionInfrastructure";
-import { resolveDesktopPythonRuntime } from "../../infrastructure/desktop/DesktopPythonRuntimeResolver";
-import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
-import { RendererDeliveryModes } from "../../domain/runtime/AppRuntimeProfile";
+} from "../../src/infrastructure/execution/createExecutionInfrastructure";
+import { resolveDesktopPythonRuntime } from "../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
+import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import {
+  HostSecureTransportKinds,
+  assertSecureTransportEndpoint,
+  resolveHostSecureTransportConfig,
+} from "../../src/infrastructure/config/HostSecureTransportConfig";
+import { RendererDeliveryModes } from "../../src/domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
-import type { DesktopBootstrapContext } from "../shared/DesktopContracts";
-import { SqliteAssetSystemRepository } from "../../infrastructure/filesystem/SqliteAssetSystemRepository";
-import { InMemoryAssetLineageGraphProjectionSink } from "../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
-import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
-import { GetAssetVersionHistoryUseCase } from "../../application/assets-system/GetAssetVersionHistoryUseCase";
-import { GetCanonicalDependencyStateUseCase } from "../../application/assets-system/CanonicalDependencyStateUseCase";
-import { GetAssetDependencyHealthUseCase } from "../../application/assets-system/GetAssetDependencyHealthUseCase";
-import { GetAssetImpactAnalysisUseCase } from "../../application/assets-system/GetAssetImpactAnalysisUseCase";
-import { GetCanonicalProvenanceSummaryUseCase } from "../../application/assets-system/CanonicalAssetReadUseCases";
-import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase } from "../../application/assets-system/ReconciliationUseCases";
-import { ReplayAssetGraphProjectionUseCase } from "../../application/assets-system/ReplayAssetGraphProjectionUseCase";
-import { VerifyAssetGraphProjectionUseCase } from "../../application/assets-system/VerifyAssetGraphProjectionUseCase";
-import { ProjectionRebuildOrchestrationUseCase } from "../../application/assets-system/ProjectionRebuildOrchestrationUseCase";
-import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
-import { ProjectionTrustReadModelService } from "../../application/assets-system/ProjectionTrustReadModelService";
-import { SqliteAgentRepository } from "../../infrastructure/filesystem/agents/SqliteAgentRepository";
-import { SqliteAgentExecutionSessionRepository } from "../../infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
-import { AgentStudioBackendApi } from "../../infrastructure/api/agents/AgentStudioBackendApi";
-import { AgentRunnerService } from "../../application/agents/services/AgentRunnerService";
-import { DeterministicAgentPlanningService } from "../../application/agents/services/AgentPlanningInterface";
-import { ExecuteAgentToolsUseCase } from "../../application/agents/ExecuteAgentToolsUseCase";
-import { DefaultAgentMemoryRetrievalService } from "../../application/agents/services/AgentMemoryRetrievalService";
-import { AgentMemoryWriteService } from "../../application/agents/services/AgentMemoryWriteService";
-import { AssetBackedAgentMemoryStore } from "../../application/agents/services/AssetBackedAgentMemoryStore";
-import { CompositeToolCapabilityCatalog } from "../../infrastructure/tools/CompositeToolCapabilityCatalog";
-import { StaticLocalToolCapabilityCatalog } from "../../infrastructure/tools/StaticLocalToolCapabilityCatalog";
-import { McpToolCapabilityCatalog } from "../../infrastructure/tools/McpToolCapabilityCatalog";
-import { CompositeToolCapabilityExecutor } from "../../infrastructure/tools/CompositeToolCapabilityExecutor";
-import { StaticLocalToolCapabilityExecutor } from "../../infrastructure/tools/StaticLocalToolCapabilityExecutor";
-import { McpToolCapabilityExecutor } from "../../infrastructure/tools/McpToolCapabilityExecutor";
-import { DeterministicToolCapabilityAgentOrchestrator } from "../../infrastructure/agents/DeterministicToolCapabilityAgentOrchestrator";
-import { PythonRuntimeConfig } from "../../infrastructure/config/PythonRuntimeConfig";
-import { createMcpRuntimeIntegration } from "../../infrastructure/python/mcp/createMcpRuntimeIntegration";
-import { SqliteAssetSystemAgentMemoryCatalog } from "../../infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
-import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
-import type { UpdateAgentRequest } from "../../application/agents/UpdateAgentUseCase";
-import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentPolicy, AgentToolAccessPolicy } from "../../domain/agents/AgentPolicy";
-import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
-import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
-import type { AgentConfigurationValidationInput } from "../../application/agents/services/AgentConfigurationValidationService";
-import type { AgentRunControlRequest, AgentRunRequest } from "../../application/agents/contracts/AgentRunContracts";
-import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
-import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { RegistryBackendApi } from "../../infrastructure/api/registry/RegistryBackendApi";
-import { ListPersistedWorkflowsUseCase } from "../../application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import { ListWorkflowRunSummariesUseCase } from "../../application/workflow-run-history/ListWorkflowRunSummariesUseCase";
-import { SqliteStudioShellRepository } from "../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteWorkflowPersistenceRepository } from "../../infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
-import { SqliteWorkflowRunSummaryRepository } from "../../infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
-import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../application/studio-shell/contracts";
-import { RegistryQueryService } from "../../application/asset-registry/RegistryQueryService";
-import { CrossStudioRegistryQueryService } from "../../application/asset-registry/CrossStudioRegistryQueryService";
-import { RegistryDependencyGraphService } from "../../application/asset-registry/RegistryDependencyGraphService";
-import { RegistryCacheLayer } from "../../application/asset-registry/RegistryCacheLayer";
-import { CompositionAssetContractResolver } from "../../application/contracts/CompositionAssetContractResolver";
-import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { SqliteSystemRuntimeExecutionStore } from "../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
-import { SqliteExecutionAuditRepository } from "../../infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
-import { SqliteImageRunHistoryRepository } from "../../infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
-import { LocalStorageInstanceProvisioner } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
-import { LocalSystemOutputArtifactStorage } from "../../infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
-import { LocalStorageInstanceLifecycleInfrastructure } from "../../infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
+import type {
+  DesktopBootstrapContext,
+  DesktopIdentityTransportTrustBootstrap,
+} from "../shared/DesktopContracts";
+import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
+import { InMemoryAssetLineageGraphProjectionSink } from "../../src/infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
+import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
+import { GetAssetVersionHistoryUseCase } from "../../src/application/assets-system/GetAssetVersionHistoryUseCase";
+import { GetCanonicalDependencyStateUseCase } from "../../src/application/assets-system/CanonicalDependencyStateUseCase";
+import { GetAssetDependencyHealthUseCase } from "../../src/application/assets-system/GetAssetDependencyHealthUseCase";
+import { GetAssetImpactAnalysisUseCase } from "../../src/application/assets-system/GetAssetImpactAnalysisUseCase";
+import { GetCanonicalProvenanceSummaryUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
+import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReconciliationUseCases";
+import { ReplayAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReplayAssetGraphProjectionUseCase";
+import { VerifyAssetGraphProjectionUseCase } from "../../src/application/assets-system/VerifyAssetGraphProjectionUseCase";
+import { ProjectionRebuildOrchestrationUseCase } from "../../src/application/assets-system/ProjectionRebuildOrchestrationUseCase";
+import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../src/application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
+import { ProjectionTrustReadModelService } from "../../src/application/assets-system/ProjectionTrustReadModelService";
+import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
+import { SqliteAgentExecutionSessionRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
+import { AgentStudioBackendApi } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
+import { AgentRunnerService } from "../../src/application/agents/services/AgentRunnerService";
+import { DeterministicAgentPlanningService } from "../../src/application/agents/services/AgentPlanningInterface";
+import { ExecuteAgentToolsUseCase } from "../../src/application/agents/ExecuteAgentToolsUseCase";
+import { DefaultAgentMemoryRetrievalService } from "../../src/application/agents/services/AgentMemoryRetrievalService";
+import { AgentMemoryWriteService } from "../../src/application/agents/services/AgentMemoryWriteService";
+import { AssetBackedAgentMemoryStore } from "../../src/application/agents/services/AssetBackedAgentMemoryStore";
+import { CompositeToolCapabilityCatalog } from "../../src/infrastructure/tools/CompositeToolCapabilityCatalog";
+import { StaticLocalToolCapabilityCatalog } from "../../src/infrastructure/tools/StaticLocalToolCapabilityCatalog";
+import { McpToolCapabilityCatalog } from "../../src/infrastructure/tools/McpToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "../../src/infrastructure/tools/CompositeToolCapabilityExecutor";
+import { StaticLocalToolCapabilityExecutor } from "../../src/infrastructure/tools/StaticLocalToolCapabilityExecutor";
+import { McpToolCapabilityExecutor } from "../../src/infrastructure/tools/McpToolCapabilityExecutor";
+import { DeterministicToolCapabilityAgentOrchestrator } from "../../src/infrastructure/agents/DeterministicToolCapabilityAgentOrchestrator";
+import { PythonRuntimeConfig } from "../../src/infrastructure/config/PythonRuntimeConfig";
+import { createMcpRuntimeIntegration } from "../../src/infrastructure/python/mcp/createMcpRuntimeIntegration";
+import { SqliteAssetSystemAgentMemoryCatalog } from "../../src/infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
+import type { CreateAgentRequest } from "../../src/application/agents/CreateAgentUseCase";
+import type { UpdateAgentRequest } from "../../src/application/agents/UpdateAgentUseCase";
+import type { ConfigureAgentGoalsRequest } from "../../src/application/agents/ConfigureAgentGoalsUseCase";
+import type { AgentPolicy, AgentToolAccessPolicy } from "../../src/domain/agents/AgentPolicy";
+import type { AgentMemoryConfiguration } from "../../src/domain/agents/AgentMemory";
+import type { AgentPlanningStrategy } from "../../src/domain/agents/Agent";
+import type { AgentConfigurationValidationInput } from "../../src/application/agents/services/AgentConfigurationValidationService";
+import type { AgentRunControlRequest, AgentRunRequest } from "../../src/application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "../../src/application/agents/TriggerAgentLaunchUseCase";
+import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+import { RegistryBackendApi } from "../../src/infrastructure/api/registry/RegistryBackendApi";
+import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
+import { ListWorkflowRunSummariesUseCase } from "../../src/application/workflow-run-history/ListWorkflowRunSummariesUseCase";
+import { SqliteStudioShellRepository } from "../../src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteWorkflowPersistenceRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
+import { SqliteWorkflowRunSummaryRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
+import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../src/application/studio-shell/contracts";
+import { RegistryQueryService } from "../../src/application/asset-registry/RegistryQueryService";
+import { CrossStudioRegistryQueryService } from "../../src/application/asset-registry/CrossStudioRegistryQueryService";
+import { RegistryDependencyGraphService } from "../../src/application/asset-registry/RegistryDependencyGraphService";
+import { RegistryCacheLayer } from "../../src/application/asset-registry/RegistryCacheLayer";
+import { CompositionAssetContractResolver } from "../../src/application/contracts/CompositionAssetContractResolver";
+import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { SqliteExecutionAuditRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
+import { SqliteImageRunHistoryRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
+import { LocalStorageInstanceProvisioner } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
+import { LocalSystemOutputArtifactStorage } from "../../src/infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
+import { LocalStorageInstanceLifecycleInfrastructure } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
 import {
   parseSystemRuntimeWindowLaunchContract,
   SystemRuntimeWindowLaunchQueryParam,
   type LaunchSystemRuntimeWindowReadModel,
-} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+} from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
+import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
+import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
+import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
+import {
+  startAuthoritativeServerHostAssembly,
+  type AuthoritativeServerHostRuntimeHandle,
+} from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (started) {
@@ -95,6 +110,33 @@ if (started) {
 const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
+const preloadScriptPath = resolvePreloadScriptPath();
+
+function resolvePreloadScriptPath(): string {
+  const preloadCandidates = [
+    path.join(__dirname, "preload.cjs"),
+    path.join(__dirname, "../preload.cjs"),
+    path.join(__dirname, "preload.mjs"),
+    path.join(__dirname, "../preload.mjs"),
+  ];
+  const resolvedPath = preloadCandidates.find((candidate) => fs.existsSync(candidate));
+  if (!resolvedPath) {
+    return preloadCandidates[0];
+  }
+  return resolvedPath;
+}
+
+function installRendererContentSecurityPolicy(): void {
+  const policy = createRendererContentSecurityPolicy({
+    rendererDevUrl,
+    runtimeConfig: bootstrapContext?.runtimeConfig,
+  });
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
+    responseHeaders["Content-Security-Policy"] = [policy];
+    callback({ responseHeaders });
+  });
+}
 
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
@@ -109,10 +151,33 @@ let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
+let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopBootstrapContext | undefined;
+let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
+
+const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
+  trustedDeviceBindingId: "identity.desktop.transport.trusted-device-binding-id",
+  trustMarker: "identity.desktop.transport.trust-marker",
+  materialKind: "identity.desktop.transport.material-kind",
+  pinReference: "identity.desktop.transport.pin-reference",
+  publicKeyFingerprint: "identity.desktop.transport.public-key-fingerprint",
+  issuedAt: "identity.desktop.transport.issued-at",
+  expiresAt: "identity.desktop.transport.expires-at",
+});
+
+const DESKTOP_TRUST_ENV_KEYS = Object.freeze({
+  enforcement: "AI_LOOM_DESKTOP_TRUST_BOOTSTRAP_ENFORCEMENT",
+  trustedDeviceBindingId: "AI_LOOM_DESKTOP_TRUSTED_DEVICE_BINDING_ID",
+  trustMarker: "AI_LOOM_DESKTOP_TRUST_MARKER",
+  materialKind: "AI_LOOM_DESKTOP_TRUST_MATERIAL_KIND",
+  pinReference: "AI_LOOM_DESKTOP_TRUST_PIN_REFERENCE",
+  publicKeyFingerprint: "AI_LOOM_DESKTOP_TRUST_PUBLIC_KEY_FINGERPRINT",
+  issuedAt: "AI_LOOM_DESKTOP_TRUST_ISSUED_AT",
+  expiresAt: "AI_LOOM_DESKTOP_TRUST_EXPIRES_AT",
+});
 
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
@@ -126,17 +191,17 @@ function createRendererSearch(params: Record<string, string | undefined>): strin
   return serialized ? `?${serialized}` : undefined;
 }
 
-function toFileEntry(filePath: string) {
+function toFileEntry(modelsRootPath: string, filePath: string) {
   const stats = fs.statSync(filePath);
   return {
-    path: filePath,
+    path: toLogicalModelPath(modelsRootPath, filePath),
     kind: stats.isDirectory() ? "directory" as const : "file" as const,
     size: stats.isFile() ? stats.size : undefined,
     modifiedAt: stats.mtime.toISOString(),
   };
 }
 
-function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
+function listEntries(modelsRootPath: string, rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
   if (!fs.existsSync(rootPath)) {
     return [];
   }
@@ -145,7 +210,7 @@ function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnT
   const walk = (currentPath: string) => {
     for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
       const entryPath = path.join(currentPath, entry.name);
-      results.push(toFileEntry(entryPath));
+      results.push(toFileEntry(modelsRootPath, entryPath));
       if (recursive && entry.isDirectory()) {
         walk(entryPath);
       }
@@ -153,6 +218,123 @@ function listEntries(rootPath: string, recursive = false): ReadonlyArray<ReturnT
   };
   walk(rootPath);
   return results;
+}
+
+function resolveDesktopIdentityTransportTrustBootstrap(): DesktopIdentityTransportTrustBootstrap | undefined {
+  const enforcement = normalizeTrustBootstrapEnforcement(process.env[DESKTOP_TRUST_ENV_KEYS.enforcement]);
+  const trustedDeviceBindingId = readDesktopTrustValue({
+    storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustedDeviceBindingId,
+    envKey: DESKTOP_TRUST_ENV_KEYS.trustedDeviceBindingId,
+  });
+  const pinReference = readDesktopTrustSecretValue({
+    storageKey: DESKTOP_TRUST_STORAGE_KEYS.pinReference,
+    envKey: DESKTOP_TRUST_ENV_KEYS.pinReference,
+  });
+
+  const trustConfigured = Boolean(trustedDeviceBindingId || pinReference);
+  const effectiveEnforcement = enforcement ?? (trustConfigured ? "required" : "optional");
+  if (!trustConfigured && effectiveEnforcement !== "required") {
+    return undefined;
+  }
+
+  const materialKind = normalizeMaterialKind(
+    readDesktopTrustValue({
+      storageKey: DESKTOP_TRUST_STORAGE_KEYS.materialKind,
+      envKey: DESKTOP_TRUST_ENV_KEYS.materialKind,
+    }),
+  ) ?? "opaque-marker";
+
+  return Object.freeze({
+    enforcement: effectiveEnforcement,
+    registeredDevice: trustedDeviceBindingId
+      ? Object.freeze({
+          trustedDeviceBindingId,
+          trustMarker: readDesktopTrustSecretValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustMarker,
+            envKey: DESKTOP_TRUST_ENV_KEYS.trustMarker,
+          }),
+        })
+      : undefined,
+    pinnedTrustMaterial: pinReference
+      ? Object.freeze({
+          pinReference,
+          materialKind,
+          publicKeyFingerprint: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.publicKeyFingerprint,
+            envKey: DESKTOP_TRUST_ENV_KEYS.publicKeyFingerprint,
+          }),
+          issuedAt: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.issuedAt,
+            envKey: DESKTOP_TRUST_ENV_KEYS.issuedAt,
+          }),
+          expiresAt: readDesktopTrustValue({
+            storageKey: DESKTOP_TRUST_STORAGE_KEYS.expiresAt,
+            envKey: DESKTOP_TRUST_ENV_KEYS.expiresAt,
+          }),
+        })
+      : undefined,
+  });
+}
+
+function readDesktopTrustValue(input: {
+  readonly storageKey: string;
+  readonly envKey: string;
+}): string | undefined {
+  const fromStorage = normalizeOptional(storageDatabase?.getItem(input.storageKey) ?? undefined);
+  if (fromStorage) {
+    return fromStorage;
+  }
+  return normalizeOptional(process.env[input.envKey]);
+}
+
+function readDesktopTrustSecretValue(input: {
+  readonly storageKey: string;
+  readonly envKey: string;
+}): string | undefined {
+  const encoded = storageDatabase?.getItem(`secure:${input.storageKey}`);
+  if (encoded) {
+    try {
+      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
+      const normalized = normalizeOptional(decrypted);
+      if (normalized) {
+        return normalized;
+      }
+    } catch {
+      // fall through to non-secret and env fallback
+    }
+  }
+  return readDesktopTrustValue(input);
+}
+
+function normalizeMaterialKind(
+  value: string | undefined,
+): "session-signing-key" | "attestation-key" | "opaque-marker" | undefined {
+  if (value === "session-signing-key" || value === "attestation-key" || value === "opaque-marker") {
+    return value;
+  }
+  return undefined;
+}
+
+function normalizeTrustBootstrapEnforcement(value: string | undefined): "required" | "optional" | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (normalized === "required" || normalized === "optional") {
+    return normalized;
+  }
+  return undefined;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeHttpOrigin(value: string): string | undefined {
+  try {
+    const origin = new URL(value).origin;
+    return origin === "null" ? undefined : origin;
+  } catch {
+    return undefined;
+  }
 }
 
 function createDesktopAgentRunner(params: {
@@ -201,7 +383,7 @@ async function createMainWindow(): Promise<void> {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "../preload.mjs"),
+      preload: preloadScriptPath,
     },
   });
 
@@ -269,7 +451,7 @@ async function launchRuntimeWindowFromContract(
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: path.join(__dirname, "../preload.mjs"),
+      preload: preloadScriptPath,
     },
   });
 
@@ -325,7 +507,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   await serviceSupervisor.start();
 
-  const runtimeConfig = isPackaged
+  const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
         storage: storagePaths,
         pythonRuntime,
@@ -338,6 +520,33 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
         serviceSupervisorPort: 8790,
       });
+  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+  authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
+    hostOptions: {
+      databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
+      cors: {
+        allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
+        allowLoopbackOrigins: true,
+        allowNullOrigin: isPackaged,
+      },
+      env: process.env,
+    },
+    boot: {
+      startupReason: "electron-main-authoritative-server-host-startup",
+      environment: process.env,
+    },
+  });
+  const identityApiBaseUrl = assertSecureTransportEndpoint(
+    `http://${authoritativeServerRuntime.address}`,
+    resolveHostSecureTransportConfig({
+      hostKind: HostSecureTransportKinds.desktop,
+      hostAddress: "127.0.0.1",
+    }),
+  );
+  const runtimeConfig = AppRuntimeConfig.fromValues({
+    ...baseRuntimeConfig.toValues(),
+    identityApiBaseUrl,
+  });
 
   bootstrapContext = Object.freeze({
     runtimeConfig: runtimeConfig.toValues(),
@@ -347,6 +556,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       port: 8790,
     },
     pythonRuntime,
+    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap(),
   });
 
   ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {
@@ -762,44 +972,54 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     }
   });
   ipcMain.on("ai-loom-desktop-model-files:exists", (event, targetPath: string) => {
-    event.returnValue = fs.existsSync(targetPath);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = fs.existsSync(absolutePath);
   });
   ipcMain.on("ai-loom-desktop-model-files:stat", (event, targetPath: string) => {
-    event.returnValue = toFileEntry(targetPath);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = toFileEntry(storagePaths.modelsDirectory, absolutePath);
   });
   ipcMain.on("ai-loom-desktop-model-files:read", (event, targetPath: string) => {
-    event.returnValue = new Uint8Array(fs.readFileSync(targetPath));
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = new Uint8Array(fs.readFileSync(absolutePath));
   });
   ipcMain.on("ai-loom-desktop-model-files:write", (_event, request: { path: string; content: Uint8Array; overwrite?: boolean; createDirectories?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.path)) {
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.path);
+    if (!request.overwrite && fs.existsSync(absolutePath)) {
       throw new Error(`File '${request.path}' already exists.`);
     }
     if (request.createDirectories) {
-      fs.mkdirSync(path.dirname(request.path), { recursive: true });
+      fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
     }
-    fs.writeFileSync(request.path, Buffer.from(request.content));
+    fs.writeFileSync(absolutePath, Buffer.from(request.content));
   });
   ipcMain.on("ai-loom-desktop-model-files:delete", (_event, targetPath: string) => {
-    if (fs.existsSync(targetPath)) {
-      fs.rmSync(targetPath, { recursive: true, force: true });
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    if (fs.existsSync(absolutePath)) {
+      fs.rmSync(absolutePath, { recursive: true, force: true });
     }
   });
   ipcMain.on("ai-loom-desktop-model-files:list", (event, targetPath: string, options?: { recursive?: boolean }) => {
-    event.returnValue = listEntries(targetPath, options?.recursive === true);
+    const absolutePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, targetPath);
+    event.returnValue = listEntries(storagePaths.modelsDirectory, absolutePath, options?.recursive === true);
   });
   ipcMain.on("ai-loom-desktop-model-files:move", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.to)) {
+    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
+    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
+    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
       throw new Error(`File '${request.to}' already exists.`);
     }
-    fs.mkdirSync(path.dirname(request.to), { recursive: true });
-    fs.renameSync(request.from, request.to);
+    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
+    fs.renameSync(absoluteSourcePath, absoluteTargetPath);
   });
   ipcMain.on("ai-loom-desktop-model-files:copy", (_event, request: { from: string; to: string; overwrite?: boolean }) => {
-    if (!request.overwrite && fs.existsSync(request.to)) {
+    const absoluteSourcePath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.from);
+    const absoluteTargetPath = resolveModelFileAbsolutePath(storagePaths.modelsDirectory, request.to);
+    if (!request.overwrite && fs.existsSync(absoluteTargetPath)) {
       throw new Error(`File '${request.to}' already exists.`);
     }
-    fs.mkdirSync(path.dirname(request.to), { recursive: true });
-    fs.copyFileSync(request.from, request.to);
+    fs.mkdirSync(path.dirname(absoluteTargetPath), { recursive: true });
+    fs.copyFileSync(absoluteSourcePath, absoluteTargetPath);
   });
 
   canonicalAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
@@ -1046,9 +1266,37 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   }
 }
 
+async function disposeDesktopRuntimeResources(): Promise<void> {
+  await authoritativeServerRuntime?.stop();
+  await serviceSupervisor?.stop();
+  storageDatabase?.dispose();
+  executionRunRepository?.dispose();
+  workflowRunSummaryRepository?.dispose();
+  agentRepository?.dispose();
+  studioShellRepository?.dispose();
+  workflowPersistenceRepository?.dispose();
+}
+
 app.whenReady().then(async () => {
-  await bootstrapDesktopRuntime();
-  await createMainWindow();
+  desktopHostRuntime = await startDesktopHostAssembly({
+    startHost: async () => {
+      await bootstrapDesktopRuntime();
+      try {
+        installRendererContentSecurityPolicy();
+        await createMainWindow();
+      } catch (error) {
+        await disposeDesktopRuntimeResources();
+        throw error;
+      }
+      return Object.freeze({
+        close: disposeDesktopRuntimeResources,
+      });
+    },
+    boot: {
+      startupReason: "electron-main-desktop-host-startup",
+      environment: process.env,
+    },
+  });
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1067,11 +1315,5 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", async () => {
-  await serviceSupervisor?.stop();
-  storageDatabase?.dispose();
-  executionRunRepository?.dispose();
-  workflowRunSummaryRepository?.dispose();
-  agentRepository?.dispose();
-  studioShellRepository?.dispose();
-  workflowPersistenceRepository?.dispose();
+  await desktopHostRuntime?.stop();
 });

@@ -24,14 +24,14 @@ The purpose of this slice is still not to replace the current truthful workflow 
 
 The execution slice now uses two small execution-native contract families:
 
-- `domain/execution/ExecutionPlan.ts` for plan/unit identity, dependency ordering, and statuses (`pending`, `ready`, `running`, `completed`, `failed`, `skipped`, `cancelled`)
-- `domain/execution/ExecutionRun.ts` plus `application/execution/ExecutionContracts.ts` for run snapshots, unit transitions, execution-native provenance, diagnostics, and result/event attachments
+- `src/domain/execution/ExecutionPlan.ts` for plan/unit identity, dependency ordering, and statuses (`pending`, `ready`, `running`, `completed`, `failed`, `skipped`, `cancelled`)
+- `src/domain/execution/ExecutionRun.ts` plus `src/application/execution/ExecutionContracts.ts` for run snapshots, unit transitions, execution-native provenance, diagnostics, and result/event attachments
 
 This taxonomy is intentionally small. It is sufficient for workflow execution plans, truthful model/dataset runtime-backed runs, persisted run history, and a narrow MCP server-operation slice today without overcommitting the system to a speculative generalized MCP orchestration framework.
 
 ### New application-layer engine
 
-`application/execution/UnifiedExecutionEngine.ts` now executes and starts `ExecutionPlan` runs by:
+`src/application/execution/UnifiedExecutionEngine.ts` now executes and starts `ExecutionPlan` runs by:
 
 - determining which units are ready based on dependency completion
 - delegating each unit to a matching execution-unit handler
@@ -96,7 +96,7 @@ Future work (not implemented in this epic):
 
 ### Workflow path now routed through the engine
 
-`application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
+`src/application/workflows/ExecuteWorkflowUseCase.ts` now builds a one-unit execution plan for **both** the immediate workflow run path and the `startExecution(...)` path, then submits that plan to the unified execution engine.
 
 The migrated path is still deliberately narrow:
 
@@ -108,34 +108,34 @@ The remaining MCP areas stay out of scope for Direction 1 because the current ru
 This gives the codebase one real production seam for synchronous workflow runs, started workflow runs, and a second non-workflow execution-backed product area without forcing a broad refactor.
 
 ### Workflow Studio draft planning seam
-- Workflow Studio now has a canonical draft-to-plan mapper in `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
+- Workflow Studio now has a canonical draft-to-plan mapper in `src/application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts`.
 - `mapWorkflowDraftToExecutionPlan(...)` validates canonical draft integrity first (`validateWorkflowDraft`) and then emits deterministic ordered execution-plan elements for action steps and built-ins (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`) plus normalized ordered output plans.
-- Execution alignment contracts are now explicit in `application/workflow-studio/WorkflowExecutionAlignmentContracts.ts` (execution request/context, trigger handoff, step sequencing metadata, input/output bindings, and validation-boundary result contracts).
-- Workflow-to-execution translation now runs through `application/workflow-studio/WorkflowDefinitionExecutionPlanTranslator.ts`; `WorkflowDraftExecutionPlanMapper.ts` remains a compatibility export seam over that translator so canonical workflow-draft semantics stay single-sourced.
-- Translation now includes canonical execution-context assembly (`application/workflow-studio/WorkflowExecutionContextAssemblyService.ts`) so runtime parameters, dataset/static bindings, trigger payloads, and session metadata resolve into one deterministic execution context with explicit unresolved-input issues at the pre-execution validation boundary.
+- Execution alignment contracts are now explicit in `src/application/workflow-studio/WorkflowExecutionAlignmentContracts.ts` (execution request/context, trigger handoff, step sequencing metadata, input/output bindings, and validation-boundary result contracts).
+- Workflow-to-execution translation now runs through `src/application/workflow-studio/WorkflowDefinitionExecutionPlanTranslator.ts`; `WorkflowDraftExecutionPlanMapper.ts` remains a compatibility export seam over that translator so canonical workflow-draft semantics stay single-sourced.
+- Translation now includes canonical execution-context assembly (`src/application/workflow-studio/WorkflowExecutionContextAssemblyService.ts`) so runtime parameters, dataset/static bindings, trigger payloads, and session metadata resolve into one deterministic execution context with explicit unresolved-input issues at the pre-execution validation boundary.
 - Output planning now fails before runtime when output contracts are unsupported or incompatible with execution planning (for example unknown destination types, output-type mismatches, or unsupported formats), instead of silently deferring these failures to runtime.
 - Execution plans now emit explicit control-flow mapping descriptors (`controlFlowMappings`) for branch routing, loop execution, and manual outcome routing in addition to ordered step sequencing metadata, keeping control-flow semantics execution-ready without introducing a second runtime model.
 - This mapper is planning-only: it creates explicit runtime-ready plan elements without adding a second runtime executor or speculative graph model.
 - Stories 6.11-6.12 now extend that same seam into runtime + persistence behavior without introducing alternate workflow-draft representations:
-  - `application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (conditional branch, loop/iteration, delay/wait, manual approval) and emits explicit completed/skipped/failed/paused step traces.
+  - `src/application/workflow-studio/WorkflowDraftExecutionRuntime.ts` executes mapped built-in plan elements deterministically (conditional branch, loop/iteration, delay/wait, manual approval) and emits explicit completed/skipped/failed/paused step traces.
   - `WorkflowStudioApplicationService.executeWorkflowDraft(...)` now routes canonical draft content through `deserialize -> plan mapper -> runtime executor` on the same workflow-studio contracts.
   - Built-in workflow drafts continue to persist as canonical serialized draft content and now have explicit SQLite-backed persistence/rehydration round-trip coverage for built-in type/config/order.
-- Trigger runtime-readiness mapping is now explicit but bounded through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger contracts/config (manual/user, temporal, state) into runtime-facing descriptors without adding a scheduler engine or trigger-owned execution path.
+- Trigger runtime-readiness mapping is now explicit but bounded through `src/application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which projects canonical trigger contracts/config (manual/user, temporal, state) into runtime-facing descriptors without adding a scheduler engine or trigger-owned execution path.
 - State runtime descriptors now include explicit event semantics (`sourceType`, `eventCategory`, `subject`, plus optional criteria/filter metadata) so runtime mapping is planning-ready without introducing an event-bus execution engine.
-- Trigger correctness now routes through a shared validation pipeline (`validateWorkflowDraftTriggers` and `application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) that supports per-trigger config validation and workflow-level trigger checks before runtime mapping.
-- Stories 7.11-7.12 now route trigger mapping through the same execution-plan seam: `mapWorkflowDraftToExecutionPlan(...)` includes trigger execution semantics produced by `application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts` (manual/user invocation, temporal scheduling metadata, state-event metadata).
+- Trigger correctness now routes through a shared validation pipeline (`validateWorkflowDraftTriggers` and `src/application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) that supports per-trigger config validation and workflow-level trigger checks before runtime mapping.
+- Stories 7.11-7.12 now route trigger mapping through the same execution-plan seam: `mapWorkflowDraftToExecutionPlan(...)` includes trigger execution semantics produced by `src/application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts` (manual/user invocation, temporal scheduling metadata, state-event metadata).
 - Trigger planning consumes canonical validated draft content and fails safely when unsupported/invalid trigger semantics reach planning (no silent trigger drops).
 - Execution-plan trigger semantics remain continuation-ready (manual trigger scope includes both `workflow-start` and `workflow-continuation`) so future human-approval resume/intermediate continuation behavior is not blocked by start-only assumptions.
-- Pre-execution readiness validation is now a first-class canonical seam (`application/workflow-studio/WorkflowPreExecutionValidationPipeline.ts`) and runs before manual launch: authored workflow validation, pre-execution asset-version reference checks, and translation readiness are returned in one structured boundary result.
+- Pre-execution readiness validation is now a first-class canonical seam (`src/application/workflow-studio/WorkflowPreExecutionValidationPipeline.ts`) and runs before manual launch: authored workflow validation, pre-execution asset-version reference checks, and translation readiness are returned in one structured boundary result.
 - Manual Workflow Studio run now uses that same canonical flow through desktop/backend contracts (`StudioShellBackendApi.runWorkflowDraft` -> `WorkflowStudioApplicationService.runWorkflowDraftManual`) instead of UI-local execution logic: validate readiness -> translate canonical plan -> launch through runtime executor.
 - Workflow Studio launch feedback is now backend-authoritative (validation summary/issues + launch status projection), while wizard/canvas remain shared-draft authoring surfaces only.
-- Asset-backed step execution binding is now explicit in the canonical translator seam (`application/workflow-studio/WorkflowAssetStepExecutionBindingService.ts`), producing deterministic per-step runtime bindings (`assetStepBindings`) for supported executable asset kinds (currently `agent-assistant`) and failing pre-execution when asset-backed bindings are unresolved or unsupported.
+- Asset-backed step execution binding is now explicit in the canonical translator seam (`src/application/workflow-studio/WorkflowAssetStepExecutionBindingService.ts`), producing deterministic per-step runtime bindings (`assetStepBindings`) for supported executable asset kinds (currently `agent-assistant`) and failing pre-execution when asset-backed bindings are unresolved or unsupported.
 - Workflow draft runtime execution now has an explicit asset-invocation boundary (`WorkflowDraftExecutionRuntime.assetStepExecutor`) so asset-backed steps run through the same aligned plan/context/sequencing flow, with truthful explicit failures when no runtime invoker is configured for a required asset-backed step.
-- Trigger-aware execution entry is now explicit and shared (`application/workflow-studio/WorkflowTriggerExecutionEntryService.ts` + `WorkflowStudioApplicationService.runWorkflowDraftTriggered`): manual/user, temporal, and state/data activations all route through one validation -> translation -> context assembly -> runtime launch path instead of separate trigger pipelines.
+- Trigger-aware execution entry is now explicit and shared (`src/application/workflow-studio/WorkflowTriggerExecutionEntryService.ts` + `WorkflowStudioApplicationService.runWorkflowDraftTriggered`): manual/user, temporal, and state/data activations all route through one validation -> translation -> context assembly -> runtime launch path instead of separate trigger pipelines.
 - Trigger activation semantics now enforce draft association and kind alignment at translation time (`trigger-activation-not-found`, `trigger-activation-kind-mismatch`) so trigger launches fail deterministically when activation context does not match authored trigger definitions.
-- Workflow output handling now runs through a canonical runtime delivery seam (`application/workflow-studio/WorkflowExecutionOutputDeliveryService.ts`) that maps authored output plans into explicit delivery results for viewer, file-export, system-record, and prompt-response-chat destinations; output-delivery failures are explicit runtime issues instead of silent no-ops.
-- Workflow output binding declarations are now explicit asset configuration (`application/contracts/ImageWorkflowOutputBindingConfiguration.ts`) and map into canonical output-binding descriptors used by write-plan resolution/materialization paths; this keeps target selection, write behavior, and target-specific options inspectable and reusable.
-- Persisted workflow image records now include a typed lineage envelope (workflow/version/run, source image or dataset context, binding target, and output relationship metadata) across output/history/comparison dataset targets via `application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`.
+- Workflow output handling now runs through a canonical runtime delivery seam (`src/application/workflow-studio/WorkflowExecutionOutputDeliveryService.ts`) that maps authored output plans into explicit delivery results for viewer, file-export, system-record, and prompt-response-chat destinations; output-delivery failures are explicit runtime issues instead of silent no-ops.
+- Workflow output binding declarations are now explicit asset configuration (`src/application/contracts/ImageWorkflowOutputBindingConfiguration.ts`) and map into canonical output-binding descriptors used by write-plan resolution/materialization paths; this keeps target selection, write behavior, and target-specific options inspectable and reusable.
+- Persisted workflow image records now include a typed lineage envelope (workflow/version/run, source image or dataset context, binding target, and output relationship metadata) across output/history/comparison dataset targets via `src/application/workflow-studio/WorkflowOutputRecordMaterializationService.ts`.
 - Workflow Studio run orchestration now emits structured execution lifecycle/status reports (`queued` -> `running` -> `completed|failed`) with typed failure classification (`validation-failure`, `translation-failure`, `unsupported-configuration`, `runtime-failure`, `output-delivery-failure`, `launch-failure`) on the same manual/trigger entry path.
 - Workflow Studio now also exposes a canonical pre-launch execution-readiness check over the same validation pipeline (`StudioShellBackendApi.assessWorkflowExecutionReadiness`) so UI launch eligibility/blocked state is based on backend validation truth rather than UI-local heuristics.
 - Workflow run feedback projections now include bounded output handoff summaries (per-output destination/target delivery status) so Workflow Studio can report result delivery outcomes without exposing runtime-internal payload details.
@@ -148,10 +148,10 @@ Direction 5 Epic 6 stories 6.17–6.18 now keep system-runtime execution read in
 ## Execution flow for workflows
 
 ### 1. A workflow enters through a UI service/store
-In the renderer, stores call services such as `ui/services/WorkflowService.ts`, which then use application-layer use cases.
+In the renderer, stores call services such as `src/ui/services/WorkflowService.ts`, which then use application-layer use cases.
 
 ### 2. The application use case prepares execution
-`application/workflows/ExecuteWorkflowUseCase.ts` is responsible for:
+`src/application/workflows/ExecuteWorkflowUseCase.ts` is responsible for:
 - applying property overrides
 - validating the workflow before execution
 - resolving workflow context metadata via `WorkflowContextService`
@@ -161,7 +161,7 @@ In the renderer, stores call services such as `ui/services/WorkflowService.ts`, 
 This remains the central orchestration point for workflow runs.
 
 ### 3. The execution engine delegates product-specific work to thin adapters
-`infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the workflow execution-unit handler, `infrastructure/execution/DatasetGenerationExecutionUnitHandler.ts` is the dataset-generation execution-unit handler, and `infrastructure/execution/McpServerOperationExecutionUnitHandler.ts` is the narrow MCP server-operation handler.
+`src/infrastructure/execution/WorkflowExecutionUnitHandler.ts` is the workflow execution-unit handler, `src/infrastructure/execution/DatasetGenerationExecutionUnitHandler.ts` is the dataset-generation execution-unit handler, and `src/infrastructure/execution/McpServerOperationExecutionUnitHandler.ts` is the narrow MCP server-operation handler.
 
 Their job is intentionally thin:
 - accept an execution unit from the engine
@@ -173,7 +173,7 @@ Their job is intentionally thin:
 This preserves the existing runtime-aware execution stacks while establishing a canonical execution seam above them.
 
 ### 4. The executor chooses a strategy
-`infrastructure/execution/TruthfulWorkflowExecutor.ts` still selects an execution strategy via `WorkflowRuntimeSelector`.
+`src/infrastructure/execution/TruthfulWorkflowExecutor.ts` still selects an execution strategy via `WorkflowRuntimeSelector`.
 
 This is important because the system does **not** assume one runtime path. Instead, it chooses a compatible strategy and records why that strategy was selected.
 
@@ -182,8 +182,8 @@ The selector is now orchestration-aware for delegated execution. When the shared
 ### 5. A concrete strategy runs the workflow
 Today the main strategies are:
 
-- **Python delegated execution** via `infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy.ts`
-- **Interpreted scaffold fallback** via `infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts`
+- **Python delegated execution** via `src/infrastructure/python/execution/PythonDelegatedWorkflowExecutionStrategy.ts`
+- **Interpreted scaffold fallback** via `src/infrastructure/interpreted/execution/InterpretedWorkflowExecutionStrategy.ts`
 
 The delegated strategy serializes workflow nodes/connections into the Python runtime request. The interpreted strategy topologically sorts the graph, resolves node execution context, runs nodes one at a time, and accumulates outputs/provenance.
 
@@ -245,15 +245,15 @@ Tool metadata lives on the workflow metadata object (`isPublishedAsTool`, `toolT
 
 ### Projection model
 The application layer provides projection services:
-- `application/projection/WorkflowProjectionService.ts`
-- `application/projection/WorkflowToolProjectionService.ts`
+- `src/application/projection/WorkflowProjectionService.ts`
+- `src/application/projection/WorkflowToolProjectionService.ts`
 
 These services adapt the workflow into different external representations:
 - a form-oriented projection for workflow editing
 - a tool definition / runnable tool schema for end-user tool running
 
 ### Running a tool
-`application/tools/RunToolUseCase.ts` performs tool execution by:
+`src/application/tools/RunToolUseCase.ts` performs tool execution by:
 1. loading the tool definition
 2. loading the source workflow from the workflow repository
 3. applying tool input onto the workflow projection
@@ -328,7 +328,7 @@ Fallbacks are modeled explicitly instead of being hidden.
 Execution strategies and capability providers can be swapped or extended without rewriting application use cases.
 
 ### Inner-to-outer migration seam
-The new execution engine slice starts in the domain/application layers and adapts the existing infrastructure stack outward, which matches the project’s architecture guidance better than a UI-first or runtime-first refactor would.
+The new execution engine slice starts in the src/domain/application layers and adapts the existing infrastructure stack outward, which matches the project’s architecture guidance better than a UI-first or runtime-first refactor would.
 
 ## Recommended next migration steps
 
@@ -366,17 +366,17 @@ That is "done enough" for Direction 1: the unified execution engine now includes
   - `ai-loom.mcp-tool-definitions.v1` for shareable definition export/import flows (definition + source only; no runtime approvals/secrets/operational trust state).
 
 ## Direction 4 Phase 1 execution alignment
-- Agent execution sessions now use execution-native lifecycle language (`pending/ready/running/completed/failed/cancelled`) via `domain/agents/AgentExecutionSession.ts`, with explicit transition/run-plan compatibility checks, canonical asset-based diagnostics, and timestamp coherence invariants.
-- A compact mapping seam (`application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) and provides per-unit payload mapping so future agent execution flows through the same unified engine substrate.
+- Agent execution sessions now use execution-native lifecycle language (`pending/ready/running/completed/failed/cancelled`) via `src/domain/agents/AgentExecutionSession.ts`, with explicit transition/run-plan compatibility checks, canonical asset-based diagnostics, and timestamp coherence invariants.
+- A compact mapping seam (`src/application/agents/contracts/AgentExecutionMapping.ts`) maps agent plan steps into `ExecutionPlan` units (`agent-tool-step`) and provides per-unit payload mapping so future agent execution flows through the same unified engine substrate.
 - Agent roots expose explicit `toolAccess` beside policy and memory allows intentional zero-asset initialization while remaining canonically `AssetId`-typed once references are present.
 - This does not add a second orchestration engine: it only establishes a durable contract for later planner/runner slices.
 
-- Direction 4 planning now has an execution-native inner seam: validated `AgentPlan` step graphs (including dependencies, input references, expected outputs) map through `application/agents/contracts/AgentExecutionMapping.ts` into `ExecutionPlan` `agent-tool-step` units, proving future planner output routes into the same unified execution engine instead of a parallel agent runtime.
+- Direction 4 planning now has an execution-native inner seam: validated `AgentPlan` step graphs (including dependencies, input references, expected outputs) map through `src/application/agents/contracts/AgentExecutionMapping.ts` into `ExecutionPlan` `agent-tool-step` units, proving future planner output routes into the same unified execution engine instead of a parallel agent runtime.
 - Direction 4 Phase 3 now adds a memory substrate aligned to that same execution/planning seam:
-  - retrieval is a typed application contract that returns asset-backed memory references (`application/agents/contracts/AgentMemoryRetrieval.ts`);
-  - session working memory is a bounded domain object attached to agent plan/execution context (`domain/agents/AgentWorkingMemory.ts`);
-  - write-back is a bounded application pipeline that normalizes execution outcomes into asset-backed memory references (`application/agents/services/AgentMemoryWriteService.ts`);
-  - memory behavior is policy-shaped (`domain/agents/AgentMemory.ts`) rather than implicit.
+  - retrieval is a typed application contract that returns asset-backed memory references (`src/application/agents/contracts/AgentMemoryRetrieval.ts`);
+  - session working memory is a bounded domain object attached to agent plan/execution context (`src/domain/agents/AgentWorkingMemory.ts`);
+  - write-back is a bounded application pipeline that normalizes execution outcomes into asset-backed memory references (`src/application/agents/services/AgentMemoryWriteService.ts`);
+  - memory behavior is policy-shaped (`src/domain/agents/AgentMemory.ts`) rather than implicit.
 
 ## TODO
 
@@ -401,13 +401,13 @@ Auth, approval, permission, and sandbox denials are explicit structured outcomes
 
 Approval lifecycle actions are auditable (`approval-requested`, `approval-granted`, `approval-denied`, `approval-revoked`) and trust read models now expose machine-readable posture (required permissions, missing approvals, sandbox policy, and enforcement truthfulness metadata).
 
-This slice enforces bounded sandbox policy in the application/runtime orchestration layer and truthfully distinguishes invocation-level enforced controls (network/filesystem/asset gating) from declared-only posture (environment exposure). It creates seams for future stronger process/OS sandboxing without claiming that hard isolation already exists.
+This slice enforces bounded sandbox policy in the src/application/runtime orchestration layer and truthfully distinguishes invocation-level enforced controls (network/filesystem/asset gating) from declared-only posture (environment exposure). It creates seams for future stronger process/OS sandboxing without claiming that hard isolation already exists.
 
 Approval lifecycle is now complete and persisted per `(tool, permission, scopeType, scopeId)` with `pending` / `approved` / `denied` / `revoked` states, and execution enforces those records directly (no implicit grant fallback).
 
 MCP execution trust flow is now deterministic across paths: contract validation -> credential resolution -> permission policy -> approval policy -> sandbox policy -> execution.
 
-Sandbox contract now uses an explicit policy object (`network.allowed + allowlists`, `filesystem.allowed + read/write paths`, `assets.read/write`, `environment.allowedEnvVars`) and includes request-vs-policy posture for network (hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
+Sandbox contract now uses an explicit policy object (`network.allowed + allowlists`, `filesystem.allowed + read/write paths`, `assets.read/write`, `environment.allowedEnvVars`) and includes request-vs-policy posture for network (src/hosts/protocols), filesystem (read/write path sets), asset actions (read/write), and environment variable exposure; request overreach fails with `sandbox-denied`.
 
 Trust read models are split for direct consumption (`getToolTrustState`, `getMissingApprovals`, `getEffectivePermissions`, `getSandboxPosture`) so callers do not reconstruct approval/sandbox logic manually.
 
@@ -456,20 +456,20 @@ Audit schema now records administrative approval transitions plus decision denia
 - Trigger-first invocation now has a bounded inner use case (`TriggerAgentLaunchUseCase`) that validates trigger-kind contracts and delegates to the same canonical launch path (no side runtime path).
 - Launch/session operational projections now include bounded execution-progress, retry, outcome, memory-write, and output-asset summaries from canonical runner/session truth.
 - Session-detail composition projection can now include resolver-backed authored-agent contract projection (`CompositionAssetContractResolver.resolveAgentContractById`) alongside execution-artifact taxonomy classification.
-- Phase 8.1 backend integration now consolidates Agent Studio transport over one desktop backend seam (`infrastructure/api/agents/AgentStudioBackendApi.ts`), keeping authoring + runtime/session reads/control under one response envelope while reusing existing Phase 6/7 use cases and typed error semantics.
+- Phase 8.1 backend integration now consolidates Agent Studio transport over one desktop backend seam (`src/infrastructure/api/agents/AgentStudioBackendApi.ts`), keeping authoring + runtime/session reads/control under one response envelope while reusing existing Phase 6/7 use cases and typed error semantics.
 - `AgentStudioBackendApi` keeps agent-facing read models composition-native: authored-agent reads remain taxonomy-classified (`CompositionTaxonomyClassifier.classifyAgent`) and contract-projected (`CompositionAssetContractResolver.resolveAgentContractById`), and session/operational reads remain execution-artifact classified with optional authored-agent contract projection.
 - Desktop IPC now exposes a coherent studio-ready operation set on the existing `ai-loom-desktop-agents:*` channel family (`launch`, `trigger-launch`, `list-sessions`, `get-session`, `control-run`, `studio-snapshot`) without introducing a parallel runtime path.
 - Desktop host bootstrap now wires launch/trigger-launch to a real `AgentRunnerService` path (deterministic planner + tool capability orchestration + asset-backed memory store + session persistence), so launch endpoints are execution-backed rather than transport-declared unsupported operations.
 
 
 ## Workflow run history foundation (Epic 12 stories 12.1-12.4)
-- Workflow observability now has a canonical workflow-run-history contract in `domain/workflow-studio/WorkflowRunHistoryDomain.ts`:
+- Workflow observability now has a canonical workflow-run-history contract in `src/domain/workflow-studio/WorkflowRunHistoryDomain.ts`:
   - top-level run summary identity/status/trigger/timestamps
   - correlation ids linking workflow-run summaries to durable execution-run records (`executionRunId`, optional `workflowExecutionId`, optional `executionFlowId`)
   - explicit workflow-definition references and output references
   - explicit run-detail records (`WorkflowRunDetailRecord`) carrying step-run execution records, execution context, and structured output records.
-- Application orchestration now records workflow-run summary lifecycle through `application/workflow-run-history/WorkflowRunHistoryService.ts` and lists summaries through `ListWorkflowRunSummariesUseCase`.
-- Workflow execution integration remains on the existing execution backbone: `infrastructure/execution/WorkflowExecutionUnitHandler.ts` records run start/terminal summary lifecycle and now streams node/step runtime events into run-detail step-run updates (`recordStepEvent`) without introducing a second runtime path.
+- Application orchestration now records workflow-run summary lifecycle through `src/application/workflow-run-history/WorkflowRunHistoryService.ts` and lists summaries through `ListWorkflowRunSummariesUseCase`.
+- Workflow execution integration remains on the existing execution backbone: `src/infrastructure/execution/WorkflowExecutionUnitHandler.ts` records run start/terminal summary lifecycle and now streams node/step runtime events into run-detail step-run updates (`recordStepEvent`) without introducing a second runtime path.
 - Run detail now distinguishes list-facing summary and inspection-facing detail:
   - summary: `WorkflowRunSummaryRecord` + `stepRunStats`
   - detail: `WorkflowRunDetailRecord` with ordered step runs (status/timestamps/duration/error summary), structured execution input/trigger/runtime context, and structured top-level outputs.
@@ -494,12 +494,12 @@ Audit schema now records administrative approval transitions plus decision denia
   - rerun/edit-and-rerun affordances now enforce terminal-state and historical-context prerequisites with explicit unsupported-state UX.
 
 ## Direction 5 update: Data Studio validation and execution integration (stories 18.13-18.14)
-- Data Studio pipeline validation is now a first-class application seam (`application/data-studio/DataStudioPipelineValidation.ts`) with structured stage/pipeline/transition/graph diagnostics.
+- Data Studio pipeline validation is now a first-class application seam (`src/application/data-studio/DataStudioPipelineValidation.ts`) with structured stage/pipeline/transition/graph diagnostics.
 - Validation enforces required stages/configuration plus cross-stage constraints (source -> ingestion, extraction -> chunking, prepared-storage prerequisites) and transition-progression constraints for wizard/canvas authoring parity.
 - Data Studio execution now runs through the unified execution backbone:
-  - execution plan mapping + artifacts/provenance in `application/data-studio/DataStudioPipelineExecution.ts`,
-  - run orchestration/readiness gating in `application/data-studio/DataStudioPipelineExecutionService.ts`,
-  - execution-unit handling in `infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
+  - execution plan mapping + artifacts/provenance in `src/application/data-studio/DataStudioPipelineExecution.ts`,
+  - run orchestration/readiness gating in `src/application/data-studio/DataStudioPipelineExecutionService.ts`,
+  - execution-unit handling in `src/infrastructure/execution/DataStudioPipelineExecutionUnitHandler.ts`,
   - handler registration in shared execution infrastructure composition (`createExecutionInfrastructure*.ts`).
 - Studio Shell now exposes backend-authoritative Data Studio readiness/run operations (`assessDataStudioExecutionReadiness`, `runDataStudioPipeline`) and toolbar-aligned renderer wiring (`run-data-pipeline`) while preserving workflow-specific semantics.
 
@@ -513,12 +513,12 @@ Audit schema now records administrative approval transitions plus decision denia
 
 ## AI Loom image manipulation UI-trigger integration update (stories 4.2.9-4.2.10)
 
-- UI-triggered execution now has reusable trigger wrappers/components in `ui/components/assets/image-system/WorkflowUiTriggerComponents.tsx` for:
+- UI-triggered execution now has reusable trigger wrappers/components in `src/ui/components/assets/image-system/WorkflowUiTriggerComponents.tsx` for:
   - workflow trigger buttons,
   - workflow-aware form submit wrappers,
   - image selection trigger surfaces.
 - These wrappers stay adapter-first: they emit normalized `UiTriggerEvent` contracts and hand off via a dispatch adapter (`createWorkflowUiTriggerDispatchAdapter`) that composes the existing `WorkflowUiEventRuntimeDispatcher` path rather than calling workflow internals directly.
-- System context gathering for UI-triggered runs is now a reusable mapping seam (`application/workflow-studio/UiTriggerSystemContextMapper.ts`) consumed by the dispatcher:
+- System context gathering for UI-triggered runs is now a reusable mapping seam (`src/application/workflow-studio/UiTriggerSystemContextMapper.ts`) consumed by the dispatcher:
   - selected image context,
   - current form/runtime parameter values,
   - dataset references and dataset instance refs,
@@ -533,19 +533,19 @@ Audit schema now records administrative approval transitions plus decision denia
 ## AI Loom image manipulation update: system-context to input-binding adapters (stories 4.3.1-4.3.2)
 
 - `UiTriggerSystemContextMapper` now maps trigger events into the shared `SystemContextContract` rather than directly emitting workflow-execution metadata objects.
-- A dedicated workflow adapter seam (`WorkflowSystemContextBindingAdapter` in `application/workflow-studio/SystemContextWorkflowInputMapper.ts`) translates that contract into workflow execution context metadata/input values.
+- A dedicated workflow adapter seam (`WorkflowSystemContextBindingAdapter` in `src/application/workflow-studio/SystemContextWorkflowInputMapper.ts`) translates that contract into workflow execution context metadata/input values.
 - `WorkflowUiEventRuntimeDispatcher` composes both seams (`UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter`) so state gathering and workflow binding translation remain independently swappable.
 
 ## AI Loom image manipulation update: System Studio context extraction + contract validation (stories 4.3.3-4.3.4)
 
-- Added a dedicated System Studio extraction seam (`application/workflow-studio/SystemStudioContextExtraction.ts`) that maps studio-facing state snapshots into normalized `SystemContextContract` objects.
+- Added a dedicated System Studio extraction seam (`src/application/workflow-studio/SystemStudioContextExtraction.ts`) that maps studio-facing state snapshots into normalized `SystemContextContract` objects.
 - The extraction seam is workflow-agnostic and contract-first:
   - selected image state -> `selectedImages`,
   - parameter form state -> `parameters` (with lightweight normalization),
   - dataset selection/reference state -> `datasets`,
   - runtime/system metadata -> `runtime`.
-- Added a UI adapter seam (`ui/components/assets/image-system/ImageSystemStudioContextAdapter.ts`) so image-system component state (`ImageInterfaceState`) is translated at the boundary and raw component structures do not leak into workflow/runtime contracts.
-- Added `SystemContextValidationService` (`application/workflow-studio/SystemContextValidationService.ts`) to provide inspectable, reusable validation outputs for:
+- Added a UI adapter seam (`src/ui/components/assets/image-system/ImageSystemStudioContextAdapter.ts`) so image-system component state (`ImageInterfaceState`) is translated at the boundary and raw component structures do not leak into workflow/runtime contracts.
+- Added `SystemContextValidationService` (`src/application/workflow-studio/SystemContextValidationService.ts`) to provide inspectable, reusable validation outputs for:
   - required context/parameter checks,
   - selected-image/media-structure checks,
   - dataset reference + schema-intent alignment checks,
@@ -554,14 +554,14 @@ Audit schema now records administrative approval transitions plus decision denia
 
 ## AI Loom image manipulation update: workflow input binding adapter + dataset reference resolution (stories 4.3.5-4.3.6)
 
-- Added a dedicated dataset-resolution seam (`application/workflow-studio/SystemContextDatasetReferenceResolver.ts`) that resolves system-context dataset references into concrete dataset-instance runtime handles, with structured inspectable outcomes (`resolved`, `unresolved`, `issues`, `byReferenceId`).
+- Added a dedicated dataset-resolution seam (`src/application/workflow-studio/SystemContextDatasetReferenceResolver.ts`) that resolves system-context dataset references into concrete dataset-instance runtime handles, with structured inspectable outcomes (`resolved`, `unresolved`, `issues`, `byReferenceId`).
 - Resolution is contract-first and storage-agnostic: it distinguishes abstract references from resolved runtime handles, checks role/intent compatibility for common image-system roles (`active-input`, `history`, `system-owned-output`), and returns explicit failure diagnostics when instance resolution or compatibility fails.
-- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
+- `WorkflowSystemContextBindingAdapter` (`src/application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now composes that resolver and emits workflow-ready input metadata with normalized runtime-facing dataset payloads (`datasetInstances`, `datasetRuntimeHandles`, `systemDatasetInstanceRefs`, `datasetResolution`) while preserving separation from raw UI state.
 - `SystemContextValidationService` now reuses the same dataset-resolution seam before workflow input binding preview so validation, execution mapping, and inspect/debug surfaces share one dataset resolution truth.
 
 ## AI Loom image manipulation update: UI event payload enrichment + System Studio context preview/debug (stories 4.3.7-4.3.8)
 
-- UI-trigger workflow dispatch now enriches trigger activation payloads through a dedicated contract seam (`application/workflow-studio/UiTriggerEventPayloadEnrichmentService.ts`) that preserves existing trigger contracts while attaching normalized system context outputs.
+- UI-trigger workflow dispatch now enriches trigger activation payloads through a dedicated contract seam (`src/application/workflow-studio/UiTriggerEventPayloadEnrichmentService.ts`) that preserves existing trigger contracts while attaching normalized system context outputs.
 - Enriched payloads now include standardized, inspectable fields for:
   - selected-image/parameter/dataset/runtime context (`systemContext`, `systemContextSummary`),
   - dataset resolution diagnostics (`datasetContext.resolution`),
@@ -569,24 +569,24 @@ Audit schema now records administrative approval transitions plus decision denia
   - envelope metadata for debugging/lineage (`__systemContextEnvelope`).
 - Dispatch integration remains adapter-first: `WorkflowUiEventRuntimeDispatcher` composes `UiTriggerSystemContextMapper` + `WorkflowSystemContextBindingAdapter` + payload enricher without coupling UI components to runtime internals.
 - System Studio now includes a bounded developer-facing context preview/debug surface:
-  - orchestration service (`application/workflow-studio/SystemContextDebugPreviewService.ts`) that executes extraction -> validation -> dataset resolution -> workflow binding -> enriched payload preview,
-  - reusable extension panel (`ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx`) wired through System Studio registration (`system-studio-context-debug-preview`) for pre-dispatch inspection.
+  - orchestration service (`src/application/workflow-studio/SystemContextDebugPreviewService.ts`) that executes extraction -> validation -> dataset resolution -> workflow binding -> enriched payload preview,
+  - reusable extension panel (`src/ui/components/studio-shell/SystemContextDebugPreviewPanel.tsx`) wired through System Studio registration (`system-studio-context-debug-preview`) for pre-dispatch inspection.
 
 ## AI Loom image manipulation update: reusable system-context mapping configuration (story 4.3.9)
 
-- System-context to workflow-input binding now uses an explicit reusable mapping configuration contract (`domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`) with:
+- System-context to workflow-input binding now uses an explicit reusable mapping configuration contract (`src/domain/system-studio/SystemContextWorkflowMappingConfiguration.ts`) with:
   - versioned mapping configuration envelopes,
   - source roots/path selectors (`parameters`, `selected-image`, `datasets`, `dataset-resolution`, etc.),
   - workflow target selectors (`workflow-input`, `workflow-metadata`),
   - optional transformer ids, default values, and required flags.
-- `WorkflowSystemContextBindingAdapter` (`application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now applies this contract instead of embedding ad hoc field wiring:
+- `WorkflowSystemContextBindingAdapter` (`src/application/workflow-studio/SystemContextWorkflowInputMapper.ts`) now applies this contract instead of embedding ad hoc field wiring:
   - default mapping behavior remains compatible with prior 4.3.1-4.3.8 outputs,
   - custom mapping configurations can override/extend binding behavior with inspectable `systemContextMapping` report metadata (`appliedMappings`, issues).
-- System assets can now persist reusable context mapping configuration under bounded execution metadata (`SystemExecutionMetadata.workflowContextMapping` in `domain/system-studio/SystemAssetDomain.ts`) so System Studio setups are save/load/duplicate friendly.
+- System assets can now persist reusable context mapping configuration under bounded execution metadata (`SystemExecutionMetadata.workflowContextMapping` in `src/domain/system-studio/SystemAssetDomain.ts`) so System Studio setups are save/load/duplicate friendly.
 
 ## AI Loom image manipulation hardening update: cross-studio validation + reload integrity + e2e handoff tests (stories 5.2.7-5.2.9)
 
-- Cross-studio boundary validation is now centralized through `application/system-studio/ReferenceImageCrossStudioIntegrity.ts`, which composes existing shared seams (`SystemContextValidationService`, dataset-resolution logic, and system-context workflow mapping) instead of introducing a separate validation model.
+- Cross-studio boundary validation is now centralized through `src/application/system-studio/ReferenceImageCrossStudioIntegrity.ts`, which composes existing shared seams (`SystemContextValidationService`, dataset-resolution logic, and system-context workflow mapping) instead of introducing a separate validation model.
 - The validation boundary now explicitly catches representative handoff failures before output materialization:
   - missing or invalid selected image references,
   - unresolved dataset instance references,
@@ -622,11 +622,11 @@ Audit schema now records administrative approval transitions plus decision denia
 - This keeps output/result/history views grounded in persisted normalized state and reduces ambiguity/orphaned lineage across successful, failed, and partial runs.
 
 ## AI Loom image manipulation hardening update: performance baseline instrumentation + cross-studio state sync (stories 5.4.7-5.4.8)
-- Reference-image execution now records bounded phase telemetry through one runtime seam (`ui/runtime/ReferenceImagePerformanceTelemetry.ts`) instead of scattering `performance.now()` calls in components.
+- Reference-image execution now records bounded phase telemetry through one runtime seam (`src/ui/runtime/ReferenceImagePerformanceTelemetry.ts`) instead of scattering `performance.now()` calls in components.
 - Measured phases align with the current architecture and user flow: intake/load, preparation/start, runtime work, persistence/save, and UI refresh.
 - System Studio now projects plain-language primary status (`Preparing`, `Working`, `Saving`, `Finished`) while technical timing/baseline details are surfaced in a collapsed advanced section.
 - Baseline summaries are computed over real run reports (single-image, repeated recent runs, and multi-result batch-style runs where supported) so bottleneck discovery stays lightweight and maintainable.
-- Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
+- Cross-studio refresh orchestration now routes through a dedicated synchronization seam (`src/ui/runtime/ReferenceImageCrossStudioSyncService.ts`) that refreshes shared studio snapshot state before reloading results/history and reconciling active selections.
 - This keeps Data/Workflow/System views aligned on the same underlying persisted runtime graph without navigation hacks or duplicated refresh logic.
 
 ## AI Loom image manipulation hardening update: persistence stress/recovery + architecture gap log (stories 5.4.9-5.4.10)
@@ -747,8 +747,8 @@ The image slice proved the shared architecture, but it exposed concrete follow-u
 
 ## AI Loom image manipulation runtime-window execution + restore update (stories 8.5-8.6)
 
-- Standalone runtime-window run actions now prepare backend execution requests from hydrated runtime selections/config through a dedicated mapper seam (`ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) instead of page-local ad hoc request construction.
+- Standalone runtime-window run actions now prepare backend execution requests from hydrated runtime selections/config through a dedicated mapper seam (`src/ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) instead of page-local ad hoc request construction.
 - Mapping remains on existing execution orchestration contracts: runtime UI state -> `buildReferenceImageStartRequest` -> `startSystemExecution` backend path -> normalized result/persistence -> dataset refresh.
 - Dataset/storage references in runtime context now remain logical and inspectable (binding ids, dataset ids, storage-instance references/areas, sharing scope metadata) with no UI-facing filesystem path contracts.
 - FaceID-enabled runs now require an explicit selected reference image at preflight mapping time, while default non-FaceID template behavior remains runnable without extra setup.
-- Runtime-window session override state now has a dedicated persistence model (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) so restored runs layer serialized runtime overrides on top of hydrated launch defaults for clean reopen/restore continuation.
+- Runtime-window session override state now has a dedicated persistence model (`src/ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) so restored runs layer serialized runtime overrides on top of hydrated launch defaults for clean reopen/restore continuation.

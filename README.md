@@ -25,12 +25,31 @@ npm run dev
 ```
 
 That starts the renderer plus the Electron desktop host, which is the expected development path for durable `dev/` filesystem + SQLite persistence.
+The desktop dev command now runs a preflight cleanup that clears stale `.vite` build artifacts with retry/backoff handling so restarts recover more reliably after forced terminal stops.
 
 ### Explicit browser-only fallback
 
 ```bash
 npm run dev:browser
 ```
+
+### Host-based local startup modes
+
+All local startup paths now run through host composition entrypoint assemblies.
+
+- Authoritative server host only: `npm run dev:host:authoritative-server`
+- Hybrid host only: `npm run dev:host:hybrid`
+- Web host only: `npm run dev:host:web`
+- Worker host only: `npm run dev:host:worker`
+- Combined local control-plane + worker hosts: `npm run dev:host:control-plane-worker`
+
+Authoritative server persistence bootstrap configuration:
+
+- Primary database path: `AI_LOOM_SERVER_DATABASE_PATH`
+- Optional SQLite bootstrap overrides:
+  - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`
+  - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`
+  - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
 
 This starts:
 
@@ -186,6 +205,14 @@ The app no longer treats scaffold execution as if it were the primary production
 - `electron/**`: Electron main/preload host implementation
 - `ui/composition/**`: explicit dev-vs-desktop repository composition
 - `forge.config.ts`: Electron Forge packaging configuration
+
+## Identity session docs
+
+- Session architecture and integration expectations: `docs/architecture/identity-session-architecture.md`
+- Identity foundation overview: `docs/architecture/identity-foundation.md`
+- Identity server API contract: `docs/architecture/identity-server-api.md`
+- Feature 1 final baseline and downstream implementation notes: `docs/architecture/identity-feature-1-final-baseline.md`
+- Trusted-device user workflows: `docs/trusted-device-workflows.md`
 
 ## Node execution truthfulness categories
 

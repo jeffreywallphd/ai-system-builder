@@ -16,7 +16,7 @@ Those stable meanings live in the **domain** and **application** layers.
 ## Domain core
 
 ### Workflows as the central aggregate
-The workflow aggregate (`domain/workflows/Workflow.ts`) is the most important domain object in the codebase. It owns:
+The workflow aggregate (`src/domain/workflows/Workflow.ts`) is the most important domain object in the codebase. It owns:
 - identity
 - metadata
 - lifecycle state
@@ -31,7 +31,7 @@ The aggregate exposes operations like `addNode`, `updateNode`, `removeNode`, `ad
 The workflow can be converted to a graph (`toGraph()`), but graph-specific behavior is separated into graph/domain services rather than being buried in the UI. That keeps graph reasoning reusable and testable.
 
 ### Validation as business policy
-`domain/services/WorkflowValidator.ts` combines graph checks, node validation, connection validation, and runtime-policy checks. This is the correct place for those rules because workflow validity is a business concern, not a view concern.
+`src/domain/services/WorkflowValidator.ts` combines graph checks, node validation, connection validation, and runtime-policy checks. This is the correct place for those rules because workflow validity is a business concern, not a view concern.
 
 ### Compatibility services
 The domain also contains compatibility logic such as:
@@ -88,7 +88,7 @@ The context system is mostly modeled in the application layer rather than the pu
 - trimming/budgeting
 - generating execution envelopes and inspection outputs
 
-`application/context/WorkflowContextService.ts` is therefore a central application-layer service.
+`src/application/context/WorkflowContextService.ts` is therefore a central application-layer service.
 
 ### Projection services are application translators
 Projection services translate the rich internal workflow model into alternate surfaces such as forms and tools. They are not domain rules and not infrastructure details; application is the right layer for them.
@@ -151,20 +151,20 @@ The MCP inner-layer model now adds an explicit trust/governance foundation:
 Current limitations (intentional for this pass):
 - secret persistence is still local-first, but now uses secure desktop encryption (`safeStorage` bridge) when available and encrypted local fallback otherwise.
 - scope is intentionally bounded to global/project with a user-scope extension seam; this is not a full identity/tenant system.
-- sandboxing is still bounded to application/runtime execution policy gates; policy shape is explicit (`network.allowed`, `filesystem.allowed`, `assets.read/write`, `environment.allowedEnvVars`) and network/filesystem/asset posture is invocation-level enforced while environment exposure is declared-only metadata (not hard OS/container isolation).
+- sandboxing is still bounded to src/application/runtime execution policy gates; policy shape is explicit (`network.allowed`, `filesystem.allowed`, `assets.read/write`, `environment.allowedEnvVars`) and network/filesystem/asset posture is invocation-level enforced while environment exposure is declared-only metadata (not hard OS/container isolation).
 
 ## Direction 5 update: Studio shell inner foundation (stories 1.1–1.2)
 
 The studio shell now has a bounded inner-layer model and application orchestration seam for asset authoring sessions:
-- domain model in `domain/studio-shell/StudioShellDomain.ts` introduces `Studio`, `AssetSession`, `AssetDraft`, and `AssetMetadata` with lifecycle/invariant rules (session mutability, draft revisioning, studio/session ownership checks).
+- domain model in `src/domain/studio-shell/StudioShellDomain.ts` introduces `Studio`, `AssetSession`, `AssetDraft`, and `AssetMetadata` with lifecycle/invariant rules (session mutability, draft revisioning, studio/session ownership checks).
 - taxonomy and contract remain explicit-but-separate metadata concerns on `AssetMetadata` (`taxonomy` uses `CompositionTaxonomyDescriptor`; `contract` uses `AssetContractDescriptor`) so classification and interaction-surface semantics are not collapsed.
-- application orchestration in `application/studio-shell/DefaultStudioShellApplicationService.ts` now exposes studio initialization, session start, draft create/load/update flows over a dedicated repository port (`IStudioShellRepository`).
-- inner-layer tests cover both domain invariants and orchestration behaviors (`domain/studio-shell/tests/*`, `application/studio-shell/tests/*`).
+- application orchestration in `src/application/studio-shell/DefaultStudioShellApplicationService.ts` now exposes studio initialization, session start, draft create/load/update flows over a dedicated repository port (`IStudioShellRepository`).
+- inner-layer tests cover both domain invariants and orchestration behaviors (`src/domain/studio-shell/tests/*`, `src/application/studio-shell/tests/*`).
 
 ## Direction 5 update: Studio shell metadata integration (stories 1.3–1.4)
 
-- taxonomy authoring now uses the shared taxonomy seam with deterministic combination validation in the studio shell draft lifecycle (`assertAllowedCompositionTaxonomyCombination` in `domain/taxonomy/CompositionTaxonomy.ts`, applied by `normalizeAssetMetadata`).
-- contract authoring remains a separate metadata concern and now has stricter execution metadata normalization/validation (`domain/contracts/AssetContract.ts`) while still round-tripping on the same draft/session model.
+- taxonomy authoring now uses the shared taxonomy seam with deterministic combination validation in the studio shell draft lifecycle (`assertAllowedCompositionTaxonomyCombination` in `src/domain/taxonomy/CompositionTaxonomy.ts`, applied by `normalizeAssetMetadata`).
+- contract authoring remains a separate metadata concern and now has stricter execution metadata normalization/validation (`src/domain/contracts/AssetContract.ts`) while still round-tripping on the same draft/session model.
 - draft updates now support metadata patch semantics (`AssetMetadataPatch`) so taxonomy and contract can be independently set/updated/cleared without overwriting each other, while full metadata replacement remains available.
 - application orchestration maps domain validation failures for create/update into typed invalid-request errors (`StudioShellInvalidRequestError`) to keep higher-layer behavior deterministic.
 
@@ -176,8 +176,8 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - draft revisioning and publish/versioning are explicitly separate:
   - draft content/metadata edits increment `revision`
   - publish operations append immutable version ids/history and track latest published version separately.
-- version creation now reuses canonical asset vocabulary (`AssetVersion`, parent version linkage, upstream version ids, immutable version-id conflict semantics) through the existing studio-shell application/repository seam.
-- studio-shell application orchestration now includes explicit publish and version-history operations over `IStudioShellRepository` version persistence methods, with focused domain/application tests for normalization, validation, persistence behavior, and orchestration flow.
+- version creation now reuses canonical asset vocabulary (`AssetVersion`, parent version linkage, upstream version ids, immutable version-id conflict semantics) through the existing studio-shell src/application/repository seam.
+- studio-shell application orchestration now includes explicit publish and version-history operations over `IStudioShellRepository` version persistence methods, with focused src/domain/application tests for normalization, validation, persistence behavior, and orchestration flow.
 
 ## Direction 5 update: Studio shell dependency + lifecycle controls (stories 1.7–1.8)
 
@@ -186,55 +186,55 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - publish/version snapshots now include draft dependency references in version metadata and merge dependency version ids into canonical `AssetVersion.upstreamVersionIds` without replacing provenance behavior.
 - draft authoring now has explicit lifecycle state (`draft` | `validated` | `published`) with deterministic transition rules.
 - lifecycle transitions are enforced in the domain; invalid transitions now map to typed application failures (`StudioShellInvalidLifecycleTransitionError`) instead of string-matched handling.
-- studio-shell now has a bounded backend/UI boundary through `infrastructure/api/studio-shell/StudioShellBackendApi.ts`, reusing `DefaultStudioShellApplicationService` and `IStudioShellRepository` while projecting a reusable shell snapshot (studio/session/draft/version/readiness state).
+- studio-shell now has a bounded backend/UI boundary through `src/infrastructure/api/studio-shell/StudioShellBackendApi.ts`, reusing `DefaultStudioShellApplicationService` and `IStudioShellRepository` while projecting a reusable shell snapshot (studio/session/draft/version/readiness state).
 - validation/error handling for studio-shell is now structured across that boundary: typed operation codes (`not-found`/`conflict`/`invalid-request`/`invalid-lifecycle-transition`) plus deterministic `validationIssues` sections for taxonomy, contract, provenance, dependencies, lifecycle readiness, and publish/version status.
 
 ## Direction 5 update: Workflow Studio canonical validation + lifecycle foundation (stories 1.9-1.10)
 
-- Workflow Studio now exposes a canonical workflow-definition validation engine in `domain/workflow-studio/WorkflowStudioDomain.ts` via `validateWorkflowDraft(...)` and `validateWorkflowEntity(...)`, with structured deterministic issues (`code`, `section`, `severity`, `path`, `message`) for triggers, inputs, steps, outputs, and cross-section dependency rules.
+- Workflow Studio now exposes a canonical workflow-definition validation engine in `src/domain/workflow-studio/WorkflowStudioDomain.ts` via `validateWorkflowDraft(...)` and `validateWorkflowEntity(...)`, with structured deterministic issues (`code`, `section`, `severity`, `path`, `message`) for triggers, inputs, steps, outputs, and cross-section dependency rules.
 - Output validation now also enforces destination-specific readiness in that same canonical path (file-export format/delivery constraints, web-viewer title requirements, system-entry target/entity/collection/write-mode/record-shape compatibility checks, and prompt-response-chat prompt-link/scope/response-field checks) so output authoring gates are not UI-only.
 - Validation remains inner-layer and reusable across authoring surfaces, persistence gates, and runtime-preparation readiness checks (no UI-local source of truth path).
 - Workflow entity lifecycle is now explicit and transition-guarded (`draft` -> `saved` -> `executable`) through `WorkflowLifecycleStates`, `isWorkflowLifecycleTransitionAllowed(...)`, and `transitionWorkflowEntityLifecycle(...)`.
 - `executable` state is now domain-gated by canonical draft readiness (lifecycle transition/create validation uses workflow-definition validation, not presentation flags).
-- Workflow Studio publish flow now enforces canonical workflow-content validation before lifecycle publish/version operations (`application/workflow-studio/WorkflowStudioApplicationService.ts`).
+- Workflow Studio publish flow now enforces canonical workflow-content validation before lifecycle publish/version operations (`src/application/workflow-studio/WorkflowStudioApplicationService.ts`).
 
 ## Direction 5 update: Workflow Studio persistence + taxonomy alignment (stories 1.11-1.12)
 
-- Workflow Studio canonical draft and entity models now expose explicit persistence mappings and versioned serialized-document shapes (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowEntityToPersistenceRecord`, `serializeWorkflowDraftDocument`, `serializeWorkflowEntity`) in `domain/workflow-studio/WorkflowStudioDomain.ts`.
+- Workflow Studio canonical draft and entity models now expose explicit persistence mappings and versioned serialized-document shapes (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowEntityToPersistenceRecord`, `serializeWorkflowDraftDocument`, `serializeWorkflowEntity`) in `src/domain/workflow-studio/WorkflowStudioDomain.ts`.
 - Draft/entity rehydration now goes through canonical normalization (`mapWorkflowDraftFromPersistenceRecord`, `mapWorkflowEntityFromPersistenceRecord`, `deserializeWorkflowDraftDocument`, `deserializeWorkflowEntity`) so identity/metadata/lifecycle/triggers/inputs/steps/outputs survive round-trip without UI-local shaping.
 - Workflow asset-backed references now carry taxonomy metadata on canonical asset refs (`WorkflowDraftAssetReference.taxonomy`) and are validated against shared taxonomy expectations for dataset-backed inputs and agent-assistant steps.
-- Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `application/workflow-studio/WorkflowStudioApplicationService.ts`.
+- Workflow draft validation now emits deterministic taxonomy/asset-reference issues for mismatched dataset taxonomy and malformed asset-backed step identities, while keeping canonical validation in the domain layer and publish enforcement in `src/application/workflow-studio/WorkflowStudioApplicationService.ts`.
 
-## Direction 5 update: Workflow persistence domain/application foundation (stories 11.1-11.2)
+## Direction 5 update: Workflow persistence src/domain/application foundation (stories 11.1-11.2)
 
-- Workflow persistence now has a dedicated canonical domain contract in `domain/workflow-studio/WorkflowPersistenceDomain.ts` that wraps canonical `WorkflowEntity` payloads (no parallel workflow definition shape).
+- Workflow persistence now has a dedicated canonical domain contract in `src/domain/workflow-studio/WorkflowPersistenceDomain.ts` that wraps canonical `WorkflowEntity` payloads (no parallel workflow definition shape).
 - The persistence contract explicitly models:
   - persisted identity/status (`draft`/`saved`) derived from workflow lifecycle state,
   - metadata/timestamps,
   - ownership/context metadata (`ownerId`, `tenantId`, `studioId`, `sessionId`),
   - basic revision/version metadata (`persistenceRevision`, `workflowRevision`, optional `versionLabel`, optional duplicate source linkage),
   - payload strategy metadata (`workflow-entity` + schema version).
-- The application-layer persistence boundary now has an explicit repository port (`application/ports/interfaces/IWorkflowPersistenceRepository.ts`) with create/update/get/list/duplicate contracts and bounded list-query semantics.
-- Application use cases for create/update/get/list/duplicate now live in `application/workflow-persistence/*` with typed request validation and explicit failure contracts (`WorkflowPersistenceInvalidRequestError`, `WorkflowPersistenceNotFoundError`, `WorkflowPersistenceConflictError`).
+- The application-layer persistence boundary now has an explicit repository port (`src/application/ports/interfaces/IWorkflowPersistenceRepository.ts`) with create/update/get/list/duplicate contracts and bounded list-query semantics.
+- Application use cases for create/update/get/list/duplicate now live in `src/application/workflow-persistence/*` with typed request validation and explicit failure contracts (`WorkflowPersistenceInvalidRequestError`, `WorkflowPersistenceNotFoundError`, `WorkflowPersistenceConflictError`).
 
 ## Direction 5 update: Workflow persistence infrastructure + studio draft synchronization (stories 11.3-11.4)
 
-- Workflow persistence now has a concrete SQLite infrastructure adapter (`infrastructure/filesystem/SqliteWorkflowPersistenceRepository.ts`) implementing the existing `IWorkflowPersistenceRepository` create/update/get/list/duplicate contract over canonical persisted workflow records.
-- Repository persistence keeps canonical `WorkflowEntity` payload compatibility enforced via `serializeWorkflowEntity`/`deserializeWorkflowEntity` at the infrastructure boundary, while preserving domain/application contract ownership of status/revision/timestamp semantics.
+- Workflow persistence now has a concrete SQLite infrastructure adapter (`src/infrastructure/filesystem/SqliteWorkflowPersistenceRepository.ts`) implementing the existing `IWorkflowPersistenceRepository` create/update/get/list/duplicate contract over canonical persisted workflow records.
+- Repository persistence keeps canonical `WorkflowEntity` payload compatibility enforced via `serializeWorkflowEntity`/`deserializeWorkflowEntity` at the infrastructure boundary, while preserving src/domain/application contract ownership of status/revision/timestamp semantics.
 - Studio-shell workflow draft mutations now synchronize into workflow persistence through existing application use cases (`CreatePersistedWorkflowUseCase`, `UpdatePersistedWorkflowUseCase`, `GetPersistedWorkflowUseCase`) inside `StudioShellBackendApi`, rather than UI-owned persistence logic.
 - Workflow draft synchronization maps workflow studio draft metadata/context into persistence ownership/version metadata and keeps lifecycle alignment (`draft` draft state, `saved` for validated/published transitions) under application orchestration.
 
 ## Direction 5 update: Explore workflow discovery + workflow studio entry routing (stories 11.5-11.6)
 
-- Explore/library now treats persisted workflows as first-class assets through the existing explore-query seam (`application/asset-registry/ExploreAssetQueryService.ts`) by augmenting canonical registry results with workflow-persistence summaries when available.
+- Explore/library now treats persisted workflows as first-class assets through the existing explore-query seam (`src/application/asset-registry/ExploreAssetQueryService.ts`) by augmenting canonical registry results with workflow-persistence summaries when available.
 - Persisted workflow explore rows remain taxonomy-aligned (`composite/workflow/*`) and surface persistence status/source metadata for future metadata/version filtering without introducing a parallel workflow-browser architecture.
-- Workflow Studio entry now resolves explicit new/open/resume route intents through a dedicated route parser/builder seam (`ui/studio-shell/workflow/WorkflowStudioEntryRouting.ts`) layered on top of existing studio routing/search conventions.
+- Workflow Studio entry now resolves explicit new/open/resume route intents through a dedicated route parser/builder seam (`src/ui/studio-shell/workflow/WorkflowStudioEntryRouting.ts`) layered on top of existing studio routing/search conventions.
 - Workflow Studio initialization for new/open/resume remains service-backed (`StudioShellService` -> `StudioShellBackendApi`) and uses existing draft/session orchestration (`startSession`, `createDraft`, shared workflow mode store synchronization) instead of UI-local reconstruction paths.
 - Persisted workflow retrieval for open/resume is now an explicit backend contract (`StudioShellBackendApi.getPersistedWorkflow`) exposed through existing desktop/browser studio-shell bridge seams, with typed not-found/invalid-entry handling.
 
 ## Direction 5 update: Workflow duplication + lightweight revision metadata hardening (stories 11.7-11.8)
 
-- Persisted workflow duplication is now exposed as an explicit backend contract (`StudioShellBackendApi.duplicatePersistedWorkflow`) and reused by Workflow Studio entry routing (`workflowEntry=duplicate`) plus Explore workflow actions, so duplication flows through existing application/repository seams instead of UI-local copy logic.
+- Persisted workflow duplication is now exposed as an explicit backend contract (`StudioShellBackendApi.duplicatePersistedWorkflow`) and reused by Workflow Studio entry routing (`workflowEntry=duplicate`) plus Explore workflow actions, so duplication flows through existing src/application/repository seams instead of UI-local copy logic.
 - Duplication stays canonical and non-mutating: duplicate records inherit workflow definition + metadata, reset identity/timestamps/revision (`persistenceRevision=1`, `workflowRevision=1`), remain in `draft` status, and persist lineage through `revision.duplicatedFromWorkflowId`.
 - Duplicate id allocation is now application-owned in `DuplicatePersistedWorkflowUseCase` when no explicit id is supplied (`<source>:copy`, then `:copy-<n>`), with conflict/not-found behavior preserved through existing typed persistence errors.
 - Persisted workflow rehydration now validates canonical revision/timestamp/payload consistency (`normalizePersistedWorkflowRecord`) in both SQLite and in-memory repositories, so malformed persisted revision/version metadata fails fast on load instead of silently round-tripping.
@@ -259,24 +259,24 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 
 ## Direction 5 update: Workflow built-in step taxonomy + registry foundation (stories 6.1-6.2)
 
-- Workflow-native built-in steps are now first-class inner-layer contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
+- Workflow-native built-in steps are now first-class inner-layer contracts in `src/domain/workflow-studio/WorkflowStudioDomain.ts` with canonical categories (`control-flow`, `temporal`, `human-interaction`, reserved `transformation`) and stable built-in step identities.
 - Built-in step contracts now carry canonical discovery metadata (type/category/label/description/config schema id/default config) plus a shared domain validation entry point (`normalizeWorkflowDraftBuiltInStepConfig`), keeping semantics out of UI-local lists/forms.
 - The initial built-ins are explicitly modeled and discoverable: `if-then`, `loop-iteration`, `delay-wait`, and `manual-approval`.
-- Application discovery is now exposed through `application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, giving wizard/canvas-facing layers a stable built-in step registry without hardcoded page-local definitions.
+- Application discovery is now exposed through `src/application/workflow-studio/BuiltInWorkflowStepRegistry.ts`, giving wizard/canvas-facing layers a stable built-in step registry without hardcoded page-local definitions.
 - Story 6.3 now defines `if-then` as a canonical conditional primitive with explicit condition strategy contracts (`expression` or `comparison`) and explicit branch targets (`then` / optional `else` labels + step references) validated in the same domain normalization path.
 - Story 6.4 now defines `loop-iteration` as a canonical loop primitive with explicit mode/source contracts (`fixed-count`, `collection`, `range`) plus bounded body/max-iteration/exit-condition fields; cross-section checks still validate collection input references against canonical workflow inputs.
 - Story 6.5 now defines `delay-wait` as a canonical temporal primitive with explicit timing modes (`duration` with structured value/unit, or `until-time` with timestamp/timezone), compatibility aliases (`durationSeconds`, `waitUntil`), and deterministic malformed-config rejection through the same built-in normalization path.
 - Story 6.6 now defines `manual-approval` as a canonical human-interaction primitive with explicit interaction modes (`review` or `approval`), structured continuation/decision outcomes, required prompt semantics, timeout behavior policy (`reject`/`continue`/`escalate`), and compatibility aliasing for legacy `approvalMessage` flows.
 - Stories 6.7-6.8 keep renderer authoring aligned to those contracts: wizard step selection is registry-backed and mixed with asset-backed options, and wizard built-in editors only write canonical draft config fields that continue to validate through `normalizeWorkflowDraftBuiltInStepConfig` / `validateWorkflowDraft`.
 - Stories 6.9-6.10 now add canonical control-flow authoring and planning seams on top of that base:
-  - step authoring operations in `ui/studio-shell/workflow/WorkflowWizardSteps.ts` now preserve control-flow integrity during insert/reorder/remove (forward-only branch/body/outcome references, move blocking when a reorder would invalidate control-flow placement, and reference cleanup on removal),
+  - step authoring operations in `src/ui/studio-shell/workflow/WorkflowWizardSteps.ts` now preserve control-flow integrity during insert/reorder/remove (forward-only branch/body/outcome references, move blocking when a reorder would invalidate control-flow placement, and reference cleanup on removal),
   - planning remains canonical-first through `mapWorkflowDraftToExecutionPlan(...)`, and stories 6.11-6.12 now add runtime execution over that same plan seam (`WorkflowDraftExecutionRuntime`) plus explicit built-in persistence/rehydration round-trip coverage across studio-shell SQLite paths,
   - domain validation now includes explicit built-in reference order checks (`built-in-step-reference-order-invalid`) for `if-then`, `loop-iteration`, and `manual-approval` outcome references,
-  - workflow planning now has a dedicated canonical mapper `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` (`mapWorkflowDraftToExecutionPlan`) that validates canonical drafts first and then emits deterministic execution-plan elements for action + built-in step types without introducing a parallel workflow model.
+  - workflow planning now has a dedicated canonical mapper `src/application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` (`mapWorkflowDraftToExecutionPlan`) that validates canonical drafts first and then emits deterministic execution-plan elements for action + built-in step types without introducing a parallel workflow model.
 
 ## Direction 5 update: Workflow trigger domain model + concrete manual/temporal types (stories 7.1-7.4)
 
-- Workflow triggers are now first-class canonical domain contracts in `domain/workflow-studio/WorkflowStudioDomain.ts` with stable identity (`id`), kind (`user`/`temporal`/`state`), stable type ids, and typed config payloads on the canonical workflow draft (`WorkflowDraft.triggers`).
+- Workflow triggers are now first-class canonical domain contracts in `src/domain/workflow-studio/WorkflowStudioDomain.ts` with stable identity (`id`), kind (`user`/`temporal`/`state`), stable type ids, and typed config payloads on the canonical workflow draft (`WorkflowDraft.triggers`).
 - Trigger configuration normalization/validation now has an explicit domain entry point (`normalizeWorkflowDraftTriggerConfig`) so trigger config correctness stays reusable across authoring, persistence rehydration, and later runtime mapping.
 - The domain now exposes trigger type definitions (`WorkflowDraftTriggerDefinition`) with stable ids, labels/descriptions, config schema ids, capability metadata, default config payloads, and validation hooks.
 - Seeded trigger definitions cover planned Epic 7 categories, with manual/user and temporal now implemented as concrete first trigger families:
@@ -289,8 +289,8 @@ The studio shell now has a bounded inner-layer model and application orchestrati
   - cron-like schedule execution (`cronExpression`),
   - recurring interval execution (`every` + `unit`),
   - optional scheduling bounds (`startAt`/`endAt`) with timestamp/order validation.
-- Application-layer discovery now uses `application/workflow-studio/WorkflowTriggerTypeRegistry.ts` for listing/lookup/filtering, default config projection, and config validation delegation without introducing UI-local trigger catalogs or runtime-specific trigger behavior.
-- Runtime-alignment readiness is now explicit through `application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which maps canonical trigger contracts into runtime-facing descriptors without introducing a scheduler engine or UI-owned trigger logic.
+- Application-layer discovery now uses `src/application/workflow-studio/WorkflowTriggerTypeRegistry.ts` for listing/lookup/filtering, default config projection, and config validation delegation without introducing UI-local trigger catalogs or runtime-specific trigger behavior.
+- Runtime-alignment readiness is now explicit through `src/application/workflow-studio/WorkflowTriggerRuntimeMapper.ts`, which maps canonical trigger contracts into runtime-facing descriptors without introducing a scheduler engine or UI-owned trigger logic.
 - This keeps trigger semantics in inner layers and creates clean extension seams for future selector/config UI, persistence integration, and execution mapping stories.
 
 ## Direction 5 update: Workflow state trigger implementation + shared trigger validation pipeline (stories 7.5-7.6)
@@ -305,7 +305,7 @@ The studio shell now has a bounded inner-layer model and application orchestrati
   - structured malformed-trigger issue reporting,
   - workflow-level trigger checks (duplicate ids, duplicate trigger definitions, continuation-step reference checks).
 - `validateWorkflowDraft` now routes trigger checks through that shared pipeline instead of inline ad hoc trigger checks.
-- Application reuse now has a dedicated seam (`application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for single-trigger, type-config, and collection-level validation without introducing UI-owned trigger policy.
+- Application reuse now has a dedicated seam (`src/application/workflow-studio/WorkflowTriggerValidationPipeline.ts`) for single-trigger, type-config, and collection-level validation without introducing UI-owned trigger policy.
 - Forward compatibility for human-approval continuation semantics remains explicit: the shared pipeline allows both `workflow-start` and `workflow-continuation` invocation scopes by default.
 
 ## Direction 5 update: Workflow trigger persistence/read-write + wizard selector integration (stories 7.7-7.8)
@@ -313,12 +313,12 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 - Canonical workflow draft persistence/read-write already carries trigger arrays (`WorkflowDraft.triggers`) through the same authoritative mappings (`mapWorkflowDraftToPersistenceRecord`, `mapWorkflowDraftFromPersistenceRecord`, `serializeWorkflowDraft`, `deserializeWorkflowDraft`) used by workflow Studio save/load/version paths.
 - SQLite-backed studio-shell integration now has explicit trigger round-trip coverage so manual/user, temporal, and state trigger definitions survive persisted draft reload without alternate trigger storage paths.
 - Invalid trigger payload handling remains safe and bounded at load/read seams: malformed trigger payloads surface draft-parse validation state in mode-store synchronization instead of corrupting existing shared draft state.
-- Wizard trigger selection is now registry-driven through a dedicated authoring seam (`ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) backed by `WorkflowTriggerTypeRegistry`, so trigger-type discovery/default creation stays aligned with canonical trigger contracts.
+- Wizard trigger selection is now registry-driven through a dedicated authoring seam (`src/ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) backed by `WorkflowTriggerTypeRegistry`, so trigger-type discovery/default creation stays aligned with canonical trigger contracts.
 - Renderer trigger editing remains shared-draft-first and validation-projection-driven (`WorkflowStudioModeStateStore` + canonical draft validation) without duplicating trigger validation policy in UI logic.
 
 ## Direction 5 update: Workflow trigger execution-planning alignment + coverage (stories 7.11-7.12)
 
-- Trigger runtime mapping is now integrated into the canonical execution-plan seam: `application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` now carries trigger execution semantics mapped through `application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts`.
+- Trigger runtime mapping is now integrated into the canonical execution-plan seam: `src/application/workflow-studio/WorkflowDraftExecutionPlanMapper.ts` now carries trigger execution semantics mapped through `src/application/workflow-studio/WorkflowDraftTriggerExecutionPlanner.ts`.
 - Execution trigger semantics are explicit and type-preserving for all implemented trigger families:
   - manual/user -> user-invocation semantics (including `workflow-start` and `workflow-continuation` scope metadata),
   - temporal -> schedule semantics (`scheduleMode`, cron/runAt/interval/time-window metadata),
@@ -332,20 +332,20 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 
 ## Direction 5 update: Studio shell persistence integration (story 1.11)
 
-- Studio shell now has a real SQLite-backed infrastructure adapter (`infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
+- Studio shell now has a real SQLite-backed infrastructure adapter (`src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository.ts`) implementing `IStudioShellRepository` with migration-managed schema, indexed studio/session/draft/version storage, and full aggregate snapshot persistence.
 - Rehydration paths normalize persisted metadata/dependencies and reconstruct studio/session/draft/version state through existing domain normalization seams so taxonomy/contract/provenance/dependency/lifecycle/version invariants stay bounded to inner-layer rules.
 - Desktop composition now uses the SQLite repository for studio-shell IPC operations (`electron/main/main.ts`) so studio/session/draft/version state survives process restarts.
 
 ## Direction 5 update: System Studio inner orchestration (stories 5.9–5.10)
 
-- System Studio now has a bounded application orchestrator (`application/system-studio/SystemStudioApplicationService.ts`) that reuses the shared Studio Shell lifecycle (initialize/open/create/update/validate/publish) instead of introducing a second lifecycle stack.
+- System Studio now has a bounded application orchestrator (`src/application/system-studio/SystemStudioApplicationService.ts`) that reuses the shared Studio Shell lifecycle (initialize/open/create/update/validate/publish) instead of introducing a second lifecycle stack.
 - System draft authoring remains first-class in shared draft/version persistence; no side-channel system store was introduced.
 - System publish flow now enforces recursive system consistency through existing shared seams (`evaluate/assertSystemStudioDraftPublishConsistency`) including nested system resolution, child contract resolution, recursive contract projection, and recursion safety checks.
 - System Studio UI integration remains on the shared `StudioShellPage` registration/route architecture (`/studio-shell/system`) with backend-authoritative draft/session/validation/publish behavior.
 
 ## Direction 5 update: External runtime bounded safeguards alignment (stories 7.23–7.24)
 
-- External runtime safeguards stay in existing application/infrastructure seams (`SystemRuntimeBackendApi`, `ExecutionUpdateStream`, quota/rate-limit/access/tenant services) instead of introducing a second execution platform.
+- External runtime safeguards stay in existing src/application/infrastructure seams (`SystemRuntimeBackendApi`, `ExecutionUpdateStream`, quota/rate-limit/access/tenant services) instead of introducing a second execution platform.
 - Hot-path protections are explicitly bounded and testable: short-lived caller/tenant-scoped poll/status caching, bounded callback registrations per session, bounded streaming subscription/fan-out controls, bounded async in-flight tracking, and bounded emit cadence on execution updates.
 - These guards are additive and preserve current correctness constraints (auth/access/tenant/version-aware semantics remain required before returning cached/projection reads).
 - Architecture docs now explicitly separate:
@@ -362,7 +362,7 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 
 ## Direction 5 update: Studio shell extension interface (story 1.12)
 
-- Studio shell now includes a bounded typed extension contract for renderer panel contributions (`ui/studio-shell/StudioShellExtensions.ts`) with explicit slot targeting, ordering, and duplicate-id rejection.
+- Studio shell now includes a bounded typed extension contract for renderer panel contributions (`src/ui/studio-shell/StudioShellExtensions.ts`) with explicit slot targeting, ordering, and duplicate-id rejection.
 - `StudioShellPage` composes registered extension panels alongside shared shell concerns (session/draft context, metadata/dependencies/lifecycle surfaces, validation/error display) without moving business rules out of backend/application contracts.
 - publish operations are lifecycle-gated (`validated` required) while remaining distinct from draft revisioning and immutable version history semantics.
 
@@ -374,28 +374,28 @@ The studio shell now has a bounded inner-layer model and application orchestrati
 
 ## Direction 5 update: Atomic studio registration foundation (story 2.5)
 
-- The existing Studio Shell extension seam now has a bounded studio registration contract in `ui/studio-shell/StudioShellExtensions.ts` (`StudioRegistration`, `StudioRegistrationRegistry`, plus `AtomicStudioRegistry` compatibility) so atomic and composite studios share one extension/registration seam rather than a second plugin architecture.
+- The existing Studio Shell extension seam now has a bounded studio registration contract in `src/ui/studio-shell/StudioShellExtensions.ts` (`StudioRegistration`, `StudioRegistrationRegistry`, plus `AtomicStudioRegistry` compatibility) so atomic and composite studios share one extension/registration seam rather than a second plugin architecture.
 - Registration is deterministic (`studioType` uniqueness, role validation, stable listing order, slot-scoped extension lookup) and intentionally small: identity, atomic role, bounded draft defaults, and optional slot contributions.
 - Atomic registrations inherit the shared shell lifecycle and operational behavior (session/draft context, metadata/dependencies/lifecycle/version validation/publish surfaces), with `StudioShellPage` optionally consuming registration defaults/extensions.
 
 ## Direction 5 update: Model studio domain + application slice (story 2.6)
 
-- Model Studio now has a thin inner-layer domain helper (`domain/model-studio/ModelStudioDomain.ts`) that truthfully authors atomic model metadata (taxonomy `atomic/model/none`) with generated provenance defaults.
-- A bounded application orchestrator (`application/model-studio/ModelStudioApplicationService.ts`) builds on `StudioShellApplicationService` instead of duplicating shell create/update/publish flows.
+- Model Studio now has a thin inner-layer domain helper (`src/domain/model-studio/ModelStudioDomain.ts`) that truthfully authors atomic model metadata (taxonomy `atomic/model/none`) with generated provenance defaults.
+- A bounded application orchestrator (`src/application/model-studio/ModelStudioApplicationService.ts`) builds on `StudioShellApplicationService` instead of duplicating shell create/update/publish flows.
 - Model drafting/publishing reuses shared contract/provenance/version semantics:
   - taxonomy-driven model contract projection now resolves through `CompositionAssetContractResolver.resolveContractForTaxonomy` for `semanticRole=model`.
   - publish path reuses shared lifecycle transition + immutable version creation from studio shell application service.
 
 ## Direction 5 update: Model studio UI integration (story 2.7)
 
-- Model Studio now integrates directly through the shared `StudioShellPage` surface using registration-driven wiring (`ui/pages/ModelStudioPage.tsx` + `ui/studio-shell/registrations/ModelStudioRegistration.ts`) rather than introducing a second Model Studio UI architecture.
+- Model Studio now integrates directly through the shared `StudioShellPage` surface using registration-driven wiring (`src/ui/pages/ModelStudioPage.tsx` + `src/ui/studio-shell/registrations/ModelStudioRegistration.ts`) rather than introducing a second Model Studio UI architecture.
 - Model registration now contributes bounded model-specific extension panels (draft guidance + metadata status) through existing slot seams while shared shell panels remain authoritative for session context, metadata/dependencies, lifecycle/version state, validation, and publish flow.
 - `StudioShellPage` now respects registration defaults during draft creation (title/tags plus optional taxonomy/contract/provenance patch fields) so atomic model defaults flow through the same backend/application contracts.
 
 ## Direction 5 update: Dataset studio domain + application slice (story 2.8)
 
-- Dataset Studio now has a thin inner-layer domain helper (`domain/dataset-studio/DatasetStudioDomain.ts`) that authors atomic dataset metadata (taxonomy `atomic/dataset/none`) with generated provenance defaults.
-- A bounded application orchestrator (`application/dataset-studio/DatasetStudioApplicationService.ts`) mirrors the Model Studio pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle rather than duplicating shell orchestration.
+- Dataset Studio now has a thin inner-layer domain helper (`src/domain/dataset-studio/DatasetStudioDomain.ts`) that authors atomic dataset metadata (taxonomy `atomic/dataset/none`) with generated provenance defaults.
+- A bounded application orchestrator (`src/application/dataset-studio/DatasetStudioApplicationService.ts`) mirrors the Model Studio pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle rather than duplicating shell orchestration.
 - Shared taxonomy-driven contract projection now includes atomic dataset defaults in `CompositionAssetContractResolver`, keeping dataset authoring aligned with shared contract/provenance/version semantics.
 
 ## TODO
@@ -569,7 +569,7 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Partial execution outcomes are now preserved across inner read models:
   - `AgentRunnerResult.outcomes` remains ordered per-step truth.
   - `AgentWorkingMemory.executionOutputs` carries completed/failed/cancelled step summaries.
-  - execution sessions now persist per-step outcomes and output-asset diagnostics (`domain/agents/AgentExecutionSession.ts`), so "partial success + terminal fail/cancel" is durable.
+  - execution sessions now persist per-step outcomes and output-asset diagnostics (`src/domain/agents/AgentExecutionSession.ts`), so "partial success + terminal fail/cancel" is durable.
 - Session terminal truth is now explicit and persisted:
   - `AgentExecutionSession.terminalState` captures terminal `reason` (`completed`/`failed`/`cancelled`/`blocked`) plus bounded partial-progress summary (`hadPartialProgress`, completed/attempted step counts).
   - blocked-before-step runs persist as failed lifecycle status with terminal reason `blocked`, so blocked vs failed remains machine-readable.
@@ -605,39 +605,39 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 
 ## Direction 5 update: Dataset studio UI integration (story 2.9)
 
-- Dataset Studio now integrates through the shared shell renderer with registration-driven wiring (`ui/pages/DatasetStudioPage.tsx` + `ui/studio-shell/registrations/DatasetStudioRegistration.ts`) instead of introducing a second dataset page architecture.
+- Dataset Studio now integrates through the shared shell renderer with registration-driven wiring (`src/ui/pages/DatasetStudioPage.tsx` + `src/ui/studio-shell/registrations/DatasetStudioRegistration.ts`) instead of introducing a second dataset page architecture.
 - Dataset registration contributes bounded dataset-specific panel guidance (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, taxonomy/contract/provenance/dependencies, validation, lifecycle, and publish/version state.
-- Dataset Studio flow now has an explicit renderer-service integration test over the real shell backend/persistence path (`ui/services/tests/StudioShellService.integration.test.ts`) using dataset-studio studio ids and taxonomy semantics.
+- Dataset Studio flow now has an explicit renderer-service integration test over the real shell backend/persistence path (`src/ui/services/tests/StudioShellService.integration.test.ts`) using dataset-studio studio ids and taxonomy semantics.
 
 ## Direction 5 update: Tool studio domain + application slice (story 2.10)
 
-- Tool Studio now has a thin inner-layer domain helper (`domain/tool-studio/ToolStudioDomain.ts`) for atomic tool authoring with taxonomy `atomic/tool/(conditional|deterministic)` and generated provenance defaults.
-- A bounded application orchestrator (`application/tool-studio/ToolStudioApplicationService.ts`) mirrors model/dataset patterns and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of duplicating shell orchestration.
+- Tool Studio now has a thin inner-layer domain helper (`src/domain/tool-studio/ToolStudioDomain.ts`) for atomic tool authoring with taxonomy `atomic/tool/(conditional|deterministic)` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/tool-studio/ToolStudioApplicationService.ts`) mirrors model/dataset patterns and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of duplicating shell orchestration.
 - Shared taxonomy-driven contract projection now includes atomic tool defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, aligning Tool Studio draft metadata with shared contract/provenance/version semantics and MCP/API-facing provider metadata posture.
 
 ## Direction 5 update: Tool studio UI integration (story 2.11)
 
-- Tool Studio now integrates through the same shared shell renderer/route seam as Model and Dataset Studio (`ui/pages/ToolStudioPage.tsx` + `ui/studio-shell/registrations/ToolStudioRegistration.ts` + `/studio-shell/tool` route wiring) instead of a separate page architecture.
+- Tool Studio now integrates through the same shared shell renderer/route seam as Model and Dataset Studio (`src/ui/pages/ToolStudioPage.tsx` + `src/ui/studio-shell/registrations/ToolStudioRegistration.ts` + `/studio-shell/tool` route wiring) instead of a separate page architecture.
 - Tool registration contributes bounded tool-specific panel guidance (`draft-authoring`, `metadata`) and MCP/API-oriented draft defaults while preserving shared shell authority for session/draft state, dependency/lifecycle/version flows, and backend validation rendering.
-- Tool Studio flow now has explicit renderer-service integration coverage over the real shell backend/persistence path (`ui/services/tests/StudioShellService.integration.test.ts`) using tool-studio ids/taxonomy semantics.
+- Tool Studio flow now has explicit renderer-service integration coverage over the real shell backend/persistence path (`src/ui/services/tests/StudioShellService.integration.test.ts`) using tool-studio ids/taxonomy semantics.
 
 ## Direction 5 update: Atomic validation standardization (story 2.12)
 
-- Shared studio-shell validation projection is now centralized in one application seam (`application/studio-shell/StudioShellValidation.ts`) and consumed by backend snapshot/validate endpoints, replacing backend-local duplicate validation assembly.
-- Studio registration defaults now reuse taxonomy-driven contract projection through shared helpers (`createStudioMetadataPatch`, `createAtomicStudioMetadataPatch`, `createCompositeStudioMetadataPatch` in `ui/studio-shell/registrations/AtomicStudioRegistrationDefaults.ts`) so atomic and composite studios align on metadata default validity posture.
+- Shared studio-shell validation projection is now centralized in one application seam (`src/application/studio-shell/StudioShellValidation.ts`) and consumed by backend snapshot/validate endpoints, replacing backend-local duplicate validation assembly.
+- Studio registration defaults now reuse taxonomy-driven contract projection through shared helpers (`createStudioMetadataPatch`, `createAtomicStudioMetadataPatch`, `createCompositeStudioMetadataPatch` in `src/ui/studio-shell/registrations/AtomicStudioRegistrationDefaults.ts`) so atomic and composite studios align on metadata default validity posture.
 - Shared shell default dependency authoring now starts with an empty dependency set (instead of an implicit unpinned seed dependency), removing studio-specific accidental warning drift while preserving backend-authoritative dependency validation semantics.
-- Focused tests now cover cross-atomic validation consistency and shared issue structure (`application/studio-shell/tests/StudioShellValidation.test.ts`, `infrastructure/api/studio-shell/tests/StudioShellBackendApi.test.ts`).
+- Focused tests now cover cross-atomic validation consistency and shared issue structure (`src/application/studio-shell/tests/StudioShellValidation.test.ts`, `src/infrastructure/api/studio-shell/tests/StudioShellBackendApi.test.ts`).
 
 ## Direction 5 update: Atomic contract and taxonomy enforcement hardening (stories 2.13–2.14)
 
-- Atomic publish flows for Model/Dataset/Tool now enforce shared taxonomy + contract truth through one reusable application seam (`application/studio-shell/AtomicStudioAssetEnforcement.ts`) instead of studio-specific ad hoc checks.
+- Atomic publish flows for Model/Dataset/Tool now enforce shared taxonomy + contract truth through one reusable application seam (`src/application/studio-shell/AtomicStudioAssetEnforcement.ts`) instead of studio-specific ad hoc checks.
 - Enforcement validates structural kind (`atomic`), expected semantic role (`model`/`dataset`/`tool`), allowed behavior kinds (including bounded tool `conditional|deterministic`), and contract equivalence against taxonomy-driven projection (`CompositionAssetContractResolver.resolveContractForTaxonomy`).
 - Model/Dataset/Tool application publish orchestration now runs this shared enforcement before lifecycle transition/publish so metadata drift introduced via shell patching cannot publish invalid atomic versions.
 - 
 
 ## Direction 5 update: Atomic studio end-to-end consistency (story 2.15)
 
-- Cross-studio consistency now has one shared end-to-end integration test over the real renderer/service -> desktop bridge -> backend API -> application orchestration -> SQLite persistence path (`ui/services/tests/StudioShellService.integration.test.ts`).
+- Cross-studio consistency now has one shared end-to-end integration test over the real renderer/service -> desktop bridge -> backend API -> application orchestration -> SQLite persistence path (`src/ui/services/tests/StudioShellService.integration.test.ts`).
 - The test runs the same lifecycle for Model, Dataset, and Tool studios: initialize/open studio, create atomic draft defaults, update draft content/metadata, run lifecycle validation/publish, reload persisted state, and verify version history.
 - Assertions are taxonomy/contract/lifecycle/version coherent across all implemented atomic studios:
   - taxonomy stays atomic with role-specific semantics (`model`, `dataset`, `tool`);
@@ -656,42 +656,42 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 
 ## Direction 5 update: Prompt Template studio domain + application slice (story 2.17)
 
-- Prompt Template Studio now has a thin inner-layer domain helper (`domain/prompt-template-studio/PromptTemplateStudioDomain.ts`) for atomic prompt-template authoring with taxonomy `atomic/prompt-template/none` and generated provenance defaults.
-- A bounded application orchestrator (`application/prompt-template-studio/PromptTemplateStudioApplicationService.ts`) follows the Model/Dataset/Tool pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Prompt Template Studio now has a thin inner-layer domain helper (`src/domain/prompt-template-studio/PromptTemplateStudioDomain.ts`) for atomic prompt-template authoring with taxonomy `atomic/prompt-template/none` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/prompt-template-studio/PromptTemplateStudioApplicationService.ts`) follows the Model/Dataset/Tool pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
 - Shared taxonomy-driven contract projection now includes atomic prompt-template defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, and publish flow reuses shared atomic taxonomy/contract enforcement via `AtomicStudioAssetEnforcement`.
 
 ## Direction 5 update: Prompt Template studio UI integration (story 2.18)
 
-- Prompt Template Studio now integrates through the same shared shell renderer/route seam (`ui/pages/PromptTemplateStudioPage.tsx` + `ui/studio-shell/registrations/PromptTemplateStudioRegistration.ts` + `/studio-shell/prompt-template` route wiring) instead of a separate page architecture.
+- Prompt Template Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/PromptTemplateStudioPage.tsx` + `src/ui/studio-shell/registrations/PromptTemplateStudioRegistration.ts` + `/studio-shell/prompt-template` route wiring) instead of a separate page architecture.
 - Prompt-template-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces stay authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
-- Cross-atomic renderer-service integration coverage now includes prompt-template alongside model/dataset/tool in `ui/services/tests/StudioShellService.integration.test.ts`.
+- Cross-atomic renderer-service integration coverage now includes prompt-template alongside model/dataset/tool in `src/ui/services/tests/StudioShellService.integration.test.ts`.
 
 ## Direction 5 update: Embedding Index studio domain + application slice (story 2.19)
 
-- Embedding Index Studio now has a thin inner-layer domain helper (`domain/embedding-index-studio/EmbeddingIndexStudioDomain.ts`) for atomic embedding-index authoring with taxonomy `atomic/embedding-index/none` and generated provenance defaults.
-- A bounded application orchestrator (`application/embedding-index-studio/EmbeddingIndexStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Embedding Index Studio now has a thin inner-layer domain helper (`src/domain/embedding-index-studio/EmbeddingIndexStudioDomain.ts`) for atomic embedding-index authoring with taxonomy `atomic/embedding-index/none` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/embedding-index-studio/EmbeddingIndexStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
 - Shared taxonomy-driven contract projection now includes atomic embedding-index defaults in `CompositionAssetContractResolver.resolveContractForTaxonomy`, and publish flow reuses shared atomic taxonomy/contract enforcement via `AtomicStudioAssetEnforcement`.
 
 ## Direction 5 update: Embedding Index studio UI integration (story 2.20)
 
-- Embedding Index Studio now integrates through the shared shell renderer/route seam (`ui/pages/EmbeddingIndexStudioPage.tsx` + `ui/studio-shell/registrations/EmbeddingIndexStudioRegistration.ts` + `/studio-shell/embedding-index` route wiring) instead of introducing a second UI architecture.
+- Embedding Index Studio now integrates through the shared shell renderer/route seam (`src/ui/pages/EmbeddingIndexStudioPage.tsx` + `src/ui/studio-shell/registrations/EmbeddingIndexStudioRegistration.ts` + `/studio-shell/embedding-index` route wiring) instead of introducing a second UI architecture.
 
 ## Direction 5 update: Config Profile studio domain + application slice (story 2.21)
 
-- Config Profile Studio now has a thin inner-layer domain helper (`domain/config-profile-studio/ConfigProfileStudioDomain.ts`) for atomic config-profile authoring with taxonomy `atomic/config-profile/none` and generated provenance defaults.
-- A bounded application orchestrator (`application/config-profile-studio/ConfigProfileStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template/Embedding Index pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
+- Config Profile Studio now has a thin inner-layer domain helper (`src/domain/config-profile-studio/ConfigProfileStudioDomain.ts`) for atomic config-profile authoring with taxonomy `atomic/config-profile/none` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/config-profile-studio/ConfigProfileStudioApplicationService.ts`) follows the same Model/Dataset/Tool/Prompt Template/Embedding Index pattern and reuses `StudioShellApplicationService` for initialize/create/publish lifecycle.
 - Config Profile authoring and publish remain aligned with taxonomy-driven contract projection (`CompositionAssetContractResolver`), centralized validation (`StudioShellValidation`), and publish-time atomic enforcement (`AtomicStudioAssetEnforcement`) through shared shell seams.
 
 ## Direction 5 update: Config Profile studio UI integration (story 2.22)
 
-- Config Profile Studio now integrates through the shared shell renderer/route seam (`ui/pages/ConfigProfileStudioPage.tsx` + `ui/studio-shell/registrations/ConfigProfileStudioRegistration.ts` + `/studio-shell/config-profile` route wiring) instead of introducing a second UI architecture.
+- Config Profile Studio now integrates through the shared shell renderer/route seam (`src/ui/pages/ConfigProfileStudioPage.tsx` + `src/ui/studio-shell/registrations/ConfigProfileStudioRegistration.ts` + `/studio-shell/config-profile` route wiring) instead of introducing a second UI architecture.
 - Config-profile renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots), while shared shell panels remain authoritative for draft/session context, metadata/dependency/lifecycle/version state, validation display, and publish flow.
 - Embedding-index-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata`) while shared shell surfaces remain authoritative for session/draft context, metadata/dependencies, validation, lifecycle/version, and publish flow.
-- Cross-atomic renderer-service and enforcement coverage now includes embedding-index alongside model/dataset/tool/prompt-template in `ui/services/tests/StudioShellService.integration.test.ts` and `application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`.
+- Cross-atomic renderer-service and enforcement coverage now includes embedding-index alongside model/dataset/tool/prompt-template in `src/ui/services/tests/StudioShellService.integration.test.ts` and `src/application/studio-shell/tests/AtomicStudioAssetEnforcement.test.ts`.
 
 ## Direction 5 update: Workflow studio domain + application slice (story 3.5)
 
-- Workflow Studio now has a thin bounded inner-layer domain helper (`domain/workflow-studio/WorkflowStudioDomain.ts`) for specialized composite orchestrator authoring with taxonomy `composite/workflow/{deterministic|conditional|iterative}` and generated provenance defaults.
+- Workflow Studio now has a thin bounded inner-layer domain helper (`src/domain/workflow-studio/WorkflowStudioDomain.ts`) for specialized composite orchestrator authoring with taxonomy `composite/workflow/{deterministic|conditional|iterative}` and generated provenance defaults.
 - Workflow Studio domain now includes a canonical workflow authoring entity contract (`WorkflowEntity`) with stable identity, human-readable name, descriptive metadata, lifecycle timestamps, and explicit relation to canonical draft state.
 - Workflow Studio domain now includes canonical workflow draft schema contracts (`WorkflowDraft`) with typed top-level sections (`triggers`, `inputs`, `steps`, `outputs`), explicit step ordering semantics, and deterministic serialize/deserialize normalization helpers.
 - Workflow draft trigger contracts now use a canonical discriminated trigger model (`kind` + `type` + typed `config`) covering user (`manual` / `button-click` / `user-initiated-run`), temporal (`schedule` / `recurring`), and state (`data-available` / `asset-state-changed` / `system-event`) trigger categories with kind/type compatibility validation.
@@ -701,62 +701,62 @@ SQLite storage now also carries normalized `asset_versions.version_label` and `a
 - Workflow draft step contracts now include canonical built-in step variants (`if-then`, `loop-iteration`, `delay-wait`, `manual-approval`) under the same base step model (`kind=control-flow`) with typed configuration payloads and deterministic structural validation.
 - Workflow draft output contracts now include a canonical structured output model (`id`, `order`, `outputType`, `format`, `destination`, `configuration`, `sourceStepId`) supporting one-or-more outputs per draft without introducing output-specific parallel schemas.
 - Output destination definitions are now inner-layer contracts (`list/getWorkflowDraftOutputDestinationDefinitions`) with stable schema ids/defaults/formats for `file-export`, `web-viewer`, `system-entry`, and `prompt-response-chat`, so output selector/configuration flows reuse domain truth instead of UI-local registries.
-- Output discovery now also has an explicit application-layer registry seam (`application/workflow-studio/WorkflowOutputTypeRegistry.ts`) that projects domain output definitions into reusable selector/config metadata (capabilities, field contracts, multiplicity policy, and destination/format support) for renderer and future execution/persistence surfaces.
+- Output discovery now also has an explicit application-layer registry seam (`src/application/workflow-studio/WorkflowOutputTypeRegistry.ts`) that projects domain output definitions into reusable selector/config metadata (capabilities, field contracts, multiplicity policy, and destination/format support) for renderer and future execution/persistence surfaces.
 - Output normalization now preserves backward compatibility aliases (`destination.options`, legacy top-level `title`) while projecting canonical `configuration`, and validation now includes output ordering integrity (`output-order-duplicate`, `output-order-non-contiguous`) plus destination-specific readiness checks.
-- A bounded application orchestrator (`application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
+- A bounded application orchestrator (`src/application/workflow-studio/WorkflowStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing workflow-specific create/update/publish infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so workflow semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 
 ## Direction 5 update: Workflow studio UI integration (story 3.6)
 
-- Workflow Studio now integrates through the same shared shell renderer/route seam (`ui/pages/WorkflowStudioPage.tsx` + `ui/studio-shell/registrations/WorkflowStudioRegistration.ts` + `/studio-shell/workflow` route wiring) instead of a separate workflow UI architecture.
+- Workflow Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/WorkflowStudioPage.tsx` + `src/ui/studio-shell/registrations/WorkflowStudioRegistration.ts` + `/studio-shell/workflow` route wiring) instead of a separate workflow UI architecture.
 - Workflow registration contributes bounded workflow-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
-- Renderer-service integration coverage now includes a workflow composite-orchestrator scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.
+- Renderer-service integration coverage now includes a workflow composite-orchestrator scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `src/ui/services/tests/StudioShellService.integration.test.ts`.
 
 ## Direction 5 update: Context Bundle studio domain + application slice (story 3.7)
 
-- Context Bundle Studio now has a thin bounded inner-layer domain helper (`domain/context-bundle-studio/ContextBundleStudioDomain.ts`) for specialized composite input-preparer authoring with taxonomy `composite/context-bundle/{none|deterministic}` and generated provenance defaults.
-- A bounded application orchestrator (`application/context-bundle-studio/ContextBundleStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing context-bundle-specific create/update/publish infrastructure.
+- Context Bundle Studio now has a thin bounded inner-layer domain helper (`src/domain/context-bundle-studio/ContextBundleStudioDomain.ts`) for specialized composite input-preparer authoring with taxonomy `composite/context-bundle/{none|deterministic}` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/context-bundle-studio/ContextBundleStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing context-bundle-specific create/update/publish infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so context-bundle semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 
 ## Direction 5 update: Context Bundle studio UI integration (story 3.8)
 
-- Context Bundle Studio now integrates through the same shared shell renderer/route seam (`ui/pages/ContextBundleStudioPage.tsx` + `ui/studio-shell/registrations/ContextBundleStudioRegistration.ts` + `/studio-shell/context-bundle` route wiring) instead of a separate context-bundle UI architecture.
+- Context Bundle Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/ContextBundleStudioPage.tsx` + `src/ui/studio-shell/registrations/ContextBundleStudioRegistration.ts` + `/studio-shell/context-bundle` route wiring) instead of a separate context-bundle UI architecture.
 - Context-bundle registration contributes bounded context-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
-- Renderer-service integration coverage now includes a context-bundle composite input-preparer scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `ui/services/tests/StudioShellService.integration.test.ts`.
+- Renderer-service integration coverage now includes a context-bundle composite input-preparer scenario over the real shared path (`StudioShellService` -> desktop bridge -> `StudioShellBackendApi` -> `DefaultStudioShellApplicationService` -> SQLite repository) in `src/ui/services/tests/StudioShellService.integration.test.ts`.
 
 ## Direction 5 update: Dataset Pipeline studio domain + application slice (story 3.9)
 
-- Dataset Pipeline Studio now has a thin bounded inner-layer domain helper (`domain/dataset-pipeline-studio/DatasetPipelineStudioDomain.ts`) for composite dataset-pipeline authoring with taxonomy `composite/dataset-pipeline/{deterministic|iterative}` and generated provenance defaults.
-- A bounded application orchestrator (`application/dataset-pipeline-studio/DatasetPipelineStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing dataset-pipeline-specific infrastructure.
+- Dataset Pipeline Studio now has a thin bounded inner-layer domain helper (`src/domain/dataset-pipeline-studio/DatasetPipelineStudioDomain.ts`) for composite dataset-pipeline authoring with taxonomy `composite/dataset-pipeline/{deterministic|iterative}` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/dataset-pipeline-studio/DatasetPipelineStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing dataset-pipeline-specific infrastructure.
 - Publish gating now reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so dataset-pipeline semantic-role and behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 - Dataset-pipeline draft guidance and tests intentionally reuse existing data-preparation vocabulary (source ingestion, data cleaning, dataset transformation, data validation) instead of creating a parallel pipeline ontology.
 
 ## Direction 5 update: Dataset Pipeline studio UI integration (story 3.10)
 
-- Dataset Pipeline Studio now integrates through the same shared shell renderer/route seam (`ui/pages/DatasetPipelineStudioPage.tsx` + `ui/studio-shell/registrations/DatasetPipelineStudioRegistration.ts` + `/studio-shell/dataset-pipeline` route wiring) instead of a separate dataset-pipeline UI architecture.
+- Dataset Pipeline Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/DatasetPipelineStudioPage.tsx` + `src/ui/studio-shell/registrations/DatasetPipelineStudioRegistration.ts` + `/studio-shell/dataset-pipeline` route wiring) instead of a separate dataset-pipeline UI architecture.
 - Dataset-pipeline registration contributes bounded dataset-pipeline-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
 
 ## Direction 5 update: Training Recipe studio domain + application slice (story 3.11)
 
-- Training Recipe Studio now has a thin bounded inner-layer domain helper (`domain/training-recipe-studio/TrainingRecipeStudioDomain.ts`) for composite training-recipe authoring with taxonomy `composite/training-recipe/deterministic` and generated provenance defaults.
-- A bounded application orchestrator (`application/training-recipe-studio/TrainingRecipeStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing a separate training architecture.
+- Training Recipe Studio now has a thin bounded inner-layer domain helper (`src/domain/training-recipe-studio/TrainingRecipeStudioDomain.ts`) for composite training-recipe authoring with taxonomy `composite/training-recipe/deterministic` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/training-recipe-studio/TrainingRecipeStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle instead of introducing a separate training architecture.
 - Publish gating reuses shared composite enforcement (`assertCompositeStudioDraftPublishConsistency`) so training-recipe semantic-role and deterministic-behavior invariants plus taxonomy-driven contract derivability remain backend/application-authoritative.
 
 ## Direction 5 update: Training Recipe studio UI integration (story 3.12)
 
-- Training Recipe Studio now integrates through the same shared shell renderer/route seam (`ui/pages/TrainingRecipeStudioPage.tsx` + `ui/studio-shell/registrations/TrainingRecipeStudioRegistration.ts` + `/studio-shell/training-recipe` route wiring) instead of a separate training-recipe UI architecture.
+- Training Recipe Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/TrainingRecipeStudioPage.tsx` + `src/ui/studio-shell/registrations/TrainingRecipeStudioRegistration.ts` + `/studio-shell/training-recipe` route wiring) instead of a separate training-recipe UI architecture.
 - Training-recipe registration contributes bounded training-recipe-specific guidance/metadata slot panels while shared shell surfaces remain authoritative for draft/session context, taxonomy/contract/provenance/dependencies state, lifecycle transitions, validation display, and publish/version operations.
 
 ## Direction 5 update: Tool Chain studio domain + application + UI integration (stories 3.13–3.14)
 
-- Tool Chain Studio now has a thin bounded inner-layer domain helper (`domain/tool-chain-studio/ToolChainStudioDomain.ts`) for composite tool-chain authoring with taxonomy `composite/tool-chain/deterministic` and generated provenance defaults.
-- A bounded application orchestrator (`application/tool-chain-studio/ToolChainStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle and shared composite publish enforcement (`assertCompositeStudioDraftPublishConsistency`) instead of introducing tool-chain-specific infrastructure.
-- Tool Chain Studio now integrates through the same shared shell renderer/route seam (`ui/pages/ToolChainStudioPage.tsx` + `ui/studio-shell/registrations/ToolChainStudioRegistration.ts` + `/studio-shell/tool-chain` route wiring), with tool-chain-specific behavior bounded to registration defaults and slot contributions.
+- Tool Chain Studio now has a thin bounded inner-layer domain helper (`src/domain/tool-chain-studio/ToolChainStudioDomain.ts`) for composite tool-chain authoring with taxonomy `composite/tool-chain/deterministic` and generated provenance defaults.
+- A bounded application orchestrator (`src/application/tool-chain-studio/ToolChainStudioApplicationService.ts`) reuses `StudioShellApplicationService` for initialize/create/publish lifecycle and shared composite publish enforcement (`assertCompositeStudioDraftPublishConsistency`) instead of introducing tool-chain-specific infrastructure.
+- Tool Chain Studio now integrates through the same shared shell renderer/route seam (`src/ui/pages/ToolChainStudioPage.tsx` + `src/ui/studio-shell/registrations/ToolChainStudioRegistration.ts` + `/studio-shell/tool-chain` route wiring), with tool-chain-specific behavior bounded to registration defaults and slot contributions.
 
 ## Direction 5 update: Composite consistency + interop coverage (stories 3.17–3.18)
 
-- Shared integration coverage now includes all implemented composite studios (workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain) over the same service -> bridge -> backend -> application -> SQLite seam (`ui/services/tests/StudioShellService.integration.test.ts`).
-- Shared validation and publish seams now carry composite dependency identity/version checks, semantic-role compatibility checks, taxonomy/contract consistency checks, and publish-time dependency pinning requirements (`application/studio-shell/StudioShellValidation.ts`, `application/studio-shell/AtomicStudioAssetEnforcement.ts`).
+- Shared integration coverage now includes all implemented composite studios (workflow, context-bundle, dataset-pipeline, training-recipe, tool-chain) over the same service -> bridge -> backend -> application -> SQLite seam (`src/ui/services/tests/StudioShellService.integration.test.ts`).
+- Shared validation and publish seams now carry composite dependency identity/version checks, semantic-role compatibility checks, taxonomy/contract consistency checks, and publish-time dependency pinning requirements (`src/application/studio-shell/StudioShellValidation.ts`, `src/application/studio-shell/AtomicStudioAssetEnforcement.ts`).
 - Composite-to-atomic interop in this slice is dependency + taxonomy + contract driven (composites reference atomic versions and are validated by shared seams); this slice does not add a separate composite runtime orchestration subsystem.
 
 ## Direction 5 implementation status (through stories 5.24)
@@ -777,13 +777,13 @@ Explicitly later than this scope:
 
 ## Direction 5 update: System consistency + interop integration coverage (stories 5.21–5.22)
 
-- Shared integration coverage now includes bounded end-to-end consistency for System Studio across create/update/validate/publish/reload over the real renderer service -> desktop bridge -> backend API -> application orchestration -> SQLite path (`ui/services/tests/StudioShellService.integration.test.ts`).
+- Shared integration coverage now includes bounded end-to-end consistency for System Studio across create/update/validate/publish/reload over the real renderer service -> desktop bridge -> backend API -> application orchestration -> SQLite path (`src/ui/services/tests/StudioShellService.integration.test.ts`).
 - System-specific operations are now exercised over that same seam (list/add/remove/reorder child components, interface updates, parameter updates, execution-metadata updates, and compatibility-insights queries) using the actual `SystemStudioBackendApi` bridge contract, not test-only direct application calls.
 - Cross-kind interop coverage now validates mixed atomic/composite/system child composition in a single system draft with pinned versions, clean compatibility-insights status, and persisted upstream version lineage after publish/reload.
 
 ## Direction 5 update: Registry performance + consistency hardening (stories 4.15–4.16)
 
-- Registry now has a bounded in-memory cache seam (`application/asset-registry/RegistryCacheLayer.ts`) consumed by query + dependency-graph services via cache-aside/read-through behavior (no second source-of-truth).
+- Registry now has a bounded in-memory cache seam (`src/application/asset-registry/RegistryCacheLayer.ts`) consumed by query + dependency-graph services via cache-aside/read-through behavior (no second source-of-truth).
 - Query caching is keyed by filter/search shape and guarded by source signatures (`versionCount` + `lineageEdgeCount`) so publish/version/dependency changes invalidate cached projections deterministically.
 - Dependency graph caching now memoizes adjacency/direct-expansion/traversal results; projection dirty/signature checks still govern rebuild truth through `IRegistryGraphProjectionRepository`.
 - Cross-studio correctness now has integration-style coverage that spans atomic + composite assets across publish visibility, taxonomy/contract/provenance projection, dependency graph traversal, lineage, filtering/search, and dependency replacement after version updates.
@@ -810,7 +810,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: System runtime domain foundation (stories 6.1–6.2)
 
-- New bounded runtime domain slice: `domain/system-runtime/SystemRuntimeDomain.ts`.
+- New bounded runtime domain slice: `src/domain/system-runtime/SystemRuntimeDomain.ts`.
 - Keeps runtime state separate from asset definitions and models only execution-state concerns:
   - execution id
   - execution context/invocation metadata
@@ -819,14 +819,14 @@ Explicitly later than this scope:
   - input/output payload envelopes
   - execution node refs
 - Execution node refs include `parentExecutionNodeId` and `path` for nested-system readiness without implementing recursive orchestration.
-- Runtime behavior alignment is now explicit in application layer (`application/system-runtime/RuntimeBehaviorAlignment.ts`) and consumes shared taxonomy truth rather than introducing parallel runtime taxonomy rules.
+- Runtime behavior alignment is now explicit in application layer (`src/application/system-runtime/RuntimeBehaviorAlignment.ts`) and consumes shared taxonomy truth rather than introducing parallel runtime taxonomy rules.
 
 
 ## Direction 5 update: Runtime environment abstraction + execution plan builder (stories 6.5–6.6)
 
-- Runtime environment selection is now a bounded domain/application seam (`RuntimeEnvironmentDomain` + `RuntimeEnvironmentSelector`) rather than an implicit local-host assumption.
+- Runtime environment selection is now a bounded src/domain/application seam (`RuntimeEnvironmentDomain` + `RuntimeEnvironmentSelector`) rather than an implicit local-host assumption.
 - The selector models current truthful local capabilities and explicit extension points for MCP-mediated and remote/distributed environments without implementing infrastructure adapters in this slice.
-- Runtime planning now has an explicit `ExecutionPlanBuilder` in `application/system-runtime/ExecutionPlanBuilder.ts` that composes:
+- Runtime planning now has an explicit `ExecutionPlanBuilder` in `src/application/system-runtime/ExecutionPlanBuilder.ts` that composes:
   - system structure + bindings
   - runtime execution contract mapping outputs
   - runtime dependency resolution outputs
@@ -836,13 +836,13 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Execution orchestration + step execution seams (stories 6.7–6.8)
 
-- Runtime execution now includes an application-authoritative orchestration seam in `application/system-runtime/ExecutionOrchestrationService.ts`.
+- Runtime execution now includes an application-authoritative orchestration seam in `src/application/system-runtime/ExecutionOrchestrationService.ts`.
 - The orchestration service:
   - accepts a built plan (or builds one through `ExecutionPlanBuilder`)
   - initializes runtime execution state in `SystemRuntimeDomain`
   - sequences plan nodes deterministically through `orderedNodeIds`
   - delegates all unit execution to a lower-level step engine seam.
-- Runtime step execution now includes a bounded engine seam in `application/system-runtime/StepExecutionEngine.ts`.
+- Runtime step execution now includes a bounded engine seam in `src/application/system-runtime/StepExecutionEngine.ts`.
 - The step engine:
   - consumes execution-plan nodes + selected runtime environment
   - supports atomic/composite/system step categories with bounded system-step recursion readiness
@@ -866,12 +866,12 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Deployment provisioning + execution foundation (stories 8.5–8.6)
 
-- Deployment now includes a bounded environment provisioning seam in deployment layers (`domain/deployment/EnvironmentProvisioningDomain.ts`, `application/deployment/EnvironmentProvisioningCompatibilityValidator.ts`, `application/deployment/EnvironmentProvisioningService.ts`).
+- Deployment now includes a bounded environment provisioning seam in deployment layers (`src/domain/deployment/EnvironmentProvisioningDomain.ts`, `src/application/deployment/EnvironmentProvisioningCompatibilityValidator.ts`, `src/application/deployment/EnvironmentProvisioningService.ts`).
 - Provisioning remains deterministic and provider-agnostic:
   - it accepts built deployment bundles + validated deployment configuration + selected abstract target category (`local`/`cloud`/`edge`),
   - emits a structured provisioning plan and a provisioned-environment reference,
   - validates compatibility explicitly before producing a ready environment.
-- Deployment execution now has a bounded application service (`application/deployment/DeploymentExecutionService.ts`) and explicit deployment contracts (`domain/deployment/DeploymentExecutionDomain.ts`):
+- Deployment execution now has a bounded application service (`src/application/deployment/DeploymentExecutionService.ts`) and explicit deployment contracts (`src/domain/deployment/DeploymentExecutionDomain.ts`):
   - execution requires bundle/config/target + provisioned-environment linkage,
   - emits structured deployment result/status + version-pinned traceable deployment record,
   - persists records through a minimal bounded in-memory repository seam for later state/log/version stories.
@@ -882,9 +882,9 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Deployment state tracking + diagnostics (stories 8.7–8.8)
 
-- Deployment now has explicit lifecycle state contracts in `domain/deployment/DeploymentStateDomain.ts` (`requested`, provisioning progress/completion, deployment-in-progress, `active`, `failed`, `inactive`) with bounded transition validation.
-- `application/deployment/DeploymentExecutionService.ts` now orchestrates provisioning + execution through `executeLifecycle`, persists state snapshots/transitions on deployment records, and exposes query seams (`listDeploymentsByState`, `getDeploymentStateSnapshot`, `listStateTransitions`).
-- Deployment diagnostics are now explicit and separate from runtime execution trace/audit semantics via `domain/deployment/DeploymentDiagnosticsDomain.ts` + `application/deployment/DeploymentDiagnosticsService.ts`:
+- Deployment now has explicit lifecycle state contracts in `src/domain/deployment/DeploymentStateDomain.ts` (`requested`, provisioning progress/completion, deployment-in-progress, `active`, `failed`, `inactive`) with bounded transition validation.
+- `src/application/deployment/DeploymentExecutionService.ts` now orchestrates provisioning + execution through `executeLifecycle`, persists state snapshots/transitions on deployment records, and exposes query seams (`listDeploymentsByState`, `getDeploymentStateSnapshot`, `listStateTransitions`).
+- Deployment diagnostics are now explicit and separate from runtime execution trace/audit semantics via `src/domain/deployment/DeploymentDiagnosticsDomain.ts` + `src/application/deployment/DeploymentDiagnosticsService.ts`:
   - authoritative provisioning/deployment/state-transition points emit bounded deployment log entries,
   - failure paths emit structured deployment diagnostic records linked to deployment identity and version-pinned linkage metadata.
 - Boundaries remain explicit in this slice:
@@ -897,11 +897,11 @@ Explicitly later than this scope:
 - Deployment activation is now an explicit management concern separated from deployment lifecycle state:
   - deployment records track activation state (`active`/`inactive`/`superseded`) and activation history events with action-kind metadata.
   - successful deployments are not implicitly active; activation is explicitly selected by management actions.
-- Versioned deployment management now has a bounded application service (`application/deployment/DeploymentVersionManager.ts`) that:
+- Versioned deployment management now has a bounded application service (`src/application/deployment/DeploymentVersionManager.ts`) that:
   - lists deployment history by system/version/target scope,
   - exposes active deployment lookup for a bounded target context,
   - applies explicit active selection while superseding prior active records in-scope.
-- Rollback is now an explicit bounded deployment-management action via `application/deployment/DeploymentRollbackService.ts` with contracts in `domain/deployment/DeploymentRollbackDomain.ts`:
+- Rollback is now an explicit bounded deployment-management action via `src/application/deployment/DeploymentRollbackService.ts` with contracts in `src/domain/deployment/DeploymentRollbackDomain.ts`:
   - rollback eligibility is explicit and structured (`isRollbackEligible`),
   - rollback actions record request/decision/outcome separately from ordinary deployment actions,
   - rollback re-activation preserves deployment-version traceability (asset version, bundle, config, target, deployment identity).
@@ -913,7 +913,7 @@ Explicitly later than this scope:
 ## Direction 5 update: Deployment access control + quotas (stories 8.11–8.12)
 
 - Deployment governance now reuses Epic 7 caller-context patterns (authenticated caller kind/id, roles, session, tenant context) through bounded deployment services rather than introducing a second auth universe.
-- `application/deployment/DeploymentAccessControl.ts` introduces explicit deployment access contracts:
+- `src/application/deployment/DeploymentAccessControl.ts` introduces explicit deployment access contracts:
   - `DeploymentAccessContext`, `DeploymentAccessPolicy`, `DeploymentAccessEvaluator`, and structured `DeploymentAccessDecision`.
   - bounded role-based policy defaults for deploy, activation, rollback, and deployment history/detail reads.
   - structured denial errors (`DeploymentAccessDeniedError`) that preserve caller/tenant/system/target linkage metadata.
@@ -922,7 +922,7 @@ Explicitly later than this scope:
   - deployment activation/version management (`DeploymentVersionManager.setActiveDeployment`),
   - rollback execution (`DeploymentRollbackService.rollback`),
   - deployment-history/detail reads where exposed (`DeploymentVersionManager`, rollback action listing).
-- Deployment quotas remain distinct from access control through `application/deployment/DeploymentQuotaEvaluator.ts`:
+- Deployment quotas remain distinct from access control through `src/application/deployment/DeploymentQuotaEvaluator.ts`:
   - explicit `DeploymentQuotaPolicy`, `DeploymentQuotaDecision`, and structured `DeploymentQuotaExceededError`,
   - bounded windowed limits for deployments per caller, deployments per target scope, activation-change frequency, and rollback frequency.
 - Quota evaluation is centralized at the same authoritative deployment boundaries (execution/activation/rollback) and is tenant-aware in scoped key derivation.
@@ -933,13 +933,13 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Deployment environment isolation + system endpoint exposure (stories 8.13–8.14)
 
-- Deployment records now include explicit environment isolation scope (`domain/deployment/DeploymentIsolationDomain.ts`) with durable linkage across deployment identity, source system/bundle version, deployment target/environment, tenant context, and bounded runtime binding key.
-- Deployment isolation enforcement is centralized through `application/deployment/DeploymentIsolationEvaluator.ts` and applied at authoritative seams:
+- Deployment records now include explicit environment isolation scope (`src/domain/deployment/DeploymentIsolationDomain.ts`) with durable linkage across deployment identity, source system/bundle version, deployment target/environment, tenant context, and bounded runtime binding key.
+- Deployment isolation enforcement is centralized through `src/application/deployment/DeploymentIsolationEvaluator.ts` and applied at authoritative seams:
   - deployment state/log/diagnostic reads,
   - deployment history + active deployment lookup/selection paths,
   - rollback candidate selection.
 - Isolation remains deployment-specific (not a duplicate of runtime request isolation) and extends Epic 7 tenant/caller propagation semantics into deployment-management boundaries.
-- System endpoint exposure is now a first-class deployment output via `domain/deployment/SystemEndpointExposureDomain.ts` and `application/deployment/SystemEndpointExposureService.ts`:
+- System endpoint exposure is now a first-class deployment output via `src/domain/deployment/SystemEndpointExposureDomain.ts` and `src/application/deployment/SystemEndpointExposureService.ts`:
   - stable endpoint identity maps to the active deployment for a bounded system/target/tenant scope,
   - endpoint records preserve deployment linkage (deployment id, system version, bundle/build key, config id, environment),
   - endpoint resolution reuses deployment isolation checks.
@@ -951,15 +951,15 @@ Explicitly later than this scope:
 ## Direction 5 update: Bounded autoscaling interface + deployment audit trail (stories 8.17–8.18)
 
 - Deployment autoscaling is now an explicit bounded deployment-management seam (not provider infrastructure):
-  - domain contracts in `domain/deployment/DeploymentAutoscalingDomain.ts` (`DeploymentScalingPolicy`, `DeploymentScalingConfiguration`, `DeploymentScaleStatus`, `ScaleDecision`, `ScaleActionRequest`),
-  - application orchestration in `application/deployment/DeploymentAutoscalingService.ts` exposing a typed `AutoscalingInterface`.
+  - domain contracts in `src/domain/deployment/DeploymentAutoscalingDomain.ts` (`DeploymentScalingPolicy`, `DeploymentScalingConfiguration`, `DeploymentScaleStatus`, `ScaleDecision`, `ScaleActionRequest`),
+  - application orchestration in `src/application/deployment/DeploymentAutoscalingService.ts` exposing a typed `AutoscalingInterface`.
 - Autoscaling remains deployment-linked and provider-agnostic:
   - only active deployments are eligible for scaling configuration and scale-action requests,
   - scaling records preserve linkage across deployment id, system asset/version, bundle/build key, deployment configuration, target/environment, tenant boundary, and nested-system counts,
   - bounded policy inputs (utilization/health metadata) can drive explicit `ScaleDecision` outputs without introducing automatic scaling loops or provider adapters.
 - Deployment governance now includes a deployment-specific audit trail separate from runtime execution audit and deployment diagnostics:
-  - domain audit contracts in `domain/deployment/DeploymentAuditTrailDomain.ts`,
-  - queryable persistence seam in `application/deployment/DeploymentAuditTrailService.ts`,
+  - domain audit contracts in `src/domain/deployment/DeploymentAuditTrailDomain.ts`,
+  - queryable persistence seam in `src/application/deployment/DeploymentAuditTrailService.ts`,
   - authoritative deployment boundaries now emit deployment audit records:
     - deployment lifecycle request/outcomes (`DeploymentExecutionService`),
     - activation changes (`DeploymentVersionManager`),
@@ -973,12 +973,12 @@ Explicitly later than this scope:
 ## Direction 5 update: Deployment endpoint/runtime interop + bounded safeguards alignment (stories 8.19–8.24)
 
 - Deployment public surfaces are now explicitly implemented and tested:
-  - deployment SDK/public contract + reference client (`infrastructure/api/deployment/sdk/PublicDeploymentSdkContract.ts`, `DeploymentClient.ts`),
-  - deployment backend API transport mapping (`infrastructure/api/deployment/DeploymentBackendApi.ts`),
-  - deployment end-to-end + interop coverage (`infrastructure/api/deployment/tests/DeploymentLifecycleE2E.test.ts`, `DeploymentInteropE2E.test.ts`, `DeploymentClientSdk.test.ts`).
+  - deployment SDK/public contract + reference client (`src/infrastructure/api/deployment/sdk/PublicDeploymentSdkContract.ts`, `DeploymentClient.ts`),
+  - deployment backend API transport mapping (`src/infrastructure/api/deployment/DeploymentBackendApi.ts`),
+  - deployment end-to-end + interop coverage (`src/infrastructure/api/deployment/tests/DeploymentLifecycleE2E.test.ts`, `DeploymentInteropE2E.test.ts`, `DeploymentClientSdk.test.ts`).
 - Endpoint routing and deployment health are now first-class implemented seams (stories 8.15–8.16), layered on top of exposure/version/activation truth:
-  - `application/deployment/EndpointRoutingService.ts` resolves exposed endpoint -> active deployment -> runtime invoker path,
-  - `application/deployment/DeploymentHealthMonitor.ts` evaluates deployment health from deployment state + diagnostics + endpoint resolvability signals.
+  - `src/application/deployment/EndpointRoutingService.ts` resolves exposed endpoint -> active deployment -> runtime invoker path,
+  - `src/application/deployment/DeploymentHealthMonitor.ts` evaluates deployment health from deployment state + diagnostics + endpoint resolvability signals.
 - Story 8.23 adds bounded performance safeguards without introducing a second deployment platform:
   - deterministic build bundle reuse for repeated build requests (`DeploymentBuildPipeline` bounded cache),
   - bounded deployment diagnostics/log polling (`DeploymentDiagnosticsService` query limits),
@@ -994,7 +994,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Studio–Studio handoff platform + bounded stability safeguards (stories 9.1–9.24)
 
-- Epic 9 is implemented as a bounded Studio–Studio handoff stack in existing inner/application seams (`domain/studio-handoff/*`, `application/studio-handoff/*`, `infrastructure/filesystem/studio-handoff/*`, `infrastructure/api/studio-handoff/*`), not as a second orchestration platform.
+- Epic 9 is implemented as a bounded Studio–Studio handoff stack in existing inner/application seams (`src/domain/studio-handoff/*`, `src/application/studio-handoff/*`, `src/infrastructure/filesystem/studio-handoff/*`, `src/infrastructure/api/studio-handoff/*`), not as a second orchestration platform.
 - Implemented handoff model/surfaces now include:
   - first-class handoff contract + context (`StudioHandoffContract`, `StudioHandoffContext`) with version-pinned asset identity and intent/provenance metadata,
   - compatibility validation grounded in taxonomy/contract/capability truth (`StudioHandoffCompatibilityValidator`),
@@ -1008,7 +1008,7 @@ Explicitly later than this scope:
   - structured failure/retry/reconciliation semantics (`StudioHandoffFailure*`, `StudioHandoffRetryService`) with explicit retry linkage records.
 - Implemented System Studio integration/public surfaces:
   - System Studio handoff intake/composition initialization (`SystemStudioHandoffIntegrationService`) including grouped/system-of-systems intake context,
-  - public SDK contract + mapper/client transport seams (`infrastructure/api/studio-handoff/sdk/*`),
+  - public SDK contract + mapper/client transport seams (`src/infrastructure/api/studio-handoff/sdk/*`),
   - end-to-end and cross-studio interop coverage (`StudioHandoffPipeline.integration.test.ts`, `CrossStudioInterop.integration.test.ts`).
 - Story 9.23 bounded safeguard additions (correctness-preserving, in-process):
   - repeated compatibility/routing/input-adaptation/output-adaptation calls now use bounded in-memory decision caches for stable version-pinned inputs,
@@ -1021,7 +1021,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Exchange publish/package/import platform + end-to-end coherence coverage (stories 10.1–10.24)
 
-- Epic 10 is implemented as a bounded exchange stack across existing domain/application/infrastructure seams (`domain/exchange/*`, `application/exchange/*`, `infrastructure/api/exchange/*`) and remains explicitly separate from runtime execution state, deployment execution state, and studio-handoff transport artifacts.
+- Epic 10 is implemented as a bounded exchange stack across existing src/domain, src/application, and src/infrastructure seams (`src/domain/exchange/*`, `src/application/exchange/*`, `src/infrastructure/api/exchange/*`) and remains explicitly separate from runtime execution state, deployment execution state, and studio-handoff transport artifacts.
 - Implemented exchange domain model/capabilities now include:
   - unified exchange bundle model + format/version compatibility (`ExchangeBundleDomain`, `ExchangeFormatVersioning`),
   - package manifests for atomic/composite assets and systems (`AssetPackageManifest`, `SystemPackageManifest`),
@@ -1034,8 +1034,8 @@ Explicitly later than this scope:
   - exchange access control/evaluation (`ExchangeAccessControl`) with caller/tenant propagation,
   - local-first exchange catalog abstraction + concrete local catalog/query support (`ExchangeCatalogServices`),
   - authoritative publish workflow linking package readiness, artifact verification, catalog registration, and published record persistence (`ExchangePublishWorkflow`).
-- Public exchange contract surfaces are implemented and tested via the SDK/public DTO mapping seam (`infrastructure/api/exchange/sdk/PublicExchangeSdkContract.ts`, `ExchangeSdkMapper.ts`, `ExchangeSdkContract.test.ts`).
-- Story 10.23 end-to-end integration coverage now verifies coherent exchange lifecycle behavior over real seams (export -> deserialize/validate -> publish/catalog -> import), including bounded access-denial/conflict outcomes and system-of-systems continuity (`application/exchange/tests/ExchangeEndToEndLifecycle.integration.test.ts`).
+- Public exchange contract surfaces are implemented and tested via the SDK/public DTO mapping seam (`src/infrastructure/api/exchange/sdk/PublicExchangeSdkContract.ts`, `ExchangeSdkMapper.ts`, `ExchangeSdkContract.test.ts`).
+- Story 10.23 end-to-end integration coverage now verifies coherent exchange lifecycle behavior over real seams (export -> deserialize/validate -> publish/catalog -> import), including bounded access-denial/conflict outcomes and system-of-systems continuity (`src/application/exchange/tests/ExchangeEndToEndLifecycle.integration.test.ts`).
 - Current boundaries (implemented vs bounded/future):
   - implemented now: local-first exchange for atomic/composite/system package export/import/publish/catalog with provenance/lineage continuity and public contract mapping.
   - bounded/partial by design: local catalog implementation is in-memory/local-reference oriented in this slice; repository abstraction boundaries are preserved for later remote/LAN catalog adapters.
@@ -1043,13 +1043,13 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio canonical-shape + converter foundation (stories 13.1-13.2)
 
-- Data Studio now has a bounded canonical data-shape contract in `domain/dataset-studio/CanonicalDataShapes.ts` for:
+- Data Studio now has a bounded canonical data-shape contract in `src/domain/dataset-studio/CanonicalDataShapes.ts` for:
   - record collections,
   - table projections,
   - document-derived text-item collections,
   - image-derived structured metadata records.
 - Canonical shape metadata now includes bounded provenance/lineage/transformation-ready envelopes (source hints, asset/version lineage refs, converter metadata, preview attributes) so later preview/lineage/transform flows can reuse one inner-layer contract.
-- A reusable conversion core now exists in `application/dataset-studio/DataConverterCore.ts` with explicit contracts and typed failures for core conversions:
+- A reusable conversion core now exists in `src/application/dataset-studio/DataConverterCore.ts` with explicit contracts and typed failures for core conversions:
   - file-like payloads -> canonical records,
   - canonical records -> canonical table,
   - document text -> canonical text items,
@@ -1062,16 +1062,16 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio converter contracts + source locator abstraction (stories 13.3-13.4)
 
-- Data converter operations now have explicit request/result contracts in `application/dataset-studio/DataConverterContracts.ts` with:
+- Data converter operations now have explicit request/result contracts in `src/application/dataset-studio/DataConverterContracts.ts` with:
   - operation-scoped request unions,
   - converter context metadata (`requestId`/`operationId`/pipeline lineage hints),
   - structured diagnostics (`code`/`severity`/`path`/details),
   - explicit operation boundary metadata (raw/resolved/canonical input boundary -> canonical output kind) for preview/lineage/pipeline composition.
-- Data conversion orchestration in `application/dataset-studio/DataConverterCore.ts` now keeps existing 13.1/13.2 conversion behavior while adding:
+- Data conversion orchestration in `src/application/dataset-studio/DataConverterCore.ts` now keeps existing 13.1/13.2 conversion behavior while adding:
   - a contract-first `convert(...)` operation entrypoint,
   - structured success/failure envelopes,
   - typed source-resolution failure handling for pre-conversion boundaries.
-- Data source resolution is now a separate reusable abstraction in `application/dataset-studio/DataSourceLocator.ts`:
+- Data source resolution is now a separate reusable abstraction in `src/application/dataset-studio/DataSourceLocator.ts`:
   - normalized source-reference contracts (`in-memory`, `local-file`, `url`),
   - standardized resolved source model consumed by converter contracts,
   - loader-backed resolution seam (`IDataSourcePayloadLoader`) so source lookup stays separate from conversion semantics.
@@ -1082,17 +1082,17 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio preview engine + data asset base abstraction (stories 13.5-13.6)
 
-- Data Studio now has a reusable preview engine in `application/data-studio/DataPreviewEngine.ts` that maps canonical data-shape outputs into deterministic preview models:
+- Data Studio now has a reusable preview engine in `src/application/data-studio/DataPreviewEngine.ts` that maps canonical data-shape outputs into deterministic preview models:
   - `records`, `table`, `text-items`, and `image-metadata-records` are supported directly from the canonical shape contract,
   - previews are sampled/partial by bounded options (`maxItems`, `maxColumns`, `maxTextLength`) rather than full data exploration behavior,
   - preview metadata and diagnostics are preserved in one model so application services and UI surfaces can reuse the same preview truth.
-- UI rendering adapters for the preview model now exist in `ui/components/assets/DataPreviewSurface.tsx`:
+- UI rendering adapters for the preview model now exist in `src/ui/components/assets/DataPreviewSurface.tsx`:
   - rendering is model-driven (canonical shape -> preview model -> UI) rather than ad hoc per-screen branching,
   - diagnostics and metadata are surfaced alongside sampled content for authoring-time inspection.
-- Data assets now have a shared domain abstraction in `domain/dataset-studio/DataAssetBase.ts`:
-  - extends the existing asset architecture (`domain/assets/Asset`) instead of introducing a parallel asset hierarchy,
+- Data assets now have a shared domain abstraction in `src/domain/dataset-studio/DataAssetBase.ts`:
+  - extends the existing asset architecture (`src/domain/assets/Asset`) instead of introducing a parallel asset hierarchy,
   - standardizes explicit input/output contracts, bounded config surface, preview capability, version metadata, inspectability, and composability checks.
-- A thin concrete canonical adapter `domain/dataset-studio/CanonicalDataAsset.ts` plus application integration in `application/dataset-studio/DataAssetFactory.ts` now provide a minimal end-to-end bridge from converter results to data-asset instances and preview generation.
+- A thin concrete canonical adapter `src/domain/dataset-studio/CanonicalDataAsset.ts` plus application integration in `src/application/dataset-studio/DataAssetFactory.ts` now provide a minimal end-to-end bridge from converter results to data-asset instances and preview generation.
 - Scope remains intentionally bounded:
   - no ingestion-suite/pipeline-builder runtime stack was introduced,
   - no parallel taxonomy/identity/contract model was introduced,
@@ -1100,17 +1100,17 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data asset execution framework + lineage metadata model (stories 13.7-13.8)
 
-- Data Studio now has an internal data-layer execution seam in `application/dataset-studio/DataAssetExecutionFramework.ts`:
+- Data Studio now has an internal data-layer execution seam in `src/application/dataset-studio/DataAssetExecutionFramework.ts`:
   - explicit execution request/context/result contracts for dataset assets,
   - bounded execution input modes (`source-reference`, `resolved-source`, `converter-request`, `converter-result`, and canonical-shape),
   - lifecycle-oriented execution flow (validation -> resolve/convert -> preview -> packaged result),
   - standardized execution outputs for preview, diagnostics, downstream composition, and lineage handoff.
 - Execution integrates existing 13.1-13.6 foundations directly:
   - conversion and source resolution via `DataConverterCore` + source-locator-backed conversion paths,
-  - canonical data-shape output reuse from `domain/dataset-studio/CanonicalDataShapes.ts`,
-  - preview generation via `application/data-studio/DataPreviewEngine.ts`,
-  - data-asset compatibility checks against `domain/dataset-studio/DataAssetBase.ts`.
-- Data lineage metadata is now first-class in `domain/dataset-studio/DataLineageMetadata.ts`:
+  - canonical data-shape output reuse from `src/domain/dataset-studio/CanonicalDataShapes.ts`,
+  - preview generation via `src/application/data-studio/DataPreviewEngine.ts`,
+  - data-asset compatibility checks against `src/domain/dataset-studio/DataAssetBase.ts`.
+- Data lineage metadata is now first-class in `src/domain/dataset-studio/DataLineageMetadata.ts`:
   - typed lineage references (inputs/intermediates/outputs),
   - execution-step provenance with status/timestamps/diagnostics,
   - producer + execution markers and serializable metadata envelopes.
@@ -1121,7 +1121,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio validation/error model + preview-panel integration seam (stories 13.9-13.10)
 
-- Data Studio now has a focused validation/error framework in `application/dataset-studio/DataStudioValidation.ts` that standardizes:
+- Data Studio now has a focused validation/error framework in `src/application/dataset-studio/DataStudioValidation.ts` that standardizes:
   - issue sections across canonical-shape, converter-request/result, source-reference/resolved-source, data-asset-config, execution-request, and preview-model boundaries,
   - warning vs error severities with path-level issue reporting,
   - deterministic mapping from validation issues -> converter diagnostics for existing execution/preview contracts.
@@ -1136,7 +1136,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data asset registry + schema-driven config contracts (stories 13.11-13.12)
 
-- Data Studio now has an explicit registry seam in `application/dataset-studio/DataAssetRegistry.ts` for deterministic registration/discovery/loading of data assets without creating a parallel taxonomy or global plugin runtime.
+- Data Studio now has an explicit registry seam in `src/application/dataset-studio/DataAssetRegistry.ts` for deterministic registration/discovery/loading of data assets without creating a parallel taxonomy or global plugin runtime.
 - Registry entries now expose bounded discovery metadata for UI/application composition:
   - asset identity (`assetId`, `versionId`, `name`),
   - taxonomy-aligned role metadata (`taxonomy` + bounded `specialization` tags for converter/preview/ingestion/transformation intent),
@@ -1144,11 +1144,11 @@ Explicitly later than this scope:
   - output/composability metadata (`outputShapeKind`, `composableInputShapeKinds`),
   - capability metadata (`configurable`, `previewable`, `executable`),
   - schema-driven config contracts (`DataAssetConfigSchema`) for reusable authoring surfaces.
-- Data asset config schema contracts are now centralized in `application/dataset-studio/DataAssetConfiguration.ts`:
+- Data asset config schema contracts are now centralized in `src/application/dataset-studio/DataAssetConfiguration.ts`:
   - typed field kinds and options,
   - deterministic schema normalization/default resolution,
   - bounded schema inference from existing `DataAssetBase.config` values when explicit schema is not provided.
-- Data Studio validation now includes schema-aware config validation in `application/dataset-studio/DataStudioValidation.ts` (`validateDataAssetConfigValues`) so field-level config diagnostics use the same validation framework as execution/preview flows.
+- Data Studio validation now includes schema-aware config validation in `src/application/dataset-studio/DataStudioValidation.ts` (`validateDataAssetConfigValues`) so field-level config diagnostics use the same validation framework as execution/preview flows.
 - Scope remains intentionally bounded:
   - no remote marketplace/auto-discovery/plugin-packaging architecture was introduced,
   - registry loading is explicit registration + optional config-aware asset factory functions,
@@ -1156,39 +1156,39 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data asset versioning + metadata integration (story 13.13)
 
-- Data Studio now has an explicit data-asset versioning seam in `domain/dataset-studio/DataAssetVersioning.ts`:
+- Data Studio now has an explicit data-asset versioning seam in `src/domain/dataset-studio/DataAssetVersioning.ts`:
   - normalized version descriptors (`semantic`, `label`, `unversioned`),
   - compatibility-oriented comparability checks for deterministic latest-version resolution,
   - explicit validation helpers for strict version metadata fields (`schemaVersion`, `contractVersion`, `publishedVersionId`) while allowing label versions for asset ids where needed.
-- Data asset inspection in `domain/dataset-studio/DataAssetBase.ts` now exposes a structured metadata snapshot:
+- Data asset inspection in `src/domain/dataset-studio/DataAssetBase.ts` now exposes a structured metadata snapshot:
   - identity (`assetId`, optional `versionId`, category),
   - display metadata (name/description/tags),
   - version descriptor,
   - input/output contract references + contract version,
   - capability metadata (configurable/previewable/executable),
   - composability and dependency metadata.
-- Registry integration in `application/dataset-studio/DataAssetRegistry.ts` now consumes that inspection metadata directly and resolves latest version by version precedence instead of registration order.
-- Dataset Studio preview UI now includes version labeling in the asset selector and fixes a TSX generic parsing defect that caused runtime `Readonly is not defined` errors in browser mode (`ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`).
+- Registry integration in `src/application/dataset-studio/DataAssetRegistry.ts` now consumes that inspection metadata directly and resolves latest version by version precedence instead of registration order.
+- Dataset Studio preview UI now includes version labeling in the asset selector and fixes a TSX generic parsing defect that caused runtime `Readonly is not defined` errors in browser mode (`src/ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`).
 - Scope remains intentionally bounded:
   - no package-manager/plugin lifecycle framework,
   - no remote compatibility negotiation or migration engine beyond local version metadata validation and matching.
 
 ## Direction 5 update: Data Studio sample-asset test harness (story 13.14)
 
-- Data Studio now includes a reusable sample-asset harness in `application/dataset-studio/DataStudioSampleAssets.ts` with representative assets across conversion, preview, transformation, and ingestion:
+- Data Studio now includes a reusable sample-asset harness in `src/application/dataset-studio/DataStudioSampleAssets.ts` with representative assets across conversion, preview, transformation, and ingestion:
   - records converter sample,
   - document text-items sample,
   - image metadata records sample,
   - CSV ingestor sample,
   - JSON ingestor sample.
 - The harness registers assets through the existing `DataAssetRegistry` with schema-driven configuration, specialization metadata, and versioned metadata descriptors.
-- End-to-end harness coverage is now implemented in `application/dataset-studio/tests/DataStudioSampleAssetsHarness.test.ts` and validates:
+- End-to-end harness coverage is now implemented in `src/application/dataset-studio/tests/DataStudioSampleAssetsHarness.test.ts` and validates:
   - source reference resolution + converter operations,
   - canonical shape outputs and preview generation,
   - execution framework and lineage capture,
   - schema-driven config validation behavior,
   - registry discovery and metadata/version surfacing.
-- Additional focused coverage now includes `domain/dataset-studio/tests/DataAssetVersioning.test.ts` and updated `DataAssetBase`/registry tests for versioning + metadata behavior.
+- Additional focused coverage now includes `src/domain/dataset-studio/tests/DataAssetVersioning.test.ts` and updated `DataAssetBase`/registry tests for versioning + metadata behavior.
 - Scope remains intentionally bounded:
   - harness assets are deterministic and in-memory,
   - no separate testing runtime or production ingestion pipeline was introduced.
@@ -1196,8 +1196,8 @@ Explicitly later than this scope:
 ## Direction 5 update: CSV + JSON ingestor assets (stories 14.1-14.2)
 
 - Data Studio now has first-class ingestion assets for CSV and JSON in:
-  - `application/dataset-studio/CsvIngestorAsset.ts`
-  - `application/dataset-studio/JsonIngestorAsset.ts`
+  - `src/application/dataset-studio/CsvIngestorAsset.ts`
+  - `src/application/dataset-studio/JsonIngestorAsset.ts`
 - Each ingestor now includes explicit contract descriptors, schema-driven config contracts (zod runtime validation + UI config schema), deterministic execute behavior, and bounded preview behavior with inferred field schema summaries.
 - CSV ingestion now uses `csv-parse` with bounded config options:
   - delimiter,
@@ -1215,7 +1215,7 @@ Explicitly later than this scope:
   - ingestion remains a composable records-boundary seam for downstream conversion/preview.
 ## Direction update: Dataset Studio document/image ingestion assets (stories 14.3-14.4)
 
-- Dataset Studio now includes first-class ingestion assets for document/PDF and image sources in `application/dataset-studio`:
+- Dataset Studio now includes first-class ingestion assets for document/PDF and image sources in `src/application/dataset-studio`:
   - `DocumentPdfIngestorAsset` ingests PDF/text sources into canonical `text-items`, preserves page-aware structure, emits preview summaries, and exposes an explicit OCR extension strategy seam for image-only/scanned documents.
   - `ImageIngestorAsset` ingests PNG/JPEG/WEBP sources into canonical `image-metadata-records`, extracts dimensions/format/orientation/file stats plus optional EXIF highlights, and emits preview-friendly metadata summaries.
 - Both assets follow the same asset-contract/config/versioning pattern used by existing CSV/JSON ingestors:
@@ -1229,7 +1229,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Batch ingestion framework + source locator input abstraction (stories 14.5-14.6)
 
-- Data Studio now has a reusable source-input abstraction in `application/dataset-studio/SourceLocatorInputAbstraction.ts` with zod-validated request contracts for:
+- Data Studio now has a reusable source-input abstraction in `src/application/dataset-studio/SourceLocatorInputAbstraction.ts` with zod-validated request contracts for:
   - single local file references,
   - multiple explicit local file references,
   - local directory references with scanner-backed glob scanning,
@@ -1249,7 +1249,7 @@ Explicitly later than this scope:
   - previewed subset,
   - extension summary counts,
   - structured per-reference issues (`invalid_config`, `invalid_reference`, `unreadable_path`, `unsupported_extension`, `unsupported_kind`).
-- Data Studio now has a batch ingestion orchestration seam in `application/dataset-studio/BatchIngestionFramework.ts` that composes existing ingestors instead of duplicating ingest logic:
+- Data Studio now has a batch ingestion orchestration seam in `src/application/dataset-studio/BatchIngestionFramework.ts` that composes existing ingestors instead of duplicating ingest logic:
   - CSV/JSON via existing converter ingestion path (`DataConverterCore` -> `CsvIngestorAsset` / `JsonIngestorAsset`),
   - document/PDF via `DocumentPdfIngestorAsset`,
   - image via `ImageIngestorAsset`.
@@ -1273,7 +1273,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Data Studio canonical ingestion normalization + contracts (stories 14.7-14.8)
 
-- Data Studio ingestion now has a shared normalization/contract seam in `application/dataset-studio`:
+- Data Studio ingestion now has a shared normalization/contract seam in `src/application/dataset-studio`:
   - `IngestionContracts.ts` provides reusable zod-backed ingestion contract fragments for execution context, payload primitives, and structured validation issue mapping.
   - `IngestionCanonicalNormalization.ts` provides reusable canonical-output normalization and standardized ingestion result envelopes.
 - CSV and JSON ingestion now emits canonical normalized records outputs alongside legacy parsed-record payloads for compatibility.
@@ -1283,12 +1283,12 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Ingestor preview contract + structured ingestion error layer (stories 14.9-14.10)
 
-- Ingestion contracts now include a first-class structured issue model in `application/dataset-studio/IngestionContracts.ts`:
+- Ingestion contracts now include a first-class structured issue model in `src/application/dataset-studio/IngestionContracts.ts`:
   - stable categories (`invalid-configuration`, `unsupported-source-type`, `unreadable-source`, `parse-extraction-failure`, `preview-failure`, `batch-partial-failure`, etc.),
   - severity and recoverability semantics,
   - source-association metadata (source id/reference, batch item metadata, file hints),
   - reusable zod-to-ingestion-issue mapping and exception-to-issue translation helpers.
-- Ingestion preview is now a shared contract surface in `application/dataset-studio/IngestionCanonicalNormalization.ts`:
+- Ingestion preview is now a shared contract surface in `src/application/dataset-studio/IngestionCanonicalNormalization.ts`:
   - reusable `IngestionPreviewEnvelope`,
   - summary metadata (`totalCount`, `sampleCount`, `truncated`, and batch aggregate counts),
   - canonical preview payload reuse via `DataPreviewEngine`,
@@ -1301,7 +1301,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Ingestion registry/discovery integration (stories 14.11-14.12)
 
-- Data Studio ingestion assets are now registered through one shared `DataAssetRegistry` catalog (`application/dataset-studio/DataStudioAssetRegistryCatalog.ts`) instead of panel-local ad hoc registration paths.
+- Data Studio ingestion assets are now registered through one shared `DataAssetRegistry` catalog (`src/application/dataset-studio/DataStudioAssetRegistryCatalog.ts`) instead of panel-local ad hoc registration paths.
 - Registry descriptors for ingestion assets now expose inspectability/discovery metadata in addition to existing identity/version/contracts/config metadata:
   - explicit category (`data-ingestion`),
   - supported source kinds/extensions/media types,
@@ -1312,7 +1312,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Advanced ingestion configuration mode + logging/lineage hooks (stories 14.13-14.14)
 
-- Ingestion config schemas now carry contract-level field visibility metadata (`simple` vs `advanced`) through `application/dataset-studio/DataAssetConfiguration.ts`, so UI mode split is schema-driven rather than screen-local duplication.
+- Ingestion config schemas now carry contract-level field visibility metadata (`simple` vs `advanced`) through `src/application/dataset-studio/DataAssetConfiguration.ts`, so UI mode split is schema-driven rather than screen-local duplication.
 - CSV/JSON/document/image/batch ingestion schema fields now declare simple/advanced visibility directly in asset-owned config contract definitions.
 - Ingestion normalization envelopes now include structured logging + lineage hooks (`log`, `lineage`) with bounded metadata for:
   - producer asset/version,
@@ -1326,16 +1326,16 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Unified ingestion model + source detection foundation (stories 15.1-15.2)
 
-- Dataset Studio now has a unified ingestion domain contract in `domain/dataset-studio/UnifiedIngestionDomain.ts` with:
+- Dataset Studio now has a unified ingestion domain contract in `src/domain/dataset-studio/UnifiedIngestionDomain.ts` with:
   - source kinds (`csv`, `json`, `document`, `image`, `unknown`),
   - versioned source-reference collections that support single-source now and multi-source expansion,
   - simple/advanced configuration modes,
   - output targets aligned to canonical shape kinds (`records`, `text-items`, `image-metadata-records`),
   - structured detection/result/preview/error contracts.
 - Source detection now follows clean boundaries:
-  - domain-level interfaces/contracts in `domain/dataset-studio/UnifiedIngestionDomain.ts`,
-  - application orchestration in `application/dataset-studio/UnifiedSourceTypeDetectionService.ts`,
-  - infrastructure `file-type` wrapper in `infrastructure/dataset-studio/FileTypeSignatureSniffer.ts`.
+  - domain-level interfaces/contracts in `src/domain/dataset-studio/UnifiedIngestionDomain.ts`,
+  - application orchestration in `src/application/dataset-studio/UnifiedSourceTypeDetectionService.ts`,
+  - infrastructure `file-type` wrapper in `src/infrastructure/dataset-studio/FileTypeSignatureSniffer.ts`.
 - Detection is deterministic and explainable with layered signals:
   - explicit metadata,
   - extension + MIME heuristics,
@@ -1346,11 +1346,11 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Unified ingestion routing engine + converter integration (stories 15.3-15.4)
 
-- Unified ingestion now has a dedicated routing seam in `application/dataset-studio/UnifiedIngestionRoutingService.ts`:
+- Unified ingestion now has a dedicated routing seam in `src/application/dataset-studio/UnifiedIngestionRoutingService.ts`:
   - deterministic source-kind routing for `csv` / `json` / `document` / `image`,
   - explicit unknown-kind fallback policy keyed by output target,
-  - structured route contracts (route request, resolved route metadata, unsupported-route failures) defined in `domain/dataset-studio/UnifiedIngestionDomain.ts`.
-- Unified ingestion orchestration is now explicit in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts`:
+  - structured route contracts (route request, resolved route metadata, unsupported-route failures) defined in `src/domain/dataset-studio/UnifiedIngestionDomain.ts`.
+- Unified ingestion orchestration is now explicit in `src/application/dataset-studio/UnifiedIngestionOrchestrationService.ts`:
   - receives source + optional payload/config,
   - runs source detection (15.2),
   - resolves route (15.3),
@@ -1362,15 +1362,15 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Unified ingestion simple/advanced configuration modes (stories 15.5-15.6)
 
-- Unified ingestion configuration now resolves through one shared application contract in `application/dataset-studio/UnifiedIngestionConfiguration.ts`, with centralized defaults and validation for both simple and advanced modes.
+- Unified ingestion configuration now resolves through one shared application contract in `src/application/dataset-studio/UnifiedIngestionConfiguration.ts`, with centralized defaults and validation for both simple and advanced modes.
 - Simple mode remains the default surface with minimal required decisions and automatic detection/routing defaults.
 - Advanced mode now supports explicit detection override and strategy override (`auto`/`csv`/`json`/`document`/`image`) while still executing through the same orchestration service (`UnifiedIngestionOrchestrationService`) and routing seam.
 - Contradictory advanced combinations are rejected before execution so advanced overrides do not bypass canonical validation or produce silent route/output mismatches.
 
 ## Direction 5 update: Unified ingestion normalization pipeline + preview contracts (stories 15.7-15.8)
 
-- Unified ingestion now has an explicit post-routing/post-conversion normalization seam in `application/dataset-studio/UnifiedIngestionNormalizationPipeline.ts`.
-- Normalization contracts are now first-class in `domain/dataset-studio/UnifiedIngestionDomain.ts` through `UnifiedIngestionNormalizedOutput` and `UnifiedIngestionNormalizationVersion`.
+- Unified ingestion now has an explicit post-routing/post-conversion normalization seam in `src/application/dataset-studio/UnifiedIngestionNormalizationPipeline.ts`.
+- Normalization contracts are now first-class in `src/domain/dataset-studio/UnifiedIngestionDomain.ts` through `UnifiedIngestionNormalizedOutput` and `UnifiedIngestionNormalizationVersion`.
 - Normalization behavior is centralized and composable through discrete stages (kind validation, output-target alignment, summary/warning synthesis), rather than ad hoc per-ingestor shaping.
 - Normalized unified outputs now carry one consistent inspectable envelope across source kinds:
   - canonical output kind,
@@ -1380,7 +1380,7 @@ Explicitly later than this scope:
   - route summary,
   - structured warnings (including empty output and fallback-route posture).
 - Unified orchestration now enforces normalization as an explicit stage and returns stage-aware failures for normalization and preview generation paths (`normalization`, `preview`) in addition to existing ingestion stages.
-- Unified ingestion preview is now centralized in `application/dataset-studio/UnifiedIngestionPreviewService.ts` and is generated from normalized outputs only (no raw format-specific preview bypass path).
+- Unified ingestion preview is now centralized in `src/application/dataset-studio/UnifiedIngestionPreviewService.ts` and is generated from normalized outputs only (no raw format-specific preview bypass path).
 - Preview contracts now include:
   - sampled row/item entries,
   - metadata summary,
@@ -1391,7 +1391,7 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Unified ingestion failure policy + composable asset wrapper (stories 15.9-15.10)
 
-- Unified ingestion failure handling now routes through one centralized application policy seam in `application/dataset-studio/UnifiedIngestionFailurePolicy.ts` instead of ad hoc per-stage try/catch mapping.
+- Unified ingestion failure handling now routes through one centralized application policy seam in `src/application/dataset-studio/UnifiedIngestionFailurePolicy.ts` instead of ad hoc per-stage try/catch mapping.
 - Stage-aware failure contracts now include deterministic classification metadata (`stage`, `code`, `message`, `disposition=recoverable|terminal`) plus bounded partial context (`detectionResolved`, `routeResolved`, `outputTarget`) in `UnifiedIngestionOrchestrationService` results.
 - Fallback behavior is now explicit and inspectable:
   - detection tie-break decisions,
@@ -1399,7 +1399,7 @@ Explicitly later than this scope:
   - degraded preview fallback decisions,
   - partial-metadata fallback notes.
 - Preview generation no longer hard-fails the full unified path when preview rendering throws; `UnifiedIngestionPreviewService` returns a degraded preview payload with warning issues, preserving normalized output metadata for downstream orchestration/UI.
-- Unified ingestion now has a high-level composable execution wrapper in `application/dataset-studio/UnifiedIngestionAsset.ts`:
+- Unified ingestion now has a high-level composable execution wrapper in `src/application/dataset-studio/UnifiedIngestionAsset.ts`:
   - stable asset identity/version (`unified-ingestion@1.0.0`),
   - versioned wrapper contracts (`inputContractVersion`, `outputContractVersion`),
   - wrapper entrypoints (`execute`, `preview`) that run through the same orchestration/configuration seams,
@@ -1419,25 +1419,25 @@ Explicitly later than this scope:
 
 ## Direction 5 update: Unified ingestion lineage + metadata tracking (story 15.13)
 
-- Unified ingestion contracts now include bounded, versioned lineage + metadata envelopes in `domain/dataset-studio/UnifiedIngestionDomain.ts`:
+- Unified ingestion contracts now include bounded, versioned lineage + metadata envelopes in `src/domain/dataset-studio/UnifiedIngestionDomain.ts`:
   - per-item execution metadata (source identity, detection summary, route summary, conversion summary, normalization counts, optional preview summary, processing timestamps),
   - per-item lineage record with explicit stage timeline (`source-registration`, `configuration`, `source-read`, `detection`, `routing`, `ingestion`, `conversion`, `normalization`, `preview`) and stage-level status (`succeeded`/`failed`/`degraded`/`skipped`),
   - batch-level aggregate metadata and lineage summary contracts (counts + item lineage references).
-- Unified orchestration now captures lineage + metadata across success, partial, degraded, and failure paths in `application/dataset-studio/UnifiedIngestionOrchestrationService.ts` without introducing a parallel provenance subsystem.
-- Batch orchestration now preserves per-item lineage/metadata and emits batch aggregate metadata/lineage in `application/dataset-studio/UnifiedIngestionBatchOrchestrationService.ts`, including partial-failure and fail-fast visibility.
-- Unified asset wrapper contracts expose lineage/metadata for single and batch execution surfaces through `application/dataset-studio/UnifiedIngestionAsset.ts`.
-- Dataset Studio unified preview/batch inspection now surfaces high-signal metadata first with expandable lineage details in `ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`.
+- Unified orchestration now captures lineage + metadata across success, partial, degraded, and failure paths in `src/application/dataset-studio/UnifiedIngestionOrchestrationService.ts` without introducing a parallel provenance subsystem.
+- Batch orchestration now preserves per-item lineage/metadata and emits batch aggregate metadata/lineage in `src/application/dataset-studio/UnifiedIngestionBatchOrchestrationService.ts`, including partial-failure and fail-fast visibility.
+- Unified asset wrapper contracts expose lineage/metadata for single and batch execution surfaces through `src/application/dataset-studio/UnifiedIngestionAsset.ts`.
+- Dataset Studio unified preview/batch inspection now surfaces high-signal metadata first with expandable lineage details in `src/ui/components/assets/DatasetStudioDraftPreviewPanel.tsx`.
 
 ## Direction 5 extension update: Stage-based ingestion pipeline model + stage-asset mapping (stories 15E.1-15E.2)
 
-- Dataset Studio now has a canonical stage-pipeline domain contract in `domain/dataset-studio/StagePipelineDomain.ts`:
+- Dataset Studio now has a canonical stage-pipeline domain contract in `src/domain/dataset-studio/StagePipelineDomain.ts`:
   - explicit high-level stage kinds (`source-selection`, `ingestion`, `profiling`, `normalization`, `preview`),
   - ordered stage definitions with unique ids/order,
   - stage-level data-shape contracts (canonical shape kinds),
   - stage-to-underlying-asset references (wrappers, not replacement definitions),
   - explicit execution policy (`required` / `optional` / `conditional`).
 - Unified ingestion execution metadata now includes stage-pipeline inspectability (`pipelineId`, ordered stage ids) while preserving existing lineage/event contracts and execution behavior.
-- Stage-to-asset resolution now has a dedicated application seam in `application/dataset-studio/StageAssetMappingService.ts`:
+- Stage-to-asset resolution now has a dedicated application seam in `src/application/dataset-studio/StageAssetMappingService.ts`:
   - static stage mappings (for example source-selection/profiling/normalization/preview),
   - conditional stage mappings for ingestion (detected source kind, advanced strategy override, output-target fallback),
   - optional config-default payloads and typed policy/fallback metadata,
@@ -1449,10 +1449,10 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Wizard flow engine + default pipeline templates (stories 15E.3-15E.4)
 
-- Dataset Studio now has a stage-oriented wizard flow state-machine seam in `application/dataset-studio/WizardFlowEngine.ts` backed by canonical flow contracts in `domain/dataset-studio/StageFlowDefinition.ts`.
+- Dataset Studio now has a stage-oriented wizard flow state-machine seam in `src/application/dataset-studio/WizardFlowEngine.ts` backed by canonical flow contracts in `src/domain/dataset-studio/StageFlowDefinition.ts`.
 - Wizard state is application-owned (current/completed/skipped stages + per-stage configuration/output), UI-independent, and supports forward/back transitions, conditional branching, and auto-skip behavior.
 - Stage-flow contracts now support dynamic insertion/removal/reordering and transition validation against stage data contracts to prevent invalid stage hops.
-- Default pipeline templates are now modeled in `domain/dataset-studio/PipelineTemplateDomain.ts` and served through `application/dataset-studio/TemplateService.ts` with:
+- Default pipeline templates are now modeled in `src/domain/dataset-studio/PipelineTemplateDomain.ts` and served through `src/application/dataset-studio/TemplateService.ts` with:
   - template listing and UI-ready descriptors,
   - template instantiation with partial customization (stage config overrides, skip list, reorder list),
   - validation against stage definition contracts and stage-to-asset mapping (`StageAssetMappingService`).
@@ -1460,14 +1460,14 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Intent-driven wizard configuration + stage policy automation (stories 15E.5-15E.6)
 
-- Dataset Studio now has an explicit intent model in `domain/dataset-studio/IntentDomain.ts` with intent id/name/description, associated pipeline templates, optional stage overrides, and optional stage blueprints for extensible/custom presets.
-- Intent resolution is now a dedicated application seam in `application/dataset-studio/IntentService.ts`:
+- Dataset Studio now has an explicit intent model in `src/domain/dataset-studio/IntentDomain.ts` with intent id/name/description, associated pipeline templates, optional stage overrides, and optional stage blueprints for extensible/custom presets.
+- Intent resolution is now a dedicated application seam in `src/application/dataset-studio/IntentService.ts`:
   - lists registered intents,
   - resolves `intent -> template` mappings,
   - applies intent-specific stage include/exclude/reorder adjustments,
   - validates resulting flows against stage-flow contracts and stage-to-asset mappings.
-- Wizard flow initialization now supports intent-first orchestration in `application/dataset-studio/WizardFlowEngine.ts` by accepting `intentId`/`intentPreset` + `IntentService`, resolving template+intent adjustments before start, and persisting intent context in runtime wizard state.
-- Stage execution automation is now isolated in `application/dataset-studio/StageExecutionPolicy.ts`:
+- Wizard flow initialization now supports intent-first orchestration in `src/application/dataset-studio/WizardFlowEngine.ts` by accepting `intentId`/`intentPreset` + `IntentService`, resolving template+intent adjustments before start, and persisting intent context in runtime wizard state.
+- Stage execution automation is now isolated in `src/application/dataset-studio/StageExecutionPolicy.ts`:
   - stage decision outcomes: `execute`, `auto-complete`, `skip`,
   - data-driven skip rules over unified-ingestion outputs,
   - auto-configuration merge from mapping defaults + template defaults + intent defaults + ingestion-derived normalization hints.
@@ -1475,23 +1475,23 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Unified ingestion stage contracts + raw storage integration (stories 15E.7-15E.8)
 
-- Stage-aware unified-ingestion output contracts are now explicit and zod-backed in `application/dataset-studio/StageIntegrationContracts.ts`.
+- Stage-aware unified-ingestion output contracts are now explicit and zod-backed in `src/application/dataset-studio/StageIntegrationContracts.ts`.
 - Unified-ingestion stage outputs now support both:
   - typed envelope projection from orchestration results, and
   - backward-compatible parsing of legacy flat stage output records.
 - Wizard orchestration now supports typed stage output writes through:
   - `WizardFlowEngine.setUnifiedIngestionStageOutput(...)`,
   - `WizardFlowEngine.setRawStorageStageOutput(...)`.
-- Stage policy automation now consumes typed ingestion-stage output metadata when available and still supports legacy output fields for compatibility (`application/dataset-studio/StageExecutionPolicy.ts`).
+- Stage policy automation now consumes typed ingestion-stage output metadata when available and still supports legacy output fields for compatibility (`src/application/dataset-studio/StageExecutionPolicy.ts`).
 - Raw storage is now a first-class stage integration with:
-  - explicit stage asset id (`raw-storage-stage`) in `domain/dataset-studio/StagePipelineDomain.ts`,
-  - stage-to-asset mapping defaults + metadata hooks in `application/dataset-studio/StageAssetMappingService.ts`,
-  - reusable raw-storage persistence adapter seam and inspectable output/log/lineage contracts in `application/dataset-studio/RawStorageStageService.ts`.
-- Default template flows now include raw-storage as a first-class stage in ELT, document, and analytics templates (`domain/dataset-studio/PipelineTemplateDomain.ts`).
+  - explicit stage asset id (`raw-storage-stage`) in `src/domain/dataset-studio/StagePipelineDomain.ts`,
+  - stage-to-asset mapping defaults + metadata hooks in `src/application/dataset-studio/StageAssetMappingService.ts`,
+  - reusable raw-storage persistence adapter seam and inspectable output/log/lineage contracts in `src/application/dataset-studio/RawStorageStageService.ts`.
+- Default template flows now include raw-storage as a first-class stage in ELT, document, and analytics templates (`src/domain/dataset-studio/PipelineTemplateDomain.ts`).
 
 ## Direction 5 extension update: Stage metadata/contracts + stage-based wizard state integration (stories 15E.9-15E.10)
 
-- Dataset Studio now has a dedicated stage metadata + contract seam in `application/dataset-studio/StageMetadataContracts.ts` with zod-backed validation for:
+- Dataset Studio now has a dedicated stage metadata + contract seam in `src/application/dataset-studio/StageMetadataContracts.ts` with zod-backed validation for:
   - stage metadata envelopes (identity/type/category/description/order/execution/inspectability/lineage/preview/source/status markers),
   - stage input/output contracts (`simple` and `composite-mapped`),
   - stage metadata propagation payloads for downstream stage access.
@@ -1502,9 +1502,9 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Stage-aware dataset canvas projection + editing services (stories 15E.11-15E.12)
 
-- Application-layer stage-canvas projection now lives in `application/dataset-studio/StageCanvasGraphProjectionService.ts` and translates canonical stage-flow/runtime contracts into canvas graph read models (stage groups + asset nodes + flow edges) while preserving ordering/dependency semantics.
-- Projection contracts remain application translators: no UI data shape leakage into `domain/dataset-studio/*` and no second stage graph source-of-truth.
-- Stage-level editing orchestration now lives in `application/dataset-studio/StageCanvasEditingService.ts` with explicit validation/error contracts for:
+- Application-layer stage-canvas projection now lives in `src/application/dataset-studio/StageCanvasGraphProjectionService.ts` and translates canonical stage-flow/runtime contracts into canvas graph read models (stage groups + asset nodes + flow edges) while preserving ordering/dependency semantics.
+- Projection contracts remain application translators: no UI data shape leakage into `src/domain/dataset-studio/*` and no second stage graph source-of-truth.
+- Stage-level editing orchestration now lives in `src/application/dataset-studio/StageCanvasEditingService.ts` with explicit validation/error contracts for:
   - stage configuration updates,
   - stage reorder constraints,
   - optional-stage insertion/removal constraints,
@@ -1514,14 +1514,14 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Intermediate output inspection + pipeline persistence (stories 15E.13-15E.14)
 
-- Stage output inspection now has an application-owned adapter seam in `application/dataset-studio/StageOutputInspectionService.ts` that normalizes inspectable stage outputs into one UI-ready contract:
+- Stage output inspection now has an application-owned adapter seam in `src/application/dataset-studio/StageOutputInspectionService.ts` that normalizes inspectable stage outputs into one UI-ready contract:
   - output summary,
   - stage contract/type summary,
   - preview availability/reference with structured fallback summary,
   - propagated upstream metadata (detected type/storage/lineage/pipeline/upstream-stage ids),
   - inspectability status handling for skipped, auto-configured, and no-output states.
 - Inspection normalization is reused across Wizard and Canvas projection paths through shared `WizardFlowEngine` state + `StageRuntimeTracking` metadata (no React-owned inspection derivation).
-- Stage pipeline persistence now has a versioned application seam in `application/dataset-studio/StagePipelinePersistenceService.ts` that captures:
+- Stage pipeline persistence now has a versioned application seam in `src/application/dataset-studio/StagePipelinePersistenceService.ts` that captures:
   - pipeline identity/metadata,
   - full stage flow definition,
   - wizard runtime state (including stage config/output/status tracking context),
@@ -1532,43 +1532,43 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Mid-level pipeline stage domain + composition mapping foundation (stories 17.1-17.2)
 
-- Dataset Studio now has a dedicated mid-level stage domain seam in `domain/dataset-studio/PipelineStageDomain.ts` with explicit stage ids, definitions, instances, config, metadata, canonical-shape contracts, ordering constraints, and zod-backed validation.
-- A runtime-inspectable stage registry now exists in `domain/dataset-studio/PipelineStageRegistry.ts`, covering the full stage set (`SourceSelection` through `StoragePrepared`) with reusable stage definitions and no hardcoded pipeline-flow graph.
-- Stage-to-asset composition now has a dedicated application seam in `application/dataset-studio/StageAssetCompositionService.ts` with:
+- Dataset Studio now has a dedicated mid-level stage domain seam in `src/domain/dataset-studio/PipelineStageDomain.ts` with explicit stage ids, definitions, instances, config, metadata, canonical-shape contracts, ordering constraints, and zod-backed validation.
+- A runtime-inspectable stage registry now exists in `src/domain/dataset-studio/PipelineStageRegistry.ts`, covering the full stage set (`SourceSelection` through `StoragePrepared`) with reusable stage definitions and no hardcoded pipeline-flow graph.
+- Stage-to-asset composition now has a dedicated application seam in `src/application/dataset-studio/StageAssetCompositionService.ts` with:
   - explicit composition contracts (`AssetReference`, `AssetGroup`, `StageCompositionDefinition`),
   - stage-config to asset-config mapping rules,
   - single-asset, multi-asset, and conditional composition support,
   - React Flow-compatible asset-graph segment projection (`Node`/`Edge`) for canvas inspectability.
-- Composition definitions reuse existing ingestion/transformation asset ids from Epics 13-16 and keep orchestration logic in shared application/domain seams (no UI coupling and no duplicated asset execution logic).
+- Composition definitions reuse existing ingestion/transformation asset ids from Epics 13-16 and keep orchestration logic in shared src/application/domain seams (no UI coupling and no duplicated asset execution logic).
 
 ## Direction 5 extension update: Mid-level pipeline graph construction + canvas mapping (stories 17.3-17.4)
 
-- Mid-level stage pipelines now have a dedicated graph contract in `domain/dataset-studio/PipelineGraphDomain.ts` with typed stage/asset nodes, typed inter-node edges, zod-backed schema validation, and deterministic serialization/deserialization + inspection helpers.
-- Graph construction now lives in `application/dataset-studio/PipelineGraphConstructionService.ts` and reuses existing stage registry + stage-asset composition seams (`PipelineStageRegistry`, `StageAssetCompositionService`) instead of duplicating asset logic.
+- Mid-level stage pipelines now have a dedicated graph contract in `src/domain/dataset-studio/PipelineGraphDomain.ts` with typed stage/asset nodes, typed inter-node edges, zod-backed schema validation, and deterministic serialization/deserialization + inspection helpers.
+- Graph construction now lives in `src/application/dataset-studio/PipelineGraphConstructionService.ts` and reuses existing stage registry + stage-asset composition seams (`PipelineStageRegistry`, `StageAssetCompositionService`) instead of duplicating asset logic.
 - Construction enforces fail-fast graph correctness for:
   - ordering constraints,
   - stage input/output compatibility,
   - required/optional stage enablement behavior,
   - branching restrictions unless explicitly allowed.
-- React Flow projection now has a dedicated mapper in `application/dataset-studio/PipelineReactFlowGraph.ts` with strongly typed `stage`/`asset` node-data unions and typed edge data, plus deterministic horizontal stage-group layout and UI-ready metadata fields for preview/inspection hooks.
+- React Flow projection now has a dedicated mapper in `src/application/dataset-studio/PipelineReactFlowGraph.ts` with strongly typed `stage`/`asset` node-data unions and typed edge data, plus deterministic horizontal stage-group layout and UI-ready metadata fields for preview/inspection hooks.
 - The graph + React Flow mappers are pure deterministic translators suitable for memoized canvas consumption and future custom node/edge extensions.
 
 ## Direction 5 extension update: Mid-level pipeline inspection + editing orchestration (stories 17.5-17.6)
 
 - Mid-level pipeline inspection now has a dedicated canonical seam:
-  - domain inspection contracts in `domain/dataset-studio/PipelineInspectionDomain.ts` define typed pipeline/stage/asset inspection results, execution status, preview payload unions, metadata envelopes, and zod validation.
+  - domain inspection contracts in `src/domain/dataset-studio/PipelineInspectionDomain.ts` define typed pipeline/stage/asset inspection results, execution status, preview payload unions, metadata envelopes, and zod validation.
   - stage/asset preview contracts are canonical-shape aligned (`records`, `table`, `text-items`, `image-metadata`) with bounded sample sizes for inspectability without heavy compute paths.
-  - application inspection orchestration in `application/dataset-studio/PipelineInspectionService.ts` maps execution outputs to inspection results, handles partial/missing outputs, supports extensible enrichment hooks, and attaches serializable inspection metadata to `PipelineGraph` nodes (non-UI).
-- Mid-level pipeline editing now has an immutable, validation-first orchestration seam in `application/dataset-studio/PipelineEditingService.ts`:
+  - application inspection orchestration in `src/application/dataset-studio/PipelineInspectionService.ts` maps execution outputs to inspection results, handles partial/missing outputs, supports extensible enrichment hooks, and attaches serializable inspection metadata to `PipelineGraph` nodes (non-UI).
+- Mid-level pipeline editing now has an immutable, validation-first orchestration seam in `src/application/dataset-studio/PipelineEditingService.ts`:
   - edit API supports `addStage`, `removeStage`, `replaceStage`, `reorderStage`, and `toggleStage`.
-  - edits return a new pipeline definition (`domain/dataset-studio/PipelineDefinitionDomain.ts`) plus regenerated deterministic `PipelineGraph` and `PipelineReactFlowGraph` projections.
+  - edits return a new pipeline definition (`src/domain/dataset-studio/PipelineDefinitionDomain.ts`) plus regenerated deterministic `PipelineGraph` and `PipelineReactFlowGraph` projections.
   - validation enforces ordering/compatibility/required-stage constraints through existing stage registry + graph construction seams (no duplicated composition logic), with typed edit errors for deterministic callers.
   - replacement edits preserve compatible config keys via stage-to-asset composition mappings and reset incompatible configuration/metadata fields using explicit preservation reports.
   - serialized edited pipelines round-trip through version-safe definition serialization and rehydrate into graph/canvas projections.
 
 ## Direction 5 extension update: Mid-level pipeline composition packages (stories 17.7-17.8)
 
-- Mid-level reusable pipeline-definition packages now live in `application/dataset-studio/MidLevelPipelineDefinitions.ts` with strongly typed contracts for:
+- Mid-level reusable pipeline-definition packages now live in `src/application/dataset-studio/MidLevelPipelineDefinitions.ts` with strongly typed contracts for:
   - `TabularCleaningPipelineDefinition` (`Normalization -> Cleaning -> Transformation? -> Aggregation?`),
   - `DocumentPreparationPipelineDefinition` (`Extraction -> Normalization -> Chunking -> Labeling? -> Enrichment?`).
 - Both pipeline packages now expose:
@@ -1587,7 +1587,7 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Image preparation + reusable enrichment composition (stories 17.9-17.10)
 
-- Mid-level image preparation now has a reusable pipeline package in `application/dataset-studio/MidLevelPipelineDefinitions.ts`:
+- Mid-level image preparation now has a reusable pipeline package in `src/application/dataset-studio/MidLevelPipelineDefinitions.ts`:
   - `ImagePreparationPipelineDefinition` with optional `Extraction`, required `Normalization`, optional `Transformation`, optional `Labeling`, and optional `Enrichment`.
   - deterministic stage-order validation plus direct `PipelineDefinition`/`PipelineGraph`/`PipelineReactFlowGraph`/inspection integration through existing 17.x seams.
 - Image preparation composition is Node-first and reuses existing ingestion/transformation contracts:
@@ -1595,7 +1595,7 @@ Explicitly later than this scope:
   - optional OCR extraction through injectable `IImageOcrExtractor` (`tesseract.js` default implementation),
   - optional image transformation through `SharpImageTransformationService` (resize/grayscale/format normalization via `sharp`),
   - placeholder labeling through existing classification asset mapping (no ML runtime introduced).
-- Enrichment now has an explicit reusable domain contract in `domain/dataset-studio/EnrichmentStageDomain.ts`:
+- Enrichment now has an explicit reusable domain contract in `src/domain/dataset-studio/EnrichmentStageDomain.ts`:
   - `EnrichmentStageConfig`,
   - strategy kinds: `derived`, `lookup`, `metadata-augmentation`,
   - lookup join-type support (`left`, `inner`),
@@ -1611,10 +1611,10 @@ Explicitly later than this scope:
 ## Direction 5 extension update: Feature engineering + labeling stage compositions (stories 17.11-17.12)
 
 - Dataset Studio now has dedicated stage-domain contracts for:
-  - `FeatureEngineeringStageConfig`, `FeatureEngineeringOperation`, and `FeatureEngineeringStrategy` (`domain/dataset-studio/FeatureEngineeringStageDomain.ts`),
-  - `LabelingStageConfig`, `AnnotationMode`, `AnnotationTarget`, and `AnnotationRecord` (`domain/dataset-studio/LabelingStageDomain.ts`).
+  - `FeatureEngineeringStageConfig`, `FeatureEngineeringOperation`, and `FeatureEngineeringStrategy` (`src/domain/dataset-studio/FeatureEngineeringStageDomain.ts`),
+  - `LabelingStageConfig`, `AnnotationMode`, `AnnotationTarget`, and `AnnotationRecord` (`src/domain/dataset-studio/LabelingStageDomain.ts`).
 - Both contracts are zod-backed, serializable, and include stage-option parse/round-trip helpers for canonical stage config persistence and safe reconfiguration.
-- Stage-to-asset composition now supports richer reusable multi-asset mappings in `application/dataset-studio/StageAssetCompositionService.ts`:
+- Stage-to-asset composition now supports richer reusable multi-asset mappings in `src/application/dataset-studio/StageAssetCompositionService.ts`:
   - feature engineering expands to normalization -> generation -> validation -> projection patterns over reusable existing transformation assets,
   - labeling expands to target preparation -> mode-aware assisted/placeholder seeding -> annotation attachment -> output validation using existing reusable assets.
 - Canonical-shape compatibility was expanded for feature engineering (`records`, `table`, `text-items`, `image-metadata-records`) while preserving stage typing/ordering constraints in the existing stage registry and graph-construction seams.
@@ -1625,42 +1625,42 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Mid-level template registry + composition hardening (stories 17.13-17.14)
 
-- Mid-level pipeline templates now have explicit domain contracts in `domain/dataset-studio/MidLevelPipelineTemplateDomain.ts` with zod-backed validation for:
+- Mid-level pipeline templates now have explicit domain contracts in `src/domain/dataset-studio/MidLevelPipelineTemplateDomain.ts` with zod-backed validation for:
   - template identity/category/use-case metadata,
   - default + optional stage declarations,
   - default stage configuration maps,
   - wizard guidance/progressive-disclosure metadata,
   - editing + preview capability descriptors,
   - instantiation options (optional-stage enable/disable, stage-order, config overrides).
-- A dedicated mid-level template registry + instantiation seam now exists in `application/dataset-studio/MidLevelPipelineTemplateService.ts`, covering:
+- A dedicated mid-level template registry + instantiation seam now exists in `src/application/dataset-studio/MidLevelPipelineTemplateService.ts`, covering:
   - discoverable default templates (`General`, `Analytics`, `Document`, `Image` preparation),
   - deterministic instantiation into canonical `PipelineDefinition` + `PipelineGraph` + `PipelineReactFlowGraph`,
   - reuse of existing 17.x pipeline-definition packages + stage composition mappings (no parallel pipeline model).
-- Validation hardening now includes an explicit end-to-end seam in `application/dataset-studio/PipelineValidationService.ts` with typed validation errors for:
+- Validation hardening now includes an explicit end-to-end seam in `src/application/dataset-studio/PipelineValidationService.ts` with typed validation errors for:
   - invalid pipeline definitions/stage instances/transitions,
   - invalid template instantiations,
   - invalid edited pipelines.
-- Serialization/reload hardening now has a dedicated seam in `application/dataset-studio/PipelineSerializationService.ts` for:
+- Serialization/reload hardening now has a dedicated seam in `src/application/dataset-studio/PipelineSerializationService.ts` for:
   - persisted mid-level pipeline documents (versioned envelope),
   - round-trip definition/graph serialization,
   - deterministic graph reconstruction checks on rehydrate,
   - React Flow reconstruction from persisted canonical graph.
-- Inspection preview contracts now expose a normalized preview envelope (`version/kind/truncated/totalCount/payload`) in `domain/dataset-studio/PipelineInspectionDomain.ts` and `application/dataset-studio/PipelineInspectionService.ts` while preserving legacy preview payload access.
+- Inspection preview contracts now expose a normalized preview envelope (`version/kind/truncated/totalCount/payload`) in `src/domain/dataset-studio/PipelineInspectionDomain.ts` and `src/application/dataset-studio/PipelineInspectionService.ts` while preserving legacy preview payload access.
 
 ## Direction 5 extension update: Data Studio unified preparation asset + stage-first abstraction (stories 18.1-18.2)
 
-- Data Studio now has a canonical unified preparation asset contract in `domain/dataset-studio/UnifiedPreparationAsset.ts` with explicit identity/versioning, upstream Epic 17 pipeline bindings, stage configuration (visibility + activation + config mode), output/storage hooks, lineage/reuse hooks, and preview/inspection metadata.
+- Data Studio now has a canonical unified preparation asset contract in `src/domain/dataset-studio/UnifiedPreparationAsset.ts` with explicit identity/versioning, upstream Epic 17 pipeline bindings, stage configuration (visibility + activation + config mode), output/storage hooks, lineage/reuse hooks, and preview/inspection metadata.
 - Unified preparation validation now enforces required stage coverage (`SourceSelection`, `UnifiedIngestion`, `StoragePrepared`), conditional-stage activation integrity, and normalized stage definitions via zod-backed schema parsing.
-- Stage-oriented preparation orchestration now has a dedicated application seam in `application/dataset-studio/UnifiedPreparationPipelineService.ts`:
+- Stage-oriented preparation orchestration now has a dedicated application seam in `src/application/dataset-studio/UnifiedPreparationPipelineService.ts`:
   - resolves unified preparation definitions into canonical `PipelineDefinition` stage instances,
   - validates and projects through existing stage/graph seams (`PipelineValidationService`, `PipelineGraphConstructionService`, `StageAssetCompositionService`),
   - emits explicit stage-to-asset-group mappings for Wizard/Canvas-ready stage reasoning,
   - enforces bounded Epic 17 upstream binding compatibility.
-- A compact cross-studio authoring projection extension point now exists in `application/studio-shell/StudioAuthoringGraph.ts`, and unified preparation resolution emits this projection as a future Wizard/Canvas handoff hook without changing existing Workflow Studio semantics.
+- A compact cross-studio authoring projection extension point now exists in `src/application/studio-shell/StudioAuthoringGraph.ts`, and unified preparation resolution emits this projection as a future Wizard/Canvas handoff hook without changing existing Workflow Studio semantics.
 
 ## Direction 5 extension update: Data Studio wizard framework + dynamic stage rendering (stories 18.3-18.4)
 
-- Data Studio now has an explicit wizard state-machine seam in `application/data-studio/DataStudioPreparationWizard.ts` that operates directly on unified preparation asset definitions from 18.1-18.2 (not a disconnected UI model).
+- Data Studio now has an explicit wizard state-machine seam in `src/application/data-studio/DataStudioPreparationWizard.ts` that operates directly on unified preparation asset definitions from 18.1-18.2 (not a disconnected UI model).
 - Wizard progression includes:
   - stage navigation (`goNext`, `goBack`, `goToStage`),
   - stage completion/skipping tracking,
@@ -1678,17 +1678,17 @@ Explicitly later than this scope:
 
 ## Direction 5 extension update: Data Studio persistent pipeline state + prepared output storage (stories 18.7-18.8)
 
-- Data Studio now has a canonical persistent authoring-state contract in `application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
+- Data Studio now has a canonical persistent authoring-state contract in `src/application/data-studio/DataStudioPipelineState.ts`, modeling pipeline identity/metadata, stage-level state, stage asset-group bindings, transitions, authoring-flow metadata, and wizard/canvas compatibility projection hooks over one unified-preparation asset source.
 - `DataStudioPreparationWizard` now exports/imports this persistent state directly, so wizard progression and later canvas projection can operate on one serializable, validation-backed representation rather than transient component-local state.
-- Prepared-data persistence now includes an explicit prepared-storage stage service (`application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.
+- Prepared-data persistence now includes an explicit prepared-storage stage service (`src/application/dataset-studio/PreparedStorageStageService.ts`) and output contracts (`PreparedStorageStageOutput` in `StageIntegrationContracts.ts`) that bind prepared dataset identity, storage target/reference, upstream asset/pipeline references, and lineage metadata through bounded application seams.
 
 ## Direction 5 UI update: UI-trigger normalized error/feedback + traceability (stories 4.2.7-4.2.8)
 
-- UI-triggered workflow dispatch now has a normalized interaction error/result contract in `application/workflow-studio/WorkflowUiInteractionContracts.ts`:
+- UI-triggered workflow dispatch now has a normalized interaction error/result contract in `src/application/workflow-studio/WorkflowUiInteractionContracts.ts`:
   - deterministic issue codes for invalid event payloads, binding failures, parameter-mapping failures, dispatch failures, and execution-launch failures,
   - framework-agnostic feedback sink hooks (`onStatus`, `onIssue`, `onDispatchRecord`) for UI status rendering without coupling image/system/workflow components to runtime internals.
 - Runtime UI dispatch now emits typed interaction status transitions (received, validation-failed, no-binding-matched, dispatching, launch-blocked/failed/launched, execution-failed) through the dispatcher seam.
-- UI trigger lifecycle traceability is now captured through internal trace contracts in `application/workflow-studio/WorkflowUiEventTrace.ts`:
+- UI trigger lifecycle traceability is now captured through internal trace contracts in `src/application/workflow-studio/WorkflowUiEventTrace.ts`:
   - normalized event identity/source, binding/workflow refs, payload summaries, dispatch status/outcomes, and correlation ids,
   - trace sink adapter boundary allows persistence/logging evolution without leaking React/browser event structures into shared or durable traces.
 
@@ -1697,7 +1697,7 @@ Explicitly later than this scope:
 - Dataset-pipeline document contracts now support schema linkage at both levels:
   - pipeline-level input/output schema references (`datasetPipelineSpec.schemas.input/output`),
   - ingestion-source-level schema references (`datasetPipelineSpec.sources[].schema`) for source-specific structure alignment.
-- Pipeline draft normalization and update helpers continue to be domain-owned in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts`, with schema reference parsing/cleanup centralized there (no UI-local schema-link persistence model).
+- Pipeline draft normalization and update helpers continue to be domain-owned in `src/domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts`, with schema reference parsing/cleanup centralized there (no UI-local schema-link persistence model).
 - Dataset Pipeline Studio authoring now uses registry-backed schema discovery for linking:
   - select/update/clear flows for input schema and output schema,
   - per-source schema selection for ingestion sources,
@@ -1715,7 +1715,90 @@ Explicitly later than this scope:
   - no separate migration framework,
   - no parallel persistence model,
   - canonical save/export still writes current `DataStudioPipelineState`.
-- Dataset Pipeline draft parsing in `domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts` now normalizes legacy contracts into current pipeline-document shape before zod validation:
+- Dataset Pipeline draft parsing in `src/domain/dataset-pipeline-studio/DatasetPipelineAssetDocument.ts` now normalizes legacy contracts into current pipeline-document shape before zod validation:
   - `datasetSpec` -> `datasetPipelineSpec`,
   - `datasetPipelineSpec.schema` -> `datasetPipelineSpec.schemas.input.inlineDefinition`.
 - Recoverable migrations now emit explicit parse issues so legacy/mixed drafts are visible to authors while remaining editable and serializable in current format.
+
+## Direction 6 note: Identity domain foundation (story 1.1.1)
+- Added `src/domain/identity/IdentityDomain.ts` as a new inner-layer identity seam.
+- Explicitly split identity (`UserIdentity`), credential (`CredentialPolicy`/`CredentialState`), and session (`Session`) lifecycle contracts.
+- Provider semantics are extensible (`AuthProvider` with local/external categories + provider kinds) so local-password support does not block future external identity integration.
+- Domain slice is pure and infrastructure-agnostic.
+
+## Direction 6 note: Identity application contracts foundation (story 1.1.2)
+- Added identity application-layer ports in `src/application/identity/ports/*` for identity lookup, identity persistence, credential-material persistence, and session persistence.
+- Added explicit infrastructure seams for deterministic orchestration in identity use cases (`IIdentityClock`, `IIdentityIdGenerator`).
+- Added shared identity contract DTO/types in `src/application/contracts/IdentityApplicationContracts.ts` so registration/login/credential-update/session-issuance flows share stable request/query record shapes without framework coupling.
+- Added contract-focused tests in `src/application/identity/tests/IdentityPortsContracts.test.ts` to keep boundaries compile-verified and infrastructure-independent.
+
+## Direction 6 note: Identity persistence schema and migration foundation (story 1.1.3)
+- Added a production SQLite identity persistence adapter in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` implementing lookup, persistence, credential-material, and session repository contracts from `src/application/identity/ports/*`.
+- Added explicit migration definitions in `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts` with version tracking and durable tables for auth providers, user identities, provider links, credential policies, credential material records, and sessions.
+- Added integrity constraints and indexes for identity-critical invariants: unique username/email, unique provider subject linkage, single active primary provider per user, single active credential material per provider-subject, enum status checks, and foreign-key references.
+- Kept credential secret material out general profile rows by isolating hash/salt/pepper fields in `identity_credential_material_records`.
+- Added repository integration tests in `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts` for migration application, contract round-trip behavior, and constraint enforcement.
+
+## Direction 6 note: Identity persistence adapters in src layer (story 1.1.4)
+- Added a `src`-layer identity persistence adapter in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts` implementing lookup, persistence, credential-material, and session repository contracts.
+- Added `src`-layer schema migrations in `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts` and local SQLite compatibility seam in `src/infrastructure/persistence/sqlite/SqliteCompat.ts` to keep the new persistence slice infrastructure-contained.
+- Added explicit mapper boundaries in `src/infrastructure/persistence/identity/IdentityPersistenceMapper.ts` so src/domain/application contracts are translated independently from SQL operations and raw row shapes are not exposed to upper layers.
+- Added mapper and adapter tests in `src/infrastructure/persistence/identity/tests/*` covering mapping behavior, migration application, and CRUD/query flows for user identities, provider links, credential material, and sessions.
+
+## Direction 6 note: Identity policy and validation services (story 1.1.5)
+- Added a pure identity policy seam in `src/domain/identity/IdentityPolicy.ts` for deterministic normalization and reusable lifecycle validation:
+  - username/email/profile normalization,
+  - provider-subject normalization with provider-oriented behavior (local-password subjects normalize case; external subjects preserve case),
+  - credential candidate policy evaluation mapped to structured issues,
+  - user status-transition evaluation mapped to structured issues.
+- Added an application-layer reusable service in `src/application/identity/services/IdentityPolicyService.ts` to orchestrate:
+  - normalization reuse for registration/lookup inputs,
+  - repository-backed uniqueness checks for username/email/provider-subject seams,
+  - deterministic conflict ordering with machine-readable conflict records.
+- Added focused tests in `src/domain/identity/tests/IdentityPolicy.test.ts` and `src/application/identity/tests/IdentityPolicyService.test.ts` to cover normalization determinism, conflict detection, credential-policy evaluation, and status-transition validation behavior.
+
+## Direction 6 note: Seed-safe admin bootstrap initialization (story 1.1.6)
+- Added `src/application/identity/services/IdentityBootstrapService.ts` as a dedicated first-run bootstrap seam for initial local admin identity setup, intentionally separate from normal registration flows.
+- Added identity-state gating via `IIdentityLookupRepository.countUserIdentities()` so bootstrap is only allowed before any identity exists.
+- Bootstrap now creates or validates local provider/policy dependencies, provisions the first active local identity, and persists explicit credential material with caller-supplied hash metadata (no default password behavior).
+- Repeat bootstrap attempts are explicitly blocked once identity state exists, and invalid bootstrap conditions (bad profile/provider normalization, missing credential hash fields, or incompatible existing provider state) fail deterministically.
+- Coverage was added for bootstrap success/blocking behaviors in `src/application/identity/tests/IdentityBootstrapService.test.ts` and for identity counting support in SQLite identity adapter tests.
+
+## Direction 6 note: Identity error taxonomy and shared operation results (story 1.1.7)
+- Added a shared identity error taxonomy and operation-result contract in `src/application/contracts/IdentityApplicationContracts.ts`:
+  - canonical error codes for duplicate identity, invalid credentials, inactive account, policy violation, unsupported provider, invalid session state, invalid request/state, and not found;
+  - typed operation result envelopes (`ok` success/failure) and error boundary metadata for src/domain, src/application, and src/infrastructure seams.
+- Updated identity application services to return structured result contracts instead of relying on thrown/string-matched errors:
+  - `IdentityBootstrapService.bootstrapFirstLocalAdmin(...)` now returns typed success/failure results with deterministic codes (`identity-duplicate`, `identity-invalid-credentials`, `identity-policy-violation`, `identity-unsupported-provider`, etc.).
+  - `IdentityPolicyService.checkAccountUniqueness(...)` now includes a structured `outcome` result contract for policy-violation and duplicate-identity outcomes.
+- Updated identity persistence adapters and ports to return structured mutation results for failure-prone operations:
+  - credential-material supersede and session removal now return typed operation results (including explicit invalid-request and invalid-session-state failures) across both filesystem and `src` SQLite identity adapters.
+- Added/updated tests to verify key taxonomy-aligned failure paths and shared result behavior in:
+  - `src/application/contracts/tests/IdentityApplicationContracts.test.ts`,
+  - `src/application/identity/tests/IdentityBootstrapService.test.ts`,
+  - `src/application/identity/tests/IdentityPolicyService.test.ts`,
+  - `src/application/identity/tests/IdentityPortsContracts.test.ts`,
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`,
+  - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`.
+
+## Direction 6 note: Identity architecture and implementation conventions documentation (story 1.1.8)
+- Added dedicated identity architecture docs:
+  - `docs/architecture/identity-foundation.md` (full production note),
+  - `docs/architecture/identity-foundation.ai.md` (companion quick-reference).
+- Captures implemented domain concepts, persistence schema, port/adapter seams, bootstrap assumptions, and provider extension path.
+- Explicitly documents that local identity is separate from device/runtime/tool trust layers.
+
+## Direction 8 note: Secret domain and application contracts foundation (story 8.1.1)
+- Added canonical secret inner-layer contracts in `src/domain/security/SecretDomain.ts`:
+  - explicit scope ownership (`server`, `workspace`, `user`) + allowed owner combinations,
+  - lifecycle states (`active`, `disabled`, `revoked`, `deleted`),
+  - version lineage + rotation semantics,
+  - key-encryption-context scope alignment,
+  - redaction-safe metadata constraints for secret references.
+- Added deterministic permission/audit decision contracts (`SecretAccessDecision` + `evaluateSecretAccessDecision(...)`) in the same domain seam so retrieval paths can be permission-checked and auditable by contract.
+- Added application boundaries for later src/infrastructure/UI slices:
+  - `src/application/security/ports/SecretServicePorts.ts` (persistence/encryption/access-policy/audit ports),
+  - `src/application/security/use-cases/SecretManagementServiceContracts.ts` (create/read metadata/retrieve plaintext/rotate/disable/delete/list service contracts).
+- Added focused contract/invariant tests in:
+  - `src/domain/security/tests/SecretDomain.test.ts`,
+  - `src/application/security/tests/SecretServiceContracts.test.ts`.

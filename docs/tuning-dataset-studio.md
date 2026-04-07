@@ -3,30 +3,30 @@
 ## Architecture overview
 
 ### Domain
-- `domain/tuning-datasets/interfaces/ITuningDatasetStudio.ts` defines the canonical dataset task types, lifecycle statuses, example/split/validation/export contracts, repositories, policies, and services.
-- `domain/tuning-datasets/TuningDatasetEntities.ts` implements explicit governed-asset entities for datasets, immutable released versions, generative QA examples, source references, lineage, annotations, validation issues, release manifests, and export records.
-- `domain/tuning-datasets/TuningDatasetServices.ts` provides concrete policies/services for QA validation, duplicate detection, split assignment, privacy sanitization, source import, provider-backed generation fallback orchestration, release-manifest construction, statistics calculation, and canonical/QA export generation.
+- `src/domain/tuning-datasets/interfaces/ITuningDatasetStudio.ts` defines the canonical dataset task types, lifecycle statuses, example/split/validation/export contracts, repositories, policies, and services.
+- `src/domain/tuning-datasets/TuningDatasetEntities.ts` implements explicit governed-asset entities for datasets, immutable released versions, generative QA examples, source references, lineage, annotations, validation issues, release manifests, and export records.
+- `src/domain/tuning-datasets/TuningDatasetServices.ts` provides concrete policies/services for QA validation, duplicate detection, split assignment, privacy sanitization, source import, provider-backed generation fallback orchestration, release-manifest construction, statistics calculation, and canonical/QA export generation.
 
 ### Application
-- `application/tuning-datasets/contracts.ts` contains explicit commands, queries, summaries, and detail DTOs for the studio workspace.
-- `application/tuning-datasets/TuningDatasetStudioApplicationService.ts` declares the application-facing workflow surface for dataset lifecycle, example lifecycle, review/quality, splits, and export.
-- `application/tuning-datasets/DefaultTuningDatasetStudioApplicationService.ts` orchestrates repositories and domain services for the full generative QA vertical slice.
+- `src/application/tuning-datasets/contracts.ts` contains explicit commands, queries, summaries, and detail DTOs for the studio workspace.
+- `src/application/tuning-datasets/TuningDatasetStudioApplicationService.ts` declares the application-facing workflow surface for dataset lifecycle, example lifecycle, review/quality, splits, and export.
+- `src/application/tuning-datasets/DefaultTuningDatasetStudioApplicationService.ts` orchestrates repositories and domain services for the full generative QA vertical slice.
 
 ### Infrastructure
-- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository.ts` persists dataset metadata in browser storage or the desktop-backed durable key-value bridge when available.
-- `infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository.ts` persists versions, examples, source documents, validations, and export artifacts in browser storage or the desktop-backed durable key-value bridge when available.
-- `infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService.ts` is the provider-backed generation adapter used by the default studio composition.
+- `src/infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetRepository.ts` persists dataset metadata in browser storage or the desktop-backed durable key-value bridge when available.
+- `src/infrastructure/browser/tuning-datasets/LocalStorageTuningDatasetVersionRepository.ts` persists versions, examples, source documents, validations, and export artifacts in browser storage or the desktop-backed durable key-value bridge when available.
+- `src/infrastructure/python/tuning-datasets/PythonRuntimeDatasetGenerationService.ts` is the provider-backed generation adapter used by the default studio composition.
 - Export artifacts are stored as canonical internal records whose content can be re-downloaded later.
 
 ### Runtime / API wiring
-- `ui/composition/createUiDependencies.ts` wires the new repositories, the Python runtime-backed generation adapter, fallback orchestration, application service, UI service, and store into the existing dependency composition path.
-- `ui/services/TuningDatasetService.ts` is the UI-facing API adapter used by the store and the dataset workspace.
-- `ui/state/TuningDatasetStore.ts` provides runtime orchestration, loading/mutation state, and view-ready data for the tabbed dataset studio.
+- `src/ui/composition/createUiDependencies.ts` wires the new repositories, the Python runtime-backed generation adapter, fallback orchestration, application service, UI service, and store into the existing dependency composition path.
+- `src/ui/services/TuningDatasetService.ts` is the UI-facing API adapter used by the store and the dataset workspace.
+- `src/ui/state/TuningDatasetStore.ts` provides runtime orchestration, loading/mutation state, and view-ready data for the tabbed dataset studio.
 
 ### UI
-- `ui/pages/ContextPage.tsx` is now a top-level tabbed workspace with **Context Engineering** and **Fine-Tuning Dataset** tabs.
-- `ui/components/context/ContextEngineeringLibrary.tsx` preserves the prior prompt-pack experience under the Context Engineering tab.
-- `ui/components/tuning-datasets/FineTuningDatasetStudio.tsx` implements the production workflow for Overview, Sources, Examples, Validation, Splits, Versions, and Exports.
+- `src/ui/pages/ContextPage.tsx` is now a top-level tabbed workspace with **Context Engineering** and **Fine-Tuning Dataset** tabs.
+- `src/ui/components/context/ContextEngineeringLibrary.tsx` preserves the prior prompt-pack experience under the Context Engineering tab.
+- `src/ui/components/tuning-datasets/FineTuningDatasetStudio.tsx` implements the production workflow for Overview, Sources, Examples, Validation, Splits, Versions, and Exports.
 
 ## Supported dataset task types
 The domain currently models these task types:

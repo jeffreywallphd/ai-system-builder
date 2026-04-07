@@ -1,4 +1,4 @@
-﻿# Presentation and State
+# Presentation and State
 
 This document explains how the renderer is organized and how state, stores, services, and composition fit into the larger architecture.
 
@@ -9,12 +9,29 @@ The renderer is a React application whose pages and components depend on a manua
 ## Top-level structure
 
 ### React shell
-- `ui/App.tsx` wraps the router with `AppProviders`.
-- `ui/routes/AppRouter.tsx` defines the route tree for the main product areas.
-- `ui/layout/AppLayout.tsx` provides shared layout/chrome.
+- `src/ui/App.tsx` now gates authenticated renderer startup: unauthenticated routes render without `AppProviders`, and authenticated sessions mount the full provider/bootstrap graph.
+- `src/ui/App.tsx` now runs authenticated bootstrap checks against real identity session validation before mounting authenticated providers, and re-validates on visibility return for expiry/revocation recovery.
+- `src/ui/routes/AppRouter.tsx` defines the route tree for the main product areas.
+- `src/ui/layout/AppLayout.tsx` provides shared layout/chrome.
+
+### Identity entry surface
+- Minimal production identity UI now lives in route-driven pages:
+  - `src/ui/pages/LoginPage.tsx`
+  - `src/ui/pages/RegisterPage.tsx`
+  - `src/ui/pages/IdentityAdminPage.tsx`
+  - `src/ui/pages/TrustedDevicesPage.tsx`
+- Identity transport and environment seams are split by renderer convention:
+  - shared transport/session/validation: `src/ui/shared/identity/*`
+  - desktop endpoint resolution: `src/ui/desktop/identity/*`
+  - web/thin-client endpoint resolution: `src/ui/web/identity/*`
+  - UI service adapter: `src/ui/services/IdentityAuthService.ts`
+- Shared auth session-state seams now include:
+  - `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts` for authenticated bootstrap and active-session refresh orchestration
+  - `src/ui/shared/identity/IdentityAuthSessionStore.ts` for platform-aware session persistence (desktop storage bridge when available, local storage fallback)
+  - `src/ui/shared/identity/IdentityAuthEnvironment.ts` for channel-aware login context (`desktop` vs `thin-client`)
 
 ### Dependency provider
-`ui/composition/AppProviders.tsx` creates the full UI dependency graph with `createUiDependencies()` and performs startup work such as:
+`src/ui/composition/AppProviders.tsx` creates the full UI dependency graph with `createUiDependencies()` and performs startup work such as:
 - initializing the runtime console/runtime manager
 - initializing MCP state
 - refreshing health
@@ -24,7 +41,7 @@ This means `AppProviders` is not only dependency injection; it is also a startup
 
 ## Manual renderer composition
 
-`ui/composition/createUiDependencies.ts` is the real renderer composition root.
+`src/ui/composition/createUiDependencies.ts` is the real renderer composition root.
 
 It creates and wires together:
 - settings storage/configuration
@@ -42,12 +59,12 @@ Architecturally, this file is extremely important because it shows what the prod
 ## UI services as presentation-facing adapters
 
 Examples include:
-- `ui/services/WorkflowService.ts`
-- `ui/services/NodeService.ts`
-- `ui/services/ModelService.ts`
-- `ui/services/ToolService.ts`
-- `ui/services/ContextService.ts`
-- `ui/services/McpService.ts`
+- `src/ui/services/WorkflowService.ts`
+- `src/ui/services/NodeService.ts`
+- `src/ui/services/ModelService.ts`
+- `src/ui/services/ToolService.ts`
+- `src/ui/services/ContextService.ts`
+- `src/ui/services/McpService.ts`
 
 These services wrap application use cases and repositories in APIs that are convenient for the stores and pages.
 
@@ -62,13 +79,13 @@ Some of these services also include convenience logic that directly manipulates 
 The UI uses store classes rather than pushing all state into React components. Stores are the main place where asynchronous workflows, optimistic updates, page state, and view-model shaping happen.
 
 Examples:
-- `ui/state/WorkflowStore.ts`
-- `ui/state/ModelStore.ts`
-- `ui/state/McpStore.ts`
-- `ui/state/ContextStore.ts`
-- `ui/state/TuningDatasetStore.ts`
-- `ui/state/RuntimeConsoleStore.ts`
-- `ui/state/ManagedServicesStore.ts`
+- `src/ui/state/WorkflowStore.ts`
+- `src/ui/state/ModelStore.ts`
+- `src/ui/state/McpStore.ts`
+- `src/ui/state/ContextStore.ts`
+- `src/ui/state/TuningDatasetStore.ts`
+- `src/ui/state/RuntimeConsoleStore.ts`
+- `src/ui/state/ManagedServicesStore.ts`
 
 This gives the renderer a middle layer between components and application services.
 
@@ -85,14 +102,14 @@ The product is organized into page-level workspaces rather than a single monolit
 - assets
 - settings
 
-The architecture is therefore both layered and feature-oriented: each feature has pages/components/stores/services, but most features still rely on the same application/domain infrastructure beneath them.
+The architecture is therefore both layered and feature-oriented: each feature has pages/components/stores/services, but most features still rely on the same src/application/domain infrastructure beneath them.
 
 ## Agent Studio shell boundary (Phase 8.2 initial slice)
 
-- The first Agent Studio UI slice is intentionally shell-level (`ui/pages/AgentStudioPage.tsx`) and desktop-backend-driven.
+- The first Agent Studio UI slice is intentionally shell-level (`src/ui/pages/AgentStudioPage.tsx`) and desktop-backend-driven.
 - The shell only consumes backend contracts exposed through the desktop bridge (`DesktopAgentAuthoringBridge` / `ai-loom-desktop-agents:*`) for list/load, launch, session reads, run control, and studio snapshot.
 - UI state remains view orchestration only (selection/loading/error); it does not reconstruct runtime or policy semantics that already come from backend composition-classified/projection-backed read models.
-- Validation/business/runtime interpretation remains in domain/application/backend seams.
+- Validation/business/runtime interpretation remains in src/domain, src/application, and backend seams.
 - Phase 8.3 extends this shell with authoring sections (goals, policy, tools, memory, strategy) that submit backend configuration use cases through the same desktop bridge/service seam and reload backend snapshots after success.
 - Phase 8.4 adds a launch form that sends backend run request contracts directly (`input`, `contextOverrides`, `metadata`, `trigger`) through the existing studio bridge/service and then refreshes snapshot/session reads from backend truth.
 - Phase 8.5 adds run-control UX in launch/session list/session detail panels via shared `AgentRunControls`, consuming only backend-advertised control capabilities, submitting controls through `AgentStudioService.controlRun`, and reloading backend session state after each control response.
@@ -108,9 +125,9 @@ The architecture is therefore both layered and feature-oriented: each feature ha
 - Intentionally out of scope in this slice: client-side policy validation, runtime/session interpretation heuristics, synthetic progress derivation, speculative observability frameworks, and any non-backend launch/control path.
 
 ### Presentation-side execution summaries
-The workflow editor still uses a dedicated presentation projection (`ui/presenters/WorkflowExecutionPresenter.ts`) to turn raw execution events, provenance, and output counts into a UI-friendly status summary for `ui/components/execution/WorkflowExecutionStatusPanel.tsx`.
+The workflow editor still uses a dedicated presentation projection (`src/ui/presenters/WorkflowExecutionPresenter.ts`) to turn raw execution events, provenance, and output counts into a UI-friendly status summary for `src/ui/components/execution/WorkflowExecutionStatusPanel.tsx`.
 
-Durable execution history now follows the same pattern through application-layer list/detail projections (`ExecutionRunProjectionService` and `ExecutionRunDetailProjectionService`), a thin renderer `ExecutionHistoryService`, and reusable `ui/components/execution/ExecutionHistoryPanel.tsx` / `ExecutionRunDetailPanel.tsx` surfaces. Workflow editor history, dataset-generation history, model-training history, and runtime-backed MCP server-operation history all consume those projected summaries/details instead of reconstructing plan semantics in page components or decoding feature-specific artifacts in the UI.
+Durable execution history now follows the same pattern through application-layer list/detail projections (`ExecutionRunProjectionService` and `ExecutionRunDetailProjectionService`), a thin renderer `ExecutionHistoryService`, and reusable `src/ui/components/execution/ExecutionHistoryPanel.tsx` / `ExecutionRunDetailPanel.tsx` surfaces. Workflow editor history, dataset-generation history, model-training history, and runtime-backed MCP server-operation history all consume those projected summaries/details instead of reconstructing plan semantics in page components or decoding feature-specific artifacts in the UI.
 
 Workflow Studio run-history list/detail follows the same boundary style: `WorkflowStudioRunHistoryPanel` renders workflow-scoped run summaries and detail sections, while data is loaded through `StudioShellService` (`listWorkflowRuns`, `getWorkflowRunDetail`) from backend-owned run-history projections instead of UI-layer repository access.
 The panel now keeps disclosure bounded in that same seam: run-level summary first, expandable step-by-step inspection second, and structured diagnostics/failure-location cues rendered from backend read models rather than UI-side parsing/inference.
@@ -122,7 +139,7 @@ Run-history rerun controls now surface explicit unsupported-state UX for non-ter
 
 Related-run lineage navigation now also flows through this same seam: the renderer asks `ExecutionHistoryService` for related-run clusters, and the execution detail panel can jump directly between runs in the same flow/plan grouping without introducing feature-specific linkage logic in page components.
 
-That keeps display wording, badge tone, fallback wording, progress summaries, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the application/infrastructure layers.
+That keeps display wording, badge tone, fallback wording, progress summaries, and truthfulness summaries out of the page/component tree while still leaving execution business logic in the src/application/infrastructure layers.
 
 ## Why this presentation architecture fits desktop tooling
 
@@ -140,35 +157,35 @@ The current store-and-service approach is a good fit for that level of interacti
 
 The clean-architecture story would be simpler if the renderer reused the generic container/bootstrap directly, but the current UI composition is hand-written and host-aware. This gives the renderer a lot of flexibility, but also means architecture understanding depends heavily on reading `createUiDependencies.ts`.
 
-- Phase 9.1 introduces the first bounded Studio Shell renderer surface (`ui/pages/StudioShellPage.tsx`) built from reusable panel primitives (`ui/components/studio-shell/StudioShellPanel.tsx`) and a thin desktop bridge-backed service (`ui/services/StudioShellService.ts`).
+- Phase 9.1 introduces the first bounded Studio Shell renderer surface (`src/ui/pages/StudioShellPage.tsx`) built from reusable panel primitives (`src/ui/components/studio-shell/StudioShellPanel.tsx`) and a thin desktop bridge-backed service (`src/ui/services/StudioShellService.ts`).
 - Studio Shell validation/error UX is backend-authoritative via `StudioShellBackendApi` snapshot/validation contracts (`validationIssues` + typed operation error codes); the page only renders those payloads and does not implement taxonomy/contract/provenance/dependency/lifecycle/version business rules locally.
-- Phase 9.2 adds a bounded Studio Shell extension seam in the renderer (`ui/studio-shell/StudioShellExtensions.ts`) with typed `StudioRegistration` (`kind`, semantic role, allowed behavior options, defaults, shell presentation hints, slot contributions) so atomic and composite studios register through the same shell model.
+- Phase 9.2 adds a bounded Studio Shell extension seam in the renderer (`src/ui/studio-shell/StudioShellExtensions.ts`) with typed `StudioRegistration` (`kind`, semantic role, allowed behavior options, defaults, shell presentation hints, slot contributions) so atomic and composite studios register through the same shell model.
 - Extension composition remains typed and intentionally small (slot + title/subtitle + order + render callback); this is not a generic plugin runtime.
-- Phase 9.3 now validates the initial authoring/publish vertical slice through the real renderer service boundary (`ui/services/tests/StudioShellService.integration.test.ts`), including publish and persistence reload behavior through the desktop/backend/application/repository stack.
+- Phase 9.3 now validates the initial authoring/publish vertical slice through the real renderer service boundary (`src/ui/services/tests/StudioShellService.integration.test.ts`), including publish and persistence reload behavior through the desktop/backend/src/application/repository stack.
 
 ## TODO
 
 - The renderer composition root is effective but very large. It may eventually need sub-composition modules per feature or per bounded capability area to stay comprehensible.
 - The startup logic in `AppProviders.tsx` mixes dependency provisioning with operational bootstrapping. If initialization behavior grows further, a dedicated application startup coordinator could make the architecture clearer.
 
-- Phase 9.4 (story 2.7) now routes Model Studio through the same shell renderer (`ui/pages/ModelStudioPage.tsx` -> `StudioShellPage` with `modelStudioRegistration`) so model authoring uses shared draft/session, validation, dependency, lifecycle, and publish/version surfaces instead of a parallel page stack.
+- Phase 9.4 (story 2.7) now routes Model Studio through the same shell renderer (`src/ui/pages/ModelStudioPage.tsx` -> `StudioShellPage` with `modelStudioRegistration`) so model authoring uses shared draft/session, validation, dependency, lifecycle, and publish/version surfaces instead of a parallel page stack.
 - Model-specific UI behavior is bounded to registration slot contributions (`draft-authoring`, `metadata`) and registration defaults; no model business rules were moved into renderer logic.
 
-- Phase 9.5 (story 2.9) now routes Dataset Studio through the same shell renderer (`ui/pages/DatasetStudioPage.tsx` -> `StudioShellPage` with `datasetStudioRegistration`) so dataset authoring inherits shared draft/session, validation, dependency, lifecycle, and publish/version surfaces.
+- Phase 9.5 (story 2.9) now routes Dataset Studio through the same shell renderer (`src/ui/pages/DatasetStudioPage.tsx` -> `StudioShellPage` with `datasetStudioRegistration`) so dataset authoring inherits shared draft/session, validation, dependency, lifecycle, and publish/version surfaces.
 - Dataset-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots); no dataset business rules were moved into UI logic.
-- Phase 9.6 (story 2.11) now routes Tool Studio through that same shell renderer (`ui/pages/ToolStudioPage.tsx` -> `StudioShellPage` with `toolStudioRegistration`) so atomic MCP/API tool authoring uses the same session/draft/validation/lifecycle/publish path.
+- Phase 9.6 (story 2.11) now routes Tool Studio through that same shell renderer (`src/ui/pages/ToolStudioPage.tsx` -> `StudioShellPage` with `toolStudioRegistration`) so atomic MCP/API tool authoring uses the same session/draft/validation/lifecycle/publish path.
 - Tool-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) with MCP/API-oriented defaults; no tool business rules were moved into UI logic.
 - Phase 9.7 (story 2.12) keeps validation projection backend-authoritative while standardizing atomic defaults: model/dataset/tool registration metadata now includes taxonomy-driven contract defaults and empty dependency defaults, and shared validation issue projection is centralized behind the backend contract.
-- Phase 9.8 (story 2.15) adds a cross-atomic end-to-end consistency test (`ui/services/tests/StudioShellService.integration.test.ts`) that runs the same create -> edit -> validate -> publish -> reload flow for Model, Dataset, and Tool studios over the real shared seams (renderer service, desktop bridge, backend API, application service, SQLite persistence).
+- Phase 9.8 (story 2.15) adds a cross-atomic end-to-end consistency test (`src/ui/services/tests/StudioShellService.integration.test.ts`) that runs the same create -> edit -> validate -> publish -> reload flow for Model, Dataset, and Tool studios over the real shared seams (renderer service, desktop bridge, backend API, application service, SQLite persistence).
 - This keeps studio UI integration truthful: atomic studios remain thin registration variants of `StudioShellPage`, and composite studios can onboard through the same registration seam without parallel page/business-rule stacks.
-- Phase 9.9 (story 2.18) now routes Prompt Template Studio through the same shell renderer (`ui/pages/PromptTemplateStudioPage.tsx` -> `StudioShellPage` with `promptTemplateStudioRegistration`) so prompt-template authoring uses shared draft/session, validation, dependency, lifecycle, and publish/version surfaces.
-- Prompt-template-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots), and cross-atomic shell integration coverage now includes Prompt Template Studio in `ui/services/tests/StudioShellService.integration.test.ts`.
-- Phase 9.10 (stories 2.21â€“2.22) now routes Config Profile Studio through that same shell renderer (`ui/pages/ConfigProfileStudioPage.tsx` -> `StudioShellPage` with `configProfileStudioRegistration`) so config-profile authoring uses shared draft/session, validation, dependency, lifecycle, publish/version, and persistence-backed consistency seams.
-- Phase 9.11 (stories 3.5â€“3.6) now routes Workflow Studio through that same shell renderer (`ui/pages/WorkflowStudioPage.tsx` -> `StudioShellPage` with `workflowStudioRegistration`) so composite workflow-orchestrator authoring uses the shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
+- Phase 9.9 (story 2.18) now routes Prompt Template Studio through the same shell renderer (`src/ui/pages/PromptTemplateStudioPage.tsx` -> `StudioShellPage` with `promptTemplateStudioRegistration`) so prompt-template authoring uses shared draft/session, validation, dependency, lifecycle, and publish/version surfaces.
+- Prompt-template-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots), and cross-atomic shell integration coverage now includes Prompt Template Studio in `src/ui/services/tests/StudioShellService.integration.test.ts`.
+- Phase 9.10 (stories 2.21â€“2.22) now routes Config Profile Studio through that same shell renderer (`src/ui/pages/ConfigProfileStudioPage.tsx` -> `StudioShellPage` with `configProfileStudioRegistration`) so config-profile authoring uses shared draft/session, validation, dependency, lifecycle, publish/version, and persistence-backed consistency seams.
+- Phase 9.11 (stories 3.5â€“3.6) now routes Workflow Studio through that same shell renderer (`src/ui/pages/WorkflowStudioPage.tsx` -> `StudioShellPage` with `workflowStudioRegistration`) so composite workflow-orchestrator authoring uses the shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Workflow-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
 - Story 4.13 promotes draft authoring as the primary shell surface: `StudioShellPage` now renders draft authoring above/outside the card grid, and shell toolbar configuration is now registration-driven (`shell.toolbar`) with optional typed actions (refresh/save/validate/workflow-mode) that execute through existing shell orchestration seams.
 - Studio shell authoring now also supports optional registration-driven side drawers (`shell.drawers.left/right`) with toolbar-bound open/close toggles (left toggle rendered as the leftmost control, right toggle rendered as the rightmost control) so studio-specific authoring cards can be moved into closable side rails without creating a second shell pattern.
-- Workflow Studio draft authoring now includes an explicit mode abstraction (`wizard`, `canvas`) plus a centralized renderer-side mode/draft state manager (`ui/studio-shell/workflow/WorkflowStudioModes.ts`, `WorkflowStudioModeStateStore.ts`) so mode selection and canonical workflow draft state are shared instead of mode-local.
+- Workflow Studio draft authoring now includes an explicit mode abstraction (`wizard`, `canvas`) plus a centralized renderer-side mode/draft state manager (`src/ui/studio-shell/workflow/WorkflowStudioModes.ts`, `WorkflowStudioModeStateStore.ts`) so mode selection and canonical workflow draft state are shared instead of mode-local.
 - Workflow Studio now exposes an explicit mode switch control in the draft-authoring shell and routes mode changes through canonical Workflow Studio mode paths (wizard/canvas) so in-app and direct URL navigation stay aligned.
 - Workflow Studio shell toolbar mode switching now renders as a single context-aware toggle action (`Wizard`/`Canvas`) that routes through the same mode-state + route synchronization seam.
 - Workflow Studio shell `Nodes` drawer toggle is now mode-aware: it is visible only in Canvas mode and hidden in Wizard mode to avoid non-applicable toolbar controls, and Canvas mode loads with that drawer closed by default.
@@ -176,8 +193,8 @@ The clean-architecture story would be simpler if the renderer reused the generic
 - Workflow Studio registration no longer contributes the prior `Workflow draft guidance` draft-authoring card; workflow authoring guidance now lives in the mode surface and shared readiness disclosures.
 - Workflow Studio mode state now treats canonical `WorkflowDraft` content as the single source of truth for both modes, with explicit shared section support for `triggers`, `inputs`, `steps`, and `outputs` and no per-mode draft shape.
 - Mode switching synchronization is now state-driven: wizard and canvas both mutate/read the same `WorkflowStudioModeStateStore` canonical draft, so switching modes preserves current draft data without shadow transfer logic.
-- Canvas mode now uses a bounded projection/sync adapter (`ui/studio-shell/workflow/WorkflowStudioCanvasViewModel.ts`) that derives section/node view state from canonical `WorkflowDraft` and applies typed canvas actions back into that same draft (no canvas-only workflow model).
-- Workflow Studio Canvas Mode now renders that projection through React Flow (`ui/components/studio-shell/workflow/WorkflowStudioCanvasReactFlow.tsx`) as the canonical canvas primitive layer (nodes, edges, controls, viewport).
+- Canvas mode now uses a bounded projection/sync adapter (`src/ui/studio-shell/workflow/WorkflowStudioCanvasViewModel.ts`) that derives section/node view state from canonical `WorkflowDraft` and applies typed canvas actions back into that same draft (no canvas-only workflow model).
+- Workflow Studio Canvas Mode now renders that projection through React Flow (`src/ui/components/studio-shell/workflow/WorkflowStudioCanvasReactFlow.tsx`) as the canonical canvas primitive layer (nodes, edges, controls, viewport).
 - React Flow node/edge derivation remains adapter-driven and deterministic: section/item graph nodes + section-flow/entry/sequence edges + stable initial placement are projected in `WorkflowStudioCanvasViewModel` from shared draft truth (not canvas-local workflow state).
 - Canvas graph projection now calculates per-node heights from projected node content and applies deterministic cumulative y-axis spacing inside each section column in `WorkflowStudioCanvasViewModel`, so section/item nodes do not touch or overlap.
 - Canvas node movement now uses gentle position transitions (`react-flow` node transform transitions), so auto-spacing updates are visually smooth instead of abrupt.
@@ -193,7 +210,7 @@ The clean-architecture story would be simpler if the renderer reused the generic
 - Workflow Studio Canvas Mode now renders the left `Nodes` drawer as a real overlay drawer: fixed under the app header, anchored to the far-left edge on tablet/desktop, full-width on mobile, and including a fixed close affordance with independently scrollable node sections.
 - Workflow Studio canvas layout now renders the React Flow canvas surface directly (without the prior canvas layout container card wrapper), with inspector/details surfaces still kept in the same mode boundary.
 - Workflow Studio draft authoring now has explicit mode-aware renderer boundaries: shared shell orchestration stays in `StudioShellPage`, while mode-specific surfaces are isolated in `WorkflowStudioDraftAuthoringBoundary` + `WorkflowStudioWizardExperienceSurface` + `WorkflowStudioCanvasExperienceSurface`.
-- Experience-asset authoring keeps the reusable UI-neutral contract seam (`ui/studio-shell/experience-assets/ExperienceAssetContracts.ts`), while active mode switching now resolves directly inside studio-specific boundaries (`WorkflowStudioDraftAuthoringBoundary`, `DatasetStudioDraftAuthoringBoundary`) instead of routing through a shared intermediary renderer.
+- Experience-asset authoring keeps the reusable UI-neutral contract seam (`src/ui/studio-shell/experience-assets/ExperienceAssetContracts.ts`), while active mode switching now resolves directly inside studio-specific boundaries (`WorkflowStudioDraftAuthoringBoundary`, `DatasetStudioDraftAuthoringBoundary`) instead of routing through a shared intermediary renderer.
 - `ExperienceAssetAuthoringBoundary` has been removed from the repository after disconnection from active runtime; workflow and dataset authoring continue to preserve route-driven wizard/canvas behavior in their canonical studio boundaries.
 - Migration audit snapshot for workflow authoring/runtime seams under the studio-shell flow:
   - **Standalone editor route retired from active runtime:** `/workflows/:workflowId` now redirects into Workflow Studio entry routing and no longer mounts the standalone editor page.
@@ -201,17 +218,17 @@ The clean-architecture story would be simpler if the renderer reused the generic
   - **Workflow-specific wizard/canvas intermediary surfaces removed:** active runtime now binds through `WorkflowStudioWizardExperienceSurface` and `WorkflowStudioCanvasExperienceSurface`; prior mode layout/surface files were deleted after disconnection.
   - **Legacy compatibility infrastructure removed:** `ExperienceAssetAuthoringBoundary` is no longer part of active studio runtime or source.
 
-- Experience-asset presentation now also has a compact neutral vocabulary layer (`ui/studio-shell/experience-assets/ExperiencePresentationVocabulary.ts`) covering document/issue/page/mode/action ids plus reusable action/progress/issue summary models for cross-studio authoring surfaces.
-- Wizard engine mechanics are now extracted into a workflow-neutral renderer (`ui/components/studio-shell/experience-assets/ConfigurableWizardSurface.tsx`) with narrow contracts (`ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts`) for ordered page navigation, current-page hosting, progress summary, terminal actions, and readiness summary rendering without workflow-editor imports.
-- Canvas engine mechanics are now extracted into a workflow-neutral renderer (`ui/components/studio-shell/experience-assets/ConfigurableCanvasSurface.tsx`) with narrow contracts (`ui/studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts.ts`) for graph shell hosting, focused-target handling, palette/inspector regions, interaction messaging, and optional drawer orchestration without workflow-editor imports.
+- Experience-asset presentation now also has a compact neutral vocabulary layer (`src/ui/studio-shell/experience-assets/ExperiencePresentationVocabulary.ts`) covering document/issue/page/mode/action ids plus reusable action/progress/issue summary models for cross-studio authoring surfaces.
+- Wizard engine mechanics are now extracted into a workflow-neutral renderer (`src/ui/components/studio-shell/experience-assets/ConfigurableWizardSurface.tsx`) with narrow contracts (`src/ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts`) for ordered page navigation, current-page hosting, progress summary, terminal actions, and readiness summary rendering without workflow-editor imports.
+- Canvas engine mechanics are now extracted into a workflow-neutral renderer (`src/ui/components/studio-shell/experience-assets/ConfigurableCanvasSurface.tsx`) with narrow contracts (`src/ui/studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts.ts`) for graph shell hosting, focused-target handling, palette/inspector regions, interaction messaging, and optional drawer orchestration without workflow-editor imports.
 - Studio-shell orchestration remains host-owned around these reusable surfaces: save/run/validate/lifecycle orchestration and backend persistence/execution calls continue in `StudioShellPage` + `StudioShellService`/backend contracts, while wizard/canvas experience surfaces consume document/mode/issue state plus host-provided callbacks.
-- Wizard and canvas are now first-class registered experience assets (`loom-wizard`, `loom-canvas`) via `ui/studio-shell/experience-assets/ExperienceSurfaceAssets.ts`, and Workflow Studio declares consumption through registration configuration (`workflowStudioRegistration.shell.experienceAssets`) instead of hardcoded mode metadata.
+- Wizard and canvas are now first-class registered experience assets (`loom-wizard`, `loom-canvas`) via `src/ui/studio-shell/experience-assets/ExperienceSurfaceAssets.ts`, and Workflow Studio declares consumption through registration configuration (`workflowStudioRegistration.shell.experienceAssets`) instead of hardcoded mode metadata.
 - Experience-asset canvas definition format now exists as a bounded contract (`CanvasExperienceAssetDefinition`) so studios can map document-to-graph summaries, palette/inspector hooks, and graph interaction hosts into the reusable canvas surface without embedding workflow-specific domain semantics.
-- Workflow Studio Canvas now binds through an explicit workflow adapter seam (`ui/studio-shell/workflow/WorkflowCanvasExperienceAdapter.tsx`) that maps workflow draft/view-model semantics into `CanvasExperienceAssetDefinition` for the reusable canvas engine, while keeping workflow-specific editing behavior outside generic canvas contracts.
+- Workflow Studio Canvas now binds through an explicit workflow adapter seam (`src/ui/studio-shell/workflow/WorkflowCanvasExperienceAdapter.tsx`) that maps workflow draft/view-model semantics into `CanvasExperienceAssetDefinition` for the reusable canvas engine, while keeping workflow-specific editing behavior outside generic canvas contracts.
 - Reusable experience surfaces now expose route-neutral state/callback contracts (`currentModeId`/`onModeChange`, `currentPageId`/`onPageChange`) so workflow route parsing/synchronization stays in workflow-host integration layers rather than inside generic wizard/canvas boundary components.
 - Workflow Studio mode surfaces now render directly as asset-native experience surfaces (`WorkflowStudioWizardExperienceSurface`, `WorkflowStudioCanvasExperienceSurface`) inside the draft authoring boundary without workflow-specific layout wrappers in active runtime paths.
 - Wizard Mode now provides a structured section framework via reusable section components (`WizardSection`, `SectionHeader`, `SectionBody`) and always renders Trigger, Inputs, Steps, and Outputs in top-to-bottom order.
-- Wizard Trigger section now uses a registry-backed interactive authoring editor (`WorkflowStudioTriggerSectionEditor` + `ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) that enumerates supported trigger types from `WorkflowTriggerTypeRegistry`, adds trigger instances from registry defaults, and binds add/edit/remove/type-switch actions directly to canonical `WorkflowDraft.triggers` in `WorkflowStudioModeStateStore`.
+- Wizard Trigger section now uses a registry-backed interactive authoring editor (`WorkflowStudioTriggerSectionEditor` + `src/ui/studio-shell/workflow/WorkflowWizardTriggers.ts`) that enumerates supported trigger types from `WorkflowTriggerTypeRegistry`, adds trigger instances from registry defaults, and binds add/edit/remove/type-switch actions directly to canonical `WorkflowDraft.triggers` in `WorkflowStudioModeStateStore`.
 - Trigger authoring now supports multi-trigger management in wizard mode (add/select/edit/reorder/remove) with id-based operations, stable display ordering, and safe selected-trigger fallback after deletion.
 - Trigger configuration editing now uses type-specific form surfaces for user/manual, temporal, and state triggers, with shared utility-level config patching and validation-message projection from shared trigger validation seams.
 - Trigger validation feedback now stays canonical-projection-driven (`WorkflowStudioModeStateStore` + `validateWorkflowDraft`) without renderer-local trigger-rule duplication.
@@ -219,7 +236,7 @@ The clean-architecture story would be simpler if the renderer reused the generic
 - Wizard Inputs now include an interactive dataset selector (`WorkflowStudioInputSectionEditor`) that queries registry dataset assets (`atomic/dataset/none`), supports search + multi-select, writes directly to canonical `WorkflowDraft.inputs[]`, and preserves mode-shared draft truth.
 - Wizard Inputs now also support inline dataset creation handoff through shared route-based inline creation semantics (`InlineAssetCreationService`): launch Dataset Studio, return to Wizard Inputs, and auto-attach returned dataset assets when handoff status is `created` (while `cancelled` returns without side effects).
 - Workflow Wizard Inputs now also include bounded explicit input-binding authoring on the same surface (`WorkflowStudioInputSectionEditor` + `WorkflowWizardInputBindings`) so each workflow input can map to canonical source kinds (UI form value, selected-image context, dataset-instance reference, runtime/trigger payload, and constants), persist authored `metadata.systemInputBinding`, and render validation/preview diagnostics through shared binding-resolution services.
-- Binding flow coverage now includes UI + application integration tests for authoring persistence, validation/preview diagnostics, and execution-context resolution across supported binding sources (`ui/studio-shell/workflow/tests/WorkflowWizardInputBindings.test.ts`, `ui/components/studio-shell/workflow/tests/WorkflowStudioInputSectionEditor.test.tsx`, `application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`, `application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`).
+- Binding flow coverage now includes UI + application integration tests for authoring persistence, validation/preview diagnostics, and execution-context resolution across supported binding sources (`src/ui/studio-shell/workflow/tests/WorkflowWizardInputBindings.test.ts`, `src/ui/components/studio-shell/workflow/tests/WorkflowStudioInputSectionEditor.test.tsx`, `src/application/workflow-studio/tests/WorkflowExecutionContextAssemblyService.test.ts`, `src/application/workflow-studio/tests/WorkflowInputBindingPreviewService.test.ts`).
 - Wizard Steps now include an interactive ordered step builder (`WorkflowStudioStepSectionEditor`) over canonical `WorkflowDraft.steps[]` with add/remove, up/down reorder, stable step identity preservation, and explicit empty-state first-step CTA.
 - Wizard Steps now include an extensible step-type selector over canonical `WorkflowDraft.steps[]`, supporting both asset-backed and built-in action step categories.
 - Wizard step selection now uses one registry-backed authoring flow for both asset-backed and built-in options, with built-in actions clearly labeled by canonical category (`control-flow`, `temporal`, `human-interaction`) and no page-local hardcoded built-in list.
@@ -227,12 +244,12 @@ The clean-architecture story would be simpler if the renderer reused the generic
 - Wizard built-in step configuration is now structured and draft-bound for all initial built-ins: conditional expression + branch labels/step-ids (`if-then`), loop mode/source/body/limits (`loop-iteration`), duration vs until-time with note (`delay-wait`), and prompt/mode/outcomes/roles/timeout policy (`manual-approval`).
 - Wizard Steps now expose a placement-aware insertion control (`Insertion point`) and control-flow-aware move guards: reorders that would place referenced branch/body/outcome steps before their control-flow parent are blocked in authoring operations, and move buttons only enable when the resulting order stays valid.
 - Wizard Outputs now include an interactive output editor (`WorkflowStudioOutputSectionEditor`) over canonical `WorkflowDraft.outputs[]` with multi-output list management (view/select/edit/remove/reorder), destination-type selection (`file-export`, `web-viewer`, `system-entry`, `prompt-response-chat`), canonical output ordering (`order`) preservation, and metadata-driven type-specific configuration forms (required/optional field semantics plus type-switch resets that clear stale destination-specific options).
-- Output add/config UI now composes a reusable registry-driven selector seam (`WorkflowOutputSelector` + `ui/studio-shell/workflow/WorkflowWizardOutputs.ts` + `WorkflowOutputTypeRegistry`) so wizard and future authoring surfaces reuse one metadata contract instead of hardcoded per-type add flows.
+- Output add/config UI now composes a reusable registry-driven selector seam (`WorkflowOutputSelector` + `src/ui/studio-shell/workflow/WorkflowWizardOutputs.ts` + `WorkflowOutputTypeRegistry`) so wizard and future authoring surfaces reuse one metadata contract instead of hardcoded per-type add flows.
 - Output reload hardening now preserves unknown/stale output destination types as explicit unknown entries in authoring/review summaries (instead of silently coercing to a default type), so malformed persisted output payloads remain visible and recoverable.
 - Output configuration remains draft-bound and mode-shared: file export format/delivery/path/name, web viewer title/presentation mode, and system-record destination fields (entity, collection path, write mode, record shape, metadata inclusion) persist through Wizard/Canvas mode switches using `WorkflowStudioModeStateStore`.
 - Wizard review/overview surfaces now render registry-driven output summaries (type label + key configuration details) from canonical `WorkflowDraft.outputs[]`, including the workflow readiness review and mode overview cards, so summaries stay current after add/edit/remove/reorder operations.
-- Workflow execution now has a bounded conversational continuation seam in the renderer (`ui/workflow-conversation/*` + `WorkflowConversationSessionService`): eligible prompt-response workflow runs create canonical chat sessions linked to workflow + execution ids and persisted through local UI storage.
-- Conversational sessions now route through a dedicated chat surface (`/run/workflow-chat/:sessionId`, `ui/pages/WorkflowConversationPage.tsx`) that rehydrates persisted session state, renders seeded initial prompt/assistant messages from execution output truth, and appends continued turns through the existing workflow execution service path.
+- Workflow execution now has a bounded conversational continuation seam in the renderer (`src/ui/workflow-conversation/*` + `WorkflowConversationSessionService`): eligible prompt-response workflow runs create canonical chat sessions linked to workflow + execution ids and persisted through local UI storage.
+- Conversational sessions now route through a dedicated chat surface (`/run/workflow-chat/:sessionId`, `src/ui/pages/WorkflowConversationPage.tsx`) that rehydrates persisted session state, renders seeded initial prompt/assistant messages from execution output truth, and appends continued turns through the existing workflow execution service path.
 - Workflow Studio mode state now exposes shared validation hooks (`WorkflowStudioModeValidation` + `WorkflowStudioModeStateStore` validation projection) so both Wizard and Canvas consume one canonical draft validation result path (including parse-safety and draft-integrity checks) with non-crashing feedback.
 - Workflow Studio now supports direct mode deep links through `/studio-shell/workflow/:modeId` and `?mode=` parsing via `WorkflowStudioModeRouting`; resolved modes are synchronized into the centralized `WorkflowStudioModeStateStore` (no routing-local mode shadow state).
 - Default mode behavior is now explicit and centralized: entering Workflow Studio without an explicit mode (or with an invalid mode) resolves deterministically to `wizard`, while valid explicit route/query modes are still respected.
@@ -243,26 +260,26 @@ The clean-architecture story would be simpler if the renderer reused the generic
 - Workflow Studio save flows now also synchronize persisted workflow records through backend/application workflow-persistence use cases, so wizard-authored and canvas-authored shared-draft saves update the same persisted canonical workflow definition.
 - Workflow Studio metadata authoring now keeps workflow name/summary/tags in the same save/dirty contract as shared draft content: save status projects `saving`/`saved`/`unsaved`/`failed`, route-leave guards include metadata edits, and workflow metadata updates flow through the same studio save path into persistence and Explore listings.
 - Canvas validation polish now projects canonical draft issues into React Flow-adjacent UI (`WorkflowStudioCanvasModeSurface`): section/node issue summaries, invalid-node styling, empty-state guidance, and actionable invalid-connection feedback from `WorkflowStudioCanvasViewModel.resolveWorkflowCanvasConnectionAction`.
-- Story 2.13 now adds focused mode-system regression coverage at renderer/application seams (`ui/studio-shell/workflow/tests/WorkflowStudioModeSystem.integration.test.tsx` + expanded routing tests), covering default/direct/invalid route resolution, mode-switch UI state transitions, wizard/canvas shared-draft synchronization, mode-layout rendering, and validation-hook safety checks.
-- Wizard progression/readiness is now derived from canonical draft + shared validation via `ui/studio-shell/workflow/WorkflowStudioWizardProgress.ts` (section completeness/readiness, previous/current/next section targets, and workflow-ready summary) rather than persisted draft fields.
+- Story 2.13 now adds focused mode-system regression coverage at renderer/application seams (`src/ui/studio-shell/workflow/tests/WorkflowStudioModeSystem.integration.test.tsx` + expanded routing tests), covering default/direct/invalid route resolution, mode-switch UI state transitions, wizard/canvas shared-draft synchronization, mode-layout rendering, and validation-hook safety checks.
+- Wizard progression/readiness is now derived from canonical draft + shared validation via `src/ui/studio-shell/workflow/WorkflowStudioWizardProgress.ts` (section completeness/readiness, previous/current/next section targets, and workflow-ready summary) rather than persisted draft fields.
 - Wizard mode now uses explicit page routing and linear progression in `WorkflowStudioWizardModeSurface`: one page is visible at a time (`trigger`, `inputs`, `steps`, `outputs`) with route-backed page buttons plus Back/Next controls.
-- Wizard page-routing contracts are now reusable at the shell level (`ui/studio-shell/wizard/WizardPageRouting.ts`), and Workflow Studio binds that contract through `ui/studio-shell/workflow/WorkflowStudioWizardRouting.ts` + `/studio-shell/workflow/wizard/:wizardPageId` routes.
+- Wizard page-routing contracts are now reusable at the shell level (`src/ui/studio-shell/wizard/WizardPageRouting.ts`), and Workflow Studio binds that contract through `src/ui/studio-shell/workflow/WorkflowStudioWizardRouting.ts` + `/studio-shell/workflow/wizard/:wizardPageId` routes.
 - Story 3.15 now adds a unified wizard readiness summary surface (per-section status + workflow-level blocking issues + explicit required-input policy) and an explicit terminal handoff action (`Prepare for Run`) that blocks invalid completion while linking ready flows into lifecycle/publish controls.
 - Workflow Studio manual run now routes through backend/application orchestration from the shell toolbar (`Run Workflow`) and renders backend-authoritative pre-execution validation + launch outcome feedback in the same shell surface (no UI-local execution rule path).
-- Workflow Studio execution feedback is now presented through a dedicated reusable renderer panel (`ui/components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel.tsx`) that combines canonical readiness checks, launch lifecycle status, failure summaries, and bounded output handoff summaries from backend read models.
+- Workflow Studio execution feedback is now presented through a dedicated reusable renderer panel (`src/ui/components/studio-shell/workflow/WorkflowStudioExecutionFeedbackPanel.tsx`) that combines canonical readiness checks, launch lifecycle status, failure summaries, and bounded output handoff summaries from backend read models.
 - Toolbar `Run Validation` in Workflow Studio now uses canonical execution-readiness validation (`StudioShellService.assessWorkflowExecutionReadiness`) rather than only draft-metadata validation, keeping launch eligibility and blocked reasons aligned with the execution pipeline.
 - Story 4.14 rebalances wizard mode for authoring focus: active page content renders directly under page buttons, wizard focus/progress text sits directly beneath those page buttons, Back/Next controls are on the page-nav rail (plus an additional inline Trigger-page Back/Next row), and readiness diagnostics remain in a bottom-of-stack disclosure collapsed by default.
-- Stories 5–6 now route Workflow Studio wizard rendering through a reusable wizard asset definition seam (`ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts` + `WizardExperienceAssetDefinition` contracts) and a workflow-specific adapter (`ui/studio-shell/workflow/WorkflowWizardExperienceAdapter.tsx`) that maps workflow sections, readiness/progress, issues, page renderers, and terminal behavior into the generic configurable wizard surface.
+- Stories 5–6 now route Workflow Studio wizard rendering through a reusable wizard asset definition seam (`src/ui/studio-shell/experience-assets/ConfigurableWizardSurfaceContracts.ts` + `WizardExperienceAssetDefinition` contracts) and a workflow-specific adapter (`src/ui/studio-shell/workflow/WorkflowWizardExperienceAdapter.tsx`) that maps workflow sections, readiness/progress, issues, page renderers, and terminal behavior into the generic configurable wizard surface.
 - Navigation/progression concerns remain UI-only orchestration; all section edits still mutate only shared canonical `WorkflowStudioModeStateStore.sharedDraft`.
-- Phase 9.12 (stories 3.7â€“3.8) now routes Context Bundle Studio through that same shell renderer (`ui/pages/ContextBundleStudioPage.tsx` -> `StudioShellPage` with `contextBundleStudioRegistration`) so composite context-bundle input-preparer authoring uses the shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
+- Phase 9.12 (stories 3.7â€“3.8) now routes Context Bundle Studio through that same shell renderer (`src/ui/pages/ContextBundleStudioPage.tsx` -> `StudioShellPage` with `contextBundleStudioRegistration`) so composite context-bundle input-preparer authoring uses the shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Context-bundle-specific renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
-- Phase 9.13 (stories 3.9â€“3.10) now routes Dataset Pipeline Studio through that same shell renderer (`ui/pages/DatasetPipelineStudioPage.tsx` -> `StudioShellPage` with `datasetPipelineStudioRegistration`) so composite dataset-pipeline authoring uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
+- Phase 9.13 (stories 3.9â€“3.10) now routes Dataset Pipeline Studio through that same shell renderer (`src/ui/pages/DatasetPipelineStudioPage.tsx` -> `StudioShellPage` with `datasetPipelineStudioRegistration`) so composite dataset-pipeline authoring uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Dataset-pipeline renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
-- Phase 9.14 (stories 3.11â€“3.12) now routes Training Recipe Studio through that same shell renderer (`ui/pages/TrainingRecipeStudioPage.tsx` -> `StudioShellPage` with `trainingRecipeStudioRegistration`) so composite training-recipe authoring uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
+- Phase 9.14 (stories 3.11â€“3.12) now routes Training Recipe Studio through that same shell renderer (`src/ui/pages/TrainingRecipeStudioPage.tsx` -> `StudioShellPage` with `trainingRecipeStudioRegistration`) so composite training-recipe authoring uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Training-recipe renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
-- Phase 9.15 (stories 3.13â€“3.14) now routes Tool Chain Studio through that same shell renderer (`ui/pages/ToolChainStudioPage.tsx` -> `StudioShellPage` with `toolChainStudioRegistration`) so composite tool-chain authoring also uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
+- Phase 9.15 (stories 3.13â€“3.14) now routes Tool Chain Studio through that same shell renderer (`src/ui/pages/ToolChainStudioPage.tsx` -> `StudioShellPage` with `toolChainStudioRegistration`) so composite tool-chain authoring also uses the same shared session/draft/metadata/dependency/validation/lifecycle/publish/version surfaces.
 - Tool-chain renderer behavior remains registration-bounded (`draft-authoring`, `metadata` slots) while business rules stay backend/application-owned via shared composite validation and enforcement seams.
-- Phase 9.16 (stories 3.17â€“3.18) extends composite consistency/interop coverage through shared integration tests over the real renderer-to-persistence path, including all implemented composite studios and composite-to-atomic dependency reuse checks (`ui/services/tests/StudioShellService.integration.test.ts`).
+- Phase 9.16 (stories 3.17â€“3.18) extends composite consistency/interop coverage through shared integration tests over the real renderer-to-persistence path, including all implemented composite studios and composite-to-atomic dependency reuse checks (`src/ui/services/tests/StudioShellService.integration.test.ts`).
 
 Current Direction 5 UI status:
 - Fully implemented now in renderer: atomic studios + composite studios (Workflow, Context Bundle, Dataset Pipeline, Training Recipe, Tool Chain) on one shared `StudioShellPage` architecture.
@@ -295,10 +312,10 @@ Current Direction 5 UI status:
 - Direction 5 stories 6.15â€“6.16 now keep runtime monitoring/result UX inside the existing System Studio run-trigger extension: `SystemRuntimeRunPanel` composes bounded API-driven monitoring/result sections (`ExecutionMonitorPanel`, `ExecutionResultPanel`) to render execution status/progress/node+nested state, bounded trace/log and recovery indicators, plus execution output/node+nested summaries and diagnostics from `getSystemExecutionStatus/getSystemExecutionTrace/getSystemExecutionResult` without renderer-side runtime model reimplementation.
 - Still intentionally out of scope in renderer: speculative rich visual graph tooling and runtime execution-binding authoring beyond current structural composition/editing + shared shell lifecycle/publish flows.
 
-- Data Studio preview UI now includes a reusable `DataPreviewPanel` surface (`ui/components/assets/DataPreviewPanel.tsx`) that is fed by data-layer execution results (preview model + diagnostics + validation issues + lineage summary) rather than UI-local data parsing/render branching.
+- Data Studio preview UI now includes a reusable `DataPreviewPanel` surface (`src/ui/components/assets/DataPreviewPanel.tsx`) that is fed by data-layer execution results (preview model + diagnostics + validation issues + lineage summary) rather than UI-local data parsing/render branching.
 - Dataset Studio integrates this through a registration-bounded extension (`dataset-studio-data-preview-panel` in `DatasetStudioRegistration.ts`) using a thin draft-content adapter (`DatasetStudioDraftPreviewPanel.tsx`) that executes existing converter/execution seams and renders empty/loading/error/ready states without introducing a parallel page architecture.
-- Dataset Studio preview authoring now includes a reusable schema-driven `AssetConfigurationPanel` (`ui/components/assets/AssetConfigurationPanel.tsx`) consumed by the same draft adapter surface (`DatasetStudioDraftPreviewPanel.tsx`) so configuration editing is not a bespoke asset-specific form.
-- Configuration controls are rendered from registered data-asset config schema contracts (`DataAssetConfigSchema`) resolved through the data-layer registry seam (`application/dataset-studio/DataAssetRegistry.ts`) and applied back into execution requests via existing execution-framework orchestration.
+- Dataset Studio preview authoring now includes a reusable schema-driven `AssetConfigurationPanel` (`src/ui/components/assets/AssetConfigurationPanel.tsx`) consumed by the same draft adapter surface (`DatasetStudioDraftPreviewPanel.tsx`) so configuration editing is not a bespoke asset-specific form.
+- Configuration controls are rendered from registered data-asset config schema contracts (`DataAssetConfigSchema`) resolved through the data-layer registry seam (`src/application/dataset-studio/DataAssetRegistry.ts`) and applied back into execution requests via existing execution-framework orchestration.
 - Field-level config diagnostics now project from the shared Data Studio validation framework (`validateDataAssetConfigValues` in `DataStudioValidation.ts`) instead of UI-local validation rules.
 - The Dataset Studio panel keeps lifecycle behavior bounded and architecture-aligned:
   - deterministic defaults from schema + asset config,
@@ -317,9 +334,9 @@ Current Direction 5 UI status:
 - Data Studio navigation/language now makes schema vs flow responsibilities explicit: Dataset Studio presents side-by-side entry cards for `Schema Studio` (structure definitions) and `Pipeline Studio` (data movement/transformation flow definitions), while technical graph internals remain secondary disclosures in the same authoring surface.
 
 Direction 5 Epic 11 final hardening status (stories 11.23-11.24):
-- UX consistency hardening now has shared policy/regression seams in `ui/routes/UxConsistencyPolicy.ts` and `ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
-- Legacy UX cleanup policy artifacts were removed after sunset; active routing uses canonical path redirects directly in `ui/routes/AppRouter.tsx`.
-- Explore is the user-facing library term in page-level hero copy (`ui/pages/RegistryPage.tsx`), while internal registry route naming remains implementation detail.
+- UX consistency hardening now has shared policy/regression seams in `src/ui/routes/UxConsistencyPolicy.ts` and `src/ui/routes/IntentUxRegressionSuite.ts`, focused on intent-first terminology, taxonomy suppression in primary UX, and cross-surface route/origin continuity across Build/Explore/Run plus shell-adjacent surfaces.
+- Legacy UX cleanup policy artifacts were removed after sunset; active routing uses canonical path redirects directly in `src/ui/routes/AppRouter.tsx`.
+- Explore is the user-facing library term in page-level hero copy (`src/ui/pages/RegistryPage.tsx`), while internal registry route naming remains implementation detail.
 - Legacy compatibility feature-flag gating is now disconnected from active runtime routing; canonical Build/Explore/Run redirects are always enforced for deprecated entry paths.
 
 Intent UX documentation alignment checklist (implemented scope):
@@ -342,7 +359,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UX update: Main menu Data entry
 
-- The global header command palette/navigation menu now includes a first-class `Data` entry (`ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
+- The global header command palette/navigation menu now includes a first-class `Data` entry (`src/ui/routes/CommandPalette.ts`) that routes to Dataset Studio (`/studio-shell/dataset`).
 - Top-level menu order is now: `Build`, `Run`, `Explore`, `Data`, `Manage`.
 - This extends existing shell navigation patterns without adding a parallel navigation system.
 
@@ -367,24 +384,24 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI extension update: Stage-based Dataset Studio wizard shell (story 15E.10)
 
-- Dataset Studio draft authoring now includes a stage-based wizard panel (`ui/components/assets/DatasetStageWizardPanel.tsx`) rendered through the existing registration-based shell extension path (`DatasetStudioRegistration`).
-- Wizard UI state/orchestration stays out of React components through a dedicated adapter seam (`ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) that wraps `WizardFlowEngine` for snapshot/read/update/navigation behavior.
-- Stage progress/navigation UI is now reusable in `ui/components/wizard/StageWizardProgressNavigator.tsx`, with explicit current/completed/skipped/pending/disabled stage cues.
+- Dataset Studio draft authoring now includes a stage-based wizard panel (`src/ui/components/assets/DatasetStageWizardPanel.tsx`) rendered through the existing registration-based shell extension path (`DatasetStudioRegistration`).
+- Wizard UI state/orchestration stays out of React components through a dedicated adapter seam (`src/ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) that wraps `WizardFlowEngine` for snapshot/read/update/navigation behavior.
+- Stage progress/navigation UI is now reusable in `src/ui/components/wizard/StageWizardProgressNavigator.tsx`, with explicit current/completed/skipped/pending/disabled stage cues.
 - Stage rendering uses progressive disclosure:
   - simple stage-specific config renderers for source/ingestion stages,
   - fallback stage summary renderer for non-customized stages,
   - optional advanced metadata disclosure for inspectability/lineage-focused details.
-- Styling reuses existing wizard/card/field classes and extends shared wizard styles (`ui/styles/components/wizard.css`) with reusable stage-wizard classes (no stage-specific element selectors).
+- Styling reuses existing wizard/card/field classes and extends shared wizard styles (`src/ui/styles/components/wizard.css`) with reusable stage-wizard classes (no stage-specific element selectors).
 
 
 ## Direction 5 UI extension update: Stage-aware dataset canvas graph + editing foundations (stories 15E.11-15E.12)
 
-- Dataset Studio now has a dedicated stage-canvas projection seam in `application/dataset-studio/StageCanvasGraphProjectionService.ts` that projects canonical stage flow/runtime state into a canvas graph model (stage groups, underlying asset nodes, and stage-flow edges) without introducing a parallel domain graph.
+- Dataset Studio now has a dedicated stage-canvas projection seam in `src/application/dataset-studio/StageCanvasGraphProjectionService.ts` that projects canonical stage flow/runtime state into a canvas graph model (stage groups, underlying asset nodes, and stage-flow edges) without introducing a parallel domain graph.
 - Projection supports wizard-backed runtime state, template-instantiated stage flows, and saved stage-flow definitions through one contract path, preserving stage ordering/dependency semantics and inspectable stage/node metadata.
 - Stage grouping metadata now includes stage name/description/status, execution mode, asset-count/shape summaries, runtime config/output payloads, and runtime-tracking hooks for later inspection/editor expansion.
-- Stage-aware editing is now centralized in `application/dataset-studio/StageCanvasEditingService.ts` (reorder validation, optional stage add/remove validation, stage config updates, compatibility checks, and graph regeneration) instead of UI-local domain mutations.
-- Dataset stage authoring UI now exposes a shared Wizard/Canvas surface (`ui/components/assets/DatasetStageAuthoringPanel.tsx`) with one adapter-backed source of truth (`DatasetStageWizardStateAdapter` wrapping `WizardFlowEngine`) so wizard and canvas remain synchronized.
-- Canvas rendering for dataset stages now uses `@xyflow/react` (`ui/components/assets/DatasetStageCanvasReactFlow.tsx`) and keeps business rules in adapter/service seams; UI handles selection and minimal edit affordances only.
+- Stage-aware editing is now centralized in `src/application/dataset-studio/StageCanvasEditingService.ts` (reorder validation, optional stage add/remove validation, stage config updates, compatibility checks, and graph regeneration) instead of UI-local domain mutations.
+- Dataset stage authoring UI now exposes a shared Wizard/Canvas surface (`src/ui/components/assets/DatasetStageAuthoringPanel.tsx`) with one adapter-backed source of truth (`DatasetStageWizardStateAdapter` wrapping `WizardFlowEngine`) so wizard and canvas remain synchronized.
+- Canvas rendering for dataset stages now uses `@xyflow/react` (`src/ui/components/assets/DatasetStageCanvasReactFlow.tsx`) and keeps business rules in adapter/service seams; UI handles selection and minimal edit affordances only.
 
 ## Direction 5 UI extension update: Stage inspection + persistence reload surfaces (stories 15E.13-15E.14)
 
@@ -395,25 +412,25 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - propagated upstream lineage/storage metadata.
 - Wizard now surfaces current-stage inspection plus previously completed/skipped stage inspection cards using the same adapter snapshot source used for navigation/configuration.
 - Canvas inspector now renders stage-group inspection from the same projected model used by node/edge graph rendering, preserving wizard/canvas consistency.
-- Dataset stage adapter (`ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) now supports persistence export/import via a thin bridge to application persistence service, and reconstructed wizard/canvas state remains synchronized through one rehydrated `WizardFlowEngine`.
+- Dataset stage adapter (`src/ui/studio-shell/dataset/DatasetStageWizardStateAdapter.ts`) now supports persistence export/import via a thin bridge to application persistence service, and reconstructed wizard/canvas state remains synchronized through one rehydrated `WizardFlowEngine`.
 - UI persistence controls in dataset stage authoring remain bounded to adapter-level save/reload actions; persistence mechanics stay outside React component business logic.
 
 ## Direction 5 UI extension update: Data Studio preparation wizard framework + stage rendering (stories 18.3-18.4)
 
-- Data Studio now has a dedicated renderer adapter seam in `ui/studio-shell/data/DataStudioPreparationWizardStateAdapter.ts` over the application wizard engine (`application/data-studio/DataStudioPreparationWizard.ts`), keeping navigation/state/validation orchestration out of React components.
-- A new stage-based authoring surface now renders in Data Studio via `ui/components/assets/DataStudioPreparationWizardPanel.tsx`:
+- Data Studio now has a dedicated renderer adapter seam in `src/ui/studio-shell/data/DataStudioPreparationWizardStateAdapter.ts` over the application wizard engine (`src/application/data-studio/DataStudioPreparationWizard.ts`), keeping navigation/state/validation orchestration out of React components.
+- A new stage-based authoring surface now renders in Data Studio via `src/ui/components/assets/DataStudioPreparationWizardPanel.tsx`:
   - metadata-driven stage navigation/progress rendering,
   - dynamic stage body rendering (stage-id keyed renderers + fallback renderer),
   - conditional/optional stage availability behavior from wizard snapshots,
   - simple/advanced presentation mode toggles,
   - wizard-to-canvas handoff summary from canonical authoring graph projection.
 - Data Studio now includes toolbar alignment through shared shell toolbar contracts in `DatasetStudioRegistration` (`save-draft`, `run-validation`, `refresh-snapshot`) rather than bespoke per-panel toolbar logic.
-- Stage progress status contracts are now shared through `ui/studio-shell/wizard/WizardStageContracts.ts` so stage-based wizard surfaces can reuse one status vocabulary (`current/completed/skipped/pending/disabled`) without dataset-specific type coupling.
+- Stage progress status contracts are now shared through `src/ui/studio-shell/wizard/WizardStageContracts.ts` so stage-based wizard surfaces can reuse one status vocabulary (`current/completed/skipped/pending/disabled`) without dataset-specific type coupling.
 - Data Studio node-palette behavior now uses a left-drawer pattern aligned with Workflow Canvas semantics (search + stage-focused selection), but mapped to Data Studio stage/assets context instead of workflow trigger/input/step/output node semantics.
 
 ## Direction 5 UI extension update: Data Studio intent templates + progressive disclosure (stories 18.5-18.6)
 
-- Data Studio preparation now initializes from an intent-based template registry (`application/data-studio/DataStudioPreparationTemplates.ts`) with built-in ELT, analytics, document, and image templates.
+- Data Studio preparation now initializes from an intent-based template registry (`src/application/data-studio/DataStudioPreparationTemplates.ts`) with built-in ELT, analytics, document, and image templates.
 - Template contracts are explicit and inspectable (id/version/intent/stage defaults/default asset-group bindings/conditional evaluators/field-visibility overrides), and template instantiation produces validated unified-preparation assets through existing stage/pipeline seams.
 - Wizard initialization now supports template selection/reselection through the existing state adapter seam (`DataStudioPreparationWizard` + `DataStudioPreparationWizardStateAdapter`) without bypassing the canonical preparation asset model.
 - Progressive disclosure is now metadata-driven at stage and field level:
@@ -423,21 +440,21 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI extension update: Data Studio persistent pipeline state + prepared storage integration (stories 18.7-18.8)
 
-- Data Studio wizard state now supports export/import as a canonical persistent pipeline-state document through `application/data-studio/DataStudioPipelineState.ts` and `DataStudioPreparationWizard` state methods (`exportPipelineState`, `importPipelineState`), including stage state, asset-group bindings, transitions, navigation/progression metadata, and wizard/canvas compatibility projection hooks.
+- Data Studio wizard state now supports export/import as a canonical persistent pipeline-state document through `src/application/data-studio/DataStudioPipelineState.ts` and `DataStudioPreparationWizard` state methods (`exportPipelineState`, `importPipelineState`), including stage state, asset-group bindings, transitions, navigation/progression metadata, and wizard/canvas compatibility projection hooks.
 - Renderer adapter and panel wiring now consume that persistent contract (`DataStudioPreparationWizardStateAdapter`) and persist/reload authoring state via local storage (`DataStudioPreparationWizardPanel`), keeping wizard interactions aligned with non-UI-only draft/session behavior.
-- Prepared output storage integration now has a dedicated application seam in `application/dataset-studio/PreparedStorageStageService.ts` and stage contracts in `StageIntegrationContracts.ts` (`PreparedStorageStageOutput`), with explicit prepared dataset identity/version, storage target/reference, upstream linkage, and lineage capture suitable for reuse across registry/canvas/read-model surfaces.
+- Prepared output storage integration now has a dedicated application seam in `src/application/dataset-studio/PreparedStorageStageService.ts` and stage contracts in `StageIntegrationContracts.ts` (`PreparedStorageStageOutput`), with explicit prepared dataset identity/version, storage target/reference, upstream linkage, and lineage capture suitable for reuse across registry/canvas/read-model surfaces.
 
 ## Direction 5 UI extension update: Data Studio lineage/reuse + wizard-canvas handoff (stories 18.9-18.10)
 
-- Data Studio prepared dataset lineage/reuse is now structured through explicit contracts in `domain/dataset-studio/PreparedDatasetLineage.ts` and application orchestration in `application/data-studio/DataStudioLineageAndReuseService.ts` (upstream source/asset/pipeline references, stage structure/dependencies, preparation context, and reusable prepared-dataset references).
-- Persistent Data Studio pipeline state now carries first-class prepared lineage + reuse records (`preparedDatasetLineage`, `preparedDatasetReuse`) in `application/data-studio/DataStudioPipelineState.ts` rather than freeform provenance metadata.
-- Prepared storage output contracts now include stage-structure and preparation-context lineage fields (`application/dataset-studio/StageIntegrationContracts.ts`, `PreparedStorageStageService.ts`) so prepared outputs remain inspectable and reusable across downstream systems.
-- Wizard-to-Canvas handoff now projects stage-aware canvas metadata through `application/data-studio/DataStudioWizardCanvasProjectionService.ts` and `DataStudioPreparationWizardStateAdapter.toCanvasProjection()`, while preserving one shared underlying authoring graph from the wizard state.
-- Data Studio authoring UI now exposes explicit Wizard/Canvas mode switching in `ui/components/assets/DataStudioPreparationWizardPanel.tsx` with a canvas projection surface (`DataStudioPreparationCanvasReactFlow.tsx`) over the same underlying wizard/pipeline state and stage-node palette semantics.
+- Data Studio prepared dataset lineage/reuse is now structured through explicit contracts in `src/domain/dataset-studio/PreparedDatasetLineage.ts` and application orchestration in `src/application/data-studio/DataStudioLineageAndReuseService.ts` (upstream source/asset/pipeline references, stage structure/dependencies, preparation context, and reusable prepared-dataset references).
+- Persistent Data Studio pipeline state now carries first-class prepared lineage + reuse records (`preparedDatasetLineage`, `preparedDatasetReuse`) in `src/application/data-studio/DataStudioPipelineState.ts` rather than freeform provenance metadata.
+- Prepared storage output contracts now include stage-structure and preparation-context lineage fields (`src/application/dataset-studio/StageIntegrationContracts.ts`, `PreparedStorageStageService.ts`) so prepared outputs remain inspectable and reusable across downstream systems.
+- Wizard-to-Canvas handoff now projects stage-aware canvas metadata through `src/application/data-studio/DataStudioWizardCanvasProjectionService.ts` and `DataStudioPreparationWizardStateAdapter.toCanvasProjection()`, while preserving one shared underlying authoring graph from the wizard state.
+- Data Studio authoring UI now exposes explicit Wizard/Canvas mode switching in `src/ui/components/assets/DataStudioPreparationWizardPanel.tsx` with a canvas projection surface (`DataStudioPreparationCanvasReactFlow.tsx`) over the same underlying wizard/pipeline state and stage-node palette semantics.
 
 ## Direction 5 UI extension update: Data Studio reusable stage UX + advanced editing entry points (stories 18.11-18.12)
 
-- Data Studio stage authoring now uses reusable stage UX components in `ui/components/assets/data-studio/DataStudioStageUxComponents.tsx` (stage metadata/status surface, advanced editing actions, internals panel, and stage-aware node palette drawer) instead of one large panel-local implementation.
+- Data Studio stage authoring now uses reusable stage UX components in `src/ui/components/assets/data-studio/DataStudioStageUxComponents.tsx` (stage metadata/status surface, advanced editing actions, internals panel, and stage-aware node palette drawer) instead of one large panel-local implementation.
 - Wizard-mode stage configuration now renders through those reusable shells while preserving progressive disclosure (`simple` vs `advanced`) and canonical stage updates through `DataStudioPreparationWizardStateAdapter`.
 - Advanced entry points are now explicit and stateful (`Inspect internals`, `Edit in Canvas`): wizard- and stage-level actions are wired to shared wizard/canvas state in `DataStudioPreparationWizardPanel.tsx`, with stage-specific canvas focus and internals inspection backed by real authoring-graph projection data.
 - Stage-level internals are now adapter-owned read models (`findCanvasNodeIdForStage`, `getStageInternals` on `DataStudioPreparationWizardStateAdapter`) so UI rendering remains contract-driven and does not derive graph internals ad hoc.
@@ -455,13 +472,13 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI update: Image system component contracts + shared rendering utilities (stories 4.1.1-4.1.2)
 
-- Image UI component seams now have explicit internal contracts in `ui/components/assets/image-system/ImageUiContracts.ts` covering upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
-- Shared image rendering helpers now live in `ui/components/assets/image-system/ImageRenderingUtils.ts` with reusable metadata normalization, fit/layout sizing, placeholder behavior, loading-state/lazy-load helpers, and selection-friendly rendering checks.
-- Reusable renderer primitive `ImageRenderFrame` (`ui/components/assets/image-system/ImageRenderFrame.tsx`) now applies these contracts/utilities as a bounded image-display surface, and existing image-heavy UI surfaces (`AssetViewer`, `DataPreviewSurface`) now reuse that shared seam instead of ad hoc image rendering branches.
+- Image UI component seams now have explicit internal contracts in `src/ui/components/assets/image-system/ImageUiContracts.ts` covering upload panel, image viewer, parameter form, output gallery, and comparison view props/events/state/context references.
+- Shared image rendering helpers now live in `src/ui/components/assets/image-system/ImageRenderingUtils.ts` with reusable metadata normalization, fit/layout sizing, placeholder behavior, loading-state/lazy-load helpers, and selection-friendly rendering checks.
+- Reusable renderer primitive `ImageRenderFrame` (`src/ui/components/assets/image-system/ImageRenderFrame.tsx`) now applies these contracts/utilities as a bounded image-display surface, and existing image-heavy UI surfaces (`AssetViewer`, `DataPreviewSurface`) now reuse that shared seam instead of ad hoc image rendering branches.
 
 ## Direction 5 UI update: Image upload panel + single-image viewer (stories 4.1.3-4.1.4)
 
-- Added reusable image-system upload and viewer components in `ui/components/assets/image-system`:
+- Added reusable image-system upload and viewer components in `src/ui/components/assets/image-system`:
   - `ImageUploadPanel` supports drag/drop + file selection with validation feedback and preview-friendly local thumbnails.
   - `ImageViewer` supports single-image display with fit mode controls, bounded zoom interactions, selection state, metadata overlay, and loading/empty/error states.
 - Upload validation remains contract-driven and ingestion-implementation agnostic:
@@ -473,30 +490,30 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI update: Image parameter form + output gallery (stories 4.1.5-4.1.6)
 
-- Added a reusable schema-driven image parameter form component in `ui/components/assets/image-system/ImageParameterForm.tsx` that renders from shared internal parameter contracts (`ImageParameterDefinition`) rather than hardcoded workflow-engine forms.
+- Added a reusable schema-driven image parameter form component in `src/ui/components/assets/image-system/ImageParameterForm.tsx` that renders from shared internal parameter contracts (`ImageParameterDefinition`) rather than hardcoded workflow-engine forms.
 - `ImageParameterForm` supports text/number/boolean/select/range controls, default values, required/optional semantics, bounded validation feedback, and change events that include both value snapshots and validation issues.
-- Added a bounded adapter seam in `ui/components/assets/image-system/ImageParameterMappers.ts` (`mapAssetContractParametersToImageParameters`) so shared asset-contract parameter descriptors can be projected into UI-friendly form definitions without coupling to any single workflow runtime/library schema.
-- Added a reusable output gallery component in `ui/components/assets/image-system/ImageOutputGallery.tsx` with:
+- Added a bounded adapter seam in `src/ui/components/assets/image-system/ImageParameterMappers.ts` (`mapAssetContractParametersToImageParameters`) so shared asset-contract parameter descriptors can be projected into UI-friendly form definitions without coupling to any single workflow runtime/library schema.
+- Added a reusable output gallery component in `src/ui/components/assets/image-system/ImageOutputGallery.tsx` with:
   - shared image rendering via `ImageRenderFrame`,
   - selection state + selection change events,
   - item-open events,
   - loading/empty/error states,
   - bounded paging (`pageSize`) for incremental display,
   - optional dataset context display for dataset-bound usage.
-- Updated `ui/components/assets/image-system/index.ts` to export parameter-form/gallery/mapper seams together with upload/viewer components for reuse in future output datasets, result/history views, and comparison flows.
+- Updated `src/ui/components/assets/image-system/index.ts` to export parameter-form/gallery/mapper seams together with upload/viewer components for reuse in future output datasets, result/history views, and comparison flows.
 
 ## Direction 5 UI update: Image comparison view + state integration (stories 4.1.7-4.1.8)
 
-- Added a reusable comparison surface (`ui/components/assets/image-system/ImageComparisonView.tsx`) with bounded side-by-side and overlay modes, internal image view-model contracts, synchronized zoom/pan interactions, selection/focus behavior, and explicit loading/empty/error state rendering.
-- Added a reusable synchronized viewport hook (`ui/components/assets/image-system/useSynchronizedImageViewport.ts`) so comparison and future image surfaces can share one zoom/pan state seam instead of per-component interaction logic.
-- Added explicit state integration/mapping seams in `ui/components/assets/image-system/ImageSystemStateIntegration.ts` so selected image, image collections, parameter values, dataset/system refs, and interaction/loading/error component state can be propagated coherently into upload/viewer/parameter/gallery/comparison component props without introducing a parallel state architecture.
+- Added a reusable comparison surface (`src/ui/components/assets/image-system/ImageComparisonView.tsx`) with bounded side-by-side and overlay modes, internal image view-model contracts, synchronized zoom/pan interactions, selection/focus behavior, and explicit loading/empty/error state rendering.
+- Added a reusable synchronized viewport hook (`src/ui/components/assets/image-system/useSynchronizedImageViewport.ts`) so comparison and future image surfaces can share one zoom/pan state seam instead of per-component interaction logic.
+- Added explicit state integration/mapping seams in `src/ui/components/assets/image-system/ImageSystemStateIntegration.ts` so selected image, image collections, parameter values, dataset/system refs, and interaction/loading/error component state can be propagated coherently into upload/viewer/parameter/gallery/comparison component props without introducing a parallel state architecture.
 
 ## AI Loom image manipulation update: output gallery contract + dataset-backed interface composition (stories 4.4.1-4.4.2)
 
 - Interface-asset composition guidance is now explicit for the image slice:
   - **atomic interface assets** stay bounded/reusable (`ImageOutputGallery`, output detail/viewer pane, metadata summary panel, parameter summary panel),
   - **higher-level composed interface assets** bind those atomic assets to system context, workflow/runtime context, and system-owned dataset state.
-- Added a canonical output gallery data contract in `application/system-runtime/OutputGalleryDataContract.ts` for persisted gallery rows with:
+- Added a canonical output gallery data contract in `src/application/system-runtime/OutputGalleryDataContract.ts` for persisted gallery rows with:
   - image reference + dataset instance linkage,
   - workflow/run linkage,
   - optional source-image linkage,
@@ -504,35 +521,35 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - generation/transform parameter summary,
   - image metadata summary,
   - tags + derived attributes.
-- Added dataset integration orchestration in `application/system-runtime/OutputGalleryDatasetIntegrationService.ts`:
+- Added dataset integration orchestration in `src/application/system-runtime/OutputGalleryDatasetIntegrationService.ts`:
   - retrieves image outputs from system-owned dataset instances through `SystemDatasetInstanceService`,
   - maps persisted records into the new gallery contract (no ad hoc renderer-local output state),
   - preserves inspectability/paging semantics for future media/document/system interface reuse.
-- Added UI adapter seam `ui/components/assets/image-system/ImageOutputGalleryDataAdapter.ts`:
+- Added UI adapter seam `src/ui/components/assets/image-system/ImageOutputGalleryDataAdapter.ts`:
   - maps contract-backed gallery listings into reusable image interface state/view-models,
   - keeps UI components runtime/storage agnostic while grounding output gallery display in persisted dataset-backed state.
 
 ## AI Loom image manipulation update: run history model + persisted retrieval seams (stories 4.4.3-4.4.4)
 
-- Added canonical run-history contracts in `application/system-runtime/ImageRunHistoryDataContract.ts`:
+- Added canonical run-history contracts in `src/application/system-runtime/ImageRunHistoryDataContract.ts`:
   - run/workflow execution references,
   - system/workflow asset references,
   - input/output image references,
   - output dataset-instance linkage,
   - parameter summary and execution status,
   - timestamps and bounded lineage fields (`parentRunId`, trigger linkage, output grouping).
-- Added storage-agnostic run-history repository seams in `application/system-runtime/ImageRunHistoryRepository.ts` with in-memory implementation for application-layer orchestration/tests.
-- Added `application/system-runtime/ImageRunHistoryService.ts` retrieval APIs for System Studio interface assets:
+- Added storage-agnostic run-history repository seams in `src/application/system-runtime/ImageRunHistoryRepository.ts` with in-memory implementation for application-layer orchestration/tests.
+- Added `src/application/system-runtime/ImageRunHistoryService.ts` retrieval APIs for System Studio interface assets:
   - list prior runs (`listRuns`) with paging,
   - fetch a run plus linked outputs (`getRunWithLinkedOutputs`) by joining persisted run history and output-gallery dataset-backed records.
-- Runtime output persistence now records run-history entries through the same image-output pipeline (`application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts`) when a run-history service is composed:
+- Runtime output persistence now records run-history entries through the same image-output pipeline (`src/application/workflow-studio/WorkflowRuntimeOutputPersistenceService.ts`) when a run-history service is composed:
   - no renderer-local/transient history arrays,
   - no parallel output/history model detached from dataset-backed output records.
-- Added SQLite persistence adapter `infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository.ts` for durable run-history storage aligned with existing repository/migration patterns.
+- Added SQLite persistence adapter `src/infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository.ts` for durable run-history storage aligned with existing repository/migration patterns.
 
 ## AI Loom image manipulation update: output gallery + run history interface assets (stories 4.4.5-4.4.6)
 
-- Added explicit atomic image interface assets in `ui/components/assets/image-system` for persisted output/history rendering:
+- Added explicit atomic image interface assets in `src/ui/components/assets/image-system` for persisted output/history rendering:
   - `ImageOutputGalleryCollection` (grid/list presentation),
   - `ImageRunHistoryList`,
   - `ImageSummaryPanels` (parameter + metadata summaries reused by gallery/history items).
@@ -550,7 +567,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - workflow summary,
   - input/output summary,
   - parameter summary.
-- Styling remains aligned with shared image-surface primitives in `ui/styles/components/assets.css` and extends reusable class-based variants for list presentation and summary panels.
+- Styling remains aligned with shared image-surface primitives in `src/ui/styles/components/assets.css` and extends reusable class-based variants for list presentation and summary panels.
 
 ## AI Loom image manipulation update: output selection + history/output interaction composition (stories 4.4.7-4.4.8)
 
@@ -565,37 +582,37 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI update: Image component event contracts + style reuse alignment (stories 4.1.9-4.1.10)
 
-- Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.
-- Component-side event emission is centralized through a reusable adapter seam (`ui/components/assets/image-system/ImageUiEventAdapters.ts`) so upload/viewer/form/gallery/comparison components remain workflow-runtime agnostic while still exposing structured context-rich events for later trigger mapping.
-- Image component styling now reuses shared image-surface primitives in `ui/styles/components/assets.css` (`ui-image-surface*`, `ui-image-item-card*`, `ui-image-control-group`) to reduce duplicated panel/status/item/control styling across upload panel, viewer, parameter form, output gallery, and comparison view.
+- Epic 4.1 image components now emit one standardized UI event envelope (`ImageUiEvent`) with typed event names/payloads in `src/ui/components/assets/image-system/ImageUiContracts.ts`, covering upload lifecycle, image selection/deselection, parameter change/submit/reset, gallery interactions, comparison target/mode changes, and viewer interactions.
+- Component-side event emission is centralized through a reusable adapter seam (`src/ui/components/assets/image-system/ImageUiEventAdapters.ts`) so upload/viewer/form/gallery/comparison components remain workflow-runtime agnostic while still exposing structured context-rich events for later trigger mapping.
+- Image component styling now reuses shared image-surface primitives in `src/ui/styles/components/assets.css` (`ui-image-surface*`, `ui-image-item-card*`, `ui-image-control-group`) to reduce duplicated panel/status/item/control styling across upload panel, viewer, parameter form, output gallery, and comparison view.
 
 ## Direction 5 UI update: UI trigger event contract + workflow adapter seam (stories 4.2.1-4.2.2)
 
-- Workflow execution now has a reusable internal UI trigger contract in `application/workflow-studio/UiTriggerEventContract.ts`:
+- Workflow execution now has a reusable internal UI trigger contract in `src/application/workflow-studio/UiTriggerEventContract.ts`:
   - framework-agnostic event shape (`click`/`submit`/`selection`) with explicit source/context references and structured payload support,
   - normalization + validation helpers (`createUiTriggerEvent`, `validateUiTriggerEvent`) that reject malformed timestamps and reserved framework event keys (`nativeEvent`, `target`, `currentTarget`),
   - trigger-kind mapping (`mapUiTriggerKindToWorkflowSourceKind`) aligned with existing execution trigger source kinds.
-- Trigger-to-workflow translation is now bounded in `application/workflow-studio/WorkflowUiTriggerEventAdapter.ts`:
+- Trigger-to-workflow translation is now bounded in `src/application/workflow-studio/WorkflowUiTriggerEventAdapter.ts`:
   - matches normalized UI events against existing workflow manual trigger plans (`userButtonClick`, `userManual`, `userInitiatedRun`) without changing workflow trigger semantics,
   - emits normalized `WorkflowExecutionTriggerEntry` records for downstream validation/execution path reuse.
-- Image-system UI surfaces now use a thin adapter seam in `ui/components/assets/image-system/ImageUiTriggerEventAdapter.ts`:
+- Image-system UI surfaces now use a thin adapter seam in `src/ui/components/assets/image-system/ImageUiTriggerEventAdapter.ts`:
   - translates image component events into the shared UI trigger contract for bounded use cases (button-like gallery open, parameter submit, image selection),
   - keeps React/browser event details out of workflow-facing contracts, preserving easy library/component swap paths.
 
 ## Direction 5 UI update: Trigger binding extension + declarative UI trigger config (stories 4.2.3-4.2.4)
 
-- Trigger execution entry contracts now include explicit UI-ready trigger metadata in `application/workflow-studio/WorkflowTriggerExecutionEntryService.ts`:
+- Trigger execution entry contracts now include explicit UI-ready trigger metadata in `src/application/workflow-studio/WorkflowTriggerExecutionEntryService.ts`:
   - existing source kinds remain unchanged (`manual-user`, `temporal`, `state-data`),
   - entries can now carry `contextReferences` and `bindingMetadata` so runtime context preserves trigger source/type/payload plus binding lineage without adding a parallel trigger model.
-- Declarative UI-to-workflow binding configuration is now an asset-level contract in `application/contracts/ImageWorkflowUiTriggerBindingConfiguration.ts`:
+- Declarative UI-to-workflow binding configuration is now an asset-level contract in `src/application/contracts/ImageWorkflowUiTriggerBindingConfiguration.ts`:
   - bindings are versioned/typed/validated and reference normalized UI event kinds (`click`, `submit`, `selection`) rather than raw browser/React events,
   - selectors cover `sourceComponentId` and optional `actionId`/`eventName`, then target workflow trigger ids/types.
 - Image workflow assets now include `uiTriggerBindings` beside existing input/output binding configs (`ImageToImageWorkflowAsset`, `RestyleWorkflowAsset`, `EnhanceUpscaleWorkflowAsset`, `BatchTransformWorkflowAsset`), keeping UI-trigger wiring inspectable, versionable, and reusable.
-- `application/workflow-studio/WorkflowUiTriggerEventAdapter.ts` now consumes declarative binding configs when provided and falls back to existing manual-trigger matching when absent, preserving compatibility with prior dataset/system/manual trigger semantics.
+- `src/application/workflow-studio/WorkflowUiTriggerEventAdapter.ts` now consumes declarative binding configs when provided and falls back to existing manual-trigger matching when absent, preserving compatibility with prior dataset/system/manual trigger semantics.
 
 ## Direction 5 UI update: Runtime UI-event dispatch + parameter passing (stories 4.2.5-4.2.6)
 
-- Runtime dispatch is now implemented as an application-layer seam (`application/workflow-studio/WorkflowUiEventRuntimeDispatcher.ts`) that consumes normalized UI events, resolves declarative UI trigger bindings, and dispatches into the existing `WorkflowStudioApplicationService.runWorkflowDraftTriggered` path without replacing the trigger/runtime pipeline.
+- Runtime dispatch is now implemented as an application-layer seam (`src/application/workflow-studio/WorkflowUiEventRuntimeDispatcher.ts`) that consumes normalized UI events, resolves declarative UI trigger bindings, and dispatches into the existing `WorkflowStudioApplicationService.runWorkflowDraftTriggered` path without replacing the trigger/runtime pipeline.
 - Dispatch remains boundary-clean and asynchronous:
   - UI event normalization stays in `UiTriggerEventContract`/UI adapters,
   - binding lookup stays in `WorkflowUiTriggerEventAdapter`,
@@ -607,11 +624,11 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## AI Loom image manipulation update: lineage mini-view + system interaction space composition (stories 4.4.9-4.4.10)
 
-- Added a minimal persisted lineage contract for image runs in `application/system-runtime/ImageRunLineageDataContract.ts`.
+- Added a minimal persisted lineage contract for image runs in `src/application/system-runtime/ImageRunLineageDataContract.ts`.
   - Scope is intentionally bounded for this slice: input image refs -> workflow/run -> output image refs -> output dataset instance.
   - Lineage is built from persisted run-history and output-gallery relationships (`ImageRunHistoryWithOutputs`) using stable identifiers.
 - `ImageRunHistoryService` now exposes `getRunLineage(...)` as a retrieval seam over persisted state rather than UI-only graph assembly.
-- Added a lightweight reusable atomic interface asset `ImageLineageMiniView` (`ui/components/assets/image-system/ImageLineageMiniView.tsx`) that renders inspectable lineage edges/nodes without introducing a graph-library-specific domain contract.
+- Added a lightweight reusable atomic interface asset `ImageLineageMiniView` (`src/ui/components/assets/image-system/ImageLineageMiniView.tsx`) that renders inspectable lineage edges/nodes without introducing a graph-library-specific domain contract.
 - Extended composed image interface assets for cohesive System Studio experience:
   - `ImageHistoryLinkedOutputInspectorAsset` now includes lineage inspection for the selected persisted run/output linkage.
   - `ImageResultHistoryInteractionSpaceAsset` composes run history, output gallery selection/inspection, history->output linking, and lineage mini-view into one system interaction space.
@@ -652,14 +669,14 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 extension update: studio surfaces as assetized hostable boundaries (stories 1-2)
 
-- Studio authoring surfaces now expose a reusable host contract seam in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+- Studio authoring surfaces now expose a reusable host contract seam in `src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
   - `StudioAssetContract`
   - `StudioAssetDefinition`
   - `StudioHostContext`
   - `StudioSessionState`
   - explicit render modes: `full`, `embedded`, `inline`, `readonly`.
-- A reusable host renderer boundary now exists in `ui/components/studio-shell/studio-assets/StudioAssetHostBoundary.tsx`, and checks contract-supported modes before rendering a studio surface.
-- System/Workflow/Dataset studio surfaces now map through studio-specific adapter definitions in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, separating:
+- A reusable host renderer boundary now exists in `src/ui/components/studio-shell/studio-assets/StudioAssetHostBoundary.tsx`, and checks contract-supported modes before rendering a studio surface.
+- System/Workflow/Dataset studio surfaces now map through studio-specific adapter definitions in `src/ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, separating:
   - studio definition metadata/contracts,
   - host/rendering orchestration,
   - studio-specific adapter wiring.
@@ -670,7 +687,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 extension update: embedded studio host rendering + event intent contract (stories 3-4)
 
-- Studio host context now supports host-provided embedding constraints and injection seams in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+- Studio host context now supports host-provided embedding constraints and injection seams in `src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
   - `layout` constraints for hosted surfaces (`min/max/width/height`),
   - `documentAccess` and `injectedContext` for host-provided document/context boundaries,
   - explicit host capability projection carried into embedded rendering.
@@ -679,7 +696,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - applying host sizing constraints,
   - bridging embedded events through one host-owned callback path,
   - guarding host-disallowed navigation/full-view intents by capability.
-- Embedded studio events are now standardized in `ui/studio-shell/studio-assets/StudioEmbeddedEventContracts.ts` as host-manageable intents rather than direct routing/shell ownership:
+- Embedded studio events are now standardized in `src/ui/studio-shell/studio-assets/StudioEmbeddedEventContracts.ts` as host-manageable intents rather than direct routing/shell ownership:
   - open related resource requests,
   - request full studio view,
   - selection/focus changes,
@@ -742,7 +759,7 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI extension update: atomic and composed UI asset contract foundation (stories 1.1.1-1.1.2)
 
-- Studio UI asset contracts now explicitly distinguish leaf and container assets in `ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
+- Studio UI asset contracts now explicitly distinguish leaf and container assets in `src/ui/studio-shell/studio-assets/StudioAssetContracts.ts`:
   - `StudioUiAssetKinds` (`atomic` | `composed`),
   - `AtomicStudioAssetContract` with leaf-only constraints (`allowsChildren: false`) and bounded capabilities,
   - `ComposedStudioAssetContract` with explicit child-slot contracts and composition rules.
@@ -751,13 +768,13 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - props schema descriptor (`schemaId`, `schemaVersion`),
   - rendering resolution descriptor (`react` + `definition-render`),
   - persistence descriptor (`documentType`, JSON serialization).
-- Reusable atomic UI primitive contracts now exist in `ui/studio-shell/studio-assets/StudioUiPrimitiveAssetContracts.ts` for leaf families (`text-input`, `number-input`, `toggle`, `button`, `viewer`) so future interface assets can reuse one contract shape without creating a second taxonomy.
-- Existing studio surface assets are now explicitly composed contracts in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, with slot/composition rules that support nested embeddable studio usage through existing host boundaries.
+- Reusable atomic UI primitive contracts now exist in `src/ui/studio-shell/studio-assets/StudioUiPrimitiveAssetContracts.ts` for leaf families (`text-input`, `number-input`, `toggle`, `button`, `viewer`) so future interface assets can reuse one contract shape without creating a second taxonomy.
+- Existing studio surface assets are now explicitly composed contracts in `src/ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, with slot/composition rules that support nested embeddable studio usage through existing host boundaries.
 - Studio asset definition discovery now includes shared listing/lookup helpers (`studioSurfaceAssetDefinitions`, `resolveStudioSurfaceAssetDefinitionById`, `listStudioSurfaceAssetDefinitionsByKind`) so registration/discovery flows can resolve contracts by identity and kind.
 
 ## Direction 5 UI extension update: composition validation + serialization model (stories 1.1.7-1.1.8)
 
-- Studio asset composition now has one shared validation/serialization seam in `ui/studio-shell/studio-assets/StudioAssetComposition.ts` rather than per-surface ad hoc checks.
+- Studio asset composition now has one shared validation/serialization seam in `src/ui/studio-shell/studio-assets/StudioAssetComposition.ts` rather than per-surface ad hoc checks.
 - Validation is registry-backed and taxonomy-aware across atomic/composed/system-page contracts:
   - atomic assets fail when any child slot/region payload is present,
   - composed assets validate declared slots, allowed child kinds/types/categories, required-slot presence, and slot cardinality,
@@ -787,21 +804,21 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## Direction 5 UI extension update: Schema Studio canvas + entity authoring slice (stories 3.1.5-3.1.6)
 
-- Schema Studio now has a dedicated composed studio surface contract (`schema-studio`) in `ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, aligned to existing studio-shell renderer, host-context, and persistence contracts (`schema-draft-json` over JSON serialization).
-- Authoring now runs through a dedicated Schema Studio boundary (`ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) instead of falling back to workflow metaphors:
+- Schema Studio now has a dedicated composed studio surface contract (`schema-studio`) in `src/ui/studio-shell/studio-assets/StudioSurfaceAssetDefinitions.tsx`, aligned to existing studio-shell renderer, host-context, and persistence contracts (`schema-draft-json` over JSON serialization).
+- Authoring now runs through a dedicated Schema Studio boundary (`src/ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) instead of falling back to workflow metaphors:
   - schema-level context is presented as a schema canvas,
   - entities/tables render as selectable modeling units,
   - relationships render as a bounded summary/placeholder for future edge-authoring flows.
-- Entity create/edit flows now use canonical schema-domain helpers (`domain/schema-studio/SchemaStudioDomain.ts`) rather than ad hoc UI-only state:
+- Entity create/edit flows now use canonical schema-domain helpers (`src/domain/schema-studio/SchemaStudioDomain.ts`) rather than ad hoc UI-only state:
   - `createEmptySchemaAssetDocument`,
   - `addSchemaEntityToDocument`,
   - `updateSchemaEntityInDocument`.
 - Schema entity updates persist through existing studio-shell draft content mutation (`onChangeContent`) and embedded-intent event signaling (`studio.intent` apply/selection), preserving existing host-owned save/validation/session infrastructure.
-- Schema Studio is now routed and registered as a first-class atomic studio (`ui/studio-shell/registrations/SchemaStudioRegistration.ts`, `ui/pages/SchemaStudioPage.tsx`, route mapping updates), keeping taxonomy and registration patterns aligned with existing model/dataset/tool studios.
+- Schema Studio is now routed and registered as a first-class atomic studio (`src/ui/studio-shell/registrations/SchemaStudioRegistration.ts`, `src/ui/pages/SchemaStudioPage.tsx`, route mapping updates), keeping taxonomy and registration patterns aligned with existing model/dataset/tool studios.
 
 ## Direction 5 UI extension update: Schema Studio relationships + field inspector slice (stories 3.1.7-3.1.8)
 
-- Schema Studio authoring now includes first-pass relationship creation UX in the existing schema boundary (`ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) without introducing a parallel graph editor stack.
+- Schema Studio authoring now includes first-pass relationship creation UX in the existing schema boundary (`src/ui/components/studio-shell/schema/SchemaStudioDraftAuthoringBoundary.tsx`) without introducing a parallel graph editor stack.
 - Relationship creation persists directly through canonical schema-domain helpers (`addSchemaRelationshipToDocument`) and existing draft mutation flow (`onChangeContent` + schema serialization), so links are validated and saved as schema asset structure instead of UI-local state.
 - Relationship authoring supports source/target table selection, optional source/target field binding, cardinality hints, optional labels/descriptions, and an optional technical `type` in a secondary advanced-details area to keep primary UI language approachable.
 - Duplicate/incomplete/invalid relationship definitions are denied through shared domain validation (missing entities/fields, duplicate relationship shape) with user-facing error messaging in the authoring panel.
@@ -868,19 +885,19 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## AI Loom image manipulation update: runtime editor page asset + schema-driven settings surface (stories 7.1-7.2)
 
-- System runtime preview now supports a dedicated image editor runtime page asset (`ui/studio-shell/studio-assets/ImageManipulationEditorPageAsset.tsx`) bound to the image manipulation template page binding id (`system-page:image-manipulation`).
-- The build-template seed now includes a default page panel wired to that embedded runtime page asset (`application/system-studio/SystemBuildTemplateCatalog.ts`), so image manipulation systems open with a ready-to-run editor surface by default.
-- The runtime editor UI is now rendered through a dedicated panel (`ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`) with the required layout:
+- System runtime preview now supports a dedicated image editor runtime page asset (`src/ui/studio-shell/studio-assets/ImageManipulationEditorPageAsset.tsx`) bound to the image manipulation template page binding id (`system-page:image-manipulation`).
+- The build-template seed now includes a default page panel wired to that embedded runtime page asset (`src/application/system-studio/SystemBuildTemplateCatalog.ts`), so image manipulation systems open with a ready-to-run editor surface by default.
+- The runtime editor UI is now rendered through a dedicated panel (`src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`) with the required layout:
   - left: schema-driven settings editor,
   - right top: image preview,
   - right bottom: horizontal results gallery strip.
-- Settings are rendered from the existing Comfy image manipulation property schema (`ComfyImageManipulationPropertySchema`) through a reusable editor component (`ui/components/assets/image-system/ComfyImageManipulationPropertyEditor.tsx`) with grouped non-technical sections and collapsed advanced controls.
+- Settings are rendered from the existing Comfy image manipulation property schema (`ComfyImageManipulationPropertySchema`) through a reusable editor component (`src/ui/components/assets/image-system/ComfyImageManipulationPropertyEditor.tsx`) with grouped non-technical sections and collapsed advanced controls.
 
 ## AI Loom image manipulation update: primary preview + gallery slider runtime panels (stories 7.3-7.4)
 
 - The runtime editor now uses reusable image-system primitives for right-side runtime browsing:
-  - `ui/components/assets/image-system/ImagePreviewPanel.tsx`
-  - `ui/components/assets/image-system/ImageGallerySlider.tsx`
+  - `src/ui/components/assets/image-system/ImagePreviewPanel.tsx`
+  - `src/ui/components/assets/image-system/ImageGallerySlider.tsx`
 - `ImageManipulationRuntimeEditorPanel` now loads dataset-bound image collections for:
   - source input dataset (`input-image-dataset`)
   - generated output dataset (`output-image-dataset`)
@@ -922,23 +939,115 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 
 ## AI Loom image manipulation update: runtime hydration + dataset/selection binding (stories 8.3-8.4)
 
-- Runtime-window rendering now hydrates a normalized runtime state model from launch contract + studio snapshot draft serialization via a dedicated runtime hydration service (`ui/runtime/SystemRuntimeWindowHydrationService.ts`), instead of page-local ad hoc initialization.
+- Runtime-window rendering now hydrates a normalized runtime state model from launch contract + studio snapshot draft serialization via a dedicated runtime hydration service (`src/ui/runtime/SystemRuntimeWindowHydrationService.ts`), instead of page-local ad hoc initialization.
 - Hydration now carries resolved system/workflow/page identities, schema default config, execution metadata, dataset/storage logical references, and normalized initial selection state, with explicit warning/error issue projection for invalid/incomplete payloads.
-- Image runtime dataset/selection wiring now flows through a dedicated binding seam (`ui/runtime/ImageManipulationRuntimeDatasetBindingService.ts`) that resolves role bindings (input/output/reference), reconciles selections against loaded dataset windows, and maintains a serializable selection snapshot suitable for future persistence/restore.
+- Image runtime dataset/selection wiring now flows through a dedicated binding seam (`src/ui/runtime/ImageManipulationRuntimeDatasetBindingService.ts`) that resolves role bindings (input/output/reference), reconciles selections against loaded dataset windows, and maintains a serializable selection snapshot suitable for future persistence/restore.
 - Runtime editor page behavior now consumes hydrated dataset/workflow/system references and avoids hardcoded ownership assumptions so shared storage-instance-backed datasets and embedded-subsystem launches remain compatible with the existing host/application contracts.
 
 ## AI Loom image manipulation update: runtime-window backend run wiring + session persistence (stories 8.5-8.6)
 
-- Runtime-window run mapping now routes through an explicit mapper seam (`ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) so the UI submits resolved config/selection + logical dataset/storage references on the same backend execution start path (`startSystemExecution`) and shared output persistence/refresh flow.
+- Runtime-window run mapping now routes through an explicit mapper seam (`src/ui/runtime/ImageManipulationRuntimeExecutionRequestMapper.ts`) so the UI submits resolved config/selection + logical dataset/storage references on the same backend execution start path (`startSystemExecution`) and shared output persistence/refresh flow.
 - Run-request preparation now enforces normalized preflight failures for missing required runtime selections (source dataset/input image and FaceID reference when enabled) before backend launch, while preserving default-template runnability with no extra setup.
-- Runtime-window execution request construction is now shared in a non-component seam (`ui/runtime/ReferenceImageExecutionRequestBuilder.ts`) so runtime panels do not own workflow-input mapping internals.
-- Runtime-window session overrides now persist through a dedicated persistence seam (`ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) that stores serializable logical state only (property config/preset, selection snapshot, preview/gallery focus, advanced-panel disclosure, launch/session/page context references).
+- Runtime-window execution request construction is now shared in a non-component seam (`src/ui/runtime/ReferenceImageExecutionRequestBuilder.ts`) so runtime panels do not own workflow-input mapping internals.
+- Runtime-window session overrides now persist through a dedicated persistence seam (`src/ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) that stores serializable logical state only (property config/preset, selection snapshot, preview/gallery focus, advanced-panel disclosure, launch/session/page context references).
 - Runtime editor startup now layers persisted runtime-window overrides on top of hydrated defaults and continues to refresh output collections in-place after execution, so reopen/restore keeps in-progress context without raw-path leakage.
 
 ## AI Loom image manipulation update: runtime-window reopen/restore orchestration + lifecycle tests (stories 8.7-8.8)
 
-- Runtime-window restore now uses a single orchestrator (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) that composes launch contract input, hydration, persisted-session lookup, and stale-reference normalization.
+- Runtime-window restore now uses a single orchestrator (`src/ui/runtime/SystemRuntimeWindowRestoreService.ts`) that composes launch contract input, hydration, persisted-session lookup, and stale-reference normalization.
 - Runtime host boot (`SystemRuntimeWindowHost`) now surfaces restore issues with explicit source tags (`launch`, `hydration`, `session-restore`) while preserving non-fatal startup continuity.
 - Runtime-window relaunch from System Runtime Run panel now routes through reopen-aware launch preparation (`buildReopenRequest`) so existing runtime session identity and persisted logical runtime state are carried forward on relaunch.
 - `ImageManipulationRuntimeEditorPanel` now accepts host-resolved restored session context while keeping the established session persistence seam for ongoing updates.
-- Runtime lifecycle tests now cover launch payload normalization, hydration defaults + dataset/storage binding establishment, reopen restore success, stale-reference degradation, and invalid launch-query normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
+- Runtime lifecycle tests now cover launch payload normalization, hydration defaults + dataset/storage binding establishment, reopen restore success, stale-reference degradation, and invalid launch-query normalization (`src/ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
+
+## Workspace administration UI update (story 3.4.2)
+
+- Added a dedicated authenticated renderer surface for workspace administration in `src/ui/pages/WorkspaceAdministrationPage.tsx`.
+- Renderer integration remains thin and contract-driven:
+  - transport client seam in `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts`,
+  - page-facing service seam in `src/ui/services/WorkspaceAdministrationService.ts`,
+  - no UI-side tenancy business-rule reimplementation beyond basic form-shape validation.
+- Route/navigation integration now includes `ROUTE_PATHS.workspaceAdmin` (`/settings/workspaces`) with settings-entry discoverability:
+  - `src/ui/routes/RouteConfig.ts`,
+  - `src/ui/routes/AppRouter.tsx`,
+  - `src/ui/pages/SettingsPage.tsx`.
+
+## Workspace thin-client administration UI update (story 3.4.3)
+
+- Added focused thin-client workspace surfaces for web/mobile contexts:
+  - `src/ui/pages/WorkspaceMembershipThinClientPage.tsx`
+  - `src/ui/pages/WorkspaceInvitationOnboardingPage.tsx`
+- Added web-specific route helper in `src/ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite acceptance link path composition.
+- Renderer integration remains thin and contract-driven over existing backend endpoints:
+  - workspace client/service seams in `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts` and `src/ui/services/WorkspaceAdministrationService.ts` now include invitation onboarding acceptance.
+- Thin-client route coverage now includes:
+  - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`) for compact membership/invitation management,
+  - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`) for invite acceptance onboarding.
+- Responsive surface behavior for these pages is implemented in shared app styles (`src/ui/styles/app.css`) using dedicated thin-page layout classes to keep operations usable on smaller screens.
+
+## Authorization sharing management UI update (story 4.4.2)
+
+- Added shared renderer authorization-management transport + service seams:
+  - `src/ui/shared/authorization/AuthorizationManagementClient.ts`
+  - `src/ui/services/AuthorizationManagementService.ts`
+- Added reusable sharing/visibility management UI in `src/ui/components/authorization/AuthorizationSharingManagementPanel.tsx` that now supports:
+  - loading current access state,
+  - updating visibility and sharing policy,
+  - listing/revoking current sharing grants,
+  - adding per-user/per-workspace-role/per-workspace/public grants,
+  - rendering effective permission feedback and validation errors from backend API responses.
+- Added dedicated desktop and thin-client sharing management pages:
+  - `src/ui/pages/AuthorizationSharingManagementPage.tsx` at `ROUTE_PATHS.authorizationSharing` (`/settings/sharing`)
+  - `src/ui/pages/AuthorizationSharingThinClientPage.tsx` at `ROUTE_PATHS.authorizationSharingThin` (`/settings/sharing/thin`)
+- Added web route helpers in `src/ui/web/authorization/AuthorizationSharingRoutes.ts` to build deep links into desktop/thin sharing surfaces.
+- Added representative resource-surface integration in `src/ui/pages/AssetDetailPage.tsx` so asset detail now exposes working sharing and visibility controls backed by authorization management APIs.
+
+## Authorization access review inspection UI update (story 4.4.3)
+
+- `AuthorizationSharingManagementPanel` now supports optional target-actor effective-access inspection through a dedicated inspected-actor user-id input.
+- Access-state read results now expose and display both inspector and inspected actor identities to make review context explicit in admin/user workflows.
+- Permission feedback now surfaces concise contribution summaries per permission (owner, role, direct grant, sharing, visibility) backed by structured server explanation fields.
+- The renderer authorization client now forwards `inspectedActorUserIdentityId` on `/access-state` requests, preserving end-to-end inspection context between UI and backend API.
+
+## Authorization reporting UI update (story 4.4.6)
+
+- Added an authenticated admin reporting page: `src/ui/pages/AuthorizationReportingPage.tsx`.
+- Renderer seams stay contract-driven and backend-authoritative:
+  - reporting read support in `src/ui/shared/authorization/AuthorizationManagementClient.ts`,
+  - service passthrough in `src/ui/services/AuthorizationManagementService.ts`,
+  - no UI-side policy evaluation or persistence lookups.
+- Route/settings integration now includes:
+  - `ROUTE_PATHS.authorizationReporting` (`/settings/sharing/reporting`) in `src/ui/routes/RouteConfig.ts`,
+  - route wiring in `src/ui/routes/AppRouter.tsx`,
+  - settings quick-link in `src/ui/pages/SettingsPage.tsx`.
+- The reporting surface renders concrete admin tables for:
+  - role assignments,
+  - unusual visibility/sharing-policy patterns,
+  - recent sharing mutations.
+
+## Trusted node inventory UI update (story 5.3.5)
+
+- Added authenticated admin node inventory inspection page:
+  - `src/ui/pages/NodeInventoryPage.tsx`
+  - route: `ROUTE_PATHS.nodeInventory` -> `/settings/node-inventory`
+  - settings quick-link integration in `src/ui/pages/SettingsPage.tsx`.
+- Renderer integration remains thin and backend-contract driven:
+  - transport client seam: `src/ui/shared/nodes/NodeInventoryClient.ts`
+  - page-facing service seam: `src/ui/services/NodeInventoryService.ts`
+  - contracts consumed as-is from inventory list/detail endpoints (`/api/v1/nodes/inventory`, `/api/v1/nodes/inventory/:nodeId`).
+- Inventory UI behavior:
+  - filter controls for trust/presence/approval/enrollment/node-type/capability/deployment-tag/last-seen range,
+  - explicit pending/active/offline/revoked state labels via badge treatment in list/detail,
+  - explicit loading, empty, and error states without placeholder node data.
+
+## Asset workflow UI integration update (story 10.3.4)
+
+- Added a shared renderer asset workflow transport seam in `src/ui/shared/assets/AssetWorkflowClient.ts` and a page-facing adapter in `src/ui/services/AssetWorkflowService.ts`.
+- `/assets` now renders a contract-driven logical asset workflow page (`src/ui/pages/AssetsPage.tsx`) instead of redirect-only behavior.
+- The page is intentionally bounded and backend-authoritative, covering:
+  - list/query,
+  - detail lookup,
+  - upload initiation,
+  - download authorization,
+  - preview resolution.
+- UI state remains logical-id focused and path-free for this workflow (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`), aligned with protected asset governance boundaries.

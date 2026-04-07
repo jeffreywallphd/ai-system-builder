@@ -1,0 +1,155 @@
+﻿import { afterEach, describe, expect, it } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { SecretAccessActions, SecretActorTypes } from "@domain/security/SecretDomain";
+import {
+  SystemSecretBootstrapDiagnosticCodes,
+  SystemSecretBootstrapStates,
+  bootstrapSystemSecretsFromEnvironment,
+} from "../SystemSecretBootstrapService";
+import { composeServerSecretService } from "../SecretServiceComposition";
+
+const createdRoots: string[] = [];
+
+afterEach(() => {
+  while (createdRoots.length > 0) {
+    const root = createdRoots.pop();
+    if (root) {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+describe("SystemSecretBootstrapService", () => {
+  it("migrates required system secrets from legacy environment configuration", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-migrate-"));
+    createdRoots.push(root);
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 11).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:openai",
+          OPENAI_API_KEY: "sk-live-bootstrap",
+        },
+        secretService: service,
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(result.migratedSecretIds).toEqual(["secret:server:provider:openai"]);
+      expect(result.diagnostics).toHaveLength(0);
+
+      const metadata = await service.getSecretMetadataUseCase.execute({
+        actor: {
+          actorId: "user:server-admin",
+          actorType: SecretActorTypes.serverAdmin,
+          grantedActions: [SecretAccessActions.readMetadata],
+        },
+        secretId: "secret:server:provider:openai",
+      });
+      expect(metadata.ok).toBeTrue();
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it("returns invalid when a required system secret is missing", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-missing-"));
+    createdRoots.push(root);
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 12).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:huggingface",
+          AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV: "false",
+        },
+        secretService: service,
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.invalid);
+      expect(result.diagnostics).toEqual([
+        expect.objectContaining({
+          code: SystemSecretBootstrapDiagnosticCodes.requiredSecretMissing,
+          secretId: "secret:server:provider:huggingface",
+        }),
+      ]);
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it("returns invalid when migration is needed but secret encryption is unavailable", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-unconfigured-"));
+    createdRoots.push(root);
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {},
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:provider:openai",
+          OPENAI_API_KEY: "sk-live-bootstrap",
+        },
+        secretService: service,
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.invalid);
+      expect(result.diagnostics).toEqual([
+        expect.objectContaining({
+          code: SystemSecretBootstrapDiagnosticCodes.legacyMigrationUnavailable,
+          secretId: "secret:server:provider:openai",
+        }),
+      ]);
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it("migrates and validates identity-session signing material through platform secret consumers", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "ai-loom-system-secret-bootstrap-signing-"));
+    createdRoots.push(root);
+    const service = composeServerSecretService({
+      databasePath: path.join(root, "identity.sqlite"),
+      env: {
+        AI_LOOM_SECRET_MASTER_KEY_ID: "kek:server:default",
+        AI_LOOM_SECRET_MASTER_KEY: Buffer.alloc(32, 13).toString("base64"),
+        AI_LOOM_SECRET_ENCRYPTED_PAYLOAD_DIRECTORY: path.join(root, "secret-envelopes"),
+      },
+    });
+
+    try {
+      const result = await bootstrapSystemSecretsFromEnvironment({
+        env: {
+          AI_LOOM_SECRET_BOOTSTRAP_REQUIRED_SYSTEM_SECRET_IDS: "secret:server:signing:identity-session",
+          AI_LOOM_IDENTITY_SESSION_SIGNING_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----v1-----END PRIVATE KEY-----",
+        },
+        secretService: service,
+      });
+
+      expect(result.state).toBe(SystemSecretBootstrapStates.ready);
+      expect(result.migratedSecretIds).toEqual(["secret:server:signing:identity-session"]);
+      expect(result.diagnostics).toHaveLength(0);
+    } finally {
+      service.dispose();
+    }
+  });
+});
+

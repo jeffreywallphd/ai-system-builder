@@ -1,5 +1,5 @@
-import type { AppRuntimeConfigValues } from "../../infrastructure/config/AppRuntimeConfig";
-import type { CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
+import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
+import type { CanonicalEntityType } from "../../src/application/ports/interfaces/ICanonicalAssetIdentityRepository";
 
 export interface DesktopStoragePaths {
   readonly appDataDirectory: string;
@@ -20,6 +20,26 @@ export interface DesktopPythonRuntimeInfo {
   readonly isAvailable: boolean;
 }
 
+export interface DesktopTrustedDeviceRegistrationBootstrap {
+  readonly trustedDeviceBindingId: string;
+  readonly trustMarker?: string;
+  readonly registeredAt?: string;
+}
+
+export interface DesktopPinnedTrustMaterialBootstrap {
+  readonly pinReference: string;
+  readonly materialKind: "session-signing-key" | "attestation-key" | "opaque-marker";
+  readonly publicKeyFingerprint?: string;
+  readonly issuedAt?: string;
+  readonly expiresAt?: string;
+}
+
+export interface DesktopIdentityTransportTrustBootstrap {
+  readonly enforcement: "required" | "optional";
+  readonly registeredDevice?: DesktopTrustedDeviceRegistrationBootstrap;
+  readonly pinnedTrustMaterial?: DesktopPinnedTrustMaterialBootstrap;
+}
+
 export interface DesktopBootstrapContext {
   readonly runtimeConfig: AppRuntimeConfigValues;
   readonly storage: DesktopStoragePaths;
@@ -28,6 +48,7 @@ export interface DesktopBootstrapContext {
     readonly port: number;
   };
   readonly pythonRuntime: DesktopPythonRuntimeInfo;
+  readonly identityTransportTrust?: DesktopIdentityTransportTrustBootstrap;
 }
 
 export interface DesktopKeyValueStorageBridge {
@@ -67,12 +88,13 @@ export interface DesktopWorkflowRunSummaryBridge {
 }
 
 export interface DesktopModelFileBridge {
-  exists(path: string): boolean;
-  stat(path: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
-  read(path: string): Uint8Array;
+  // modelPath values are logical paths relative to the desktop managed-model root.
+  exists(modelPath: string): boolean;
+  stat(modelPath: string): { readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string };
+  read(modelPath: string): Uint8Array;
   write(request: { readonly path: string; readonly content: Uint8Array; readonly overwrite?: boolean; readonly createDirectories?: boolean }): void;
-  delete(path: string): void;
-  list(path: string, options?: { readonly recursive?: boolean }): ReadonlyArray<{ readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string }>;
+  delete(modelPath: string): void;
+  list(modelPath: string, options?: { readonly recursive?: boolean }): ReadonlyArray<{ readonly path: string; readonly kind: "file" | "directory"; readonly size?: number; readonly modifiedAt?: string }>;
   move(request: { readonly from: string; readonly to: string; readonly overwrite?: boolean }): void;
   copy(request: { readonly from: string; readonly to: string; readonly overwrite?: boolean }): void;
 }

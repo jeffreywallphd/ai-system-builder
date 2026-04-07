@@ -13,7 +13,7 @@ The architectural split is:
 
 ## Electron main-process responsibilities
 
-`electron/main/main.ts` is the main desktop composition point.
+`electron/main/main.ts` is the Electron main-process executable entrypoint and now delegates host startup to the dedicated desktop host assembly (`src/hosts/desktop/DesktopHostEntrypoint.ts` + `src/hosts/desktop/DesktopHostCompositionRoot.ts`).
 
 It is responsible for:
 - creating the `BrowserWindow`
@@ -25,6 +25,7 @@ It is responsible for:
 - registering IPC handlers for storage, workflow persistence, execution-run history, model-file operations, canonical asset reads, and thin agent-authoring backend operations
 
 This makes Electron the host-level boundary where local capabilities become available.
+Desktop startup orchestration is now explicit and stage-driven through the shared host bootstrap pipeline in the desktop composition root instead of ad hoc top-level startup flow.
 
 ## Preload bridge responsibilities
 
@@ -39,6 +40,8 @@ This makes Electron the host-level boundary where local capabilities become avai
 - agent authoring/configuration operations (`create/update/get/list/delete/archive`, goal/policy/tool/memory/strategy configuration, and configuration validation)
 - studio-shell authoring operations (`initialize/snapshot/start-session/create-draft/update-draft/update-dependencies/transition-lifecycle/publish-version/validate-draft`)
 
+Electron preload execution uses a CommonJS preload bundle (`.vite/build/preload.cjs`) because preload scripts are loaded in a non-ESM context.
+
 Agent authoring backend responses now use a hardened projection envelope (`agent`, `taxonomy`, optional `contract`) so desktop transport keeps read semantics aligned with `CompositionTaxonomyClassifier`/`CompositionAssetContractResolver`.
 Phase 8.1 extends this desktop backend surface to a Studio-ready seam via `AgentStudioBackendApi`, adding runtime/session IPC operations (launch/trigger launch/session list/detail/run control/studio snapshot) on `ai-loom-desktop-agents:*` while keeping transport thin over existing application use cases.
 Direction 5 Studio Shell operations are exposed the same way on `ai-loom-desktop-studio-shell:*` and delegate to `StudioShellBackendApi` over the real SQLite studio-shell repository.
@@ -46,7 +49,7 @@ Desktop launch/trigger IPC handlers now delegate into a real runner-backed execu
 Phase 8.5/8.6 UI flows remain contract-driven over this bridge: run-control UX maps directly to `control-run`, manual launches map to `launch`, and backend-trigger launches map to `trigger-launch`; unsupported automation systems (scheduler/cron/event bus/background orchestration) are intentionally not exposed in renderer-host contracts for this slice.
 Agent authoring error responses are type-mapped from inner contracts (`AgentAuthoringError`, `AgentConfigurationValidationError`) with unknown failures normalized to `internal` (no substring-derived mapping).
 
-`electron/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
+`electron/src/shared/DesktopContracts.ts` defines the TypeScript contracts for those capabilities, which is a good practice because it creates a typed interface between host and renderer.
 
 ## Why this matters architecturally
 
@@ -71,8 +74,8 @@ The renderer then uses `DesktopBridgeWorkflowRepository` for workflows and a des
 
 ### Browser/degraded path
 If the desktop workflow bridge is unavailable or the runtime mode is browser-oriented, the renderer can fall back to `BrowserStorageWorkflowRepository`, which stores workflow records in browser storage.
-`StudioShellService` now also follows this bounded fallback posture for Studio Shell operations through `ui/composition/BrowserStudioShellBridgeFallback.ts`, which reuses in-process backend APIs over `InMemoryStudioShellRepository` when the desktop preload Studio Shell bridge is absent.
-`RegistryService` now follows the same desktop-first-with-fallback pattern through `ui/composition/BrowserRegistryBridgeFallback.ts`, so Explore/Registry calls use in-process `RegistryBackendApi` when desktop registry preload contracts are unavailable in browser development mode.
+`StudioShellService` now also follows this bounded fallback posture for Studio Shell operations through `src/ui/composition/BrowserStudioShellBridgeFallback.ts`, which reuses in-process backend APIs over `InMemoryStudioShellRepository` when the desktop preload Studio Shell bridge is absent.
+`RegistryService` now follows the same desktop-first-with-fallback pattern through `src/ui/composition/BrowserRegistryBridgeFallback.ts`, so Explore/Registry calls use in-process `RegistryBackendApi` when desktop registry preload contracts are unavailable in browser development mode.
 That registry fallback shares the same in-memory workflow-persistence repository as the Studio Shell fallback, keeping persisted-workflow Explore entries coherent across Build/Explore/Run flows during browser-hosted development.
 System-runtime callback delivery in that fallback path now signs callback payloads through a runtime-compatible HMAC seam (`ExecutionCallbackDispatcher` uses Web Crypto when available and falls back to Node crypto dynamically), which avoids browser bundle failures from top-level Node module imports.
 
@@ -196,34 +199,34 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 ## AI Loom image manipulation update: runtime reopen and restore lifecycle hardening (stories 8.7-8.8)
 
 - Runtime-window relaunch now reuses persisted runtime-session context through a single reopen preparation seam (`SystemRuntimeWindowRestoreService.buildReopenRequest`) that augments normalized launch contracts with prior session id and persisted runtime-safe state overlays.
-- Runtime-window host restore now composes launch resolution, hydration, persisted-session lookup, and stale-reference handling in one orchestrator (`ui/runtime/SystemRuntimeWindowRestoreService.ts`) instead of introducing a parallel restore stack.
+- Runtime-window host restore now composes launch resolution, hydration, persisted-session lookup, and stale-reference handling in one orchestrator (`src/ui/runtime/SystemRuntimeWindowRestoreService.ts`) instead of introducing a parallel restore stack.
 - Restored state is layered over hydrated defaults so runtime windows remain runnable without manual reconfiguration while still recovering prior property/selection/panel working context.
 - Persisted stale references now degrade safely: unresolved binding references are filtered and reported as normalized restore warnings (`runtime-window.restore.*`) rather than crashing runtime-window startup.
-- Lifecycle coverage now includes launch payload normalization, hydration/run-default initialization, restore success on reopen, stale-reference degradation, and invalid launch-query normalization (`ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
+- Lifecycle coverage now includes launch payload normalization, hydration/run-default initialization, restore success on reopen, stale-reference degradation, and invalid launch-query normalization (`src/ui/runtime/tests/SystemRuntimeWindowLifecycle.test.ts`).
 
 ## AI Loom image manipulation update: runtime repository installer contracts + git installer (stories 9.1-9.2)
 
-- Added a reusable runtime repository installer contract seam in `application/runtime/RuntimeRepositoryInstallerContract.ts`:
+- Added a reusable runtime repository installer contract seam in `src/application/runtime/RuntimeRepositoryInstallerContract.ts`:
   - generic install/update/status/validate/diagnostics request and result contracts,
   - repository-source metadata and installed-repository metadata,
   - deterministic install-location key generation for provisioned system-managed runtime locations,
   - normalized operation error and issue contracts.
-- Added a concrete Git-backed installer in `infrastructure/runtime/GitRuntimeRepositoryInstaller.ts`:
+- Added a concrete Git-backed installer in `src/infrastructure/runtime/GitRuntimeRepositoryInstaller.ts`:
   - deterministic target location resolution under provisioned roots,
   - clone/install and fetch/update flows with revision capture,
   - safe re-entry behavior for partial/interrupted installs,
   - status inspection, validation, and diagnostics on the shared contract surface.
 - Added focused coverage:
-  - `application/runtime/tests/RuntimeRepositoryInstallerContract.test.ts`
-  - `infrastructure/runtime/tests/GitRuntimeRepositoryInstaller.test.ts`
+  - `src/application/runtime/tests/RuntimeRepositoryInstallerContract.test.ts`
+  - `src/infrastructure/runtime/tests/GitRuntimeRepositoryInstaller.test.ts`
 
 ## AI Loom image manipulation update: Comfy runtime installation asset + installer orchestration (stories 9.3-9.4)
 
-- Added a first-class Comfy runtime installation asset contract in `application/runtime/ComfyRuntimeInstallationAsset.ts`:
+- Added a first-class Comfy runtime installation asset contract in `src/application/runtime/ComfyRuntimeInstallationAsset.ts`:
   - versioned, inspectable runtime-installation metadata (source/revision pinning/install target/runtime start/health/capabilities/requirements),
   - deterministic provisioned-root request resolution through existing runtime repository installer contracts,
   - path-free install target intent (`targetRootKey`, deterministic location strategy) suitable for shared runtime provisioning.
-- Added `application/runtime/ComfyRuntimeInstallerOrchestrationService.ts`:
+- Added `src/application/runtime/ComfyRuntimeInstallerOrchestrationService.ts`:
   - composes existing repository installer mechanics with explicit phase hooks for environment prep, dependency install, custom nodes, model validation, and runtime start/health validation,
   - supports safe re-entry by inspecting existing repository state before install/update actions,
   - returns normalized orchestration status, per-phase outcomes, and actionable diagnostics, including explicit `not-implemented` phase reporting for later story seams.
@@ -231,57 +234,57 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
 
 ## AI Loom image manipulation update: custom node install + runtime asset validation (stories 9.7-9.8)
 
-- Comfy runtime installation metadata now declares structured custom-node requirements and runtime asset requirements (`checkpoint`, `vae`, `faceid-model`) in `application/runtime/ComfyRuntimeInstallationAsset.ts`.
-- Custom-node install/update is now implemented as a dedicated Comfy orchestration hook (`infrastructure/runtime/ComfyRuntimeCustomNodeInstallationHooks.ts`) that composes the shared runtime repository installer contract for deterministic `custom_nodes` installs with install/update/recovery/diagnostics normalization.
-- Runtime model/asset validation is now implemented as a dedicated Comfy orchestration hook (`infrastructure/runtime/ComfyRuntimeAssetValidationHook.ts`) driven by requirement metadata, with explicit normalized statuses:
+- Comfy runtime installation metadata now declares structured custom-node requirements and runtime asset requirements (`checkpoint`, `vae`, `faceid-model`) in `src/application/runtime/ComfyRuntimeInstallationAsset.ts`.
+- Custom-node install/update is now implemented as a dedicated Comfy orchestration hook (`src/infrastructure/runtime/ComfyRuntimeCustomNodeInstallationHooks.ts`) that composes the shared runtime repository installer contract for deterministic `custom_nodes` installs with install/update/recovery/diagnostics normalization.
+- Runtime model/asset validation is now implemented as a dedicated Comfy orchestration hook (`src/infrastructure/runtime/ComfyRuntimeAssetValidationHook.ts`) driven by requirement metadata, with explicit normalized statuses:
   - `present-valid`
   - `missing-required`
   - `missing-optional`
   - `incompatible`
   - `unknown-unverifiable`
-- Runtime installer composition now wires these hooks by default (`infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`), so orchestration phase output carries inspectable custom-node and model-validation metadata for installer diagnostics and runtime launch/readiness consumers.
+- Runtime installer composition now wires these hooks by default (`src/infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`), so orchestration phase output carries inspectable custom-node and model-validation metadata for installer diagnostics and runtime launch/readiness consumers.
 - Added focused tests:
-  - `application/runtime/tests/ComfyRuntimeInstallationAsset.test.ts`
-  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts`
+  - `src/application/runtime/tests/ComfyRuntimeInstallationAsset.test.ts`
+  - `src/application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts`
 
 ## AI Loom image manipulation update: Comfy Python environment + dependency install hooks (stories 9.5-9.6)
 
-- Added a reusable Python provisioning/dependency state contract in `application/runtime/PythonRuntimeProvisioningContract.ts`:
+- Added a reusable Python provisioning/dependency state contract in `src/application/runtime/PythonRuntimeProvisioningContract.ts`:
   - normalized detection/provisioning/dependency statuses and issue/error/remediation diagnostics,
   - structured command diagnostics for inspectable subprocess history,
   - persisted dependency install snapshot schema (`started`/`completed`/`failed`/`skipped`) with last-step and remediation metadata.
-- Added concrete Comfy runtime environment/dependency phase hooks in `infrastructure/runtime/ComfyRuntimePythonHooks.ts`:
+- Added concrete Comfy runtime environment/dependency phase hooks in `src/infrastructure/runtime/ComfyRuntimePythonHooks.ts`:
   - Python interpreter detection with requirement parsing (`python>=x.y`) and incompatible/missing diagnostics,
   - deterministic venv location provisioning (`<installDirectory>/.venv`) with safe staged create/promote and partial-environment recovery,
   - pip integrity/bootstrap checks (`import pip`, `ensurepip --upgrade`, `pip --version`) before dependency install,
   - repeatable requirements installation with persisted install-state metadata at `.ai-loom-comfy-python-dependencies.json`,
   - explicit missing-requirements, pip-bootstrap, install-failure, and partial-retry diagnostics/remediation hints.
-- Added orchestration composition helper `infrastructure/runtime/ComfyRuntimeInstallerComposition.ts` that wires these hooks into `ComfyRuntimeInstallerOrchestrationService` as the default environment/dependency phase implementation seam.
+- Added orchestration composition helper `src/infrastructure/runtime/ComfyRuntimeInstallerComposition.ts` that wires these hooks into `ComfyRuntimeInstallerOrchestrationService` as the default environment/dependency phase implementation seam.
 - Added focused tests:
-  - `infrastructure/runtime/tests/ComfyRuntimePythonHooks.test.ts`
-  - `infrastructure/runtime/tests/ComfyRuntimeInstallerComposition.test.ts`
+  - `src/infrastructure/runtime/tests/ComfyRuntimePythonHooks.test.ts`
+  - `src/infrastructure/runtime/tests/ComfyRuntimeInstallerComposition.test.ts`
 
 ## AI Loom image manipulation update: Comfy runtime lifecycle + installer state recovery (stories 9.9-9.10)
 
-- Runtime lifecycle/process management now has a dedicated infrastructure hook (`infrastructure/runtime/ComfyRuntimeLifecycleHooks.ts`) wired into installer orchestration as the runtime-validation phase.
+- Runtime lifecycle/process management now has a dedicated infrastructure hook (`src/infrastructure/runtime/ComfyRuntimeLifecycleHooks.ts`) wired into installer orchestration as the runtime-validation phase.
   - supports `start`, `stop`, `restart`, `inspect`, and validation-driven launch readiness checks;
   - resolves runtime launch command from the provisioned Comfy virtual environment (`<installDirectory>/.venv/.../python`) first;
   - injects runtime host/port/environment configuration from orchestration context;
   - validates readiness/liveness endpoint URLs and polls for health with explicit timeout outcomes;
   - distinguishes normalized lifecycle states (`starting`, `healthy`, `unhealthy`, `stopped`, `unknown`, `timed-out`) with inspectable diagnostics metadata.
-- Installer/runtime state persistence now uses a reusable contract seam (`application/runtime/ComfyRuntimeInstallerStateContract.ts`) with a filesystem-backed implementation (`infrastructure/runtime/FileComfyRuntimeInstallerStateStore.ts`).
+- Installer/runtime state persistence now uses a reusable contract seam (`src/application/runtime/ComfyRuntimeInstallerStateContract.ts`) with a filesystem-backed implementation (`src/infrastructure/runtime/FileComfyRuntimeInstallerStateStore.ts`).
   - persisted state now records phase status by step, repository/runtime revision metadata, runtime launch/health metadata, timestamps, and structured issues;
   - orchestration now loads persisted state, reconciles observed repository/runtime conditions, and emits explicit mismatch diagnostics instead of silently trusting stale metadata;
   - resume behavior is idempotent for completed setup phases (`environment`, `dependencies`, `custom-nodes`) when persisted state still matches observed conditions, while stale/mismatched state triggers full recovery execution.
-- Runtime installer composition now wires lifecycle + state-store hooks by default (`infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`) so image-manipulation runtime provisioning flows are recovery-ready without exposing user-managed install/runtime paths.
+- Runtime installer composition now wires lifecycle + state-store hooks by default (`src/infrastructure/runtime/ComfyRuntimeInstallerComposition.ts`) so image-manipulation runtime provisioning flows are recovery-ready without exposing user-managed install/runtime paths.
 - Added focused tests:
-  - `infrastructure/runtime/tests/ComfyRuntimeLifecycleHooks.test.ts`
-  - `infrastructure/runtime/tests/FileComfyRuntimeInstallerStateStore.test.ts`
-  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (resume/reconciliation additions)
+  - `src/infrastructure/runtime/tests/ComfyRuntimeLifecycleHooks.test.ts`
+  - `src/infrastructure/runtime/tests/FileComfyRuntimeInstallerStateStore.test.ts`
+  - `src/application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (resume/reconciliation additions)
 
 ## AI Loom image manipulation update: installer diagnostics system exposure + coverage hardening (stories 9.11-9.12)
 
-- Added a reusable system-facing diagnostics projection seam at `application/runtime/ComfyRuntimeSystemDiagnostics.ts`.
+- Added a reusable system-facing diagnostics projection seam at `src/application/runtime/ComfyRuntimeSystemDiagnostics.ts`.
   - maps installer orchestration + persisted state into one structured diagnostics model (phase statuses, repository/revision state, runtime lifecycle health, persisted-state recovery, normalized failures, and next-action remediation guidance);
   - includes bounded runtime readiness classification used by higher-level system/runtime consumers (`ready`, `partially-configured`, `unhealthy`, `missing-dependencies-or-assets`, `recoverable`).
 - Installer orchestration output now carries this projection directly as `systemDiagnostics` on `ComfyRuntimeInstallerOrchestrationResult` so callers do not need ad hoc parsing.
@@ -290,9 +293,9 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
   - hydration validates/normalizes the payload and exposes it on hydrated runtime state for runtime-window/status consumers.
 - Image manipulation system template runtime metadata now pins the diagnostics contract version so system/template validation paths have an explicit diagnostics seam.
 - Added focused tests for diagnostics projection + wiring:
-  - `application/runtime/tests/ComfyRuntimeSystemDiagnostics.test.ts`
-  - `application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (system diagnostics assertions)
-  - `application/system-runtime/tests/SystemRuntimeWindowLaunchResolver.test.ts`
-  - `ui/runtime/tests/SystemRuntimeWindowHydrationService.test.ts`
-  - `application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
-  - `application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
+  - `src/application/runtime/tests/ComfyRuntimeSystemDiagnostics.test.ts`
+  - `src/application/runtime/tests/ComfyRuntimeInstallerOrchestrationService.test.ts` (system diagnostics assertions)
+  - `src/application/system-runtime/tests/SystemRuntimeWindowLaunchResolver.test.ts`
+  - `src/ui/runtime/tests/SystemRuntimeWindowHydrationService.test.ts`
+  - `src/application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
+  - `src/application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
