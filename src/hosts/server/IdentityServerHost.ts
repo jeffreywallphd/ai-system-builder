@@ -144,6 +144,7 @@ import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAu
 import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
 import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
+import { RecoverRunOrchestrationStartupStateUseCase } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -1013,6 +1014,24 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       now: () => workspaceClock.now(),
     }),
   });
+  const runStartupRecovery = await new RecoverRunOrchestrationStartupStateUseCase({
+    runRepository: persistentPlatformServices.platformPersistenceRepository,
+    queueRepository: persistentPlatformServices.platformPersistenceRepository,
+    orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+    transactionManager: persistentPlatformServices.platformPersistenceRepository,
+    now: () => workspaceClock.now(),
+  }).execute();
+  if (runStartupRecovery.summary.appliedCount > 0 || runStartupRecovery.summary.manualFollowUpCount > 0) {
+    options.logger?.info({
+      event: "run.orchestration-recovery.startup",
+      requestId: "server-startup",
+      details: Object.freeze({
+        asOf: runStartupRecovery.asOf,
+        appliedCount: runStartupRecovery.summary.appliedCount,
+        manualFollowUpCount: runStartupRecovery.summary.manualFollowUpCount,
+      }),
+    });
+  }
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
     nodeTrustIdentityRepository: nodeTrustRepository,

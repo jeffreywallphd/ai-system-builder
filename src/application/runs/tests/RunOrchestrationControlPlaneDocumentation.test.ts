@@ -35,6 +35,18 @@ const retryAiDocPath = path.join(
   "architecture",
   "run-orchestration-authoritative-retry-rerun-workflow-and-lineage.ai.md",
 );
+const recoveryDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-startup-recovery-reconciliation.md",
+);
+const recoveryAiDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-startup-recovery-reconciliation.ai.md",
+);
 const architectureAiDocPath = path.join(
   repoRoot,
   "docs",
@@ -54,6 +66,8 @@ describe("run orchestration control-plane documentation", () => {
     expect(existsSync(cancellationAiDocPath)).toBeTrue();
     expect(existsSync(retryDocPath)).toBeTrue();
     expect(existsSync(retryAiDocPath)).toBeTrue();
+    expect(existsSync(recoveryDocPath)).toBeTrue();
+    expect(existsSync(recoveryAiDocPath)).toBeTrue();
     expect(existsSync(contributorDocPath)).toBeTrue();
     expect(existsSync(contributorAiDocPath)).toBeTrue();
   });
@@ -80,6 +94,7 @@ describe("run orchestration control-plane documentation", () => {
     expect(doc).toContain("## Extending backend dispatch integrations");
     expect(doc).toContain("## Extending cancellation orchestration");
     expect(doc).toContain("## Extending retry and rerun orchestration");
+    expect(doc).toContain("## Extending startup recovery and reconciliation");
     expect(doc).toContain("## Extending progress ingestion and finalization");
     expect(doc).toContain("## Invariants and non-negotiable boundaries");
     expect(doc).toContain("## Prohibited patterns");
@@ -102,6 +117,7 @@ describe("run orchestration control-plane documentation", () => {
       "src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts",
       "src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts",
       "src/application/runs/use-cases/RequestAuthoritativeRunRetryUseCase.ts",
+      "src/application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase.ts",
       "src/application/runs/use-cases/FinalizeRunExecutionOutcomeUseCase.ts",
       "src/infrastructure/execution/runs/RunExecutionDispatchRouter.ts",
       "src/infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi.ts",
@@ -121,10 +137,12 @@ describe("run orchestration control-plane documentation", () => {
     expect(readme).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
     expect(readme).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
     expect(readme).toContain("run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
+    expect(readme).toContain("run-orchestration-startup-recovery-reconciliation.md");
     expect(readme).toContain("../run-orchestration-contributor-guide.md");
     expect(readmeAi).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
     expect(readmeAi).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
     expect(readmeAi).toContain("run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
+    expect(readmeAi).toContain("run-orchestration-startup-recovery-reconciliation.md");
     expect(readmeAi).toContain("docs/run-orchestration-contributor-guide.md");
   });
 
@@ -140,7 +158,11 @@ describe("run orchestration control-plane documentation", () => {
     const retryAiDoc = readFileSync(retryAiDocPath, "utf8");
     expect(retryAiDoc).toContain("docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md");
     expect(retryAiDoc).toContain("lineage");
+    const recoveryAiDoc = readFileSync(recoveryAiDocPath, "utf8");
+    expect(recoveryAiDoc).toContain("docs/architecture/run-orchestration-startup-recovery-reconciliation.md");
+    expect(recoveryAiDoc).toContain("startup");
     expect(contributorAiDoc).toContain("docs/run-orchestration-contributor-guide.md");
+    expect(contributorAiDoc).toContain("Startup recovery guidance");
     expect(contributorAiDoc).toContain("Bypassing authoritative node claim use case before dispatch is prohibited.");
   });
 });

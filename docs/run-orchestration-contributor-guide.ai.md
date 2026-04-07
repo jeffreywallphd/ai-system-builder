@@ -6,6 +6,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 ## Human doc
 - `docs/run-orchestration-contributor-guide.md`
 - `docs/architecture/run-orchestration-operational-visibility-projections.md`
+- `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
@@ -37,6 +38,12 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Preserve linkage via `retry.previousRunId`, incremented attempt counters, and explicit retry reason when present.
 - Keep source-run history immutable; retries create derived runs instead of mutating historical truth.
 - Return explicit ineligible semantics for non-retry-eligible states.
+
+## Startup recovery guidance
+- Keep startup reconciliation in `RecoverRunOrchestrationStartupStateUseCase`.
+- Preserve guarded stale-assigned requeue semantics behind queue persistence support.
+- Keep stale dispatching/running transitions explicit and auditable.
+- Record manual-follow-up outcomes explicitly when safe automatic recovery is unavailable.
 
 ## Prohibited patterns
 - Bypassing reservation claim semantics is prohibited.

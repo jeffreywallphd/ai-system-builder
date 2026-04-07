@@ -735,6 +735,45 @@ export class SqlitePlatformPersistenceAdapter
     });
   }
 
+  public async requeueAssignedRunForRecovery(input: {
+    readonly runId: string;
+    readonly requeuedAt: string;
+    readonly eligibilityMarker?: RunQueueEligibilityMarker;
+  }): Promise<boolean> {
+    const runId = normalizePlatformLookup(input.runId);
+    if (!runId) {
+      return false;
+    }
+
+    const requeuedAt = input.requeuedAt.trim();
+    const eligibilityMarker = input.eligibilityMarker ?? "ready";
+    const mutationResult = this.executeMutation("requeue assigned run for recovery", () => this.getDatabase().prepare(`
+        UPDATE platform_run_orchestration_queue
+        SET
+          lifecycle_state = 'queued',
+          eligibility_marker = ?,
+          claim_token = NULL,
+          claimed_by = NULL,
+          claimed_at = NULL,
+          claim_expires_at = NULL,
+          assignment_node_id = NULL,
+          assignment_claimed_at = NULL,
+          dispatch_prepared_at = NULL,
+          last_dispatch_attempt_id = NULL,
+          dequeued_at = NULL,
+          updated_at = ?,
+          revision = revision + 1
+        WHERE run_id = ?
+          AND lifecycle_state = 'assigned'
+      `).run(
+      eligibilityMarker,
+      requeuedAt,
+      runId,
+    ));
+
+    return mutationResult.changes === 1;
+  }
+
   public async recordDispatchAttemptResult(input: {
     readonly runId: string;
     readonly attemptId: string;
