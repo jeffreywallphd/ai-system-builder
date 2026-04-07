@@ -200,6 +200,21 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       workspaceContext: WorkspaceContextRequirement.optional,
     }),
   }),
+  "security-policy": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([
+        UiSurfaceKeys.desktopAdmin,
+        UiSurfaceKeys.desktopOperational,
+      ]),
+      requiredRoles: Object.freeze(["owner", "admin"]),
+      requiredCapabilities: Object.freeze(["system.manage"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
   "storage-admin": Object.freeze({
     group: UiRouteGroupKeys.administration,
     navigation: Object.freeze({

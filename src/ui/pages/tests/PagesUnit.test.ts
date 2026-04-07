@@ -9,6 +9,7 @@ describe("ui/pages unit coverage", () => {
     const context = readSource("ui/pages/ContextPage.tsx");
     const assets = readSource("ui/pages/AssetsPage.tsx");
     const mcp = readSource("ui/pages/McpPage.tsx");
+    const securityPolicy = readSource("ui/pages/SecurityPolicyConfigurationPage.tsx");
     const storageAdmin = readSource("ui/pages/StorageAdministrationPage.tsx");
     const workspaceAdmin = readSource("ui/pages/WorkspaceAdministrationPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
@@ -19,6 +20,7 @@ describe("ui/pages unit coverage", () => {
     expect(context).toContain("Context Engineering");
     expect(assets).toContain("Use protected logical asset APIs for listing");
     expect(mcp).toContain("Create new local MCP servers");
+    expect(securityPolicy).toContain("Security and policy configuration");
     expect(storageAdmin).toContain("Managed storage administration");
     expect(workspaceAdmin).toContain("Workspace administration");
     expect(notFound).toContain("Page Not Found");
