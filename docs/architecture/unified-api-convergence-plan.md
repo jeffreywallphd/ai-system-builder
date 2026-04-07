@@ -85,3 +85,23 @@ These can remain implementation details as long as protected business actions fl
 
 - Production-facing extension and prohibition rules for future work are documented in `docs/architecture/unified-api-authoritative-surface.md` (Story 14.1.8).
 - Contributor execution checklist is documented in `docs/unified-api-contributor-guide.md`.
+
+## Story 14.3.1 migration note: desktop session/context bootstrap convergence
+
+- Desktop UI session bootstrap now initializes authoritative actor/workspace/trusted-session context from `GET /api/v1/identity/session/context` via shared identity client contracts.
+- Renderer bootstrap no longer treats persisted login payload fields as authoritative actor/workspace/trust context.
+- Persisted identity session state now stores a normalized allowlist projection sourced from authoritative session-context response:
+  - actor identity (`userIdentityId`, `username`, `displayName`)
+  - session trust posture (`assuranceLevel`, `trustState`, trust invalidation metadata)
+  - workspace context (`requestedWorkspaceId`, `resolvedWorkspaceId`, visible workspace summaries)
+  - derived initial capability state (resolved workspace roles/admin-owner posture)
+- Desktop startup/session bootstrap failures now flow through a normalized client bootstrap error model and are surfaced in login UX as session-context initialization failures.
+- Host-specific wiring remains shell-only (desktop endpoint/base-url wiring), while converged session/context authority is server-mediated.
+
+### Story 14.3.1 tests
+
+- `src/ui/shared/identity/tests/IdentityAuthSessionCoordinator.test.ts`
+  - validates authoritative actor/workspace/trust context hydration and persistence
+  - validates normalized context-unavailable bootstrap handling
+- `src/ui/shared/identity/tests/IdentityAuthSessionStore.test.ts`
+  - validates persistence/rehydration of normalized workspace/capability bootstrap state

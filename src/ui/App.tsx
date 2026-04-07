@@ -22,7 +22,7 @@ export default function App({
     () => new IdentityAuthSessionCoordinator(sessionStore, authService),
     [authService, sessionStore],
   );
-  const [authNotice, setAuthNotice] = useState<"session-expired" | "session-invalid" | undefined>(undefined);
+  const [authNotice, setAuthNotice] = useState<"session-expired" | "session-invalid" | "session-context-unavailable" | undefined>(undefined);
   const [authenticated, setAuthenticated] = useState<boolean>(() => {
     if (typeof isAuthenticated === "boolean") {
       return isAuthenticated;
@@ -66,6 +66,8 @@ export default function App({
           setAuthNotice("session-expired");
         } else if (result.reason === IdentitySessionUnauthenticatedReason.invalidSession) {
           setAuthNotice("session-invalid");
+        } else if (result.reason === IdentitySessionUnauthenticatedReason.contextUnavailable) {
+          setAuthNotice("session-context-unavailable");
         } else {
           setAuthNotice(undefined);
         }
@@ -99,6 +101,8 @@ export default function App({
           setAuthNotice("session-expired");
         } else if (result.reason === IdentitySessionUnauthenticatedReason.invalidSession) {
           setAuthNotice("session-invalid");
+        } else if (result.reason === IdentitySessionUnauthenticatedReason.contextUnavailable) {
+          setAuthNotice("session-context-unavailable");
         } else {
           setAuthNotice(undefined);
         }
@@ -112,10 +116,26 @@ export default function App({
     };
   }, [isAuthenticated, sessionCoordinator, sessionStore]);
 
-  const handleAuthenticated = (session: LoginLocalIdentityApiResponse) => {
+  const handleAuthenticated = async (session: LoginLocalIdentityApiResponse): Promise<boolean> => {
     sessionStore.saveSession(session);
-    setAuthenticated(true);
-    setAuthNotice(undefined);
+    const result = await sessionCoordinator.refreshIfAuthenticated();
+    if (result.status === IdentitySessionBootstrapStatus.authenticated) {
+      setAuthenticated(true);
+      setAuthNotice(undefined);
+      return true;
+    }
+
+    setAuthenticated(false);
+    if (result.reason === IdentitySessionUnauthenticatedReason.expiredSession) {
+      setAuthNotice("session-expired");
+    } else if (result.reason === IdentitySessionUnauthenticatedReason.invalidSession) {
+      setAuthNotice("session-invalid");
+    } else if (result.reason === IdentitySessionUnauthenticatedReason.contextUnavailable) {
+      setAuthNotice("session-context-unavailable");
+    } else {
+      setAuthNotice(undefined);
+    }
+    return false;
   };
 
   const handleLogout = async (): Promise<void> => {
