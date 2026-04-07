@@ -22,6 +22,7 @@ Out of scope in this slice:
 - `src/domain/audit/tests/AuditDomain.test.ts`
 - `src/application/audit/AuditApplicationContracts.ts`
 - `src/application/audit/tests/AuditApplicationContracts.test.ts`
+- `docs/architecture/audit-shared-event-contracts.md` (shared contract/schema/DTO follow-up for Story 18.1.2)
 
 ## Canonical event model
 
