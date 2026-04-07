@@ -5,6 +5,7 @@ import type {
   OfflineResynchronizationDecision,
 } from "@application/common/OfflineLocalModeResynchronization";
 import {
+  OfflineConflictClasses,
   type OfflinePendingOperationReplayDescriptorDto,
   OfflineConnectivityStates,
   OfflineConflictSeverities,
@@ -80,18 +81,21 @@ export function toOfflineReconciliationOutcomeDto(
 ): OfflineReconciliationOutcomeDto {
   const resolvedAt = options?.resolvedAt ?? new Date().toISOString();
   const conflicts: ReadonlyArray<OfflineConflictIndicatorDto> | undefined =
-    decision.action === OfflineReconciliationActions.conflictRequiresReview
+    decision.conflictClass
       ? Object.freeze([Object.freeze({
         operationId: decision.mutationId,
         resourceClass: "workflow-draft",
         resourceId: "unknown",
-        severity: OfflineConflictSeverities.high,
-        conflictCode: options?.conflictCode ?? "authoritative-revision-mismatch",
+        severity: decision.action === OfflineReconciliationActions.rejectNotAllowed
+          ? OfflineConflictSeverities.medium
+          : OfflineConflictSeverities.high,
+        conflictClass: decision.conflictClass ?? OfflineConflictClasses.authoritativeStateUnavailable,
+        conflictCode: options?.conflictCode ?? decision.conflictClass ?? "authoritative-revision-mismatch",
         summary: options?.conflictSummary ?? decision.reason,
         authoritativeRevision: options?.authoritativeRevision,
         localMutationRevision: options?.localMutationRevision,
         detectedAt: resolvedAt,
-        requiresUserAttention: true,
+        requiresUserAttention: decision.requiresUserAttention,
       })])
       : undefined;
 
@@ -99,6 +103,9 @@ export function toOfflineReconciliationOutcomeDto(
     operationId: decision.mutationId,
     action: decision.action,
     requiresUserAttention: decision.requiresUserAttention,
+    requiresAdminAttention: decision.requiresAdminAttention,
+    preserveLocalDraftAsUnsynced: decision.preserveLocalDraftAsUnsynced,
+    decisionRule: decision.decisionRule,
     reason: decision.reason,
     resolvedAt,
     conflicts,

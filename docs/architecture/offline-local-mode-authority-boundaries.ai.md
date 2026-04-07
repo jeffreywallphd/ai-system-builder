@@ -50,6 +50,27 @@ Story 19.1.3 adds explicit resource classification and policy-driven posture eva
 - Sync status progression is explicit and validated (`local-only`, `queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
 - Pending operations remain explicit queue artifacts and cannot silently mutate authoritative snapshots in place.
 
+## Story 19.1.5 additions
+
+- Added explicit reconciliation conflict classes:
+  - `stale-base-edit`
+  - `deleted-or-revoked-resource`
+  - `permission-changed-during-disconnection`
+  - `invalidated-run-submission`
+  - `resource-version-mismatch`
+  - `authoritative-state-unavailable`
+- Added explicit decision rules to make reconciliation behavior testable and bounded:
+  - auto-apply only when authoritative baseline matches
+  - user/admin intervention required for reject/conflict paths
+  - local draft preservation (`preserveLocalDraftAsUnsynced`) for draft-scope conflict/reject outcomes
+- Added authoritative reconnect snapshot policy flags for classification:
+  - resource existence/revocation
+  - replay permission posture (+ admin intervention requirement)
+  - run submission validity
+  - revision comparability/version-line compatibility
+- Added explicit deferred unsafe auto-merge posture:
+  - non-comparable versions and unavailable authoritative snapshots are conflicted, not auto-resolved
+
 ## Classification inputs
 
 - workspace visibility

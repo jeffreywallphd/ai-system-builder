@@ -4,6 +4,7 @@
 
 Story 19.1.2 establishes shared offline-state/sync contracts so desktop host logic, API DTO/schema validation, and UI rendering rely on one canonical shape set.
 Story 19.1.4 adds explicit local draft lifecycle state and structured reconnect replay descriptors.
+Story 19.1.5 adds explicit conflict-class and reconciliation decision metadata.
 
 ## Canonical runtime contract package
 
@@ -19,6 +20,8 @@ Story 19.1.4 adds explicit local draft lifecycle state and structured reconnect 
   - include `replayDescriptor` so operation intent is durable and replayable against authoritative APIs.
 - Use `OfflineSyncQueueStateDto.pendingRunSubmissions` for explicit pending run-submission records.
 - Use `OfflineReconciliationOutcomeDto` (+ `OfflineConflictIndicatorDto`) for reconnect outcomes.
+  - include canonical `conflictClass` on conflict indicators
+  - include `decisionRule`, `requiresAdminAttention`, and `preserveLocalDraftAsUnsynced` on outcomes
 - Use `OfflineConnectivitySurfaceStateDto` for connectivity-aware UI state.
 - Use parser helpers in `OfflineSynchronizationSchemaContracts` before persisting or serving payloads.
 
@@ -26,3 +29,4 @@ Story 19.1.4 adds explicit local draft lifecycle state and structured reconnect 
 
 - Domain/application offline policy models remain in place and include migration notes.
 - Runtime UI connection state typing now maps to the shared connectivity-state contract shape.
+- Conflict metadata is intentionally explicit so unsupported/unsafe auto-merge cases remain visible and testable.

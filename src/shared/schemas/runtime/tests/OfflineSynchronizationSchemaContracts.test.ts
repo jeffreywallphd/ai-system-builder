@@ -151,6 +151,72 @@ describe("OfflineSynchronizationSchemaContracts", () => {
     })).toThrow(OfflineSynchronizationSchemaValidationError);
   });
 
+  it("rejects reconciliation outcomes without required conflict class metadata", () => {
+    expect(() => parseOfflineSynchronizationStateSnapshotDto({
+      contractVersion: "offline-sync/v1",
+      workspaceId: "workspace:alpha",
+      cachedResources: [],
+      drafts: [],
+      queue: {
+        queueId: "offline-sync:workspace-alpha",
+        operations: [{
+          operationId: "operation:conflict:1",
+          targetResourceClass: "workflow-draft",
+          targetResourceId: "workflow:draft:1",
+          intent: "promote-local-draft",
+          baseAuthoritativeRevision: "rev:9",
+          localMutationRevision: 3,
+          queuedAt: "2026-04-07T10:03:00.000Z",
+          userVisibleSyncStatus: "sync-conflict",
+          divergenceDisclosureToken: "offline-warning:workflow:draft:1",
+          replayDescriptor: {
+            method: "PATCH",
+            path: "/v1/workflows/drafts/workflow:draft:1/promote",
+            idempotencyKey: "idem:operation:conflict:1",
+            payload: { draftId: "workflow:draft:1" },
+          },
+          retryCount: 1,
+        }],
+        pendingRunSubmissions: [],
+        outcomes: [{
+          operationId: "operation:conflict:1",
+          action: "conflict-requires-review",
+          requiresUserAttention: true,
+          requiresAdminAttention: false,
+          preserveLocalDraftAsUnsynced: true,
+          decisionRule: "preserve-unsynced-draft-and-require-user-review",
+          reason: "Authoritative revision changed while offline.",
+          resolvedAt: "2026-04-07T10:03:01.000Z",
+          conflicts: [{
+            operationId: "operation:conflict:1",
+            resourceClass: "workflow-draft",
+            resourceId: "workflow:draft:1",
+            severity: "high",
+            conflictCode: "stale-base-edit",
+            summary: "baseline stale",
+            detectedAt: "2026-04-07T10:03:01.000Z",
+            requiresUserAttention: true,
+          }],
+        }],
+        updatedAt: "2026-04-07T10:03:01.000Z",
+      },
+      status: {
+        state: "blocked-conflict",
+        pendingOperationCount: 0,
+        conflictCount: 1,
+        rejectedCount: 0,
+      },
+      connectivity: {
+        state: "connected",
+        stale: false,
+        localModeActive: false,
+        lastChangedAt: "2026-04-07T10:03:02.000Z",
+        canQueueOperations: true,
+        canResynchronize: true,
+      },
+    })).toThrow(OfflineSynchronizationSchemaValidationError);
+  });
+
   it("rejects write requests when request workspaceId does not match state workspaceId", () => {
     expect(() => parseOfflineSynchronizationStateWriteRequestDto({
       workspaceId: "workspace:beta",

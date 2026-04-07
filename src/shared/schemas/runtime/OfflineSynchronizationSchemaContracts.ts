@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   OfflineCacheFreshnessStates,
+  OfflineConflictClasses,
   OfflineConflictSeverities,
   OfflineConnectivityStates,
   OfflineDraftSyncStatuses,
@@ -106,6 +107,15 @@ const OfflineConflictSeveritySchema = z.enum([
   OfflineConflictSeverities.low,
   OfflineConflictSeverities.medium,
   OfflineConflictSeverities.high,
+]);
+
+const OfflineConflictClassSchema = z.enum([
+  OfflineConflictClasses.staleBaseEdit,
+  OfflineConflictClasses.deletedOrRevokedResource,
+  OfflineConflictClasses.permissionChangedDuringDisconnection,
+  OfflineConflictClasses.invalidatedRunSubmission,
+  OfflineConflictClasses.resourceVersionMismatch,
+  OfflineConflictClasses.authoritativeStateUnavailable,
 ]);
 
 const OfflineReconciliationActionSchema = z.enum([
@@ -228,6 +238,7 @@ export const OfflineConflictIndicatorDtoSchema: z.ZodType<OfflineConflictIndicat
   resourceClass: OfflineSyncResourceClassSchema,
   resourceId: RequiredStringSchema,
   severity: OfflineConflictSeveritySchema,
+  conflictClass: OfflineConflictClassSchema,
   conflictCode: RequiredStringSchema,
   summary: z.string().trim().min(1).max(1024),
   authoritativeRevision: RequiredStringSchema.optional(),
@@ -248,6 +259,9 @@ export const OfflineReconciliationOutcomeDtoSchema: z.ZodType<OfflineReconciliat
   operationId: RequiredStringSchema,
   action: OfflineReconciliationActionSchema,
   requiresUserAttention: z.boolean(),
+  requiresAdminAttention: z.boolean(),
+  preserveLocalDraftAsUnsynced: z.boolean(),
+  decisionRule: RequiredStringSchema,
   reason: z.string().trim().min(1).max(1024),
   resolvedAt: TimestampSchema,
   authoritativeRevisionAfter: RequiredStringSchema.optional(),
@@ -268,6 +282,13 @@ export const OfflineReconciliationOutcomeDtoSchema: z.ZodType<OfflineReconciliat
         message: "Conflict outcomes must include at least one conflict indicator.",
       });
     }
+  }
+  if (value.action === OfflineReconciliationActions.applyToAuthoritative && value.requiresAdminAttention) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["requiresAdminAttention"],
+      message: "Applied outcomes cannot require admin attention.",
+    });
   }
 });
 
