@@ -23,6 +23,7 @@ import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
 } from "../AuthoritativeSecretAccessAuditHook";
+import { RuntimeBackendAuditGovernanceRealtimePublisher } from "../RuntimeBackendAuditGovernanceRealtimePublisher";
 
 class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public readonly events: CanonicalAuditEvent[] = [];
@@ -412,5 +413,53 @@ describe("Authoritative security audit adapters", () => {
     expect(repository.events).toHaveLength(1);
     expect(repository.events[0]?.action).toBe("share.resource.publication.updated");
     expect(repository.events[0]?.category).toBe("sharing");
+  });
+
+  it("publishes canonical user-safe audit/governance realtime envelopes from authoritative append results", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const publishedPayloads: Array<{
+      readonly workspaceId?: string;
+      readonly payload: Record<string, unknown>;
+    }> = [];
+    const runtimeBackendApiStub = {
+      publishRuntimeAuditGovernance: (input: {
+        readonly workspaceId?: string;
+        readonly payload: unknown;
+      }) => {
+        publishedPayloads.push({
+          workspaceId: input.workspaceId,
+          payload: input.payload as Record<string, unknown>,
+        });
+        return Object.freeze({}) as never;
+      },
+    };
+    const realtimePublisher = new RuntimeBackendAuditGovernanceRealtimePublisher(runtimeBackendApiStub);
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      publicationPort: realtimePublisher,
+      now: () => new Date("2026-04-07T19:30:00.000Z"),
+      idGenerator: () => "realtime-1",
+    });
+    const sink = new AuthoritativeStorageManagementAuditSink(recorder);
+
+    await sink.recordStorageManagementEvent({
+      type: "storage-policy-updated",
+      actorUserIdentityId: "user:storage-admin",
+      workspaceId: "workspace:primary",
+      storageInstanceId: "storage:alpha",
+      occurredAt: "2026-04-07T19:30:00.000Z",
+      outcome: "success",
+      details: Object.freeze({
+        policyId: "policy-storage-alpha",
+        keyReferenceId: "kms://workspace-alpha/keys/one",
+      }),
+    });
+
+    expect(repository.events).toHaveLength(1);
+    expect(publishedPayloads).toHaveLength(1);
+    expect(publishedPayloads[0]?.workspaceId).toBe("workspace:primary");
+    expect(publishedPayloads[0]?.payload.eventKind).toBe("policy-action-recorded");
+    expect(publishedPayloads[0]?.payload.action).toBe("policy.storage.updated");
+    expect((publishedPayloads[0]?.payload.details as Record<string, unknown>)?.keyReferenceId).toBe("[REDACTED]");
   });
 });

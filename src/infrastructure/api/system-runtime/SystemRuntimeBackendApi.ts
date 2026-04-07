@@ -63,6 +63,7 @@ import {
   type RuntimeRealtimeRunStatusPayload,
   RuntimeRealtimeSubscriptionModes,
   type RuntimeRealtimeAdminChangePayload,
+  type RuntimeRealtimeAuditGovernancePayload,
   type RuntimeRealtimeConnectivityStatePayload,
   type RuntimeRealtimeEventEnvelope,
   type RuntimeRealtimeEventSubscription,
@@ -1312,6 +1313,18 @@ export class SystemRuntimeBackendApi {
     readonly actorUserIdentityId?: string;
   }): RuntimeRealtimeEventEnvelope {
     return this.realtimeEventStream.publishAdminChangeEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeAuditGovernance(input: {
+    readonly payload: RuntimeRealtimeAuditGovernancePayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishAuditGovernanceEvent({
       actorUserIdentityId: input.actorUserIdentityId,
       workspaceId: input.workspaceId,
       payload: input.payload,

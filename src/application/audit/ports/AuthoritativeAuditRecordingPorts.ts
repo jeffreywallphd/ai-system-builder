@@ -18,6 +18,7 @@ import type {
   AuditLedgerAppendResult,
   IAuditLedgerRepository,
 } from "../AuditApplicationContracts";
+import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 
 export const AuthoritativeAuditEventSources = Object.freeze({
   identity: "identity",
@@ -87,6 +88,13 @@ export interface AuthoritativeAuditRecordingPort {
 
 export interface AuthoritativeAuditRecordingServiceDependencies {
   readonly repository: IAuditLedgerRepository;
+  readonly publicationPort?: {
+    publishAuthoritativeAuditEvent(input: {
+      readonly source: AuthoritativeAuditEventSource;
+      readonly appendResult: AuditLedgerAppendResult;
+      readonly event: CanonicalAuditEvent;
+    }): Promise<void> | void;
+  };
   readonly retentionLifecycleDefaults?: Readonly<{
     readonly policyKey?: string;
     readonly policyVersion?: string;

@@ -11,6 +11,7 @@ import {
   parseRuntimeRealtimeWebSocketEventMessage,
   parseRuntimeRealtimeWebSocketSubscriptionAckMessage,
 } from "@shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts";
+import { AuditLedgerBackendApi } from "../../../../api/audit/AuditLedgerBackendApi";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 
 const servers: Server[] = [];
@@ -76,6 +77,30 @@ class RuntimeRealtimeBackendStub {
       },
     });
   }
+
+  public publishAuditGovernance(input: { readonly workspaceId: string; readonly eventId: string; readonly action: string }): void {
+    this.stream.publishAuditGovernanceEvent({
+      workspaceId: input.workspaceId,
+      payload: {
+        eventId: input.eventId,
+        eventType: "workspace-policy-updated",
+        auditCategory: "policy",
+        eventKind: "policy-action-recorded",
+        action: input.action,
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T12:00:00.000Z",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+        actorId: "user:admin",
+        actorKind: "user",
+        workspaceId: input.workspaceId,
+        details: {
+          summary: "updated policy",
+        },
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+    });
+  }
 }
 
 class WebSocketFrameReader {
@@ -133,6 +158,57 @@ async function startServer(runtimeBackend: RuntimeRealtimeBackendStub): Promise<
   const server = createIdentityHttpServer({
     backendApi: harness.backendApi,
     systemRuntimeBackendApi: runtimeBackend as unknown as SystemRuntimeBackendApi,
+    webSocket: {
+      channelPathPrefix: "/ws",
+    },
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+  servers.push(server);
+  const address = server.address() as AddressInfo;
+  return Object.freeze({
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    port: address.port,
+  });
+}
+
+class AuditRealtimeAuthorizerStub {
+  public async listGovernanceAuditEvents() {
+    return {
+      ok: true as const,
+      data: {
+        events: [],
+        facets: [],
+        totalCount: 0,
+        query: {},
+        pagination: { limit: 1, offset: 0, hasMore: false },
+        explanatory: {
+          detailVisibility: "user-safe",
+          roleSensitivity: "workspace-member",
+          protectedDataReadEnabled: false,
+          protectedDataEventCount: 0,
+          directMatchCount: 0,
+          searchMatchCount: 0,
+        },
+      },
+    };
+  }
+}
+
+async function startServerWithAuditAuthorization(input: {
+  readonly runtimeBackend: RuntimeRealtimeBackendStub;
+  readonly auditLedgerBackendApi?: AuditLedgerBackendApi;
+}): Promise<{ readonly baseUrl: string; readonly port: number }> {
+  const harness = await createIdentityAuthTestHarness();
+  const server = createIdentityHttpServer({
+    backendApi: harness.backendApi,
+    systemRuntimeBackendApi: input.runtimeBackend as unknown as SystemRuntimeBackendApi,
+    auditLedgerBackendApi: input.auditLedgerBackendApi,
     webSocket: {
       channelPathPrefix: "/ws",
     },
@@ -424,5 +500,63 @@ describe("IdentityHttpServer runtime realtime websocket delivery", () => {
     const closeFrame = await reader.nextFrame();
     expect(closeFrame.opcode).toBe(8);
     socket.destroy();
+  });
+
+  it("enforces audit/governance realtime subscription authorization boundaries", async () => {
+    const runtimeBackend = new RuntimeRealtimeBackendStub();
+    const deniedServer = await startServer(runtimeBackend);
+    const deniedToken = await registerAndLogin(deniedServer.baseUrl, "runtime.ws.audit.denied.1");
+
+    const deniedSocket = await openWebSocketUpgradeSocket({
+      port: deniedServer.port,
+      path: "/ws?purpose=stream-control&workspaceId=workspace-a",
+      authorization: deniedToken,
+    });
+    expect(deniedSocket.response.startsWith("HTTP/1.1 101")).toBeTrue();
+    const deniedReader = new WebSocketFrameReader(deniedSocket.socket);
+    deniedSocket.socket.write(buildMaskedClientTextFrame(JSON.stringify({
+      action: "runtime-realtime.subscribe",
+      request: {
+        topics: [{ topic: RuntimeRealtimeTopics.auditGovernance, workspaceId: "workspace-a" }],
+      },
+    })));
+    const deniedErrorFrame = await deniedReader.nextFrame();
+    const deniedError = parseRuntimeRealtimeWebSocketErrorMessage(JSON.parse(deniedErrorFrame.payload.toString("utf8")));
+    expect(deniedError.error.code).toBe("forbidden");
+    deniedSocket.socket.destroy();
+
+    const allowedServer = await startServerWithAuditAuthorization({
+      runtimeBackend,
+      auditLedgerBackendApi: new AuditRealtimeAuthorizerStub() as unknown as AuditLedgerBackendApi,
+    });
+    const allowedToken = await registerAndLogin(allowedServer.baseUrl, "runtime.ws.audit.allowed.1");
+    const allowedSocket = await openWebSocketUpgradeSocket({
+      port: allowedServer.port,
+      path: "/ws?purpose=stream-control&workspaceId=workspace-a",
+      authorization: allowedToken,
+    });
+    expect(allowedSocket.response.startsWith("HTTP/1.1 101")).toBeTrue();
+    const allowedReader = new WebSocketFrameReader(allowedSocket.socket);
+    allowedSocket.socket.write(buildMaskedClientTextFrame(JSON.stringify({
+      action: "runtime-realtime.subscribe",
+      request: {
+        topics: [{ topic: RuntimeRealtimeTopics.auditGovernance, workspaceId: "workspace-a" }],
+      },
+    })));
+
+    const ackFrame = await allowedReader.nextFrame();
+    const ack = parseRuntimeRealtimeWebSocketSubscriptionAckMessage(JSON.parse(ackFrame.payload.toString("utf8")));
+    expect(ack.topics[0]?.topic).toBe(RuntimeRealtimeTopics.auditGovernance);
+
+    runtimeBackend.publishAuditGovernance({
+      workspaceId: "workspace-a",
+      eventId: "audit:event:policy:1",
+      action: "policy.updated",
+    });
+    const eventFrame = await allowedReader.nextFrame();
+    const event = parseRuntimeRealtimeWebSocketEventMessage(JSON.parse(eventFrame.payload.toString("utf8")));
+    expect(event.event.topic).toBe(RuntimeRealtimeTopics.auditGovernance);
+    expect((event.event.payload as { eventId?: string }).eventId).toBe("audit:event:policy:1");
+    allowedSocket.socket.destroy();
   });
 });

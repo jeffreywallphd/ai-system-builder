@@ -105,4 +105,45 @@ describe("AuthoritativeRuntimeEventStream", () => {
       listener: () => {},
     })).toThrow("invalid-request:Topic workspace scope must match actor workspace scope.");
   });
+
+  it("delivers audit-governance envelopes through shared runtime stream topics", () => {
+    const stream = new AuthoritativeRuntimeEventStream();
+    const captured: string[] = [];
+
+    stream.subscribe({
+      request: {
+        actor: {
+          actorUserIdentityId: "user-admin",
+          accessChannel: "desktop",
+          workspaceId: "workspace-a",
+        },
+        topics: [{ topic: RuntimeRealtimeTopics.auditGovernance, workspaceId: "workspace-a" }],
+      },
+      listener: (event) => {
+        captured.push(event.topic);
+      },
+    });
+
+    const published = stream.publishAuditGovernanceEvent({
+      workspaceId: "workspace-a",
+      actorUserIdentityId: "user-admin",
+      payload: {
+        eventId: "audit:event:1",
+        eventType: "workspace-member-added",
+        auditCategory: "administrative",
+        eventKind: "administrative-action-recorded",
+        action: "workspace.member.added",
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T12:00:00.000Z",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+        actorId: "user:admin",
+        actorKind: "user",
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+    });
+
+    expect(published.topic).toBe(RuntimeRealtimeTopics.auditGovernance);
+    expect(captured).toEqual([RuntimeRealtimeTopics.auditGovernance]);
+  });
 });

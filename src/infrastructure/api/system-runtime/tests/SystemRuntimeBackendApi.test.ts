@@ -667,6 +667,63 @@ describe("SystemRuntimeBackendApi", () => {
     subscription.data?.unsubscribe();
   });
 
+  it("publishes audit/governance realtime events through the shared runtime subscription surface", () => {
+    const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
+    const captured: Array<{ topic: string; eventId?: string }> = [];
+    const subscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "audit-admin" },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "audit-admin",
+          accessChannel: "desktop",
+          workspaceId: "workspace-audit",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.auditGovernance, workspaceId: "workspace-audit" },
+        ],
+      },
+      listener: (event) => {
+        captured.push({
+          topic: event.topic,
+          eventId: (event.payload as { eventId?: string }).eventId,
+        });
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    const published = runtimeApi.publishRuntimeAuditGovernance({
+      workspaceId: "workspace-audit",
+      actorUserIdentityId: "audit-admin",
+      payload: {
+        eventId: "audit:event:ws-policy-1",
+        eventType: "workspace-policy-updated",
+        auditCategory: "policy",
+        eventKind: "policy-action-recorded",
+        action: "policy.updated",
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T12:00:00.000Z",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+        actorId: "user:admin",
+        actorKind: "user",
+        workspaceId: "workspace-audit",
+        details: {
+          summary: "updated policy",
+        },
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+    });
+
+    expect(published.topic).toBe(RuntimeRealtimeTopics.auditGovernance);
+    expect(captured).toEqual(expect.arrayContaining([
+      { topic: RuntimeRealtimeTopics.auditGovernance, eventId: "audit:event:ws-policy-1" },
+    ]));
+    subscription.data?.unsubscribe();
+  });
+
   it("publishes authoritative orchestration run/queue events through runtime realtime subscriptions", () => {
     const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
     const captured: Array<{ topic: string; eventKind: unknown }> = [];

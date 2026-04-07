@@ -53,6 +53,22 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   }
 }
 
+class ReplayAuditLedgerRepository extends InMemoryAuditLedgerRepository {
+  public override async appendAuditEvent(
+    event: CanonicalAuditEvent,
+    context: AuditLedgerAppendContext,
+  ): Promise<AuditLedgerAppendResult> {
+    this.events.push(event);
+    this.contexts.push(context);
+    return {
+      changed: false,
+      wasReplay: true,
+      sequence: this.events.length,
+      event,
+    };
+  }
+}
+
 function buildInput(overrides?: Partial<AuthoritativeAuditRecordEventInput>): AuthoritativeAuditRecordEventInput {
   return {
     operationKey: "Audit:Identity:Login:1",
@@ -305,5 +321,56 @@ describe("AuthoritativeAuditRecordingService", () => {
 
     expect(event.payload.userSafeDetails?.key).toBe("value");
     expect(Object.isFrozen(event.payload)).toBeTrue();
+  });
+
+  it("publishes realtime-facing notifications only for newly changed authoritative appends", async () => {
+    const publishCalls: Array<{ source: string; eventId: string }> = [];
+    const changedRepository = new InMemoryAuditLedgerRepository();
+    const changedService = new AuthoritativeAuditRecordingService({
+      repository: changedRepository,
+      now: () => new Date("2026-04-07T16:30:00.000Z"),
+      idGenerator: () => "event-publish-1",
+      publicationPort: {
+        publishAuthoritativeAuditEvent: async (input) => {
+          publishCalls.push({
+            source: input.source,
+            eventId: input.event.eventId,
+          });
+        },
+      },
+    });
+
+    await changedService.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:publish:1",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }));
+
+    const replayRepository = new ReplayAuditLedgerRepository();
+    const replayService = new AuthoritativeAuditRecordingService({
+      repository: replayRepository,
+      now: () => new Date("2026-04-07T16:31:00.000Z"),
+      idGenerator: () => "event-publish-2",
+      publicationPort: {
+        publishAuthoritativeAuditEvent: async (input) => {
+          publishCalls.push({
+            source: input.source,
+            eventId: input.event.eventId,
+          });
+        },
+      },
+    });
+
+    await replayService.recordPolicyEvent(buildInput({
+      operationKey: "policy:updated:publish:replay",
+      eventType: "policy-updated",
+      action: "policy.updated",
+    }));
+
+    expect(publishCalls).toHaveLength(1);
+    expect(publishCalls[0]).toEqual({
+      source: AuthoritativeAuditEventSources.policy,
+      eventId: "audit:policy:event-publish-1",
+    });
   });
 });
