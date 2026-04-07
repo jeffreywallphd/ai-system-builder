@@ -32,12 +32,15 @@ interface RuntimeSessionContext {
 export interface RuntimeRunInspectionSummary {
   readonly executionId: string;
   readonly status: RuntimeSdkExecutionStatusResponse["status"];
+  readonly rootAssetId: string;
+  readonly rootVersionId?: string;
   readonly progressLabel: string;
   readonly diagnosticsCount?: number;
   readonly traceEventCount?: number;
   readonly traceLogCount?: number;
   readonly outputFieldCount?: number;
   readonly outputContractIds?: ReadonlyArray<string>;
+  readonly outputAssetIds?: ReadonlyArray<string>;
 }
 
 export class RuntimeOperationsService {
@@ -228,12 +231,15 @@ export class RuntimeOperationsService {
       data: Object.freeze({
         executionId: status.data.executionId,
         status: status.data.status,
+        rootAssetId: status.data.rootAssetId,
+        rootVersionId: status.data.rootVersionId,
         progressLabel: `${status.data.progress.completedNodeCount}/${status.data.progress.totalNodeCount} nodes`,
         diagnosticsCount: result.ok ? result.data?.diagnostics.length : undefined,
         traceEventCount: trace.ok ? trace.data?.trace.events.length : undefined,
         traceLogCount: trace.ok ? trace.data?.trace.logs.length : undefined,
         outputFieldCount: result.ok ? result.data?.outputSummary.outputFieldCount : undefined,
         outputContractIds: result.ok ? result.data?.outputSummary.contractOutputIds : undefined,
+        outputAssetIds: result.ok ? resolveRuntimeOutputAssetIds(result.data) : undefined,
       }),
     });
   }
@@ -302,6 +308,59 @@ export class RuntimeOperationsService {
     }
     return Object.keys(next).length > 0 ? Object.freeze(next) : undefined;
   }
+}
+
+function resolveRuntimeOutputAssetIds(
+  result: RuntimeSdkExecutionResultResponse | undefined,
+): ReadonlyArray<string> {
+  if (!result) {
+    return Object.freeze([]);
+  }
+  const referenced = new Set<string>();
+  if (typeof result.rootAssetId === "string" && result.rootAssetId.trim().startsWith("asset:")) {
+    referenced.add(result.rootAssetId.trim());
+  }
+  for (const contractId of result.outputSummary.contractOutputIds) {
+    const normalized = contractId.trim();
+    if (normalized.startsWith("asset:")) {
+      referenced.add(normalized);
+    }
+  }
+  collectAssetLikeIds(result.output, referenced);
+  return Object.freeze([...referenced.values()]);
+}
+
+function collectAssetLikeIds(
+  value: unknown,
+  sink: Set<string>,
+): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      collectAssetLikeIds(entry, sink);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string") {
+      const normalized = entry.trim();
+      if (isAssetReferenceKey(key) && normalized.startsWith("asset:")) {
+        sink.add(normalized);
+      }
+      continue;
+    }
+    collectAssetLikeIds(entry, sink);
+  }
+}
+
+function isAssetReferenceKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return normalized === "assetid"
+    || normalized === "outputassetid"
+    || normalized === "previewassetid"
+    || normalized.endsWith("assetid");
 }
 
 function createDefaultRuntimeControlClient(): RuntimeControlClient {
