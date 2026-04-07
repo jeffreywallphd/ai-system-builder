@@ -1,5 +1,4 @@
 import type { IPlatformAuditEventRepository } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
-import type { PlatformRunRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
   AuthorizationPolicyEvaluationTargetKinds,
   type IAuthorizationPolicyDecisionEvaluator,
@@ -16,6 +15,11 @@ import {
   mergeOperationalStatusProjection,
 } from "@application/runs/use-cases/RunOperationalVisibilityProjection";
 import {
+  buildRunQueueSchedulingAdminSummary,
+  buildRunSchedulingVisibilityProjection,
+  stripRunSchedulingAdminDiagnostics,
+} from "@application/runs/use-cases/RunSchedulingVisibilityProjection";
+import {
   mapPlatformRunRecordToCanonicalRun,
   toRunStatusEnvelopeFromPlatformRecord,
 } from "@application/runs/use-cases/RunCreationPersistenceMapper";
@@ -27,6 +31,7 @@ import { AuthorizationResourceFamilies } from "@domain/authorization/Authorizati
 import type {
   RunDetail,
   RunListReadResponse,
+  RunQueueStatusItem,
   RunQueueStatusReadResponse,
   RunStatusEnvelope,
   RunSubmissionSource,
@@ -198,13 +203,23 @@ export class AuthoritativeRunQueryBackendApi {
       asOf: this.now().toISOString(),
     });
 
-    const visibleItems = [];
+    const visibleItems: RunQueueStatusItem[] = [];
+    const adminVisibleItems: RunQueueStatusItem[] = [];
     for (const item of queue.items) {
       if (await this.isRunReadAllowed({
         authorization: request.authorization,
         runId: item.runId,
       })) {
-        visibleItems.push(item);
+        const audience = await this.resolveOperationalAudience(request.authorization, item.runId);
+        if (audience === OperationalVisibilityAudiences.admin) {
+          visibleItems.push(item);
+          adminVisibleItems.push(item);
+        } else {
+          visibleItems.push(Object.freeze({
+            ...item,
+            scheduling: stripRunSchedulingAdminDiagnostics(item.scheduling),
+          }));
+        }
       }
     }
     const queueStateCounters = countByState(visibleItems.map((item) => item.state));
@@ -230,6 +245,12 @@ export class AuthoritativeRunQueryBackendApi {
         items: Object.freeze(visibleItems),
         totalCount: visibleItems.length,
         asOf: queue.asOf,
+        schedulingAdminSummary: adminVisibleItems.length > 0
+          ? buildRunQueueSchedulingAdminSummary({
+            asOf: queue.asOf,
+            items: Object.freeze(adminVisibleItems),
+          })
+          : undefined,
       }),
     });
   }
@@ -300,8 +321,21 @@ export class AuthoritativeRunQueryBackendApi {
     }
 
     const audience = await this.resolveOperationalAudience(request.authorization, runId);
-    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
+    const auditEvents = await this.listRunAuditEvents(runId, workspaceId);
     const dispatchAttempts = await this.getDispatchAttempts(runId);
+    const timeline = buildOperationalRunStatusTimeline({
+      run: mapPlatformRunRecordToCanonicalRun(record),
+      auditEvents,
+      dispatchAttempts,
+      audience,
+    });
+    const queueEntry = await this.getQueueEntry(runId);
+    const scheduling = buildRunSchedulingVisibilityProjection({
+      runRecord: record,
+      queueEntry,
+      auditEvents,
+      dispatchAttempts,
+    });
     await this.recordObservability({
       event: "run.orchestration.query.get-run-detail.completed",
       operation: "query.get-run-detail",
@@ -324,13 +358,18 @@ export class AuthoritativeRunQueryBackendApi {
 
     return Object.freeze({
       ok: true,
-      data: mergeOperationalDetailProjection({
+      data: Object.freeze({
+        ...mergeOperationalDetailProjection({
         detail,
         run: mapPlatformRunRecordToCanonicalRun(record),
         timeline,
         metadata: record.metadata,
         dispatchAttempts,
         audience,
+      }),
+        scheduling: audience === OperationalVisibilityAudiences.admin
+          ? scheduling
+          : stripRunSchedulingAdminDiagnostics(scheduling),
       }),
     });
   }
@@ -385,8 +424,21 @@ export class AuthoritativeRunQueryBackendApi {
 
     const status = toRunStatusEnvelopeFromPlatformRecord(record);
     const audience = await this.resolveOperationalAudience(request.authorization, runId);
-    const timeline = await this.getRunStatusTimeline(runId, workspaceId, record, audience);
+    const auditEvents = await this.listRunAuditEvents(runId, workspaceId);
     const dispatchAttempts = await this.getDispatchAttempts(runId);
+    const timeline = buildOperationalRunStatusTimeline({
+      run: mapPlatformRunRecordToCanonicalRun(record),
+      auditEvents,
+      dispatchAttempts,
+      audience,
+    });
+    const queueEntry = await this.getQueueEntry(runId);
+    const scheduling = buildRunSchedulingVisibilityProjection({
+      runRecord: record,
+      queueEntry,
+      auditEvents,
+      dispatchAttempts,
+    });
     await this.recordObservability({
       event: "run.orchestration.query.get-run-status.completed",
       operation: "query.get-run-status",
@@ -407,7 +459,8 @@ export class AuthoritativeRunQueryBackendApi {
     });
     return Object.freeze({
       ok: true,
-      data: mergeOperationalStatusProjection({
+      data: Object.freeze({
+        ...mergeOperationalStatusProjection({
         status,
         run: mapPlatformRunRecordToCanonicalRun(record),
         timeline,
@@ -415,26 +468,17 @@ export class AuthoritativeRunQueryBackendApi {
         dispatchAttempts,
         audience,
       }),
+        scheduling: audience === OperationalVisibilityAudiences.admin
+          ? scheduling
+          : stripRunSchedulingAdminDiagnostics(scheduling),
+      }),
     });
   }
 
-  private async getRunStatusTimeline(
-    runId: string,
-    workspaceId: string,
-    record: PlatformRunRecord,
-    audience: typeof OperationalVisibilityAudiences[keyof typeof OperationalVisibilityAudiences],
-  ) {
-    const canonicalRun = mapPlatformRunRecordToCanonicalRun(record);
-    const dispatchAttempts = await this.getDispatchAttempts(runId);
+  private async listRunAuditEvents(runId: string, workspaceId: string) {
     if (!this.dependencies.auditEventRepository) {
-      return buildOperationalRunStatusTimeline({
-        run: canonicalRun,
-        auditEvents: Object.freeze([]),
-        dispatchAttempts,
-        audience,
-      });
+      return Object.freeze([]);
     }
-
     const events = await this.dependencies.auditEventRepository.listAuditEvents({
       eventKinds: Object.freeze(["runs"]),
       workspaceId,
@@ -442,13 +486,7 @@ export class AuthoritativeRunQueryBackendApi {
       limit: 64,
       offset: 0,
     });
-
-    return buildOperationalRunStatusTimeline({
-      run: canonicalRun,
-      auditEvents: events,
-      dispatchAttempts,
-      audience,
-    });
+    return Object.freeze([...events]);
   }
 
   private async getDispatchAttempts(runId: string) {
@@ -457,6 +495,13 @@ export class AuthoritativeRunQueryBackendApi {
     }
     const attempts = await this.dependencies.queueRepository.listDispatchAttemptsByRunId(runId);
     return Object.freeze([...attempts]);
+  }
+
+  private async getQueueEntry(runId: string) {
+    if (!this.dependencies.queueRepository) {
+      return undefined;
+    }
+    return this.dependencies.queueRepository.getQueueEntryByRunId(runId);
   }
 
   private async isRunReadAllowed(input: {

@@ -7,6 +7,7 @@ import {
   parseRunLifecycleEventEnvelope,
   parseRunLifecycleUpdateRequest,
   parseRunQueueStatusReadRequest,
+  parseRunQueueStatusReadResponse,
   parseRunStatusEnvelope,
   parseRunSubmissionRequest,
   toLegacyRuntimeStartRunRequest,
@@ -60,6 +61,65 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       offset: 0,
     });
     expect(queueRead.statuses?.length).toBe(2);
+  });
+
+  it("parses queue status response contracts with scheduling visibility projections", () => {
+    const parsed = parseRunQueueStatusReadResponse({
+      items: [{
+        runId: "run-1",
+        workflowId: "workflow-1",
+        workspaceId: "workspace-1",
+        state: "queued",
+        queue: {
+          queueId: "queue-1",
+          enteredAt: "2026-04-07T10:00:00.000Z",
+          position: 1,
+          positionAsOf: "2026-04-07T10:01:00.000Z",
+        },
+        assignmentStatus: "unassigned",
+        executionOutcome: "none",
+        updatedAt: "2026-04-07T10:01:00.000Z",
+        scheduling: {
+          candidateConstraints: {
+            requiredCapabilities: ["executor"],
+            requiresRemoteScheduling: true,
+          },
+          placement: {
+            outcome: "deferred",
+            reasonCodes: ["node-missing-capability"],
+          },
+          admin: {
+            requiresAdministrativeAttention: true,
+            reasonCodes: ["node-missing-capability"],
+            decisionReasonCodes: ["no-eligible-candidates"],
+            exclusionReasonCodes: ["node-missing-capability"],
+          },
+        },
+      }],
+      totalCount: 1,
+      asOf: "2026-04-07T10:01:00.000Z",
+      schedulingAdminSummary: {
+        asOf: "2026-04-07T10:01:00.000Z",
+        totalRuns: 1,
+        deferredRuns: 1,
+        requiresAdministrativeAttentionRuns: 1,
+        reasonCodes: [{
+          code: "node-missing-capability",
+          count: 1,
+        }],
+        decisionReasonCodes: [{
+          code: "no-eligible-candidates",
+          count: 1,
+        }],
+        exclusionReasonCodes: [{
+          code: "node-missing-capability",
+          count: 1,
+        }],
+      },
+    });
+
+    expect(parsed.schedulingAdminSummary?.deferredRuns).toBe(1);
+    expect(parsed.items[0]?.scheduling?.placement.outcome).toBe("deferred");
   });
 
   it("parses authoritative run list read contracts", () => {

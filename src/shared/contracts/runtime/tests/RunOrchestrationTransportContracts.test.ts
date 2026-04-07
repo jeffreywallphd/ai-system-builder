@@ -73,6 +73,7 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(summary.runId).toBe("run-1");
     expect(summary.state).toBe(RunLifecycleStates.running);
     expect(summary.actionAvailability?.cancel.allowed).toBeTrue();
+    expect(summary.scheduling).toBeUndefined();
 
     const detail = toRunDetail(run);
     expect(detail.assignment.assignedNodeId).toBe("node-1");

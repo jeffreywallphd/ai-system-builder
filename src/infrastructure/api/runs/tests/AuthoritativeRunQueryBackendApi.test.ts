@@ -100,9 +100,23 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
 
 class InMemoryRunQueueReadRepository implements IRunOrchestrationQueuePersistenceRepository {
   public readonly dispatchAttempts = new Map<string, ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>();
+  public entries: ReadonlyArray<AuthoritativeRunQueueEntryRecord> = Object.freeze([]);
 
-  public async getQueueEntryByRunId(_runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
-    return undefined;
+  public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
+    return this.entries.find((entry) => entry.runId === runId);
+  }
+
+  public async listQueueEntries(
+    _query?: {
+      readonly workspaceId?: string;
+      readonly queueId?: string;
+      readonly lifecycleStates?: ReadonlyArray<typeof RunLifecycleStates[keyof typeof RunLifecycleStates]>;
+      readonly includeDequeued?: boolean;
+      readonly limit?: number;
+      readonly offset?: number;
+    },
+  ): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
+    return this.entries;
   }
 
   public async enqueueRunForAssignment(
@@ -625,6 +639,121 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(response.data?.items).toHaveLength(1);
     expect(response.data?.items[0]?.runId).toBe("run:queue");
     expect(response.data?.items[0]?.actionAvailability?.cancel.allowed).toBeTrue();
+  });
+
+  it("gates scheduling admin diagnostics and queue admin summary by run.manage visibility", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const runQueueRepository = new InMemoryRunQueueReadRepository();
+    await runRepository.createRun(createRunRecord({
+      runId: "run:queue-admin",
+      workspaceId: "workspace-alpha",
+      workflowId: "workflow-alpha",
+      state: RunLifecycleStates.queued,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-07T09:00:00.000Z",
+      updatedAt: "2026-04-07T09:05:00.000Z",
+    }), {
+      operationKey: "seed:queue-admin",
+      actorId: "system:test",
+    });
+    runQueueRepository.entries = Object.freeze([Object.freeze({
+      runId: "run:queue-admin",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: RunLifecycleStates.queued,
+      enteredAt: "2026-04-07T09:00:00.000Z",
+      orderKey: "001",
+      eligibilityMarker: "deferred",
+      eligibleAt: "2026-04-07T09:10:00.000Z",
+      updatedAt: "2026-04-07T09:05:00.000Z",
+      revision: 2,
+      deferCount: 2,
+      lastNoPlacementCategory: "capability-coverage-missing",
+      lastNoPlacementReasonCodes: Object.freeze(["node-missing-capability"]),
+      lastNoPlacementReasonMessage: "No eligible node satisfies required capabilities.",
+      lastNoPlacementDecisionId: "decision:1",
+      lastNoPlacementRecordedAt: "2026-04-07T09:05:00.000Z",
+      lastNoPlacementRequiresAdministrativeAttention: true,
+    })]);
+
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    authRepositories.resourceMetadata.set(toResourceKey("authoritative-run", "run:queue-admin"), Object.freeze({
+      resourceFamily: AuthorizationResourceFamilies.run,
+      resourceType: "authoritative-run",
+      resourceId: "run:queue-admin",
+      ownerUserIdentityId: "user-owner",
+      ownershipScope: ResourceOwnershipScopes.workspace,
+      workspaceId: "workspace-alpha",
+      visibility: ResourceVisibilities.workspace,
+      sharingPolicyMode: SharingPolicyModes.workspaceMembers,
+      allowResharing: false,
+      isPublishedCapable: false,
+    }));
+    authRepositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-viewer-queue",
+          actorUserIdentityId: "user-viewer",
+          roleKey: "viewer",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+        createRoleAssignment({
+          id: "role-admin-queue",
+          actorUserIdentityId: "user-admin",
+          roleKey: "admin",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-07T10:00:00.000Z") },
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: new ListAuthoritativeRunQueueStatusUseCase({
+        runRepository,
+        queueRepository: runQueueRepository,
+        now: () => new Date("2026-04-07T10:00:00.000Z"),
+      }),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      queueRepository: runQueueRepository,
+      authorizationDecisionEvaluator: evaluator,
+      now: () => new Date("2026-04-07T10:00:00.000Z"),
+    });
+
+    const viewer = await api.listQueueStatus({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(viewer.ok).toBeTrue();
+    expect(viewer.data?.items[0]?.scheduling?.admin).toBeUndefined();
+    expect(viewer.data?.schedulingAdminSummary).toBeUndefined();
+
+    const admin = await api.listQueueStatus({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-admin",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(admin.ok).toBeTrue();
+    expect(admin.data?.items[0]?.scheduling?.admin?.requiresAdministrativeAttention).toBeTrue();
+    expect(admin.data?.schedulingAdminSummary?.requiresAdministrativeAttentionRuns).toBe(1);
   });
 
   it("keeps diagnostics redacted for readers and exposes admin diagnostics for run.manage audiences", async () => {
