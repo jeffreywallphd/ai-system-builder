@@ -11,7 +11,7 @@ import {
 } from "../../config/HostSecureTransportConfig";
 
 const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
-const SUPERVISOR_ENTRYPOINT = path.resolve(REPOSITORY_ROOT, "infrastructure/runtime/service-supervisor.js");
+const SUPERVISOR_ENTRYPOINT = path.resolve(REPOSITORY_ROOT, "src/infrastructure/runtime/service-supervisor.js");
 const PYTHON_RUNTIME_WORKDIR = path.resolve(REPOSITORY_ROOT, "python-runtime");
 const MCP_WORKSPACE_ROOT = path.resolve(REPOSITORY_ROOT, "user", "workflow-data", "mcp");
 const SUPERVISOR_DEFINITIONS_PATH = path.resolve(REPOSITORY_ROOT, ".ai-loom-studio", "browser-dev-managed-services.json");
@@ -353,3 +353,4 @@ export function resolveBrowserDevelopmentManagedRuntimeFromEnvironment(): Browse
     autostartEnabled: process.env.AI_LOOM_SERVICE_SUPERVISOR_AUTOSTART !== "false",
   });
 }
+

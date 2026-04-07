@@ -23,9 +23,9 @@
     "make:desktop": "electron-forge make",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "service-supervisor": "node infrastructure/runtime/service-supervisor.js",
+    "service-supervisor": "node src/infrastructure/runtime/service-supervisor.js",
     "test": "bun test",
-    "test:service-supervisor": "bun test infrastructure/runtime/tests/ServiceSupervisor.test.ts",
+    "test:service-supervisor": "bun test src/infrastructure/runtime/tests/ServiceSupervisor.test.ts",
     "dev:browser": "vite --mode browser",
     "start:authoritative-server": "bun run src/hosts/server/AuthoritativeServerHostEntrypoint.ts",
     "start:hybrid-host": "bun run src/hosts/hybrid/HybridHostEntrypoint.ts",
@@ -73,3 +73,4 @@
   },
   "main": ".vite/build/main.mjs"
 }
+
