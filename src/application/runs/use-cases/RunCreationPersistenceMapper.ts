@@ -48,6 +48,13 @@ export interface RunAuthoritativeMetadata {
       readonly queueId: string;
       readonly recordedAt: string;
     };
+    readonly lineage?: {
+      readonly kind: "retry";
+      readonly previousRunId: string;
+      readonly attempt: number;
+      readonly maxAttempts: number;
+      readonly retryReason?: string;
+    };
     readonly finalization?: RunAuthoritativeFinalizationSnapshot;
   };
 }
@@ -125,6 +132,12 @@ export function mapPlatformRunStatusToLifecycleState(status: PlatformRunStatus):
 export function createInitialCanonicalRunRecord(
   command: CanonicalRunSubmissionCommand,
   runId: string,
+  retry?: {
+    readonly attempt: number;
+    readonly maxAttempts: number;
+    readonly previousRunId?: string;
+    readonly retryReason?: string;
+  },
 ): CanonicalRunRecord {
   return createCanonicalRunRecord({
     identity: {
@@ -149,8 +162,10 @@ export function createInitialCanonicalRunRecord(
       outcome: RunExecutionOutcomeKinds.none,
     },
     retry: {
-      attempt: 1,
-      maxAttempts: 1,
+      attempt: retry?.attempt ?? 1,
+      maxAttempts: retry?.maxAttempts ?? 1,
+      previousRunId: normalizeOptional(retry?.previousRunId),
+      retryReason: normalizeOptional(retry?.retryReason),
     },
     updatedAt: command.occurredAt,
   });
@@ -161,6 +176,7 @@ export function createRunAuthoritativeMetadata(
   run: CanonicalRunRecord,
   queueId: string,
 ): RunAuthoritativeMetadata {
+  const hasRetryLineage = Boolean(run.retry.previousRunId);
   return Object.freeze({
     schemaVersion: RunAuthoritativeMetadataSchemaVersion,
     canonicalRun: run,
@@ -186,6 +202,17 @@ export function createRunAuthoritativeMetadata(
         queueId,
         recordedAt: run.updatedAt,
       }),
+      ...(hasRetryLineage
+        ? {
+          lineage: Object.freeze({
+            kind: "retry" as const,
+            previousRunId: run.retry.previousRunId!,
+            attempt: run.retry.attempt,
+            maxAttempts: run.retry.maxAttempts,
+            retryReason: run.retry.retryReason,
+          }),
+        }
+        : {}),
     }),
   });
 }

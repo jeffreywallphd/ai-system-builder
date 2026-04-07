@@ -33,6 +33,12 @@ export interface CreateAuthoritativeRunRequest {
   readonly command: CanonicalRunSubmissionCommand;
   readonly runId?: string;
   readonly queueId?: string;
+  readonly retry?: {
+    readonly attempt: number;
+    readonly maxAttempts: number;
+    readonly previousRunId?: string;
+    readonly retryReason?: string;
+  };
 }
 
 export interface CreateAuthoritativeRunResult {
@@ -107,7 +113,7 @@ export class CreateAuthoritativeRunUseCase {
       ?? this.idGenerator.nextId("run");
     const queueId = resolveQueueId(input);
     const canonicalRun = transitionCanonicalRunRecord(
-      createInitialCanonicalRunRecord(input.command, runId),
+      createInitialCanonicalRunRecord(input.command, runId, input.retry),
       {
         toState: RunLifecycleStates.queued,
         occurredAt: input.command.occurredAt,

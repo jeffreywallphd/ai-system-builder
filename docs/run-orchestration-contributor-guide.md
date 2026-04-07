@@ -16,6 +16,8 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-execution-heartbeat-progress-ingestion.md`
 - `docs/architecture/run-orchestration-completion-failure-finalization.md`
 - `docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md`
+- `docs/architecture/run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md`
+- `docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md`
 
 ## Required implementation path
 
@@ -65,6 +67,14 @@ Provide an implementation checklist for contributors extending the authoritative
 4. Keep cancellation queue/claim coordination in application use cases; do not release claims directly from route handlers.
 5. Keep cancellation telemetry split: canonical run cancellation state for user-safe visibility, audit + metadata for operator diagnostics.
 
+## Extending retry and rerun orchestration
+
+1. Keep retry eligibility and lineage handling in `RequestAuthoritativeRunRetryUseCase`.
+2. Treat retries as new authoritative runs; do not mutate historical source-run lifecycle state.
+3. Reuse `ValidateRunSubmissionUseCase` + `CreateAuthoritativeRunUseCase` for retried submissions instead of writing run records directly.
+4. Preserve lineage explicitly on the retried run (`retry.previousRunId`, incremented `retry.attempt`, optional `retryReason`).
+5. Restrict retry eligibility to explicit policy states (currently `failed` and `cancelled`) and return clear ineligible semantics for all other states.
+
 ## Invariants and non-negotiable boundaries
 
 - Lifecycle transition legality is domain-owned (`RunDomain`) and must remain single-source.
@@ -81,6 +91,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Mutating canonical run lifecycle directly from infrastructure adapters is prohibited.
 - Bypassing `IngestRunExecutionUpdateUseCase` for execution progress/heartbeat/lifecycle mutation is prohibited.
 - Persisting internal diagnostics directly into user-facing run contracts is prohibited.
+- Creating retried runs by bypassing authoritative validation + creation use cases is prohibited.
 
 ## Review checklist
 
