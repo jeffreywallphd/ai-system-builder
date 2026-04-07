@@ -1120,6 +1120,63 @@ body {
   padding: var(--space-sm);
 }
 
+.ui-workspace-admin-shared__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-workspace-admin-shared__summary-card {
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ui-workspace-admin-shared__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-workspace-admin-shared__partial-visibility {
+  margin: 0;
+  padding: var(--space-sm);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+  font-size: var(--font-size-sm);
+}
+
+.ui-workspace-admin-shared__member-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-lg);
+  background: rgba(15, 23, 42, 0.26);
+  padding: var(--space-sm);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.ui-workspace-admin-shared__member-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.ui-workspace-admin-shared__role-assignment .ui-card__body {
+  padding-top: var(--space-sm);
+}
+
+.ui-workspace-admin-shared__role-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
 .ui-node-enrollment-review-page__grid {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
@@ -1436,6 +1493,12 @@ body {
   }
 
   .ui-workspace-thin-page__invite-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ui-workspace-admin-shared__summary-grid,
+  .ui-workspace-admin-shared__detail-grid,
+  .ui-workspace-admin-shared__role-form {
     grid-template-columns: 1fr;
   }
 
