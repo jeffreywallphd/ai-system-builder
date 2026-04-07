@@ -13,6 +13,7 @@ This operational note documents Story 5.2.5 (Feature 5 / Epic 5.2): the first pr
 - `src/ui/pages/NodeEnrollmentReviewPage.tsx`
 - `src/ui/services/NodeEnrollmentReviewService.ts`
 - `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`
+- `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`
 - `src/ui/routes/RouteConfig.ts`
 - `src/ui/routes/AppRouter.tsx`
 - `src/ui/pages/SettingsPage.tsx`
@@ -39,6 +40,13 @@ Displayed request fields:
 - deployment tags
 - request timestamp
 - trust lifecycle status (pending enrollment context)
+- node heartbeat and capability context in linked inventory detail workflows
+
+Surface behavior:
+
+- desktop sessions render dense tabular pending-request review with row action menus
+- thin-client/admin-lite sessions render compact card review with shared action lists
+- both surfaces use one shared review decision action contract (approve/reject with optional decision note)
 
 ## State handling
 
@@ -61,6 +69,7 @@ Backend state remains authoritative; after each decision, the UI refreshes pendi
 
 - `src/ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
 - `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
+- `src/ui/shared/nodes/tests/NodeTrustAdministrationPanels.test.tsx`
 - route/settings contract updates in:
   - `src/ui/routes/tests/RoutesContracts.test.ts`
   - `src/ui/routes/tests/RoutesUnit.test.ts`

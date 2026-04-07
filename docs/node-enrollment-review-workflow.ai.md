@@ -9,6 +9,7 @@ UI-facing admin review and decision flow for pending node enrollment requests (S
 - `src/ui/pages/NodeEnrollmentReviewPage.tsx`
 - `src/ui/services/NodeEnrollmentReviewService.ts`
 - `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`
+- `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx`
 - `src/ui/routes/RouteConfig.ts`
 - `src/ui/routes/AppRouter.tsx`
 - `src/ui/pages/SettingsPage.tsx`
@@ -24,6 +25,10 @@ UI-facing admin review and decision flow for pending node enrollment requests (S
   - inspect one request detail
   - approve with optional decision note
   - reject with optional decision note
+- Surface-specific rendering:
+  - desktop: dense table + row action menus
+  - thin/admin-lite: compact cards + action lists
+  - both reuse one shared decision panel action contract
 
 ## Data contract posture
 
@@ -45,4 +50,5 @@ UI-facing admin review and decision flow for pending node enrollment requests (S
 
 - `src/ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
 - `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
+- `src/ui/shared/nodes/tests/NodeTrustAdministrationPanels.test.tsx`
 - route/settings/service contract assertions updated to include new node-enrollment review entry points

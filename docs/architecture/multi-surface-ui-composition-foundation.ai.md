@@ -144,3 +144,9 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
   - thin admin-lite entry (`/settings/admin-lite`).
 - Added metadata-driven route protection in the route seam via `src/ui/routes/SurfaceRouteAccessPolicy.ts` + `SurfaceProtectedRoute` in `AppRouter.tsx`.
 - Settings shortcuts and command palette now apply strict session-derived availability context so unauthorized users cannot discover gated admin destinations through UI shortcut channels.
+
+## Story 15.3.4 update
+
+- Shared node administration presentation now lives in `src/ui/shared/nodes/NodeTrustAdministrationPanels.tsx` for inventory + enrollment review list/detail/status/action composition.
+- Desktop uses dense table/menu wrappers while thin/admin-lite uses compact card/list wrappers, with one shared action contract for review and disable operations.
+- `NodeInventoryPage` and `NodeEnrollmentReviewPage` now consume that shared seam directly.
