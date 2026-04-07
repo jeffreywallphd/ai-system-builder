@@ -77,6 +77,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-width: 0;
+}
+
+.ui-operational-truncate {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 .ui-operational-dashboard__node-grid {
@@ -124,6 +134,12 @@
   gap: var(--space-sm);
 }
 
+.ui-operational-queue-visibility__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
 .ui-operational-approved-run-launch__section {
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-md);
@@ -135,6 +151,14 @@
 
 .ui-operational-approved-run-launch__payload-field {
   grid-column: 1 / -1;
+}
+
+.ui-operational-approved-run-launch__step {
+  margin: 0;
+}
+
+.ui-operational-approved-run-launch__actions {
+  align-items: center;
 }
 
 .ui-operational-approved-run-launch__validation-list {
@@ -181,5 +205,28 @@
   .ui-operational-queue-filters__row,
   .ui-operational-result-review__layout {
     grid-template-columns: 1fr;
+  }
+
+  .ui-operational-queue-visibility__controls {
+    position: sticky;
+    top: var(--space-xs);
+    z-index: var(--z-sticky);
+    background: var(--color-bg-primary);
+    padding-bottom: var(--space-xs);
+  }
+
+  .ui-operational-approved-run-launch__actions {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    padding: var(--space-xs);
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-primary);
+  }
+
+  .ui-operational-result-review__layout > .ui-stack:first-child,
+  .ui-operational-result-review__layout > .ui-card {
+    scroll-margin-top: calc(var(--space-xl) + 3.5rem);
   }
 }

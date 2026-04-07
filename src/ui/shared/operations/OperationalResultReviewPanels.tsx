@@ -36,7 +36,7 @@ export function OperationalResultOutputCard({
   return (
     <article className={`ui-operational-dashboard__item ${selected ? "ui-operational-result-review__card--selected" : ""}`}>
       <div className="ui-row ui-row--between ui-row--wrap">
-        <strong>{entry.executionId}</strong>
+        <strong className="ui-operational-truncate" title={entry.executionId}>{entry.executionId}</strong>
         <span className="ui-badge ui-badge--neutral">{entry.status ?? "unknown"}</span>
       </div>
       <p className="ui-text-small ui-text-secondary">
@@ -170,7 +170,7 @@ export function OperationalResultDetailPanel({
               references.map((assetId) => (
                 <article key={assetId} className="ui-operational-run-detail__section">
                   <div className="ui-stack ui-stack--2xs">
-                    <strong>{assetId}</strong>
+                    <strong className="ui-operational-truncate" title={assetId}>{assetId}</strong>
                     <span className="ui-text-small ui-text-secondary">
                       {assetDetailsByAssetId?.[assetId]?.kind ?? "asset"} | {assetDetailsByAssetId?.[assetId]?.visibility ?? "visibility unknown"}
                     </span>
@@ -222,6 +222,7 @@ export function OperationalResultReviewPanels({
   const reviewState = resolveResultReviewState({
     hasEntries: entries.length > 0,
   });
+  const isMobileViewport = responsiveProfile.viewport === "mobile";
 
   return (
     <section className="ui-card ui-operational-result-review" data-testid="operational-result-review">
@@ -237,6 +238,7 @@ export function OperationalResultReviewPanels({
         <SurfaceStateBoundary state={reviewState}>
           <div className="ui-operational-result-review__layout">
             <div className="ui-stack ui-stack--xs">
+              {isMobileViewport ? <p className="ui-text-small ui-text-secondary">Step 1: Select a run output card.</p> : null}
               {entries.map((entry) => (
                 <OperationalResultOutputCard
                   key={entry.executionId}
@@ -246,6 +248,7 @@ export function OperationalResultReviewPanels({
                 />
               ))}
             </div>
+            {isMobileViewport ? <p className="ui-text-small ui-text-secondary">Step 2: Review metadata and protected asset actions.</p> : null}
             <OperationalResultDetailPanel
               selectedEntry={selectedEntry}
               isLoading={detailIsLoading}

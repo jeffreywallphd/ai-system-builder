@@ -200,3 +200,12 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Connectivity-state regression coverage now includes shared indicator rendering and state assertions in:
   - `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`,
   - operational dashboard/run/queue shared UI suites.
+
+## Story 15.2.7 update
+
+- Thin-client mobile/tablet production refinements stay in shared operational seams (`src/ui/shared/operations/*`) rather than page-local breakpoint branches in `RunPage`.
+- Operational monitor/review/launch flows now use mobile-practical composition contracts:
+  - run list table now consistently uses responsive card contracts (`ui-responsive-table__table` + `data-label`) when profile table layout resolves to cards,
+  - queue visibility controls and approved-run launch actions expose mobile-sticky control wrappers in shared operational styles,
+  - result review adds explicit stepwise mobile guidance while preserving desktop/tablet shared component reuse.
+- Narrow-surface readability hardening (execution/system/asset identifier truncation wrappers) is implemented in shared operational components and styles so desktop and thin-client surfaces inherit one maintainable behavior seam.

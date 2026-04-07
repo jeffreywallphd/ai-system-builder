@@ -124,5 +124,8 @@ describe("OperationalApprovedRunLaunchPanel", () => {
     expect(html).toContain("Input payload");
     expect(html).toContain("Launch approved run");
     expect(html).toContain("ui-responsive-form");
+    expect(html).toContain("Step 1: Provide approved run identifiers and bounded parameters.");
+    expect(html).toContain("Step 2: Launch the approved run and review validation feedback.");
+    expect(html).toContain("ui-operational-approved-run-launch__actions");
   });
 });

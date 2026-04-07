@@ -80,6 +80,9 @@ describe("Operational run visibility and status rendering", () => {
     expect(html).toContain("run:completed");
     expect(html).toContain("Live updates: Connected");
     expect(html).toContain("Row actions");
+    expect(html).toContain("ui-responsive-table__table");
+    expect(html).toContain("data-label=\"Execution\"");
+    expect(html).toContain("data-label=\"Actions\"");
   });
 
   it("renders status changes in the run detail panel", () => {

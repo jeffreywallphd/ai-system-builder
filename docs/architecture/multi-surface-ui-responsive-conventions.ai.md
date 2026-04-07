@@ -37,4 +37,14 @@ Story 15.1.6 standardizes breakpoint, density, touch target, panel collapse, and
 - `src/ui/shared/tests/SurfaceResponsiveConventions.test.tsx`
 - `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
 - `src/ui/shared/tests/SurfaceActionComponents.test.tsx`
+- `src/ui/shared/tests/OperationalRunVisibilityStatusIntegration.test.tsx`
+- `src/ui/shared/tests/OperationalQueueVisibilityActions.test.tsx`
+- `src/ui/shared/tests/OperationalResultReviewPanels.test.tsx`
+- `src/ui/shared/tests/OperationalApprovedRunLaunchPanel.test.tsx`
+
+## Story 15.2.7 guidance addendum
+- Run-monitor tables must include responsive card contracts (`ui-responsive-table__table` + cell `data-label`) so mobile card rendering remains readable and accessible.
+- Prefer shared sticky control wrappers for queue-monitor and approved-launch actions at mobile/tablet widths; avoid page-local sticky behavior.
+- For constrained thin-client surfaces, stepwise shared copy can clarify multi-step review/launch flows without creating a separate business-logic stack.
+- Long execution/system/asset ids should use shared truncation presentation wrappers so narrow-surface list/detail views stay practical.
 

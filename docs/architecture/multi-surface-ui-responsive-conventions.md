@@ -77,4 +77,15 @@ Use `toSurfaceViewport` and `createSurfaceResponsiveProfile` instead of page-loc
 - `src/ui/shared/tests/SurfaceResponsiveConventions.test.tsx`
 - `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
 - `src/ui/shared/tests/SurfaceActionComponents.test.tsx`
+- `src/ui/shared/tests/OperationalRunVisibilityStatusIntegration.test.tsx`
+- `src/ui/shared/tests/OperationalQueueVisibilityActions.test.tsx`
+- `src/ui/shared/tests/OperationalResultReviewPanels.test.tsx`
+- `src/ui/shared/tests/OperationalApprovedRunLaunchPanel.test.tsx`
+
+## Story 15.2.7 operational refinement notes
+
+- Ensure run-monitor list tables always include `.ui-responsive-table__table` and cell `data-label` attributes so mobile card rendering keeps field context.
+- Prefer shared sticky-control wrappers (queue controls, approved launch actions) at mobile/tablet widths for practical monitor/launch workflows instead of introducing page-local sticky logic.
+- For small surfaces, use concise stepwise guidance text in shared review/launch components when workflows are multi-step and not all desktop interactions are practical on phone-sized layouts.
+- Apply shared truncation wrappers for long ids (execution/system/asset/contract) so card/list/detail compositions remain scannable across mobile and tablet.
 
