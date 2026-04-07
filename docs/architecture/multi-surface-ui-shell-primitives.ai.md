@@ -40,3 +40,11 @@ Feature 15.1.2 adds shared shell primitives so desktop and thin-client admin/ope
 - Canonical state kinds now include: `loading`, `empty`, `not-found`, `disconnected`, `error`, `permission-denied`.
 - Use `SurfaceStateBoundary` + `SurfaceStatePanel` for converged list/detail page-state rendering instead of per-page ad hoc status markup.
 - Use `toSurfacePresentationStateFromApiError` to map API error semantics into UI state consistently across surfaces.
+
+## Story 15.1.7 update
+- Shell primitives now provide baseline accessibility semantics:
+  - navigation regions render as `nav`
+  - detail regions render as `aside`
+  - header action groups expose toolbar semantics
+  - status surfaces map tone to live-region alert behavior
+- Desktop/thin wrappers now pass accessible frame labels so screen-reader users can identify active surface context.

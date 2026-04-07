@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CommandPaletteService, type CommandPaletteEntry } from "../../routes/CommandPalette";
+import { useSurfaceDialogFocusTrap } from "../../shared/accessibility";
 
 export interface CommandPaletteProps {
   readonly isOpen: boolean;
@@ -11,6 +12,13 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
   const location = useLocation();
   const navigate = useNavigate();
   const service = useMemo(() => new CommandPaletteService(), []);
+  const dialogRef = useRef<HTMLElement>(null);
+
+  useSurfaceDialogFocusTrap({
+    isOpen,
+    containerRef: dialogRef,
+    onRequestClose: onClose,
+  });
 
   const model = useMemo(
     () => service.resolveDefaultModel({ pathname: location.pathname, search: location.search }),
@@ -30,14 +38,17 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     <div className="ui-overlay-panel ui-overlay-panel--right ui-overlay-panel--open ui-command-palette" aria-hidden={false}>
       <button type="button" className="ui-overlay-panel__scrim" onClick={onClose} aria-label="Close navigation menu" />
       <aside
+        ref={dialogRef}
         id="global-navigation-menu"
         className="ui-overlay-panel__surface"
         role="dialog"
         aria-modal="true"
         aria-label="Navigation menu"
+        tabIndex={-1}
       >
         <div className="ui-overlay-panel__body ui-stack ui-stack--sm">
-          <div className="ui-command-palette__entries">
+          <h2 className="ui-visually-hidden">Navigation menu actions</h2>
+          <nav className="ui-command-palette__entries" aria-label="Available navigation destinations">
             {model.entries.map((entry) => (
               <button
                 key={entry.id}
@@ -48,7 +59,7 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
                 {entry.label}
               </button>
             ))}
-          </div>
+          </nav>
         </div>
       </aside>
     </div>

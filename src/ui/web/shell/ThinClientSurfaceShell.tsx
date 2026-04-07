@@ -14,7 +14,7 @@ export default function ThinClientSurfaceShell({
   className,
 }: ThinClientSurfaceShellProps): JSX.Element {
   return (
-    <SurfaceFrame surface="thin" className={className}>
+    <SurfaceFrame surface="thin" className={className} ariaLabel={`${title} thin-client surface`}>
       <SurfaceHeaderBar title={title} subtitle={subtitle} actions={actions} />
       {children}
     </SurfaceFrame>

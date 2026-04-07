@@ -18,6 +18,11 @@ import { GlobalCommandTrigger } from "../routes/CommandPalette";
 import GuidedOnboardingFlowSurface from "../components/navigation/GuidedOnboardingFlow";
 import { SystemRuntimeWindowLaunchQueryParam } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import SystemRuntimeWindowHost from "../components/studio-shell/SystemRuntimeWindowHost";
+import {
+  SurfaceLiveRegion,
+  SurfaceSkipLink,
+  useSurfaceRouteFocus,
+} from "../shared/accessibility";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -63,8 +68,14 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [routeAnnouncement, setRouteAnnouncement] = useState<string | undefined>(undefined);
   const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  useSurfaceRouteFocus(location.pathname, mainContentRef, {
+    onAnnounce: setRouteAnnouncement,
+  });
 
   useEffect(() => {
     return runtimeConsoleStore.subscribe(setRuntimeConsoleState);
@@ -185,6 +196,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
 
   return (
     <div className="ui-app ui-surface-app">
+      <SurfaceSkipLink targetId="main-content" />
       <header className="ui-app__header">
         <div className="ui-app__header-inner">
           <Link to="/" className="ui-app__brand" aria-label="AI Loom Studio home">
@@ -224,7 +236,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
         </div>
       </header>
 
-      <main className="ui-app__main">
+      <main id="main-content" ref={mainContentRef} tabIndex={-1} className="ui-app__main">
         <div
           className={`ui-app__main-inner${
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
@@ -255,6 +267,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
       />
 
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setCommandPaletteOpen(false)} />
+      <SurfaceLiveRegion id="ui-route-change-announcer" message={routeAnnouncement} />
 
       <footer className="ui-app__footer">
         <div className="ui-app__footer-inner">

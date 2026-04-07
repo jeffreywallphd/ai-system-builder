@@ -35,6 +35,9 @@ describe("Surface shell primitives", () => {
     );
 
     expect(html).toContain("ui-shell ui-shell--desktop");
+    expect(html).toContain("<nav");
+    expect(html).toContain("<aside");
+    expect(html).toContain("aria-labelledby");
     expect(html).toContain("Node operations");
     expect(html).toContain("Navigation");
     expect(html).toContain("Content");
@@ -70,6 +73,17 @@ describe("Surface shell primitives", () => {
     );
 
     expect(html).toContain("ui-shell-status ui-shell-status--warning");
+    expect(html).toContain("role=\"status\"");
+    expect(html).toContain("aria-live=\"polite\"");
     expect(html).toContain("warning content");
+  });
+
+  it("renders danger status as an alert region", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(SurfaceStatusRegion, { tone: "danger" }, "danger content"),
+    );
+
+    expect(html).toContain("role=\"alert\"");
+    expect(html).toContain("aria-live=\"assertive\"");
   });
 });

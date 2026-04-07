@@ -55,6 +55,7 @@ describe("SurfaceActionComponents", () => {
     );
 
     expect(html).toContain("ui-action-strip");
+    expect(html).toContain("role=\"toolbar\"");
     expect(html).toContain("Refresh");
     expect(html).toContain("Delete");
     expect(html).toContain("disabled");
@@ -79,6 +80,9 @@ describe("SurfaceActionComponents", () => {
 
     expect(html).toContain("Row actions");
     expect(html).toContain("ui-action-menu__list");
+    expect(html).toContain("role=\"menu\"");
+    expect(html).toContain("aria-haspopup=\"menu\"");
+    expect(html).toContain("role=\"menuitem\"");
     expect(html).toContain("Delete");
     expect(html).not.toContain("Refresh");
   });
@@ -100,6 +104,7 @@ describe("SurfaceActionComponents", () => {
     );
 
     expect(html).toContain("ui-action-list");
+    expect(html).toContain("role=\"toolbar\"");
     expect(html).toContain("ui-action-list--interaction-touch");
     expect(html).toContain("data-action-layout=\"sheet\"");
     expect(html).toContain("Refresh");
