@@ -108,6 +108,17 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
         exclusionReasonCodes: [],
         exclusionReasons: [],
       }],
+      reasonSummary: {
+        decisionReasonCodes: ["capacity-unavailable"],
+        decisionReasonCatalog: [{
+          code: "capacity-unavailable",
+          count: 1,
+          sampleMessage: "Capacity check passed.",
+        }],
+        exclusionReasonCodes: [],
+        exclusionReasonCatalog: [],
+        exclusionSamples: [],
+      },
       reasons: [{
         code: "capacity-unavailable",
         message: "Capacity check passed.",
@@ -155,6 +166,17 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
           excludedCandidateCount: 0,
         },
         queueEvaluation: [],
+        reasonSummary: {
+          decisionReasonCodes: ["queue-empty"],
+          decisionReasonCatalog: [{
+            code: "queue-empty",
+            count: 1,
+            sampleMessage: "No queued runs were available.",
+          }],
+          exclusionReasonCodes: [],
+          exclusionReasonCatalog: [],
+          exclusionSamples: [],
+        },
         reasons: [{
           code: "queue-empty",
           message: "No queued runs were available.",
@@ -214,6 +236,21 @@ describe("SchedulingPolicyEvaluationSchemaContracts", () => {
         exclusionReasonCodes: ["reservation-conflict"],
         exclusionReasons: [],
       }],
+      reasonSummary: {
+        decisionReasonCodes: [],
+        decisionReasonCatalog: [],
+        exclusionReasonCodes: ["reservation-conflict"],
+        exclusionReasonCatalog: [{
+          code: "reservation-conflict",
+          count: 1,
+          sampleMessage: "Node is reserved.",
+        }],
+        exclusionSamples: [{
+          runId: "run:1",
+          nodeId: "node:1",
+          reasonCodes: ["reservation-conflict"],
+        }],
+      },
       reasons: [],
     })).toThrow(SchedulingPolicyEvaluationSchemaValidationError);
   });

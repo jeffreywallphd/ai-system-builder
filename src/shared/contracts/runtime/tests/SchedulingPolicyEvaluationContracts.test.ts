@@ -15,6 +15,7 @@ import {
   createSchedulingOutcomeReason,
   isSchedulingTerminalOutcome,
   normalizeSchedulingPriorityBand,
+  toSchedulingDecisionReasonSummary,
   toSchedulingPolicyEvaluationResult,
 } from "../SchedulingPolicyEvaluationContracts";
 
@@ -99,6 +100,8 @@ describe("SchedulingPolicyEvaluationContracts", () => {
     expect(evaluation.summary.eligibleCandidateCount).toBe(1);
     expect(evaluation.queueEvaluation[0]?.priority.priorityBand).toBe("critical");
     expect(evaluation.queueEvaluation[0]?.exclusionReasonCodes).toEqual([]);
+    expect(evaluation.reasonSummary.decisionReasonCodes).toEqual(["capacity-unavailable"]);
+    expect(evaluation.reasonSummary.exclusionReasonCodes).toEqual([]);
   });
 
   it("builds decision bundles with embedded policy-evaluation projections", () => {
@@ -140,5 +143,48 @@ describe("SchedulingPolicyEvaluationContracts", () => {
     expect(normalizeSchedulingPriorityBand("high")).toBe("high");
     expect(normalizeSchedulingPriorityBand("")).toBe("normal");
     expect(normalizeSchedulingPriorityBand("not-a-band")).toBe("normal");
+  });
+
+  it("builds decision-reason summaries with compact code catalogs and exclusion samples", () => {
+    const decision = createSchedulingPolicyDecision({
+      decisionId: "decision:summary",
+      occurredAt: "2026-04-07T21:00:00.000Z",
+      outcome: SchedulingDecisionOutcomes.deferred,
+      evaluatedCandidates: [Object.freeze({
+        runId: "run:1",
+        nodeId: "node:1",
+        eligible: false,
+        denialReasons: Object.freeze([
+          Object.freeze({
+            code: "hybrid-local-interactive-protection",
+            message: "  Hybrid node is in a protected local-user window and is not eligible for remote assignment.  ",
+          }),
+        ]),
+        scorecard: Object.freeze({
+          priorityBand: "normal",
+          rolePriorityScore: 2,
+          queueAgeSeconds: 42,
+        }),
+      })],
+      reasons: [Object.freeze({
+        code: "no-eligible-candidates",
+        message: "Scheduling candidates were evaluated, but none were eligible for assignment.",
+      })],
+      policySources: [SchedulingPolicySourceKinds.runSubmission],
+    });
+
+    const summary = toSchedulingDecisionReasonSummary({ decision });
+    expect(summary.decisionReasonCodes).toEqual(["no-eligible-candidates"]);
+    expect(summary.exclusionReasonCodes).toEqual(["hybrid-local-interactive-protection"]);
+    expect(summary.exclusionSamples).toEqual([
+      Object.freeze({
+        runId: "run:1",
+        nodeId: "node:1",
+        reasonCodes: Object.freeze(["hybrid-local-interactive-protection"]),
+      }),
+    ]);
+    expect(summary.decisionReasonCatalog[0]?.sampleMessage).toBe(
+      "Scheduling candidates were evaluated, but none were eligible for assignment.",
+    );
   });
 });

@@ -4,6 +4,10 @@ import type {
   IAuthoritativeSchedulingPolicyEvaluator,
   SchedulingEvaluationSnapshot,
 } from "@application/scheduling/AuthoritativeSchedulingDecisionPipeline";
+import type {
+  ISchedulingDecisionOutcomeRecorder,
+  SchedulingDecisionOutcomeCaptureRecord,
+} from "@application/scheduling/ports/SchedulingDecisionOutcomeCapturePorts";
 import {
   createSchedulingDecisionBundle,
   createSchedulingOutcomeReason,
@@ -65,6 +69,14 @@ class RecordingPolicyEvaluator implements IAuthoritativeSchedulingPolicyEvaluato
   }
 }
 
+class RecordingOutcomeRecorder implements ISchedulingDecisionOutcomeRecorder {
+  public recorded: SchedulingDecisionOutcomeCaptureRecord[] = [];
+
+  public async recordDecisionOutcome(record: SchedulingDecisionOutcomeCaptureRecord): Promise<void> {
+    this.recorded.push(record);
+  }
+}
+
 describe("EvaluateAuthoritativeSchedulingDecisionPipelineUseCase", () => {
   it("assembles inputs and delegates policy evaluation with normalized pipeline arguments", async () => {
     const snapshot: SchedulingEvaluationSnapshot = Object.freeze({
@@ -116,5 +128,53 @@ describe("EvaluateAuthoritativeSchedulingDecisionPipelineUseCase", () => {
     await expect(useCase.evaluateNextAssignments({
       reservationOwner: "  ",
     })).rejects.toThrow("reservationOwner");
+  });
+
+  it("records scheduling outcome captures for admin/audit projections when recorder is configured", async () => {
+    const snapshot: SchedulingEvaluationSnapshot = Object.freeze({
+      asOf: "2026-04-07T21:00:00.000Z",
+      queueLeases: [],
+      runs: [],
+      nodes: [],
+    });
+    const recorder = new RecordingOutcomeRecorder();
+    const useCase = new EvaluateAuthoritativeSchedulingDecisionPipelineUseCase({
+      inputAssembler: new RecordingInputAssembler(snapshot),
+      policyEvaluator: new RecordingPolicyEvaluator(),
+      outcomeRecorder: recorder,
+      now: () => new Date("2026-04-07T21:05:00.000Z"),
+    });
+
+    await useCase.evaluateNextAssignments({
+      reservationOwner: "scheduler:alpha",
+    });
+
+    expect(recorder.recorded).toHaveLength(1);
+    expect(recorder.recorded[0]).toEqual(Object.freeze({
+      decisionId: "decision:pipeline",
+      occurredAt: "2026-04-07T21:00:00.000Z",
+      recordedAt: "2026-04-07T21:05:00.000Z",
+      outcome: "deferred",
+      selected: undefined,
+      summary: Object.freeze({
+        queueLeaseCount: 0,
+        runCount: 0,
+        nodeCount: 0,
+        candidateCount: 0,
+        eligibleCandidateCount: 0,
+        excludedCandidateCount: 0,
+      }),
+      reasonSummary: Object.freeze({
+        decisionReasonCodes: Object.freeze(["queue-empty"]),
+        decisionReasonCatalog: Object.freeze([Object.freeze({
+          code: "queue-empty",
+          count: 1,
+          sampleMessage: "Queue is empty.",
+        })]),
+        exclusionReasonCodes: Object.freeze([]),
+        exclusionReasonCatalog: Object.freeze([]),
+        exclusionSamples: Object.freeze([]),
+      }),
+    }));
   });
 });
