@@ -1,12 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import {
   OfflineConnectivityStates,
+  OfflineDraftSyncStatuses,
   OfflinePendingOperationIntents,
   OfflinePendingOperationStatuses,
   OfflineSyncResourceClasses,
   OfflineSynchronizationStates,
   createOfflineSynchronizationStateSnapshot,
   deriveOfflineSynchronizationStatus,
+  transitionOfflineDraftSyncStatus,
+  transitionOfflinePendingOperationStatus,
 } from "../OfflineSynchronizationContracts";
 
 describe("OfflineSynchronizationContracts", () => {
@@ -24,8 +27,15 @@ describe("OfflineSynchronizationContracts", () => {
           queuedAt: "2026-04-07T00:00:00.000Z",
           userVisibleSyncStatus: OfflinePendingOperationStatuses.syncConflict,
           divergenceDisclosureToken: "offline-warning:workflow:draft:1",
+          replayDescriptor: {
+            method: "PATCH",
+            path: "/v1/workflows/drafts/workflow:draft:1/promote",
+            idempotencyKey: "idem:operation:1",
+            payload: { draftId: "workflow:draft:1" },
+          },
           retryCount: 1,
         }],
+        pendingRunSubmissions: [],
         outcomes: [],
         updatedAt: "2026-04-07T00:00:01.000Z",
       },
@@ -59,6 +69,7 @@ describe("OfflineSynchronizationContracts", () => {
       queue: {
         queueId: "offline-sync:workspace-alpha",
         operations: [],
+        pendingRunSubmissions: [],
         outcomes: [],
         updatedAt: "2026-04-07T00:00:01.000Z",
       },
@@ -75,5 +86,57 @@ describe("OfflineSynchronizationContracts", () => {
     expect(snapshot.contractVersion).toBe("offline-sync/v1");
     expect(snapshot.status.state).toBe(OfflineSynchronizationStates.idle);
     expect(snapshot.connectivity.localModeActive).toBeTrue();
+  });
+
+  it("enforces explicit draft sync transitions", () => {
+    const transitioned = transitionOfflineDraftSyncStatus({
+      draft: {
+        draftId: "draft:1",
+        resourceClass: OfflineSyncResourceClasses.workflowDraft,
+        resourceId: "workflow:draft:1",
+        baseAuthoritativeRevision: "rev:1",
+        authoritativeSnapshotRevision: "rev:1",
+        draftRevision: 1,
+        syncStatus: OfflineDraftSyncStatuses.localOnly,
+        dirty: true,
+        lastEditedAt: "2026-04-07T00:00:00.000Z",
+        lastEditedByActorUserIdentityId: "user:1",
+        localChanges: [],
+      },
+      nextStatus: OfflineDraftSyncStatuses.queuedPendingSync,
+      queuedMutationId: "operation:1",
+    });
+
+    expect(transitioned.syncStatus).toBe(OfflineDraftSyncStatuses.queuedPendingSync);
+    expect(transitioned.queuedMutationId).toBe("operation:1");
+  });
+
+  it("enforces explicit pending operation status transitions", () => {
+    const transitioned = transitionOfflinePendingOperationStatus({
+      operation: {
+        operationId: "operation:2",
+        targetResourceClass: OfflineSyncResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:1",
+        intent: OfflinePendingOperationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "rev:1",
+        localMutationRevision: 2,
+        queuedAt: "2026-04-07T00:00:00.000Z",
+        userVisibleSyncStatus: OfflinePendingOperationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:workflow:draft:1",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:1/promote",
+          idempotencyKey: "idem:operation:2",
+          payload: { draftId: "workflow:draft:1" },
+        },
+        retryCount: 0,
+      },
+      nextStatus: OfflinePendingOperationStatuses.syncConflict,
+      retryCount: 1,
+      lastAttemptedAt: "2026-04-07T00:01:00.000Z",
+    });
+
+    expect(transitioned.userVisibleSyncStatus).toBe(OfflinePendingOperationStatuses.syncConflict);
+    expect(transitioned.retryCount).toBe(1);
   });
 });

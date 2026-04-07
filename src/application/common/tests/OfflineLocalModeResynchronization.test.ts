@@ -20,6 +20,12 @@ describe("OfflineLocalModeResynchronization", () => {
       baseAuthoritativeRevision: "rev:10",
       localMutationRevision: 2,
       divergenceDisclosureToken: "offline-warning:run:intent:1",
+      replayDescriptor: {
+        method: "POST",
+        path: "/v1/runs/intents/run:intent:1",
+        idempotencyKey: "idem:mutation:apply:1",
+        payload: { runIntentId: "run:intent:1" },
+      },
     });
 
     const decisions = planOfflineResynchronization({
@@ -45,6 +51,12 @@ describe("OfflineLocalModeResynchronization", () => {
       baseAuthoritativeRevision: "workflow:rev:4",
       localMutationRevision: 6,
       divergenceDisclosureToken: "offline-warning:workflow:draft:1",
+      replayDescriptor: {
+        method: "PATCH",
+        path: "/v1/workflows/drafts/workflow:draft:1/promote",
+        idempotencyKey: "idem:mutation:conflict:1",
+        payload: { draftId: "workflow:draft:1" },
+      },
     });
 
     const decisions = planOfflineResynchronization({

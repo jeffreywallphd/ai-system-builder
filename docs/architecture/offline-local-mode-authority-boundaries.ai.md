@@ -28,6 +28,28 @@ Story 19.1.3 adds explicit resource classification and policy-driven posture eva
 - Added resource-policy matrix projection:
   - `listOfflineResourceEligibilityPolicies()`
 
+## Story 19.1.4 additions
+
+- Added explicit local draft lifecycle model:
+  - `createOfflineLocalDraftDocument(...)`
+  - `appendOfflineLocalDraftChange(...)`
+  - `transitionOfflineLocalDraftSynchronizationStatus(...)`
+- Added structured queued-operation replay descriptor requirements:
+  - rooted API path
+  - replay HTTP method
+  - idempotency key
+  - durable replay payload
+- Added explicit pending run-submission record model:
+  - `createOfflinePendingRunSubmissionRecord(...)`
+  - bound to queued `run-submission-intent` authoritative operations
+
+## Story 19.1.4 model posture
+
+- Local drafts carry both `baseAuthoritativeRevision` and `authoritativeSnapshotRevision` to preserve the authoritative baseline.
+- Local edits always reassert `local-only` draft sync status and remove queued linkage.
+- Sync status progression is explicit and validated (`local-only`, `queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
+- Pending operations remain explicit queue artifacts and cannot silently mutate authoritative snapshots in place.
+
 ## Classification inputs
 
 - workspace visibility

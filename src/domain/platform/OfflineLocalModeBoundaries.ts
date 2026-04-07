@@ -673,6 +673,241 @@ export function evaluateOfflineResourcePolicy(
   });
 }
 
+export const OfflineDraftSynchronizationStatuses = Object.freeze({
+  localOnly: "local-only",
+  queuedPendingSync: "queued-pending-sync",
+  syncConflict: "sync-conflict",
+  syncRejected: "sync-rejected",
+  syncApplied: "sync-applied",
+});
+
+export type OfflineDraftSynchronizationStatus =
+  typeof OfflineDraftSynchronizationStatuses[keyof typeof OfflineDraftSynchronizationStatuses];
+
+export const OfflineLocalDraftChangeKinds = Object.freeze({
+  create: "create",
+  update: "update",
+  delete: "delete",
+  reorder: "reorder",
+  metadata: "metadata",
+});
+
+export type OfflineLocalDraftChangeKind =
+  typeof OfflineLocalDraftChangeKinds[keyof typeof OfflineLocalDraftChangeKinds];
+
+export interface OfflineLocalDraftChangeRecord {
+  readonly changeId: string;
+  readonly draftId: string;
+  readonly resourceId: string;
+  readonly kind: OfflineLocalDraftChangeKind;
+  readonly changedAt: string;
+  readonly changedByActorUserIdentityId: string;
+  readonly path?: string;
+  readonly summary?: string;
+}
+
+export interface OfflineLocalDraftDocument {
+  readonly draftId: string;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly baseAuthoritativeRevision: string;
+  readonly authoritativeSnapshotRevision: string;
+  readonly draftRevision: number;
+  readonly syncStatus: OfflineDraftSynchronizationStatus;
+  readonly queuedMutationId?: string;
+  readonly lastEditedAt: string;
+  readonly lastEditedByActorUserIdentityId: string;
+  readonly localChanges: ReadonlyArray<OfflineLocalDraftChangeRecord>;
+}
+
+export function createOfflineLocalDraftDocument(input: {
+  readonly draftId: string;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly baseAuthoritativeRevision: string;
+  readonly authoritativeSnapshotRevision?: string;
+  readonly draftRevision?: number;
+  readonly syncStatus?: OfflineDraftSynchronizationStatus;
+  readonly queuedMutationId?: string;
+  readonly lastEditedAt?: string;
+  readonly lastEditedByActorUserIdentityId: string;
+  readonly localChanges?: ReadonlyArray<OfflineLocalDraftChangeRecord>;
+}): OfflineLocalDraftDocument {
+  const boundary = resolveOfflineResourceAuthorityBoundary(input.resourceClass);
+  if (boundary.authoritativeStateScope !== OfflineAuthorityScopes.localDraft) {
+    throw new OfflineLocalModeDomainError(
+      `Resource class '${input.resourceClass}' is not eligible for local-draft state.`,
+    );
+  }
+
+  const draftRevision = input.draftRevision ?? 1;
+  if (!Number.isInteger(draftRevision) || draftRevision < 1) {
+    throw new OfflineLocalModeDomainError("Local draft draftRevision must be an integer >= 1.");
+  }
+
+  const syncStatus = input.syncStatus ?? OfflineDraftSynchronizationStatuses.localOnly;
+  if (!Object.values(OfflineDraftSynchronizationStatuses).includes(syncStatus)) {
+    throw new OfflineLocalModeDomainError(`Offline draft syncStatus '${String(syncStatus)}' is invalid.`);
+  }
+
+  const queuedMutationId = input.queuedMutationId?.trim();
+  if (syncStatus === OfflineDraftSynchronizationStatuses.queuedPendingSync && !queuedMutationId) {
+    throw new OfflineLocalModeDomainError(
+      "Queued local draft state requires queuedMutationId for explicit synchronization tracking.",
+    );
+  }
+  if (syncStatus === OfflineDraftSynchronizationStatuses.localOnly && queuedMutationId) {
+    throw new OfflineLocalModeDomainError(
+      "Local-only draft state cannot retain queuedMutationId after local edits.",
+    );
+  }
+
+  const normalizedChanges = Object.freeze([...(input.localChanges ?? [])].map((change) => Object.freeze({
+    changeId: normalizeRequired(change.changeId, "Local draft changeId"),
+    draftId: normalizeRequired(change.draftId, "Local draft change draftId"),
+    resourceId: normalizeRequired(change.resourceId, "Local draft change resourceId"),
+    kind: normalizeOfflineLocalDraftChangeKind(change.kind),
+    changedAt: normalizeIsoTimestamp(change.changedAt, "Local draft change changedAt"),
+    changedByActorUserIdentityId: normalizeRequired(
+      change.changedByActorUserIdentityId,
+      "Local draft change changedByActorUserIdentityId",
+    ),
+    path: change.path?.trim() ? change.path.trim() : undefined,
+    summary: change.summary?.trim() ? change.summary.trim() : undefined,
+  })));
+
+  return Object.freeze({
+    draftId: normalizeRequired(input.draftId, "Local draft draftId"),
+    resourceClass: input.resourceClass,
+    resourceId: normalizeRequired(input.resourceId, "Local draft resourceId"),
+    baseAuthoritativeRevision: normalizeRequired(
+      input.baseAuthoritativeRevision,
+      "Local draft baseAuthoritativeRevision",
+    ),
+    authoritativeSnapshotRevision: normalizeRequired(
+      input.authoritativeSnapshotRevision ?? input.baseAuthoritativeRevision,
+      "Local draft authoritativeSnapshotRevision",
+    ),
+    draftRevision,
+    syncStatus,
+    queuedMutationId,
+    lastEditedAt: normalizeIsoTimestamp(input.lastEditedAt ?? new Date().toISOString(), "Local draft lastEditedAt"),
+    lastEditedByActorUserIdentityId: normalizeRequired(
+      input.lastEditedByActorUserIdentityId,
+      "Local draft lastEditedByActorUserIdentityId",
+    ),
+    localChanges: normalizedChanges,
+  });
+}
+
+function normalizeOfflineLocalDraftChangeKind(value: OfflineLocalDraftChangeKind): OfflineLocalDraftChangeKind {
+  if (!Object.values(OfflineLocalDraftChangeKinds).includes(value)) {
+    throw new OfflineLocalModeDomainError(`Local draft change kind '${String(value)}' is invalid.`);
+  }
+  return value;
+}
+
+function resolveAllowedDraftSyncTransitions(
+  status: OfflineDraftSynchronizationStatus,
+): ReadonlyArray<OfflineDraftSynchronizationStatus> {
+  const transitions: Record<OfflineDraftSynchronizationStatus, ReadonlyArray<OfflineDraftSynchronizationStatus>> = {
+    [OfflineDraftSynchronizationStatuses.localOnly]: Object.freeze([
+      OfflineDraftSynchronizationStatuses.localOnly,
+      OfflineDraftSynchronizationStatuses.queuedPendingSync,
+    ]),
+    [OfflineDraftSynchronizationStatuses.queuedPendingSync]: Object.freeze([
+      OfflineDraftSynchronizationStatuses.queuedPendingSync,
+      OfflineDraftSynchronizationStatuses.syncConflict,
+      OfflineDraftSynchronizationStatuses.syncRejected,
+      OfflineDraftSynchronizationStatuses.syncApplied,
+    ]),
+    [OfflineDraftSynchronizationStatuses.syncConflict]: Object.freeze([
+      OfflineDraftSynchronizationStatuses.syncConflict,
+      OfflineDraftSynchronizationStatuses.queuedPendingSync,
+      OfflineDraftSynchronizationStatuses.syncRejected,
+    ]),
+    [OfflineDraftSynchronizationStatuses.syncRejected]: Object.freeze([
+      OfflineDraftSynchronizationStatuses.syncRejected,
+      OfflineDraftSynchronizationStatuses.queuedPendingSync,
+    ]),
+    [OfflineDraftSynchronizationStatuses.syncApplied]: Object.freeze([
+      OfflineDraftSynchronizationStatuses.syncApplied,
+      OfflineDraftSynchronizationStatuses.localOnly,
+    ]),
+  };
+  return transitions[status];
+}
+
+export function transitionOfflineLocalDraftSynchronizationStatus(input: {
+  readonly draft: OfflineLocalDraftDocument;
+  readonly nextStatus: OfflineDraftSynchronizationStatus;
+  readonly queuedMutationId?: string;
+  readonly lastEditedAt?: string;
+}): OfflineLocalDraftDocument {
+  const nextStatus = input.nextStatus;
+  if (!Object.values(OfflineDraftSynchronizationStatuses).includes(nextStatus)) {
+    throw new OfflineLocalModeDomainError(`Offline draft nextStatus '${String(nextStatus)}' is invalid.`);
+  }
+
+  const allowed = resolveAllowedDraftSyncTransitions(input.draft.syncStatus);
+  if (!allowed.includes(nextStatus)) {
+    throw new OfflineLocalModeDomainError(
+      `Offline draft cannot transition from '${input.draft.syncStatus}' to '${nextStatus}'.`,
+    );
+  }
+
+  const queuedMutationId = (
+    nextStatus === OfflineDraftSynchronizationStatuses.queuedPendingSync
+      ? normalizeRequired(input.queuedMutationId ?? input.draft.queuedMutationId ?? "", "Local draft queuedMutationId")
+      : undefined
+  );
+
+  return createOfflineLocalDraftDocument({
+    ...input.draft,
+    syncStatus: nextStatus,
+    queuedMutationId,
+    lastEditedAt: input.lastEditedAt ?? input.draft.lastEditedAt,
+  });
+}
+
+export function appendOfflineLocalDraftChange(input: {
+  readonly draft: OfflineLocalDraftDocument;
+  readonly changeId: string;
+  readonly kind: OfflineLocalDraftChangeKind;
+  readonly changedByActorUserIdentityId: string;
+  readonly changedAt?: string;
+  readonly path?: string;
+  readonly summary?: string;
+}): OfflineLocalDraftDocument {
+  const changedAt = normalizeIsoTimestamp(input.changedAt ?? new Date().toISOString(), "Local draft change changedAt");
+  const updatedChanges = Object.freeze([
+    ...input.draft.localChanges,
+    Object.freeze({
+      changeId: normalizeRequired(input.changeId, "Local draft changeId"),
+      draftId: input.draft.draftId,
+      resourceId: input.draft.resourceId,
+      kind: normalizeOfflineLocalDraftChangeKind(input.kind),
+      changedAt,
+      changedByActorUserIdentityId: normalizeRequired(
+        input.changedByActorUserIdentityId,
+        "Local draft changedByActorUserIdentityId",
+      ),
+      path: input.path?.trim() ? input.path.trim() : undefined,
+      summary: input.summary?.trim() ? input.summary.trim() : undefined,
+    }),
+  ]);
+
+  return createOfflineLocalDraftDocument({
+    ...input.draft,
+    draftRevision: input.draft.draftRevision + 1,
+    syncStatus: OfflineDraftSynchronizationStatuses.localOnly,
+    queuedMutationId: undefined,
+    lastEditedAt: changedAt,
+    lastEditedByActorUserIdentityId: input.changedByActorUserIdentityId,
+    localChanges: updatedChanges,
+  });
+}
+
 export const OfflineQueuedMutationIntents = Object.freeze({
   promoteLocalDraft: "promote-local-draft",
   createOrUpdateAuthoritative: "create-or-update-authoritative",
@@ -692,6 +927,24 @@ export const OfflineQueuedMutationStatuses = Object.freeze({
 export type OfflineQueuedMutationStatus =
   typeof OfflineQueuedMutationStatuses[keyof typeof OfflineQueuedMutationStatuses];
 
+export const OfflineMutationReplayHttpMethods = Object.freeze({
+  post: "POST",
+  put: "PUT",
+  patch: "PATCH",
+  delete: "DELETE",
+});
+
+export type OfflineMutationReplayHttpMethod =
+  typeof OfflineMutationReplayHttpMethods[keyof typeof OfflineMutationReplayHttpMethods];
+
+export interface OfflineQueuedMutationReplayDescriptor {
+  readonly method: OfflineMutationReplayHttpMethod;
+  readonly path: string;
+  readonly idempotencyKey: string;
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly payloadContentType?: string;
+}
+
 export interface OfflineQueuedMutationEnvelope {
   readonly mutationId: string;
   readonly targetResourceClass: OfflineResourceClass;
@@ -702,6 +955,16 @@ export interface OfflineQueuedMutationEnvelope {
   readonly queuedAt: string;
   readonly userVisibleSyncStatus: OfflineQueuedMutationStatus;
   readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflineQueuedMutationReplayDescriptor;
+}
+
+export interface OfflinePendingRunSubmissionRecord {
+  readonly submissionId: string;
+  readonly queuedMutation: OfflineQueuedMutationEnvelope;
+  readonly requestedAt: string;
+  readonly requestedByActorUserIdentityId: string;
+  readonly workflowDefinitionId: string;
+  readonly inputDigest: string;
 }
 
 /*
@@ -738,6 +1001,7 @@ export function createOfflineQueuedMutationEnvelope(input: {
   readonly queuedAt?: string;
   readonly userVisibleSyncStatus?: OfflineQueuedMutationStatus;
   readonly divergenceDisclosureToken: string;
+  readonly replayDescriptor: OfflineQueuedMutationReplayDescriptor;
 }): OfflineQueuedMutationEnvelope {
   const boundary = resolveOfflineResourceAuthorityBoundary(input.targetResourceClass);
   if (!boundary.offlineCapabilities.queueMutation) {
@@ -782,14 +1046,55 @@ export function createOfflineQueuedMutationEnvelope(input: {
       input.divergenceDisclosureToken,
       "Queued mutation divergenceDisclosureToken",
     ),
+    replayDescriptor: normalizeOfflineQueuedMutationReplayDescriptor(input.replayDescriptor),
   });
 
   assertOfflineQueuedMutationEnvelopeRequiresVisibleDivergenceSignal(envelope);
   return envelope;
 }
 
+function normalizeOfflineQueuedMutationReplayDescriptor(
+  descriptor: OfflineQueuedMutationReplayDescriptor,
+): OfflineQueuedMutationReplayDescriptor {
+  if (!Object.values(OfflineMutationReplayHttpMethods).includes(descriptor.method)) {
+    throw new OfflineLocalModeDomainError(
+      `Queued mutation replay descriptor method '${String(descriptor.method)}' is invalid.`,
+    );
+  }
+
+  const payload = descriptor.payload as Record<string, unknown>;
+  if (!payload || Array.isArray(payload)) {
+    throw new OfflineLocalModeDomainError(
+      "Queued mutation replay descriptor payload must be an object.",
+    );
+  }
+
+  const path = normalizeRequired(descriptor.path, "Queued mutation replay descriptor path");
+  if (!path.startsWith("/")) {
+    throw new OfflineLocalModeDomainError(
+      "Queued mutation replay descriptor path must be rooted (start with '/').",
+    );
+  }
+
+  return Object.freeze({
+    method: descriptor.method,
+    path,
+    idempotencyKey: normalizeRequired(
+      descriptor.idempotencyKey,
+      "Queued mutation replay descriptor idempotencyKey",
+    ),
+    payload: Object.freeze({ ...payload }),
+    payloadContentType: descriptor.payloadContentType?.trim()
+      ? descriptor.payloadContentType.trim()
+      : undefined,
+  });
+}
+
 export function assertOfflineQueuedMutationEnvelopeRequiresVisibleDivergenceSignal(
-  envelope: Pick<OfflineQueuedMutationEnvelope, "userVisibleSyncStatus" | "divergenceDisclosureToken">,
+  envelope: Pick<
+    OfflineQueuedMutationEnvelope,
+    "userVisibleSyncStatus" | "divergenceDisclosureToken" | "replayDescriptor"
+  >,
 ): void {
   const token = envelope.divergenceDisclosureToken.trim();
   if (!token) {
@@ -806,4 +1111,43 @@ export function assertOfflineQueuedMutationEnvelopeRequiresVisibleDivergenceSign
       `Queued offline mutation status '${String(envelope.userVisibleSyncStatus)}' is not valid for visible pending reconciliation.`,
     );
   }
+  normalizeOfflineQueuedMutationReplayDescriptor(envelope.replayDescriptor);
+}
+
+export function createOfflinePendingRunSubmissionRecord(input: {
+  readonly submissionId: string;
+  readonly queuedMutation: OfflineQueuedMutationEnvelope;
+  readonly requestedAt?: string;
+  readonly requestedByActorUserIdentityId: string;
+  readonly workflowDefinitionId: string;
+  readonly inputDigest: string;
+}): OfflinePendingRunSubmissionRecord {
+  if (input.queuedMutation.targetResourceClass !== OfflineResourceClasses.runSubmissionIntent) {
+    throw new OfflineLocalModeDomainError(
+      "Pending run submission records require queued mutation targetResourceClass='run-submission-intent'.",
+    );
+  }
+  if (input.queuedMutation.intent !== OfflineQueuedMutationIntents.createOrUpdateAuthoritative) {
+    throw new OfflineLocalModeDomainError(
+      "Pending run submission records require queued mutation intent='create-or-update-authoritative'.",
+    );
+  }
+
+  return Object.freeze({
+    submissionId: normalizeRequired(input.submissionId, "Pending run submission submissionId"),
+    queuedMutation: input.queuedMutation,
+    requestedAt: normalizeIsoTimestamp(
+      input.requestedAt ?? new Date().toISOString(),
+      "Pending run submission requestedAt",
+    ),
+    requestedByActorUserIdentityId: normalizeRequired(
+      input.requestedByActorUserIdentityId,
+      "Pending run submission requestedByActorUserIdentityId",
+    ),
+    workflowDefinitionId: normalizeRequired(
+      input.workflowDefinitionId,
+      "Pending run submission workflowDefinitionId",
+    ),
+    inputDigest: normalizeRequired(input.inputDigest, "Pending run submission inputDigest"),
+  });
 }

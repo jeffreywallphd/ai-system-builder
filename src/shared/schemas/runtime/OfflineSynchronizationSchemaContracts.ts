@@ -3,8 +3,10 @@ import {
   OfflineCacheFreshnessStates,
   OfflineConflictSeverities,
   OfflineConnectivityStates,
+  OfflineDraftSyncStatuses,
   OfflinePendingOperationIntents,
   OfflinePendingOperationStatuses,
+  OfflineReplayHttpMethods,
   OfflineReconciliationActions,
   OfflineSyncResourceClasses,
   OfflineSynchronizationContractVersions,
@@ -85,6 +87,21 @@ const OfflinePendingOperationStatusSchema = z.enum([
   OfflinePendingOperationStatuses.syncRejected,
 ]);
 
+const OfflineDraftSyncStatusSchema = z.enum([
+  OfflineDraftSyncStatuses.localOnly,
+  OfflineDraftSyncStatuses.queuedPendingSync,
+  OfflineDraftSyncStatuses.syncConflict,
+  OfflineDraftSyncStatuses.syncRejected,
+  OfflineDraftSyncStatuses.syncApplied,
+]);
+
+const OfflineReplayHttpMethodSchema = z.enum([
+  OfflineReplayHttpMethods.post,
+  OfflineReplayHttpMethods.put,
+  OfflineReplayHttpMethods.patch,
+  OfflineReplayHttpMethods.delete,
+]);
+
 const OfflineConflictSeveritySchema = z.enum([
   OfflineConflictSeverities.low,
   OfflineConflictSeverities.medium,
@@ -140,7 +157,10 @@ export const OfflineDraftStateDtoSchema: z.ZodType<OfflineDraftStateDto> = z.obj
   resourceClass: OfflineSyncResourceClassSchema,
   resourceId: RequiredStringSchema,
   baseAuthoritativeRevision: RequiredStringSchema,
+  authoritativeSnapshotRevision: RequiredStringSchema,
   draftRevision: z.number().int().min(1),
+  syncStatus: OfflineDraftSyncStatusSchema,
+  queuedMutationId: RequiredStringSchema.optional(),
   dirty: z.boolean(),
   lastEditedAt: TimestampSchema,
   lastEditedByActorUserIdentityId: RequiredStringSchema,
@@ -153,7 +173,31 @@ export const OfflineDraftStateDtoSchema: z.ZodType<OfflineDraftStateDto> = z.obj
       message: "Drafts marked clean cannot include localChanges entries.",
     });
   }
+  if (value.syncStatus === OfflineDraftSyncStatuses.queuedPendingSync && !value.queuedMutationId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["queuedMutationId"],
+      message: "Queued draft sync status requires queuedMutationId.",
+    });
+  }
+  if (value.syncStatus === OfflineDraftSyncStatuses.localOnly && value.queuedMutationId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["queuedMutationId"],
+      message: "Local-only draft status cannot retain queuedMutationId.",
+    });
+  }
 });
+
+const OfflinePendingOperationReplayDescriptorDtoSchema = z.object({
+  method: OfflineReplayHttpMethodSchema,
+  path: RequiredStringSchema.refine((value) => value.startsWith("/"), {
+    message: "Replay path must be rooted and start with '/'.",
+  }),
+  idempotencyKey: RequiredStringSchema,
+  payload: z.record(z.string(), z.unknown()),
+  payloadContentType: RequiredStringSchema.optional(),
+}).strict();
 
 export const OfflinePendingOperationEnvelopeDtoSchema: z.ZodType<OfflinePendingOperationEnvelopeDto> = z.object({
   operationId: RequiredStringSchema,
@@ -165,8 +209,18 @@ export const OfflinePendingOperationEnvelopeDtoSchema: z.ZodType<OfflinePendingO
   queuedAt: TimestampSchema,
   userVisibleSyncStatus: OfflinePendingOperationStatusSchema,
   divergenceDisclosureToken: RequiredStringSchema,
+  replayDescriptor: OfflinePendingOperationReplayDescriptorDtoSchema,
   retryCount: z.number().int().min(0),
   lastAttemptedAt: TimestampSchema.optional(),
+}).strict();
+
+const OfflinePendingRunSubmissionDtoSchema = z.object({
+  submissionId: RequiredStringSchema,
+  operationId: RequiredStringSchema,
+  workflowDefinitionId: RequiredStringSchema,
+  inputDigest: RequiredStringSchema,
+  requestedAt: TimestampSchema,
+  requestedByActorUserIdentityId: RequiredStringSchema,
 }).strict();
 
 export const OfflineConflictIndicatorDtoSchema: z.ZodType<OfflineConflictIndicatorDto> = z.object({
@@ -220,6 +274,7 @@ export const OfflineReconciliationOutcomeDtoSchema: z.ZodType<OfflineReconciliat
 export const OfflineSyncQueueStateDtoSchema: z.ZodType<OfflineSyncQueueStateDto> = z.object({
   queueId: RequiredStringSchema,
   operations: z.array(OfflinePendingOperationEnvelopeDtoSchema),
+  pendingRunSubmissions: z.array(OfflinePendingRunSubmissionDtoSchema),
   outcomes: z.array(OfflineReconciliationOutcomeDtoSchema),
   updatedAt: TimestampSchema,
 }).strict().superRefine((value, context) => {
@@ -240,6 +295,17 @@ export const OfflineSyncQueueStateDtoSchema: z.ZodType<OfflineSyncQueueStateDto>
         code: z.ZodIssueCode.custom,
         path: ["operations"],
         message: "Queue operations cannot retain sync-applied entries; move them to outcomes.",
+      });
+      break;
+    }
+  }
+
+  for (const pendingRunSubmission of value.pendingRunSubmissions) {
+    if (!operationIds.has(pendingRunSubmission.operationId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pendingRunSubmissions"],
+        message: "Pending run submissions must reference an operation present in queue.operations.",
       });
       break;
     }

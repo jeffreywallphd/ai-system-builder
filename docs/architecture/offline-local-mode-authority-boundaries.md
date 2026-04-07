@@ -37,6 +37,24 @@ Canonical shared contracts define stable cross-layer DTO/state shapes for:
 
 This keeps offline/sync payload semantics consistent across desktop host logic, API DTO/schema validation, and UI surfaces without ad hoc local object shapes.
 
+## Local draft and pending-operation model (Story 19.1.4)
+
+Disconnected work is now represented as explicit local state with lifecycle transitions, instead of implicit in-place edits over authoritative snapshots.
+
+Canonical domain seams:
+- `createOfflineLocalDraftDocument(...)`
+- `appendOfflineLocalDraftChange(...)`
+- `transitionOfflineLocalDraftSynchronizationStatus(...)`
+- `createOfflineQueuedMutationEnvelope(...)`
+- `createOfflinePendingRunSubmissionRecord(...)`
+
+Model guarantees:
+- local drafts include `authoritativeSnapshotRevision` and `baseAuthoritativeRevision` so the offline edit baseline is explicit;
+- draft sync progression is explicit (`local-only` -> `queued-pending-sync` -> `sync-conflict`/`sync-rejected`/`sync-applied`);
+- queued operations include a structured replay descriptor (`method`, rooted API `path`, `idempotencyKey`, payload);
+- pending run submissions are first-class local records bound to queued authoritative intents;
+- local edits reset draft sync status back to `local-only` and clear queued linkage, preventing silent in-place mutation of authoritative snapshots.
+
 ## Resource classification model (Story 19.1.3)
 
 Offline behavior is now classified through explicit policy metadata and evaluators instead of implicit per-surface assumptions.
@@ -96,6 +114,8 @@ Unknown/unsupported resource classes are explicitly excluded:
 - Local draft edits are allowed only for `workflow-draft` local state.
 - Any operation intended to affect authoritative state must become a queued mutation envelope with:
   - baseline authoritative revision (`baseAuthoritativeRevision`)
+  - authoritative snapshot reference preserved on the local draft (`authoritativeSnapshotRevision`)
+  - structured replay descriptor (`method`, `path`, `idempotencyKey`, payload)
   - explicit user-visible sync status (`queued-pending-sync`, `sync-conflict`, or `sync-rejected`)
   - explicit divergence disclosure token (`divergenceDisclosureToken`)
 - Queued offline mutations are prohibited from self-marking as globally applied before authoritative acceptance.

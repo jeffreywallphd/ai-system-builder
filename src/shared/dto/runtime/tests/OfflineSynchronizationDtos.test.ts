@@ -31,6 +31,12 @@ describe("OfflineSynchronizationDtos", () => {
       divergenceDisclosureToken: "offline-warning:workflow:draft:1",
       userVisibleSyncStatus: OfflinePendingOperationStatuses.queuedPendingSync,
       queuedAt: "2026-04-07T10:00:00.000Z",
+      replayDescriptor: {
+        method: "PATCH",
+        path: "/v1/workflows/drafts/workflow:draft:1/promote",
+        idempotencyKey: "idem:mutation:offline:1",
+        payload: { draftId: "workflow:draft:1" },
+      },
     });
 
     const dto = toOfflinePendingOperationEnvelopeDto(envelope, {
@@ -41,6 +47,7 @@ describe("OfflineSynchronizationDtos", () => {
     expect(dto.operationId).toBe("mutation:offline:1");
     expect(dto.retryCount).toBe(3);
     expect(dto.targetResourceClass).toBe("workflow-draft");
+    expect(dto.replayDescriptor.path).toBe("/v1/workflows/drafts/workflow:draft:1/promote");
   });
 
   it("maps reconciliation decisions and marks conflicts", () => {
