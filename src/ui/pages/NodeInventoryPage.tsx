@@ -9,14 +9,14 @@ import {
   NodeTrustStates,
   type NodeRevocationReason,
   NodeTypes,
-} from "../../src/domain/nodes/NodeTrustDomain";
+} from "../../domain/nodes/NodeTrustDomain";
 import {
   NodeInventoryOperationalStates,
   NodeInventoryPresenceStates,
   type NodeCapabilityProfileDto,
   type NodeInventoryDetailDto,
   type NodeInventorySummaryDto,
-} from "../../src/shared/contracts/nodes/NodeTrustApiContracts";
+} from "../../shared/contracts/nodes/NodeTrustApiContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeInventoryService } from "../services/NodeInventoryService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";

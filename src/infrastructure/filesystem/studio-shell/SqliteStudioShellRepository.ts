@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
-import { AssetVersion } from "../../../src/domain/assets/AssetVersion";
+import { AssetVersion } from "../../../domain/assets/AssetVersion";
 import {
   AssetDraftLifecycleStatuses,
   AssetSessionStatuses,
@@ -14,7 +14,7 @@ import {
   type AssetDraftLifecycleStatus,
   type AssetSession,
   type Studio,
-} from "../../../src/domain/studio-shell/StudioShellDomain";
+} from "../../../domain/studio-shell/StudioShellDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface SnapshotRow {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../src/domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
 import { RegistryService } from "../../services/RegistryService";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";

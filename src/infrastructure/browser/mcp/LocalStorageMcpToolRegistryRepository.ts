@@ -1,5 +1,5 @@
 import type { IMcpToolRegistryRepository } from "../../../application/ports/interfaces/IMcpToolRegistryRepository";
-import type { InstalledMcpToolRecord } from "../../../src/domain/mcp/InstalledMcpTool";
+import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
 
 const defaultStorageKey = "ai-loom-studio.mcp-installed-tools";
 

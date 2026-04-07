@@ -15,12 +15,12 @@ import type {
   TransitionWorkspaceAdministrationLifecycleApiResponse,
   UpdateWorkspaceAdministrationApiResponse,
   WorkspaceAdministrationApiResponse,
-} from "../../../src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+} from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import type {
   AcceptWorkspaceInvitationOnboardingApiResponse,
   IssueWorkspaceInvitationApiResponse,
   WorkspaceInvitationApiResponse,
-} from "../../../src/infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+} from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
 
 export interface WorkspaceAdministrationClient {
   listWorkspaces(

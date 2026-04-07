@@ -1,4 +1,4 @@
-import type { RuntimeExecutionTraceReadModel } from "../../../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import type { RuntimeExecutionTraceReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 export function ExecutionTracePanel({ trace }: { readonly trace: RuntimeExecutionTraceReadModel | undefined }): JSX.Element {
   return (

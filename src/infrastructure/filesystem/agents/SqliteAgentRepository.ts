@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
-import { createAgent, type Agent } from "../../../src/domain/agents/Agent";
-import { AssetId } from "../../../src/domain/assets/AssetId";
+import { createAgent, type Agent } from "../../../domain/agents/Agent";
+import { AssetId } from "../../../domain/assets/AssetId";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface AgentRow {

@@ -1,6 +1,6 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../src/domain/execution/ExecutionPlan";
-import { DatasetPipelineStageKinds, type DatasetPipelineStageKind } from "../../src/domain/dataset-studio/StagePipelineDomain";
-import { PipelineStageIds, type PipelineStageId } from "../../src/domain/dataset-studio/PipelineStageDomain";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+import { DatasetPipelineStageKinds, type DatasetPipelineStageKind } from "../../domain/dataset-studio/StagePipelineDomain";
+import { PipelineStageIds, type PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
 import { createDataStudioPipelineExecutionProvenance, DataStudioPipelineExecutionArtifacts, type DataStudioPipelineExecutionResult, type DataStudioPipelineExecutionStageRecord, type DataStudioPipelineExecutionUnitInput } from "../../application/data-studio/DataStudioPipelineExecution";
 import {
   buildPreparedDatasetLineage,

@@ -7,7 +7,7 @@ import {
   type IRuntimeDependencyOrchestrator,
 } from "../../../application/runtime/RuntimeDependencyOrchestrator";
 import type { AppRuntimeConfig } from "../../config/AppRuntimeConfig";
-import type { ModelCreationEnvironment } from "../../../src/domain/model-training/ModelCreationSupport";
+import type { ModelCreationEnvironment } from "../../../domain/model-training/ModelCreationSupport";
 import { createRuntimeDependencyDetail } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export class RuntimeAwareModelCreationEnvironmentGateway implements IModelCreationEnvironmentGateway {

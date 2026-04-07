@@ -6,7 +6,7 @@ import {
   DeviceTrustStatuses,
   createDeviceFingerprint,
   createDeviceTrustMaterialRef,
-} from "../../../src/domain/identity/TrustedDeviceDomain";
+} from "../../../domain/identity/TrustedDeviceDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -29,7 +29,7 @@ import {
   PairingTokenActorScopes,
   PairingTokenArtifactTypes,
   PairingTokenStatuses,
-} from "../../../src/domain/identity/TrustedDevicePairingDomain";
+} from "../../../domain/identity/TrustedDevicePairingDomain";
 
 describe("identity application shared contracts", () => {
   it("exposes stable lookup, id namespace, and credential material contract types", () => {

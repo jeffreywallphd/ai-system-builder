@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { AuthorizationResourceFamily } from "../../src/domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationResourceFamily } from "../../domain/authorization/AuthorizationPermissionCatalog";
 import AuthorizationSharingManagementPanel from "../components/authorization/AuthorizationSharingManagementPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import type { AuthorizationManagementService } from "../services/AuthorizationManagementService";

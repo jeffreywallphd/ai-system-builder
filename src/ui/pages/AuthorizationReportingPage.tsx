@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AuthorizationWorkspaceSharingReportApiResponse } from "../../src/infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import type { AuthorizationWorkspaceSharingReportApiResponse } from "../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { AuthorizationManagementService } from "../services/AuthorizationManagementService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";

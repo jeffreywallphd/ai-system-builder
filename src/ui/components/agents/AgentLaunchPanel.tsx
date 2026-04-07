@@ -8,7 +8,7 @@ import {
 } from "../../../application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../../application/agents/TriggerAgentLaunchUseCase";
 import type { AgentLaunchReadModel } from "../../../application/agents/contracts/AgentRunContracts";
-import type { AgentStudioSnapshotReadModel } from "../../../src/infrastructure/api/agents/AgentStudioBackendApi";
+import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
 import { AgentRunControls } from "./AgentRunControls";
 import { TriggerSelector } from "./TriggerSelector";
 import { TriggerConfigFields } from "./TriggerConfigFields";

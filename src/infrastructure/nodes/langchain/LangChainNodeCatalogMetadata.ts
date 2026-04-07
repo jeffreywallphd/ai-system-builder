@@ -1,10 +1,10 @@
 import { NodePort, NodePortCompatibilityProfile } from "../../../domain/nodes/NodePort";
 import { NodeProperty, NodePropertyBindingProfile } from "../../../domain/nodes/NodeProperty";
-import { ModelCompatibility } from "../../../src/domain/models/ModelCompatibility";
+import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
 import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
 import type { NodePortValueType } from "../../../domain/nodes/interfaces/INodePort";
 import type { NodePropertyType, NodePropertyValue } from "../../../domain/nodes/interfaces/INodeProperty";
-import type { ModelModality, ModelTask } from "../../../src/domain/models/interfaces/IModelCompatibility";
+import type { ModelModality, ModelTask } from "../../../domain/models/interfaces/IModelCompatibility";
 import { CHAT_PROMPT_BUILDER_NODE_DEFINITION } from "./ChatPromptBuilderNodeDefinition";
 import { COMBINE_SUMMARIES_NODE_DEFINITION } from "./CombineSummariesNodeDefinition";
 import { CONTEXT_FORMATTER_NODE_DEFINITION } from "./ContextFormatterNodeDefinition";

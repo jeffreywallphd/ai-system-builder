@@ -1,5 +1,5 @@
 import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import type { AssetKind } from "../../domain/assets/interfaces/IAsset";
 import type { NodePortValueType } from "../../domain/nodes/interfaces/INodePort";
 import { AssetPresenter, type AssetDetailViewModel } from "./AssetPresenter";

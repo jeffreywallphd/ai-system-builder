@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { deserializeWorkflowDraft, serializeWorkflowDraft } from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
-import { WorkflowInputBindingSourceKinds } from "../../../../src/domain/workflow-studio/WorkflowInputBindingDomain";
+import { deserializeWorkflowDraft, serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowInputBindingSourceKinds } from "../../../../domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createDefaultBindingSource,
   createSingleSourceBinding,

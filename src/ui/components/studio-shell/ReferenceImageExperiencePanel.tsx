@@ -3,8 +3,8 @@ import { ReferenceImageSystemTemplate } from "../../../application/system-studio
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { ImageRunHistoryRecord } from "../../../application/system-runtime/ImageRunHistoryDataContract";
 import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
-import { createSystemContextContract, type SystemContextContract } from "../../../src/domain/system-studio/SystemContextContract";
-import type { FileIngestionPolicy } from "../../../src/domain/ingestion/interfaces/IFileIngestion";
+import { createSystemContextContract, type SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageOutputGallery } from "../assets/image-system/ImageOutputGallery";
 import { ImageViewer } from "../assets/image-system/ImageViewer";

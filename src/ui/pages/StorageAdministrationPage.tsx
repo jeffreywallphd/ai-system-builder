@@ -3,15 +3,15 @@ import { Link, useSearchParams } from "react-router-dom";
 import type {
   GetStorageInstanceDetailApiResponse,
   GetStorageInstanceHealthApiResponse,
-} from "../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import {
   StorageBackendTypes,
   StorageLifecycleStates,
   type StorageBackendType,
   type StorageLifecycleState,
-} from "../../src/domain/storage/StorageDomain";
-import { StorageSyncStatuses, type StorageSyncStatus } from "../../src/shared/contracts/storage/StorageTransportContracts";
-import type { StorageInstanceSummaryDto } from "../../src/shared/contracts/storage/StorageTransportContracts";
+} from "../../domain/storage/StorageDomain";
+import { StorageSyncStatuses, type StorageSyncStatus } from "../../shared/contracts/storage/StorageTransportContracts";
+import type { StorageInstanceSummaryDto } from "../../shared/contracts/storage/StorageTransportContracts";
 import StorageInstanceWorkflowPanel from "../components/storage/StorageInstanceWorkflowPanel";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { StorageAdministrationService } from "../services/StorageAdministrationService";

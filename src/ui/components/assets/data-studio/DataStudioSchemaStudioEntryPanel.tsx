@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { StudioEntryModes } from "../../../../application/studio-entry/StudioEntryContracts";
-import type { RegistryAsset } from "../../../../src/domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../../domain/asset-registry/RegistryAsset";
 import { RegistryService } from "../../../services/RegistryService";
 import {
   InlineAssetCreationModes,

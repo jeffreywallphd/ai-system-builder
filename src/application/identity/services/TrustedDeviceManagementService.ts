@@ -25,7 +25,7 @@ import {
   pairTrustedDevice,
   touchTrustedDevice,
   updateTrustedDeviceDisplayName,
-} from "../../../src/domain/identity/TrustedDeviceDomain";
+} from "../../../domain/identity/TrustedDeviceDomain";
 import { mapTrustedDeviceRecord } from "./TrustedDeviceServiceMappers";
 import { publishIdentityLifecycleEventBestEffort } from "./IdentityLifecycleEventPublishing";
 

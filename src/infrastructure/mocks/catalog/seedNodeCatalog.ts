@@ -1,4 +1,4 @@
-import type { IComfyObjectInfo } from "../../../src/infrastructure/comfyui/catalog/ComfyNodeCatalogProvider";
+import type { IComfyObjectInfo } from "../../../infrastructure/comfyui/catalog/ComfyNodeCatalogProvider";
 
 export const SEED_NODE_CATALOG: Readonly<Record<string, IComfyObjectInfo>> =
   Object.freeze({

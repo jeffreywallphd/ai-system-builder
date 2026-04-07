@@ -4,12 +4,12 @@ import type {
   ListPendingNodeEnrollmentsApiResponse,
   NodeTrustApiResponse,
   RejectNodeEnrollmentApiResponse,
-} from "../../../src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
-import { NodeEnrollmentRequestStatuses } from "../../../src/domain/nodes/NodeTrustDomain";
+} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
 import type {
   ApproveNodeEnrollmentActionRequestDto,
   RejectNodeEnrollmentActionRequestDto,
-} from "../../../src/shared/contracts/nodes/NodeTrustApiContracts";
+} from "../../../shared/contracts/nodes/NodeTrustApiContracts";
 
 export interface NodeEnrollmentReviewClient {
   listPendingNodeEnrollments(

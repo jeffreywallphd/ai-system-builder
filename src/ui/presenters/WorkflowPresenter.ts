@@ -1,6 +1,6 @@
-import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
 import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowValidationResult } from "../../src/domain/services/interfaces/IWorkflowValidator";
+import type { IWorkflowValidationResult } from "../../domain/services/interfaces/IWorkflowValidator";
 import type { WorkflowResponse } from "../../application/dto/WorkflowResponse";
 import { ValidationPresenter, type ValidationSummaryViewModel } from "./ValidationPresenter";
 import { NodePresenter, type NodeDetailViewModel } from "./NodePresenter";

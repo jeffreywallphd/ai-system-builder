@@ -4,8 +4,8 @@ import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
-import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../src/domain/studio-shell/AssetSelectorContract";
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createAssetSelectorRequest, AssetSelectorSelectionModes, AssetSelectorSelectionTypes } from "../../../../domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorSessionStore } from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import { AssetSelectorUsageContexts } from "../../../../application/studio-entry/AssetSelectorCapabilityRegistry";
 import {

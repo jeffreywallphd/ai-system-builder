@@ -1,10 +1,10 @@
-import { TuningDataset } from "../../../src/domain/tuning-datasets/TuningDatasetEntities";
+import { TuningDataset } from "../../../domain/tuning-datasets/TuningDatasetEntities";
 import type {
   Dataset,
   DatasetRepository,
   DatasetStatus,
   DatasetTaskType,
-} from "../../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 interface StorageLike {
   getItem(key: string): string | null;

@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { UiDependencies } from "./types";
 import { createUiDependencies } from "./createUiDependencies";
-import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import { WorkflowTemplateBootstrapService } from "../services/WorkflowTemplateBootstrapService";
 import { StudioShellService } from "../services/StudioShellService";
 import { RegistryService } from "../services/RegistryService";

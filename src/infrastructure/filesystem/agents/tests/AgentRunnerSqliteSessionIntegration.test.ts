@@ -2,10 +2,10 @@ import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { createAgent, type Agent } from "../../../../src/domain/agents/Agent";
-import { Asset } from "../../../../src/domain/assets/Asset";
-import { AssetId } from "../../../../src/domain/assets/AssetId";
-import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
+import { createAgent, type Agent } from "../../../../domain/agents/Agent";
+import { Asset } from "../../../../domain/assets/Asset";
+import { AssetId } from "../../../../domain/assets/AssetId";
+import { AssetVersion } from "../../../../domain/assets/AssetVersion";
 import { ExecuteAgentToolsUseCase } from "../../../../application/agents/ExecuteAgentToolsUseCase";
 import { DeterministicAgentPlanningService } from "../../../../application/agents/services/AgentPlanningInterface";
 import { AgentRunnerService } from "../../../../application/agents/services/AgentRunnerService";
@@ -18,7 +18,7 @@ import type { IToolCapabilityCatalog } from "../../../../application/ports/inter
 import type { IAgentToolOrchestrator } from "../../../../application/ports/interfaces/IAgentToolOrchestrator";
 import { AgentMcpToolGovernanceService } from "../../../../application/agents/services/AgentMcpToolGovernanceService";
 import type { IMcpToolRegistryRepository } from "../../../../application/ports/interfaces/IMcpToolRegistryRepository";
-import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "../../../../src/domain/mcp/InstalledMcpTool";
+import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
 import { SqliteAgentExecutionSessionRepository } from "../SqliteAgentExecutionSessionRepository";
 
 const createdRoots: string[] = [];

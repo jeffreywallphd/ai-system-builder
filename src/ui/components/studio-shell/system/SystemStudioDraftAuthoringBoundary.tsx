@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
-import type { StudioShellValidationIssue } from "../../../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import {
   StudioShellValidationIssueCodes,
   StudioShellValidationSections,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { LocalStorageInstalledModelCatalog } from "../LocalStorageInstalledModelCatalog";
-import { makeModel } from "../../../../src/domain/services/tests/testUtils";
+import { makeModel } from "../../../../domain/services/tests/testUtils";
 
 function createStorage() {
   const values = new Map<string, string>();

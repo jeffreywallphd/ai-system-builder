@@ -5,7 +5,7 @@ import {
   WorkflowDraftSystemOutputWriteModes,
   type WorkflowDraft,
   type WorkflowDraftOutput,
-} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   createDefaultWorkflowOutputTypeRegistry,
   type WorkflowOutputRegistryFieldMetadata,

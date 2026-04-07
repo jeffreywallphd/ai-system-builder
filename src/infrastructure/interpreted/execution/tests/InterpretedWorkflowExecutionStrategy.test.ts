@@ -1,12 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../src/domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../src/domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../src/domain/workflows/tests/testUtils";
+import { Workflow } from "../../../../domain/workflows/Workflow";
+import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
+import { makeNode } from "../../../../domain/workflows/tests/testUtils";
 import { Node } from "../../../../domain/nodes/Node";
 import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
 import { NodePort, NodePortCompatibilityProfile } from "../../../../domain/nodes/NodePort";
 import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
-import { WorkflowConnection } from "../../../../src/domain/workflows/WorkflowConnection";
+import { WorkflowConnection } from "../../../../domain/workflows/WorkflowConnection";
 import { ExecuteMcpToolUseCase } from "../../../../application/mcp/ExecuteMcpToolUseCase";
 import { DefaultNodeExecutionContextResolver } from "../DefaultNodeExecutionContextResolver";
 import { DefaultNodeOutputStore } from "../DefaultNodeOutputStore";

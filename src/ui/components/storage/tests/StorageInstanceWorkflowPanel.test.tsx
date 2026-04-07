@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { StorageManagedActions } from "../../../../src/domain/storage/StorageDomain";
-import type { GetStorageInstanceDetailApiResponse } from "../../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+import { StorageManagedActions } from "../../../../domain/storage/StorageDomain";
+import type { GetStorageInstanceDetailApiResponse } from "../../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import StorageInstanceWorkflowPanel, { StorageInstanceWorkflowPanelPresentation } from "../StorageInstanceWorkflowPanel";
 import type { StorageAdministrationService } from "../../../services/StorageAdministrationService";
 

@@ -10,7 +10,7 @@ import {
   type WorkflowDraftTriggerType,
   type WorkflowDraftUserTriggerConfig,
   type WorkflowValidationIssue,
-} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { createDefaultWorkflowTriggerTypeRegistry } from "../../../application/workflow-studio/WorkflowTriggerTypeRegistry";
 import { validateSingleWorkflowTriggerDefinition } from "../../../application/workflow-studio/WorkflowTriggerValidationPipeline";
 

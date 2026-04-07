@@ -46,7 +46,7 @@ import {
   rejectPairingSession,
   type PairingSession,
   type PairingToken,
-} from "../../../src/domain/identity/TrustedDevicePairingDomain";
+} from "../../../domain/identity/TrustedDevicePairingDomain";
 import {
   DeviceTrustMaterialKinds,
   DeviceTrustStatuses,
@@ -55,7 +55,7 @@ import {
   pairTrustedDevice,
   type DeviceTrustMaterialRef,
   type TrustedDevice,
-} from "../../../src/domain/identity/TrustedDeviceDomain";
+} from "../../../domain/identity/TrustedDeviceDomain";
 import {
   mapPairingSessionRecord,
   mapPairingTokenRecord,

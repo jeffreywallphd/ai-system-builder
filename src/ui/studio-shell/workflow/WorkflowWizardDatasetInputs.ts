@@ -4,13 +4,13 @@ import {
   type WorkflowDraft,
   type WorkflowDraftDatasetInput,
   type WorkflowDraftInput,
-} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   createCompositionTaxonomyDescriptor,
-} from "../../../src/domain/taxonomy/CompositionTaxonomy";
+} from "../../../domain/taxonomy/CompositionTaxonomy";
 
 export interface WorkflowDatasetAssetCandidate {
   readonly assetId: string;

@@ -11,7 +11,7 @@ import {
   startAuthoritativeServerHostAssembly,
   type AuthoritativeServerHostEntrypointOptions,
   type AuthoritativeServerHostRuntimeHandle,
-} from "../../../src/hosts/server/AuthoritativeServerHostEntrypoint";
+} from "../../../hosts/server/AuthoritativeServerHostEntrypoint";
 import {
   resolveBrowserDevelopmentManagedRuntimeFromEnvironment,
 } from "./BrowserDevelopmentManagedRuntime";

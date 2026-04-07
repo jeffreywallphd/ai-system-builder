@@ -1,9 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../src/domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../src/domain/assets/AssetVersion";
+import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "../../../../domain/assets/AssetVersion";
 import { SystemRuntimeBackendApi } from "../SystemRuntimeBackendApi";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../src/application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyDecisionEvaluator } from "../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
@@ -12,10 +12,10 @@ import type {
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
-} from "../../../../src/application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationRoleGrantReadRepository } from "../../../../src/application/authorization/ports/IAuthorizationRoleGrantReadRepository";
-import type { IAuthorizationSharingGrantReadRepository } from "../../../../src/application/authorization/ports/IAuthorizationSharingGrantReadRepository";
-import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../../src/application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
+} from "../../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationRoleGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationRoleGrantReadRepository";
+import type { IAuthorizationSharingGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationSharingGrantReadRepository";
+import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
@@ -23,8 +23,8 @@ import {
   SharingPolicyModes,
   SharingSubjectKinds,
   createRoleAssignment,
-} from "../../../../src/domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../../src/domain/authorization/AuthorizationPermissionCatalog";
+} from "../../../../domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
 

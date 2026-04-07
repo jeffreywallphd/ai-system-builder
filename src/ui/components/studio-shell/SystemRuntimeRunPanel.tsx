@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AssetDraftLifecycleStatuses } from "../../../src/domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { ExecutionMonitorPanel } from "./runtime/ExecutionMonitorPanel";
 import { ExecutionResultPanel } from "./runtime/ExecutionResultPanel";

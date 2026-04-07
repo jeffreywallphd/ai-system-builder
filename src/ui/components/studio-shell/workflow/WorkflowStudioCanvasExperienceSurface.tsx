@@ -8,7 +8,7 @@ import {
   type WorkflowDraftIfThenStepConfig,
   type WorkflowDraft,
   type WorkflowValidationIssue,
-} from "../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,

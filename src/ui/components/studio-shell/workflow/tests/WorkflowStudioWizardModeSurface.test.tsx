@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioWizardModeSurface from "../WorkflowStudioWizardExperienceSurface";
 import {
   WorkflowStudioHandoffFlowKinds,

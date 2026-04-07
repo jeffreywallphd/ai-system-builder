@@ -1,4 +1,4 @@
-import type { SessionRevocationReason } from "../../src/domain/identity/IdentityDomain";
+import type { SessionRevocationReason } from "../../domain/identity/IdentityDomain";
 
 export const IdentityLifecycleEventTypes = Object.freeze({
   localAccountRegistered: "identity.local-account.registered",

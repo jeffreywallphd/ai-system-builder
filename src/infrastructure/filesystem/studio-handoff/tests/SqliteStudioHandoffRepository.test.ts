@@ -12,14 +12,14 @@ import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
-} from "../../../../src/domain/studio-handoff/StudioHandoffContract";
-import { createStudioHandoffContext } from "../../../../src/domain/studio-handoff/StudioHandoffContext";
+} from "../../../../domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContext } from "../../../../domain/studio-handoff/StudioHandoffContext";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../../src/domain/taxonomy/CompositionTaxonomy";
+} from "../../../../domain/taxonomy/CompositionTaxonomy";
 
 const tempDirs: string[] = [];
 

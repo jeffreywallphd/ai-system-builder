@@ -1,4 +1,4 @@
-import type { PipelineStageId } from "../../../../src/domain/dataset-studio/PipelineStageDomain";
+import type { PipelineStageId } from "../../../../domain/dataset-studio/PipelineStageDomain";
 import type {
   DataStudioWizardFieldSnapshot,
   DataStudioWizardStageSnapshot,

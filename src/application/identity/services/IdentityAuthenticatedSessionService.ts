@@ -11,7 +11,7 @@ import {
   type SessionDeviceTrustInvalidationReason,
   type Session,
   type SessionRevocationReason,
-} from "../../../src/domain/identity/IdentityDomain";
+} from "../../../domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,

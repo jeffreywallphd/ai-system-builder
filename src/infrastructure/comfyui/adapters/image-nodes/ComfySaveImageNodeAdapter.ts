@@ -6,9 +6,9 @@ import type {
   IImageNodeExecutionRequest,
 } from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import type { DatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
-import { createImageRecord } from "../../../../src/domain/dataset-studio/contracts/ImageRecord";
-import { createDatasetInstanceImageRecord } from "../../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
-import type { CanonicalRecordValue } from "../../../../src/domain/dataset-studio/CanonicalDataShapes";
+import { createImageRecord } from "../../../../domain/dataset-studio/contracts/ImageRecord";
+import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
+import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,

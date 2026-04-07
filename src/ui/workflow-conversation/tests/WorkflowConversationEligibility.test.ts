@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { WorkflowDraftOutputDestinationTypes } from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowDraftOutputDestinationTypes } from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import { evaluateWorkflowConversationEligibility } from "../WorkflowConversationEligibility";
 
 function createWorkflow(): any {

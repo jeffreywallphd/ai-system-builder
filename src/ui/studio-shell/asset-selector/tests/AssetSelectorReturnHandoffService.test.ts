@@ -3,7 +3,7 @@ import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../../src/domain/studio-shell/AssetSelectorContract";
+} from "../../../../domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorSessionStore } from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import {
   AssetSelectorUsageContexts,

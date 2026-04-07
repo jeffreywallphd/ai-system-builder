@@ -4,16 +4,16 @@ import path from "node:path";
 import { describe, expect, it } from "bun:test";
 import { StorageBackedDatasetInstanceRepository } from "../../../../../application/system-runtime/DatasetInstanceRepository";
 import type { DatasetInstanceStorageAdapter } from "../../../../../application/system-runtime/DatasetInstanceStorageAdapter";
-import { createImageRecord } from "../../../../../src/domain/dataset-studio/contracts/ImageRecord";
+import { createImageRecord } from "../../../../../domain/dataset-studio/contracts/ImageRecord";
 import {
   createDatasetInstance,
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRuntimeStatuses,
-} from "../../../../../src/domain/system-runtime/DatasetInstanceDomain";
+} from "../../../../../domain/system-runtime/DatasetInstanceDomain";
 import {
   createDatasetInstanceImageRecord,
   type DatasetInstanceImageRecord,
-} from "../../../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
+} from "../../../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import { ComfyLoadImageNodeAdapter } from "../ComfyLoadImageNodeAdapter";
 import { ComfyModelLoaderNodeAdapter } from "../ComfyModelLoaderNodeAdapter";
 import { ComfyPromptInputNodeAdapter } from "../ComfyPromptInputNodeAdapter";

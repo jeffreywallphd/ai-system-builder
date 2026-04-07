@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   useBeforeUnload,
@@ -6,7 +6,7 @@ import {
   useLocation,
   useNavigate,
 } from "react-router-dom";
-import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../src/domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses, type AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
 import type {
   DataStudioExecutionReadinessReadModel,
   RunDataStudioPipelineReadModel,
@@ -14,7 +14,7 @@ import type {
   StudioShellSnapshotReadModel,
   StudioShellValidationIssue,
   WorkflowExecutionReadinessReadModel,
-} from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
 import StudioAssetHostBoundary from "../components/studio-shell/studio-assets/StudioAssetHostBoundary";
 import WorkflowStudioExecutionFeedbackPanel, {
   type WorkflowStudioRunFeedback,
@@ -68,7 +68,7 @@ import {
   InlineAssetReturnStatuses,
   type InlineAssetCreationReturnTarget,
 } from "../routes/InlineAssetCreation";
-import { createWorkflowAssetMetadata } from "../../src/domain/workflow-studio/WorkflowStudioDomain";
+import { createWorkflowAssetMetadata } from "../../domain/workflow-studio/WorkflowStudioDomain";
 import { DataStudioWizardPersistenceStorageKey } from "../studio-shell/data/DataStudioPreparationWizardStateAdapter";
 import {
   createStudioHostContext,

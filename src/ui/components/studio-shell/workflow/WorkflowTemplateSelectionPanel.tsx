@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CoreImageStarterWorkflowTemplates } from "../../../../application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
 import { WorkflowTemplateInstantiationService } from "../../../../application/workflow-template-studio/WorkflowTemplateInstantiationService";
-import type { WorkflowTemplateDefinition } from "../../../../src/domain/workflow-template-studio/WorkflowTemplateDomain";
+import type { WorkflowTemplateDefinition } from "../../../../domain/workflow-template-studio/WorkflowTemplateDomain";
 import { RegistryService } from "../../../services/RegistryService";
 
 interface WorkflowTemplateSelectionPanelProps {

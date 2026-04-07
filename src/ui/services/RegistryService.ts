@@ -1,8 +1,8 @@
 import type { RegistryDependencyGraph, RegistryDependencyTraversal } from "../../application/asset-registry/RegistryDependencyGraphService";
 import type { RegistryFilterParams } from "../../application/asset-registry/RegistryQueryService";
 import type { ExploreSearchQuery, ExploreSearchResult, UnifiedExploreAssetLibrary } from "../../application/asset-registry/ExploreAssetQueryService";
-import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery, RegistrySearchQuery } from "../../src/infrastructure/api/registry/RegistryBackendApi";
-import type { RegistryAsset } from "../../src/domain/asset-registry/RegistryAsset";
+import type { RegistryDependencyEndpointQuery, RegistryTraversalEndpointQuery, RegistryApiResponse, RegistryAssetDetailQuery, RegistrySearchQuery } from "../../infrastructure/api/registry/RegistryBackendApi";
+import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import { resolveDesktopRegistryBridge } from "../composition/DesktopRegistryBridgeAdapter";
 import { resolveBrowserRegistryBridgeFallback } from "../composition/BrowserRegistryBridgeFallback";
 

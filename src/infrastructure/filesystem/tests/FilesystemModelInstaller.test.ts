@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Model, ModelArtifact, ModelSource } from "../../../src/domain/models/Model";
+import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
 import { FilesystemModelInstaller } from "../FilesystemModelInstaller";
 import { LocalFileStorage } from "../LocalFileStorage";
 

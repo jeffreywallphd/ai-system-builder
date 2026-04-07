@@ -1,5 +1,5 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
-import { AssetSelectorSelectionModes } from "../../../../src/domain/studio-shell/AssetSelectorContract";
+import { AssetSelectorSelectionModes } from "../../../../domain/studio-shell/AssetSelectorContract";
 import type { AssetSelectorSessionState } from "../../../../application/studio-entry/AssetSelectorSessionStore";
 import type { AssetSelectorResultItem } from "../../../studio-shell/asset-selector/AssetSelectorDataProvider";
 

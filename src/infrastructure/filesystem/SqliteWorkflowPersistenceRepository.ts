@@ -7,11 +7,11 @@ import type {
 import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
-} from "../../src/domain/workflow-studio/WorkflowPersistenceDomain";
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   normalizePersistedWorkflowRecord,
   toPersistedWorkflowSummary,
-} from "../../src/domain/workflow-studio/WorkflowPersistenceDomain";
+} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "./sqlite/SqliteCompat";
 
 interface WorkflowRow {

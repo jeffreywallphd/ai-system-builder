@@ -11,7 +11,7 @@ import {
 import {
   rehydrateWorkspaceOwnershipMetadata,
   type WorkspaceOwnershipMetadata,
-} from "../../src/shared/workspaces/WorkspaceOwnership";
+} from "../../shared/workspaces/WorkspaceOwnership";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();

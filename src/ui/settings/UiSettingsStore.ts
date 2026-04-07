@@ -1,4 +1,4 @@
-import type { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
 import {
   createDefaultUiSettings,
   createWorkspaceDefaults,

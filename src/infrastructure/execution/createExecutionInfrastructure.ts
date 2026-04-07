@@ -9,11 +9,11 @@ import type { IWorkflowRunSummaryRepository } from "../../application/ports/inte
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
 import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import type { DatasetGenerationService } from "../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { DatasetGenerationService } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { IModelTrainingRuntime } from "../../application/ports/interfaces/IModelTrainingRuntime";
 import type { DesktopExecutionRunBridge, DesktopWorkflowRunSummaryBridge } from "../../electron/shared/DesktopContracts";
-import { LocalStorageExecutionRunRepository } from "../../src/infrastructure/browser/execution/LocalStorageExecutionRunRepository";
-import { DesktopBridgeExecutionRunRepository } from "../../src/infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
+import { LocalStorageExecutionRunRepository } from "../../infrastructure/browser/execution/LocalStorageExecutionRunRepository";
+import { DesktopBridgeExecutionRunRepository } from "../../infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
 import { LocalExecutionRunRepository } from "../filesystem/execution/LocalExecutionRunRepository";
 import { SqliteExecutionRunRepository } from "../filesystem/execution/SqliteExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";

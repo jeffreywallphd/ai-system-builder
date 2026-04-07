@@ -3,8 +3,8 @@ import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../src/domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../../src/domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "../../../../domain/execution/ExecutionRun";
 import { SqliteExecutionRunRepository } from "../SqliteExecutionRunRepository";
 
 function makeRun(runId: string, overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {

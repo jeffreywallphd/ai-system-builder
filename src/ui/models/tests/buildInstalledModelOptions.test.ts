@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { attachInstalledModelOptions, buildInstalledModelOptions } from "../buildInstalledModelOptions";
-import { ModelCompatibility } from "../../../src/domain/models/ModelCompatibility";
+import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
 
 const baseModel: any = {
   isRunnable: true,

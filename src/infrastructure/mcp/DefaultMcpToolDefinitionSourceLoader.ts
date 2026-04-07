@@ -1,6 +1,6 @@
 import type { IMcpToolDefinitionSourceLoader } from "../../application/ports/interfaces/IMcpToolDefinitionSourceLoader";
-import type { McpToolDefinitionSource } from "../../src/domain/mcp/InstalledMcpTool";
-import type { McpToolDefinition } from "../../src/domain/mcp/McpToolCapability";
+import type { McpToolDefinitionSource } from "../../domain/mcp/InstalledMcpTool";
+import type { McpToolDefinition } from "../../domain/mcp/McpToolCapability";
 
 export interface ITextLoader {
   readText(path: string): Promise<string>;

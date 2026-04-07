@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 import { SqliteStudioHandoffAuditRepository } from "../SqliteStudioHandoffAuditRepository";
 import { StudioHandoffAuditTrailService } from "../../../../application/studio-handoff/StudioHandoffAuditTrailService";
-import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "../../../../src/domain/studio-handoff/StudioHandoffAuditTrail";
+import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "../../../../domain/studio-handoff/StudioHandoffAuditTrail";
 
 const tempDirs: string[] = [];
 

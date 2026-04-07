@@ -1,4 +1,4 @@
-import type { TaxonomySemanticRole } from "../../src/domain/taxonomy/CompositionTaxonomy";
+import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
 import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver } from "./StudioRouteMapping";
 import {

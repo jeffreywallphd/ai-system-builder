@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../src/domain/workflows/Workflow";
-import { WorkflowConnection } from "../../../../src/domain/workflows/WorkflowConnection";
-import { WorkflowMetadata } from "../../../../src/domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../src/domain/workflows/tests/testUtils";
+import { Workflow } from "../../../../domain/workflows/Workflow";
+import { WorkflowConnection } from "../../../../domain/workflows/WorkflowConnection";
+import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
+import { makeNode } from "../../../../domain/workflows/tests/testUtils";
 import { ComfyWorkflowAdapter } from "../ComfyWorkflowAdapter";
 
 describe("ComfyWorkflowAdapter", () => {

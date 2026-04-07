@@ -7,7 +7,7 @@ import type {
   ListStorageInstancesApiResponse,
   StorageManagementApiResponse,
   UpdateStorageInstanceMetadataApiResponse,
-} from "../../../src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import type {
   StorageAccessMode,
   StorageAccessScope,
@@ -17,7 +17,7 @@ import type {
   StorageLifecycleState,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
-} from "../../../src/domain/storage/StorageDomain";
+} from "../../../domain/storage/StorageDomain";
 
 export interface StorageAdministrationClient {
   createStorageInstance(

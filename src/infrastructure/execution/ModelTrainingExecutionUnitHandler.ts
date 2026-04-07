@@ -1,4 +1,4 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../src/domain/execution/ExecutionPlan";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
 import type { IExecutionEngineEvent } from "../../application/execution/ExecutionContracts";
 import type { IExecutionDiagnostics } from "../../application/execution/ExecutionContracts";
 import type { IModelTrainingRuntime, SubmitModelTrainingJobRequest } from "../../application/ports/interfaces/IModelTrainingRuntime";
@@ -15,7 +15,7 @@ import type {
   IExecutionUnitHandler,
   IExecutionUnitRunHandle,
 } from "../../application/execution/UnifiedExecutionEngine";
-import type { ModelTrainingJob } from "../../src/domain/model-training/ModelTrainingTypes";
+import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
 import type { ExecutionAssetLineageRecorder } from "../../application/assets-system/ExecutionAssetLineageRecorder";
 
 function delay(ms: number): Promise<void> {

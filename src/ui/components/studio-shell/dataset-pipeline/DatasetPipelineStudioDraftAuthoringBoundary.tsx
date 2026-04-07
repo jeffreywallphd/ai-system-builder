@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { RegistryAsset } from "../../../../src/domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../../../domain/asset-registry/RegistryAsset";
 import {
   deserializeDatasetPipelineAssetDocumentForEditing,
   resolveDatasetPipelineSchemaReferenceStatus,
@@ -7,7 +7,7 @@ import {
   updateDatasetPipelineSchemaReference,
   updateDatasetPipelineSourceSchemaReference,
   type DatasetPipelineSchemaReference,
-} from "../../../../src/domain/dataset-pipeline-studio/DatasetPipelineAssetDocument";
+} from "../../../../domain/dataset-pipeline-studio/DatasetPipelineAssetDocument";
 import { RegistryService } from "../../../services/RegistryService";
 import {
   StudioEmbeddedIntentKinds,

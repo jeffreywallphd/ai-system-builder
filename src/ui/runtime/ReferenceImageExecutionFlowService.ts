@@ -1,9 +1,9 @@
-import type { SystemContextContract } from "../../src/domain/system-studio/SystemContextContract";
+import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
 import type {
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
-} from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
-import type { RuntimeExecutionResultReadModel } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { RuntimeExecutionResultReadModel } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
   ReferenceImagePerformancePhaseIds,
   ReferenceImagePerformanceTelemetrySession,

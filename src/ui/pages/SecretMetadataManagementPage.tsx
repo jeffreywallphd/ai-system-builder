@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { SecretMetadataApiRecord } from "../../src/infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
-import { SecretKinds, SecretScopes, type SecretKind, type SecretScope } from "../../src/domain/security/SecretDomain";
-import { SecretClassificationIds, type SecretClassificationId } from "../../src/shared/contracts/security/SecretClassificationContracts";
+import type { SecretMetadataApiRecord } from "../../infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
+import { SecretKinds, SecretScopes, type SecretKind, type SecretScope } from "../../domain/security/SecretDomain";
+import { SecretClassificationIds, type SecretClassificationId } from "../../shared/contracts/security/SecretClassificationContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { SecretMetadataManagementService } from "../services/SecretMetadataManagementService";
 import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";

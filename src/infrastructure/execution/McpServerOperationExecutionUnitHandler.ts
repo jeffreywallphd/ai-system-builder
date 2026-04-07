@@ -1,4 +1,4 @@
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../src/domain/execution/ExecutionPlan";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IExecutionEngineEvent } from "../../application/execution/ExecutionContracts";
 import type {

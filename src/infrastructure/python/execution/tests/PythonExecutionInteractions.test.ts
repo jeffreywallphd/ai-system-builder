@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { PythonBackedNodeExecutor } from "../PythonBackedNodeExecutor";
-import { makeNode } from "../../../../src/domain/workflows/tests/testUtils";
+import { makeNode } from "../../../../domain/workflows/tests/testUtils";
 
 describe("python execution interactions", () => {
   it("skips unsupported nodes", async () => {

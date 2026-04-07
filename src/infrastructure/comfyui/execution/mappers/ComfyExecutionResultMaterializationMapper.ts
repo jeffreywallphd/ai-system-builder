@@ -1,7 +1,7 @@
-import type { CanonicalRecordValue } from "../../../../src/domain/dataset-studio/CanonicalDataShapes";
+import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetInstanceImageGenerationRoles,
-} from "../../../../src/domain/system-runtime/DatasetInstanceRecordDomain";
+} from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
 import type {
   IComfyAdapterResult,
 } from "../../../../application/execution/comfyui/ComfyAdapterContract";

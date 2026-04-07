@@ -1,4 +1,4 @@
-import type { IModel } from "../../src/domain/models/interfaces/IModel";
+import type { IModel } from "../../domain/models/interfaces/IModel";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
@@ -10,7 +10,7 @@ import type {
 import type {
   IModelCompatibilityContext,
   IModelCompatibilityResult,
-} from "../../src/domain/services/interfaces/IModelCompatibilityService";
+} from "../../domain/services/interfaces/IModelCompatibilityService";
 import {
   InstallModelUseCase,
   type IInstallModelRequest,

@@ -3,18 +3,18 @@ import type {
   ListNodeInventoryApiResponse,
   NodeTrustApiResponse,
   RevokeNodeTrustApiResponse,
-} from "../../../src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
 import type {
   NodeInventoryOperationalState,
   NodeInventoryPresenceState,
   RevokeNodeTrustActionRequestDto,
-} from "../../../src/shared/contracts/nodes/NodeTrustApiContracts";
+} from "../../../shared/contracts/nodes/NodeTrustApiContracts";
 import type {
   NodeApprovalStatus,
   NodeEnrollmentRequestStatus,
   NodeRoleCapability,
   NodeType,
-} from "../../../src/domain/nodes/NodeTrustDomain";
+} from "../../../domain/nodes/NodeTrustDomain";
 
 export interface NodeInventoryClient {
   listNodeInventory(

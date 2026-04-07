@@ -7,7 +7,7 @@ import type {
   RegistryDependencyGraph,
   RegistryDependencyGraphNode,
 } from "../../application/asset-registry/RegistryDependencyGraphService";
-import type { RegistryAsset } from "../../src/domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
 import {
   AssetContractPanel,
   AssetDependencySummaryPanel,

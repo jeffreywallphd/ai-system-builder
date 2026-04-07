@@ -8,11 +8,11 @@ import type { IExecutionRunRepository } from "../../application/ports/interfaces
 import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type { IMcpServerManager } from "../../application/ports/interfaces/IMcpServerManager";
 import type { IWorkflowExecutor } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { DatasetGenerationService } from "../../src/domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { DatasetGenerationService } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type { IModelTrainingRuntime } from "../../application/ports/interfaces/IModelTrainingRuntime";
 import type { DesktopExecutionRunBridge } from "../../electron/shared/DesktopContracts";
-import { LocalStorageExecutionRunRepository } from "../../src/infrastructure/browser/execution/LocalStorageExecutionRunRepository";
-import { DesktopBridgeExecutionRunRepository } from "../../src/infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
+import { LocalStorageExecutionRunRepository } from "../../infrastructure/browser/execution/LocalStorageExecutionRunRepository";
+import { DesktopBridgeExecutionRunRepository } from "../../infrastructure/browser/execution/DesktopBridgeExecutionRunRepository";
 import { DatasetGenerationExecutionUnitHandler } from "./DatasetGenerationExecutionUnitHandler";
 import { DataStudioPipelineExecutionUnitHandler } from "./DataStudioPipelineExecutionUnitHandler";
 import { McpServerOperationExecutionUnitHandler } from "./McpServerOperationExecutionUnitHandler";

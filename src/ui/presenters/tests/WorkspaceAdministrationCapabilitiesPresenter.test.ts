@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { WorkspaceAdminListItemApiRecord } from "../../../src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+import type { WorkspaceAdminListItemApiRecord } from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { presentWorkspaceAdministrationCapabilities } from "../WorkspaceAdministrationCapabilitiesPresenter";
 
 describe("WorkspaceAdministrationCapabilitiesPresenter", () => {

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ExecutionAuditRepository } from "../../../application/system-runtime/ExecutionAuditRepository";
-import type { ExecutionAuditRecord } from "../../../src/domain/system-runtime/ExecutionAuditTrailDomain";
+import type { ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface AuditRecordRow {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
-import type { IExecutionRunRecord } from "../../../../src/domain/execution/ExecutionRun";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../src/domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "../../../../domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../domain/execution/ExecutionPlan";
 import { LocalStorageExecutionRunRepository } from "../LocalStorageExecutionRunRepository";
 
 function makeRun(overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {

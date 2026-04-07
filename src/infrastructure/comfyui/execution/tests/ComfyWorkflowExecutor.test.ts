@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../src/domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../src/domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../src/domain/workflows/tests/testUtils";
+import { Workflow } from "../../../../domain/workflows/Workflow";
+import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
+import { makeNode } from "../../../../domain/workflows/tests/testUtils";
 import { ComfyQueueExecutionAdapter, ComfyWorkflowExecutor } from "../ComfyWorkflowExecutor";
 import { ComfyPromptExecutionError } from "../ComfyQueueClient";
 

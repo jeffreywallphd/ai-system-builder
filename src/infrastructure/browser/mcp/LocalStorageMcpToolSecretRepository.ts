@@ -5,7 +5,7 @@ import type {
   McpToolSecretScopeType,
   ResolvedMcpToolSecretRecord,
 } from "../../../application/ports/interfaces/IMcpToolSecretRepository";
-import type { McpToolCredentialFieldRequirement } from "../../../src/domain/mcp/McpToolTrust";
+import type { McpToolCredentialFieldRequirement } from "../../../domain/mcp/McpToolTrust";
 
 interface PersistedSecretEnvelope {
   readonly version: 2;

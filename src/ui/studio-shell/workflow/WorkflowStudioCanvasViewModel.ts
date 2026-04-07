@@ -13,7 +13,7 @@ import {
   type WorkflowDraftStepType,
   type WorkflowDraftTriggerType,
   type WorkflowValidationIssue,
-} from "../../../src/domain/workflow-studio/WorkflowStudioDomain";
+} from "../../../domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   getWorkflowTriggerSummary,
