@@ -54,6 +54,10 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
     this.countQuery = query;
     return this.events.length;
   }
+
+  public async getAuditEventById(eventId: string): Promise<CanonicalAuditEvent | undefined> {
+    return this.events.find((event) => event.eventId === eventId);
+  }
 }
 
 class StaticAuthorizer implements AuditLedgerQueryAuthorizer {
@@ -76,40 +80,52 @@ class StaticAuthorizer implements AuditLedgerQueryAuthorizer {
 }
 
 function createEvent(eventId: string, occurredAt: string): CanonicalAuditEvent {
-  return createCanonicalAuditEvent({
+  return createEventWithOverrides({
     eventId,
-    eventType: "workspace-policy-updated",
-    category: AuditEventCategories.policy,
-    action: "policy.updated",
-    outcome: "succeeded",
     occurredAt,
-    actor: {
+  });
+}
+
+function createEventWithOverrides(overrides: Partial<CanonicalAuditEvent>): CanonicalAuditEvent {
+  return createCanonicalAuditEvent({
+    eventId: overrides.eventId ?? "audit:event:default",
+    eventType: overrides.eventType ?? "workspace-policy-updated",
+    category: overrides.category ?? AuditEventCategories.policy,
+    action: overrides.action ?? "policy.updated",
+    outcome: "succeeded",
+    occurredAt: overrides.occurredAt ?? "2026-04-07T19:00:00.000Z",
+    actor: overrides.actor ?? {
       actorId: "user:auditor",
       actorKind: AuditActorKinds.user,
       actorUserIdentityId: "user:auditor",
     },
-    scope: {
+    scope: overrides.scope ?? {
       kind: AuditScopeKinds.workspace,
       workspaceId: "workspace:alpha",
     },
-    protectedResource: {
+    protectedResource: overrides.protectedResource ?? {
       resourceType: "policy",
       resourceId: "policy:alpha",
       resourceRef: "policy:alpha",
       sensitivityClass: "sensitive",
       workspaceId: "workspace:alpha",
     },
-    payload: {
+    payload: overrides.payload ?? {
       hasProtectedData: false,
       redactionReasons: [],
       userSafeDetails: {
         reason: "updated",
       },
     },
-    integrity: {
+    integrity: overrides.integrity ?? {
       schemaVersion: "1.0",
       hashAlgorithm: "sha-256",
     },
+    recordedAt: overrides.recordedAt,
+    retention: overrides.retention,
+    immutability: overrides.immutability,
+    correlationId: overrides.correlationId,
+    requestId: overrides.requestId,
   });
 }
 
@@ -171,6 +187,7 @@ describe("AuditLedgerQueryService", () => {
           actorIds: ["user:auditor"],
           resourceTypes: ["policy"],
           resourceIds: ["policy:alpha"],
+          allowedCategories: ["policy"],
           enforceThinSafeOnly: true,
           canReadProtectedData: false,
         },
@@ -186,6 +203,7 @@ describe("AuditLedgerQueryService", () => {
           actorIds: ["user:auditor", "user:other"],
           resourceTypes: ["policy", "secret"],
           resourceIds: ["policy:alpha", "policy:beta"],
+          categories: ["policy", "administrative"],
           hasProtectedData: false,
         },
       },
@@ -200,6 +218,7 @@ describe("AuditLedgerQueryService", () => {
     expect(repository.listQuery?.filters?.actorIds).toEqual(["user:auditor"]);
     expect(repository.listQuery?.filters?.resourceTypes).toEqual(["policy"]);
     expect(repository.listQuery?.filters?.resourceIds).toEqual(["policy:alpha"]);
+    expect(repository.listQuery?.filters?.categories).toEqual(["policy"]);
     expect(repository.listQuery?.filters?.includeThinSafeOnly).toBeTrue();
     expect(repository.listQuery?.filters?.hasProtectedData).toBeFalse();
   });
@@ -270,5 +289,149 @@ describe("AuditLedgerQueryService", () => {
     ]);
     expect(outcome.value.pagination.hasMore).toBeTrue();
     expect(outcome.value.response.totalCount).toBe(3);
+  });
+
+  it("returns not-found for detail lookup when event does not exist", async () => {
+    const repository = new InMemoryAuditLedgerRepository([]);
+    const service = new AuditLedgerQueryService({
+      repository,
+      authorizer: new StaticAuthorizer({
+        allowed: true,
+        scope: {
+          workspaceIds: ["workspace:alpha"],
+          detailVisibility: "admin",
+        },
+      }),
+    });
+
+    const outcome = await service.getAuditEventDetail({
+      requesterId: "user:auditor",
+      eventId: "audit:event:missing",
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe(AuditLedgerQueryErrorCodes.notFound);
+  });
+
+  it("returns user-safe detail by default for non-admin read scope", async () => {
+    const repository = new InMemoryAuditLedgerRepository([
+      createEvent("audit:event:1", "2026-04-07T19:00:00.000Z"),
+    ]);
+    const service = new AuditLedgerQueryService({
+      repository,
+      authorizer: new StaticAuthorizer({
+        allowed: true,
+        scope: {
+          workspaceIds: ["workspace:alpha"],
+          enforceThinSafeOnly: false,
+          canReadProtectedData: false,
+          detailVisibility: "user-safe",
+        },
+      }),
+    });
+
+    const outcome = await service.getAuditEventDetail({
+      requesterId: "user:auditor",
+      eventId: "audit:event:1",
+    });
+
+    expect(outcome.ok).toBeTrue();
+    if (!outcome.ok) {
+      return;
+    }
+
+    expect(outcome.value.event.visibility).toBe("user-safe");
+    expect(outcome.value.event.adminOnlyDetails).toBeUndefined();
+  });
+
+  it("returns admin detail when authorized access scope allows admin visibility", async () => {
+    const repository = new InMemoryAuditLedgerRepository([
+      createEventWithOverrides({
+        eventId: "audit:event:admin",
+        occurredAt: "2026-04-07T19:04:00.000Z",
+        payload: {
+          userSafeDetails: { reason: "updated" },
+          adminOnlyDetails: { beforeValue: "member", afterValue: "admin" },
+          hasProtectedData: true,
+          redactionReasons: ["internal-only-diagnostic"],
+        },
+      }),
+    ]);
+    const service = new AuditLedgerQueryService({
+      repository,
+      authorizer: new StaticAuthorizer({
+        allowed: true,
+        scope: {
+          workspaceIds: ["workspace:alpha"],
+          canReadProtectedData: true,
+          detailVisibility: "admin",
+        },
+      }),
+    });
+
+    const outcome = await service.getAuditEventDetail({
+      requesterId: "user:admin",
+      eventId: "audit:event:admin",
+    });
+
+    expect(outcome.ok).toBeTrue();
+    if (!outcome.ok) {
+      return;
+    }
+
+    expect(outcome.value.event.visibility).toBe("admin");
+    expect(outcome.value.event.adminOnlyDetails).toEqual({
+      beforeValue: "member",
+      afterValue: "admin",
+    });
+  });
+
+  it("hides detail lookup for events outside sensitivity/category scope", async () => {
+    const repository = new InMemoryAuditLedgerRepository([
+      createEventWithOverrides({
+        eventId: "audit:event:protected",
+        occurredAt: "2026-04-07T19:05:00.000Z",
+        category: AuditEventCategories.protectedData,
+        action: "secret.read.access-evaluated",
+        eventType: "secret-access-decision",
+        payload: {
+          userSafeDetails: {
+            decision: "allowed",
+          },
+          adminOnlyDetails: {
+            secretId: "secret:one",
+          },
+          hasProtectedData: true,
+          redactionReasons: ["secret-material"],
+        },
+      }),
+    ]);
+    const service = new AuditLedgerQueryService({
+      repository,
+      authorizer: new StaticAuthorizer({
+        allowed: true,
+        scope: {
+          workspaceIds: ["workspace:alpha"],
+          enforceThinSafeOnly: true,
+          canReadProtectedData: false,
+          allowedCategories: [AuditEventCategories.administrative],
+          detailVisibility: "user-safe",
+        },
+      }),
+    });
+
+    const outcome = await service.getAuditEventDetail({
+      requesterId: "user:member",
+      eventId: "audit:event:protected",
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe(AuditLedgerQueryErrorCodes.notFound);
   });
 });

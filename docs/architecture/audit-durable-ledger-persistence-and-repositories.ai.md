@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 18.2.1, Story 18.2.2, and Story 18.2.3 provide durable canonical audit-ledger storage plus application query retrieval workflows with immutable-enough baseline safeguards for authoritative audit persistence.
+Story 18.2.1, Story 18.2.2, Story 18.2.3, and Story 18.2.4 provide durable canonical audit-ledger storage plus permission-aware application query/detail retrieval workflows with immutable-enough baseline safeguards for authoritative audit persistence.
 
 Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
@@ -10,7 +10,9 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 
 - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+- `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
+- `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -26,13 +28,16 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
   - replay-safe operation-key handling,
   - duplicate-content conflict protection,
   - indexed list-query filtering over canonical references/taxonomy/timestamps,
-  - filter-consistent `countAuditEvents(...)` support for query pagination metadata.
+  - filter-consistent `countAuditEvents(...)` support for query pagination metadata,
+  - canonical event lookup support (`getAuditEventById(...)`) for detail workflows.
 - Added immutable-enough persistence safeguards:
   - DB triggers that prohibit `UPDATE`/`DELETE` for audit events and replay records.
   - hash-chain insert guardrails for digest presence and previous-digest continuity.
   - repository-level integrity continuity checks and sequence monotonic validation during append.
 - Updated persistence composition and host audit recorder wiring so authoritative capture writes to the durable audit ledger adapter.
 - Added application-layer `AuditLedgerQueryService` to provide authorization-aware retrieval over shared query contracts with deterministic pagination/sorting defaults and logical scope filtering.
+- Added `WorkspaceAuditLedgerReadAuthorizer` to centralize workspace-role/sensitivity-driven read scope decisions for list and detail retrieval.
+- Added permission-aware detail retrieval (`getAuditEventDetail(...)`) with user-safe vs admin detail projection.
 
 ## Behavior summary
 
@@ -40,12 +45,15 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - Mutation replay metadata is append-maintenance only and does not mutate persisted event truth.
 - Query filters support category/action/eventType/actor/workspace/resource/occurred windows and thin-safe category mode.
 - Query service merges authorization scope limits (workspace/actor/resource/protected-data/thin-safe) with caller filters before repository reads.
+- Detail retrieval applies the same authorization scope and returns non-leaky `notFound` when events are outside workspace/sensitivity visibility.
+- The same canonical event can render as `user-safe` detail for general actors and `admin` detail for administrative actors.
 - Trust boundary is explicit: this is immutable-enough within runtime/SQLite controls, not a full cryptographic immutability/notarization system.
 
 ## Tests
 
 - `src/infrastructure/persistence/audit/tests/SqliteAuditLedgerRepository.test.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
+- `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
 - `src/application/audit/tests/AuditLedgerPersistencePorts.test.ts`
 - `src/infrastructure/persistence/tests/AuthoritativePersistenceComposition.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`

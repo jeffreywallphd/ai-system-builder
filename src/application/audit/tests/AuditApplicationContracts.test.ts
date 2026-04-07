@@ -43,6 +43,10 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   async countAuditEvents(_query: AuditLedgerQuery): Promise<number> {
     return this.events.length;
   }
+
+  async getAuditEventById(eventId: string): Promise<ReturnType<typeof createCanonicalAuditEvent> | undefined> {
+    return this.events.find((event) => event.eventId === eventId);
+  }
 }
 
 describe("AuditApplicationContracts", () => {
@@ -105,6 +109,7 @@ describe("AuditApplicationContracts", () => {
       },
       listAuditEvents: async () => [],
       countAuditEvents: async () => 0,
+      getAuditEventById: async () => undefined,
     };
 
     await expect(appendAuditEventBestEffort(failingRepository, event, {

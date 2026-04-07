@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1, Story 18.2.2, and Story 18.2.3 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1, Story 18.2.2, Story 18.2.3, and Story 18.2.4 for Feature 18 / Epic 18.2.
 
 ## Purpose
 
@@ -10,7 +10,9 @@ Introduce the durable persistence model and repository implementation for canoni
 
 - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+- `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 - `src/application/audit/tests/AuditLedgerQueryService.test.ts`
+- `src/application/audit/tests/WorkspaceAuditLedgerReadAuthorizer.test.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -56,10 +58,26 @@ Key behavior:
 - provides deterministic paging/sort defaults (`occurredAt desc`) and stable pagination metadata (`hasMore`, bounded page window);
 - keeps retrieval logic in the application layer and out of UI state services.
 
+## Story 18.2.4 permission-aware access and detail projection
+
+Audit retrieval now has explicit role/sensitivity-aware access profiling in the application layer:
+
+- `WorkspaceAuditLedgerReadAuthorizer` derives read scope from workspace authorization snapshots and role posture.
+- workspace-scoped admin actors (`owner`/`admin`) receive full-category query scope, protected-data eligibility, and `admin` detail visibility.
+- active non-admin workspace actors receive thin-safe category scope, protected-data exclusion, and `user-safe` detail visibility.
+- list retrieval applies role-derived scope and category intersections before repository reads.
+- detail retrieval (`getAuditEventDetail`) is permission-checked through the same authorizer path and returns:
+  - `notFound` for missing/non-visible events,
+  - `user-safe` detail for general access tiers,
+  - `admin` detail (including admin-only payload) only for admin tiers.
+
+This keeps role, workspace, category-sensitivity, and visibility decisions centralized in audit application services, not in controllers or page code.
+
 Repository query support now includes:
 
 - `listAuditEvents(...)` for filtered/sorted/paged event retrieval;
 - `countAuditEvents(...)` for filter-consistent total counts used by application query responses.
+- `getAuditEventById(...)` for permission-aware detail retrieval.
 
 ## Append semantics
 
