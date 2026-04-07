@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Story 18.2.1 introduces durable canonical audit-ledger storage so authoritative audit events are persisted and queryable via dedicated repository seams.
+Story 18.2.1 and Story 18.2.2 provide durable canonical audit-ledger storage with immutable-enough baseline safeguards for authoritative audit persistence.
 
 Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-repositories.md`
 
@@ -24,6 +24,10 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
   - replay-safe operation-key handling,
   - duplicate-content conflict protection,
   - indexed list-query filtering over canonical references/taxonomy/timestamps.
+- Added immutable-enough persistence safeguards:
+  - DB triggers that prohibit `UPDATE`/`DELETE` for audit events and replay records.
+  - hash-chain insert guardrails for digest presence and previous-digest continuity.
+  - repository-level integrity continuity checks and sequence monotonic validation during append.
 - Updated persistence composition and host audit recorder wiring so authoritative capture writes to the durable audit ledger adapter.
 
 ## Behavior summary
@@ -31,6 +35,7 @@ Canonical human doc: `docs/architecture/audit-durable-ledger-persistence-and-rep
 - Canonical events are appended, not updated in place.
 - Mutation replay metadata is append-maintenance only and does not mutate persisted event truth.
 - Query filters support category/action/eventType/actor/workspace/resource/occurred windows and thin-safe category mode.
+- Trust boundary is explicit: this is immutable-enough within runtime/SQLite controls, not a full cryptographic immutability/notarization system.
 
 ## Tests
 

@@ -22,7 +22,13 @@ import {
   type AuditLedgerEventRow,
   type AuditLedgerMutationReplayRow,
 } from "./AuditLedgerPersistenceMapper";
-import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
+import { AuditImmutabilityPostures, type CanonicalAuditEvent } from "@domain/audit/AuditDomain";
+
+interface AuditLedgerTailRow {
+  readonly sequence: number;
+  readonly event_id: string;
+  readonly integrity_event_digest: string | null;
+}
 
 const SqlSortFieldMap = Object.freeze({
   [AuditEventSortFields.occurredAt]: "occurred_at",
@@ -85,6 +91,9 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
 
     let insertedSequence = 0;
     this.getDatabase().transaction(() => {
+      const previousTail = this.getLatestAuditLedgerTail();
+      this.assertAppendIntegrityConstraints(event, previousTail);
+
       this.executeMutation("append canonical audit event", () => this.getDatabase().prepare(`
           INSERT INTO authoritative_audit_ledger_events (
             event_id,
@@ -128,6 +137,11 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
         throw new Error(`Audit event '${event.eventId}' was not persisted.`);
       }
       insertedSequence = inserted.sequence;
+      if (previousTail && insertedSequence <= previousTail.sequence) {
+        throw new Error(
+          `Audit event '${event.eventId}' sequence '${insertedSequence}' is not monotonic after '${previousTail.sequence}'.`,
+        );
+      }
 
       this.persistMutationReplay({
         operationKey,
@@ -324,6 +338,59 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
       WHERE operation_key = ?
       LIMIT 1
     `).get(operationKey) as AuditLedgerMutationReplayRow | undefined;
+  }
+
+  private getLatestAuditLedgerTail(): AuditLedgerTailRow | undefined {
+    return this.getDatabase().prepare(`
+      SELECT sequence, event_id, integrity_event_digest
+      FROM authoritative_audit_ledger_events
+      ORDER BY sequence DESC
+      LIMIT 1
+    `).get() as AuditLedgerTailRow | undefined;
+  }
+
+  private assertAppendIntegrityConstraints(event: CanonicalAuditEvent, previousTail: AuditLedgerTailRow | undefined): void {
+    const eventDigest = normalizeOptional(event.integrity.eventDigest);
+    const previousEventDigest = normalizeOptional(event.integrity.previousEventDigest);
+    const requiresHashChainDigest = event.immutability === AuditImmutabilityPostures.appendOnlyHashChained;
+
+    if (requiresHashChainDigest && !eventDigest) {
+      throw new Error(
+        `Audit event '${event.eventId}' with immutability '${AuditImmutabilityPostures.appendOnlyHashChained}' requires integrity.eventDigest.`,
+      );
+    }
+
+    if (!previousTail) {
+      if (previousEventDigest) {
+        throw new Error(
+          `Audit event '${event.eventId}' cannot set integrity.previousEventDigest when no prior events exist.`,
+        );
+      }
+      return;
+    }
+
+    if (requiresHashChainDigest && !previousEventDigest) {
+      throw new Error(
+        `Audit event '${event.eventId}' with immutability '${AuditImmutabilityPostures.appendOnlyHashChained}' requires integrity.previousEventDigest when prior events exist.`,
+      );
+    }
+
+    if (!previousEventDigest) {
+      return;
+    }
+
+    const expectedPreviousDigest = normalizeOptional(previousTail.integrity_event_digest ?? undefined);
+    if (!expectedPreviousDigest) {
+      throw new Error(
+        `Audit event '${event.eventId}' cannot verify integrity.previousEventDigest because latest persisted event '${previousTail.event_id}' has no integrity.eventDigest.`,
+      );
+    }
+
+    if (previousEventDigest !== expectedPreviousDigest) {
+      throw new Error(
+        `Audit event '${event.eventId}' integrity.previousEventDigest '${previousEventDigest}' does not match latest ledger digest '${expectedPreviousDigest}'.`,
+      );
+    }
   }
 
   private persistMutationReplay(input: {
