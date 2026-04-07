@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1 and Story 18.2.2 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1, Story 18.2.2, and Story 18.2.3 for Feature 18 / Epic 18.2.
 
 ## Purpose
 
@@ -9,6 +9,8 @@ Introduce the durable persistence model and repository implementation for canoni
 ## Canonical files
 
 - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
+- `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+- `src/application/audit/tests/AuditLedgerQueryService.test.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
 - `src/infrastructure/persistence/audit/AuditLedgerPersistenceMapper.ts`
 - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
@@ -39,6 +41,25 @@ Secondary indexes support common governance query paths:
 - actor/workspace/resource references
 - correlation/request lookups
 - protected-data posture filters
+
+## Story 18.2.3 query service workflows
+
+Application-layer query retrieval is now exposed through
+`AuditLedgerQueryService` with explicit authorization and logical-scope enforcement.
+
+Key behavior:
+
+- validates and normalizes list query input using shared audit query contracts/schemas;
+- enforces requester authorization decisions before repository access;
+- applies logical scope constraints consistently across workspace, actor, and resource filters;
+- enforces thin-safe and protected-data read posture constraints from authorization scope;
+- provides deterministic paging/sort defaults (`occurredAt desc`) and stable pagination metadata (`hasMore`, bounded page window);
+- keeps retrieval logic in the application layer and out of UI state services.
+
+Repository query support now includes:
+
+- `listAuditEvents(...)` for filtered/sorted/paged event retrieval;
+- `countAuditEvents(...)` for filter-consistent total counts used by application query responses.
 
 ## Append semantics
 
@@ -88,5 +109,6 @@ Current limits (explicit, non-cryptographic):
 ## Tests
 
 - `SqliteAuditLedgerRepository.test.ts` validates durable append/reload, idempotent replay, immutable conflict handling, query filters/sorting, prohibited direct mutation paths, and hash-chain continuity guardrails.
+- `AuditLedgerQueryService.test.ts` validates authorization outcomes, logical scope intersections (workspace/actor/resource), protected-data/thin-safe posture enforcement, and deterministic pagination behavior.
 - `AuditLedgerPersistencePorts.test.ts` validates operation-key normalization guardrails.
 - `AuthoritativePersistenceComposition.test.ts` and host composition tests are updated for the new audit-ledger service seam.

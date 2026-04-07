@@ -26,15 +26,17 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
    - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
    - `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
    - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
-4. Add/update durable ledger persistence implementation:
+4. Add/update audit query retrieval service and authorization scoping:
+   - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+5. Add/update durable ledger persistence implementation:
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
-5. Add/update source adapter mapping in infrastructure:
+6. Add/update source adapter mapping in infrastructure:
    - `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
    - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
    - `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
    - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
-6. Validate review-surface compatibility:
+7. Validate review-surface compatibility:
    - `src/ui/services/GovernanceAuditReviewService.ts`
    - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
 
@@ -54,6 +56,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Emit from application use-cases/services or infrastructure event adapters only.
 - Keep UI and route handlers read/query only for governance review.
 - Keep canonical ledger append ownership under `IAuditLedgerRepository` via authoritative service.
+- Keep audit retrieval authorization and logical scope enforcement in application query services, not UI state services.
 
 ## Redaction and payload rules
 

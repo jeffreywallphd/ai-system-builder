@@ -238,6 +238,14 @@ describe("SqliteAuditLedgerRepository", () => {
     expect(byActorAndResource).toHaveLength(1);
     expect(byActorAndResource[0]?.eventId).toBe("audit:event:secret");
 
+    const scopedCount = await repository.countAuditEvents({
+      filters: {
+        actorIds: ["service:secrets"],
+        resourceTypes: ["secret"],
+      },
+    });
+    expect(scopedCount).toBe(1);
+
     const ascendingByOccurred = await repository.listAuditEvents({
       sorting: {
         sortBy: "occurredAt",
@@ -249,6 +257,18 @@ describe("SqliteAuditLedgerRepository", () => {
       "audit:event:secret",
       "audit:event:run",
     ]);
+
+    const offsetWindow = await repository.listAuditEvents({
+      sorting: {
+        sortBy: "occurredAt",
+        sortDirection: SharedApiSortDirections.ascending,
+      },
+      pagination: {
+        limit: 1,
+        offset: 1,
+      },
+    });
+    expect(offsetWindow.map((event) => event.eventId)).toEqual(["audit:event:secret"]);
 
     repository.dispose();
   });

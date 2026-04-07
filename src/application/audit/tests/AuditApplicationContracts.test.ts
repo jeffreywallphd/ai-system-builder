@@ -39,6 +39,10 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   async listAuditEvents(_query: AuditLedgerQuery): Promise<readonly ReturnType<typeof createCanonicalAuditEvent>[]> {
     return this.events;
   }
+
+  async countAuditEvents(_query: AuditLedgerQuery): Promise<number> {
+    return this.events.length;
+  }
 }
 
 describe("AuditApplicationContracts", () => {
@@ -100,6 +104,7 @@ describe("AuditApplicationContracts", () => {
         throw new Error("unavailable");
       },
       listAuditEvents: async () => [],
+      countAuditEvents: async () => 0,
     };
 
     await expect(appendAuditEventBestEffort(failingRepository, event, {
