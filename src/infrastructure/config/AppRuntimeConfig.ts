@@ -208,8 +208,8 @@ export class AppRuntimeConfig {
     const modelInstallDirectory =
       AppRuntimeConfig.readEnvVariable("VITE_MODEL_INSTALL_DIRECTORY") ||
       "dev/models";
-    const identityApiBaseUrl =
-      AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL");
+    const identityApiBaseUrl = AppRuntimeConfig.readEnvVariable("VITE_IDENTITY_API_BASE_URL")
+      || `http://${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_HOST") || "127.0.0.1"}:${AppRuntimeConfig.readEnvVariable("AI_LOOM_BROWSER_IDENTITY_PORT") || "8788"}`;
 
     return new AppRuntimeConfig(AppRuntimeConfig.createValues(runtimeMode, {
       workflowRepositoryMode: profile.supportsLocalWorkspaceFilesystem ? "filesystem-indexed" : "browser-storage",

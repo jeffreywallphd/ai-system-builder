@@ -42,6 +42,7 @@ export interface SharedApiClientOptions {
   readonly defaultHeaders?: Readonly<Record<string, string>>;
   readonly defaultTimeoutMs?: number;
   readonly retryPolicy?: SharedApiRetryPolicy;
+  readonly onDiagnosticEvent?: (event: SharedApiClientDiagnosticEvent) => void;
 }
 
 export interface SharedApiRequestOptions<TResponse extends SharedApiEnvelope<unknown>> {
@@ -54,6 +55,30 @@ export interface SharedApiRequestOptions<TResponse extends SharedApiEnvelope<unk
   readonly timeoutMs?: number;
   readonly retryPolicy?: SharedApiRetryPolicy;
   readonly parseResponse?: (payload: unknown) => TResponse;
+}
+
+export type SharedApiClientDiagnosticSeverity = "debug" | "info" | "warn" | "error";
+
+export interface SharedApiClientDiagnosticEvent {
+  readonly severity: SharedApiClientDiagnosticSeverity;
+  readonly stage:
+    | "request-start"
+    | "request-retry-scheduled"
+    | "request-retry-response"
+    | "request-timeout"
+    | "request-cancelled"
+    | "request-transport-failure";
+  readonly method: SharedApiRequestOptions<SharedApiEnvelope<unknown>>["method"];
+  readonly path: string;
+  readonly url: string;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  readonly status?: number;
+  readonly sharedCode?: SharedApiErrorCode;
+  readonly retryable?: boolean;
+  readonly delayMs?: number;
+  readonly errorName?: string;
+  readonly errorMessage?: string;
 }
 
 const EnvelopeSchema = z.object({
@@ -110,6 +135,7 @@ export class SharedApiClient {
   private readonly defaultHeaders: Readonly<Record<string, string>>;
   private readonly defaultTimeoutMs: number | undefined;
   private readonly defaultRetryPolicy: SharedApiRetryPolicy | undefined;
+  private readonly onDiagnosticEvent: ((event: SharedApiClientDiagnosticEvent) => void) | undefined;
 
   public constructor(options: SharedApiClientOptions) {
     const normalizedBaseUrl = options.baseUrl.trim().replace(/\/$/, "");
@@ -125,6 +151,7 @@ export class SharedApiClient {
     });
     this.defaultTimeoutMs = options.defaultTimeoutMs;
     this.defaultRetryPolicy = options.retryPolicy;
+    this.onDiagnosticEvent = options.onDiagnosticEvent;
   }
 
   public async requestJson<TResponse extends SharedApiEnvelope<unknown>>(
@@ -140,9 +167,19 @@ export class SharedApiClient {
         options.signal,
         options.timeoutMs ?? this.defaultTimeoutMs,
       );
+      const url = `${this.baseUrl}${options.path}`;
+      this.emitDiagnosticEvent({
+        severity: "debug",
+        stage: "request-start",
+        method: options.method,
+        path: options.path,
+        url,
+        attempt,
+        maxAttempts,
+      });
 
       try {
-        const response = await this.fetchImplementation(`${this.baseUrl}${options.path}`, {
+        const response = await this.fetchImplementation(url, {
           method: options.method,
           headers: this.buildHeaders(options.sessionToken, options.headers, options.body),
           body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -151,12 +188,36 @@ export class SharedApiClient {
         });
 
         const parsedResponse = await this.parseResponse(response, options.parseResponse);
-        if (!this.shouldRetryResponse(response, parsedResponse, retryPolicy, options.method, attempt, maxAttempts)) {
+        const shouldRetry = this.shouldRetryResponse(response, parsedResponse, retryPolicy, options.method, attempt, maxAttempts);
+        if (!shouldRetry) {
           return parsedResponse;
         }
+
+        this.emitDiagnosticEvent({
+          severity: "info",
+          stage: "request-retry-response",
+          method: options.method,
+          path: options.path,
+          url,
+          attempt,
+          maxAttempts,
+          status: response.status,
+          sharedCode: resolveSharedCode(parsedResponse.error?.sharedCode ?? parsedResponse.error?.code, response.status),
+          retryable: true,
+        });
       } catch (error) {
         if (isAbortError(error)) {
           if (requestSignal.didTimeout()) {
+            this.emitDiagnosticEvent({
+              severity: "warn",
+              stage: "request-timeout",
+              method: options.method,
+              path: options.path,
+              url,
+              attempt,
+              maxAttempts,
+              retryable: true,
+            });
             return this.normalizeErrorResponse(
               SharedApiErrorCodes.temporarilyUnavailable,
               "Request timed out.",
@@ -166,6 +227,16 @@ export class SharedApiClient {
               }),
             ) as TResponse;
           }
+          this.emitDiagnosticEvent({
+            severity: "info",
+            stage: "request-cancelled",
+            method: options.method,
+            path: options.path,
+            url,
+            attempt,
+            maxAttempts,
+            retryable: false,
+          });
           return this.normalizeErrorResponse(
             SharedApiErrorCodes.temporarilyUnavailable,
             "Request was cancelled.",
@@ -176,13 +247,40 @@ export class SharedApiClient {
           ) as TResponse;
         }
 
-        if (!this.shouldRetryException(options.method, attempt, maxAttempts)) {
+        const shouldRetry = this.shouldRetryException(options.method, attempt, maxAttempts);
+        if (!shouldRetry) {
+          this.emitDiagnosticEvent({
+            severity: "error",
+            stage: "request-transport-failure",
+            method: options.method,
+            path: options.path,
+            url,
+            attempt,
+            maxAttempts,
+            sharedCode: SharedApiErrorCodes.temporarilyUnavailable,
+            retryable: true,
+            errorName: resolveErrorName(error),
+            errorMessage: resolveErrorMessage(error),
+          });
           return this.normalizeErrorResponse(
             SharedApiErrorCodes.temporarilyUnavailable,
             "Unable to reach the API service.",
             Object.freeze({
               retryable: true,
               domainCode: "transport-unavailable",
+              diagnostics: Object.freeze({
+                request: Object.freeze({
+                  method: options.method,
+                  path: options.path,
+                  url,
+                  attempt,
+                  maxAttempts,
+                }),
+                transport: Object.freeze({
+                  errorName: resolveErrorName(error),
+                  errorMessage: resolveErrorMessage(error),
+                }),
+              }),
             }),
           ) as TResponse;
         }
@@ -191,6 +289,16 @@ export class SharedApiClient {
       }
 
       const delayMs = resolveRetryDelayMs(retryPolicy, attempt);
+      this.emitDiagnosticEvent({
+        severity: "debug",
+        stage: "request-retry-scheduled",
+        method: options.method,
+        path: options.path,
+        url,
+        attempt,
+        maxAttempts,
+        delayMs,
+      });
       await waitFor(delayMs, options.signal);
     }
 
@@ -352,6 +460,10 @@ export class SharedApiClient {
         ...additionalErrorFields,
       }),
     });
+  }
+
+  private emitDiagnosticEvent(event: SharedApiClientDiagnosticEvent): void {
+    this.onDiagnosticEvent?.(Object.freeze(event));
   }
 }
 
@@ -576,4 +688,24 @@ function isAbortError(error: unknown): boolean {
   }
 
   return error.name === "AbortError";
+}
+
+function resolveErrorName(error: unknown): string | undefined {
+  if (typeof error === "object" && error && "name" in error) {
+    const name = String((error as { name?: unknown }).name ?? "").trim();
+    return name.length > 0 ? name : undefined;
+  }
+  return undefined;
+}
+
+function resolveErrorMessage(error: unknown): string | undefined {
+  if (typeof error === "object" && error && "message" in error) {
+    const message = String((error as { message?: unknown }).message ?? "").trim();
+    return message.length > 0 ? message : undefined;
+  }
+  if (typeof error === "string") {
+    const normalized = error.trim();
+    return normalized.length > 0 ? normalized : undefined;
+  }
+  return undefined;
 }

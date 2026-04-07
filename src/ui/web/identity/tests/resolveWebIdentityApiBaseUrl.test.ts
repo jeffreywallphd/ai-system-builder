@@ -17,14 +17,14 @@ describe("resolveWebIdentityApiBaseUrl", () => {
     expect(resolveWebIdentityApiBaseUrl()).toBe("http://127.0.0.1:8788");
   });
 
-  it("uses browser origin when available", () => {
+  it("uses development identity endpoint fallback when runtime config is not injected", () => {
     (globalThis as typeof globalThis & { window?: Window }).window = {
       location: {
         origin: "http://127.0.0.1:5174",
       },
     } as Window;
 
-    expect(resolveWebIdentityApiBaseUrl()).toBe("http://127.0.0.1:5174");
+    expect(resolveWebIdentityApiBaseUrl()).toBe("http://127.0.0.1:8788");
   });
 
   it("rejects insecure non-loopback endpoints", () => {
