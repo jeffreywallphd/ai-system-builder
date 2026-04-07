@@ -382,6 +382,41 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     expect(reevaluated.data?.mutation.changed).toBeTrue();
   });
 
+  it("publishes scheduling-requeued realtime events for deferred-run re-evaluation results", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
+    const { api } = buildApi({ realtimePublisher });
+
+    const response = await api.reevaluateDeferredSchedulingRuns({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      reevaluate: {
+        queueId: "queue:default",
+      },
+    });
+
+    expect(response.ok).toBeTrue();
+    expect(realtimeEvents).toHaveLength(4);
+    const queueKinds = realtimeEvents
+      .filter((event) => event.type === "queue")
+      .map((event) => (event.payload as { eventKind?: string }).eventKind);
+    const runKinds = realtimeEvents
+      .filter((event) => event.type === "run")
+      .map((event) => (event.payload as { eventKind?: string }).eventKind);
+    expect(queueKinds).toEqual(["scheduling-requeued", "scheduling-requeued"]);
+    expect(runKinds).toEqual(["scheduling-requeued", "scheduling-requeued"]);
+  });
+
   it("denies scheduling admin actions when run.manage permission is denied", async () => {
     const denyManageEvaluator = Object.freeze({
       evaluateDecision: async (input: { readonly requiredPermissionKey: string }) => Object.freeze({

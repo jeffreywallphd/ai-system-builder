@@ -8,24 +8,39 @@ import type {
   ISchedulingGovernanceEventSink,
   SchedulingGovernanceEvent,
 } from "@application/scheduling/ports/SchedulingGovernanceEventPorts";
+import type {
+  RuntimeRealtimeQueueMovementPayload,
+  RuntimeRealtimeRunStatusPayload,
+} from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import type { RunOrchestrationRealtimePublisher } from "./RunOrchestrationRealtimePublisher";
 
 const SchedulingAuditActionsByType = Object.freeze({
   "scheduling-priority-placement-selected": "run.scheduling.priority-placement.selected",
   "scheduling-deferred-no-placement": "run.scheduling.no-placement.deferred",
   "scheduling-reservation-conflict": "run.scheduling.reservation.conflict",
+  "scheduling-assignment-materialized": "run.scheduling.assignment.materialized",
   "scheduling-assignment-materialization-conflict": "run.scheduling.assignment.materialization.conflict",
 } as const satisfies Record<SchedulingGovernanceEvent["type"], string>);
 
 export class PlatformSchedulingGovernanceEventSink implements ISchedulingGovernanceEventSink {
   public constructor(
     private readonly repository: IPlatformAuditEventRepository,
+    private readonly realtimePublisher?: RunOrchestrationRealtimePublisher,
   ) {}
 
   public async recordSchedulingGovernanceEvent(event: SchedulingGovernanceEvent): Promise<void> {
-    if (event.channel !== "audit") {
+    if (event.channel === "audit") {
+      await this.recordAuditEvent(event);
       return;
     }
 
+    if (event.channel !== "operational") {
+      return;
+    }
+    this.publishRealtimeEvents(event);
+  }
+
+  private async recordAuditEvent(event: SchedulingGovernanceEvent): Promise<void> {
     const actorId = resolveActorId(event);
     const auditEvent = Object.freeze({
       eventId: `audit:run-scheduling:${randomUUID()}`,
@@ -43,6 +58,27 @@ export class PlatformSchedulingGovernanceEventSink implements ISchedulingGoverna
       operationKey: `run-scheduling-audit:${event.type}:${event.decisionId ?? event.runId ?? event.nodeId ?? randomUUID()}`,
       actorId,
       occurredAt: event.occurredAt,
+    });
+  }
+
+  private publishRealtimeEvents(event: SchedulingGovernanceEvent): void {
+    const runId = normalizeOptional(event.runId);
+    if (!this.realtimePublisher || !runId) {
+      return;
+    }
+
+    const queuePayload = toRuntimeQueuePayload(event, runId);
+    this.realtimePublisher.publishQueueMovement({
+      actorUserIdentityId: normalizeOptional(event.actorUserIdentityId),
+      workspaceId: normalizeOptional(event.workspaceId),
+      payload: queuePayload,
+    });
+
+    const runPayload = toRuntimeRunStatusPayload(event, runId);
+    this.realtimePublisher.publishRunStatus({
+      actorUserIdentityId: normalizeOptional(event.actorUserIdentityId),
+      workspaceId: normalizeOptional(event.workspaceId),
+      payload: runPayload,
     });
   }
 }
@@ -105,4 +141,83 @@ function normalizeRef(value: string | undefined, prefix: string): string | undef
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function toRuntimeQueuePayload(
+  event: SchedulingGovernanceEvent,
+  runId: string,
+): RuntimeRealtimeQueueMovementPayload {
+  return Object.freeze({
+    queueItemId: `runtime-queue:${runId}`,
+    executionId: runId,
+    status: resolveRuntimeQueueStatus(event),
+    runId,
+    queueId: normalizeOptional(event.queueId),
+    eventKind: resolveRuntimeEventKind(event),
+    changedAt: event.occurredAt,
+  });
+}
+
+function toRuntimeRunStatusPayload(
+  event: SchedulingGovernanceEvent,
+  runId: string,
+): RuntimeRealtimeRunStatusPayload {
+  const lifecycleState = resolveRuntimeLifecycleState(event);
+  return Object.freeze({
+    executionId: runId,
+    status: lifecycleState,
+    runId,
+    queueId: normalizeOptional(event.queueId),
+    lifecycleState,
+    eventKind: resolveRuntimeEventKind(event),
+    changedAt: event.occurredAt,
+  });
+}
+
+function resolveRuntimeEventKind(
+  event: SchedulingGovernanceEvent,
+): RuntimeRealtimeRunStatusPayload["eventKind"] {
+  switch (event.type) {
+    case "scheduling-priority-placement-selected":
+      return "scheduling-priority-placement-selected";
+    case "scheduling-deferred-no-placement":
+      return "scheduling-deferred-no-placement";
+    case "scheduling-reservation-conflict":
+      return "scheduling-reservation-conflict";
+    case "scheduling-assignment-materialization-conflict":
+      return "scheduling-assignment-materialization-conflict";
+    case "scheduling-assignment-materialized":
+      return "scheduling-assignment-materialized";
+    default:
+      return "state-changed";
+  }
+}
+
+function resolveRuntimeLifecycleState(event: SchedulingGovernanceEvent): string {
+  switch (event.type) {
+    case "scheduling-priority-placement-selected":
+    case "scheduling-assignment-materialized":
+      return "assignment-pending";
+    case "scheduling-deferred-no-placement":
+      return "queued";
+    case "scheduling-reservation-conflict":
+    case "scheduling-assignment-materialization-conflict":
+      return "queued";
+    default:
+      return "queued";
+  }
+}
+
+function resolveRuntimeQueueStatus(event: SchedulingGovernanceEvent): RuntimeRealtimeQueueMovementPayload["status"] {
+  switch (event.type) {
+    case "scheduling-priority-placement-selected":
+    case "scheduling-assignment-materialized":
+      return "running";
+    case "scheduling-deferred-no-placement":
+    case "scheduling-reservation-conflict":
+    case "scheduling-assignment-materialization-conflict":
+      return "queued";
+    default:
+      return "queued";
+  }
 }

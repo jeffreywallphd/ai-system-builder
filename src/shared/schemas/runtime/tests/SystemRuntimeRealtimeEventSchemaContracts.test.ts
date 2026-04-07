@@ -147,4 +147,32 @@ describe("SystemRuntimeRealtimeEventSchemaContracts", () => {
     });
     expect(error.error.code).toBe("forbidden");
   });
+
+  it("accepts scheduling-specific orchestration event kinds", () => {
+    const envelope = parseRuntimeRealtimeEventEnvelope({
+      eventId: "event-scheduling-1",
+      schemaVersion: "2026-04-07",
+      emittedAt: "2026-04-07T12:00:00.000Z",
+      sequence: 9,
+      cursor: "runtime-realtime:9",
+      category: "queue-movement",
+      topic: "runtime.queue",
+      workspaceScope: { workspaceId: "workspace-a" },
+      actorScope: {},
+      runScope: { executionId: "run:1" },
+      payload: {
+        queueItemId: "runtime-queue:run:1",
+        executionId: "run:1",
+        status: "queued",
+        runId: "run:1",
+        eventKind: "scheduling-requeued",
+        changedAt: "2026-04-07T12:00:00.000Z",
+      },
+    });
+
+    expect(envelope.payload).toMatchObject({
+      executionId: "run:1",
+      eventKind: "scheduling-requeued",
+    });
+  });
 });

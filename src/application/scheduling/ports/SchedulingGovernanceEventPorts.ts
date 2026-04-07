@@ -10,6 +10,7 @@ export const SchedulingGovernanceEventTypes = Object.freeze({
   priorityPlacementSelected: "scheduling-priority-placement-selected",
   deferredNoPlacement: "scheduling-deferred-no-placement",
   reservationConflict: "scheduling-reservation-conflict",
+  assignmentMaterialized: "scheduling-assignment-materialized",
   assignmentMaterializationConflict: "scheduling-assignment-materialization-conflict",
 });
 
