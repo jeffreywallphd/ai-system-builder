@@ -1,4 +1,4 @@
-import type { RuntimeExecutionResultReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionResultReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { ExecutionDiagnosticsPanel } from "./ExecutionDiagnosticsPanel";
 import { ExecutionNodeResultList } from "./ExecutionNodeResultList";
 import { ExecutionOutputSummary } from "./ExecutionOutputSummary";
@@ -21,3 +21,4 @@ export function ExecutionResultPanel({ result }: { readonly result?: RuntimeExec
     </div>
   );
 }
+

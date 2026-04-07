@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ApplicationBootstrap, APPLICATION_TOKENS } from "../../infrastructure/composition/ApplicationBootstrap";
-import { TOKENS } from "../../infrastructure/composition/InfrastructureRegistry";
+﻿import { describe, expect, it } from "bun:test";
+import { ApplicationBootstrap, APPLICATION_TOKENS } from "@infrastructure/composition/ApplicationBootstrap";
+import { TOKENS } from "@infrastructure/composition/InfrastructureRegistry";
 
 describe("infrastructure cross-subfolder interactions", () => {
   it("composes config/filesystem/composition services through bootstrap", () => {
@@ -18,3 +18,4 @@ describe("infrastructure cross-subfolder interactions", () => {
     expect(container.resolve(APPLICATION_TOKENS.WorkflowValidator)).toBeDefined();
   });
 });
+

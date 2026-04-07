@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 interface DetailPanelProps {
@@ -38,7 +38,7 @@ export function AssetSummaryPanel({ asset }: { readonly asset: RegistryAsset }):
         <span className="ui-badge">Role: {asset.taxonomy?.semanticRole ?? "n/a"}</span>
         <span className="ui-badge">Behavior: {asset.taxonomy?.behaviorKind ?? "n/a"}</span>
       </div>
-      <div className="ui-text-small ui-text-secondary">Kind: {asset.kind} · Status: {asset.status}</div>
+      <div className="ui-text-small ui-text-secondary">Kind: {asset.kind} Â· Status: {asset.status}</div>
       <div className="ui-text-small">Latest version: {asset.versionId ?? "unavailable"}</div>
     </DetailPanel>
   );
@@ -62,7 +62,7 @@ export function AssetProvenancePanel({ asset }: { readonly asset: RegistryAsset 
       <div className="ui-text-small">Source: {asset.provenance.sourceType ?? "unknown"} ({asset.provenance.sourceLabel ?? "unspecified"})</div>
       <div className="ui-text-small">Derivation context: {asset.provenance.derivationContext ?? "none"}</div>
       <div className="ui-text-small ui-text-secondary">
-        Upstream assets: {asset.provenance.upstreamAssets.length} · Direct upstream versions: {asset.provenance.directUpstreamVersionIds.length}
+        Upstream assets: {asset.provenance.upstreamAssets.length} Â· Direct upstream versions: {asset.provenance.directUpstreamVersionIds.length}
       </div>
     </DetailPanel>
   );
@@ -82,9 +82,9 @@ export function AssetDependencySummaryPanel({ asset }: { readonly asset: Registr
       {asset.systemDetails ? (
         <div className="ui-text-small ui-text-secondary">
           Aggregated (system): direct {asset.systemDetails.aggregatedDependencies.directCount}
-          {" · "}transitive {asset.systemDetails.aggregatedDependencies.transitiveCount}
-          {" · "}total {asset.systemDetails.aggregatedDependencies.totalCount}
-          {" · "}status {asset.systemDetails.aggregatedDependencies.traversalStatus}
+          {" Â· "}transitive {asset.systemDetails.aggregatedDependencies.transitiveCount}
+          {" Â· "}total {asset.systemDetails.aggregatedDependencies.totalCount}
+          {" Â· "}status {asset.systemDetails.aggregatedDependencies.traversalStatus}
         </div>
       ) : null}
     </DetailPanel>
@@ -100,12 +100,12 @@ export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAss
     <DetailPanel title="System Details" testId="registry-system-details-panel">
       <div className="ui-text-small">
         Selected children: {asset.systemDetails.selectedChildren.length}
-        {" · "}Bindings: {asset.systemDetails.bindings.count}
+        {" Â· "}Bindings: {asset.systemDetails.bindings.count}
       </div>
       <div className="ui-text-small ui-text-secondary">
         Inputs: {asset.systemDetails.interfaces.inputs.length}
-        {" · "}Outputs: {asset.systemDetails.interfaces.outputs.length}
-        {" · "}Parameters: {asset.systemDetails.interfaces.parameters.length}
+        {" Â· "}Outputs: {asset.systemDetails.interfaces.outputs.length}
+        {" Â· "}Parameters: {asset.systemDetails.interfaces.parameters.length}
       </div>
       <div className="ui-text-small ui-text-secondary">
         Child summary: {asset.systemDetails.selectedChildren
@@ -117,23 +117,23 @@ export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAss
       </div>
       <div className="ui-text-small ui-text-secondary">
         Version lineage: {asset.systemDetails.versionLineage.currentVersionId}
-        {asset.systemDetails.versionLineage.parentVersionId ? ` · parent ${asset.systemDetails.versionLineage.parentVersionId}` : ""}
-        {asset.systemDetails.versionLineage.rootVersionId ? ` · root ${asset.systemDetails.versionLineage.rootVersionId}` : ""}
+        {asset.systemDetails.versionLineage.parentVersionId ? ` Â· parent ${asset.systemDetails.versionLineage.parentVersionId}` : ""}
+        {asset.systemDetails.versionLineage.rootVersionId ? ` Â· root ${asset.systemDetails.versionLineage.rootVersionId}` : ""}
       </div>
       <div className="ui-text-small ui-text-secondary">
         Nested system refs in upstream: {asset.systemDetails.versionLineage.nestedSystemVersionReferences
           .filter((entry) => entry.includedInUpstream).length}
         {" / "}{asset.systemDetails.versionLineage.nestedSystemVersionReferences.length}
-        {" · "}Child refs in upstream: {asset.systemDetails.versionLineage.childVersionReferences
+        {" Â· "}Child refs in upstream: {asset.systemDetails.versionLineage.childVersionReferences
           .filter((entry) => entry.includedInUpstream).length}
         {" / "}{asset.systemDetails.versionLineage.childVersionReferences.length}
       </div>
       {asset.systemDetails.executionMetadata ? (
         <div className="ui-text-small ui-text-secondary">
           Execution metadata: runtime {asset.systemDetails.executionMetadata.runtimeEnvironment ?? "unspecified"}
-          {" · "}orchestration {asset.systemDetails.executionMetadata.orchestrationMode ?? "unspecified"}
-          {" · "}publish {asset.systemDetails.executionMetadata.publishVisibility ?? "unspecified"}
-          {" · "}profile {asset.systemDetails.executionMetadata.executionProfileId ?? "none"}
+          {" Â· "}orchestration {asset.systemDetails.executionMetadata.orchestrationMode ?? "unspecified"}
+          {" Â· "}publish {asset.systemDetails.executionMetadata.publishVisibility ?? "unspecified"}
+          {" Â· "}profile {asset.systemDetails.executionMetadata.executionProfileId ?? "none"}
         </div>
       ) : (
         <div className="ui-text-small ui-text-secondary">Execution metadata: none authored.</div>
@@ -143,19 +143,19 @@ export function SystemAssetDetailsPanel({ asset }: { readonly asset: RegistryAss
           <div className="ui-text-small ui-text-secondary">
             Runtime activity: {asset.systemDetails.runtimeActivity.recentExecutionCount} recent execution(s)
             {asset.systemDetails.runtimeActivity.latestExecution
-              ? ` · latest ${asset.systemDetails.runtimeActivity.latestExecution.executionId} (${asset.systemDetails.runtimeActivity.latestExecution.result})`
-              : " · no recent runs"}
+              ? ` Â· latest ${asset.systemDetails.runtimeActivity.latestExecution.executionId} (${asset.systemDetails.runtimeActivity.latestExecution.result})`
+              : " Â· no recent runs"}
           </div>
           {asset.systemDetails.runtimeActivity.recentExecutions.length > 0 ? (
             <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
               {asset.systemDetails.runtimeActivity.recentExecutions.map((execution) => (
                 <li key={execution.executionId} className="ui-text-small ui-text-secondary">
                   {execution.executionId}
-                  {" · "}status {execution.status}
-                  {" · "}result {execution.result}
-                  {" · "}version {execution.rootVersionId ?? "draft/unversioned"}
-                  {" · "}trace events {execution.traceEventCount}
-                  {" · "}trace logs {execution.traceLogCount}
+                  {" Â· "}status {execution.status}
+                  {" Â· "}result {execution.result}
+                  {" Â· "}version {execution.rootVersionId ?? "draft/unversioned"}
+                  {" Â· "}trace events {execution.traceEventCount}
+                  {" Â· "}trace logs {execution.traceLogCount}
                 </li>
               ))}
             </ul>
@@ -176,16 +176,16 @@ export function AssetVersionHistoryPanel({ asset }: { readonly asset: RegistryAs
           {asset.versionHistory.map((entry) => (
             <li key={entry.versionId}>
               <div className="ui-text-small">
-                {entry.versionLabel ? `${entry.versionLabel} · ` : ""}{entry.versionId}
+                {entry.versionLabel ? `${entry.versionLabel} Â· ` : ""}{entry.versionId}
               </div>
               <div className="ui-text-small ui-text-secondary">
                 Created {entry.createdAt.toString()}
-                {entry.parentVersionId ? ` · Parent ${entry.parentVersionId}` : ""}
+                {entry.parentVersionId ? ` Â· Parent ${entry.parentVersionId}` : ""}
               </div>
               <div className="ui-text-small ui-text-secondary">
                 Upstream links: {entry.upstreamVersionIds.length}
-                {entry.upstreamAdded.length ? ` · +${entry.upstreamAdded.length}` : ""}
-                {entry.upstreamRemoved.length ? ` · -${entry.upstreamRemoved.length}` : ""}
+                {entry.upstreamAdded.length ? ` Â· +${entry.upstreamAdded.length}` : ""}
+                {entry.upstreamRemoved.length ? ` Â· -${entry.upstreamRemoved.length}` : ""}
               </div>
             </li>
           ))}
@@ -274,9 +274,9 @@ function NodeList({
               >
                 {node.name ?? node.assetId}
               </Link>
-              <span className="ui-text-small ui-text-secondary"> · {node.versionId}</span>
+              <span className="ui-text-small ui-text-secondary"> Â· {node.versionId}</span>
               {typeof node.depth === "number" ? (
-                <span className="ui-text-small ui-text-secondary"> · depth {node.depth}</span>
+                <span className="ui-text-small ui-text-secondary"> Â· depth {node.depth}</span>
               ) : null}
             </li>
           ))}
@@ -296,7 +296,7 @@ export function DependencyGraphPanel({
   return (
     <DetailPanel title="Dependency Graph" testId="registry-asset-graph-panel">
       <div className="ui-text-small ui-text-secondary">
-        Root asset: {rootAssetId} · Version: {rootVersionId ?? "unavailable"}
+        Root asset: {rootAssetId} Â· Version: {rootVersionId ?? "unavailable"}
       </div>
       <div className="ui-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "1rem" }}>
         <NodeList
@@ -315,3 +315,4 @@ export function DependencyGraphPanel({
     </DetailPanel>
   );
 }
+

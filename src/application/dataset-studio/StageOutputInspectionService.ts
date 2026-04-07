@@ -1,6 +1,6 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { StageFlowDefinition, StageFlowRuntimeState } from "../../domain/dataset-studio/StageFlowDefinition";
-import type { DatasetPipelineStageDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { StageFlowDefinition, StageFlowRuntimeState } from "@domain/dataset-studio/StageFlowDefinition";
+import type { DatasetPipelineStageDefinition } from "@domain/dataset-studio/StagePipelineDomain";
 import type { StageRuntimeTracking } from "./StageMetadataContracts";
 import { readRawStorageStageOutput, readUnifiedIngestionStageOutput } from "./StageIntegrationContracts";
 
@@ -305,3 +305,4 @@ export class StageOutputInspectionService {
 export function createStageOutputInspectionService(): StageOutputInspectionService {
   return new StageOutputInspectionService();
 }
+

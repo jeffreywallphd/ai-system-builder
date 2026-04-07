@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowValidationIssueCodes,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { validateWorkflowStudioModeState } from "../WorkflowStudioModeValidation";
 
 describe("WorkflowStudioModeValidation", () => {
@@ -40,3 +40,4 @@ describe("WorkflowStudioModeValidation", () => {
     }));
   });
 });
+

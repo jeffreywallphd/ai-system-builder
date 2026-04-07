@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -7,7 +7,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceLookupQuery,
   NodeEnrollmentRequestPersistenceRecord,
@@ -22,11 +22,11 @@ import type {
   UpdateNodeApprovalPersistenceRecordInput,
   UpdateNodeCapabilityProfilePersistenceRecordInput,
   UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   NodeTrustPersistenceQueryPresets,
   normalizeNodeTrustMutationOperationKey,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustPersistencePorts } from "../ports/NodeTrustPersistencePorts";
@@ -614,3 +614,4 @@ describe("node trust persistence repository contract assumptions", () => {
     expect(activeNodes).toHaveLength(0);
   });
 });
+

@@ -1,12 +1,12 @@
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
 import {
   PythonRuntimeOwnership,
   PythonRuntimeStatuses,
   type IPythonRuntimeManager,
   type PythonRuntimeManagerStatus,
-} from "../../../application/ports/interfaces/IPythonRuntimeManager";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+} from "@application/ports/interfaces/IPythonRuntimeManager";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources } from "@application/runtime/RuntimeEvent";
 import type { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { PythonRuntimeLauncher, type RuntimeProcessLike } from "./PythonRuntimeLauncher";
 import { PythonRuntimeState } from "./PythonRuntimeState";
@@ -196,3 +196,4 @@ function toErrorMessage(error: unknown): string {
 
   return typeof error === "string" ? error : "Unknown error";
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   AggregationAsset,
   AggregationOperations,
@@ -322,3 +322,4 @@ describe("Transformation pipeline orchestration", () => {
     await expect(executeTransformationPipelineDefinition(createAggregationRecordsInput(), invalidDefinition, registry)).rejects.toThrow();
   });
 });
+

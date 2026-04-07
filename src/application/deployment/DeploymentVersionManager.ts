@@ -1,10 +1,10 @@
-import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import {
   type DeploymentHistoryQuery,
   type ManagedDeploymentVersion,
   toManagedDeploymentVersion,
-} from "../../domain/deployment/DeploymentVersionManagementDomain";
-import { DeploymentStates } from "../../domain/deployment/DeploymentStateDomain";
+} from "@domain/deployment/DeploymentVersionManagementDomain";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
 import type { DeploymentExecutionService, DeploymentRecordRepository } from "./DeploymentExecutionService";
 import {
   DeploymentAccessActions,
@@ -16,8 +16,8 @@ import {
   DeploymentQuotaEvaluator,
 } from "./DeploymentQuotaEvaluator";
 import { DeploymentIsolationEvaluator } from "./DeploymentIsolationEvaluator";
-import type { DeploymentEnvironmentContext } from "../../domain/deployment/DeploymentIsolationDomain";
-import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import type { DeploymentEnvironmentContext } from "@domain/deployment/DeploymentIsolationDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "@domain/deployment/DeploymentAuditTrailDomain";
 import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 interface DeploymentVersionLookupCachePolicy {
@@ -461,3 +461,4 @@ export class DeploymentVersionManager {
     return "unknown";
   }
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   ICommonImageNodeContract,
   IImageNodeExecutionRequest,
-} from "../../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import { ComfyImageNodeAdapterBase } from "../ComfyImageNodeAdapterPattern";
 import { ComfyPromptInputNodeAdapter } from "../ComfyPromptInputNodeAdapter";
 
@@ -92,3 +92,4 @@ describe("ComfyImageNodeAdapterPattern", () => {
     expect(Object.keys(module).some((key) => key.toLowerCase().includes("comfy"))).toBe(false);
   });
 });
+

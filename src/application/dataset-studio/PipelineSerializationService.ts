@@ -1,21 +1,21 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   deserializePipelineDefinition,
   serializePipelineDefinition,
   validatePipelineDefinition,
   type PipelineDefinition,
-} from "../../domain/dataset-studio/PipelineDefinitionDomain";
+} from "@domain/dataset-studio/PipelineDefinitionDomain";
 import {
   deserializePipelineGraph,
   serializePipelineGraph,
   type PipelineGraph,
-} from "../../domain/dataset-studio/PipelineGraphDomain";
+} from "@domain/dataset-studio/PipelineGraphDomain";
 import {
   validatePipelineTemplateInstantiationOptions,
   type PipelineTemplateId,
   type PipelineTemplateInstantiationOptions,
-} from "../../domain/dataset-studio/MidLevelPipelineTemplateDomain";
-import type { PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
+} from "@domain/dataset-studio/MidLevelPipelineTemplateDomain";
+import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
 import { buildReactFlowGraph, type PipelineReactFlowGraph } from "./PipelineReactFlowGraph";
 import { PipelineValidationService } from "./PipelineValidationService";
 import type { StageCompositionDefinition } from "./StageAssetCompositionService";
@@ -200,3 +200,4 @@ export function createPipelineSerializationService(input?: {
 }): PipelineSerializationService {
   return new PipelineSerializationService(input);
 }
+

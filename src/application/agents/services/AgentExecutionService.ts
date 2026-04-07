@@ -1,12 +1,12 @@
-import type { Agent } from "../../../domain/agents/Agent";
+﻿import type { Agent } from "@domain/agents/Agent";
 import type { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { AgentPlanningInterface } from "../contracts/AgentPlanningStrategy";
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
+import type { AgentPlan } from "@domain/agents/AgentPlan";
 import type { AgentMemoryRetrievalService } from "../contracts/AgentMemoryRetrieval";
 import { AgentWorkingMemoryService } from "./AgentWorkingMemoryService";
 import { AgentMemoryWriteService, type AgentMemoryWriteResult } from "./AgentMemoryWriteService";
-import type { AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
-import { AssetId } from "../../../domain/assets/AssetId";
+import type { AgentWorkingMemory } from "@domain/agents/AgentWorkingMemory";
+import { AssetId } from "@domain/assets/AssetId";
 import type { AgentMcpToolGovernanceService } from "./AgentMcpToolGovernanceService";
 import { AgentRunnerService } from "./AgentRunnerService";
 import type { IAgentExecutionSessionRepository } from "../../ports/interfaces/IAgentExecutionSessionRepository";
@@ -89,3 +89,4 @@ export class AgentExecutionService {
     } satisfies AgentExecutionReadModel);
   }
 }
+

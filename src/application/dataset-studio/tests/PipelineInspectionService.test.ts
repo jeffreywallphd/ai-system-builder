@@ -1,16 +1,16 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   createCanonicalTextItemsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineExecutionStatusKinds } from "../../../domain/dataset-studio/PipelineInspectionDomain";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineExecutionStatusKinds } from "@domain/dataset-studio/PipelineInspectionDomain";
 import {
   createPipelineStageInstance,
   PipelineStageConfigModes,
   PipelineStageIds,
-} from "../../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import { buildPipelineGraph } from "../PipelineGraphConstructionService";
 import { PipelineInspectionService } from "../PipelineInspectionService";
 
@@ -250,3 +250,4 @@ describe("PipelineInspectionService", () => {
     expect(labelingStage?.metadata.summaryStats?.["annotation.manualNeededCount"]).toBe(1);
   });
 });
+

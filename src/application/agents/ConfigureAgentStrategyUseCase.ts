@@ -1,4 +1,4 @@
-import { toAgentReadModel, updateAgent, type AgentPlanningStrategy, type AgentReadModel } from "../../domain/agents/Agent";
+﻿import { toAgentReadModel, updateAgent, type AgentPlanningStrategy, type AgentReadModel } from "@domain/agents/Agent";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -29,3 +29,4 @@ export class ConfigureAgentStrategyUseCase {
     return toAgentReadModel(saved);
   }
 }
+

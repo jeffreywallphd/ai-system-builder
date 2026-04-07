@@ -1,16 +1,16 @@
-import type { IMcpToolCatalog } from "../../../application/ports/interfaces/IMcpToolCatalog";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import { RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import { toRuntimeDiagnosticDetails } from "../../../application/runtime/RuntimeDiagnostics";
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { McpResourceDescriptor } from "../../../application/mcp/models/McpResourceDescriptor";
+﻿import type { IMcpToolCatalog } from "@application/ports/interfaces/IMcpToolCatalog";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import { RuntimeEventSources } from "@application/runtime/RuntimeEvent";
+import { toRuntimeDiagnosticDetails } from "@application/runtime/RuntimeDiagnostics";
+import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpResourceDescriptor } from "@application/mcp/models/McpResourceDescriptor";
 import {
   normalizeMcpToolDescriptor,
   type McpToolDescriptor,
-} from "../../../application/mcp/models/McpToolDescriptor";
-import type { McpToolSearchQuery } from "../../../application/mcp/models/McpToolSearchQuery";
-import type { McpToolSearchResult } from "../../../application/mcp/models/McpToolSearchResult";
+} from "@application/mcp/models/McpToolDescriptor";
+import type { McpToolSearchQuery } from "@application/mcp/models/McpToolSearchQuery";
+import type { McpToolSearchResult } from "@application/mcp/models/McpToolSearchResult";
 
 export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
   constructor(
@@ -125,3 +125,4 @@ export class PythonBackedMcpToolCatalog implements IMcpToolCatalog {
     });
   }
 }
+

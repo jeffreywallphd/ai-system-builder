@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowContextService } from "../WorkflowContextService";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 import { ContextRecipe } from "../models/ContextRecipe";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 describe("WorkflowContextService", () => {
   it("assembles workflow-level context packages with selection and budgeting", async () => {
@@ -177,3 +177,4 @@ describe("WorkflowContextService", () => {
   });
 
 });
+

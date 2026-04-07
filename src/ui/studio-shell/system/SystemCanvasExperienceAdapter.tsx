@@ -1,5 +1,5 @@
-import type { JSX } from "react";
-import type { StudioShellValidationIssue } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+﻿import type { JSX } from "react";
+import type { StudioShellValidationIssue } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import PanelDesignStudio from "../../components/studio-shell/system/PanelDesignStudio";
 import type {
   CanvasExperienceAssetDefinition,
@@ -96,7 +96,7 @@ function resolveLayoutNodes(input: {
     id: panel.sourceLayoutNodeId ?? panel.panelId,
     title: panel.title,
     subtitle: panel.regionId
-      ? `${panel.description ?? "High-level section"} · Region: ${panel.regionId}`
+      ? `${panel.description ?? "High-level section"} Â· Region: ${panel.regionId}`
       : panel.description ?? "High-level section",
     x: panel.layoutBounds.x,
     y: panel.layoutBounds.y,
@@ -311,8 +311,8 @@ export function createSystemCanvasExperienceDefinition(
       </>
     ),
     resolveInteractionMessage: (canvasContext) => canvasContext.selectedLayoutNodeId
-      ? `Selected section ready for panel design · Total sections on page: ${canvasContext.layoutNodes.length}`
-      : `Sections on this page: ${canvasContext.layoutNodes.length} · Select a section to open its panel design studio`,
+      ? `Selected section ready for panel design Â· Total sections on page: ${canvasContext.layoutNodes.length}`
+      : `Sections on this page: ${canvasContext.layoutNodes.length} Â· Select a section to open its panel design studio`,
     emptyState: Object.freeze({
       when: (canvasContext) => canvasContext.layoutNodes.length === 0,
       render: () => (
@@ -346,3 +346,4 @@ export function createSystemPanelFromCanvasNode(input: {
     ]),
   });
 }
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { StudioAssetDefinition } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ImageManipulationSystemTemplate } from "../../../../application/system-studio/ImageManipulationSystemTemplate";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
-import { resolveSystemBuildTemplate } from "../../../../application/system-studio/SystemBuildTemplateCatalog";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
+import { resolveSystemBuildTemplate } from "@application/system-studio/SystemBuildTemplateCatalog";
 import SystemRuntimeInterfacePreview from "../system/SystemRuntimeInterfacePreview";
 import { StudioAssetRenderModes, StudioUiAssetKinds } from "../../../studio-shell/studio-assets/StudioAssetContracts";
 import { imageManipulationEditorPageAssetDefinition } from "../../../studio-shell/studio-assets/ImageManipulationEditorPageAsset";
@@ -212,3 +212,4 @@ describe("SystemRuntimeInterfacePreview", () => {
     expect(html).toContain("Create image");
   });
 });
+

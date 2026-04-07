@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { WorkflowDraft, WorkflowValidationIssue } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { useEffect, useState } from "react";
+import type { WorkflowDraft, WorkflowValidationIssue } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   WorkflowWizardSectionIds,
   deriveWorkflowWizardProgress,
@@ -107,3 +107,4 @@ export default function WorkflowStudioWizardModeSurface({
     </div>
   );
 }
+

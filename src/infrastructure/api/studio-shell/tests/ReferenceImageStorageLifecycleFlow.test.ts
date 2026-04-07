@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 
 describe("Reference image storage lifecycle flow", () => {
   it("supports initialize/reset/archive/cleanup operations and enforces safe deletion guardrails", async () => {
@@ -198,3 +198,4 @@ describe("Reference image storage lifecycle flow", () => {
     expect(rejected.error?.message).toContain("Storage path configuration is infrastructure-owned");
   });
 });
+

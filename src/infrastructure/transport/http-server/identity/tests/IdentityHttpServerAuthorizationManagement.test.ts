@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -7,24 +7,24 @@ import path from "node:path";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { AuthorizationManagementBackendApi } from "../../../../api/authorization/AuthorizationManagementBackendApi";
-import { SqliteAuthorizationPersistenceAdapter } from "../../../../../infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
-import { SqliteAuthorizationPolicyReadAdapter } from "../../../../../infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
-import { AuthorizationPolicyMutationService } from "../../../../../application/authorization/use-cases/AuthorizationPolicyMutationService";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
-import { GrantAuthorizationSharingAccessUseCase } from "../../../../../application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
-import { RevokeAuthorizationSharingAccessUseCase } from "../../../../../application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
-import { UpdateAuthorizationVisibilityUseCase } from "../../../../../application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
-import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../../../application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
-import { ListAuthorizationEffectiveAccessUseCase } from "../../../../../application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
-import { AuthorizationResourceFamilies } from "../../../../../domain/authorization/AuthorizationPermissionCatalog";
+import { SqliteAuthorizationPersistenceAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
+import { SqliteAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
+import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
+import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
+import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   RoleAssignmentScopes,
   RoleAssignmentStatuses,
   SharingPolicyModes,
-} from "../../../../../domain/authorization/AuthorizationDomain";
-import { WorkspaceAuthorizationRoleKeys } from "../../../../../domain/authorization/AuthorizationRoleDefinitions";
+} from "@domain/authorization/AuthorizationDomain";
+import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
 
 const servers: Server[] = [];
 const cleanup: Array<() => void> = [];
@@ -632,3 +632,4 @@ async function seedAuthorizationResource(
     },
   });
 }
+

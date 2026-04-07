@@ -1,4 +1,4 @@
-import {
+﻿import {
   createDatasetInstanceReference,
   type WorkflowInputBindingDescriptor,
   type WorkflowInputBindingResolutionContext,
@@ -10,7 +10,7 @@ import {
   type WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKinds,
   validateWorkflowInputBindingDefinitions,
-} from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
 
 export interface ResolveWorkflowInputBindingsRequest {
   readonly bindings: ReadonlyArray<WorkflowInputBindingDescriptor>;
@@ -360,3 +360,4 @@ export function resolveWorkflowInputBindings(
     diagnostics: Object.freeze(diagnostics),
   });
 }
+

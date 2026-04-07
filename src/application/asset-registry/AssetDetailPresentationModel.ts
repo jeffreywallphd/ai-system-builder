@@ -1,4 +1,4 @@
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+﻿import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 
 export const AssetDetailSectionKeys = Object.freeze({
   summary: "summary",
@@ -128,3 +128,4 @@ export class AssetDetailLayoutResolver {
     });
   }
 }
+

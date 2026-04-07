@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   buildPreparedDatasetLineage,
   buildPreparedDatasetReuseReference,
@@ -6,7 +6,7 @@ import {
   validatePreparedDatasetLineageLinks,
 } from "../DataStudioLineageAndReuseService";
 import { createDefaultDataStudioPreparationAssetDefinition } from "../DataStudioPreparationAssetDefaults";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { DataStudioAuthoringModes } from "../DataStudioPipelineState";
 
 describe("DataStudioLineageAndReuseService", () => {
@@ -140,3 +140,4 @@ describe("DataStudioLineageAndReuseService", () => {
     expect(catalog.list().length).toBe(1);
   });
 });
+

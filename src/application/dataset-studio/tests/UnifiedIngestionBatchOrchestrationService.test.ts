@@ -1,11 +1,11 @@
-/// <reference types="node" />
+﻿/// <reference types="node" />
 import { describe, expect, it } from "bun:test";
 import os from "node:os";
 import path from "node:path";
 import { promises as fs } from "node:fs";
 import { SourceInputKinds } from "../SourceLocatorInputAbstraction";
 import { UnifiedIngestionBatchOrchestrationService } from "../UnifiedIngestionBatchOrchestrationService";
-import { UnifiedIngestionOutputTargetKinds } from "../../../domain/dataset-studio/UnifiedIngestionDomain";
+import { UnifiedIngestionOutputTargetKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 async function createFixture(): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "unified-ingestion-batch-"));
@@ -119,3 +119,4 @@ describe("UnifiedIngestionBatchOrchestrationService", () => {
     expect(result.lineage.itemLineages).toHaveLength(0);
   });
 });
+

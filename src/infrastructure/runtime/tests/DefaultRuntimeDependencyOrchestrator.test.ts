@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { DefaultRuntimeDependencyOrchestrator } from "../DefaultRuntimeDependencyOrchestrator";
 
 describe("DefaultRuntimeDependencyOrchestrator", () => {
@@ -211,3 +211,4 @@ describe("DefaultRuntimeDependencyOrchestrator", () => {
     expect(checks).toBe(2);
   });
 });
+

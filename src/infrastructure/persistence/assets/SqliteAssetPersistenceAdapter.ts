@@ -1,12 +1,12 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   AssetListQuery,
   AssetSaveResult,
   GeneratedOutputSourceRecord,
   IAssetRepository,
-} from "../../../application/assets/ports/IAssetRepository";
-import type { Asset } from "../../../domain/assets/AssetDomain";
+} from "@application/assets/ports/IAssetRepository";
+import type { Asset } from "@domain/assets/AssetDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapAssetRecordToRowValues,
@@ -463,3 +463,4 @@ export class SqliteAssetPersistenceAdapter extends SafeSqliteRepositoryBase impl
   }
 
 }
+

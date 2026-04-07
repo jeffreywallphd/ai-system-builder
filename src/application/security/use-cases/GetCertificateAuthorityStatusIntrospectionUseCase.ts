@@ -1,5 +1,5 @@
-import { CertificateAuthorityStatuses, CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
-import { CertificateDistributionEventStatuses, type CertificateAuthorityStatusIntrospectionViewDto } from "../../../shared/dto/security/CertificateAuthorityDtos";
+﻿import { CertificateAuthorityStatuses, CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
+import { CertificateDistributionEventStatuses, type CertificateAuthorityStatusIntrospectionViewDto } from "@shared/dto/security/CertificateAuthorityDtos";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
@@ -320,3 +320,4 @@ function hasExpiringIssuedCertificates(
 
   return false;
 }
+

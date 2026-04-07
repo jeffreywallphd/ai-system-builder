@@ -1,11 +1,11 @@
-import {
+﻿import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateAuthorityRootPersistenceRecord,
   IssuedCertificatePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000;
 
@@ -278,3 +278,4 @@ function normalizeValidity(notBefore: string, notAfter: string): {
     notAfterEpoch,
   });
 }
+

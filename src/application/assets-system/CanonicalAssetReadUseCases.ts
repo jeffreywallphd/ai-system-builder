@@ -1,10 +1,10 @@
-import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
+﻿import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetSystemQueryRepository, CanonicalAssetQueryCriteria } from "../ports/interfaces/IAssetSystemQueryRepository";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
 
 export class LoadCanonicalAssetSummaryUseCase {
@@ -256,3 +256,4 @@ export class ExplainCanonicalVersionExistenceUseCase {
     });
   }
 }
+

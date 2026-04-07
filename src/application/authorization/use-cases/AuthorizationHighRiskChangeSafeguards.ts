@@ -1,4 +1,4 @@
-import { WorkspaceAuthorizationRoleKeys } from "../../../domain/authorization/AuthorizationRoleDefinitions";
+﻿import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
 import type { AuthorizationAdministrationOutcome } from "./AuthorizationAdministrationUseCaseShared";
 import {
   AuthorizationAdministrationErrorCodes,
@@ -136,3 +136,4 @@ function parseConfirmedRiskCodes(value: unknown): Set<string> {
     .filter((entry) => entry.length > 0);
   return new Set(normalized);
 }
+

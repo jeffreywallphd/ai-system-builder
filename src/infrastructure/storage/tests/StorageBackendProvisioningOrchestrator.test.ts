@@ -1,16 +1,16 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageAccessModes,
   StorageAccessScopes,
   StorageBackendTypes,
   createStorageInstance,
   type StorageBackendType,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageBackendHealthStatuses,
   type IStorageCapabilityInspectionPort,
-} from "../../../application/storage/ports/StorageCapabilityInspectionPort";
-import { StorageProvisioningOperationKinds } from "../../../application/storage/ports/StorageProvisioningPort";
+} from "@application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageProvisioningOperationKinds } from "@application/storage/ports/StorageProvisioningPort";
 import {
   StorageBackendAdapterRegistry,
   type StorageBackendAdapterRegistration,
@@ -268,3 +268,4 @@ describe("StorageBackendProvisioningOrchestrator", () => {
     expect(observedRequests).toEqual(["object-storage:workspace-alpha:none"]);
   });
 });
+

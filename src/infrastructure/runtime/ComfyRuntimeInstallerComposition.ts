@@ -1,8 +1,8 @@
-import {
+﻿import {
   ComfyRuntimeInstallerOrchestrationService,
   type ComfyRuntimeInstallerOrchestrationServiceOptions,
-} from "../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
-import type { IRuntimeRepositoryInstallerContract } from "../../application/runtime/RuntimeRepositoryInstallerContract";
+} from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
+import type { IRuntimeRepositoryInstallerContract } from "@application/runtime/RuntimeRepositoryInstallerContract";
 import { ComfyRuntimeAssetValidationHook, type ComfyRuntimeAssetValidationHookOptions } from "./ComfyRuntimeAssetValidationHook";
 import {
   ComfyRuntimeCustomNodeInstallationHooks,
@@ -61,3 +61,4 @@ export function createComfyRuntimeInstallerOrchestrationService(
     stateStore,
   });
 }
+

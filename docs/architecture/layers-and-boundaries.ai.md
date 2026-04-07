@@ -59,6 +59,10 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."
 - Phase 7 inner contracts now expose authored-agent operations as application use cases (launch/session-read/run-control/trigger-binding) over existing `AgentRunnerService` + `IAgentExecutionSessionRepository` seams; no parallel runtime path was introduced.
 
+## Source import convention
+- `src/` is the canonical architecture root for `domain`, `application`, `infrastructure`, `hosts`, `shared`, and `ui`.
+- Cross-layer imports should use aliases (`@application/*`, `@domain/*`, `@hosts/*`, `@infrastructure/*`, `@shared/*`, `@ui/*`, `@src/*`) instead of deep relative traversal.
+
 ## Direction 6 boundary note: Identity domain foundation (story 1.1.1)
 - New inner-layer identity contracts live in `src/domain/identity/IdentityDomain.ts`.
 - The model keeps identity lifecycle, credential lifecycle/policy, and session lifecycle as explicit separate concerns.

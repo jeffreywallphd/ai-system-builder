@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,9 +6,9 @@ import {
   createDatasetInstance,
   DatasetInstanceLifecycleStatuses,
   DatasetInstanceRuntimeStatuses,
-} from "../../../../domain/system-runtime/DatasetInstanceDomain";
-import { createDatasetInstanceImageRecord } from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
-import { StorageBackedDatasetInstanceRepository } from "../../../../application/system-runtime/DatasetInstanceRepository";
+} from "@domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
+import { StorageBackedDatasetInstanceRepository } from "@application/system-runtime/DatasetInstanceRepository";
 import { SqliteDatasetInstanceRepository } from "../SqliteDatasetInstanceRepository";
 
 describe("SqliteDatasetInstanceRepository", () => {
@@ -524,3 +524,4 @@ describe("SqliteDatasetInstanceRepository", () => {
     }
   });
 });
+

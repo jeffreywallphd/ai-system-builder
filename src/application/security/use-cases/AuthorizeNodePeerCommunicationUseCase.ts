@@ -1,9 +1,9 @@
-import {
+﻿import {
   TransportConnectionActorTypes,
   TransportPeerTypes,
   TransportSecurityScenarios,
   type TransportChannelType,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type {
   NodePeerCapability,
   NodePeerOperationClass,
@@ -265,3 +265,4 @@ function failure(
     }),
   };
 }
+

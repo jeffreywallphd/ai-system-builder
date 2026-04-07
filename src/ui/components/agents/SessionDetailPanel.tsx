@@ -1,4 +1,4 @@
-import type { AgentRunControlAction, AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentRunControlAction, AgentSessionDetailReadModel } from "@application/agents/contracts/AgentRunContracts";
 import { AgentRunControls } from "./AgentRunControls";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { CompositionSummaryCard } from "./CompositionSummaryCard";
@@ -52,3 +52,4 @@ export function SessionDetailPanel(props: SessionDetailPanelProps): JSX.Element 
     </div>
   );
 }
+

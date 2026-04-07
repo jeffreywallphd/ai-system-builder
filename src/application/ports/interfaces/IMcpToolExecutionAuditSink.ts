@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   McpToolExecutionApprovalDecision,
   McpToolExecutionPermissionDecision,
   McpToolExecutionSandboxDecision,
-} from "../../../domain/mcp/McpToolTrust";
+} from "@domain/mcp/McpToolTrust";
 
 export interface McpToolExecutionAuditEvent {
   readonly toolId?: string;
@@ -32,3 +32,4 @@ export interface McpToolExecutionAuditEvent {
 export interface IMcpToolExecutionAuditSink {
   record(event: McpToolExecutionAuditEvent): Promise<void>;
 }
+

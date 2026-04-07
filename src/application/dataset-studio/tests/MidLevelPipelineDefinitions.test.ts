@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTextItemsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineExecutionStatusKinds } from "../../../domain/dataset-studio/PipelineInspectionDomain";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineExecutionStatusKinds } from "@domain/dataset-studio/PipelineInspectionDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import type { ResolvedDataSource } from "../DataConverterContracts";
 import {
   createImagePreparationPipelineDefinition,
@@ -223,3 +223,4 @@ describe("MidLevelPipelineDefinitions", () => {
     expect(result.payload).toEqual(payload);
   });
 });
+

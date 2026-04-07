@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import type { CanvasSurfaceEditingEvent } from "../../../studio-shell/experience-assets/ConfigurableCanvasSurfaceContracts";
-import type { StudioShellValidationIssue } from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellValidationIssue } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import {
   StudioShellValidationIssueCodes,
   StudioShellValidationSections,
-} from "../../../../application/studio-shell/StudioShellValidation";
+} from "@application/studio-shell/StudioShellValidation";
 import {
   ExperienceSurfaceAssetIds,
   resolveExperienceAssetModesFromRegistrations,
@@ -571,3 +571,4 @@ export function SystemStudioDraftAuthoringBoundary({
 }
 
 export default SystemStudioDraftAuthoringBoundary;
+

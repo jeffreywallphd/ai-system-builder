@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -10,7 +10,7 @@ import {
   disableSecretRecord,
   rotateSecretRecord,
   createSecretRecord,
-} from "../../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteSecretRecordPersistenceAdapter } from "../SqliteSecretRecordPersistenceAdapter";
 
@@ -387,3 +387,4 @@ describe("SqliteSecretRecordPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

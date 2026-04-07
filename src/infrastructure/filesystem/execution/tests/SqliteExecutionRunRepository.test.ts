@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../../domain/execution/ExecutionRun";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import { SqliteExecutionRunRepository } from "../SqliteExecutionRunRepository";
 
 function makeRun(runId: string, overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {
@@ -179,3 +179,4 @@ function isSqliteRuntimeUnavailable(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("NODE_MODULE_VERSION") || message.includes("napi_register_module_v1") || message.includes("native module");
 }
+

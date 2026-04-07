@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   WorkflowExecutionPolicy,
   WorkflowStatus,
-} from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/workflows/interfaces/IWorkflow";
 
 export interface CreateWorkflowRequest {
   readonly id?: string;
@@ -37,3 +37,4 @@ export interface CreateWorkflowRequest {
 
   readonly validateOnCreate?: boolean;
 }
+

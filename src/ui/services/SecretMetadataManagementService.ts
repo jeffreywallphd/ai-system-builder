@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpSecretMetadataManagementClient,
   type SecretMetadataManagementClient,
-} from "../shared/security/SecretMetadataManagementClient";
+} from "@shared/security/SecretMetadataManagementClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class SecretMetadataManagementService {
@@ -38,3 +38,4 @@ function createDefaultSecretMetadataManagementClient(): SecretMetadataManagement
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpSecretMetadataManagementClient(baseUrl);
 }
+

@@ -1,5 +1,5 @@
-import type { RegistryService } from "../../services/RegistryService";
-import type { AssetSelectorRequest } from "../../../domain/studio-shell/AssetSelectorContract";
+﻿import type { RegistryService } from "../../services/RegistryService";
+import type { AssetSelectorRequest } from "@domain/studio-shell/AssetSelectorContract";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 
 export interface RegistryAssetSelectorDataProviderOptions {
@@ -81,3 +81,4 @@ export class RegistryAssetSelectorDataProvider implements AssetSelectorDataProvi
     });
   }
 }
+

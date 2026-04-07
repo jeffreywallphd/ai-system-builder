@@ -1,10 +1,10 @@
-import { ContextRecipe } from "../../../application/context/models/ContextRecipe";
-import { ContextPackageReference } from "../../../application/context/models/ContextPackageReference";
+﻿import { ContextRecipe } from "@application/context/models/ContextRecipe";
+import { ContextPackageReference } from "@application/context/models/ContextPackageReference";
 import type {
   IContextRecipeListCriteria,
   IContextRecipeRepository,
   IContextRecipeSummary,
-} from "../../../application/ports/interfaces/IContextRecipeRepository";
+} from "@application/ports/interfaces/IContextRecipeRepository";
 
 interface ContextRecipeRecord {
   readonly id: string;
@@ -174,3 +174,4 @@ export class LocalStorageContextRecipeRepository implements IContextRecipeReposi
     });
   }
 }
+

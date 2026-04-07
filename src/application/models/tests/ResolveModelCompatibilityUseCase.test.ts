@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ResolveModelCompatibilityUseCase } from "../ResolveModelCompatibilityUseCase";
-import { makeCompatibility, makeModel, ModelDependency, ModelRequirement } from "../../../domain/services/tests/testUtils";
+import { makeCompatibility, makeModel, ModelDependency, ModelRequirement } from "@domain/services/tests/testUtils";
 import { makeCompatibilityService } from "./testUtils";
 
 describe("ResolveModelCompatibilityUseCase", () => {
@@ -25,3 +25,4 @@ describe("ResolveModelCompatibilityUseCase", () => {
     expect(() => useCase.execute({ mode: "readiness" })).toThrow("requires model");
   });
 });
+

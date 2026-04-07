@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { ProjectedField } from "../../../application/projection/models/ProjectedField";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { ProjectedField } from "@application/projection/models/ProjectedField";
 
 interface ContextPackageReference {
   readonly packageId: string;
@@ -74,7 +74,7 @@ function moveReference(
 
 function resolvePackageOptionLabel(contextPackage: IContextPackageSummary): string {
   return contextPackage.version
-    ? `${contextPackage.name} (${contextPackage.id} · ${contextPackage.version})`
+    ? `${contextPackage.name} (${contextPackage.id} Â· ${contextPackage.version})`
     : `${contextPackage.name} (${contextPackage.id})`;
 }
 
@@ -320,3 +320,4 @@ export default function ContextPackageReferenceFieldEditor({
     </div>
   );
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   IEncryptionAtRestPolicyContextResolverPort,
   ResolveEncryptionAtRestPolicyContextRequest,
   ResolvedEncryptionAtRestPolicyContext,
-} from "../../../application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
-import type { IStorageInstanceRepository } from "../../../application/storage/ports/IStorageInstanceRepository";
-import type { IWorkspaceRepository } from "../../../application/workspaces/ports/IWorkspaceRepository";
+} from "@application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
+import type { IStorageInstanceRepository } from "@application/storage/ports/IStorageInstanceRepository";
+import type { IWorkspaceRepository } from "@application/workspaces/ports/IWorkspaceRepository";
 import {
   createEncryptionAtRestPolicyDefinition,
   EncryptionKeyScopes,
@@ -12,19 +12,19 @@ import {
   EncryptionPolicyScopes,
   ProtectedDataClasses,
   type EncryptionAtRestPolicyDefinition,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   StorageEncryptionKeyScopes,
   StorageEncryptionModes,
   type StorageEncryptionKeyScope,
   type StorageEncryptionMode,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   WorkspaceEncryptionKeyScopes,
   WorkspaceEncryptionModes,
   type WorkspaceEncryptionKeyScope,
   type WorkspaceEncryptionMode,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 
 export interface WorkspaceStorageEncryptionPolicyContextResolverDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
@@ -183,3 +183,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

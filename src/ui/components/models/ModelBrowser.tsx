@@ -1,5 +1,5 @@
-import { useState } from "react";
-import type { IModelInstallProgress } from "../../../application/ports/interfaces/IModelInstaller";
+﻿import { useState } from "react";
+import type { IModelInstallProgress } from "@application/ports/interfaces/IModelInstaller";
 import type {
   ModelCompatibilityViewModel,
   ModelDownloadFileViewModel,
@@ -91,7 +91,7 @@ export default function ModelBrowser({
               </div>
               <div className="ui-row ui-row--sm ui-row--wrap" style={{ alignItems: "center" }}>
                 <div className="ui-subtle ui-text-small">
-                  {isLoadingInstalled ? "Loading…" : `${installedModels.length} models`}
+                  {isLoadingInstalled ? "Loadingâ€¦" : `${installedModels.length} models`}
                 </div>
                 <button
                   className="ui-button ui-button--secondary ui-button--sm"
@@ -138,7 +138,7 @@ export default function ModelBrowser({
                 </div>
               </div>
               <div className="ui-subtle ui-text-small">
-                {isSearchingRemote ? "Searching…" : `${remoteModels.length} results`}
+                {isSearchingRemote ? "Searchingâ€¦" : `${remoteModels.length} results`}
               </div>
             </div>
           </div>
@@ -179,3 +179,4 @@ export default function ModelBrowser({
     </section>
   );
 }
+

@@ -1,14 +1,14 @@
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import type { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import type { AssetTransformation } from "@domain/assets/AssetTransformation";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 import type { CanonicalAssetIdentityRecord, CanonicalEntityType } from "./ICanonicalAssetIdentityRepository";
 import type { AssetLineageDirection } from "./IAssetLineageRepository";
 import type {
   TaxonomyBehaviorKind,
   TaxonomySemanticRole,
   TaxonomyStructuralKind,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 export interface CanonicalAssetQueryCriteria {
   readonly kinds?: ReadonlyArray<IAsset["kind"]>;
@@ -29,3 +29,4 @@ export interface IAssetSystemQueryRepository {
   listAdjacentVersionIds(versionId: string, direction: AssetLineageDirection): Promise<ReadonlyArray<string>>;
   listCanonicalIdentities(params?: { readonly entityType?: CanonicalEntityType; readonly assetId?: string }): Promise<ReadonlyArray<CanonicalAssetIdentityRecord>>;
 }
+

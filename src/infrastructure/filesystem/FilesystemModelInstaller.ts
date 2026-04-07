@@ -1,11 +1,11 @@
-import path from "node:path";
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+﻿import path from "node:path";
+import type { IModel } from "@domain/models/interfaces/IModel";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 import {
   ModelInstallHandle,
   ModelInstallProgress,
   ModelInstallResult,
-} from "../../application/ports/ModelInstaller";
+} from "@application/ports/ModelInstaller";
 import type {
   IModelInstallHandle,
   IModelInstallProgress,
@@ -13,7 +13,7 @@ import type {
   IModelInstallResult,
   IModelInstaller,
   IModelUninstallRequest,
-} from "../../application/ports/interfaces/IModelInstaller";
+} from "@application/ports/interfaces/IModelInstaller";
 
 function buildUnsupportedInstallHandle(request: IModelInstallRequest): IModelInstallHandle {
   const result = Promise.resolve<IModelInstallResult>(new ModelInstallResult({
@@ -113,3 +113,4 @@ async function deleteEmptyParents(fileStorage: IFileStorage, startDirectory: str
     current = path.dirname(current);
   }
 }
+

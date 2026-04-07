@@ -1,18 +1,18 @@
-import { describe, expect, it } from "bun:test";
-import { DeploymentBuildPipeline } from "../../../../application/deployment/DeploymentBuildPipeline";
-import { DeploymentDiagnosticsService, InMemoryDeploymentDiagnosticsRepository } from "../../../../application/deployment/DeploymentDiagnosticsService";
-import { DeploymentExecutionService, InMemoryDeploymentRecordRepository } from "../../../../application/deployment/DeploymentExecutionService";
-import { DeploymentHealthMonitor } from "../../../../application/deployment/DeploymentHealthMonitor";
-import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "../../../../application/deployment/DeploymentRollbackService";
-import { DeploymentVersionManager } from "../../../../application/deployment/DeploymentVersionManager";
-import { DeploymentAccessEvaluator, RoleBasedDeploymentAccessPolicy } from "../../../../application/deployment/DeploymentAccessControl";
-import { DeploymentQuotaEvaluator } from "../../../../application/deployment/DeploymentQuotaEvaluator";
-import { EndpointRoutingService } from "../../../../application/deployment/EndpointRoutingService";
-import { InMemoryEndpointExposureRepository, SystemEndpointExposureService } from "../../../../application/deployment/SystemEndpointExposureService";
+﻿import { describe, expect, it } from "bun:test";
+import { DeploymentBuildPipeline } from "@application/deployment/DeploymentBuildPipeline";
+import { DeploymentDiagnosticsService, InMemoryDeploymentDiagnosticsRepository } from "@application/deployment/DeploymentDiagnosticsService";
+import { DeploymentExecutionService, InMemoryDeploymentRecordRepository } from "@application/deployment/DeploymentExecutionService";
+import { DeploymentHealthMonitor } from "@application/deployment/DeploymentHealthMonitor";
+import { DeploymentRollbackService, InMemoryDeploymentRollbackActionRepository } from "@application/deployment/DeploymentRollbackService";
+import { DeploymentVersionManager } from "@application/deployment/DeploymentVersionManager";
+import { DeploymentAccessEvaluator, RoleBasedDeploymentAccessPolicy } from "@application/deployment/DeploymentAccessControl";
+import { DeploymentQuotaEvaluator } from "@application/deployment/DeploymentQuotaEvaluator";
+import { EndpointRoutingService } from "@application/deployment/EndpointRoutingService";
+import { InMemoryEndpointExposureRepository, SystemEndpointExposureService } from "@application/deployment/SystemEndpointExposureService";
 import { DeploymentEndpointRuntimeInvoker } from "../../system-runtime/DeploymentEndpointRuntimeInvoker";
 import { DeploymentBackendApi } from "../DeploymentBackendApi";
-import { buildSampleBundle, createSampleConfiguration } from "../../../../application/deployment/tests/testUtils";
-import { createSystemPackage } from "../../../../domain/system-packaging/SystemPackagingDomain";
+import { buildSampleBundle, createSampleConfiguration } from "@application/deployment/tests/testUtils";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 
 function createHarness() {
   const repository = new InMemoryDeploymentRecordRepository();
@@ -182,3 +182,4 @@ describe("DeploymentBackendApi", () => {
     expect(missing.error?.message).toContain("deployment:missing");
   });
 });
+

@@ -1,10 +1,10 @@
-import { describe, expect, it, mock } from "bun:test";
+﻿import { describe, expect, it, mock } from "bun:test";
 import { DefaultModelTrainingApplicationService } from "../DefaultModelTrainingApplicationService";
-import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
-import { ExampleLineage, QuestionAnsweringExample, TuningDataset, TuningDatasetVersion } from "../../../domain/tuning-datasets/TuningDatasetEntities";
-import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
-import { createUnifiedExecutionInfrastructure } from "../../../infrastructure/execution/createExecutionInfrastructure";
-import type { ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
+import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
+import { ExampleLineage, QuestionAnsweringExample, TuningDataset, TuningDatasetVersion } from "@domain/tuning-datasets/TuningDatasetEntities";
+import { AppRuntimeModes } from "@domain/runtime/AppRuntimeMode";
+import { createUnifiedExecutionInfrastructure } from "@infrastructure/execution/createExecutionInfrastructure";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 
 function makeModel(params: { id?: string; accessMethod?: "local-file" | "remote-download" } = {}) {
   return new Model({
@@ -673,3 +673,4 @@ describe("DefaultModelTrainingApplicationService", () => {
     expect(saved.some((entry) => entry.status === "completed")).toBe(true);
   });
 });
+

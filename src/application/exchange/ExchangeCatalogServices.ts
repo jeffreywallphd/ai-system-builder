@@ -1,4 +1,4 @@
-import type { ExchangeAccessContext } from "./ExchangeAccessControl";
+﻿import type { ExchangeAccessContext } from "./ExchangeAccessControl";
 import {
   ExchangeAccessActions,
   ExchangeAccessDeniedError,
@@ -8,8 +8,8 @@ import {
   createExchangeCatalogEntry,
   type ExchangeCatalogEntry,
   type ExchangeCatalogStorageReference,
-} from "../../domain/exchange/ExchangeCatalog";
-import type { PublishablePackage } from "../../domain/exchange/PublishablePackage";
+} from "@domain/exchange/ExchangeCatalog";
+import type { PublishablePackage } from "@domain/exchange/PublishablePackage";
 
 export interface ExchangeCatalogListCriteria {
   readonly catalogId: string;
@@ -248,3 +248,4 @@ export class LocalExchangeCatalog implements ExchangeCatalogRepository, Exchange
     });
   }
 }
+

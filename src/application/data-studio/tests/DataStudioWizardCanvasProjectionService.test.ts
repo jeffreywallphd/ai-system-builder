@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DataStudioPreparationWizard } from "../DataStudioPreparationWizard";
 import { DataStudioWizardCanvasProjectionService } from "../DataStudioWizardCanvasProjectionService";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 
 describe("DataStudioWizardCanvasProjectionService", () => {
   it("projects wizard snapshots into canvas graph metadata without rebuilding a separate graph model", () => {
@@ -45,3 +45,4 @@ describe("DataStudioWizardCanvasProjectionService", () => {
     expect(currentStage?.isAvailable).toBeTrue();
   });
 });
+

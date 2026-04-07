@@ -1,4 +1,4 @@
-import {
+﻿import {
   AssetContentEncryptionFormats,
   AssetContentEncryptionKeyScopes,
   AssetChecksumAlgorithms,
@@ -14,7 +14,7 @@ import {
   type AssetLifecycleState,
   type AssetStorageArea,
   type AssetVisibility,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 
 export const AssetLineageRelations = Object.freeze({
   derivedFrom: "derived-from",
@@ -323,3 +323,4 @@ function parseContentEncryptionDescriptor(serialized: string | null): {
     encryptedAt: parsed.encryptedAt.trim(),
   });
 }
+

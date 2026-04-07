@@ -1,4 +1,4 @@
-import type { AssetContractParameterDescriptor } from "../../../../domain/contracts/AssetContract";
+﻿import type { AssetContractParameterDescriptor } from "@domain/contracts/AssetContract";
 import type { ImageParameterDefinition } from "./ImageUiContracts";
 
 function normalizeType(valueType?: string): ImageParameterDefinition["type"] {
@@ -30,3 +30,4 @@ export function mapAssetContractParametersToImageParameters(
     defaultValue: parameter.defaultValue,
   })));
 }
+

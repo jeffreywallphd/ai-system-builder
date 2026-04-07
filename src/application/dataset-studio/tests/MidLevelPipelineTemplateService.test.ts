@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { PipelineEditingService } from "../PipelineEditingService";
 import { MidLevelPipelineTemplateService } from "../MidLevelPipelineTemplateService";
 
@@ -55,3 +55,4 @@ describe("MidLevelPipelineTemplateService", () => {
     })).toThrow("missing required stage");
   });
 });
+

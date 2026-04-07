@@ -1,14 +1,14 @@
-import type { SystemComponentReference, SystemExecutionMetadata } from "../../../domain/system-studio/SystemAssetDomain";
-import { SystemStudioIdentity } from "../../../domain/system-studio/SystemAssetDomain";
-import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
-import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
+﻿import type { SystemComponentReference, SystemExecutionMetadata } from "@domain/system-studio/SystemAssetDomain";
+import { SystemStudioIdentity } from "@domain/system-studio/SystemAssetDomain";
+import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
 import {
   StudioShellApplicationError,
   StudioShellErrorCodes,
-} from "../../../application/studio-shell/StudioShellApplicationErrors";
+} from "@application/studio-shell/StudioShellApplicationErrors";
 import {
   SystemStudioApplicationService,
-} from "../../../application/system-studio/SystemStudioApplicationService";
+} from "@application/system-studio/SystemStudioApplicationService";
 
 export interface SystemStudioApiError {
   readonly code: "not-found" | "conflict" | "invalid-request" | "internal";
@@ -306,3 +306,4 @@ function extractFirstAssetId(message: string): string | undefined {
   const match = /(asset|system):[a-zA-Z0-9:_-]+/.exec(message);
   return match?.[0];
 }
+

@@ -1,5 +1,5 @@
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { INodePort } from "../../../domain/nodes/interfaces/INodePort";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodePort } from "@domain/nodes/interfaces/INodePort";
 import type { IWorkflowGraph, IWorkflowGraphCycle, IWorkflowGraphLayer, IWorkflowGraphValidationResult } from "./interfaces/IWorkflowGraph";
 import type { IWorkflowConnection } from "./interfaces/IWorkflowConnection";
 
@@ -461,3 +461,4 @@ export class WorkflowGraph implements IWorkflowGraph {
     return new WorkflowGraph(params);
   }
 }
+

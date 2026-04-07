@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   createEmptySchemaAssetDocument,
   serializeSchemaAssetDocument,
-} from "../../../../../domain/schema-studio/SchemaStudioDomain";
+} from "@domain/schema-studio/SchemaStudioDomain";
 import SchemaStudioDraftAuthoringBoundary from "../SchemaStudioDraftAuthoringBoundary";
 
 describe("SchemaStudioDraftAuthoringBoundary", () => {
@@ -91,3 +91,4 @@ describe("SchemaStudioDraftAuthoringBoundary", () => {
     expect(html).toContain("blocking issue(s) found");
   });
 });
+

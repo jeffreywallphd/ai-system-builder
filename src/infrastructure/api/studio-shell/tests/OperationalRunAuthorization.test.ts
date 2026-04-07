@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { InMemoryWorkflowRunSummaryRepository } from "../../../../infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "@infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
@@ -12,10 +12,10 @@ import type {
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
-} from "../../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationRoleGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationRoleGrantReadRepository";
-import type { IAuthorizationSharingGrantReadRepository } from "../../../../application/authorization/ports/IAuthorizationSharingGrantReadRepository";
-import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationRoleGrantReadRepository } from "@application/authorization/ports/IAuthorizationRoleGrantReadRepository";
+import type { IAuthorizationSharingGrantReadRepository } from "@application/authorization/ports/IAuthorizationSharingGrantReadRepository";
+import type { IAuthorizationResourcePolicyMetadataReadRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
@@ -23,14 +23,14 @@ import {
   SharingPolicyModes,
   SharingSubjectKinds,
   createRoleAssignment,
-} from "../../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 const evaluationAsOf = "2026-04-05T16:00:00.000Z";
 
@@ -435,3 +435,4 @@ describe("Operational run authorization", () => {
     expect(denied.data?.runs).toEqual([]);
   });
 });
+

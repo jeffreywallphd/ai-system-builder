@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { PreviewToolContextUseCase } from "../PreviewToolContextUseCase";
 import { WorkflowContextService } from "../WorkflowContextService";
 import { ContextPackage } from "../models/ContextPackage";
 import { ContextRecipe } from "../models/ContextRecipe";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
 import { LoadToolDefinitionUseCase } from "../../tools/LoadToolDefinitionUseCase";
 import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
@@ -76,3 +76,4 @@ describe("PreviewToolContextUseCase", () => {
     expect(result.deliveryTargets.map((target) => target.channel)).toContain("tool-execution");
   });
 });
+

@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export interface MissingValueDetectionOptions {
   readonly treatEmptyStringAsMissing: boolean;
@@ -27,3 +27,4 @@ export function isMissingValue(
 
   return false;
 }
+

@@ -1,4 +1,4 @@
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import {
   ComfyImageManipulationBaseGraphContractVersion,
   type ComfyImageManipulationBaseGraph,
@@ -150,3 +150,4 @@ export interface IComfyImageManipulationExecutionAdapter {
   getExecutionProgress(executionId: string): Promise<ComfyImageManipulationExecutionProgressSnapshot>;
   waitForExecutionResult(executionId: string): Promise<ComfyImageManipulationExecutionResult>;
 }
+

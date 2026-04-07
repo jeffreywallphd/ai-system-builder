@@ -1,7 +1,7 @@
-import {
+﻿import {
   createWorkflowTemplatePreview,
   type WorkflowTemplatePreview,
-} from "../../domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
+} from "@domain/workflow-template-studio/WorkflowTemplatePreviewDomain";
 import type { WorkflowTemplateAssetService } from "./WorkflowTemplateAssetService";
 
 export class WorkflowTemplatePreviewService {
@@ -68,3 +68,4 @@ export class WorkflowTemplatePreviewService {
     });
   }
 }
+

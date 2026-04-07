@@ -1,4 +1,4 @@
-import { ExecutionPlan, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionPlan, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import type { IWorkflowExecutionEvent, IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
 import type { IExecutionEngineEvent } from "./ExecutionContracts";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
@@ -72,3 +72,4 @@ export function getWorkflowExecutionEventFromEngineEvent(
 ): IWorkflowExecutionEvent | undefined {
   return getWorkflowExecutionEvent(event);
 }
+

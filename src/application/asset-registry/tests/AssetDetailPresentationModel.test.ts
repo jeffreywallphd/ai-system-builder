@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { AssetDetailLayoutResolver, AssetDetailSectionKeys } from "../AssetDetailPresentationModel";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 
 function makeAsset(overrides: Partial<RegistryAsset> = {}): RegistryAsset {
   return {
@@ -96,3 +96,4 @@ describe("AssetDetailLayoutResolver", () => {
     expect(metadataText).toContain("Structure");
   });
 });
+

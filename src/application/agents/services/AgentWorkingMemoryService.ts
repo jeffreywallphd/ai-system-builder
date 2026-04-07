@@ -1,8 +1,8 @@
-import { createAgentWorkingMemory, updateAgentWorkingMemory, type AgentWorkingMemory } from "../../../domain/agents/AgentWorkingMemory";
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentPlan } from "../../../domain/agents/AgentPlan";
-import type { AgentMemoryEntryReference } from "../../../domain/agents/AgentMemory";
-import { AssetId } from "../../../domain/assets/AssetId";
+﻿import { createAgentWorkingMemory, updateAgentWorkingMemory, type AgentWorkingMemory } from "@domain/agents/AgentWorkingMemory";
+import type { Agent } from "@domain/agents/Agent";
+import type { AgentPlan } from "@domain/agents/AgentPlan";
+import type { AgentMemoryEntryReference } from "@domain/agents/AgentMemory";
+import { AssetId } from "@domain/assets/AssetId";
 
 function planAssetReferences(plan: AgentPlan): ReadonlyArray<AgentMemoryEntryReference["assetId"]> {
   const refs: AgentMemoryEntryReference["assetId"][] = [];
@@ -54,3 +54,4 @@ export class AgentWorkingMemoryService {
     });
   }
 }
+

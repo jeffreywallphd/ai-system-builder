@@ -1,4 +1,4 @@
-import type { ImageRunHistoryListing } from "../../../../application/system-runtime/ImageRunHistoryDataContract";
+﻿import type { ImageRunHistoryListing } from "@application/system-runtime/ImageRunHistoryDataContract";
 import type { ImageRunHistoryItemViewModel } from "./ImageUiContracts";
 
 function summarizeRecord(record: ImageRunHistoryListing["runs"][number]): ImageRunHistoryItemViewModel {
@@ -19,3 +19,4 @@ function summarizeRecord(record: ImageRunHistoryListing["runs"][number]): ImageR
 export function mapImageRunHistoryListingToViewModels(listing: ImageRunHistoryListing): ReadonlyArray<ImageRunHistoryItemViewModel> {
   return Object.freeze(listing.runs.map((record) => summarizeRecord(record)));
 }
+

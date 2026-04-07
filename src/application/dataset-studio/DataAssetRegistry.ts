@@ -1,11 +1,11 @@
-import { createDatasetStudioTaxonomy } from "../../domain/dataset-studio/DatasetStudioDomain";
-import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { createDatasetStudioTaxonomy } from "@domain/dataset-studio/DatasetStudioDomain";
+import type { CanonicalDataShapeKind, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetRuntimeUsabilityModes,
   type DataAssetBase,
   type DataAssetRuntimeOperationalContract,
-} from "../../domain/dataset-studio/DataAssetBase";
-import type { DataAssetVersionDescriptor } from "../../domain/dataset-studio/DataAssetVersioning";
+} from "@domain/dataset-studio/DataAssetBase";
+import type { DataAssetVersionDescriptor } from "@domain/dataset-studio/DataAssetVersioning";
 import {
   DatasetSchemaIntentIds,
   type DatasetSchemaIntentId,
@@ -13,12 +13,12 @@ import {
   type IDatasetSchemaIntent,
   type IDatasetSchemaIntentRegistry,
   type IDatasetSchemaValidationEngine,
-} from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   assertValidDataAssetVersion,
   compareDataAssetVersions,
-} from "../../domain/dataset-studio/DataAssetVersioning";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/dataset-studio/DataAssetVersioning";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import {
   createDataAssetConfigSchema,
   inferDataAssetConfigSchema,
@@ -555,3 +555,4 @@ export class DataAssetRegistry {
     return inferred;
   }
 }
+

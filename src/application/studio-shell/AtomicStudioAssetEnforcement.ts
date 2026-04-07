@@ -1,12 +1,12 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+import type { AssetDraft } from "@domain/studio-shell/StudioShellDomain";
 import type {
   CompositionTaxonomyDescriptor,
   TaxonomyBehaviorKind,
   TaxonomySemanticRole,
   TaxonomyStructuralKind,
-} from "../../domain/taxonomy/CompositionTaxonomy";
-import { TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
+import { TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
 import { StudioShellInvalidRequestError } from "./StudioShellApplicationErrors";
 import {
   buildNestedSystemReferences,
@@ -16,7 +16,7 @@ import {
   SystemBindingEndpointScopes,
   SystemComponentKinds,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 
 export const StudioAssetEnforcementIssueCodes = Object.freeze({
   taxonomyMissing: "taxonomy-missing",
@@ -486,3 +486,4 @@ export async function assertSystemStudioDraftPublishConsistency(input: {
     `Studio draft enforcement failed for '${input.expectation.studioType}': ${issues.map((issue) => `${issue.code}: ${issue.message}`).join(" ")}`,
   );
 }
+

@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { ComfyNodeDto } from "../dto/ComfyNodeDto";
 import type { ComfyWorkflowDto } from "../dto/ComfyWorkflowDto";
 import { ComfyNodeAdapter } from "./ComfyNodeAdapter";
@@ -96,3 +96,4 @@ export class ComfyWorkflowAdapter {
     });
   }
 }
+

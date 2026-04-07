@@ -1,4 +1,4 @@
-import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
+﻿import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import {
   WorkspaceEncryptionKeyScope,
@@ -8,8 +8,8 @@ import {
   WorkspaceRoles,
   updateWorkspaceDetails,
   type Workspace,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import type { WorkspaceVisibility } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -201,3 +201,4 @@ export class UpdateWorkspaceUseCase {
     };
   }
 }
+

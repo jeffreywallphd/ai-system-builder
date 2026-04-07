@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ExchangeAccessActions,
   ExchangeAccessEvaluator,
   RoleBasedExchangeAccessPolicy,
 } from "../ExchangeAccessControl";
-import { createExchangeBundle } from "../../../domain/exchange/ExchangeBundleDomain";
+import { createExchangeBundle } from "@domain/exchange/ExchangeBundleDomain";
 import { PublishablePackageService, type IPublishablePackageRepository } from "../PublishablePackageService";
-import type { PublishablePackage } from "../../../domain/exchange/PublishablePackage";
+import type { PublishablePackage } from "@domain/exchange/PublishablePackage";
 
 class InMemoryPublishablePackageRepository implements IPublishablePackageRepository {
   private readonly records = new Map<string, PublishablePackage>();
@@ -121,3 +121,4 @@ describe("ExchangeAccessControl", () => {
     expect(tenantMismatch.reasonCode).toBe("tenant-mismatch");
   });
 });
+

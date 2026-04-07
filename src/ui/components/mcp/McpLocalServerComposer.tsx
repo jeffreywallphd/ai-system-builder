@@ -1,4 +1,4 @@
-import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
+﻿import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
 
 export interface McpLocalServerComposerProps {
   readonly draft: LocalMcpToolDraft;
@@ -91,7 +91,7 @@ export default function McpLocalServerComposer({
                   <div className="ui-text-small ui-text-secondary">Describe the tool you want and the agent will draft starter logic into the editor.</div>
                 </div>
                 <button className="ui-button ui-button--secondary ui-button--sm" type="button" disabled={isBusy || isGenerating} onClick={onGenerateDraft}>
-                  {isGenerating ? "Drafting…" : "Ask coding agent"}
+                  {isGenerating ? "Draftingâ€¦" : "Ask coding agent"}
                 </button>
               </div>
               <textarea className="ui-input ui-mcp-authoring-textarea" value={agentPrompt} onChange={(event) => onAgentPromptChange?.(event.currentTarget.value)} placeholder="Example: Create a tool that summarizes pasted release notes into three bullet points and a risk list." />
@@ -115,7 +115,7 @@ export default function McpLocalServerComposer({
 
         <div className="ui-row ui-row--wrap">
           <button className="ui-button ui-button--primary" type="button" disabled={isBusy} onClick={onCreateServer}>
-            {isBusy ? "Saving…" : "Create local server"}
+            {isBusy ? "Savingâ€¦" : "Create local server"}
           </button>
         </div>
       </div>
@@ -149,3 +149,4 @@ function parseJsonRecord(value: string): Readonly<Record<string, unknown>> | und
     return undefined;
   }
 }
+

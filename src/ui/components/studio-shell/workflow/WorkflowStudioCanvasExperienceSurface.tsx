@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { Connection } from "@xyflow/react";
 import {
   WorkflowDraftBuiltInStepTypes,
@@ -8,11 +8,11 @@ import {
   type WorkflowDraftIfThenStepConfig,
   type WorkflowDraft,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
-} from "../../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@application/studio-entry/AssetSelectorSessionStore";
 import AssetSelectorShell from "../asset-selector/AssetSelectorShell";
 import {
   applyWorkflowCanvasAction,
@@ -1220,3 +1220,4 @@ export default function WorkflowStudioCanvasModeSurface({
     </div>
   );
 }
+

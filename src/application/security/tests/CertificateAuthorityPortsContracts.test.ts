@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateRevocationReasons,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateDistributionEventLookupQuery,
   CertificateDistributionEventPersistenceRecord,
@@ -19,11 +19,11 @@ import type {
   IssuedCertificatePersistenceRecord,
   TrustMaterialReferenceLookupQuery,
   TrustMaterialReferencePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   CertificateAuthorityPersistenceQueryPresets,
   normalizeCertificateAuthorityMutationOperationKey,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
 import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
@@ -893,3 +893,4 @@ describe("certificate authority application ports and repository contracts", () 
     expect(distributionEvents).toHaveLength(1);
   });
 });
+

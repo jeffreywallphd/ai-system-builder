@@ -1,6 +1,6 @@
-import { ChatCompletionExample, ExampleLineage, QuestionAnsweringExample } from "../../../domain/tuning-datasets/TuningDatasetEntities";
-import type { DatasetExample, DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import { ChatCompletionExample, ExampleLineage, QuestionAnsweringExample } from "@domain/tuning-datasets/TuningDatasetEntities";
+import type { DatasetExample, DatasetGenerationRequest, DatasetGenerationResult, DatasetGenerationService } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
 
 export class PythonRuntimeDatasetGenerationService implements DatasetGenerationService {
   constructor(private readonly client: IPythonRuntimeClient) {}
@@ -125,3 +125,4 @@ function toDomainExample(
     lineage,
   });
 }
+

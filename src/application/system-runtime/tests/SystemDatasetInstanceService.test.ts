@@ -1,28 +1,28 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetSchemaIntentIds,
   type DatasetSchemaIntentId,
-} from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import type { IImageMetadataExtractor } from "../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
-import type { ImageRecord } from "../../../domain/dataset-studio/contracts/ImageRecord";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { IImageMetadataExtractor } from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
+import type { ImageRecord } from "@domain/dataset-studio/contracts/ImageRecord";
 import {
   createMediaValidationIssue,
   createMediaValidationResult,
   type IMediaRecordValidator,
-} from "../../../domain/dataset-studio/interfaces/MediaValidation";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import type { SystemDatasetOwnershipValidator } from "../SystemDatasetInstanceService";
 import { SystemDatasetInstanceService } from "../SystemDatasetInstanceService";
 import { InMemoryDatasetEventPublisher, type DatasetEventPublisher } from "../../dataset-events/DatasetEventPublisher";
-import { DatasetEventTypes } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+import { DatasetEventTypes } from "@domain/dataset-studio/contracts/DatasetEvent";
 import { InMemoryDatasetOperationalLineageSink } from "../DatasetOperationalLineage";
-import { WorkflowOutputTargetTypes } from "../../../domain/system-runtime/WorkflowOutputTargetDomain";
+import { WorkflowOutputTargetTypes } from "@domain/system-runtime/WorkflowOutputTargetDomain";
 
 class StaticAssetCatalog implements DatasetInstanceAssetCatalog {
   public constructor(
@@ -2104,3 +2104,4 @@ describe("SystemDatasetInstanceService", () => {
   });
 
 });
+

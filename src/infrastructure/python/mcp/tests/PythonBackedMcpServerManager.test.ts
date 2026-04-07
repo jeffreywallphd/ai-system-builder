@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { PythonBackedMcpServerManager } from "../PythonBackedMcpServerManager";
-import type { IMcpServerCatalog } from "../../../../application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
 import { HttpMcpServerRuntimeClient } from "../HttpMcpServerRuntimeClient";
 
 function buildResult(action: "connect" | "disconnect" | "reconnect") {
@@ -150,3 +150,4 @@ describe("PythonBackedMcpServerManager", () => {
     expect(events.list()).toHaveLength(0);
   });
 });
+

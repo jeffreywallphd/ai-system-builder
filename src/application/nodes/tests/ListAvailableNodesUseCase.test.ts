@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListAvailableNodesUseCase } from "../ListAvailableNodesUseCase";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
 import { makeNodeCatalogProvider } from "./testUtils";
 
 describe("ListAvailableNodesUseCase", () => {
@@ -14,3 +14,4 @@ describe("ListAvailableNodesUseCase", () => {
     expect(result.definitions.map((d) => d.id)).toEqual(["d1"]);
   });
 });
+

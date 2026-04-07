@@ -1,10 +1,10 @@
-import type { INodeProperty, PropertyVisibilityLevel } from "../../domain/nodes/interfaces/INodeProperty";
+﻿import type { INodeProperty, PropertyVisibilityLevel } from "@domain/nodes/interfaces/INodeProperty";
 import type {
   IWorkflow,
   IWorkflowContextConfiguration,
   IWorkflowContextPackageReference,
   IWorkflowContextRecipeSelection,
-} from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/workflows/interfaces/IWorkflow";
 import type { ProjectedField } from "./models/ProjectedField";
 import type { ProjectedSection } from "./models/ProjectedSection";
 
@@ -617,3 +617,4 @@ export class WorkflowApplicationProjectionService {
     return updated;
   }
 }
+

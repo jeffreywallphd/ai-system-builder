@@ -1,5 +1,5 @@
-import { describe, expect, it, mock } from "bun:test";
-import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "../../../application/runtime/RuntimeDependencyOrchestrator";
+﻿import { describe, expect, it, mock } from "bun:test";
+import { RuntimeDependencyIds, RuntimeDependencyOperationalStates, RuntimeDependencyUnavailableError } from "@application/runtime/RuntimeDependencyOrchestrator";
 import { OrchestratedDocumentConversionGateway } from "../OrchestratedDocumentConversionGateway";
 
 describe("OrchestratedDocumentConversionGateway", () => {
@@ -45,3 +45,4 @@ describe("OrchestratedDocumentConversionGateway", () => {
     expect(delegate.convert).not.toHaveBeenCalled();
   });
 });
+

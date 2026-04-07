@@ -1,47 +1,47 @@
-import {
+﻿import {
   AssetDraftLifecycleStatuses,
   type AssetDraftLifecycleStatus,
   type AssetMetadata,
   type AssetMetadataPatch,
-} from "../../../domain/studio-shell/StudioShellDomain";
-import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
-import { DefaultStudioShellApplicationService } from "../../../application/studio-shell/DefaultStudioShellApplicationService";
-import { WorkflowStudioApplicationService } from "../../../application/workflow-studio/WorkflowStudioApplicationService";
+} from "@domain/studio-shell/StudioShellDomain";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
+import { WorkflowStudioApplicationService } from "@application/workflow-studio/WorkflowStudioApplicationService";
 import {
   buildStudioShellValidationIssues,
   tryReadTaxonomyFromVersionMetadata,
   type StudioShellValidationIssue,
-} from "../../../application/studio-shell/StudioShellValidation";
+} from "@application/studio-shell/StudioShellValidation";
 import type {
   CreateAssetDraftCommand,
   PublishAssetDraftVersionCommand,
   TransitionAssetDraftLifecycleCommand,
   UpdateAssetDraftCommand,
   UpdateAssetDraftDependenciesCommand,
-} from "../../../application/studio-shell/contracts";
+} from "@application/studio-shell/contracts";
 import {
   StudioShellApplicationError,
   StudioShellErrorCodes,
   StudioShellInvalidRequestError,
-} from "../../../application/studio-shell/StudioShellApplicationErrors";
-import type { IWorkflowPersistenceRepository } from "../../../application/ports/interfaces/IWorkflowPersistenceRepository";
-import type { IWorkflowRunSummaryRepository } from "../../../application/ports/interfaces/IWorkflowRunSummaryRepository";
-import { CreatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/CreatePersistedWorkflowUseCase";
-import { DuplicatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/DuplicatePersistedWorkflowUseCase";
-import { GetPersistedWorkflowUseCase } from "../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
-import { UpdatePersistedWorkflowUseCase } from "../../../application/workflow-persistence/UpdatePersistedWorkflowUseCase";
+} from "@application/studio-shell/StudioShellApplicationErrors";
+import type { IWorkflowPersistenceRepository } from "@application/ports/interfaces/IWorkflowPersistenceRepository";
+import type { IWorkflowRunSummaryRepository } from "@application/ports/interfaces/IWorkflowRunSummaryRepository";
+import { CreatePersistedWorkflowUseCase } from "@application/workflow-persistence/CreatePersistedWorkflowUseCase";
+import { DuplicatePersistedWorkflowUseCase } from "@application/workflow-persistence/DuplicatePersistedWorkflowUseCase";
+import { GetPersistedWorkflowUseCase } from "@application/workflow-persistence/GetPersistedWorkflowUseCase";
+import { UpdatePersistedWorkflowUseCase } from "@application/workflow-persistence/UpdatePersistedWorkflowUseCase";
 import type {
   ProtectedResourceActorContext,
   WorkspaceScopingInput,
-} from "../../../application/workflow-persistence/WorkflowWorkspaceScoping";
-import { GetWorkflowRunDetailUseCase } from "../../../application/workflow-run-history/GetWorkflowRunDetailUseCase";
-import { ListWorkflowRunSummariesUseCase } from "../../../application/workflow-run-history/ListWorkflowRunSummariesUseCase";
+} from "@application/workflow-persistence/WorkflowWorkspaceScoping";
+import { GetWorkflowRunDetailUseCase } from "@application/workflow-run-history/GetWorkflowRunDetailUseCase";
+import { ListWorkflowRunSummariesUseCase } from "@application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import {
   WorkflowPersistenceError,
   WorkflowPersistenceErrorCodes,
   WorkflowPersistenceInvalidRequestError,
-} from "../../../application/workflow-persistence/WorkflowPersistenceErrors";
-import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@application/workflow-persistence/WorkflowPersistenceErrors";
+import { WorkflowLifecycleStates, deserializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
@@ -58,86 +58,86 @@ import {
   type WorkflowRunStatus,
   type WorkflowRunSummaryRecord,
   type WorkflowRunTriggerSource,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
-import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "../../../application/workflow-studio/WorkflowExecutionAlignmentContracts";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
+import { WorkflowExecutionTriggerSourceKinds, type WorkflowExecutionTriggerSourceKind } from "@application/workflow-studio/WorkflowExecutionAlignmentContracts";
 import type {
   RunWorkflowDraftManualResult,
   WorkflowExecutionFailureDetail,
-} from "../../../application/workflow-studio/WorkflowStudioApplicationService";
+} from "@application/workflow-studio/WorkflowStudioApplicationService";
 import {
   DataStudioPipelineExecutionService,
   type DataStudioPipelineExecutionReadiness,
   type RunDataStudioPipelineResult,
-} from "../../../application/data-studio/DataStudioPipelineExecutionService";
+} from "@application/data-studio/DataStudioPipelineExecutionService";
 import {
   createDataStudioPipelineState,
   type DataStudioPipelineState,
-} from "../../../application/data-studio/DataStudioPipelineState";
+} from "@application/data-studio/DataStudioPipelineState";
 import {
   createDataStudioPipelineVersionMetadata,
   parseDataStudioPipelineVersionMetadata,
   type DataStudioPipelineVersionSummary,
-} from "../../../application/data-studio/DataStudioPipelineVersioning";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { UnifiedExecutionEngine } from "../../../application/execution/UnifiedExecutionEngine";
+} from "@application/data-studio/DataStudioPipelineVersioning";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { UnifiedExecutionEngine } from "@application/execution/UnifiedExecutionEngine";
 import { DataStudioPipelineExecutionUnitHandler } from "../../execution/DataStudioPipelineExecutionUnitHandler";
 import {
   buildReferenceImageDatasetInstanceRequests,
   ReferenceImageSystemTemplate,
-} from "../../../application/system-studio/ReferenceImageSystemTemplate";
-import { validateReferenceImageCrossStudioContext } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
-import { InMemoryDatasetInstanceRepository } from "../../../application/system-runtime/DatasetInstanceRepository";
+} from "@application/system-studio/ReferenceImageSystemTemplate";
+import { validateReferenceImageCrossStudioContext } from "@application/system-studio/ReferenceImageCrossStudioIntegrity";
+import { InMemoryDatasetInstanceRepository } from "@application/system-runtime/DatasetInstanceRepository";
 import {
   SystemDatasetInstanceService,
   type EnsureRoleDatasetInstanceRequest,
-} from "../../../application/system-runtime/SystemDatasetInstanceService";
-import type { StorageInstanceProvisioningContract } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
-import { assertNoUserManagedStoragePaths } from "../../../application/system-runtime/StoragePathPolicyValidation";
+} from "@application/system-runtime/SystemDatasetInstanceService";
+import type { StorageInstanceProvisioningContract } from "@application/system-runtime/StorageInstanceProvisioningContract";
+import { assertNoUserManagedStoragePaths } from "@application/system-runtime/StoragePathPolicyValidation";
 import {
   DeterministicStorageInstanceProvisioner,
   InMemoryStorageInstanceMetadataRepository,
   StorageInstanceInitializationService,
   type StorageInstanceMetadataRepository,
-} from "../../../application/system-runtime/StorageInstanceInitializationService";
+} from "@application/system-runtime/StorageInstanceInitializationService";
 import {
   StorageInstanceLifecycleService,
   type StorageInstanceLifecycleInfrastructure,
-} from "../../../application/system-runtime/StorageInstanceLifecycleService";
-import type { StorageAttachmentOwnerKind, StorageInstanceMetadata } from "../../../application/system-runtime/StorageInstanceMetadataModel";
-import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "../../../application/system-runtime/DatasetInstanceAssetCatalog";
-import { ZodMediaDatasetValidator } from "../../../application/dataset-studio/adapters/validation/MediaDatasetValidator";
-import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import { createDefaultMediaAdapterBundle } from "../../../application/dataset-studio/adapters/media/MediaAdapterFactory";
-import { WorkflowOutputMaterializationService } from "../../../application/system-runtime/WorkflowOutputMaterializationService";
+} from "@application/system-runtime/StorageInstanceLifecycleService";
+import type { StorageAttachmentOwnerKind, StorageInstanceMetadata } from "@application/system-runtime/StorageInstanceMetadataModel";
+import type { DatasetInstanceAssetCatalog, DatasetInstanceAssetDefinition } from "@application/system-runtime/DatasetInstanceAssetCatalog";
+import { ZodMediaDatasetValidator } from "@application/dataset-studio/adapters/validation/MediaDatasetValidator";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { createDefaultMediaAdapterBundle } from "@application/dataset-studio/adapters/media/MediaAdapterFactory";
+import { WorkflowOutputMaterializationService } from "@application/system-runtime/WorkflowOutputMaterializationService";
 import {
   InMemoryWorkflowOutputArtifactStorage,
   type WorkflowOutputArtifactStorage,
-} from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
-import { InMemoryWorkflowOutputProvenanceRepository } from "../../../application/system-runtime/WorkflowOutputProvenanceRepository";
-import { OutputGalleryDatasetIntegrationService } from "../../../application/system-runtime/OutputGalleryDatasetIntegrationService";
-import type { OutputGalleryItem, OutputGalleryListing } from "../../../application/system-runtime/OutputGalleryDataContract";
+} from "@application/system-runtime/WorkflowOutputArtifactStorage";
+import { InMemoryWorkflowOutputProvenanceRepository } from "@application/system-runtime/WorkflowOutputProvenanceRepository";
+import { OutputGalleryDatasetIntegrationService } from "@application/system-runtime/OutputGalleryDatasetIntegrationService";
+import type { OutputGalleryItem, OutputGalleryListing } from "@application/system-runtime/OutputGalleryDataContract";
 import {
   ImageRunHistoryExecutionStatuses,
   type ImageRunHistoryExecutionStatus,
   type ImageRunHistoryListing,
-} from "../../../application/system-runtime/ImageRunHistoryDataContract";
-import { ImageRunHistoryService } from "../../../application/system-runtime/ImageRunHistoryService";
+} from "@application/system-runtime/ImageRunHistoryDataContract";
+import { ImageRunHistoryService } from "@application/system-runtime/ImageRunHistoryService";
 import {
   InMemoryImageRunHistoryRepository,
   type ImageRunHistoryRepository,
-} from "../../../application/system-runtime/ImageRunHistoryRepository";
+} from "@application/system-runtime/ImageRunHistoryRepository";
 import { ComfyExecutionResultMaterializationMapper } from "../../comfyui/execution/mappers/ComfyExecutionResultMaterializationMapper";
-import type { SystemContextContract } from "../../../domain/system-studio/SystemContextContract";
-import type { DatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import { AuthorizationPolicyEvaluationTargetKinds } from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
+import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
-} from "../../../application/authorization/use-cases/AuthorizationResponseRedaction";
+} from "@application/authorization/use-cases/AuthorizationResponseRedaction";
 
 export interface StudioShellApiError {
   readonly code:
@@ -3837,3 +3837,4 @@ export class StudioShellBackendApi {
     });
   }
 }
+

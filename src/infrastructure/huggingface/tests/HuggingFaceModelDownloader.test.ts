@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Model, ModelArtifact, ModelSource } from "../../../domain/models/Model";
-import { ModelCompatibility } from "../../../domain/models/ModelCompatibility";
-import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
+﻿import { describe, expect, it } from "bun:test";
+import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 import { HuggingFaceModelDownloader } from "../HuggingFaceModelDownloader";
 
 class InMemoryFileStorage implements IFileStorage {
@@ -68,3 +68,4 @@ describe("HuggingFaceModelDownloader", () => {
     expect(fileStorage.writes[0]?.createDirectories).toBeTrue();
   });
 });
+

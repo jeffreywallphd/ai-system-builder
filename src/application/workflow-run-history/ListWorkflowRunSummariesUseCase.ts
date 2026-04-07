@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type { IWorkflowRunSummaryRepository } from "../ports/interfaces/IWorkflowRunSummaryRepository";
 import { toWorkflowRunHistoryError } from "./WorkflowRunHistoryErrors";
 
@@ -16,3 +16,4 @@ export class ListWorkflowRunSummariesUseCase {
     }
   }
 }
+

@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { SqliteAssetSystemRepository } from "../../../infrastructure/filesystem/SqliteAssetSystemRepository";
+import { SqliteAssetSystemRepository } from "@infrastructure/filesystem/SqliteAssetSystemRepository";
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
 import { GetAssetDependencyHealthUseCase } from "../GetAssetDependencyHealthUseCase";
 import { GetAssetImpactAnalysisUseCase } from "../GetAssetImpactAnalysisUseCase";
 import { GetCanonicalProvenanceSummaryUseCase } from "../CanonicalAssetReadUseCases";
@@ -98,3 +98,4 @@ describe("GetCanonicalDependencyStateUseCase", () => {
     }
   });
 });
+

@@ -1,7 +1,7 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -15,7 +15,7 @@ import {
   createPromptTemplateAssetMetadata,
   createPromptTemplateStudioTaxonomy,
   PromptTemplateStudioIdentity,
-} from "../../domain/prompt-template-studio/PromptTemplateStudioDomain";
+} from "@domain/prompt-template-studio/PromptTemplateStudioDomain";
 
 export interface EnsurePromptTemplateStudioResult {
   readonly initialized: boolean;
@@ -140,3 +140,4 @@ export class PromptTemplateStudioApplicationService {
     });
   }
 }
+

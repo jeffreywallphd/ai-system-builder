@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { SecretMetadataApiRecord } from "../../infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
-import { SecretKinds, SecretScopes, type SecretKind, type SecretScope } from "../../domain/security/SecretDomain";
-import { SecretClassificationIds, type SecretClassificationId } from "../../shared/contracts/security/SecretClassificationContracts";
+import type { SecretMetadataApiRecord } from "@infrastructure/api/security/sdk/PublicSecretMetadataApiContract";
+import { SecretKinds, SecretScopes, type SecretKind, type SecretScope } from "@domain/security/SecretDomain";
+import { SecretClassificationIds, type SecretClassificationId } from "@shared/contracts/security/SecretClassificationContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { SecretMetadataManagementService } from "../services/SecretMetadataManagementService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 const classificationOptions = Object.freeze([
   SecretClassificationIds.providerCredential,
@@ -479,3 +479,4 @@ function formatDate(value: string): string {
   }
   return new Date(parsed).toLocaleString();
 }
+

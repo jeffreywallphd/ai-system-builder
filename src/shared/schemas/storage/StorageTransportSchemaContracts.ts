@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -10,7 +10,7 @@ import {
   StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
   StorageRetentionExpiryActions,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageAccessPermissionEffects,
   StorageAccessSummarySources,
@@ -884,3 +884,4 @@ export function parseGetStorageInstanceDetailResponseDto(
     payload,
   );
 }
+

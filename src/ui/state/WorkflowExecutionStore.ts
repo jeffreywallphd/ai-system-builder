@@ -1,5 +1,5 @@
-import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import type { IWorkflowExecutionEvent } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 
 export interface IWorkflowExecutionState {
   readonly isExecuting: boolean;
@@ -144,3 +144,4 @@ function freezeExecutionState(state: IWorkflowExecutionState): IWorkflowExecutio
     outputAssets: Object.freeze([...(state.outputAssets ?? [])]),
   });
 }
+

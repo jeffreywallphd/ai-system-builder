@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -7,12 +7,12 @@ import { tmpdir } from "node:os";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import { CertificateOperationsBackendApi } from "../../../../api/security/CertificateOperationsBackendApi";
-import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../../../infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
-import { GetCertificateAuthorityStatusIntrospectionUseCase } from "../../../../../application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
-import { ListIssuedCertificateMetadataUseCase } from "../../../../../application/security/use-cases/ListIssuedCertificateMetadataUseCase";
-import { GetIssuedCertificateMetadataUseCase } from "../../../../../application/security/use-cases/GetIssuedCertificateMetadataUseCase";
-import { RevokeIssuedCertificateUseCase } from "../../../../../application/security/use-cases/RevokeIssuedCertificateUseCase";
-import type { ResolveCertificateAuthorityStartupStateUseCase } from "../../../../../application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
+import { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import { GetCertificateAuthorityStatusIntrospectionUseCase } from "@application/security/use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
+import { ListIssuedCertificateMetadataUseCase } from "@application/security/use-cases/ListIssuedCertificateMetadataUseCase";
+import { GetIssuedCertificateMetadataUseCase } from "@application/security/use-cases/GetIssuedCertificateMetadataUseCase";
+import { RevokeIssuedCertificateUseCase } from "@application/security/use-cases/RevokeIssuedCertificateUseCase";
+import type { ResolveCertificateAuthorityStartupStateUseCase } from "@application/security/use-cases/ResolveCertificateAuthorityStartupStateUseCase";
 
 const servers: Server[] = [];
 const cleanup: Array<() => void> = [];
@@ -392,3 +392,4 @@ async function seedCertificateAuthorityRecords(adapter: SqliteCertificateAuthori
     },
   });
 }
+

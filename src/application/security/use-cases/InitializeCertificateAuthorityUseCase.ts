@@ -1,4 +1,4 @@
-import { CertificateAuthorityStatuses, createCertificateAuthorityRoot } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { CertificateAuthorityStatuses, createCertificateAuthorityRoot } from "@domain/security/CertificateAuthorityDomain";
 import type { ICertificateAuthorityIssuerPort } from "../ports/ICertificateAuthorityIssuerPort";
 import type { ICertificateAuthorityRootMaterialStorage } from "../ports/ICertificateAuthorityRootMaterialStorage";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
@@ -13,7 +13,7 @@ import {
   type CertificateAuthorityRootPersistenceRecord,
   type CertificateSubjectPersistenceRecord,
   type RotationPolicyMetadataPersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export const CertificateAuthorityInitializationConflictPolicies = Object.freeze({
   reject: "reject",
@@ -543,3 +543,4 @@ function toCertificateLifecycleAuditDetails(
       return Object.freeze({});
   }
 }
+

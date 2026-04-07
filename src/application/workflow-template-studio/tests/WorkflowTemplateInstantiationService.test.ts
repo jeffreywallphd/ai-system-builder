@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../../ports/interfaces/IFileStorage";
 import { WorkflowTemplateAssetService } from "../WorkflowTemplateAssetService";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 
 class InMemoryAssetCatalog implements IAssetCatalog {
   private readonly records = new Map<string, IAsset>();
@@ -136,3 +136,4 @@ describe("WorkflowTemplateInstantiationService", () => {
     await expect(service.instantiateTemplate({ templateId: "template:image:starter", inputs: {} })).rejects.toThrow("Missing required workflow template input 'prompt'");
   });
 });
+

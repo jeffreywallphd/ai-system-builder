@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
-import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createDatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   DatasetInstanceDuplicationModes,
   SystemDatasetInstancePersistenceService,
@@ -267,3 +267,4 @@ describe("SystemDatasetInstancePersistenceService", () => {
     expect(reused.datasetInstances[0]).toEqual(datasetInstances[0]);
   });
 });
+

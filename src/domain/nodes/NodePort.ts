@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   INodePort,
   INodePortCompatibilityProfile,
   NodePortCardinality,
@@ -10,8 +10,8 @@ import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../domain/models/interfaces/IModelDependency";
+} from "@domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "@domain/models/interfaces/IModelDependency";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
@@ -257,3 +257,4 @@ export class NodePort implements INodePort {
     );
   }
 }
+

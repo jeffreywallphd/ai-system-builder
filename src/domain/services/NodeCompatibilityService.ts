@@ -1,7 +1,7 @@
-import type { INode } from "../../../domain/nodes/interfaces/INode";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
-import type { INodePort } from "../../../domain/nodes/interfaces/INodePort";
-import type { INodeProperty } from "../../../domain/nodes/interfaces/INodeProperty";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { INodePort } from "@domain/nodes/interfaces/INodePort";
+import type { INodeProperty } from "@domain/nodes/interfaces/INodeProperty";
 import type { IWorkflowConnection } from "../workflows/interfaces/IWorkflowConnection";
 import type { IWorkflow } from "../workflows/interfaces/IWorkflow";
 import type { IWorkflowGraph } from "../workflows/interfaces/IWorkflowGraph";
@@ -563,3 +563,4 @@ export class NodeCompatibilityService implements INodeCompatibilityService {
     return new NodeCompatibilityResult(reasons);
   }
 }
+

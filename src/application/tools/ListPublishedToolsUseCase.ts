@@ -1,8 +1,8 @@
-import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
+﻿import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
 import { WorkflowToolProjectionService } from "../projection/WorkflowToolProjectionService";
 import type { ToolDefinition } from "../projection/models/ToolDefinition";
 import type { ToolSearchCriteria } from "../dto/ToolSearchCriteria";
-import { ToolAutomationTypeClassifier } from "../../domain/services/ToolAutomationTypeClassifier";
+import { ToolAutomationTypeClassifier } from "@domain/services/ToolAutomationTypeClassifier";
 
 export interface ListPublishedToolsResult {
   readonly tools: ReadonlyArray<
@@ -73,3 +73,4 @@ export class ListPublishedToolsUseCase {
     };
   }
 }
+

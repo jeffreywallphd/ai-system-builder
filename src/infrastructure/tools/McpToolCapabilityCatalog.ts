@@ -1,8 +1,8 @@
-import type { McpToolDescriptor } from "../../application/mcp/models/McpToolDescriptor";
-import type { IMcpToolCatalog } from "../../application/ports/interfaces/IMcpToolCatalog";
-import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
-import { createToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { McpToolDescriptor } from "@application/mcp/models/McpToolDescriptor";
+import type { IMcpToolCatalog } from "@application/ports/interfaces/IMcpToolCatalog";
+import type { IToolCapabilityCatalog } from "@application/ports/interfaces/IToolCapabilityCatalog";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
+import { createToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 
 export const MCP_TOOL_CAPABILITY_PROVIDER = Object.freeze({
   kind: "mcp",
@@ -59,3 +59,4 @@ export class McpToolCapabilityCatalog implements IToolCapabilityCatalog {
     return Object.freeze(tools.filter((tool) => tool.live === true).map((tool) => mapMcpToolToCapability(tool)));
   }
 }
+

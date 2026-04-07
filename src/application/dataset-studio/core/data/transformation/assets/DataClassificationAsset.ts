@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import { BaseTransformationAsset } from "../BaseTransformationAsset";
 import {
   classifyFieldByHeuristics,
@@ -457,3 +457,4 @@ export class DataClassificationAsset extends BaseTransformationAsset<
     });
   }
 }
+

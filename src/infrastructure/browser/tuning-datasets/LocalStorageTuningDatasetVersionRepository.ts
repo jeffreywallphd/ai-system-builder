@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChatCompletionExample,
   DatasetWorkflow,
   ExampleAnnotation,
@@ -9,8 +9,8 @@ import {
   ValidationIssue,
   type SourceSegmentReference,
   type DatasetExportRecord,
-} from "../../../domain/tuning-datasets/TuningDatasetEntities";
-import { DatasetExportRecord as DatasetExportRecordEntity } from "../../../domain/tuning-datasets/TuningDatasetEntities";
+} from "@domain/tuning-datasets/TuningDatasetEntities";
+import { DatasetExportRecord as DatasetExportRecordEntity } from "@domain/tuning-datasets/TuningDatasetEntities";
 import type {
   ChatCompletionMessage,
   DatasetExample,
@@ -25,7 +25,7 @@ import type {
   DatasetWorkflowState,
   ExampleStatus,
   SplitType,
-} from "../../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -653,3 +653,4 @@ export class LocalStorageTuningDatasetVersionRepository implements DatasetVersio
     });
   }
 }
+

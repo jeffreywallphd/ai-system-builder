@@ -1,4 +1,4 @@
-import {
+﻿import {
   createAgent,
   toAgentReadModel,
   updateAgent,
@@ -6,10 +6,10 @@ import {
   type AgentExecutionConfiguration,
   type AgentPlanningStrategy,
   type AgentReadModel,
-} from "../../../domain/agents/Agent";
-import type { AgentGoal } from "../../../domain/agents/AgentGoal";
-import type { AgentPolicy } from "../../../domain/agents/AgentPolicy";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
+} from "@domain/agents/Agent";
+import type { AgentGoal } from "@domain/agents/AgentGoal";
+import type { AgentPolicy } from "@domain/agents/AgentPolicy";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 
 export class AgentService {
@@ -80,3 +80,4 @@ export class AgentService {
     return this.repository.delete(id.trim());
   }
 }
+

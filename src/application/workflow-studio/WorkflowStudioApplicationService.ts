@@ -1,7 +1,7 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -17,7 +17,7 @@ import {
   deserializeWorkflowDraft,
   validateWorkflowDraft,
   WorkflowStudioIdentity,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   mapWorkflowDraftToExecutionPlan,
   type WorkflowDraftExecutionPlan,
@@ -540,3 +540,4 @@ export class WorkflowStudioApplicationService {
     );
   }
 }
+

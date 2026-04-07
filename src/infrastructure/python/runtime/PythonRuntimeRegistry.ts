@@ -1,4 +1,4 @@
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 
 export class PythonRuntimeRegistry {
@@ -22,3 +22,4 @@ export class PythonRuntimeRegistry {
     return this.client;
   }
 }
+

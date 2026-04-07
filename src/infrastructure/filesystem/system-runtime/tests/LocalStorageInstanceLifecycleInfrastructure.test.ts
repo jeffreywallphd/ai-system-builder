@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createStorageInstanceMetadata } from "../../../../application/system-runtime/StorageInstanceMetadataModel";
+import { createStorageInstanceMetadata } from "@application/system-runtime/StorageInstanceMetadataModel";
 import { LocalStorageInstanceLifecycleInfrastructure } from "../LocalStorageInstanceLifecycleInfrastructure";
 
 describe("LocalStorageInstanceLifecycleInfrastructure", () => {
@@ -78,3 +78,4 @@ describe("LocalStorageInstanceLifecycleInfrastructure", () => {
     }
   });
 });
+

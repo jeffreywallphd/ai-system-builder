@@ -1,4 +1,4 @@
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
+﻿import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { AssetListItem } from "./AssetListItem";
 
 export interface AssetListProps {
@@ -10,7 +10,7 @@ export interface AssetListProps {
 
 export function AssetList({ assets, isLoading, error, registryContextQuery }: AssetListProps): JSX.Element {
   if (isLoading) {
-    return <p className="ui-text-secondary">Loading registry assets…</p>;
+    return <p className="ui-text-secondary">Loading registry assetsâ€¦</p>;
   }
 
   if (error) {
@@ -27,3 +27,4 @@ export function AssetList({ assets, isLoading, error, registryContextQuery }: As
     </div>
   );
 }
+

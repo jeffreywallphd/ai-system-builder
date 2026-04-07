@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentExecutionService, InMemoryDeploymentRecordRepository } from "../DeploymentExecutionService";
 import { DeploymentVersionManager } from "../DeploymentVersionManager";
 import {
@@ -360,3 +360,4 @@ describe("DeploymentHealthMonitor", () => {
     expect(degraded.linkage.nestedSystemCount).toBeGreaterThan(0);
   });
 });
+

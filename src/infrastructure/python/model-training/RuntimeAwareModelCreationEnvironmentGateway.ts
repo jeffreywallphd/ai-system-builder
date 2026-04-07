@@ -1,13 +1,13 @@
-import type { IModelCreationEnvironmentGateway } from "../../../application/ports/interfaces/IModelCreationEnvironmentGateway";
-import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import type { IModelCreationEnvironmentGateway } from "@application/ports/interfaces/IModelCreationEnvironmentGateway";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
   type IRuntimeDependencyOrchestrator,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import type { AppRuntimeConfig } from "../../config/AppRuntimeConfig";
-import type { ModelCreationEnvironment } from "../../../domain/model-training/ModelCreationSupport";
+import type { ModelCreationEnvironment } from "@domain/model-training/ModelCreationSupport";
 import { createRuntimeDependencyDetail } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export class RuntimeAwareModelCreationEnvironmentGateway implements IModelCreationEnvironmentGateway {
@@ -96,3 +96,4 @@ function mapDependencyResolutionToRuntimeStatus(
       return "unavailable";
   }
 }
+

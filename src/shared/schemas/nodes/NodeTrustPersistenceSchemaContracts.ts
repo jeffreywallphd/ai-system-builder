@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -10,7 +10,7 @@ import {
   NodeTrustStates,
   NodeTypes,
   createNodeCapabilityProfile,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 
 export interface NodeTrustPersistenceSchemaValidationIssue {
   readonly path: string;
@@ -319,3 +319,4 @@ export function parseNodeEnrollmentRequestPersistenceRecord(
     payload,
   );
 }
+

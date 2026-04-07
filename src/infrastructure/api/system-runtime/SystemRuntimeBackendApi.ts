@@ -1,4 +1,4 @@
-import type { IStudioShellRepository } from "../../../application/ports/interfaces/IStudioShellRepository";
+﻿import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
 import {
   SystemRuntimeApplicationService,
   type RuntimeExecutionSummaryReadModel,
@@ -6,19 +6,19 @@ import {
   type RuntimeExecutionStatusReadModel,
   type RuntimeExecutionTraceReadModel,
   type StartSystemRuntimeExecutionRequest,
-} from "../../../application/system-runtime/SystemRuntimeApplicationService";
-import type { ISystemRuntimeExecutionStore } from "../../../application/system-runtime/SystemRuntimeExecutionStore";
+} from "@application/system-runtime/SystemRuntimeApplicationService";
+import type { ISystemRuntimeExecutionStore } from "@application/system-runtime/SystemRuntimeExecutionStore";
 import {
   InMemoryExecutionSessionRepository,
   type ExecutionSessionRepository,
-} from "../../../application/system-runtime/ExecutionSessionRepository";
-import { RuntimeAccessControlService, type ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
-import { ExecutionQuotaEvaluator } from "../../../application/system-runtime/ExecutionQuotaEvaluator";
-import { RuntimeRateLimitEvaluator } from "../../../application/system-runtime/RuntimeRateLimitEvaluator";
+} from "@application/system-runtime/ExecutionSessionRepository";
+import { RuntimeAccessControlService, type ExecutionAccessContext } from "@application/system-runtime/RuntimeAccessControlService";
+import { ExecutionQuotaEvaluator } from "@application/system-runtime/ExecutionQuotaEvaluator";
+import { RuntimeRateLimitEvaluator } from "@application/system-runtime/RuntimeRateLimitEvaluator";
 import {
   type RuntimeValidationError,
   RuntimeInputValidationFailure,
-} from "../../../application/system-runtime/RuntimeInputValidationService";
+} from "@application/system-runtime/RuntimeInputValidationService";
 import {
   PermissiveRuntimeApiAuthenticator,
   type RuntimeApiAuthenticationRequest,
@@ -27,12 +27,12 @@ import {
 import type {
   ExternalExecutionEnvironmentRequest,
   SerializedExecutionEnvironment,
-} from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";
+} from "@application/system-runtime/ExecutionEnvironmentConfigurationValidator";
 import {
   TenantExecutionIsolationPolicy,
   type ExecutionTenantContext,
   type TenantScopedExecutionAccessContext,
-} from "../../../application/system-runtime/TenantExecutionIsolationPolicy";
+} from "@application/system-runtime/TenantExecutionIsolationPolicy";
 import {
   RuntimeOutputSerializer,
   type SerializedExecutionResult,
@@ -45,13 +45,13 @@ import {
   transitionExecutionSession,
   type ExecutionSession,
   type ExecutionSessionContext,
-} from "../../../domain/system-runtime/ExecutionSessionDomain";
+} from "@domain/system-runtime/ExecutionSessionDomain";
 import {
   ExecutionCallbackEventKinds,
   type ExecutionCallbackEventKind,
   type ExecutionCallbackRegistration,
-} from "../../../domain/system-runtime/ExecutionCallbackDomain";
-import type { RuntimeEnvironment } from "../../../domain/system-runtime/RuntimeEnvironmentDomain";
+} from "@domain/system-runtime/ExecutionCallbackDomain";
+import type { RuntimeEnvironment } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 import {
   ExecutionUpdateEventKinds,
   ExecutionUpdateStream,
@@ -63,22 +63,22 @@ import {
   type ExecutionCallbackDispatcher,
   type ExecutionCallbackPayload,
 } from "./ExecutionCallbackDispatcher";
-import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import { ExecutionAuditEventKinds, type ExecutionAuditRecord } from "@domain/system-runtime/ExecutionAuditTrailDomain";
 import type { RetryAttemptRecord } from "./ExternalRetryPolicy";
-import { ExecutionAuditTrailService } from "../../../application/system-runtime/ExecutionAuditTrailService";
+import { ExecutionAuditTrailService } from "@application/system-runtime/ExecutionAuditTrailService";
 import {
   InMemoryExecutionAuditRepository,
   type ExecutionAuditRepository,
-} from "../../../application/system-runtime/ExecutionAuditRepository";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import { AuthorizationPolicyEvaluationTargetKinds } from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@application/system-runtime/ExecutionAuditRepository";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   AuthorizationResponseAccessLevels,
   deriveAuthorizationResponseAccessLevel,
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
-} from "../../../application/authorization/use-cases/AuthorizationResponseRedaction";
+} from "@application/authorization/use-cases/AuthorizationResponseRedaction";
 
 export type {
   RuntimeExecutionResultReadModel,
@@ -1590,3 +1590,4 @@ export class SystemRuntimeBackendApi {
     return Object.freeze({ code: "internal", message });
   }
 }
+

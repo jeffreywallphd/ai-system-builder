@@ -1,9 +1,9 @@
-import {
+﻿import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
-} from "../../../infrastructure/config/HostSecureTransportConfig";
-import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
+} from "@infrastructure/config/HostSecureTransportConfig";
+import { AppRuntimeConfig } from "@infrastructure/config/AppRuntimeConfig";
 
 export function resolveWebIdentityApiBaseUrl(): string {
   const runtimeConfigBaseUrl = AppRuntimeConfig.resolveDefault().identityApiBaseUrl;
@@ -15,3 +15,4 @@ export function resolveWebIdentityApiBaseUrl(): string {
   });
   return assertSecureTransportEndpoint(endpoint, config);
 }
+

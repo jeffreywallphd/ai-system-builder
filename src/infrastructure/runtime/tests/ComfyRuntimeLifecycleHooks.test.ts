@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { ComfyRuntimeInstallationAsset } from "../../../application/runtime/ComfyRuntimeInstallationAsset";
-import { ComfyRuntimeWorkflowProfiles } from "../../../application/runtime/ComfyRuntimeRequirements";
-import type { ComfyRuntimeOrchestrationContext } from "../../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+import { ComfyRuntimeInstallationAsset } from "@application/runtime/ComfyRuntimeInstallationAsset";
+import { ComfyRuntimeWorkflowProfiles } from "@application/runtime/ComfyRuntimeRequirements";
+import type { ComfyRuntimeOrchestrationContext } from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 import { ComfyRuntimeLifecycleHooks } from "../ComfyRuntimeLifecycleHooks";
 
 describe("ComfyRuntimeLifecycleHooks", () => {
@@ -80,3 +80,4 @@ function createContext(): ComfyRuntimeOrchestrationContext {
 function cleanupContext(context: ComfyRuntimeOrchestrationContext): void {
   rmSync(path.dirname(context.installDirectory), { recursive: true, force: true });
 }
+

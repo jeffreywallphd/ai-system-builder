@@ -1,9 +1,9 @@
-import { ContextPackage } from "../../../application/context/models/ContextPackage";
+﻿import { ContextPackage } from "@application/context/models/ContextPackage";
 import type {
   IContextPackageListCriteria,
   IContextPackageRepository,
   IContextPackageSummary,
-} from "../../../application/ports/interfaces/IContextPackageRepository";
+} from "@application/ports/interfaces/IContextPackageRepository";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
@@ -104,3 +104,4 @@ export class InMemoryContextPackageRepository implements IContextPackageReposito
     this.contextPackages.delete(id.trim());
   }
 }
+

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftStepKinds,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { translateWorkflowDefinitionToExecutionPlan } from "../WorkflowDefinitionExecutionPlanTranslator";
 
 describe("WorkflowAssetStepExecutionBindingService", () => {
@@ -158,4 +158,5 @@ describe("WorkflowAssetStepExecutionBindingService", () => {
     }));
   });
 });
+
 

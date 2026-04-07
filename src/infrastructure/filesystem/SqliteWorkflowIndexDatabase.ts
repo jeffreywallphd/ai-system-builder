@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
-import type { IWorkflowRecordSummary } from "../../application/ports/interfaces/IWorkflowRepository";
+import type { IWorkflowRecordSummary } from "@application/ports/interfaces/IWorkflowRepository";
 import type { WorkflowRecord } from "../workflows/WorkflowPersistenceCodec";
 import { WorkflowPersistenceCodec } from "../workflows/WorkflowPersistenceCodec";
 
@@ -127,3 +127,4 @@ export class SqliteWorkflowIndexDatabase {
     return this.database;
   }
 }
+

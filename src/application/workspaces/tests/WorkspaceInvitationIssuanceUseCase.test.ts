@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
@@ -15,7 +15,7 @@ import {
   type WorkspaceInvitation,
   type WorkspaceMembership,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
@@ -23,8 +23,8 @@ import type {
   WorkspaceInvitationListQuery,
   WorkspacePendingInvitationByTokenHashLookupQuery,
   WorkspacePendingInvitationLookupQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   IssueWorkspaceInvitationUseCase,
   WorkspaceInvitationIssuanceErrorCodes,
@@ -420,3 +420,4 @@ describe("IssueWorkspaceInvitationUseCase", () => {
     }
   });
 });
+

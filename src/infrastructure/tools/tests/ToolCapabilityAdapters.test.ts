@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { InMemoryWorkflowRepository } from "../../mocks/repositories/InMemoryWorkflowRepository";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { WorkflowToolProjectionService } from "../../../application/projection/WorkflowToolProjectionService";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { WorkflowToolProjectionService } from "@application/projection/WorkflowToolProjectionService";
 import { WorkflowProjectedToolCapabilityCatalog } from "../WorkflowProjectedToolCapabilityCatalog";
 import { mapMcpToolToCapability, McpToolCapabilityCatalog } from "../McpToolCapabilityCatalog";
 import { CompositeToolCapabilityCatalog } from "../CompositeToolCapabilityCatalog";
-import type { IMcpToolCatalog } from "../../../application/ports/interfaces/IMcpToolCatalog";
+import type { IMcpToolCatalog } from "@application/ports/interfaces/IMcpToolCatalog";
 import { CompositeToolCapabilityExecutor } from "../CompositeToolCapabilityExecutor";
-import type { IToolCapabilityExecutor } from "../../../application/ports/interfaces/IToolCapabilityExecutor";
+import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
 import { StaticLocalToolCapabilityCatalog } from "../StaticLocalToolCapabilityCatalog";
 
 describe("tool capability adapters", () => {
@@ -159,3 +159,4 @@ describe("tool capability adapters", () => {
     expect(mcpResult.executionId).toBe("mcp-exec");
   });
 });
+

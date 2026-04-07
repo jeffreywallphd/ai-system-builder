@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   RuntimeExecutionStatusReadModel,
   RuntimeExecutionTraceReadModel,
-} from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { ExecutionStatusSummary } from "./ExecutionStatusSummary";
 import { ExecutionStepStatusList } from "./ExecutionStepStatusList";
 import { ExecutionTracePanel } from "./ExecutionTracePanel";
@@ -27,3 +27,4 @@ export function ExecutionMonitorPanel(input: {
     </div>
   );
 }
+

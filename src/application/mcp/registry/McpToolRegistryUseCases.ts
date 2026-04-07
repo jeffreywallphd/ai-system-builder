@@ -1,4 +1,4 @@
-import {
+﻿import {
   createInstalledMcpToolRecord,
   type InstalledMcpToolLifecycleEvent,
   type InstalledMcpToolLifecycle,
@@ -7,14 +7,14 @@ import {
   type McpToolLifecycleAction,
   type McpToolVersionPolicy,
   type McpToolVersionTransitionKind,
-} from "../../../domain/mcp/InstalledMcpTool";
+} from "@domain/mcp/InstalledMcpTool";
 import {
   normalizeMcpToolDefinition,
   toMcpToolMetadata,
   validateMcpToolDefinition,
   type McpToolDefinition,
   type McpToolSideEffectClass,
-} from "../../../domain/mcp/McpToolCapability";
+} from "@domain/mcp/McpToolCapability";
 import type { IMcpToolDefinitionSourceLoader } from "../../ports/interfaces/IMcpToolDefinitionSourceLoader";
 import type { IMcpToolDependencyScanner, McpToolDependencyReference } from "../../ports/interfaces/IMcpToolDependencyScanner";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
@@ -1388,3 +1388,4 @@ function blockedUpdateResult(
     remediationSuggestions,
   });
 }
+

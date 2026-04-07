@@ -1,8 +1,8 @@
-import type { ICreateContextPackageRequest } from "../../application/context/CreateContextPackageUseCase";
-import type { IUpdateContextPackageRequest } from "../../application/context/UpdateContextPackageUseCase";
-import { ContextPackage } from "../../application/context/models/ContextPackage";
-import type { IContextPackageSummary } from "../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextRecipeSummary } from "../../application/ports/interfaces/IContextRecipeRepository";
+﻿import type { ICreateContextPackageRequest } from "@application/context/CreateContextPackageUseCase";
+import type { IUpdateContextPackageRequest } from "@application/context/UpdateContextPackageUseCase";
+import { ContextPackage } from "@application/context/models/ContextPackage";
+import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
 import { ContextService } from "../services/ContextService";
 
 export interface ContextStoreState {
@@ -214,3 +214,4 @@ export class ContextStore {
     }
   }
 }
+

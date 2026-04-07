@@ -1,5 +1,5 @@
-import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
+﻿import { CompositeNodeCatalogProvider } from "@application/nodes/CompositeNodeCatalogProvider";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
 import type { INodeImplementationRegistry } from "./shared/INodeImplementationRegistry";
 import {
   createFallbackNodeCatalogDefinitionDescriptor,
@@ -40,3 +40,4 @@ function toNodeDefinitions(
     })
   );
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   MissingValueHandlingAsset,
   MissingValueStrategies,
@@ -261,3 +261,4 @@ describe("MissingValueHandlingAsset", () => {
     })).rejects.toThrow();
   });
 });
+

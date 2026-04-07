@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import path from "node:path";
 import type {
   IModelDownloadHandle,
@@ -6,13 +6,13 @@ import type {
   IModelDownloadRequest,
   IModelDownloadResult,
   IModelDownloader,
-} from "../../application/ports/interfaces/IModelDownloader";
+} from "@application/ports/interfaces/IModelDownloader";
 import {
   ModelDownloadHandle,
   ModelDownloadProgress,
   ModelDownloadResult,
-} from "../../application/ports/ModelDownloader";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/ModelDownloader";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 import { HuggingFaceApiClient } from "./HuggingFaceApiClient";
 
 function normalize(value: string): string {
@@ -335,3 +335,4 @@ export class HuggingFaceModelDownloader implements IModelDownloader {
     return createHash("sha256").update(bytes).digest("hex");
   }
 }
+

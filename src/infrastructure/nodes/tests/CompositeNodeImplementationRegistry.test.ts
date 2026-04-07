@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositeNodeImplementationRegistry } from "../CompositeNodeImplementationRegistry";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
 
 function createImplementation(providerId: string, nodeTypeId: string, title = nodeTypeId) {
   return {
@@ -76,3 +76,4 @@ describe("CompositeNodeImplementationRegistry", () => {
     ).toEqual(["shared.alpha", "beta.unique"]);
   });
 });
+

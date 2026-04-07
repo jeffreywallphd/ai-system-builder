@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import { ModelTrainingExecutionUnitHandler } from "../ModelTrainingExecutionUnitHandler";
 
 describe("ModelTrainingExecutionUnitHandler", () => {
@@ -122,3 +122,4 @@ describe("ModelTrainingExecutionUnitHandler", () => {
     expect(recorderCalls).toHaveLength(1);
   });
 });
+

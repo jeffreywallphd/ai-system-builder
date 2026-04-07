@@ -1,8 +1,8 @@
-import {
+﻿import {
   createExecutionAuditRecord,
   type ExecutionAuditEventKind,
   type ExecutionAuditRecord,
-} from "../../domain/system-runtime/ExecutionAuditTrailDomain";
+} from "@domain/system-runtime/ExecutionAuditTrailDomain";
 import type { ExecutionAuditRepository } from "./ExecutionAuditRepository";
 
 export interface RecordExecutionAuditInput {
@@ -42,3 +42,4 @@ export class ExecutionAuditTrailService {
     return this.repository.listRecent(limit);
   }
 }
+

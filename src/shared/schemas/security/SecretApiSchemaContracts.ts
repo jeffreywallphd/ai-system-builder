@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { SecretKinds, SecretScopes, createSecretScopeOwner } from "../../../domain/security/SecretDomain";
+﻿import { z } from "zod";
+import { SecretKinds, SecretScopes, createSecretScopeOwner } from "@domain/security/SecretDomain";
 import {
   SecretClassificationIds,
   findSecretClassificationById,
@@ -306,3 +306,4 @@ export function parseReEncryptSecretsCommand(payload: unknown): ReEncryptSecrets
 export function parseGetSecretReEncryptionStatusQuery(payload: unknown): GetSecretReEncryptionStatusQueryDto {
   return parseSchema("GetSecretReEncryptionStatusQuery", GetSecretReEncryptionStatusQuerySchema, payload);
 }
+

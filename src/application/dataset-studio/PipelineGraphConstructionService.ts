@@ -1,4 +1,4 @@
-import type { CanonicalDataShapeKind } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShapeKind } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   PipelineGraphEdgeKinds,
   PipelineGraphNodeKinds,
@@ -6,13 +6,13 @@ import {
   type PipelineGraph,
   type PipelineGraphEdge,
   type PipelineGraphNode,
-} from "../../domain/dataset-studio/PipelineGraphDomain";
+} from "@domain/dataset-studio/PipelineGraphDomain";
 import type {
   PipelineStageDefinition,
   PipelineStageId,
   PipelineStageInstance,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   StageAssetCompositionService,
   type StageCompositionDefinition,
@@ -502,3 +502,4 @@ export function buildPipelineGraph(input: BuildPipelineGraphInput): PipelineGrap
     stageCompositions: input.stageCompositions,
   }).build(input);
 }
+

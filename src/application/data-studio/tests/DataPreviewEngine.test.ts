@@ -4,8 +4,8 @@ import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   createCanonicalTextItemsShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import { DataPreviewEngine } from "../DataPreviewEngine";
 import { DataConverterOperationKinds, type DataConverterFailureResult } from "../../dataset-studio/DataConverterContracts";
 
@@ -253,3 +253,4 @@ describe("DataPreviewEngine", () => {
     expect(preview.kind).toBe("records");
   });
 });
+

@@ -1,11 +1,11 @@
-import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShapeKind, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataLineageReferenceKinds,
   createDataLineageExecutionStep,
   createDataLineageMetadata,
   createDataLineageReference,
   type DataLineageMetadata,
-} from "../../domain/dataset-studio/DataLineageMetadata";
+} from "@domain/dataset-studio/DataLineageMetadata";
 import {
   createPreparedStorageStageOutput,
   toStageRecordFromPreparedStorageOutput,
@@ -275,3 +275,4 @@ export class PreparedStorageStageService {
     });
   }
 }
+

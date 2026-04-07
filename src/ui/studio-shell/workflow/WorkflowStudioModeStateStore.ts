@@ -1,9 +1,9 @@
-import {
+﻿import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
   type WorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   createDefaultWorkflowStudioModeRegistry,
   DEFAULT_WORKFLOW_STUDIO_MODE_ID,
@@ -14,7 +14,7 @@ import {
   validateWorkflowStudioModeState,
   type WorkflowStudioModeValidationIssue,
 } from "./WorkflowStudioModeValidation";
-import type { WorkflowValidationIssue } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+import type { WorkflowValidationIssue } from "@domain/workflow-studio/WorkflowStudioDomain";
 import { isWorkflowStudioModeId } from "./WorkflowStudioModes";
 import type { WorkflowStudioHandoffStatus } from "./WorkflowStudioHandoffStatus";
 
@@ -395,3 +395,4 @@ export function getWorkflowStudioModeStateStore(studioId: string): WorkflowStudi
 export function clearWorkflowStudioModeStateStoresForTests(): void {
   workflowModeStoresByStudioId.clear();
 }
+

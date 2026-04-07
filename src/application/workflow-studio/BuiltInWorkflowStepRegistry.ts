@@ -1,4 +1,4 @@
-import {
+﻿import {
   getWorkflowDraftBuiltInStepDefinition,
   listWorkflowDraftBuiltInStepDefinitions,
   normalizeWorkflowDraftBuiltInStepConfig,
@@ -6,7 +6,7 @@ import {
   type WorkflowDraftBuiltInStepConfig,
   type WorkflowDraftBuiltInStepDefinition,
   type WorkflowDraftBuiltInStepType,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 export interface BuiltInWorkflowStepRegistryEntry {
   readonly type: WorkflowDraftBuiltInStepType;
@@ -96,3 +96,4 @@ export class BuiltInWorkflowStepRegistry {
 export function createDefaultBuiltInWorkflowStepRegistry(): BuiltInWorkflowStepRegistry {
   return new BuiltInWorkflowStepRegistry();
 }
+

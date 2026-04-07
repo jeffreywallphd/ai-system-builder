@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../../ports/interfaces/IFileStorage";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 import { WorkflowTemplateAssetService } from "../WorkflowTemplateAssetService";
 import { WorkflowTemplateStarterKitService } from "../WorkflowTemplateStarterKitService";
 
@@ -75,3 +75,4 @@ describe("WorkflowTemplateStarterKitService", () => {
     ]);
   });
 });
+

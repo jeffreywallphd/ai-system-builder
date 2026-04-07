@@ -1,12 +1,12 @@
-import { DeploymentStatuses, type DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+﻿import { DeploymentStatuses, type DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import {
   DeploymentHealthStatuses,
   type DeploymentHealthSignalSnapshot,
   type DeploymentHealthSnapshot,
   type DeploymentHealthStatus,
-} from "../../domain/deployment/DeploymentHealthDomain";
-import { DeploymentStates } from "../../domain/deployment/DeploymentStateDomain";
-import type { EndpointRouteRequest } from "../../domain/deployment/EndpointRoutingDomain";
+} from "@domain/deployment/DeploymentHealthDomain";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
+import type { EndpointRouteRequest } from "@domain/deployment/EndpointRoutingDomain";
 import type { EndpointExposureRepository } from "./SystemEndpointExposureService";
 import type { DeploymentDiagnosticsService } from "./DeploymentDiagnosticsService";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
@@ -217,3 +217,4 @@ export class DeploymentHealthMonitor {
     return this.repository.save(snapshot);
   }
 }
+

@@ -1,5 +1,5 @@
-import { FileIngestionPolicyService } from "../../../../domain/ingestion/FileIngestionServices";
-import type { FileIngestionPolicy } from "../../../../domain/ingestion/interfaces/IFileIngestion";
+﻿import { FileIngestionPolicyService } from "@domain/ingestion/FileIngestionServices";
+import type { FileIngestionPolicy } from "@domain/ingestion/interfaces/IFileIngestion";
 import type {
   ImageUploadIngestionAdapter,
   ImageUploadValidationIssue,
@@ -80,3 +80,4 @@ export function createBrowserImageUploadIngestionAdapter(input: {
     },
   });
 }
+

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CreateWorkflowUseCase } from "../CreateWorkflowUseCase";
-import { makeNode } from "../../../domain/services/tests/testUtils";
+import { makeNode } from "@domain/services/tests/testUtils";
 
 describe("CreateWorkflowUseCase", () => {
   it("creates workflow with defaults", () => {
@@ -14,3 +14,4 @@ describe("CreateWorkflowUseCase", () => {
     expect(result.workflow.validate().isValid).toBeTrue();
   });
 });
+

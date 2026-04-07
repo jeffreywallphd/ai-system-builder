@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   type CanonicalDataShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetSchemaIntentIds,
   createSchemaIntentValidationIssue,
   createSchemaIntentValidationResult,
   type IDatasetSchemaIntent,
-} from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { MediaSchemaIntentAdapter } from "../adapters/schema-intents/MediaSchemaIntentAdapter";
 import { DatasetSchemaValidationEngine } from "../DatasetSchemaValidationEngine";
 
@@ -90,3 +90,4 @@ describe("DatasetSchemaValidationEngine", () => {
     expect(result.summary.errorCount).toBe(0);
   });
 });
+

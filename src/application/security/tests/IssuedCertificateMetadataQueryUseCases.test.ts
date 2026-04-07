@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type { CertificateMetadataListAuthorizationQuery, CertificateQueryAuthorizationHook } from "../ports/CertificateQueryAuthorizationPorts";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import { GetIssuedCertificateMetadataUseCase } from "../use-cases/GetIssuedCertificateMetadataUseCase";
@@ -11,7 +11,7 @@ import { ListIssuedCertificateMetadataUseCase } from "../use-cases/ListIssuedCer
 import {
   parseCertificateMetadataListView,
   parseIssuedCertificateMetadataView,
-} from "../../../shared/schemas/security/CertificateAuthoritySchemaContracts";
+} from "@shared/schemas/security/CertificateAuthoritySchemaContracts";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   IssuedCertificateLookupQuery,
@@ -19,7 +19,7 @@ import type {
   RevokeIssuedCertificatePersistenceRecordInput,
   SaveIssuedCertificatePersistenceRecordInput,
   SupersedeIssuedCertificatePersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 class InMemoryIssuedCertificateRepository implements IIssuedCertificatePersistenceRepository {
   public readonly records = new Map<string, IssuedCertificatePersistenceRecord>();
@@ -359,3 +359,4 @@ function createIssuedCertificateRecord(input: {
     revision: 1,
   });
 }
+

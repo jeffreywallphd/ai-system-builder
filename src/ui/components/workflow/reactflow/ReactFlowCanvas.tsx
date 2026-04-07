@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Background,
   Controls,
@@ -20,7 +20,7 @@ import {
   type OnConnect,
 } from "@xyflow/react";
 import type { NodeDetailViewModel } from "../../../presenters/NodePresenter";
-import type { WorkflowResponse } from "../../../application/dto/WorkflowResponse";
+import type { WorkflowResponse } from "@application/dto/WorkflowResponse";
 import { NodeAdapter, type ReactFlowNodeData } from "./NodeAdapter";
 import { createReactFlowEdgeId, EdgeAdapter } from "./EdgeAdapter";
 import ReactFlowNodeWrapper from "./ReactFlowNodeWrapper";
@@ -481,3 +481,4 @@ export default function ReactFlowCanvas(
     </ReactFlowProvider>
   );
 }
+

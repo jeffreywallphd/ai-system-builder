@@ -1,4 +1,4 @@
-import {
+﻿import {
   deriveRuntimeDependencyAvailability,
   deriveRuntimeDependencyHealth,
   RuntimeDependencyHealthStates,
@@ -10,7 +10,7 @@ import {
   type RuntimeDependencyProbeResult,
   type RuntimeDependencyRegistration,
   type RuntimeDependencyResolution,
-} from "../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 
 export interface DefaultRuntimeDependencyOrchestratorOptions {
   readonly registrations: ReadonlyArray<RuntimeDependencyRegistration>;
@@ -318,3 +318,4 @@ export function isRuntimeDependencyResolutionUnhealthy(
   return resolution.health !== RuntimeDependencyHealthStates.healthy
     && resolution.health !== RuntimeDependencyHealthStates.disabled;
 }
+

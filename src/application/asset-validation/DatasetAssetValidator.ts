@@ -1,10 +1,10 @@
-import {
+﻿import {
   AssetValidationLayers,
   AssetValidationSeverities,
   createAssetValidationResult,
   type AssetValidationIssue,
   type AssetValidationResult,
-} from "../../domain/contracts/AssetValidation";
+} from "@domain/contracts/AssetValidation";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import { ValidatedAssetTypes, type AssetValidator, type ValidatedAssetRef } from "./AssetValidationTypes";
 
@@ -42,3 +42,4 @@ export class DatasetAssetValidator implements AssetValidator {
     return createAssetValidationResult({ errors: issues });
   }
 }
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DeleteContextPackageUseCase } from "../DeleteContextPackageUseCase";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("DeleteContextPackageUseCase", () => {
   it("deletes an existing context package", async () => {
@@ -32,3 +32,4 @@ describe("DeleteContextPackageUseCase", () => {
     expect(result.deleted).toBe(false);
   });
 });
+

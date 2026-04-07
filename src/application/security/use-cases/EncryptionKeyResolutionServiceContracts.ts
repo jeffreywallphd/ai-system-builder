@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   EncryptionKeyScope,
   EncryptionPolicyEvaluationSource,
   ProtectedDataClass,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type { EncryptionKeyDescriptor, EncryptionKeyScopeOwner } from "../ports/EncryptionKeyResolutionPorts";
 
 export const EncryptionMaterialClasses = Object.freeze({
@@ -77,4 +77,5 @@ export interface EncryptionKeyResolutionUseCaseContracts {
 }
 
 export interface IEncryptionKeyResolutionService extends EncryptionKeyResolutionUseCaseContracts {}
+
 

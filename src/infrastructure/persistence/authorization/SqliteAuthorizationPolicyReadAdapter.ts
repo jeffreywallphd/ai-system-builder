@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
   AuthorizationResourcePolicyMetadata,
@@ -6,16 +6,16 @@ import type {
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
-} from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
-import type { IAuthorizationRoleGrantReadRepository } from "../../../application/authorization/ports/IAuthorizationRoleGrantReadRepository";
-import type { IAuthorizationSharingGrantReadRepository } from "../../../application/authorization/ports/IAuthorizationSharingGrantReadRepository";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationResourcePolicyMetadataReadRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
+import type { IAuthorizationRoleGrantReadRepository } from "@application/authorization/ports/IAuthorizationRoleGrantReadRepository";
+import type { IAuthorizationSharingGrantReadRepository } from "@application/authorization/ports/IAuthorizationSharingGrantReadRepository";
 import {
   RoleAssignmentScopes,
   RoleAssignmentStatuses,
   type PermissionGrant,
   createRoleAssignment,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import type { SqliteAuthorizationPersistenceAdapter } from "./SqliteAuthorizationPersistenceAdapter";
 
 export interface SqliteAuthorizationPolicyReadAdapterDependencies {
@@ -159,3 +159,4 @@ function emptyRoleGrantSnapshot(): AuthorizationActorRoleGrantSnapshot {
     permissionGrants: Object.freeze([]),
   });
 }
+

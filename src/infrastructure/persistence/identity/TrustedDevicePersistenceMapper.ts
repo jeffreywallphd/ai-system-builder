@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   TrustedDeviceListQuery,
   TrustedDevicePairingSessionRecord,
   TrustedDevicePairingTokenRecord,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import {
   createTrustedDevice,
   DevicePairingMethods,
@@ -14,7 +14,7 @@ import {
   type DeviceTrustMaterialKind,
   type DeviceTrustStatus,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   PairingSessionRejectionReasons,
   PairingSessionStatuses,
@@ -28,7 +28,7 @@ import {
   type PairingTokenArtifactType,
   type PairingTokenInvalidationReason,
   type PairingTokenStatus,
-} from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 
 export interface TrustedDeviceRow {
   readonly trusted_device_id: string;
@@ -399,3 +399,4 @@ function assertPairingTokenInvalidationReason(value: string): PairingTokenInvali
   }
   throw new Error(`Persisted pairing token invalidation reason '${value}' is invalid.`);
 }
+

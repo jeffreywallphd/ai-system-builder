@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListContextRecipesUseCase } from "../ListContextRecipesUseCase";
 import { ContextRecipe } from "../models/ContextRecipe";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 describe("ListContextRecipesUseCase", () => {
   it("lists reusable context recipe summaries", async () => {
@@ -52,3 +52,4 @@ describe("ListContextRecipesUseCase", () => {
     expect(result.contextRecipes.map((recipe) => recipe.id)).toEqual(["concise-brief"]);
   });
 });
+

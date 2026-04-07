@@ -1,6 +1,6 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import { Asset } from "../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation } from "../../domain/assets/AssetMetadata";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation } from "@domain/assets/AssetMetadata";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../ports/interfaces/IFileStorage";
 
@@ -115,3 +115,4 @@ export class SaveAssetUseCase {
     return destination;
   }
 }
+

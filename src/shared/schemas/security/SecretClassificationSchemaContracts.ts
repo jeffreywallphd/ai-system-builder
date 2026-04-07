@@ -1,11 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   SecretClassificationIds,
   SecretEntryModes,
   toSecretClassificationRegistrySnapshot,
   type SecretClassificationRegistrySnapshot,
 } from "../../contracts/security/SecretClassificationContracts";
-import { SecretKinds, SecretScopes } from "../../../domain/security/SecretDomain";
+import { SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
 
 export interface SecretClassificationSchemaValidationIssue {
   readonly path: string;
@@ -159,3 +159,4 @@ export function parseSecretClassificationRegistrySnapshot(payload: unknown): Sec
 export function createSecretClassificationRegistrySnapshotPayload(): SecretClassificationRegistrySnapshot {
   return parseSecretClassificationRegistrySnapshot(toSecretClassificationRegistrySnapshot());
 }
+

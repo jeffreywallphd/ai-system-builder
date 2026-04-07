@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import { GetExecutionRunUseCase } from "../GetExecutionRunUseCase";
 import { ListExecutionRunsUseCase } from "../ListExecutionRunsUseCase";
 
@@ -96,3 +96,4 @@ describe("Execution run query use cases", () => {
     expect(result.map((run) => run.runId)).toEqual(["run-2"]);
   });
 });
+

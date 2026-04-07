@@ -1,5 +1,5 @@
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
-import { TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
+import { TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
 import {
   AssetSelectorValidationIssueCodes,
   createAssetSelectorRequest,
@@ -7,7 +7,7 @@ import {
   type AssetSelectorResult,
   type AssetSelectorValidationIssue,
   validateAssetSelectorResult,
-} from "../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 
 export const AssetSelectorUsageContexts = Object.freeze({
   workflowInput: "workflow-input",
@@ -254,3 +254,4 @@ export class AssetSelectorApplicationValidationService {
 export function createDefaultAssetSelectorCapabilityRegistry(): AssetSelectorCapabilityRegistry {
   return new AssetSelectorCapabilityRegistry(defaultCapabilityDescriptors);
 }
+

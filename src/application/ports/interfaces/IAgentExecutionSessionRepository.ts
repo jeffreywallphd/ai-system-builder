@@ -1,5 +1,5 @@
-import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
-import type { AgentExecutionSessionStatus } from "../../../domain/agents/AgentExecutionSession";
+﻿import type { AgentExecutionSession } from "@domain/agents/AgentExecutionSession";
+import type { AgentExecutionSessionStatus } from "@domain/agents/AgentExecutionSession";
 
 export interface AgentExecutionSessionTransitionRecord {
   readonly status: AgentExecutionSessionStatus;
@@ -12,3 +12,4 @@ export interface IAgentExecutionSessionRepository {
   listByAgentId(agentId: string): Promise<ReadonlyArray<AgentExecutionSession>>;
   listTransitionHistory(sessionId: string): Promise<ReadonlyArray<AgentExecutionSessionTransitionRecord>>;
 }
+

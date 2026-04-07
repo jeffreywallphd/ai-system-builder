@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   IStorageManagementService,
   StorageManagementResult,
-} from "../../../../application/storage/use-cases/StorageManagementServiceContracts";
-import { StorageManagementErrorCodes } from "../../../../application/storage/use-cases/StorageManagementServiceContracts";
+} from "@application/storage/use-cases/StorageManagementServiceContracts";
+import { StorageManagementErrorCodes } from "@application/storage/use-cases/StorageManagementServiceContracts";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -12,7 +12,7 @@ import {
   StorageManagedActions,
   createStorageInstance,
   type StorageInstance,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import { StorageManagementBackendApi } from "../StorageManagementBackendApi";
 
 class StubStorageManagementService implements IStorageManagementService {
@@ -316,3 +316,4 @@ describe("StorageManagementBackendApi", () => {
     expect(response.data.operationalNotes).toContain("binding-health:healthy");
   });
 });
+

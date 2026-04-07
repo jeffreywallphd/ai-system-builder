@@ -1,13 +1,13 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../domain/agents/Agent";
-import { createAgent } from "../../../domain/agents/Agent";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import { createAgent } from "@domain/agents/Agent";
 import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
   type AgentExecutionSession,
-} from "../../../domain/agents/AgentExecutionSession";
-import { AssetId } from "../../../domain/assets/AssetId";
+} from "@domain/agents/AgentExecutionSession";
+import { AssetId } from "@domain/assets/AssetId";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 import type {
   AgentExecutionSessionTransitionRecord,
@@ -38,8 +38,8 @@ import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabil
 import type { IAgentToolOrchestrator } from "../../ports/interfaces/IAgentToolOrchestrator";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { Asset } from "@domain/assets/Asset";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 
 class InMemoryAgentRepository implements IAgentRepository {
@@ -333,3 +333,4 @@ describe("Agent operations phase 7 contracts", () => {
     expect(capturedRequest?.metadata?.runtimeBinding).toBeDefined();
   });
 });
+

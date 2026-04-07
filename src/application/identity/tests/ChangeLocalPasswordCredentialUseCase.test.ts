@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -10,7 +10,7 @@ import {
   type AuthProvider,
   type CredentialPolicy,
   type UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import type {
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
@@ -611,3 +611,4 @@ describe("ChangeLocalPasswordCredentialUseCase", () => {
     expect(history[0]?.status).toBe("active");
   });
 });
+

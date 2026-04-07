@@ -1,4 +1,4 @@
-import { toAgentReadModel, type AgentReadModel } from "../../domain/agents/Agent";
+﻿import { toAgentReadModel, type AgentReadModel } from "@domain/agents/Agent";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 
 export interface ListAgentsRequest {
@@ -15,3 +15,4 @@ export class ListAgentsUseCase {
     return Object.freeze(filtered.map((agent) => toAgentReadModel(agent)));
   }
 }
+

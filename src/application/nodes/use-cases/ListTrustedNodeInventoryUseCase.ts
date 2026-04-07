@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import { NodeTrustPersistenceQueryPresets } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import type { NodeRoleCapability, NodeType } from "../../../domain/nodes/NodeTrustDomain";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import { NodeTrustPersistenceQueryPresets } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import type { NodeRoleCapability, NodeType } from "@domain/nodes/NodeTrustDomain";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
@@ -106,3 +106,4 @@ export class ListTrustedNodeInventoryUseCase {
     };
   }
 }
+

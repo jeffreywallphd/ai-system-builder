@@ -1,24 +1,24 @@
-import type { AgentReadModel } from "../../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../../domain/agents/AgentPolicy";
-import type { AgentPlanningStrategy } from "../../../domain/agents/Agent";
-import type { AgentConfigurationValidationInput, AgentConfigurationValidationIssue, AgentConfigurationValidationResult } from "../../../application/agents/services/AgentConfigurationValidationService";
-import type { CreateAgentRequest } from "../../../application/agents/CreateAgentUseCase";
-import type { UpdateAgentRequest } from "../../../application/agents/UpdateAgentUseCase";
-import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentRunControlRequest, AgentLaunchReadModel, AgentSessionDetailReadModel, AgentSessionSummaryReadModel, AgentRunRequest } from "../../../application/agents/contracts/AgentRunContracts";
-import type { TriggerAgentLaunchRequest } from "../../../application/agents/TriggerAgentLaunchUseCase";
-import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
-import type { IAgentExecutionSessionRepository } from "../../../application/ports/interfaces/IAgentExecutionSessionRepository";
-import type { AgentRunnerService } from "../../../application/agents/services/AgentRunnerService";
+﻿import type { AgentReadModel } from "@domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "@domain/agents/AgentPolicy";
+import type { AgentPlanningStrategy } from "@domain/agents/Agent";
+import type { AgentConfigurationValidationInput, AgentConfigurationValidationIssue, AgentConfigurationValidationResult } from "@application/agents/services/AgentConfigurationValidationService";
+import type { CreateAgentRequest } from "@application/agents/CreateAgentUseCase";
+import type { UpdateAgentRequest } from "@application/agents/UpdateAgentUseCase";
+import type { ConfigureAgentGoalsRequest } from "@application/agents/ConfigureAgentGoalsUseCase";
+import type { AgentRunControlRequest, AgentLaunchReadModel, AgentSessionDetailReadModel, AgentSessionSummaryReadModel, AgentRunRequest } from "@application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "@application/agents/TriggerAgentLaunchUseCase";
+import type { IAgentRepository } from "@application/ports/interfaces/IAgentRepository";
+import type { IAgentExecutionSessionRepository } from "@application/ports/interfaces/IAgentExecutionSessionRepository";
+import type { AgentRunnerService } from "@application/agents/services/AgentRunnerService";
 import { AgentAuthoringBackendApi, type AgentAuthoringApiReadModel, type AgentAuthoringApiResponse } from "./AgentAuthoringBackendApi";
-import { AgentRuntimeError } from "../../../application/agents/AgentRuntimeErrors";
-import { LaunchAgentUseCase } from "../../../application/agents/LaunchAgentUseCase";
-import { TriggerAgentLaunchUseCase } from "../../../application/agents/TriggerAgentLaunchUseCase";
-import { ListAgentSessionsUseCase } from "../../../application/agents/ListAgentSessionsUseCase";
-import { GetAgentSessionDetailUseCase } from "../../../application/agents/GetAgentSessionDetailUseCase";
-import { ControlAgentRunUseCase } from "../../../application/agents/ControlAgentRunUseCase";
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
+import { AgentRuntimeError } from "@application/agents/AgentRuntimeErrors";
+import { LaunchAgentUseCase } from "@application/agents/LaunchAgentUseCase";
+import { TriggerAgentLaunchUseCase } from "@application/agents/TriggerAgentLaunchUseCase";
+import { ListAgentSessionsUseCase } from "@application/agents/ListAgentSessionsUseCase";
+import { GetAgentSessionDetailUseCase } from "@application/agents/GetAgentSessionDetailUseCase";
+import { ControlAgentRunUseCase } from "@application/agents/ControlAgentRunUseCase";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
 
 export interface AgentStudioApiError {
   readonly code:
@@ -189,3 +189,4 @@ export class AgentStudioBackendApi {
     return Object.freeze({ code: "internal", message });
   }
 }
+

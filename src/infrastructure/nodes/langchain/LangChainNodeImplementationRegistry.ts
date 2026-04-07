@@ -1,10 +1,10 @@
-import {
+﻿import {
   buildLangChainNodeCatalogDescriptor,
   LANGCHAIN_NODE_REGISTRATIONS,
 } from "./LangChainNodeRegistrationCatalog";
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
+import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import type { INodeRuntimeImplementation } from "@shared/INodeRuntimeImplementation";
 
 function langChainImplementation(nodeTypeId: string): INodeRuntimeImplementation {
   const registration = LANGCHAIN_NODE_REGISTRATIONS.find(
@@ -51,3 +51,4 @@ export class LangChainNodeImplementationRegistry extends NodeImplementationRegis
     super({ providerId: "langchain", implementations: LANGCHAIN_IMPLEMENTATIONS });
   }
 }
+

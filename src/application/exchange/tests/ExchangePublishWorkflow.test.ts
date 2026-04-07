@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { createAtomicAssetPackageManifest, createCompositeAssetPackageManifest } from "../../../domain/exchange/AssetPackageManifest";
-import { BundleDependencySnapshotBuilder } from "../../../domain/exchange/BundleDependencySnapshot";
-import { createExchangeBundle } from "../../../domain/exchange/ExchangeBundleDomain";
-import { ExchangeBundleSerializer } from "../../../domain/exchange/ExchangeBundleSerialization";
-import { createPublishablePackage } from "../../../domain/exchange/PublishablePackage";
+﻿import { describe, expect, it } from "bun:test";
+import { createAtomicAssetPackageManifest, createCompositeAssetPackageManifest } from "@domain/exchange/AssetPackageManifest";
+import { BundleDependencySnapshotBuilder } from "@domain/exchange/BundleDependencySnapshot";
+import { createExchangeBundle } from "@domain/exchange/ExchangeBundleDomain";
+import { ExchangeBundleSerializer } from "@domain/exchange/ExchangeBundleSerialization";
+import { createPublishablePackage } from "@domain/exchange/PublishablePackage";
 import { ExchangeAccessEvaluator, RoleBasedExchangeAccessPolicy } from "../ExchangeAccessControl";
 import { LocalExchangeCatalog, InMemoryLocalExchangeCatalogEntryStore } from "../ExchangeCatalogServices";
 import {
@@ -12,7 +12,7 @@ import {
   type PublishedPackageRecord,
 } from "../ExchangePublishWorkflow";
 import type { IPublishablePackageRepository } from "../PublishablePackageService";
-import type { PublishablePackage } from "../../../domain/exchange/PublishablePackage";
+import type { PublishablePackage } from "@domain/exchange/PublishablePackage";
 
 class InMemoryPublishablePackageRepository implements IPublishablePackageRepository {
   private readonly records = new Map<string, PublishablePackage>();
@@ -435,3 +435,4 @@ describe("ExchangePublishWorkflow", () => {
     }
   });
 });
+

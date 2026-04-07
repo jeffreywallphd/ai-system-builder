@@ -1,17 +1,17 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
   type StudioHandoffContract,
-} from "../../../domain/studio-handoff/StudioHandoffContract";
+} from "@domain/studio-handoff/StudioHandoffContract";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   StudioHandoffCompatibilityValidator,
 } from "../StudioHandoffCompatibilityValidator";
@@ -158,7 +158,7 @@ function createExistingHandoff(input: {
 }
 
 describe("StudioHandoffOrchestrationService", () => {
-  it("orchestrates representative atomic→composite and composite→system handoffs through output+compatibility+input adapters", () => {
+  it("orchestrates representative atomicâ†’composite and compositeâ†’system handoffs through output+compatibility+input adapters", () => {
     const service = createService();
     const capabilities = createCapabilities();
 
@@ -458,3 +458,4 @@ describe("StudioHandoffOrchestrationService", () => {
     expect(updated.preparation?.lineage?.previousHandoffId).toBe("basis-handoff");
   });
 });
+

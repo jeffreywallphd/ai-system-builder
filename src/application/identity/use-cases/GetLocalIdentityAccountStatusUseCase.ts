@@ -1,4 +1,4 @@
-import type { UserIdentity } from "../../../domain/identity/IdentityDomain";
+﻿import type { UserIdentity } from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -6,9 +6,9 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
 import type { IdentityAdministrativeActionContext } from "./IdentityAdministrativeContext";
 import type { LocalIdentityAccountSummary } from "./ListLocalIdentityAccountsUseCase";
 
@@ -126,3 +126,4 @@ function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }
+

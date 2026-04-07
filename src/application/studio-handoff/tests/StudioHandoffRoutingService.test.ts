@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import { StudioCapabilityQueryService, StudioCapabilityRegistry, type StudioCapabilityDescriptor } from "../StudioCapabilityRegistry";
 import { StudioHandoffCompatibilityValidator } from "../StudioHandoffCompatibilityValidator";
 import { StudioHandoffRoutingService } from "../StudioHandoffRoutingService";
-import { StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+import { StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -279,3 +279,4 @@ describe("StudioHandoffRoutingService", () => {
     expect(second).toBe(first);
   });
 });
+

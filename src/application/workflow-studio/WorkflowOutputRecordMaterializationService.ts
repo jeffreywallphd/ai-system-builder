@@ -1,11 +1,11 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { ImageAssetReferenceInput } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import {
   DatasetInstanceImageGenerationRoles,
   type DatasetInstanceImageGeneration,
   type DatasetInstanceImageGenerationRole,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
-import { WorkflowOutputTargetTypes } from "../../domain/workflow-studio/WorkflowOutputBindingDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
+import { WorkflowOutputTargetTypes } from "@domain/workflow-studio/WorkflowOutputBindingDomain";
 import type { ResolvedWorkflowOutputWritePlanItem } from "./WorkflowOutputBindingResolutionService";
 
 export interface WorkflowExecutionProducedImage {
@@ -249,3 +249,4 @@ export function materializeWorkflowOutputRecords(
     missingOutputs: Object.freeze(missingOutputs),
   });
 }
+

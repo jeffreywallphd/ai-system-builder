@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createPublishablePackage } from "../../../../domain/exchange/PublishablePackage";
-import { createExchangeCatalogEntry } from "../../../../domain/exchange/ExchangeCatalog";
+﻿import { describe, expect, it } from "bun:test";
+import { createPublishablePackage } from "@domain/exchange/PublishablePackage";
+import { createExchangeCatalogEntry } from "@domain/exchange/ExchangeCatalog";
 import {
   toExchangeSdkCatalogEntrySummary,
   toExchangeSdkExportResult,
@@ -126,3 +126,4 @@ describe("PublicExchangeSdkContract mapper", () => {
     expect(publish.catalog.artifact.location).toBe("/local/exchange/systems/root-v4.json");
   });
 });
+

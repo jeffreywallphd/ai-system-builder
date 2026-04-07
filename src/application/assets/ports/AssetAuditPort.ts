@@ -1,4 +1,4 @@
-import type { Asset, AssetLifecycleState, AssetVisibility } from "../../../domain/assets/AssetDomain";
+﻿import type { Asset, AssetLifecycleState, AssetVisibility } from "@domain/assets/AssetDomain";
 
 export const AssetAuditEventTypes = Object.freeze({
   registered: "asset-registered",
@@ -144,4 +144,5 @@ function normalizeAuditOptional(value?: string): string | undefined {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
 }
+
 

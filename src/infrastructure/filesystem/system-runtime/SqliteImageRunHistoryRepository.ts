@@ -1,14 +1,14 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   ImageRunHistoryRepository,
   ListImageRunHistoryRecordsQuery,
   ListImageRunHistoryRecordsResult,
-} from "../../../application/system-runtime/ImageRunHistoryRepository";
+} from "@application/system-runtime/ImageRunHistoryRepository";
 import {
   validateImageRunHistoryRecord,
   type ImageRunHistoryRecord,
-} from "../../../application/system-runtime/ImageRunHistoryDataContract";
+} from "@application/system-runtime/ImageRunHistoryDataContract";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface RunHistoryRow {
@@ -173,3 +173,4 @@ export class SqliteImageRunHistoryRepository implements ImageRunHistoryRepositor
     return validateImageRunHistoryRecord(JSON.parse(serialized) as unknown);
   }
 }
+

@@ -1,4 +1,4 @@
-import type { AssetStorageArea } from "../../../domain/assets/AssetDomain";
+﻿import type { AssetStorageArea } from "@domain/assets/AssetDomain";
 
 export interface AssetContentPointer {
   readonly storageInstanceId: string;
@@ -55,4 +55,5 @@ export interface IAssetContentPort {
     request: CreateProtectedContentReadGrantRequest,
   ): Promise<ProtectedContentReadGrant>;
 }
+
 

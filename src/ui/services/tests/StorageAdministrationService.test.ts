@@ -1,6 +1,6 @@
-import { describe, expect, it, mock } from "bun:test";
+﻿import { describe, expect, it, mock } from "bun:test";
 import { StorageAdministrationService } from "../StorageAdministrationService";
-import type { StorageAdministrationClient } from "../../shared/storage/StorageAdministrationClient";
+import type { StorageAdministrationClient } from "@shared/storage/StorageAdministrationClient";
 
 describe("StorageAdministrationService", () => {
   it("delegates activate and deactivate lifecycle actions to the storage administration client", async () => {
@@ -40,3 +40,4 @@ describe("StorageAdministrationService", () => {
     }, "token-2");
   });
 });
+

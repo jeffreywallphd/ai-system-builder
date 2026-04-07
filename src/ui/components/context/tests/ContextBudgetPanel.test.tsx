@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ContextBudgetPanel from "../ContextBudgetPanel";
-import { ContextInspectionResult } from "../../../../application/context/models/ContextInspectionResult";
-import { ContextAssemblyResult } from "../../../../application/context/models/ContextAssemblyResult";
-import { AssembledContext } from "../../../../application/context/models/AssembledContext";
+import { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
+import { ContextAssemblyResult } from "@application/context/models/ContextAssemblyResult";
+import { AssembledContext } from "@application/context/models/AssembledContext";
 
 describe("ContextBudgetPanel", () => {
   it("renders budgeting summaries and author controls", () => {
@@ -34,3 +34,4 @@ describe("ContextBudgetPanel", () => {
     expect(html).toContain("Allow partial fragment trim");
   });
 });
+

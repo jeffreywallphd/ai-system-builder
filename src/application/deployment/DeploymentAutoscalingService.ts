@@ -1,4 +1,4 @@
-import {
+﻿import {
   createDeploymentScalingConfiguration,
   createScaleActionRequest,
   createScaleDecision,
@@ -10,11 +10,11 @@ import {
   type DeploymentScalingPolicy,
   type ScaleActionRequest,
   type ScaleDecision,
-} from "../../domain/deployment/DeploymentAutoscalingDomain";
-import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
-import { DeploymentStates } from "../../domain/deployment/DeploymentStateDomain";
+} from "@domain/deployment/DeploymentAutoscalingDomain";
+import { DeploymentActivationStates, DeploymentStatuses, type DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
-import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "../../domain/deployment/DeploymentAuditTrailDomain";
+import { DeploymentAuditEventKinds, DeploymentAuditOutcomes } from "@domain/deployment/DeploymentAuditTrailDomain";
 import type { DeploymentAuditTrailService } from "./DeploymentAuditTrailService";
 
 export interface DeploymentScalingRepository {
@@ -396,3 +396,4 @@ export class DeploymentAutoscalingService implements AutoscalingInterface {
     });
   }
 }
+

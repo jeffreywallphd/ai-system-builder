@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   WorkspaceEncryptionKeyScope,
   WorkspaceEncryptionMode,
   WorkspaceInvitationStatus,
@@ -6,7 +6,7 @@ import type {
   WorkspaceRole,
   WorkspaceRoleAssignmentStatus,
   WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type { WorkspaceVisibility } from "../../workspaces/WorkspaceOwnership";
 import type {
   PersistenceAuditStamp,
@@ -130,3 +130,4 @@ export function normalizeWorkspaceInvitationLookupEmail(email: string): string |
   const normalized = email.trim().toLowerCase();
   return normalized ? normalized : undefined;
 }
+

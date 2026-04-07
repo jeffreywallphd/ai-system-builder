@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type { IInstalledModelCatalog } from "../ports/interfaces/IInstalledModelCatalog";
 import type { IModelInstaller } from "../ports/interfaces/IModelInstaller";
 
@@ -72,3 +72,4 @@ export class RemoveModelUseCase {
     return installedModel;
   }
 }
+

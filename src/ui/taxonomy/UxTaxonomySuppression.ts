@@ -1,4 +1,4 @@
-import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { CompositionTaxonomyDescriptor, TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 
 export const UxTaxonomyPresentationModes = Object.freeze({
   intentPrimary: "intent-primary",
@@ -106,3 +106,4 @@ export class UxStudioEntryLabelResolver {
     return navigationLabels[routeKey] ?? fallback;
   }
 }
+

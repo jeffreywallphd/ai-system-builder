@@ -1,9 +1,9 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { INodeEnrollmentRequestPersistenceRepository } from "../../../application/nodes/ports/INodeEnrollmentRequestPersistenceRepository";
-import type { INodeTrustIdentityPersistenceRepository } from "../../../application/nodes/ports/INodeTrustIdentityPersistenceRepository";
-import type { IPlatformTransactionManager } from "../../../application/common/ports/PlatformTransactionPorts";
-import { NodeEnrollmentRequestStatuses, NodeTrustStates } from "../../../domain/nodes/NodeTrustDomain";
+import type { INodeEnrollmentRequestPersistenceRepository } from "@application/nodes/ports/INodeEnrollmentRequestPersistenceRepository";
+import type { INodeTrustIdentityPersistenceRepository } from "@application/nodes/ports/INodeTrustIdentityPersistenceRepository";
+import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
+import { NodeEnrollmentRequestStatuses, NodeTrustStates } from "@domain/nodes/NodeTrustDomain";
 import {
   NodeTrustPersistenceQueryPresets,
   normalizeNodeTrustMutationOperationKey,
@@ -20,10 +20,10 @@ import {
   type UpdateNodeApprovalPersistenceRecordInput,
   type UpdateNodeCapabilityProfilePersistenceRecordInput,
   type UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   parseNodeEnrollmentRequestPersistenceRecord,
-} from "../../../shared/schemas/nodes/NodeTrustPersistenceSchemaContracts";
+} from "@shared/schemas/nodes/NodeTrustPersistenceSchemaContracts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapNodeEnrollmentRequestRecordToRowValues,
@@ -943,3 +943,4 @@ export class SqliteNodeTrustPersistenceAdapter
   }
 
 }
+

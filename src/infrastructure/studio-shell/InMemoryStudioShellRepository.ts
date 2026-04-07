@@ -1,6 +1,6 @@
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
-import type { AssetDraft, AssetSession, Studio } from "../../domain/studio-shell/StudioShellDomain";
-import type { IStudioShellRepository } from "../../application/ports/interfaces/IStudioShellRepository";
+﻿import type { AssetVersion } from "@domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
 
 export class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -56,3 +56,4 @@ export class InMemoryStudioShellRepository implements IStudioShellRepository {
     return [...this.versions.values()].filter((entry) => entry.assetId.value === assetId);
   }
 }
+

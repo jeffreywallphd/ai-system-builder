@@ -1,4 +1,4 @@
-import type { RuntimeExecutionResultReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionResultReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 export function ExecutionDiagnosticsPanel({ result }: { readonly result: RuntimeExecutionResultReadModel }): JSX.Element {
   return (
@@ -10,7 +10,7 @@ export function ExecutionDiagnosticsPanel({ result }: { readonly result: Runtime
         <ul className="ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
           {result.diagnostics.slice(0, 12).map((entry, index) => (
             <li key={`${entry.source}:${entry.message}:${index}`} className="ui-text-small">
-              <strong>{entry.severity}</strong> · {entry.source}
+              <strong>{entry.severity}</strong> Â· {entry.source}
               {entry.code ? ` (${entry.code})` : ""}
               : {entry.message}
             </li>
@@ -20,3 +20,4 @@ export function ExecutionDiagnosticsPanel({ result }: { readonly result: Runtime
     </div>
   );
 }
+

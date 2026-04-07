@@ -1,4 +1,4 @@
-import type { Asset, AssetLifecycleState } from "../../../domain/assets/AssetDomain";
+﻿import type { Asset, AssetLifecycleState } from "@domain/assets/AssetDomain";
 
 export const AssetAuthorizationActions = Object.freeze({
   registerAsset: "asset.register",
@@ -57,4 +57,5 @@ export interface IAssetAuthorizationPort {
     readonly occurredAt?: string;
   }): Promise<AssetAuthorizationDecision>;
 }
+
 

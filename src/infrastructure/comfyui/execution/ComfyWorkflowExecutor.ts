@@ -1,28 +1,28 @@
-import { Asset } from "../../../domain/assets/Asset";
+﻿import { Asset } from "@domain/assets/Asset";
 import {
   AssetAuditInfo,
   AssetLocation,
   AssetSemanticMetadata,
   AssetSourceInfo,
   AssetTechnicalMetadata,
-} from "../../../domain/assets/AssetMetadata";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
   IWorkflowExecutor,
-} from "../../../application/ports/interfaces/IWorkflowExecutor";
+} from "@application/ports/interfaces/IWorkflowExecutor";
 import type {
   IComfyAdapterLifecycleEvent,
   IComfyAdapterRequest,
   IComfyAdapterResult,
   IComfyExecutionAdapter,
-} from "../../../application/execution/comfyui/ComfyAdapterContract";
-import { ComfyExecutionService } from "../../../application/execution/comfyui/ComfyExecutionService";
-import { createComfyExecutionContext } from "../../../application/execution/comfyui/ComfyExecutionContext";
+} from "@application/execution/comfyui/ComfyAdapterContract";
+import { ComfyExecutionService } from "@application/execution/comfyui/ComfyExecutionService";
+import { createComfyExecutionContext } from "@application/execution/comfyui/ComfyExecutionContext";
 import { mapComfyError, mapComfyProgressToLifecycleEvent } from "./ComfyExecutionLifecycle";
 import { ComfyPromptExecutionError, ComfyQueueClient } from "./ComfyQueueClient";
 import { ComfyAdapterObservability, type IComfyAdapterLogger } from "./ComfyAdapterObservability";
@@ -470,3 +470,4 @@ function inferContentType(kind: IAsset["kind"], format?: string): string | undef
 
   return undefined;
 }
+

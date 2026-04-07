@@ -1,4 +1,4 @@
-import type { WorkflowRunDetailRecord } from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+﻿import type { WorkflowRunDetailRecord } from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import type { IWorkflowRunSummaryRepository } from "../ports/interfaces/IWorkflowRunSummaryRepository";
 import { toWorkflowRunHistoryError } from "./WorkflowRunHistoryErrors";
 
@@ -17,3 +17,4 @@ export class GetWorkflowRunDetailUseCase {
     }
   }
 }
+

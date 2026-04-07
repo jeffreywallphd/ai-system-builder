@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   IdentitySessionStatuses,
   UserIdentityStatuses,
-} from "../../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   mapCredentialMaterialRowToRecord,
   mapCredentialPolicyRowToDomain,
@@ -157,3 +157,4 @@ describe("IdentityPersistenceMapper", () => {
     expect(mapped.invalidatedAt).toBeUndefined();
   });
 });
+

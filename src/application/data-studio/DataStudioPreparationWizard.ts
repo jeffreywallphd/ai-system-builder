@@ -1,17 +1,17 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   type PipelineStageConfigMode,
   type PipelineStageId,
   PipelineStageIds,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   UnifiedPreparationStageActivationModes,
   type UnifiedPreparationAssetDefinition,
   type UnifiedPreparationStageActivation,
   type UnifiedPreparationStageConfig,
   type UnifiedPreparationVisibilityMode,
-} from "../../domain/dataset-studio/UnifiedPreparationAsset";
+} from "@domain/dataset-studio/UnifiedPreparationAsset";
 import {
   UnifiedPreparationPipelineService,
   type UnifiedPreparationPipelineResolution,
@@ -1023,3 +1023,4 @@ export class DataStudioPreparationWizard {
 
 export { createDefaultDataStudioPreparationAssetDefinition } from "./DataStudioPreparationAssetDefaults";
 export type { DataStudioPreparationTemplateSummary } from "./DataStudioPreparationTemplates";
+

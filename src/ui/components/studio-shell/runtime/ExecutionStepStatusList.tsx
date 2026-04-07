@@ -1,4 +1,4 @@
-import type { RuntimeExecutionStatusReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionStatusReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 function toTone(status: RuntimeExecutionStatusReadModel["nodeStatuses"][number]["status"]): "success" | "warning" | "danger" | "info" {
   if (status === "succeeded") {
@@ -31,10 +31,10 @@ export function ExecutionStepStatusList({ status }: { readonly status: RuntimeEx
                 {node.structuralKind}/{node.semanticRole}/{node.behaviorKind}
               </span>
               <span className="ui-text-small ui-text-secondary">
-                Iterations: {node.iterationCount} · Planning cycles: {node.planningCycleCount}
+                Iterations: {node.iterationCount} Â· Planning cycles: {node.planningCycleCount}
               </span>
               {node.lastError ? (
-                <span className="ui-text-small ui-text-danger">Error: {node.lastError.code} — {node.lastError.message}</span>
+                <span className="ui-text-small ui-text-danger">Error: {node.lastError.code} â€” {node.lastError.message}</span>
               ) : null}
             </div>
           ))}
@@ -55,3 +55,4 @@ export function ExecutionStepStatusList({ status }: { readonly status: RuntimeEx
     </div>
   );
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowConnection } from "../../../../domain/workflows/WorkflowConnection";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyWorkflowAdapter } from "../ComfyWorkflowAdapter";
 
 describe("ComfyWorkflowAdapter", () => {
@@ -21,3 +21,4 @@ describe("ComfyWorkflowAdapter", () => {
     expect(adapted.prompt.b.inputs.in).toEqual(["a", 0]);
   });
 });
+

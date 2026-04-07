@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowDraftOutputDestinationTypes } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowDraftOutputDestinationTypes } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   WorkflowConversationSessionService,
   type WorkflowConversationSessionStorage,
@@ -181,3 +181,4 @@ describe("WorkflowConversationSessionService", () => {
     expect(service.getById("malformed-session")).toBeUndefined();
   });
 });
+

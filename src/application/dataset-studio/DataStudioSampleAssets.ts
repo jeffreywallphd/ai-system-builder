@@ -1,10 +1,10 @@
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
+﻿import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
   createCanonicalTextItemsShape,
   type CanonicalRecordValue,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetDiscoverabilityScopes,
   DataAssetRegistry,
@@ -47,7 +47,7 @@ import {
   createUnifiedIngestionConfigSchema,
   createUnifiedIngestionDataAsset,
 } from "./UnifiedIngestionAsset";
-import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionStrategyKinds } from "../../domain/dataset-studio/UnifiedIngestionDomain";
+import { UnifiedIngestionOutputTargetKinds, UnifiedIngestionStrategyKinds } from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 export interface DataStudioSampleAssetSet {
   readonly registry: DataAssetRegistry;
@@ -570,3 +570,4 @@ export function registerDataStudioSampleAssets(
     ]),
   });
 }
+

@@ -1,10 +1,10 @@
-import {
+﻿import {
   PythonRuntimeOwnership,
   PythonRuntimeStatuses,
   type PythonRuntimeManagerStatus,
   type PythonRuntimeOwner,
   type PythonRuntimeStatus,
-} from "../../../application/ports/interfaces/IPythonRuntimeManager";
+} from "@application/ports/interfaces/IPythonRuntimeManager";
 
 export class PythonRuntimeState implements PythonRuntimeManagerStatus {
   public readonly status: PythonRuntimeStatus;
@@ -38,3 +38,4 @@ export class PythonRuntimeState implements PythonRuntimeManagerStatus {
     });
   }
 }
+

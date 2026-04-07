@@ -1,10 +1,10 @@
-import {
+﻿import {
   assertDeploymentStateTransitionAllowed,
   type DeploymentState,
   DeploymentStates,
   type DeploymentStateSnapshot,
   type DeploymentStateTransition,
-} from "../../domain/deployment/DeploymentStateDomain";
+} from "@domain/deployment/DeploymentStateDomain";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -92,3 +92,4 @@ export class DeploymentStateTracker {
     });
   }
 }
+

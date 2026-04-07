@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import AuthorizationReportingPage from "../AuthorizationReportingPage";
 import type { AuthorizationManagementService } from "../../services/AuthorizationManagementService";
-import type { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 describe("AuthorizationReportingPage", () => {
   it("renders sign-in guidance when there is no local session", () => {
@@ -50,3 +50,4 @@ describe("AuthorizationReportingPage", () => {
     expect(html).toContain("Load report");
   });
 });
+

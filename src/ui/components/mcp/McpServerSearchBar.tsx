@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
+﻿import { useMemo, useState } from "react";
+import type { McpServerSearchCriteria } from "@application/mcp/models/McpServerSearchCriteria";
 
 export interface McpServerSearchBarProps {
   readonly value?: Partial<McpServerSearchCriteria>;
@@ -85,3 +85,4 @@ export default function McpServerSearchBar({
     </form>
   );
 }
+

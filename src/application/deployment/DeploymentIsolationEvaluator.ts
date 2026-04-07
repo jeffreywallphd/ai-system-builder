@@ -1,9 +1,9 @@
-import {
+﻿import {
   type DeploymentEnvironmentContext,
   type DeploymentIsolationPolicy,
   StrictDeploymentIsolationPolicy,
-} from "../../domain/deployment/DeploymentIsolationDomain";
-import type { DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+} from "@domain/deployment/DeploymentIsolationDomain";
+import type { DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 
 export class DeploymentIsolationDeniedError extends Error {
   public constructor(
@@ -67,4 +67,5 @@ export class DeploymentIsolationEvaluator {
     }).allowed));
   }
 }
+
 

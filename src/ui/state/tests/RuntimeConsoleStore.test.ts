@@ -1,7 +1,7 @@
-import { describe, expect, it, mock } from "bun:test";
-import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
-import { createRuntimeEvent, RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
-import type { PythonRuntimeManagerStatus } from "../../../application/ports/interfaces/IPythonRuntimeManager";
+﻿import { describe, expect, it, mock } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
+import { createRuntimeEvent, RuntimeEventSources } from "@application/runtime/RuntimeEvent";
+import type { PythonRuntimeManagerStatus } from "@application/ports/interfaces/IPythonRuntimeManager";
 import { RuntimeConsoleStore } from "../RuntimeConsoleStore";
 
 describe("RuntimeConsoleStore", () => {
@@ -763,23 +763,23 @@ describe("RuntimeConsoleStore", () => {
     eventStore.append(createRuntimeEvent({
       source: RuntimeEventSources.pythonRuntime,
       severity: "warning",
-      message: "Trying to reconnect…",
+      message: "Trying to reconnectâ€¦",
       timestamp: "2026-03-20T00:00:01.000Z",
     }));
     eventStore.append(createRuntimeEvent({
       source: RuntimeEventSources.pythonRuntime,
       severity: "warning",
-      message: "Trying to reconnect…",
+      message: "Trying to reconnectâ€¦",
       timestamp: "2026-03-20T00:00:02.000Z",
     }));
 
     await store.initializeRuntime();
     await store.refreshHealth();
 
-    expect(store.getState().events.map((entry) => entry.message)).toEqual(["Trying to reconnect…"]);
-    expect(store.getState().logs.filter((entry) => entry.message === "Trying to reconnect…")).toHaveLength(1);
+    expect(store.getState().events.map((entry) => entry.message)).toEqual(["Trying to reconnectâ€¦"]);
+    expect(store.getState().logs.filter((entry) => entry.message === "Trying to reconnectâ€¦")).toHaveLength(1);
     expect(store.getState().appState).toBe("reconnecting");
-    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtime…");
+    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtimeâ€¦");
   });
 
   it("keeps reconnecting state stable across retry failures until retries are exhausted", async () => {
@@ -829,7 +829,7 @@ describe("RuntimeConsoleStore", () => {
     await store.refreshHealth();
 
     expect(store.getState().appState).toBe("reconnecting");
-    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtime…");
+    expect(store.getState().appStateDetail).toBe("Trying to reconnect to the Python runtimeâ€¦");
 
     runtimeStatus = {
       ...runtimeStatus,
@@ -842,3 +842,4 @@ describe("RuntimeConsoleStore", () => {
     expect(store.getState().appStateDetail).toBe("Python runtime restart circuit is open until 2026-03-20T00:01:00.000Z.");
   });
 });
+

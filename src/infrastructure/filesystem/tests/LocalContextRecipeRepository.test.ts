@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import { ContextRecipe } from "../../../application/context/models/ContextRecipe";
+import { ContextRecipe } from "@application/context/models/ContextRecipe";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { LocalContextRecipeRepository } from "../LocalContextRecipeRepository";
 
@@ -27,3 +27,4 @@ describe("LocalContextRecipeRepository", () => {
     expect((await repository.list())[0]?.packageReferenceCount).toBe(1);
   });
 });
+

@@ -1,9 +1,9 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import {
   ComfyImageManipulationPropertySchema,
   type ComfyImageManipulationConfig,
   type ComfyImageManipulationConfigValidationIssue,
-} from "../../../../application/system-studio/ComfyImageManipulationPropertySchema";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
 
 type ComfySchemaGroup = (typeof ComfyImageManipulationPropertySchema.fields)[number];
 type ComfySchemaField = ComfySchemaGroup["entries"][number];
@@ -400,3 +400,4 @@ export function ComfyImageManipulationPropertyEditor({
 }
 
 export default ComfyImageManipulationPropertyEditor;
+

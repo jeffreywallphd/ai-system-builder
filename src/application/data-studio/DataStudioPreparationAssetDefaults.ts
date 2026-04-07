@@ -1,11 +1,11 @@
-import { PipelineStageIds, type PipelineStageConfigMode } from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+﻿import { PipelineStageIds, type PipelineStageConfigMode } from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   UnifiedPreparationAssetKinds,
   UnifiedPreparationStageActivationModes,
   type UnifiedPreparationAssetDefinition,
   type UnifiedPreparationStageConfig,
-} from "../../domain/dataset-studio/UnifiedPreparationAsset";
+} from "@domain/dataset-studio/UnifiedPreparationAsset";
 
 export function createDefaultDataStudioPreparationAssetDefinition(
   stageRegistry: PipelineStageRegistry = new PipelineStageRegistry(),
@@ -80,3 +80,4 @@ export function createDefaultDataStudioPreparationAssetDefinition(
     }),
   });
 }
+

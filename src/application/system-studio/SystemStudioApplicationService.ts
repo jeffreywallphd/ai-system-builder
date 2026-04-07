@@ -1,7 +1,7 @@
-import {
+﻿import {
   createAssetContractDescriptor,
   type AssetContractDescriptor,
-} from "../../domain/contracts/AssetContract";
+} from "@domain/contracts/AssetContract";
 import {
   aggregateSystemDependencies,
   buildNestedSystemReferences,
@@ -14,8 +14,8 @@ import {
   type SystemCompositionReference,
   type SystemComponentReference,
   type SystemExecutionMetadata,
-} from "../../domain/system-studio/SystemAssetDomain";
-import { AssetDraftLifecycleStatuses, type AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
+} from "@domain/system-studio/SystemAssetDomain";
+import { AssetDraftLifecycleStatuses, type AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -36,13 +36,13 @@ import {
   evaluateSystemStudioDraftConsistency,
   type StudioAssetEnforcementIssue,
 } from "../studio-shell/AtomicStudioAssetEnforcement";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { parsePersistedRuntimeCapabilityBindingEnvelope } from "../system-runtime/RuntimeCapabilityBindingPersistence";
 import {
   parseSystemSerializationDocument,
   serializeSystemSerializationDocument,
   type SystemSerializationContract,
-} from "../../domain/system-studio/SystemSerializationContract";
+} from "@domain/system-studio/SystemSerializationContract";
 import { SerializedAssetReferenceResolutionService } from "../system-runtime/SerializedAssetReferenceResolutionService";
 import {
   DatasetInstanceDuplicationModes,
@@ -1333,3 +1333,4 @@ export class SystemStudioApplicationService {
     return Object.freeze(pinned);
   }
 }
+

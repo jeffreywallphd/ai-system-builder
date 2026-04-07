@@ -1,4 +1,4 @@
-import type { IPythonRuntimeClient, IPythonRuntimeHealthResponse } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import type { IPythonRuntimeClient, IPythonRuntimeHealthResponse } from "@application/ports/interfaces/IPythonRuntimeClient";
 
 export class PythonRuntimeHealthMonitor {
   private readonly client: IPythonRuntimeClient;
@@ -19,3 +19,4 @@ export class PythonRuntimeHealthMonitor {
     }
   }
 }
+

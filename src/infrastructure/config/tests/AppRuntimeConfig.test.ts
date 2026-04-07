@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
+﻿import { describe, expect, it } from "bun:test";
+import { AppRuntimeModes } from "@domain/runtime/AppRuntimeMode";
 import {
   AppDistributionTargets,
   AppHostKinds,
   AppLifecycleStages,
   RendererDeliveryModes,
-} from "../../../domain/runtime/AppRuntimeProfile";
+} from "@domain/runtime/AppRuntimeProfile";
 import { AppRuntimeConfig } from "../AppRuntimeConfig";
 
 describe("AppRuntimeConfig", () => {
@@ -98,3 +98,4 @@ describe("AppRuntimeConfig", () => {
     }
   });
 });
+

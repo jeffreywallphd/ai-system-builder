@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DeploymentExecutionService,
   InMemoryDeploymentRecordRepository,
@@ -8,7 +8,7 @@ import {
   DeploymentAutoscalingService,
   InMemoryDeploymentScalingRepository,
 } from "../DeploymentAutoscalingService";
-import { ScaleActionStatuses, ScaleDirections } from "../../../domain/deployment/DeploymentAutoscalingDomain";
+import { ScaleActionStatuses, ScaleDirections } from "@domain/deployment/DeploymentAutoscalingDomain";
 import { buildSampleBundle } from "./testUtils";
 
 function createHarness() {
@@ -184,3 +184,4 @@ describe("Deployment autoscaling interface (bounded)", () => {
     expect(transitionCountAfter).toBe(transitionCountBefore);
   });
 });
+

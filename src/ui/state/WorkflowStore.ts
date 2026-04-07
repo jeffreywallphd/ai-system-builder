@@ -1,17 +1,17 @@
-import type { IWorkflowExecutionEvent } from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { ICreateNodeRequest } from "../../application/nodes/CreateNodeUseCase";
-import type { IConnectNodesRequest } from "../../application/nodes/ConnectNodesUseCase";
-import type { ICreateWorkflowRequest } from "../../application/workflows/CreateWorkflowUseCase";
-import type { IExecuteWorkflowRequest } from "../../application/workflows/ExecuteWorkflowUseCase";
+﻿import type { IWorkflowExecutionEvent } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { ICreateNodeRequest } from "@application/nodes/CreateNodeUseCase";
+import type { IConnectNodesRequest } from "@application/nodes/ConnectNodesUseCase";
+import type { ICreateWorkflowRequest } from "@application/workflows/CreateWorkflowUseCase";
+import type { IExecuteWorkflowRequest } from "@application/workflows/ExecuteWorkflowUseCase";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
-} from "../../domain/services/interfaces/IWorkflowValidator";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/services/interfaces/IWorkflowValidator";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { NodeService } from "../services/NodeService";
 import { McpToolCallAuthoringService } from "../services/McpToolCallAuthoringService";
 import { WorkflowService } from "../services/WorkflowService";
-import { WorkflowProjectionService } from "../../application/projection/WorkflowProjectionService";
+import { WorkflowProjectionService } from "@application/projection/WorkflowProjectionService";
 import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
 import {
   WorkflowExecutionStore,
@@ -830,3 +830,4 @@ function upsertWorkflowSummary(
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown workflow store error.";
 }
+

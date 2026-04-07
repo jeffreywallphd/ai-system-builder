@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 
 export type WorkflowSerializationFormat =
   | "json"
@@ -91,3 +91,4 @@ export interface IWorkflowSerializer {
    */
   canDeserialize(source: IWorkflowDeserializationRequest["source"]): boolean;
 }
+

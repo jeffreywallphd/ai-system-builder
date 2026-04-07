@@ -1,4 +1,4 @@
-import type { FormField } from "../../../application/projection/models/FormField";
+﻿import type { FormField } from "@application/projection/models/FormField";
 import ProjectedFieldEditor from "../projection/ProjectedFieldEditor";
 
 export default function WorkflowFormField({
@@ -10,3 +10,4 @@ export default function WorkflowFormField({
 }): JSX.Element {
   return <ProjectedFieldEditor field={field} onChange={onChange} />;
 }
+

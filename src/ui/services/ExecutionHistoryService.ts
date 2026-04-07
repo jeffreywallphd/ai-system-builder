@@ -1,12 +1,12 @@
-import type { ExecutionRunDetailProjection } from "../../application/execution/ExecutionRunDetailProjectionService";
-import { GetExecutionRunDetailUseCase } from "../../application/execution/GetExecutionRunDetailUseCase";
+﻿import type { ExecutionRunDetailProjection } from "@application/execution/ExecutionRunDetailProjectionService";
+import { GetExecutionRunDetailUseCase } from "@application/execution/GetExecutionRunDetailUseCase";
 import {
   ExecutionRelatedRunClusterProjectionService,
   type ExecutionRelatedRunClusterProjection,
-} from "../../application/execution/ExecutionRelatedRunClusterProjectionService";
-import { ExecutionRunProjectionService, type ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
-import { ListExecutionRunsUseCase, type IListExecutionRunsQuery } from "../../application/execution/ListExecutionRunsUseCase";
-import { ListRelatedExecutionRunsUseCase } from "../../application/execution/ListRelatedExecutionRunsUseCase";
+} from "@application/execution/ExecutionRelatedRunClusterProjectionService";
+import { ExecutionRunProjectionService, type ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
+import { ListExecutionRunsUseCase, type IListExecutionRunsQuery } from "@application/execution/ListExecutionRunsUseCase";
+import { ListRelatedExecutionRunsUseCase } from "@application/execution/ListRelatedExecutionRunsUseCase";
 
 export class ExecutionHistoryService {
   constructor(
@@ -45,3 +45,4 @@ export class ExecutionHistoryService {
     return this.relatedRunClusterProjectionService.project(runId, relatedRuns);
   }
 }
+

@@ -1,13 +1,13 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
-import type { PersistedWorkflowSummary } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
+import type { PersistedWorkflowSummary } from "@domain/workflow-studio/WorkflowPersistenceDomain";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
 import type {
   CompositionTaxonomyDescriptor,
   TaxonomyBehaviorKind,
   TaxonomySemanticRole,
   TaxonomyStructuralKind,
-} from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { CrossStudioRegistryQueryService } from "./CrossStudioRegistryQueryService";
 
 export const ExploreAssetKinds = Object.freeze({
@@ -388,3 +388,4 @@ export class ExploreAssetQueryService {
     ]);
   }
 }
+

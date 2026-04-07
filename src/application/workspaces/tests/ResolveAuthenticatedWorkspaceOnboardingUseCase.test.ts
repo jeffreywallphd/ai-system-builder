@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkspaceInvitationStatuses,
   WorkspaceMembershipStatuses,
@@ -7,7 +7,7 @@ import {
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
   type WorkspaceMembershipStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceInvitationLifecycleErrorCodes,
   type ResolveWorkspaceInvitationLifecycleUseCaseOutcome,
@@ -235,3 +235,4 @@ describe("ResolveAuthenticatedWorkspaceOnboardingUseCase", () => {
     }
   });
 });
+

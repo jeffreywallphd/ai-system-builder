@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import type { IRemoteModelCatalog } from "../../../application/ports/interfaces/IRemoteModelCatalog";
-import type { IModelDownloader } from "../../../application/ports/interfaces/IModelDownloader";
+﻿import { describe, expect, it } from "bun:test";
+import type { IRemoteModelCatalog } from "@application/ports/interfaces/IRemoteModelCatalog";
+import type { IModelDownloader } from "@application/ports/interfaces/IModelDownloader";
 import { HuggingFaceModelCatalog } from "../HuggingFaceModelCatalog";
 import { HuggingFaceModelDownloader } from "../HuggingFaceModelDownloader";
 
@@ -13,3 +13,4 @@ describe("huggingface contracts", () => {
     expect(typeof downloader.download).toBe("function");
   });
 });
+

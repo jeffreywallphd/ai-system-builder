@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { SearchContextPackagesUseCase } from "../SearchContextPackagesUseCase";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("SearchContextPackagesUseCase", () => {
   it("searches by package name, description, and tags", async () => {
@@ -54,3 +54,4 @@ describe("SearchContextPackagesUseCase", () => {
     expect(result.contextPackages).toHaveLength(50);
   });
 });
+

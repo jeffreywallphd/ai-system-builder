@@ -1,4 +1,4 @@
-import type { INode } from "../../../domain/nodes/interfaces/INode";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
 
 export interface IModelExecutionRequest {
   readonly node: INode;
@@ -20,3 +20,4 @@ export interface IModelExecutor {
   canExecute(request: IModelExecutionRequest): boolean;
   execute(request: IModelExecutionRequest): Promise<IModelExecutionResult>;
 }
+

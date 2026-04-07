@@ -1,9 +1,9 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   PersistedStudioHandoffRecord,
   StudioHandoffRepository,
-} from "../../../application/studio-handoff/StudioHandoffPersistenceService";
+} from "@application/studio-handoff/StudioHandoffPersistenceService";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface SnapshotRow {
@@ -226,3 +226,4 @@ export class SqliteStudioHandoffRepository implements StudioHandoffRepository {
     return typeof row?.version === "number" ? row.version : 0;
   }
 }
+

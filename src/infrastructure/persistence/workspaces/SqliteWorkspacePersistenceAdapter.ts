@@ -1,11 +1,11 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { IWorkspaceAuthorizationReadRepository } from "../../../application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import type { IWorkspaceInvitationRepository } from "../../../application/workspaces/ports/IWorkspaceInvitationRepository";
-import type { IWorkspaceMembershipRepository } from "../../../application/workspaces/ports/IWorkspaceMembershipRepository";
-import type { IWorkspaceRepository } from "../../../application/workspaces/ports/IWorkspaceRepository";
-import type { IWorkspaceRoleAssignmentRepository } from "../../../application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
-import type { IWorkspaceTransactionManager } from "../../../application/workspaces/ports/IWorkspaceTransactionManager";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import type { IWorkspaceInvitationRepository } from "@application/workspaces/ports/IWorkspaceInvitationRepository";
+import type { IWorkspaceMembershipRepository } from "@application/workspaces/ports/IWorkspaceMembershipRepository";
+import type { IWorkspaceRepository } from "@application/workspaces/ports/IWorkspaceRepository";
+import type { IWorkspaceRoleAssignmentRepository } from "@application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
+import type { IWorkspaceTransactionManager } from "@application/workspaces/ports/IWorkspaceTransactionManager";
 import {
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
@@ -14,7 +14,7 @@ import {
   type WorkspaceMembership,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
@@ -24,7 +24,7 @@ import type {
   WorkspaceListQuery,
   WorkspacePendingInvitationLookupQuery,
   WorkspaceRoleAssignmentListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
@@ -881,3 +881,4 @@ export class SqliteWorkspacePersistenceAdapter
     return roleAssignment.revokedAt ?? roleAssignment.assignedAt;
   }
 }
+

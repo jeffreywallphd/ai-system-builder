@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { buildDatasetInspectionViewModel } from "../DatasetInspectionViewModel";
 import { DataPreviewEngine } from "../DataPreviewEngine";
-import { createCanonicalImageMetadataRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { createCanonicalImageMetadataRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { DataAssetRegistryDescriptor } from "../../dataset-studio/DataAssetRegistry";
 
 const descriptor: DataAssetRegistryDescriptor = Object.freeze({
@@ -63,3 +63,4 @@ describe("buildDatasetInspectionViewModel", () => {
     expect(model.validationSummary.errors).toBe(0);
   });
 });
+

@@ -1,4 +1,4 @@
-import { SessionRevocationReasons, type SessionRevocationReason } from "../../../domain/identity/IdentityDomain";
+﻿import { SessionRevocationReasons, type SessionRevocationReason } from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,
@@ -7,8 +7,8 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
 import { type IdentityAuthenticatedSessionService } from "../services/IdentityAuthenticatedSessionService";
 
 export type RevokeIdentitySessionErrorCode =
@@ -108,3 +108,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IWorkflowValidationMessage,
   IWorkflowValidationResult,
   WorkflowValidationSeverity,
-} from "../../domain/services/interfaces/IWorkflowValidator";
+} from "@domain/services/interfaces/IWorkflowValidator";
 
 export interface ValidationBadgeViewModel {
   readonly severity: WorkflowValidationSeverity;
@@ -156,6 +156,7 @@ export class ValidationPresenter {
       parts.push(`Property ${message.target.propertyId}`);
     }
 
-    return parts.length > 0 ? parts.join(" • ") : undefined;
+    return parts.length > 0 ? parts.join(" â€¢ ") : undefined;
   }
 }
+

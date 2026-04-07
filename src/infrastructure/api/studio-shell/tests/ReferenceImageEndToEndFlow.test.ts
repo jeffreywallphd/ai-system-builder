@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
-import { InMemoryStudioShellRepository } from "../../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 
 describe("Reference image vertical slice", () => {
   it("supports upload -> run output persistence -> gallery visualization -> recent activity history", async () => {
@@ -178,3 +178,4 @@ describe("Reference image vertical slice", () => {
     expect(history.data?.runs[0]?.lineage?.outputDatasetInstanceId).toBe("dataset-instance:reference-image:output");
   });
 });
+

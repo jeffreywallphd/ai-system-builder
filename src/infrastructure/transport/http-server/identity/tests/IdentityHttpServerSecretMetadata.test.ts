@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
 import { SecretMetadataBackendApi } from "../../../../api/security/SecretMetadataBackendApi";
 import { createIdentityHttpServer } from "../IdentityHttpServer";
-import { composeServerSecretService } from "../../../../../infrastructure/security/secrets/SecretServiceComposition";
+import { composeServerSecretService } from "@infrastructure/security/secrets/SecretServiceComposition";
 
 const servers: Server[] = [];
 const cleanup: Array<() => void> = [];
@@ -510,3 +510,4 @@ async function registerAndLogin(
     sessionToken: loginBody.data.sessionToken,
   });
 }
+

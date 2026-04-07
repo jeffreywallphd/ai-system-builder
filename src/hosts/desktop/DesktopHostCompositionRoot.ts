@@ -1,11 +1,11 @@
-import {
+﻿import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
   type HostRuntimeHandle,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { DesktopHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
@@ -20,12 +20,12 @@ import {
 import {
   assertDesktopHostServiceCoverage,
   composeHostServiceRegistrationPlan,
-} from "../../infrastructure/config/HostServiceRegistrationCatalog";
-import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
-import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
+} from "@infrastructure/config/HostServiceRegistrationCatalog";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "@infrastructure/config/HostStartupConfiguration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
-import type { HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
+import type { HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
 
 export interface DesktopRuntimeHost {
   close(): Promise<void>;
@@ -269,3 +269,4 @@ export function createDesktopCompositionRoot(
     },
   });
 }
+

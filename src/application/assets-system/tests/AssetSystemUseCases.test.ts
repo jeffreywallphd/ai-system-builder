@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
 import { RecordAssetTransformationUseCase } from "../RecordAssetTransformationUseCase";
 import { GetAssetHistoryUseCase } from "../GetAssetHistoryUseCase";
 import { GetAssetLineageSummaryUseCase } from "../GetAssetLineageSummaryUseCase";
 import { GetAssetVersionHistoryUseCase } from "../GetAssetVersionHistoryUseCase";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
 
 class InMemoryAssetSystemRepository {
   public readonly assets = new Map<string, Asset>();
@@ -105,3 +105,4 @@ describe("Asset system use cases", () => {
     expect(versionHistory).toHaveLength(2);
   });
 });
+

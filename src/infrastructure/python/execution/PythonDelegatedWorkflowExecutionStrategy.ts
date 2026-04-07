@@ -1,7 +1,7 @@
-import { WorkflowExecutionEvent, WorkflowExecutionResult } from "../../../application/ports/WorkflowExecutor";
-import type { IWorkflowExecutionEvent, IWorkflowExecutionInput, IWorkflowExecutionResult } from "../../../application/ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowExecutionStrategy, IWorkflowExecutionStrategyDescriptor } from "../../../application/ports/interfaces/IWorkflowExecutionStrategy";
-import type { IPythonRuntimeClient, IPythonRuntimeExecuteWorkflowRequest } from "../../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import { WorkflowExecutionEvent, WorkflowExecutionResult } from "@application/ports/WorkflowExecutor";
+import type { IWorkflowExecutionEvent, IWorkflowExecutionInput, IWorkflowExecutionResult } from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IWorkflowExecutionStrategy, IWorkflowExecutionStrategyDescriptor } from "@application/ports/interfaces/IWorkflowExecutionStrategy";
+import type { IPythonRuntimeClient, IPythonRuntimeExecuteWorkflowRequest } from "@application/ports/interfaces/IPythonRuntimeClient";
 
 function nodePropertiesToObject(properties: ReadonlyArray<{ id: string; value: unknown }>): Readonly<Record<string, unknown>> {
   return Object.freeze(Object.fromEntries(properties.map((property) => [property.id, property.value])));
@@ -82,3 +82,4 @@ export class PythonDelegatedWorkflowExecutionStrategy implements IWorkflowExecut
     return result;
   }
 }
+

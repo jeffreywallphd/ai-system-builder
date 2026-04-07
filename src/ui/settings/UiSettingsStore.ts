@@ -1,4 +1,4 @@
-import type { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+﻿import type { AppRuntimeConfig } from "@infrastructure/config/AppRuntimeConfig";
 import {
   createDefaultUiSettings,
   createWorkspaceDefaults,
@@ -207,3 +207,4 @@ export class LocalStorageUiSettingsStorage implements UiSettingsStorage {
     this.storage?.setItem(this.key, JSON.stringify(settings));
   }
 }
+

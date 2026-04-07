@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AssetKinds, AssetStorageAreas, AssetVisibilities, createAsset, createAssetLocationRef, createAssetOwnershipMetadata, createAssetVersion, createContentDescriptor, createStorageInstanceRef } from "../../../../domain/assets/AssetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetKinds, AssetStorageAreas, AssetVisibilities, createAsset, createAssetLocationRef, createAssetOwnershipMetadata, createAssetVersion, createContentDescriptor, createStorageInstanceRef } from "@domain/assets/AssetDomain";
 import { rehydrateAssetFromDto, toAssetDto } from "../AssetDtos";
 
 describe("AssetDtos", () => {
@@ -49,3 +49,4 @@ describe("AssetDtos", () => {
     expect((dto as unknown as { path?: string }).path).toBeUndefined();
   });
 });
+

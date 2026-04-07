@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
   resolveComfyImageManipulationConfig,
   validateComfyImageManipulationConfig,
   type ComfyImageManipulationConfig,
-} from "../../../application/system-studio/ComfyImageManipulationPropertySchema";
-import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
-import { ReferenceImageSystemTemplate } from "../../../application/system-studio/ReferenceImageSystemTemplate";
-import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "../../../application/system-studio/ReferenceImageCrossStudioIntegrity";
-import type { OutputGalleryItem } from "../../../application/system-runtime/OutputGalleryDataContract";
-import type { ReferenceImageDatasetBindingId } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import type { FileIngestionPolicy } from "../../../domain/ingestion/interfaces/IFileIngestion";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
+import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "@application/system-studio/ReferenceImageCrossStudioIntegrity";
+import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
+import type { ReferenceImageDatasetBindingId } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { FileIngestionPolicy } from "@domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import { ImageGallerySlider } from "../assets/image-system/ImageGallerySlider";
@@ -48,7 +48,7 @@ import {
   type ImageManipulationSelectionRole,
   type ImageManipulationSelectionState,
 } from "./image-manipulation/ImageManipulationSelectionState";
-import type { SystemRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+import type { SystemRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import type {
   HydratedRuntimeDatasetBinding,
   SystemRuntimeHydratedState,
@@ -1143,3 +1143,4 @@ export function ImageManipulationRuntimeEditorPanel({
 }
 
 export default ImageManipulationRuntimeEditorPanel;
+

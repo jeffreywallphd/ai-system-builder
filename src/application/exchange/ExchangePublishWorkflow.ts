@@ -1,15 +1,15 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import {
   createExchangeCatalogEntry,
   type ExchangeCatalogEntry,
   type ExchangeCatalogStorageReference,
-} from "../../domain/exchange/ExchangeCatalog";
+} from "@domain/exchange/ExchangeCatalog";
 import {
   PublishablePackageStatuses,
   withPublishablePackageStatus,
   type PublishablePackage,
-} from "../../domain/exchange/PublishablePackage";
-import { ExchangeBundleDeserializer, type SerializedExchangeBundleArtifact } from "../../domain/exchange/ExchangeBundleSerialization";
+} from "@domain/exchange/PublishablePackage";
+import { ExchangeBundleDeserializer, type SerializedExchangeBundleArtifact } from "@domain/exchange/ExchangeBundleSerialization";
 import {
   ExchangeAccessActions,
   ExchangeAccessDeniedError,
@@ -350,3 +350,4 @@ export class ExchangePublishWorkflow {
     }
   }
 }
+

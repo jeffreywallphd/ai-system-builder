@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowRunHistoryService } from "../WorkflowRunHistoryService";
-import { InMemoryWorkflowRunSummaryRepository } from "../../../infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
+import { InMemoryWorkflowRunSummaryRepository } from "@infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
 import { WorkflowRunHistoryNotFoundError } from "../WorkflowRunHistoryErrors";
-import { WorkflowRunStatuses } from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+import { WorkflowRunStatuses } from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 describe("WorkflowRunHistoryService", () => {
   it("records running start state and terminal completion state with output metadata", async () => {
@@ -242,3 +242,4 @@ describe("WorkflowRunHistoryService", () => {
     expect(started.correlation.rerunReason).toBe("Updated input constraints");
   });
 });
+

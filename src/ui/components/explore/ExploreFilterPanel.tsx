@@ -1,4 +1,4 @@
-import { ExploreAssetKinds, type ExploreFacet, type ExploreFilterSet } from "../../../application/asset-registry/ExploreAssetQueryService";
+﻿import { ExploreAssetKinds, type ExploreFacet, type ExploreFilterSet } from "@application/asset-registry/ExploreAssetQueryService";
 
 export interface ExploreFilterPanelProps {
   readonly value: ExploreFilterSet;
@@ -130,3 +130,4 @@ export function ExploreFilterPanel({ value, facets, onChange, disabled }: Explor
     </div>
   );
 }
+

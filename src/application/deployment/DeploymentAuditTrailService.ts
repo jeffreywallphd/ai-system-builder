@@ -1,9 +1,9 @@
-import {
+﻿import {
   createDeploymentAuditRecord,
   type DeploymentAuditEventKind,
   type DeploymentAuditOutcome,
   type DeploymentAuditRecord,
-} from "../../domain/deployment/DeploymentAuditTrailDomain";
+} from "@domain/deployment/DeploymentAuditTrailDomain";
 
 export interface DeploymentAuditRepository {
   save(record: DeploymentAuditRecord): DeploymentAuditRecord;
@@ -76,3 +76,4 @@ export class DeploymentAuditTrailService {
     return this.repository.listByDeploymentId(deploymentId, limit);
   }
 }
+

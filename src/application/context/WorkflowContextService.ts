@@ -1,9 +1,9 @@
-import { InspectContextAssemblyUseCase } from "./InspectContextAssemblyUseCase";
+﻿import { InspectContextAssemblyUseCase } from "./InspectContextAssemblyUseCase";
 import type { ContextInspectionResult } from "./models/ContextInspectionResult";
 import type { ContextFragmentKind } from "./models/ContextFragment";
 import type { IContextPackageRepository } from "../ports/interfaces/IContextPackageRepository";
 import type { IContextRecipeRepository } from "../ports/interfaces/IContextRecipeRepository";
-import type { IWorkflow, IWorkflowContextPackageReference } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow, IWorkflowContextPackageReference } from "@domain/workflows/interfaces/IWorkflow";
 import { ExecutionContextEnvelope, type IExecutionContextToolUsePolicy } from "./models/ExecutionContextEnvelope";
 import type { DynamicContextSourceInput } from "./models/ContextAssemblyRequest";
 import { DynamicContextSource } from "./models/DynamicContextSource";
@@ -465,3 +465,4 @@ export class WorkflowContextService {
     });
   }
 }
+

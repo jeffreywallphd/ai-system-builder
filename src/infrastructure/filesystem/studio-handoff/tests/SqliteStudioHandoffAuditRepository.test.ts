@@ -1,10 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "bun:test";
 import { SqliteStudioHandoffAuditRepository } from "../SqliteStudioHandoffAuditRepository";
-import { StudioHandoffAuditTrailService } from "../../../../application/studio-handoff/StudioHandoffAuditTrailService";
-import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "../../../../domain/studio-handoff/StudioHandoffAuditTrail";
+import { StudioHandoffAuditTrailService } from "@application/studio-handoff/StudioHandoffAuditTrailService";
+import { StudioHandoffAuditEventKinds, StudioHandoffAuditOutcomes } from "@domain/studio-handoff/StudioHandoffAuditTrail";
 
 const tempDirs: string[] = [];
 
@@ -71,3 +71,4 @@ describe("SqliteStudioHandoffAuditRepository", () => {
     expect(recent[1]?.handoff.handoffId).toBe("handoff:a");
   });
 });
+

@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   UnifiedIngestionConfigModes,
   UnifiedIngestionOutputTargetKinds,
@@ -11,7 +11,7 @@ import {
   type UnifiedIngestionOutputTargetKind,
   type UnifiedIngestionSourceKind,
   type UnifiedIngestionStrategyKind,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 const DefaultPreviewSampleLimit = 25;
 
@@ -241,3 +241,4 @@ export function resolveUnifiedIngestionConfiguration(input?: {
     issues: Object.freeze([]),
   });
 }
+

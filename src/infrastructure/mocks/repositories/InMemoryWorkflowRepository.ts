@@ -1,6 +1,6 @@
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { IWorkflowRecordSummary, IWorkflowRepository } from "../../../application/ports/interfaces/IWorkflowRepository";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IWorkflowRecordSummary, IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 export class InMemoryWorkflowRepository implements IWorkflowRepository {
   private readonly workflows = new Map<string, IWorkflow>();
@@ -41,3 +41,4 @@ export class InMemoryWorkflowRepository implements IWorkflowRepository {
     );
   }
 }
+

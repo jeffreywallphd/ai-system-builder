@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -9,7 +9,7 @@ import {
   createSession,
   createUserIdentity,
   revokeSession,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   DeviceTrustStatuses,
   DeviceFingerprintAlgorithms,
@@ -24,7 +24,7 @@ import {
   touchTrustedDevice,
   updateTrustedDeviceDisplayName,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   PairingSessionStatuses,
   PairingTokenActorScopes,
@@ -43,7 +43,7 @@ import {
   registerPairingTokenFailedAttempt,
   type PairingSession,
   type PairingToken,
-} from "../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import {
   IdentityErrorCodes,
   IdentityCredentialMaterialStatuses,
@@ -1381,3 +1381,4 @@ describe("identity application ports contracts", () => {
     expect(adapter.now().toISOString()).toBe("2026-04-04T12:00:00.000Z");
   });
 });
+

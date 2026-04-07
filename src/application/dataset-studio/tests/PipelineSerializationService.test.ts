@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { MidLevelPipelineTemplateService } from "../MidLevelPipelineTemplateService";
 import { PipelineSerializationService } from "../PipelineSerializationService";
 
@@ -54,3 +54,4 @@ describe("PipelineSerializationService", () => {
     expect(() => serializationService.rehydrate(tampered)).toThrow("not equivalent");
   });
 });
+

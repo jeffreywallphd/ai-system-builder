@@ -1,4 +1,4 @@
-import type { AuthenticatedTrustState } from "../../../domain/security/TransportSecurityDomain";
+﻿import type { AuthenticatedTrustState } from "@domain/security/TransportSecurityDomain";
 
 export const NodePeerOperationClasses = Object.freeze({
   runtimeTrustMaterialReplication: "runtime-trust-material-replication",
@@ -62,3 +62,4 @@ export interface INodePeerCertificateIdentityResolverPort {
     request: ResolveNodePeerCertificateIdentityRequest,
   ): Promise<ResolveNodePeerCertificateIdentityResult>;
 }
+

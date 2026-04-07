@@ -1,20 +1,20 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import type { AuthProvider, CredentialPolicy } from "../../../domain/identity/IdentityDomain";
-import { IdentityProviderAccountPolicyConfig } from "../../../../infrastructure/config/IdentityProviderAccountPolicyConfig";
-import { SqliteWorkspacePersistenceAdapter } from "../../../infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
-import { SqliteNodeTrustAuditRecorder } from "../../../infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
-import { SqliteNodeTrustPersistenceAdapter } from "../../../infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
-import { SqliteStorageManagementAuditRecorder } from "../../../infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
+import type { AuthProvider, CredentialPolicy } from "@domain/identity/IdentityDomain";
+import { IdentityProviderAccountPolicyConfig } from "@infrastructure/config/IdentityProviderAccountPolicyConfig";
+import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
+import { SqliteNodeTrustAuditRecorder } from "@infrastructure/persistence/nodes/SqliteNodeTrustAuditRecorder";
+import { SqliteNodeTrustPersistenceAdapter } from "@infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter";
+import { SqliteStorageManagementAuditRecorder } from "@infrastructure/persistence/storage/SqliteStorageManagementAuditRecorder";
 import {
   NodeApprovalStatuses,
   NodeRevocationStates,
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
@@ -23,8 +23,8 @@ import {
   createWorkspace,
   createWorkspaceMembership,
   createWorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   applyIdentityStartupConfiguration,
   initializeCertificateAuthorityForFirstSetup,
@@ -32,18 +32,18 @@ import {
   type IdentityServerHost,
   type IdentityServerHostOptions,
 } from "../IdentityServerHost";
-import { startAuthoritativeServerHostAssembly } from "../../../hosts/server/AuthoritativeServerHostEntrypoint";
-import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "../../../application/security/ports/ICertificateAuthorityIssuerPort";
-import { SqliteCertificateAuthorityPersistenceAdapter } from "../../../infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
-import { InternalCertificateAuthorityIssuer } from "../../../infrastructure/security/ca/InternalCertificateAuthorityIssuer";
-import { createFileSystemProtectedSecretStoreFromEnvironment } from "../../../infrastructure/security/secrets/FileSystemProtectedSecretStore";
-import { ProtectedCertificateAuthorityRootMaterialStorage } from "../../../infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
+import { startAuthoritativeServerHostAssembly } from "@hosts/server/AuthoritativeServerHostEntrypoint";
+import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "@application/security/ports/ICertificateAuthorityIssuerPort";
+import { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/persistence/security/SqliteCertificateAuthorityPersistenceAdapter";
+import { InternalCertificateAuthorityIssuer } from "@infrastructure/security/ca/InternalCertificateAuthorityIssuer";
+import { createFileSystemProtectedSecretStoreFromEnvironment } from "@infrastructure/security/secrets/FileSystemProtectedSecretStore";
+import { ProtectedCertificateAuthorityRootMaterialStorage } from "@infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
 import {
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
-import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "../../../domain/security/SecretDomain";
+} from "@domain/security/CertificateAuthorityDomain";
+import { SecretAccessActions, SecretActorTypes, SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
 
 class InMemoryIdentityDefaultConfigurationRepository {
   public readonly providers = new Map<string, AuthProvider>();
@@ -1417,3 +1417,4 @@ async function seedManagedNodeRuntimeTrustMaterial(input: {
   repository.dispose();
   nodeRepository.dispose();
 }
+

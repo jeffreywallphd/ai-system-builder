@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { ManagedServiceKinds, ManagedServiceStartPolicies } from "../../../../application/services/interfaces/ManagedServiceTypes";
+﻿import { describe, expect, it } from "bun:test";
+import { ManagedServiceKinds, ManagedServiceStartPolicies } from "@application/services/interfaces/ManagedServiceTypes";
 import {
   createManagedServiceDefinition,
   ManagedServiceRestartPolicies,
   ManagedServiceSources,
   ManagedServiceTransports,
-} from "../../../../application/services/ManagedServiceDefinition";
+} from "@application/services/ManagedServiceDefinition";
 import { LocalStorageManagedServiceDefinitionRepository } from "../LocalStorageManagedServiceDefinitionRepository";
 
 class MemoryStorage {
@@ -78,3 +78,4 @@ describe("LocalStorageManagedServiceDefinitionRepository", () => {
     expect(await repository.listPersistedDefinitions()).toEqual([]);
   });
 });
+

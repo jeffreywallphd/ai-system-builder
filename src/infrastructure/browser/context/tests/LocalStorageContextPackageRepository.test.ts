@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ContextPackage } from "../../../../application/context/models/ContextPackage";
+﻿import { describe, expect, it } from "bun:test";
+import { ContextPackage } from "@application/context/models/ContextPackage";
 import { LocalStorageContextPackageRepository } from "../LocalStorageContextPackageRepository";
 
 class MemoryStorage {
@@ -54,3 +54,4 @@ describe("LocalStorageContextPackageRepository", () => {
     expect(await repository.exists("ctx-delete")).toBe(false);
   });
 });
+

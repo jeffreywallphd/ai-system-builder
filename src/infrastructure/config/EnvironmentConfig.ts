@@ -1,4 +1,4 @@
-import type { EnvironmentConfigValue } from "../../application/ports/interfaces/IEnvironmentConfigProvider";
+﻿import type { EnvironmentConfigValue } from "@application/ports/interfaces/IEnvironmentConfigProvider";
 
 function normalizeKey(key: string): string {
   const normalized = key.trim();
@@ -176,3 +176,4 @@ export class EnvironmentConfig {
     return new EnvironmentConfig(values);
   }
 }
+

@@ -1,11 +1,11 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeRevocationStates,
   NodeTrustStates,
   createNodeCapabilityProfile,
-} from "../../../domain/nodes/NodeTrustDomain";
-import type { NodeCapabilityProfilePersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@domain/nodes/NodeTrustDomain";
+import type { NodeCapabilityProfilePersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type {
@@ -178,3 +178,4 @@ function areCapabilityProfilesEqual(
 
   return left.enabledCapabilities.every((capability, index) => right.enabledCapabilities[index] === capability);
 }
+

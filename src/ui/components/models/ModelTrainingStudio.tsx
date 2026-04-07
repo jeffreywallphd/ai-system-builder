@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { ModelCreationPathSupport, ModelCreationSupportState } from "../../../domain/model-training/ModelCreationSupport";
-import type { ModelTrainingJobStudioSummary } from "../../../application/model-training/contracts";
-import type { ExecutionRunProjection } from "../../../application/execution/ExecutionRunProjectionService";
+import type { ModelCreationPathSupport, ModelCreationSupportState } from "@domain/model-training/ModelCreationSupport";
+import type { ModelTrainingJobStudioSummary } from "@application/model-training/contracts";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import type { ModelTrainingStore, ModelTrainingStoreState } from "../../state/ModelTrainingStore";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 import ExecutionHistoryPanel from "../execution/ExecutionHistoryPanel";
@@ -165,7 +165,7 @@ export default function ModelTrainingStudio({
               ) : null}
             </div>
           ) : (
-            <p className="ui-text-secondary">Loading model-creation readiness…</p>
+            <p className="ui-text-secondary">Loading model-creation readinessâ€¦</p>
           )}
         </div>
       </div>
@@ -206,7 +206,7 @@ export default function ModelTrainingStudio({
               <ul className="ui-text-secondary ui-text-small">
                 {summary.recommendedNextSteps.map((step) => (
                   <li key={step.id}>
-                    <strong>{step.label}</strong> — {step.detail}
+                    <strong>{step.label}</strong> â€” {step.detail}
                   </li>
                 ))}
               </ul>
@@ -291,7 +291,7 @@ export default function ModelTrainingStudio({
               >
                 {(summary?.datasetVersions ?? []).map((option) => (
                   <option key={`${option.datasetId}:${option.versionId}`} value={option.versionId}>
-                    {option.datasetName} · {option.versionLabel} · {option.taskType}
+                    {option.datasetName} Â· {option.versionLabel} Â· {option.taskType}
                   </option>
                 ))}
               </select>
@@ -328,7 +328,7 @@ export default function ModelTrainingStudio({
               disabled={Boolean(trainingConfigError) || trainingState.isSubmitting || localTrainingSupport?.state === "unavailable"}
               onClick={() => submitJob("local-gradient-training")}
             >
-              {trainingState.isSubmitting ? "Starting…" : "Start local training"}
+              {trainingState.isSubmitting ? "Startingâ€¦" : "Start local training"}
             </button>
             <button
               className="ui-button ui-button--secondary"
@@ -357,8 +357,8 @@ export default function ModelTrainingStudio({
               </p>
             </div>
             <div className="ui-text-secondary ui-text-small">
-              {trainingState.isLoading ? "Loading…" : `${trainingState.jobs.length} jobs`}
-              {trainingState.pollingActive ? " · auto-refreshing active jobs" : ""}
+              {trainingState.isLoading ? "Loadingâ€¦" : `${trainingState.jobs.length} jobs`}
+              {trainingState.pollingActive ? " Â· auto-refreshing active jobs" : ""}
             </div>
           </div>
 
@@ -423,7 +423,7 @@ function BlockerList({ blockers }: { readonly blockers: ReadonlyArray<{ readonly
         {blockers.map((blocker) => (
           <li key={`${blocker.code}:${blocker.message}`}>
             <strong>{blocker.message}</strong>
-            {blocker.detail ? ` — ${blocker.detail}` : ""}
+            {blocker.detail ? ` â€” ${blocker.detail}` : ""}
           </li>
         ))}
       </ul>
@@ -462,7 +462,7 @@ function JobCard(props: {
           {entry.primaryArtifact ? (
             <div className="ui-text-secondary ui-text-small">
               Primary output: <strong>{entry.primaryArtifact.label}</strong>
-              {entry.primaryArtifact.location ? ` — ${entry.primaryArtifact.location}` : ""}
+              {entry.primaryArtifact.location ? ` â€” ${entry.primaryArtifact.location}` : ""}
             </div>
           ) : (
             <div className="ui-text-secondary ui-text-small">No output artifact has been recorded yet.</div>
@@ -474,8 +474,8 @@ function JobCard(props: {
           {entry.job.progress ? (
             <div className="ui-text-secondary ui-text-small">
               {entry.job.progress.percent}%
-              {entry.job.progress.currentEpoch ? ` · epoch ${entry.job.progress.currentEpoch}/${entry.job.progress.totalEpochs ?? entry.job.configuration.epochs}` : ""}
-              {entry.job.progress.latestMetricName ? ` · ${entry.job.progress.latestMetricName}: ${entry.job.progress.latestMetricValue}` : ""}
+              {entry.job.progress.currentEpoch ? ` Â· epoch ${entry.job.progress.currentEpoch}/${entry.job.progress.totalEpochs ?? entry.job.configuration.epochs}` : ""}
+              {entry.job.progress.latestMetricName ? ` Â· ${entry.job.progress.latestMetricName}: ${entry.job.progress.latestMetricValue}` : ""}
             </div>
           ) : (
             <div className="ui-text-secondary ui-text-small">No live progress details are available for this job.</div>
@@ -505,7 +505,7 @@ function JobCard(props: {
           disabled={entry.promotion.state !== "available" || isPromoting}
           onClick={onPromote}
         >
-          {isPromoting ? "Adding to library…" : entry.promotion.label}
+          {isPromoting ? "Adding to libraryâ€¦" : entry.promotion.label}
         </button>
       </div>
 
@@ -519,7 +519,7 @@ function JobCard(props: {
               <strong>Artifacts</strong>
               <ul>
                 {entry.job.artifacts.map((artifact) => (
-                  <li key={artifact.id}>{artifact.kind} · {artifact.label}{artifact.location ? ` — ${artifact.location}` : ""}</li>
+                  <li key={artifact.id}>{artifact.kind} Â· {artifact.label}{artifact.location ? ` â€” ${artifact.location}` : ""}</li>
                 ))}
               </ul>
             </div>
@@ -527,7 +527,7 @@ function JobCard(props: {
               <strong>Checkpoints</strong>
               <ul>
                 {entry.job.checkpoints.map((checkpoint) => (
-                  <li key={checkpoint.id}>{checkpoint.label} · epoch {checkpoint.epoch}{checkpoint.metricName ? ` · ${checkpoint.metricName}: ${checkpoint.metricValue}` : ""}</li>
+                  <li key={checkpoint.id}>{checkpoint.label} Â· epoch {checkpoint.epoch}{checkpoint.metricName ? ` Â· ${checkpoint.metricName}: ${checkpoint.metricValue}` : ""}</li>
                 ))}
               </ul>
             </div>
@@ -537,3 +537,4 @@ function JobCard(props: {
     </article>
   );
 }
+

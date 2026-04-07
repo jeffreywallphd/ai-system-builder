@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkflowExecutionEvent,
   WorkflowExecutionHandle,
   WorkflowExecutionProgress,
@@ -16,7 +16,7 @@ import type {
   IComfyAdapterResult,
   IComfyExecutionAdapter,
 } from "./ComfyAdapterContract";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 
 export interface IComfyExecutionServiceMappers {
   toAdapterRequest(input: IWorkflowExecutionInput): IComfyAdapterRequest;
@@ -162,3 +162,4 @@ function toWorkflowExecutionEvent(
       : undefined,
   });
 }
+

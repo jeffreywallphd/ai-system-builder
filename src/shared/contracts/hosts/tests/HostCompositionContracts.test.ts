@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
   HostStartupDependencyBoundaryLayers,
   createHostRuntimeIdentity,
-} from "../../../../domain/hosts/HostRuntimeDomain";
-import { createHostBootConfiguration } from "../../../../application/common/HostCompositionContracts";
+} from "@domain/hosts/HostRuntimeDomain";
+import { createHostBootConfiguration } from "@application/common/HostCompositionContracts";
 import {
   HostCompositionContractScopes,
   HostCompositionContractVersions,
@@ -129,4 +129,5 @@ describe("HostCompositionContracts", () => {
     expect(metadataDto.metadata.compositionRootId).toBe("composition-root:host:worker:runtime");
   });
 });
+
 

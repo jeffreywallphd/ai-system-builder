@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../domain/agents/Agent";
-import { AssetId } from "../../../domain/assets/AssetId";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import { AssetId } from "@domain/assets/AssetId";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 import { CreateAgentUseCase } from "../CreateAgentUseCase";
 import { GetAgentUseCase } from "../GetAgentUseCase";
@@ -526,3 +526,4 @@ describe("Agent authoring use cases", () => {
     expect(sandboxConflict.issues.some((issue) => issue.code === "policy-permission-required-and-denied")).toBe(true);
   });
 });
+

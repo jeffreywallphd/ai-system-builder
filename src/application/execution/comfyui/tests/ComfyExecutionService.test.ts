@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ComfyExecutionService } from "../ComfyExecutionService";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 
 describe("ComfyExecutionService", () => {
   it("runs trigger -> adapter -> normalized result path", async () => {
@@ -95,3 +95,4 @@ describe("ComfyExecutionService", () => {
     expect(result.inspection?.diagnostics?.errorCode).toBe("execution-failed");
   });
 });
+

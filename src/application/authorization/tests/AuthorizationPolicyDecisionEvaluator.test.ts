@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   PermissionEffects,
   PermissionGrantScopes,
@@ -9,8 +9,8 @@ import {
   SharingSubjectKinds,
   createPermissionGrant,
   createRoleAssignment,
-} from "../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
@@ -362,3 +362,4 @@ describe("AuthorizationPolicyDecisionEvaluator", () => {
 function toResourceKey(resourceType: string, resourceId: string): string {
   return `${resourceType}:${resourceId}`;
 }
+

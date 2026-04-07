@@ -1,4 +1,4 @@
-import { validateWorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { validateWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowPersistenceInvalidRequestError } from "./WorkflowPersistenceErrors";
 
 export function normalizeRequired(value: string, label: string): string {
@@ -32,3 +32,4 @@ export function assertWorkflowDraftValid(
     `${operationLabel} requires a valid canonical workflow draft: ${issueSummary || "validation-failed"}.`,
   );
 }
+

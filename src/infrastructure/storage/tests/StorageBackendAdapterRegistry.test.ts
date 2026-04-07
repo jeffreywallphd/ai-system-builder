@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import type { IStorageObjectPort } from "../../../application/storage/ports/StorageObjectPort";
-import { StorageBackendTypes } from "../../../domain/storage/StorageDomain";
+﻿import { describe, expect, it } from "bun:test";
+import type { IStorageObjectPort } from "@application/storage/ports/StorageObjectPort";
+import { StorageBackendTypes } from "@domain/storage/StorageDomain";
 import { StorageBackendAdapterRegistry } from "../StorageBackendAdapterRegistry";
 
 describe("StorageBackendAdapterRegistry", () => {
@@ -130,3 +130,4 @@ describe("StorageBackendAdapterRegistry", () => {
     expect(Object.isFrozen(backends)).toBeTrue();
   });
 });
+

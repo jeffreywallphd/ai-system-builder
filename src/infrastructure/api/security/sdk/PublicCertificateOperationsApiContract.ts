@@ -1,17 +1,17 @@
-import type {
+﻿import type {
   CertificateAuthorityStatusIntrospectionViewDto,
   CertificateMetadataListViewDto,
   CertificateRevocationPersistenceRecord,
   CertificateTrustEvaluationStatus,
   IssuedCertificateMetadataViewDto,
   IssuedCertificatePersistenceRecord,
-} from "../../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type {
   CertificateRevocationReason,
   CertificateSubjectReferenceKind,
   CertificateUsageKind,
-} from "../../../../domain/security/CertificateAuthorityDomain";
-import type { CertificateRenewalDispositionKind } from "../../../../application/security/use-cases/RenewIssuedCertificateUseCase";
+} from "@domain/security/CertificateAuthorityDomain";
+import type { CertificateRenewalDispositionKind } from "@application/security/use-cases/RenewIssuedCertificateUseCase";
 
 export const CertificateOperationsApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -138,3 +138,4 @@ export interface RenewIssuedCertificateApiResponse {
   readonly gracePeriodDays: number;
   readonly replacedAt: string;
 }
+

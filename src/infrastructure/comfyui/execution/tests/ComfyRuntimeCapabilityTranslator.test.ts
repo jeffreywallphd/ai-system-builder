@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ComfyRuntimeCapabilityTranslator } from "../mappers/ComfyRuntimeCapabilityTranslator";
-import { createRuntimeCapabilityBindingContract } from "../../../../application/system-runtime/RuntimeCapabilityBindingContract";
+import { createRuntimeCapabilityBindingContract } from "@application/system-runtime/RuntimeCapabilityBindingContract";
 
 const binding = createRuntimeCapabilityBindingContract({
   bindingId: "binding:1",
@@ -60,3 +60,4 @@ describe("ComfyRuntimeCapabilityTranslator", () => {
     }
   });
 });
+

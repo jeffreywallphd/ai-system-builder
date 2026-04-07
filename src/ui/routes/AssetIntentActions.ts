@@ -1,8 +1,8 @@
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+﻿import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import { BuildIntentRoutingService } from "./BuildIntentRouting";
 import { BuildIntents, type BuildIntent } from "./BuildIntentModels";
 import { InlineAssetCreationModes, InlineAssetCreationService } from "./InlineAssetCreation";
-import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
+import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "@application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver, StudioEntryService } from "./StudioRouteMapping";
 import { InlineRunActionResolver, InlineRunLaunchService } from "./InlineRunActions";
 import { UxRunActionKinds } from "../runtime/UxRuntimeService";
@@ -242,3 +242,4 @@ export class AssetActionExecutionService {
     return undefined;
   }
 }
+

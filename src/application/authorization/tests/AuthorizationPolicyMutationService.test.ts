@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ResourceOwnershipScopes, ResourceVisibilities, RoleAssignmentScopes, RoleAssignmentStatuses } from "../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+﻿import { describe, expect, it } from "bun:test";
+import { ResourceOwnershipScopes, ResourceVisibilities, RoleAssignmentScopes, RoleAssignmentStatuses } from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationPersistenceResourceLocator,
@@ -16,7 +16,7 @@ import type {
   UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
   UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import type { AuthorizationPolicyRecordedEvent } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationPolicyEvaluationEventTypes } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
@@ -355,3 +355,4 @@ describe("AuthorizationPolicyMutationService", () => {
     expect((metadata.nested as Record<string, unknown>).safe).toBe("ok");
   });
 });
+

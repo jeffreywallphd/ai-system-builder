@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { HostCapabilityFlags } from "../../../domain/hosts/HostRuntimeDomain";
-import { HostBootModes } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { HostCapabilityFlags } from "@domain/hosts/HostRuntimeDomain";
+import { HostBootModes } from "@application/common/HostCompositionContracts";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
   WorkerHostEnvironmentKeys,
@@ -124,3 +124,4 @@ describe("WorkerHostEntrypoint", () => {
     ]);
   });
 });
+

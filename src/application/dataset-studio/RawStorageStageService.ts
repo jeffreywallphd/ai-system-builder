@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { createHash } from "node:crypto";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createIngestionLineageHook,
   createIngestionLogRecord,
@@ -173,3 +173,4 @@ export class RawStorageStageService {
     });
   }
 }
+

@@ -1,25 +1,25 @@
-import type { INode } from "../../domain/nodes/interfaces/INode";
-import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinition";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import type { IWorkflowConnection } from "../../domain/workflows/interfaces/IWorkflowConnection";
-import type { INodeCatalogSearchCriteria } from "../../application/ports/interfaces/INodeCatalogProvider";
-import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { IWorkflowConnection } from "@domain/workflows/interfaces/IWorkflowConnection";
+import type { INodeCatalogSearchCriteria } from "@application/ports/interfaces/INodeCatalogProvider";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
 import {
   CreateNodeUseCase,
   type ICreateNodeRequest,
   type ICreateNodeResult,
-} from "../../application/nodes/CreateNodeUseCase";
+} from "@application/nodes/CreateNodeUseCase";
 import {
   ConnectNodesUseCase,
   type IConnectNodesRequest,
   type IConnectNodesResult,
-} from "../../application/nodes/ConnectNodesUseCase";
+} from "@application/nodes/ConnectNodesUseCase";
 import {
   ListAvailableNodesUseCase,
   type IListAvailableNodesRequest,
   type IListAvailableNodesResult,
-} from "../../application/nodes/ListAvailableNodesUseCase";
-import { NodeCanvasLayoutService } from "../../application/nodes/NodeCanvasLayoutService";
+} from "@application/nodes/ListAvailableNodesUseCase";
+import { NodeCanvasLayoutService } from "@application/nodes/NodeCanvasLayoutService";
 
 export interface INodeServiceOptions {
   readonly createNodeUseCase: CreateNodeUseCase;
@@ -212,3 +212,4 @@ export class NodeService {
     return node;
   }
 }
+

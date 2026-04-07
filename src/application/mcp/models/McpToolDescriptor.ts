@@ -1,4 +1,4 @@
-import { buildMcpToolId } from "../../../domain/mcp/McpToolIdentity";
+﻿import { buildMcpToolId } from "@domain/mcp/McpToolIdentity";
 
 export interface McpToolDescriptorSource {
   readonly kind: "mcp-server";
@@ -217,3 +217,4 @@ function cloneUnknown<T>(value: T): T {
 function hasContent(value: unknown): boolean {
   return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
 }
+

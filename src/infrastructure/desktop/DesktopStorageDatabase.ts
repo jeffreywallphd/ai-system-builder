@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
-import type { IProductionStorageInitializer } from "../../application/runtime/interfaces/IProductionStorageInitializer";
+import type { IProductionStorageInitializer } from "@application/runtime/interfaces/IProductionStorageInitializer";
 import type { DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
 
 interface MigrationDefinition {
@@ -187,3 +187,4 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     `);
   }
 }
+

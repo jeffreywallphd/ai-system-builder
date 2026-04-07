@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
@@ -13,8 +13,8 @@ import {
   type WorkspaceMembership,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   CreateWorkspaceUseCase,
   WorkspaceCreationErrorCodes,
@@ -29,7 +29,7 @@ import type {
   WorkspaceMembershipListQuery,
   WorkspaceRoleAssignmentListQuery,
   WorkspaceListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 
 class InMemoryWorkspaceInitializationAdapter
   implements
@@ -356,3 +356,4 @@ describe("CreateWorkspaceUseCase", () => {
     expect(adapter.roleAssignments.size).toBe(0);
   });
 });
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyExecutionRequestMapper } from "../mappers/ComfyExecutionRequestMapper";
 
 describe("ComfyExecutionRequestMapper", () => {
@@ -40,3 +40,4 @@ describe("ComfyExecutionRequestMapper", () => {
     expect(mapped.executionContext.datasets.datasetAssetRefs).toEqual(["dataset:1"]);
   });
 });
+

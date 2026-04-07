@@ -1,12 +1,12 @@
-import type { ValidateTransportConnectionTrustRequest } from "../../../../application/security/ports/TransportTrustValidationPorts";
-import { TransportConnectionDirections } from "../../../../application/security/ports/TransportTrustValidationPorts";
+﻿import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
+import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
   TransportConnectionActorTypes,
   TransportPeerTypes,
   TransportSecurityScenarios,
   type TransportChannelType,
-} from "../../../../domain/security/TransportSecurityDomain";
-import type { HttpTransportTrustValidationResult } from "../../../../infrastructure/transport/TransportTrustValidationAdapters";
+} from "@domain/security/TransportSecurityDomain";
+import type { HttpTransportTrustValidationResult } from "@infrastructure/transport/TransportTrustValidationAdapters";
 import type {
   NodeTrustApiErrorCode,
   NodeTrustApiResponse,
@@ -290,3 +290,4 @@ function normalizeFingerprint(value?: string): string | undefined {
   const normalized = normalizeOptional(value);
   return normalized ? normalized.replace(/[^a-fA-F0-9]/g, "").toUpperCase() : undefined;
 }
+

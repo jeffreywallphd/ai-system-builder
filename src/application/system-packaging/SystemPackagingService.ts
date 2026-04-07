@@ -1,17 +1,17 @@
-import { createHash } from "node:crypto";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import { createHash } from "node:crypto";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   createSystemPackage,
   type PackagedDependencyEdge,
   type PackagedDependencyNode,
   type SystemPackage,
-} from "../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/system-packaging/SystemPackagingDomain";
 import {
   createSystemAsset,
   createSystemStudioTaxonomy,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 import { resolveSystemRuntimeDependencies } from "../system-runtime/RuntimeDependencyResolution";
 
@@ -233,3 +233,4 @@ export class SystemPackagingService {
     });
   }
 }
+

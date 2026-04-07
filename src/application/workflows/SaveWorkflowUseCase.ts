@@ -1,9 +1,9 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type {
   IWorkflowValidationOptions,
   IWorkflowValidationResult,
   IWorkflowValidator,
-} from "../../domain/services/interfaces/IWorkflowValidator";
+} from "@domain/services/interfaces/IWorkflowValidator";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
 import type { PublishDurableEntityToAssetSystemUseCase } from "../assets-system/PublishDurableEntityToAssetSystemUseCase";
 
@@ -77,3 +77,4 @@ export class SaveWorkflowUseCase {
     });
   }
 }
+

@@ -1,7 +1,7 @@
-import {
+﻿import {
   describeRuntimeDependencyResolution,
   type RuntimeDependencyResolution,
-} from "../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 
 export function createRuntimeDependencyMetadata(
   resolution: RuntimeDependencyResolution,
@@ -24,3 +24,4 @@ export function createRuntimeDependencyDetail(
   const detail = describeRuntimeDependencyResolution(resolution);
   return detail || fallbackMessage || `${resolution.requestedDependencyId} is ${resolution.state}.`;
 }
+

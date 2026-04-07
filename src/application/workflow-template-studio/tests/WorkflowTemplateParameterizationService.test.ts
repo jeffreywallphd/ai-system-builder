@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createWorkflowTemplateParameterDefinition } from "../../../domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createWorkflowTemplateParameterDefinition } from "@domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
 import { applyWorkflowTemplateParameterDefaults } from "../WorkflowTemplateParameterizationService";
 
 describe("WorkflowTemplateParameterizationService", () => {
@@ -46,3 +46,4 @@ describe("WorkflowTemplateParameterizationService", () => {
     expect(applied.values.advancedPrompt).toBe("high detail");
   });
 });
+

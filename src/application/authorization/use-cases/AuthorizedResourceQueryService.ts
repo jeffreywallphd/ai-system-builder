@@ -1,5 +1,5 @@
-import { createPermissionKey, type PermissionKey } from "../../../domain/authorization/AuthorizationDomain";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+﻿import { createPermissionKey, type PermissionKey } from "@domain/authorization/AuthorizationDomain";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationActorReference,
   AuthorizationPolicyDecisionEvaluationRequest,
@@ -310,3 +310,4 @@ function matchesAccessFilters(
 
   return false;
 }
+

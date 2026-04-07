@@ -1,6 +1,6 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { Agent } from "../../domain/agents/Agent";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { Agent } from "@domain/agents/Agent";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import {
   createCompositionTaxonomyDescriptor,
   type CompositionTaxonomyDescriptor,
@@ -8,7 +8,7 @@ import {
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   type TaxonomyBehaviorKind,
-} from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { ContextPackage } from "../context/models/ContextPackage";
 import type { ContextRecipe } from "../context/models/ContextRecipe";
@@ -174,3 +174,4 @@ export class CompositionTaxonomyClassifier implements ICompositionTaxonomyClassi
     });
   }
 }
+

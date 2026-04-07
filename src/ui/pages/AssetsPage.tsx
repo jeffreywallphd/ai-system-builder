@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import type { AssetDetailDto, AssetSummaryDto } from "../../shared/contracts/assets/AssetTransportContracts";
+import type { AssetDetailDto, AssetSummaryDto } from "@shared/contracts/assets/AssetTransportContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { AssetWorkflowService } from "../services/AssetWorkflowService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
-import { toUserFacingAssetWorkflowError } from "../shared/assets/AssetWorkflowClient";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
+import { toUserFacingAssetWorkflowError } from "@shared/assets/AssetWorkflowClient";
 
 interface UploadDraftState {
   readonly assetId: string;
@@ -388,3 +388,4 @@ export default function AssetsPage(): JSX.Element {
     </section>
   );
 }
+

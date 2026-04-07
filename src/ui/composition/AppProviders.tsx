@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   useEffect,
@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { UiDependencies } from "./types";
 import { createUiDependencies } from "./createUiDependencies";
-import { AppRuntimeConfig } from "../../infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig } from "@infrastructure/config/AppRuntimeConfig";
 import { WorkflowTemplateBootstrapService } from "../services/WorkflowTemplateBootstrapService";
 import { StudioShellService } from "../services/StudioShellService";
 import { RegistryService } from "../services/RegistryService";
@@ -82,3 +82,4 @@ export function useUiDependencies(): UiDependencies {
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+

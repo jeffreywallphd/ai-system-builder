@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateLinkedSubjectTrustStates,
   CertificateTrustEvaluationStatuses,
   type IssuedCertificatePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import { CertificateTrustEvaluationService } from "../use-cases/CertificateTrustEvaluationService";
 
 describe("CertificateTrustEvaluationService", () => {
@@ -147,3 +147,4 @@ function createIssuedRecord(input: {
     revision: 1,
   });
 }
+

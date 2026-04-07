@@ -1,32 +1,32 @@
-import type { Agent, AgentReadModel } from "../../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../../domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../../domain/agents/AgentPolicy";
-import type { IAgentRepository } from "../../../application/ports/interfaces/IAgentRepository";
-import { CreateAgentUseCase, type CreateAgentRequest } from "../../../application/agents/CreateAgentUseCase";
-import { UpdateAgentUseCase, type UpdateAgentRequest } from "../../../application/agents/UpdateAgentUseCase";
-import { GetAgentUseCase } from "../../../application/agents/GetAgentUseCase";
-import { ListAgentsUseCase } from "../../../application/agents/ListAgentsUseCase";
-import { DeleteAgentUseCase } from "../../../application/agents/DeleteAgentUseCase";
-import { ArchiveAgentUseCase } from "../../../application/agents/ArchiveAgentUseCase";
-import { ConfigureAgentGoalsUseCase, type ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
-import { ConfigureAgentPolicyUseCase } from "../../../application/agents/ConfigureAgentPolicyUseCase";
-import { ConfigureAgentToolsUseCase } from "../../../application/agents/ConfigureAgentToolsUseCase";
-import { ConfigureAgentMemoryUseCase } from "../../../application/agents/ConfigureAgentMemoryUseCase";
-import { ConfigureAgentStrategyUseCase } from "../../../application/agents/ConfigureAgentStrategyUseCase";
-import { ValidateAgentConfigurationUseCase } from "../../../application/agents/ValidateAgentConfigurationUseCase";
-import { AgentAuthoringError } from "../../../application/agents/AgentAuthoringErrors";
+﻿import type { Agent, AgentReadModel } from "@domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "@domain/agents/AgentPolicy";
+import type { IAgentRepository } from "@application/ports/interfaces/IAgentRepository";
+import { CreateAgentUseCase, type CreateAgentRequest } from "@application/agents/CreateAgentUseCase";
+import { UpdateAgentUseCase, type UpdateAgentRequest } from "@application/agents/UpdateAgentUseCase";
+import { GetAgentUseCase } from "@application/agents/GetAgentUseCase";
+import { ListAgentsUseCase } from "@application/agents/ListAgentsUseCase";
+import { DeleteAgentUseCase } from "@application/agents/DeleteAgentUseCase";
+import { ArchiveAgentUseCase } from "@application/agents/ArchiveAgentUseCase";
+import { ConfigureAgentGoalsUseCase, type ConfigureAgentGoalsRequest } from "@application/agents/ConfigureAgentGoalsUseCase";
+import { ConfigureAgentPolicyUseCase } from "@application/agents/ConfigureAgentPolicyUseCase";
+import { ConfigureAgentToolsUseCase } from "@application/agents/ConfigureAgentToolsUseCase";
+import { ConfigureAgentMemoryUseCase } from "@application/agents/ConfigureAgentMemoryUseCase";
+import { ConfigureAgentStrategyUseCase } from "@application/agents/ConfigureAgentStrategyUseCase";
+import { ValidateAgentConfigurationUseCase } from "@application/agents/ValidateAgentConfigurationUseCase";
+import { AgentAuthoringError } from "@application/agents/AgentAuthoringErrors";
 import {
   AgentConfigurationValidationService,
   type AgentConfigurationValidationInput,
   type AgentConfigurationValidationIssue,
   type AgentConfigurationValidationResult,
-} from "../../../application/agents/services/AgentConfigurationValidationService";
-import { AgentConfigurationValidationError } from "../../../application/agents/services/AgentConfigurationValidationError";
-import type { AgentPlanningStrategy } from "../../../domain/agents/Agent";
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
-import { CompositionTaxonomyClassifier } from "../../../application/taxonomy/CompositionTaxonomyClassifier";
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
+} from "@application/agents/services/AgentConfigurationValidationService";
+import { AgentConfigurationValidationError } from "@application/agents/services/AgentConfigurationValidationError";
+import type { AgentPlanningStrategy } from "@domain/agents/Agent";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import { CompositionTaxonomyClassifier } from "@application/taxonomy/CompositionTaxonomyClassifier";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
 
 export interface AgentAuthoringApiError {
   readonly code: "not-found" | "conflict" | "invalid-request" | "validation-failed" | "internal";
@@ -206,3 +206,4 @@ export class AgentAuthoringBackendApi {
     throw new AgentAuthoringError("agent-not-found", `Agent '${agentId}' was not found while building API projection.`);
   }
 }
+

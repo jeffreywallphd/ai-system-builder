@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftOutputDestinationTypes,
@@ -6,7 +6,7 @@ import {
   WorkflowDraftOutputTypes,
   WorkflowDraftStepKinds,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { mapWorkflowDraftToExecutionPlan } from "../WorkflowDraftExecutionPlanMapper";
 import {
   WorkflowDraftExecutionRuntime,
@@ -446,3 +446,4 @@ describe("WorkflowDraftExecutionRuntime", () => {
     }));
   });
 });
+

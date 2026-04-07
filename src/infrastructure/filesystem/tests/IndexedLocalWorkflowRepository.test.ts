@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../domain/workflows/tests/testUtils";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { IndexedLocalWorkflowRepository } from "../IndexedLocalWorkflowRepository";
 import { SqliteWorkflowIndexDatabase } from "../SqliteWorkflowIndexDatabase";
@@ -69,3 +69,4 @@ describe("IndexedLocalWorkflowRepository", () => {
     }
   });
 });
+

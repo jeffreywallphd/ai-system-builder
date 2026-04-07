@@ -1,17 +1,17 @@
-import type {
+﻿import type {
   CanonicalDataShape,
-} from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import type { IMediaDatasetValidator } from "../../../../domain/dataset-studio/interfaces/MediaValidation";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import type { IMediaDatasetValidator } from "@domain/dataset-studio/interfaces/MediaValidation";
 import {
   createSchemaIntentValidationIssue,
   createSchemaIntentValidationResult,
   DatasetSchemaIntentIds,
   type IMediaSchemaIntent,
-} from "../../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   ImageRecordContractIdentifier,
   ImageRecordSchemaVersions,
-} from "../../../../domain/dataset-studio/contracts/ImageRecordVersioning";
+} from "@domain/dataset-studio/contracts/ImageRecordVersioning";
 import { createDefaultMediaValidationAdapters } from "../validation/MediaValidationFactory";
 
 export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
@@ -60,3 +60,4 @@ export class MediaSchemaIntentAdapter implements IMediaSchemaIntent {
     return createSchemaIntentValidationResult(issues);
   }
 }
+

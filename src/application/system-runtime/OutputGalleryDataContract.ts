@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
   z.string(),
@@ -99,3 +99,4 @@ export function validateOutputGalleryItem(input: unknown): OutputGalleryItem {
 export function validateOutputGalleryListing(input: unknown): OutputGalleryListing {
   return OutputGalleryListingSchema.parse(input);
 }
+

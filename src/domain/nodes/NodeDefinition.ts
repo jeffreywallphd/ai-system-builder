@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   INodeDefinition,
   INodeDefinitionCapabilityProfile,
   NodeExecutionKind,
@@ -10,8 +10,8 @@ import type {
   IModelCompatibility,
   ModelTask,
   RuntimeEngine,
-} from "../../domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../domain/models/interfaces/IModelDependency";
+} from "@domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "@domain/models/interfaces/IModelDependency";
 import { Node } from "./Node";
 
 function normalize(value: string): string {
@@ -161,3 +161,4 @@ export class NodeDefinition implements INodeDefinition {
     return !!this.capabilities.modelCompatibility;
   }
 }
+

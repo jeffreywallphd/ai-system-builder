@@ -1,14 +1,14 @@
-import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetInstanceImageGenerationRoles,
-} from "../../../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import type {
   IComfyAdapterResult,
-} from "../../../../application/execution/comfyui/ComfyAdapterContract";
+} from "@application/execution/comfyui/ComfyAdapterContract";
 import {
   validateWorkflowOutputMaterializationPayload,
   type WorkflowOutputMaterializationPayload,
-} from "../../../../application/system-runtime/WorkflowOutputMaterializationContract";
+} from "@application/system-runtime/WorkflowOutputMaterializationContract";
 
 export interface ComfyExecutionResultMaterializationMappingRequest {
   readonly workflowRun: {
@@ -176,3 +176,4 @@ export class ComfyExecutionResultMaterializationMapper {
     return undefined;
   }
 }
+

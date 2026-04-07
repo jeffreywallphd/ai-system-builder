@@ -1,14 +1,14 @@
-import type { IWorkflowRecordSummary } from "../../application/ports/interfaces/IWorkflowRepository";
-import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
-import { McpToolCallNodeConfigurationService } from "../../application/mcp/McpToolCallNodeConfigurationService";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import { Workflow } from "../../domain/workflows/Workflow";
-import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
+﻿import type { IWorkflowRecordSummary } from "@application/ports/interfaces/IWorkflowRepository";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
+import { McpToolCallNodeConfigurationService } from "@application/mcp/McpToolCallNodeConfigurationService";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
 import {
   WorkflowAuditInfo,
   WorkflowMetadata,
   WorkflowRuntimeProfile,
-} from "../../domain/workflows/WorkflowMetadata";
+} from "@domain/workflows/WorkflowMetadata";
 
 export interface WorkflowRecord {
   readonly id: string;
@@ -269,3 +269,4 @@ export class WorkflowPersistenceCodec {
     });
   }
 }
+

@@ -1,19 +1,19 @@
-import type { AgentPlanningStrategy } from "../../domain/agents/Agent";
-import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
-import type { AgentToolAccessPolicy, AgentPolicy } from "../../domain/agents/AgentPolicy";
-import type { ConfigureAgentGoalsRequest } from "../../application/agents/ConfigureAgentGoalsUseCase";
+﻿import type { AgentPlanningStrategy } from "@domain/agents/Agent";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
+import type { AgentToolAccessPolicy, AgentPolicy } from "@domain/agents/AgentPolicy";
+import type { ConfigureAgentGoalsRequest } from "@application/agents/ConfigureAgentGoalsUseCase";
 import type {
   AgentLaunchReadModel,
   AgentRunControlAction,
   AgentRunRequest,
   AgentSessionDetailReadModel,
   AgentSessionSummaryReadModel,
-} from "../../application/agents/contracts/AgentRunContracts";
-import type { CreateAgentRequest } from "../../application/agents/CreateAgentUseCase";
+} from "@application/agents/contracts/AgentRunContracts";
+import type { CreateAgentRequest } from "@application/agents/CreateAgentUseCase";
 import { resolveDesktopAgentBridge } from "../composition/DesktopAgentBridgeAdapter";
-import type { AgentAuthoringApiReadModel } from "../../infrastructure/api/agents/AgentAuthoringBackendApi";
-import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "../../infrastructure/api/agents/AgentStudioBackendApi";
-import type { TriggerAgentLaunchRequest } from "../../application/agents/TriggerAgentLaunchUseCase";
+import type { AgentAuthoringApiReadModel } from "@infrastructure/api/agents/AgentAuthoringBackendApi";
+import type { AgentStudioApiResponse, AgentStudioSnapshotReadModel } from "@infrastructure/api/agents/AgentStudioBackendApi";
+import type { TriggerAgentLaunchRequest } from "@application/agents/TriggerAgentLaunchUseCase";
 
 export class AgentStudioService {
   private requireBridge() {
@@ -97,3 +97,4 @@ export class AgentStudioService {
     return JSON.parse(raw) as AgentStudioApiResponse<AgentAuthoringApiReadModel>;
   }
 }
+

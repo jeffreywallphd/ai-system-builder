@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { PythonRuntimeConfig } from "../../../config/PythonRuntimeConfig";
 import { HttpMcpRuntimeClient } from "../HttpMcpRuntimeClient";
 
@@ -264,3 +264,4 @@ describe("HttpMcpRuntimeClient", () => {
     ]);
   });
 });
+

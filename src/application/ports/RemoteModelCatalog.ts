@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   IRemoteModelCatalog,
   IRemoteModelCatalogItem,
@@ -348,3 +348,4 @@ export class RemoteModelCatalog implements IRemoteModelCatalog {
     );
   }
 }
+

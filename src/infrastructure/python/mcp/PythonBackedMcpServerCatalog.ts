@@ -1,7 +1,7 @@
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
+﻿import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
 
 export interface IMcpServerCatalogRuntimeClient {
   getConnectionStatus(): Promise<McpConnectionStatus>;
@@ -34,3 +34,4 @@ export class PythonBackedMcpServerCatalog implements IMcpServerCatalog {
     return serverStatus;
   }
 }
+

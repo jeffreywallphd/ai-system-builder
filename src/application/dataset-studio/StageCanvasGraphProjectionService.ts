@@ -1,6 +1,6 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { StageFlowDefinition, StageFlowRuntimeState } from "../../domain/dataset-studio/StageFlowDefinition";
-import type { DatasetPipelineStageDefinition, DatasetPipelineStageExecutionMode } from "../../domain/dataset-studio/StagePipelineDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { StageFlowDefinition, StageFlowRuntimeState } from "@domain/dataset-studio/StageFlowDefinition";
+import type { DatasetPipelineStageDefinition, DatasetPipelineStageExecutionMode } from "@domain/dataset-studio/StagePipelineDomain";
 import type { PipelineTemplateInstance } from "./TemplateService";
 import type { StageRuntimeTracking } from "./StageMetadataContracts";
 import { StageAssetMappingService } from "./StageAssetMappingService";
@@ -13,7 +13,7 @@ import type {
   UnifiedIngestionOutputTargetKind,
   UnifiedIngestionSourceKind,
   UnifiedIngestionStrategyKind,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 export type StageCanvasProjectionSource = "wizard" | "template" | "saved";
 export type StageCanvasStageStatus = "current" | "completed" | "skipped" | "pending";
@@ -395,3 +395,4 @@ export function createStageCanvasGraphProjectionService(
 ): StageCanvasGraphProjectionService {
   return new StageCanvasGraphProjectionService(mappingService);
 }
+

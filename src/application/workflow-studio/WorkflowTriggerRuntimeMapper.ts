@@ -1,4 +1,4 @@
-import {
+﻿import {
   createEmptyWorkflowDraft,
   normalizeWorkflowDraft,
   normalizeWorkflowDraftTriggerConfig,
@@ -10,7 +10,7 @@ import {
   type WorkflowDraftTemporalTriggerConfig,
   type WorkflowDraftTrigger,
   type WorkflowDraftUserTriggerConfig,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 export interface WorkflowRuntimeTriggerDescriptorBase {
   readonly triggerId: string;
@@ -198,3 +198,4 @@ export function inferWorkflowDraftTriggerRuntimeReadiness(draft: WorkflowDraft):
     reason: "ready",
   });
 }
+

@@ -1,5 +1,5 @@
-import type { ContextInspectionResult } from "../../../application/context/models/ContextInspectionResult";
-import type { ContextProvenanceEntry } from "../../../application/context/models/ContextProvenanceEntry";
+﻿import type { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
+import type { ContextProvenanceEntry } from "@application/context/models/ContextProvenanceEntry";
 
 export interface ContextInspectionPanelProps {
   readonly inspection?: ContextInspectionResult;
@@ -79,7 +79,7 @@ export default function ContextInspectionPanel({ inspection }: ContextInspection
                   <div className="ui-stack ui-stack--2xs" style={{ minWidth: 0 }}>
                     <div className="ui-heading-4">{entry.title ?? entry.fragmentId}</div>
                     <div className="ui-text-secondary ui-text-small">
-                      {entry.kind} · order {entry.order} · priority {entry.precedence}
+                      {entry.kind} Â· order {entry.order} Â· priority {entry.precedence}
                     </div>
                   </div>
 
@@ -128,3 +128,4 @@ export default function ContextInspectionPanel({ inspection }: ContextInspection
     </section>
   );
 }
+

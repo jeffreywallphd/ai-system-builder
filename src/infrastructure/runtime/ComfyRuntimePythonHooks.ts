@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+﻿import { execFile } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -17,7 +17,7 @@ import {
   type ComfyRuntimeOrchestrationContext,
   type ComfyRuntimeOrchestrationIssue,
   type ComfyRuntimeOrchestrationPhaseHookResult,
-} from "../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+} from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 import {
   PythonDependencyInstallStatuses,
   PythonEnvironmentProvisioningStatuses,
@@ -35,7 +35,7 @@ import {
   type PythonRuntimeDetectionResult,
   type PythonRuntimeEnvironmentProvisioningResult,
   type PythonRuntimeProvisioningIssue,
-} from "../../application/runtime/PythonRuntimeProvisioningContract";
+} from "@application/runtime/PythonRuntimeProvisioningContract";
 
 const execFileAsync = promisify(execFile);
 const ENVIRONMENT_STATE_FILENAME = ".ai-loom-comfy-python-environment.json";
@@ -903,3 +903,4 @@ function bufferToString(value: string | Buffer | undefined): string {
   }
   return typeof value === "string" ? value : value.toString("utf8");
 }
+

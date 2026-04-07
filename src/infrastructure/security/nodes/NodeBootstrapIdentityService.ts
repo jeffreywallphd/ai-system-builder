@@ -1,4 +1,4 @@
-import { access, chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+﻿import { access, chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { createHash, createPublicKey, generateKeyPairSync, randomUUID } from "node:crypto";
 import path from "node:path";
@@ -10,8 +10,8 @@ import {
   type NodeCapabilityProfile,
   type NodeRoleCapability,
   type NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
-import type { NodeEnrollmentSubmissionRequestDto } from "../../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@domain/nodes/NodeTrustDomain";
+import type { NodeEnrollmentSubmissionRequestDto } from "@shared/contracts/nodes/NodeTrustApiContracts";
 
 const BOOTSTRAP_RECORD_FILE_NAME = "node-bootstrap-record.json";
 const PRIVATE_KEY_FILE_NAME = "node-bootstrap-private-key.pem";
@@ -364,3 +364,4 @@ function normalizeIsoTimestamp(value: unknown): string | undefined {
   }
   return parsed.toISOString();
 }
+

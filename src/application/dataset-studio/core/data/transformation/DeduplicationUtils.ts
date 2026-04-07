@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import { compareFuzzyStrings } from "./FuzzyStringMatching";
 import {
   normalizeComparableValue,
@@ -186,3 +186,4 @@ export function findFuzzyDuplicateGroupsByFields(
     } satisfies DeduplicationGroup);
   }));
 }
+

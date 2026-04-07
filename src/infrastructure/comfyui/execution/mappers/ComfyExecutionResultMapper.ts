@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   IComfyAdapterOutputRecord,
   IComfyAdapterResult,
   IComfyAdapterAssetReference,
   IComfyAdapterExecutionContext,
-} from "../../../../application/execution/comfyui/ComfyAdapterContract";
+} from "@application/execution/comfyui/ComfyAdapterContract";
 import type {
   IComfyPromptCompletion,
   IComfyPromptOutputArtifact,
@@ -114,3 +114,4 @@ export class ComfyExecutionResultMapper {
     });
   }
 }
+

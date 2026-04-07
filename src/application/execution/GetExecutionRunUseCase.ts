@@ -1,5 +1,5 @@
-import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
-import type { IExecutionRunRecord } from "../../domain/execution/ExecutionRun";
+﻿import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 
 export class GetExecutionRunUseCase {
   constructor(private readonly executionRunRepository: IExecutionRunRepository) {}
@@ -8,3 +8,4 @@ export class GetExecutionRunUseCase {
     return this.executionRunRepository.getRunById(runId.trim());
   }
 }
+

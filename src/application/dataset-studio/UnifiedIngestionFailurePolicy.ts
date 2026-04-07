@@ -1,9 +1,9 @@
-import {
+﻿import {
   UnifiedIngestionIssueCodes,
   type UnifiedIngestionDetectionResult,
   type UnifiedIngestionIssue,
   type UnifiedIngestionRouteResult,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 export const UnifiedIngestionFailureDispositions = Object.freeze({
   recoverable: "recoverable",
@@ -139,3 +139,4 @@ export function deriveUnifiedIngestionFallbackDecisions(input: {
 
   return Object.freeze(decisions);
 }
+

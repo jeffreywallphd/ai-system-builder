@@ -1,4 +1,4 @@
-import type { SecretScope, SecretScopeOwner } from "../../../domain/security/SecretDomain";
+﻿import type { SecretScope, SecretScopeOwner } from "@domain/security/SecretDomain";
 
 export interface SecretActorDiagnosticDto {
   readonly actorId: string;
@@ -94,3 +94,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

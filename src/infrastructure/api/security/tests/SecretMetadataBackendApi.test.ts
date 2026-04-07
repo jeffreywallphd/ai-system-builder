@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { SecretKinds, SecretRecordStates, SecretScopes, type SecretReference } from "../../../../domain/security/SecretDomain";
-import { SecretServiceErrorCodes } from "../../../../application/security/use-cases/SecretManagementServiceContracts";
-import { WorkspaceMembershipStatuses } from "../../../../domain/workspaces/WorkspaceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretKinds, SecretRecordStates, SecretScopes, type SecretReference } from "@domain/security/SecretDomain";
+import { SecretServiceErrorCodes } from "@application/security/use-cases/SecretManagementServiceContracts";
+import { WorkspaceMembershipStatuses } from "@domain/workspaces/WorkspaceDomain";
 import { SecretMetadataBackendApi } from "../SecretMetadataBackendApi";
 import { SecretMetadataApiErrorCodes } from "../sdk/PublicSecretMetadataApiContract";
 
@@ -446,3 +446,4 @@ function createReference(input: {
     updatedAt: "2026-04-05T20:00:00.000Z",
   });
 }
+

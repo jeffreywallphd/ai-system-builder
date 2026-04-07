@@ -1,6 +1,6 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
-import type { FormSchema } from "../../../application/projection/models/FormSchema";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
+import type { FormSchema } from "@application/projection/models/FormSchema";
 import type { WorkflowOutputViewModel } from "../../presenters/WorkflowOutputPresenter";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import WorkflowFormSection from "./WorkflowFormSection";
@@ -37,3 +37,4 @@ export default function WorkflowFormView({
     </div>
   );
 }
+

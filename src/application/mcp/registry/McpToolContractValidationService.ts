@@ -1,4 +1,4 @@
-import type { McpToolDefinition } from "../../../domain/mcp/McpToolCapability";
+﻿import type { McpToolDefinition } from "@domain/mcp/McpToolCapability";
 
 export interface McpContractValidationIssue {
   readonly path: string;
@@ -144,3 +144,4 @@ function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined
   }
   return value as Readonly<Record<string, unknown>>;
 }
+

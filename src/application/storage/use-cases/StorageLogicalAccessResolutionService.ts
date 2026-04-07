@@ -1,4 +1,4 @@
-import { StorageDomainError } from "../../../domain/storage/StorageDomain";
+﻿import { StorageDomainError } from "@domain/storage/StorageDomain";
 import type { IStorageInstanceRepository } from "../ports/IStorageInstanceRepository";
 import type { IStorageObjectAccessResolverPort } from "../ports/StorageObjectAccessResolverPort";
 import {
@@ -189,3 +189,4 @@ class InputValidationError extends Error {
     this.name = "InputValidationError";
   }
 }
+

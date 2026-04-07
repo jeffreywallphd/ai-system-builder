@@ -1,10 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   StorageInstanceLifecycleInfrastructure,
-} from "../../../application/system-runtime/StorageInstanceLifecycleService";
-import type { StorageInstanceMetadata } from "../../../application/system-runtime/StorageInstanceMetadataModel";
-import { parseStorageLogicalReference } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
+} from "@application/system-runtime/StorageInstanceLifecycleService";
+import type { StorageInstanceMetadata } from "@application/system-runtime/StorageInstanceMetadataModel";
+import { parseStorageLogicalReference } from "@application/system-runtime/StorageInstanceProvisioningContract";
 
 export class LocalStorageInstanceLifecycleInfrastructure implements StorageInstanceLifecycleInfrastructure {
   public constructor(private readonly storageRootDirectory: string) {}
@@ -75,3 +75,4 @@ function sanitizeSegment(value: string): string {
   }
   return normalized;
 }
+

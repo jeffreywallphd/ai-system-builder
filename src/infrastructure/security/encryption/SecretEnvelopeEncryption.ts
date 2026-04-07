@@ -1,5 +1,5 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
-import type { KeyEncryptionContext, SecretScopeOwner } from "../../../domain/security/SecretDomain";
+﻿import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+import type { KeyEncryptionContext, SecretScopeOwner } from "@domain/security/SecretDomain";
 
 const ENVELOPE_SCHEMA = "ai-loom-secret-envelope";
 const ENVELOPE_VERSION = 1;
@@ -574,3 +574,4 @@ function asScope(value: unknown): SecretScopeOwner["scope"] {
   }
   throw new SecretEnvelopeEncryptionError(`Secret envelope context scope '${String(value)}' is invalid.`);
 }
+

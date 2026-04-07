@@ -1,5 +1,5 @@
-import { AuthorizationPermissionCatalog, type CatalogPermissionKey } from "../../../domain/authorization/AuthorizationPermissionCatalog";
-import type { RoleAssignment } from "../../../domain/authorization/AuthorizationDomain";
+﻿import { AuthorizationPermissionCatalog, type CatalogPermissionKey } from "@domain/authorization/AuthorizationPermissionCatalog";
+import type { RoleAssignment } from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationPolicyDecision,
   AuthorizationResourcePolicyMetadata,
@@ -14,7 +14,7 @@ import {
   mapAuthorizationSchemaValidationError,
   toAuthorizationFailure,
 } from "./AuthorizationAdministrationUseCaseShared";
-import { parseAuthorizationPolicyEvaluationRequestDto } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+import { parseAuthorizationPolicyEvaluationRequestDto } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import { AuthorizationPolicyEvaluationTargetKinds } from "../contracts/AuthorizationPolicyEvaluationContracts";
 
 export interface ListAuthorizationEffectiveAccessUseCaseInput {
@@ -197,3 +197,4 @@ function buildPermissionExplanation(input: {
     }),
   });
 }
+

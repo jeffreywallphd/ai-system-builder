@@ -1,7 +1,7 @@
-import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
-import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
-import type { ToolCapabilityInvocationResult } from "../../application/tools/models/ToolCapabilityInvocationResult";
-import { RunToolUseCase } from "../../application/tools/RunToolUseCase";
+﻿import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
+import type { ToolCapabilityInvocationRequest } from "@application/tools/models/ToolCapabilityInvocationRequest";
+import type { ToolCapabilityInvocationResult } from "@application/tools/models/ToolCapabilityInvocationResult";
+import { RunToolUseCase } from "@application/tools/RunToolUseCase";
 
 export class WorkflowToolCapabilityExecutor implements IToolCapabilityExecutor {
   constructor(private readonly runToolUseCase: RunToolUseCase) {}
@@ -41,3 +41,4 @@ export class WorkflowToolCapabilityExecutor implements IToolCapabilityExecutor {
     });
   }
 }
+

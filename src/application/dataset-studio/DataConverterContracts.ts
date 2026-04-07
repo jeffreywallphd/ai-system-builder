@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   CanonicalDataMetadata,
   CanonicalDataShape,
   CanonicalImageMetadataRecordsShape,
@@ -6,7 +6,7 @@ import type {
   CanonicalRecordsShape,
   CanonicalTableShape,
   CanonicalTextItemsShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const DataConverterOperationKinds = Object.freeze({
   sourceToRecords: "source-to-records",
@@ -312,3 +312,4 @@ export function resolveFormatFromReference(reference: DataSourceReference): "jso
 
   return undefined;
 }
+

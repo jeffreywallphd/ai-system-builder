@@ -1,6 +1,6 @@
-import type { ExecutionContext } from "../../../domain/system-runtime/SystemRuntimeDomain";
-import type { ExecutionAccessContext } from "../../../application/system-runtime/RuntimeAccessControlService";
-import type { ExternalExecutionEnvironmentRequest, SerializedExecutionEnvironment } from "../../../application/system-runtime/ExecutionEnvironmentConfigurationValidator";
+﻿import type { ExecutionContext } from "@domain/system-runtime/SystemRuntimeDomain";
+import type { ExecutionAccessContext } from "@application/system-runtime/RuntimeAccessControlService";
+import type { ExternalExecutionEnvironmentRequest, SerializedExecutionEnvironment } from "@application/system-runtime/ExecutionEnvironmentConfigurationValidator";
 import {
   type AsyncExecutionStartResponse,
   type ExecutionCallbackRegistrationRequest,
@@ -15,7 +15,7 @@ import {
   type SystemRuntimeApiResponse,
 } from "./SystemRuntimeBackendApi";
 import type { RuntimeApiAuthenticationRequest } from "./RuntimeApiAuthentication";
-import type { ExecutionCallbackRegistration } from "../../../domain/system-runtime/ExecutionCallbackDomain";
+import type { ExecutionCallbackRegistration } from "@domain/system-runtime/ExecutionCallbackDomain";
 import type { ExecutionUpdateEvent, ExecutionUpdateEventKind, ExecutionUpdateSubscription } from "./ExecutionUpdateStream";
 import { BoundedExternalRetryPolicy, buildRetryAttemptRecord, InMemoryRequestReplayGuard, type ExternalRetryPolicy, type RequestReplayGuard } from "./ExternalRetryPolicy";
 
@@ -405,3 +405,4 @@ export class ExternalSystemRuntimeInterface {
     });
   }
 }
+

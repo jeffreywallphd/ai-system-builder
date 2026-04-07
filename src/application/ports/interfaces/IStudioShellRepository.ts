@@ -1,5 +1,5 @@
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+﻿import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 
 export interface IStudioShellRepository {
   saveStudio(studio: Studio): Promise<Studio>;
@@ -17,3 +17,4 @@ export interface IStudioShellRepository {
   getAssetVersion(versionId: string): Promise<AssetVersion | undefined>;
   listAssetVersionsByAssetId(assetId: string): Promise<ReadonlyArray<AssetVersion>>;
 }
+

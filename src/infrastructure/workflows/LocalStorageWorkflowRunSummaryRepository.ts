@@ -1,15 +1,15 @@
-import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
+﻿import type { IWorkflowRunSummaryRepository } from "@application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
   WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
   normalizeWorkflowRunSummaryRecord,
   normalizeWorkflowRunDetailRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -186,3 +186,4 @@ export class LocalStorageWorkflowRunSummaryRepository implements IWorkflowRunSum
     this.storage.setItem(this.detailStorageKey, JSON.stringify(records));
   }
 }
+

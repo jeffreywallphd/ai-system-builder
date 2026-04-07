@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import {
   ManagedServiceKinds,
   ManagedServiceOwnership,
   ManagedServiceStartPolicies,
   ManagedServiceStates,
-} from "../../../application/services/interfaces/ManagedServiceTypes";
-import { ManagedServiceRestartPolicies, ManagedServiceTransports } from "../../../application/services/ManagedServiceDefinition";
+} from "@application/services/interfaces/ManagedServiceTypes";
+import { ManagedServiceRestartPolicies, ManagedServiceTransports } from "@application/services/ManagedServiceDefinition";
 import { NodeProcessRuntimeEventSink } from "../../python/runtime/NodeProcessRuntimeEventSink";
 import { InMemoryManagedServiceDefinitionRegistry } from "../InMemoryManagedServiceDefinitionRegistry";
 import { HttpManagedServiceManager } from "../HttpManagedServiceManager";
@@ -145,3 +145,4 @@ describe("HttpManagedServiceManager", () => {
     expect(store.list().map((event) => event.message)).toEqual(logMessages);
   });
 });
+

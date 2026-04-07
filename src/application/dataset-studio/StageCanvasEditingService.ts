@@ -1,8 +1,8 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DatasetPipelineStageDefinition, DatasetPipelineStageKind } from "../../domain/dataset-studio/StagePipelineDomain";
-import { DatasetPipelineStageExecutionModes } from "../../domain/dataset-studio/StagePipelineDomain";
-import { createStageFlowDefinition } from "../../domain/dataset-studio/StageFlowDefinition";
-import type { PipelineTemplate } from "../../domain/dataset-studio/PipelineTemplateDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DatasetPipelineStageDefinition, DatasetPipelineStageKind } from "@domain/dataset-studio/StagePipelineDomain";
+import { DatasetPipelineStageExecutionModes } from "@domain/dataset-studio/StagePipelineDomain";
+import { createStageFlowDefinition } from "@domain/dataset-studio/StageFlowDefinition";
+import type { PipelineTemplate } from "@domain/dataset-studio/PipelineTemplateDomain";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 import {
   StageCanvasGraphProjectionService,
@@ -340,3 +340,4 @@ export function createStageCanvasEditingService(options?: {
 }): StageCanvasEditingService {
   return new StageCanvasEditingService(options);
 }
+

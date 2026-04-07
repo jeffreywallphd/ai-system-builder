@@ -1,5 +1,5 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { IntentDefinition } from "../../domain/dataset-studio/IntentDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { IntentDefinition } from "@domain/dataset-studio/IntentDomain";
 import {
   areStageContractsCompatible,
   createInitialStageFlowRuntimeState,
@@ -13,9 +13,9 @@ import {
   type StageFlowConditionalTransition,
   type StageFlowDefinition,
   type StageFlowRuntimeState,
-} from "../../domain/dataset-studio/StageFlowDefinition";
-import type { DatasetPipelineStageDefinition } from "../../domain/dataset-studio/StagePipelineDomain";
-import type { PipelineTemplate } from "../../domain/dataset-studio/PipelineTemplateDomain";
+} from "@domain/dataset-studio/StageFlowDefinition";
+import type { DatasetPipelineStageDefinition } from "@domain/dataset-studio/StagePipelineDomain";
+import type { PipelineTemplate } from "@domain/dataset-studio/PipelineTemplateDomain";
 import {
   StageExecutionDispositions,
   StageExecutionPolicy,
@@ -809,3 +809,4 @@ export class WizardFlowEngine {
 export function createWizardFlowEngine(options: WizardFlowEngineOptions): WizardFlowEngine {
   return new WizardFlowEngine(options);
 }
+

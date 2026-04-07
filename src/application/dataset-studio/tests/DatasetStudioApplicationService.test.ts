@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { AssetDraft, AssetSession, Studio } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { AssetDraft, AssetSession, Studio } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { DatasetStudioApplicationService } from "../DatasetStudioApplicationService";
-import { DatasetStudioIdentity } from "../../../domain/dataset-studio/DatasetStudioDomain";
+import { DatasetStudioIdentity } from "@domain/dataset-studio/DatasetStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -104,3 +104,4 @@ describe("DatasetStudioApplicationService", () => {
     })).rejects.toThrow("contract-missing");
   });
 });
+

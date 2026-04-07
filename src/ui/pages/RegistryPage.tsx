@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import type { ExploreAssetSummary, ExploreFacet, ExploreFilterSet } from "../../application/asset-registry/ExploreAssetQueryService";
+import type { ExploreAssetSummary, ExploreFacet, ExploreFilterSet } from "@application/asset-registry/ExploreAssetQueryService";
 import { ExploreAssetList } from "../components/explore/ExploreAssetList";
 import { ExploreFilterPanel } from "../components/explore/ExploreFilterPanel";
 import { SearchBar } from "../components/registry/SearchBar";
@@ -167,3 +167,4 @@ export default function RegistryPage(): JSX.Element {
     </section>
   );
 }
+

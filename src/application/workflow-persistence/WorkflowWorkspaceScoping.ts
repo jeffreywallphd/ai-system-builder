@@ -1,10 +1,10 @@
-import type { WorkspaceOwnershipMetadata, WorkspaceVisibility } from "../../shared/workspaces/WorkspaceOwnership";
+﻿import type { WorkspaceOwnershipMetadata, WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import {
   createWorkspaceOwnershipMetadata,
   rehydrateWorkspaceOwnershipMetadata,
   WorkspaceOwnershipError,
-} from "../../shared/workspaces/WorkspaceOwnership";
-import type { WorkflowPersistenceOwnershipContext } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@shared/workspaces/WorkspaceOwnership";
+import type { WorkflowPersistenceOwnershipContext } from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import { WorkflowPersistenceInvalidRequestError } from "./WorkflowPersistenceErrors";
 
 export interface ProtectedResourceActorContext {
@@ -139,4 +139,5 @@ export function resolveWorkflowWorkspaceScoping(
     throw new WorkflowPersistenceInvalidRequestError("Invalid workspace scoping input.");
   }
 }
+
 

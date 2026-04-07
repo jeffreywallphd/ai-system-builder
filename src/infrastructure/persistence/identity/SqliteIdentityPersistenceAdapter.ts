@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   IdentityErrorCode,
@@ -11,25 +11,25 @@ import type {
   IdentitySessionTokenMaterialRecord,
   IdentitySessionListQuery,
   IdentityUserIdentityListQuery,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
   identitySuccess,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
-import type { IIdentitySessionRepository } from "../../../../application/identity/ports/IIdentitySessionRepository";
-import type { IIdentitySessionTokenMaterialRepository } from "../../../../application/identity/ports/IIdentitySessionTokenMaterialRepository";
-import type { IPlatformTransactionManager } from "../../../application/common/ports/PlatformTransactionPorts";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityPersistenceRepository } from "@application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentitySessionRepository } from "@application/identity/ports/IIdentitySessionRepository";
+import type { IIdentitySessionTokenMaterialRepository } from "@application/identity/ports/IIdentitySessionTokenMaterialRepository";
+import type { IPlatformTransactionManager } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   AuthProvider,
   CredentialPolicy,
   Session,
   UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   mapAuthProviderRowToDomain,
   mapAuthProviderToRowValues,
@@ -906,3 +906,4 @@ export class SqliteIdentityPersistenceAdapter
     return mapUserIdentityRowToDomain(row, links);
   }
 }
+

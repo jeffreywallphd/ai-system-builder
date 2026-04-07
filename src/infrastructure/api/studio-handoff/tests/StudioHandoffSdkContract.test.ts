@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { StudioHandoffClient, type StudioHandoffSdkTransport } from "../sdk";
 import {
   toStudioHandoffSdkInitiateResponse,
   toStudioHandoffSdkRetryResponse,
   toStudioHandoffSdkStatusResponse,
 } from "../sdk/StudioHandoffSdkMapper";
-import type { PersistedStudioHandoffRecord } from "../../../../application/studio-handoff/StudioHandoffPersistenceService";
+import type { PersistedStudioHandoffRecord } from "@application/studio-handoff/StudioHandoffPersistenceService";
 
 function createRecord(): PersistedStudioHandoffRecord {
   return Object.freeze({
@@ -168,3 +168,4 @@ describe("Studio handoff SDK contract", () => {
     });
   });
 });
+

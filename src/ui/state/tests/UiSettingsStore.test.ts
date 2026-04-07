@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AppRuntimeConfig } from "../../../infrastructure/config/AppRuntimeConfig";
+﻿import { describe, expect, it } from "bun:test";
+import { AppRuntimeConfig } from "@infrastructure/config/AppRuntimeConfig";
 import {
   LocalStorageUiSettingsStorage,
   UiSettingsStore,
@@ -236,3 +236,4 @@ describe("UiSettingsStore", () => {
     expect(adapter.load()?.development?.devSyncBaseUrl).toBe("http://dev-sync.local");
   });
 });
+

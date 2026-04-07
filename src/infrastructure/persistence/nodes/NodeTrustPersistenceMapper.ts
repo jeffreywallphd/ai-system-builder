@@ -1,4 +1,4 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeHeartbeatStatuses,
@@ -16,15 +16,15 @@ import {
   type NodeRoleCapability,
   type NodeTrustState,
   type NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import {
   parseNodeEnrollmentRequestPersistenceRecord,
   parseNodeIdentityPersistenceRecord,
-} from "../../../shared/schemas/nodes/NodeTrustPersistenceSchemaContracts";
+} from "@shared/schemas/nodes/NodeTrustPersistenceSchemaContracts";
 
 export interface NodeIdentityRow {
   readonly node_id: string;
@@ -364,3 +364,4 @@ function assertNodeEnrollmentRequestStatus(value: string): NodeEnrollmentRequest
   }
   throw new Error(`Persisted node enrollment request status '${value}' is invalid.`);
 }
+

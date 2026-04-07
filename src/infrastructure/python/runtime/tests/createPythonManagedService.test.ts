@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ManagedServicePythonRuntimeManagerAdapter } from "../../../../application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { ManagedServicePythonRuntimeManagerAdapter } from "@application/services/adapters/ManagedServicePythonRuntimeManagerAdapter";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { NodeProcessRuntimeEventSink } from "../NodeProcessRuntimeEventSink";
 import { createPythonManagedService } from "../createPythonManagedService";
 import { PythonRuntimeConfig } from "../../../config/PythonRuntimeConfig";
@@ -129,3 +129,4 @@ describe("createPythonManagedService", () => {
     expect(managedService.pythonRuntimeManager.getStatus().detail).toBe("Python runtime is disabled in settings.");
   });
 });
+

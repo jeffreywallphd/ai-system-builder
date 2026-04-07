@@ -1,4 +1,4 @@
-import type { INode } from "../../../../domain/nodes/interfaces/INode";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
 import type { IWorkflowConnection } from "./IWorkflowConnection";
 
 /**
@@ -144,3 +144,4 @@ export interface IWorkflowGraph {
    */
   validate(): IWorkflowGraphValidationResult;
 }
+

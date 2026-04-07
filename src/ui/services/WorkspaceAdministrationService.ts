@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpWorkspaceAdministrationClient,
   type WorkspaceAdministrationClient,
-} from "../shared/workspaces/WorkspaceAdministrationClient";
+} from "@shared/workspaces/WorkspaceAdministrationClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class WorkspaceAdministrationService {
@@ -93,3 +93,4 @@ function createDefaultWorkspaceAdministrationClient(): WorkspaceAdministrationCl
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpWorkspaceAdministrationClient(baseUrl);
 }
+

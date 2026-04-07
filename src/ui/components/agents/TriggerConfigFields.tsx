@@ -1,4 +1,4 @@
-import { AgentTriggerKinds, type AgentTriggerKind } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import { AgentTriggerKinds, type AgentTriggerKind } from "@application/agents/contracts/AgentRunContracts";
 
 interface TriggerConfigFieldsProps {
   readonly triggerKind: AgentTriggerKind;
@@ -35,3 +35,4 @@ export function TriggerConfigFields(props: TriggerConfigFieldsProps): JSX.Elemen
     </>
   );
 }
+

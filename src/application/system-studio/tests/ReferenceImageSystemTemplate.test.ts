@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetSchemaIntentIds } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import { DatasetInstanceRoles } from "../../../domain/system-runtime/DatasetInstanceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DatasetInstanceRoles } from "@domain/system-runtime/DatasetInstanceDomain";
 import {
   buildReferenceImageDatasetInstanceRequests,
   ReferenceImagePrimaryWorkflowTemplateAssetId,
@@ -112,3 +112,4 @@ describe("ReferenceImageSystemTemplate", () => {
     expect(mappingIds).toContain("reference-image.metadata.dataset-runtime-handles");
   });
 });
+

@@ -1,9 +1,9 @@
-import type { ModelTrainingApplicationService } from "../../application/model-training/ModelTrainingApplicationService";
+﻿import type { ModelTrainingApplicationService } from "@application/model-training/ModelTrainingApplicationService";
 import type {
   GetModelTrainingStudioSummaryQuery,
   PromoteModelTrainingJobCommand,
   SubmitModelTrainingJobCommand,
-} from "../../application/model-training/contracts";
+} from "@application/model-training/contracts";
 
 export class ModelTrainingService {
   constructor(private readonly applicationService: ModelTrainingApplicationService) {}
@@ -40,3 +40,4 @@ export class ModelTrainingService {
     return this.applicationService.submitJob(command);
   }
 }
+

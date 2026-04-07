@@ -1,16 +1,16 @@
-import type {
+﻿import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
   IWorkflowExecutor,
-} from "../../../application/ports/interfaces/IWorkflowExecutor";
+} from "@application/ports/interfaces/IWorkflowExecutor";
 import {
   WorkflowExecutionEvent,
   WorkflowExecutionHandle,
   WorkflowExecutionProgress,
   WorkflowExecutionResult,
-} from "../../../application/ports/WorkflowExecutor";
+} from "@application/ports/WorkflowExecutor";
 
 export interface IPreviewWorkflowExecutorOptions {
   readonly startDelayMs?: number;
@@ -172,3 +172,4 @@ export class PreviewWorkflowExecutor implements IWorkflowExecutor {
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+

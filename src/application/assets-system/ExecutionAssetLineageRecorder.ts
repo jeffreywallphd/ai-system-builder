@@ -1,9 +1,9 @@
-import type { IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
+﻿import type { IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
 import type { IWorkflowExecutionInput } from "../ports/interfaces/IWorkflowExecutor";
 import { ProjectArtifactToAssetSystemUseCase } from "./ProjectArtifactToAssetSystemUseCase";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
-import type { DatasetGenerationRequest, DatasetGenerationResult } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { DatasetGenerationRequest, DatasetGenerationResult } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import type { SubmitModelTrainingJobRequest } from "../ports/interfaces/IModelTrainingRuntime";
 import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 
@@ -174,3 +174,4 @@ export class ExecutionAssetLineageRecorder {
     return Object.freeze([...unique]);
   }
 }
+

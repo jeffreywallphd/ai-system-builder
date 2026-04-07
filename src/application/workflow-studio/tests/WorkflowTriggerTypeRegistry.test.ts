@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftTemporalScheduleModes,
   WorkflowDraftTriggerKinds,
@@ -6,7 +6,7 @@ import {
   WorkflowDraftUserTriggerScopes,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   WorkflowTriggerTypeRegistry,
   createDefaultWorkflowTriggerTypeRegistry,
@@ -136,3 +136,4 @@ describe("WorkflowTriggerTypeRegistry", () => {
     ])).toThrow("already registered");
   });
 });
+

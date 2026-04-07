@@ -1,12 +1,12 @@
-import type {
+﻿import type {
   UnifiedIngestionConfigMode,
   UnifiedIngestionDetectionResult,
   UnifiedIngestionIssue,
   UnifiedIngestionOutputTargetKind,
   UnifiedIngestionRouteResolution,
   UnifiedIngestionSourceReference,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
-import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
+import type { DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -14,8 +14,8 @@ import {
   UnifiedIngestionNormalizationVersion,
   UnifiedIngestionOutputTargetKinds,
   type UnifiedIngestionNormalizedOutput,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
-import type { CanonicalDataShape, CanonicalDataShapeKind } from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
+import type { CanonicalDataShape, CanonicalDataShapeKind } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export interface UnifiedIngestionNormalizationRequest {
   readonly source: UnifiedIngestionSourceReference;
@@ -254,4 +254,5 @@ export class UnifiedIngestionNormalizationPipeline {
     });
   }
 }
+
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteIdentityLifecycleEventPublisher } from "../SqliteIdentityLifecycleEventPublisher";
 
@@ -67,3 +67,4 @@ describe("SqliteIdentityLifecycleEventPublisher", () => {
     db.close();
   });
 });
+

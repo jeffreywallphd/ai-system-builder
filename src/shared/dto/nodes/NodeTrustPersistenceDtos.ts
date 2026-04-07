@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   NodeApprovalStatus,
   NodeEnrollmentRequestStatus,
   NodeHeartbeatStatus,
@@ -7,11 +7,11 @@ import type {
   NodeRoleCapability,
   NodeTrustState,
   NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   NodeEnrollmentRequestStatuses,
   NodeTrustStates,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import { normalizePersistenceOperationKey } from "../persistence/PersistenceBoundaryDtos";
 
 export interface NodeTrustPersistenceAuditStamp {
@@ -219,3 +219,4 @@ export function normalizeNodeTrustMutationOperationKey(operationKey: string): st
     throw new Error("Node trust persistence mutation operationKey is required.");
   }
 }
+

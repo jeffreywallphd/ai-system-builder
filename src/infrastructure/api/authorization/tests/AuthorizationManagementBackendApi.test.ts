@@ -1,26 +1,26 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { AuthorizationManagementBackendApi } from "../AuthorizationManagementBackendApi";
-import { GrantAuthorizationSharingAccessUseCase } from "../../../../application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
-import { RevokeAuthorizationSharingAccessUseCase } from "../../../../application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
-import { UpdateAuthorizationVisibilityUseCase } from "../../../../application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
-import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "../../../../application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
-import { ListAuthorizationEffectiveAccessUseCase } from "../../../../application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
-import { AuthorizationPolicyMutationService } from "../../../../application/authorization/use-cases/AuthorizationPolicyMutationService";
-import { AuthorizationPolicyDecisionEvaluator } from "../../../../application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
+import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
+import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
+import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
+import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
+import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   RoleAssignmentScopes,
   RoleAssignmentStatuses,
   SharingPolicyModes,
-} from "../../../../domain/authorization/AuthorizationDomain";
-import { WorkspaceAuthorizationRoleKeys } from "../../../../domain/authorization/AuthorizationRoleDefinitions";
-import { SqliteAuthorizationPersistenceAdapter } from "../../../../infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
-import { SqliteAuthorizationPolicyReadAdapter } from "../../../../infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
+} from "@domain/authorization/AuthorizationDomain";
+import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
+import { SqliteAuthorizationPersistenceAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPersistenceAdapter";
+import { SqliteAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/authorization/SqliteAuthorizationPolicyReadAdapter";
 
 const createdRoots: string[] = [];
 
@@ -711,3 +711,4 @@ async function createHarness(): Promise<{
 
   return Object.freeze({ api, adapter });
 }
+

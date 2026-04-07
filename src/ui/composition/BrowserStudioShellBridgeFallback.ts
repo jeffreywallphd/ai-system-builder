@@ -1,7 +1,7 @@
-import type { DesktopStudioShellBridge } from "../../electron/shared/DesktopContracts";
-import { StudioShellBackendApi } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { SystemStudioBackendApi } from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { DesktopStudioShellBridge } from "../../electron/shared/DesktopContracts";
+import { StudioShellBackendApi } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import { SystemStudioBackendApi } from "@infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
   resolveBrowserStudioShellRepository,
   resolveBrowserWorkflowPersistenceRepository,
@@ -78,3 +78,4 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
 
   return fallbackBridge;
 }
+

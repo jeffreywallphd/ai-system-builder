@@ -1,9 +1,9 @@
-import type { IModel } from "../../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../../domain/models/interfaces/IModelCompatibility";
+} from "@domain/models/interfaces/IModelCompatibility";
 
 export interface IRemoteModelCatalogSearchCriteria {
   /**
@@ -134,3 +134,4 @@ export interface IRemoteModelCatalog {
    */
   supportsProvider(provider: string): boolean;
 }
+

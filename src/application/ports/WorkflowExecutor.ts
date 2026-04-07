@@ -1,4 +1,4 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
@@ -433,3 +433,4 @@ export class WorkflowExecutor implements IWorkflowExecutor {
     return executor;
   }
 }
+

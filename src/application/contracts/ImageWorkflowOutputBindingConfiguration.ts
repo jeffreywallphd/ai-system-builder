@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   WorkflowOutputBindingIntents,
   WorkflowOutputBindingWriteModes,
@@ -8,8 +8,8 @@ import {
   suggestWriteModeForTargetType,
   type WorkflowOutputBindingDescriptor,
   type WorkflowOutputTargetType,
-} from "../../domain/workflow-studio/WorkflowOutputBindingDomain";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/workflow-studio/WorkflowOutputBindingDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 const canonicalRecordValueSchema: z.ZodType<CanonicalRecordValue> = z.lazy(() => z.union([
   z.string(),
@@ -158,3 +158,4 @@ export const ImageWorkflowBindingDefaults = Object.freeze({
     writeMode: WorkflowOutputBindingWriteModes.append,
   }),
 });
+

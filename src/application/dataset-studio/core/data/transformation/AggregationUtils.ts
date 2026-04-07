@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const AggregationOperations = Object.freeze({
   count: "count",
@@ -221,3 +221,4 @@ export function evaluateAggregationDefinition(
 
   return null;
 }
+

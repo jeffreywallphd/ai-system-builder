@@ -1,6 +1,6 @@
-import { ExecutionPlan, ExecutionUnitKinds } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionPlan, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import type { SubmitModelTrainingJobRequest } from "../ports/interfaces/IModelTrainingRuntime";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import type { IExecutionPlanResult, IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 import { getModelTrainingJob } from "./ModelTrainingExecutionAdapter";
 import { ExecutionRuntimeCapabilityProfiles, toExecutionRuntimeCapabilityMetadata } from "./ExecutionRuntimeCapabilities";
@@ -69,3 +69,4 @@ export function requireModelTrainingJobFromUnitResult(
   }
   return job;
 }
+

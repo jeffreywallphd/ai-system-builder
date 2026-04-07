@@ -1,4 +1,4 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type {
   IAssetCatalog,
   IAssetSearchCriteria,
@@ -217,3 +217,4 @@ export class AssetCatalog implements IAssetCatalog {
     throw new Error("AssetCatalog does not have a writable catalog configured.");
   }
 }
+

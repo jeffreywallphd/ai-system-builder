@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import {
   addSchemaEntityToDocument,
   addSchemaFieldToEntityInDocument,
@@ -18,7 +18,7 @@ import {
   type SchemaEntityDefinition,
   type SchemaFieldTypeKind,
   type SchemaRelationshipCardinalityKind,
-} from "../../../../domain/schema-studio/SchemaStudioDomain";
+} from "@domain/schema-studio/SchemaStudioDomain";
 import {
   StudioEmbeddedIntentKinds,
   createStudioIntentEvent,
@@ -648,7 +648,7 @@ export default function SchemaStudioDraftAuthoringBoundary({
               <p key={relationship.relationshipId} className="ui-text-small">
                 {relationship.label || relationship.relationshipId}: {relationship.sourceEntityId}
                 {relationship.sourceFieldId ? `.${relationship.sourceFieldId}` : ""}
-                {" "}→{" "}
+                {" "}â†’{" "}
                 {relationship.targetEntityId}
                 {relationship.targetFieldId ? `.${relationship.targetFieldId}` : ""}
                 {relationship.cardinality ? ` (${relationship.cardinality})` : ""}
@@ -660,3 +660,4 @@ export default function SchemaStudioDraftAuthoringBoundary({
     </div>
   );
 }
+

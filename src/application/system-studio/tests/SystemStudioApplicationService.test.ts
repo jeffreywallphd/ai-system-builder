@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { SystemStudioApplicationService } from "../SystemStudioApplicationService";
-import { SystemStudioIdentity } from "../../../domain/system-studio/SystemAssetDomain";
-import { AssetVersion as AssetVersionEntity } from "../../../domain/assets/AssetVersion";
+import { SystemStudioIdentity } from "@domain/system-studio/SystemAssetDomain";
+import { AssetVersion as AssetVersionEntity } from "@domain/assets/AssetVersion";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import { SystemDatasetInstancePersistenceService } from "../../system-runtime/SystemDatasetInstancePersistenceService";
-import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
-import { createDatasetInstanceImageRecord } from "../../../domain/system-runtime/DatasetInstanceRecordDomain";
+import { createDatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
+import { createDatasetInstanceImageRecord } from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   ImageManipulationWorkflowTemplateAssetId,
   ImageManipulationWorkflowTemplateVersionId,
@@ -1159,3 +1159,4 @@ describe("SystemStudioApplicationService", () => {
     expect(runtimeDatasetStore.instances.get("dataset-instance:bad-state")).toBeUndefined();
   });
 });
+

@@ -1,26 +1,26 @@
-import type { McpConnectionStatus } from "../../../application/mcp/models/McpConnectionStatus";
-import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
-import type { LocalMcpServerCreateResult } from "../../../application/mcp/models/LocalMcpServerCreateResult";
-import type { McpServerConnectionResult } from "../../../application/mcp/models/McpServerConnectionResult";
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
-import type { McpServerSearchResult } from "../../../application/mcp/models/McpServerSearchResult";
-import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
-import type { McpToolExecutionRequest } from "../../../application/mcp/models/McpToolExecutionRequest";
-import type { McpToolExecutionResult } from "../../../application/mcp/models/McpToolExecutionResult";
-import type { McpToolSearchQuery } from "../../../application/mcp/models/McpToolSearchQuery";
-import type { McpToolSearchResult } from "../../../application/mcp/models/McpToolSearchResult";
-import type { IMcpConfiguredServerRepository } from "../../../application/ports/interfaces/IMcpConfiguredServerRepository";
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
+﻿import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
+import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
+import type { LocalMcpServerCreateResult } from "@application/mcp/models/LocalMcpServerCreateResult";
+import type { McpServerConnectionResult } from "@application/mcp/models/McpServerConnectionResult";
+import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerSearchCriteria } from "@application/mcp/models/McpServerSearchCriteria";
+import type { McpServerSearchResult } from "@application/mcp/models/McpServerSearchResult";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
+import type { McpToolExecutionRequest } from "@application/mcp/models/McpToolExecutionRequest";
+import type { McpToolExecutionResult } from "@application/mcp/models/McpToolExecutionResult";
+import type { McpToolSearchQuery } from "@application/mcp/models/McpToolSearchQuery";
+import type { McpToolSearchResult } from "@application/mcp/models/McpToolSearchResult";
+import type { IMcpConfiguredServerRepository } from "@application/ports/interfaces/IMcpConfiguredServerRepository";
+import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerManager } from "@application/ports/interfaces/IMcpServerManager";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
   RuntimeDependencyUnavailableError,
   type IRuntimeDependencyOrchestrator,
   type RuntimeDependencyResolution,
-} from "../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { createRuntimeDependencyDetail, createRuntimeDependencyMetadata } from "../../runtime/RuntimeDependencyDiagnostics";
 
 export function createOrchestratedMcpRuntimeClient(
@@ -373,3 +373,4 @@ function mapResolutionToMcpRuntimeState(
 
   return "unavailable";
 }
+

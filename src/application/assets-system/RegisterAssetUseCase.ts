@@ -1,5 +1,5 @@
-import { Asset } from "../../domain/assets/Asset";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import { Asset } from "@domain/assets/Asset";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 
 export class RegisterAssetUseCase {
@@ -16,3 +16,4 @@ export class RegisterAssetUseCase {
     });
   }
 }
+

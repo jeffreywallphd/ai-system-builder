@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/TestIdentityAuthHarness";
@@ -7,9 +7,9 @@ import {
   type IdentityHttpServerLogEvent,
   type IdentityHttpServerLogger,
 } from "../IdentityHttpServer";
-import type { ValidateTransportConnectionTrustRequest } from "../../../../../application/security/ports/TransportTrustValidationPorts";
-import { TransportSecurityScenarios } from "../../../../../domain/security/TransportSecurityDomain";
-import type { HttpTransportTrustValidationResult } from "../../../../../infrastructure/transport/TransportTrustValidationAdapters";
+import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
+import { TransportSecurityScenarios } from "@domain/security/TransportSecurityDomain";
+import type { HttpTransportTrustValidationResult } from "@infrastructure/transport/TransportTrustValidationAdapters";
 
 class NoopLogger implements IdentityHttpServerLogger {
   public info(_event: IdentityHttpServerLogEvent): void {}
@@ -303,3 +303,4 @@ describe("IdentityHttpServer transport trust", () => {
     expect(latest?.details?.request?.transport?.channel?.thinClient?.browserSurface).toBeTrue();
   });
 });
+

@@ -1,17 +1,17 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   IWorkflowPersistenceRepository,
   WorkflowPersistenceListQuery,
-} from "../../application/ports/interfaces/IWorkflowPersistenceRepository";
+} from "@application/ports/interfaces/IWorkflowPersistenceRepository";
 import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   normalizePersistedWorkflowRecord,
   toPersistedWorkflowSummary,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "./sqlite/SqliteCompat";
 
 interface WorkflowRow {
@@ -254,3 +254,4 @@ export class SqliteWorkflowPersistenceRepository implements IWorkflowPersistence
     return `${record.name} ${record.metadata.tags.join(" ")}`.trim().toLowerCase();
   }
 }
+

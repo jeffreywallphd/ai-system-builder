@@ -1,5 +1,5 @@
-import type { JSX } from "react";
-import type { ImageRunLineageView } from "../../../../application/system-runtime/ImageRunLineageDataContract";
+﻿import type { JSX } from "react";
+import type { ImageRunLineageView } from "@application/system-runtime/ImageRunLineageDataContract";
 
 function labelForKind(kind: ImageRunLineageView["nodes"][number]["kind"]): string {
   switch (kind) {
@@ -41,7 +41,7 @@ export function ImageLineageMiniView({ lineage }: { readonly lineage?: ImageRunL
               <span className="ui-text-small">
                 <strong>{labelForKind(from?.kind ?? "input-image")}</strong> {from?.label ?? edge.fromNodeId}
               </span>
-              <span className="ui-text-small ui-text-secondary">→</span>
+              <span className="ui-text-small ui-text-secondary">â†’</span>
               <span className="ui-text-small">
                 <strong>{labelForKind(to?.kind ?? "output-image")}</strong> {to?.label ?? edge.toNodeId}
               </span>
@@ -52,3 +52,4 @@ export function ImageLineageMiniView({ lineage }: { readonly lineage?: ImageRunL
     </section>
   );
 }
+

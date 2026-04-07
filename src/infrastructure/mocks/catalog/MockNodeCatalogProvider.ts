@@ -1,7 +1,7 @@
-import {
+﻿import {
   ComfyNodeCatalogProvider,
   type IComfyObjectInfo,
-} from "../../../infrastructure/comfyui/catalog/ComfyNodeCatalogProvider";
+} from "@infrastructure/comfyui/catalog/ComfyNodeCatalogProvider";
 import { SEED_NODE_CATALOG } from "./seedNodeCatalog";
 
 export interface IMockNodeCatalogProviderOptions {
@@ -13,3 +13,4 @@ export class MockNodeCatalogProvider extends ComfyNodeCatalogProvider {
     super(options.definitions ?? SEED_NODE_CATALOG);
   }
 }
+

@@ -1,7 +1,7 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -15,7 +15,7 @@ import {
   ContextBundleStudioIdentity,
   createContextBundleAssetMetadata,
   createContextBundleStudioTaxonomy,
-} from "../../domain/context-bundle-studio/ContextBundleStudioDomain";
+} from "@domain/context-bundle-studio/ContextBundleStudioDomain";
 
 export interface EnsureContextBundleStudioResult {
   readonly initialized: boolean;
@@ -142,3 +142,4 @@ export class ContextBundleStudioApplicationService {
     });
   }
 }
+

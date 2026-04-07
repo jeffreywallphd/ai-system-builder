@@ -1,8 +1,8 @@
-import {
+﻿import {
   validateWorkflowDraft,
   type WorkflowDraft,
   type WorkflowValidationIssue,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import type { WorkflowStudioModeId } from "./WorkflowStudioModes";
 
 export const WorkflowStudioModeValidationIssueCodes = Object.freeze({
@@ -88,3 +88,4 @@ export function validateWorkflowStudioModeState(
     draftIsValid: draftValidation.valid,
   });
 }
+

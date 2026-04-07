@@ -1,15 +1,15 @@
-import {
+﻿import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorUsageContexts,
   type AssetSelectorUsageContext,
-} from "../../../application/studio-entry/AssetSelectorCapabilityRegistry";
-import { TaxonomySemanticRoles } from "../../../domain/taxonomy/CompositionTaxonomy";
-import { CoreImageStarterWorkflowTemplates } from "../../../application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
+} from "@application/studio-entry/AssetSelectorCapabilityRegistry";
+import { TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
+import { CoreImageStarterWorkflowTemplates } from "@application/workflow-template-studio/CoreImageStarterWorkflowTemplates";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 
 export interface WorkflowTemplateAssetSelectorRequestInput {
@@ -90,3 +90,4 @@ export class WorkflowTemplateAssetSelectorAdapter implements AssetSelectorDataPr
     });
   }
 }
+

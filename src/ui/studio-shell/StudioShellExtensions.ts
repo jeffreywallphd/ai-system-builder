@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
-import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
+﻿import type { ReactNode } from "react";
+import type { AssetDraftDependencyReference, AssetMetadataPatch } from "@domain/studio-shell/StudioShellDomain";
+import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
+import type { StudioShellSnapshotReadModel, StudioShellValidationIssue } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { WorkflowStudioModeState } from "./workflow/WorkflowStudioModeStateStore";
 import { isWorkflowStudioModeId, type WorkflowStudioModeId } from "./workflow/WorkflowStudioModes";
 import type {
@@ -11,11 +11,11 @@ import type {
   StartSystemRuntimeExecutionRequest,
   StartSystemRuntimeExecutionResponse,
   SystemRuntimeApiResponse,
-} from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import type {
   LaunchSystemRuntimeWindowReadModel,
   LaunchSystemRuntimeWindowRequest,
-} from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+} from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import type {
   AddSystemChildComponentRequest,
   RemoveSystemChildComponentRequest,
@@ -24,7 +24,7 @@ import type {
   UpdateSystemExecutionMetadataRequest,
   UpdateSystemInterfacesRequest,
   UpdateSystemParametersRequest,
-} from "../../infrastructure/api/system-studio/SystemStudioBackendApi";
+} from "@infrastructure/api/system-studio/SystemStudioBackendApi";
 import type { ExperienceSurfaceAssetId } from "./experience-assets/ExperienceSurfaceAssets";
 import type { DraftAuthoringSurfaceConfiguration } from "./experience-assets/ExperienceSurfaceAssets";
 
@@ -607,3 +607,4 @@ export class SystemStudioRegistry {
     return this.inner.listExtensionsBySlot(studioType, slot);
   }
 }
+

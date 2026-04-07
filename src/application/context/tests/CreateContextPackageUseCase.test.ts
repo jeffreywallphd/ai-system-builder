@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CreateContextPackageUseCase } from "../CreateContextPackageUseCase";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("CreateContextPackageUseCase", () => {
   it("preserves stable context package identity across saves", async () => {
@@ -53,3 +53,4 @@ describe("CreateContextPackageUseCase", () => {
     ]);
   });
 });
+

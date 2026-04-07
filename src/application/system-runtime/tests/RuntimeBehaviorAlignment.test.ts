@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../domain/agents/Agent";
-import { TaxonomyBehaviorKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import { TaxonomyBehaviorKinds } from "@domain/taxonomy/CompositionTaxonomy";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
 import {
   classifyExecutableBehavior,
@@ -73,3 +73,4 @@ describe("RuntimeBehaviorAlignment", () => {
     })).toThrow("invalid");
   });
 });
+

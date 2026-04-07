@@ -1,4 +1,4 @@
-import {
+﻿import {
   createWorkflowEntity,
   deserializeWorkflowEntity,
   serializeWorkflowEntity,
@@ -11,7 +11,7 @@ import {
 import {
   rehydrateWorkspaceOwnershipMetadata,
   type WorkspaceOwnershipMetadata,
-} from "../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/workspaces/WorkspaceOwnership";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -295,3 +295,4 @@ export function toPersistedWorkflowSummary(record: PersistedWorkflowRecord): Per
     timestamps: record.timestamps,
   });
 }
+

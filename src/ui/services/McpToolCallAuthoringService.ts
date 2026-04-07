@@ -1,5 +1,5 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
-import { buildMcpToolDescriptorId } from "../../application/mcp/models/McpToolDescriptor";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import { buildMcpToolDescriptorId } from "@application/mcp/models/McpToolDescriptor";
 import {
   McpToolCallNodeConfigurationService,
   MCP_TOOL_CALL_SERVER_ID_PROPERTY,
@@ -7,7 +7,7 @@ import {
   MCP_TOOL_CALL_TOOL_DESCRIPTOR_PROPERTY,
   MCP_TOOL_CALL_TOOL_NAME_PROPERTY,
   type McpToolCallNodeOption,
-} from "../../application/mcp/McpToolCallNodeConfigurationService";
+} from "@application/mcp/McpToolCallNodeConfigurationService";
 import { McpService } from "./McpService";
 
 export class McpToolCallAuthoringService {
@@ -155,3 +155,4 @@ export class McpToolCallAuthoringService {
     return typeof value === "string" && value.trim() ? value.trim() : undefined;
   }
 }
+

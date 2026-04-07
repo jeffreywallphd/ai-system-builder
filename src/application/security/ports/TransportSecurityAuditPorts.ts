@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   AuthenticatedTrustState,
   TransportChannelType,
   TransportConnectionActorType,
   TransportPeerType,
   TransportSecurityScenario,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 
 export const TransportSecurityAuditEventTypes = Object.freeze({
   transportConnectionAccepted: "transport-connection-accepted",
@@ -206,3 +206,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
 }
+

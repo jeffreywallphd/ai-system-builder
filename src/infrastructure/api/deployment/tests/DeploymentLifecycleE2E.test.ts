@@ -1,45 +1,45 @@
-import { describe, expect, it } from "bun:test";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetDraft, AssetSession } from "../../../../domain/studio-shell/StudioShellDomain";
-import { AssetVersion } from "../../../../domain/assets/AssetVersion";
-import { SystemPackagingService } from "../../../../application/system-packaging/SystemPackagingService";
-import { DeploymentTargetSelector } from "../../../../application/deployment/DeploymentTargetSelector";
-import { DeploymentConfigurationValidator } from "../../../../application/deployment/DeploymentConfigurationValidator";
-import { DeploymentBuildPipeline } from "../../../../application/deployment/DeploymentBuildPipeline";
+﻿import { describe, expect, it } from "bun:test";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetDraft, AssetSession } from "@domain/studio-shell/StudioShellDomain";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { SystemPackagingService } from "@application/system-packaging/SystemPackagingService";
+import { DeploymentTargetSelector } from "@application/deployment/DeploymentTargetSelector";
+import { DeploymentConfigurationValidator } from "@application/deployment/DeploymentConfigurationValidator";
+import { DeploymentBuildPipeline } from "@application/deployment/DeploymentBuildPipeline";
 import {
   DeploymentExecutionService,
   InMemoryDeploymentRecordRepository,
-} from "../../../../application/deployment/DeploymentExecutionService";
+} from "@application/deployment/DeploymentExecutionService";
 import {
   DeploymentDiagnosticsService,
   InMemoryDeploymentDiagnosticsRepository,
-} from "../../../../application/deployment/DeploymentDiagnosticsService";
+} from "@application/deployment/DeploymentDiagnosticsService";
 import {
   createDeploymentConfigurationContract,
   type DeploymentConfigurationContract,
-} from "../../../../domain/deployment/DeploymentConfigurationDomain";
+} from "@domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
   type DeploymentTarget,
-} from "../../../../domain/deployment/DeploymentTargetDomain";
-import { DeploymentVersionManager } from "../../../../application/deployment/DeploymentVersionManager";
+} from "@domain/deployment/DeploymentTargetDomain";
+import { DeploymentVersionManager } from "@application/deployment/DeploymentVersionManager";
 import {
   DeploymentRollbackService,
   InMemoryDeploymentRollbackActionRepository,
-} from "../../../../application/deployment/DeploymentRollbackService";
+} from "@application/deployment/DeploymentRollbackService";
 import {
   DeploymentAccessEvaluator,
   RoleBasedDeploymentAccessPolicy,
   type DeploymentAccessContext,
-} from "../../../../application/deployment/DeploymentAccessControl";
-import { DeploymentQuotaEvaluator } from "../../../../application/deployment/DeploymentQuotaEvaluator";
+} from "@application/deployment/DeploymentAccessControl";
+import { DeploymentQuotaEvaluator } from "@application/deployment/DeploymentQuotaEvaluator";
 import {
   InMemoryEndpointExposureRepository,
   SystemEndpointExposureService,
-} from "../../../../application/deployment/SystemEndpointExposureService";
-import { EndpointRoutingService } from "../../../../application/deployment/EndpointRoutingService";
-import { DeploymentHealthMonitor } from "../../../../application/deployment/DeploymentHealthMonitor";
+} from "@application/deployment/SystemEndpointExposureService";
+import { EndpointRoutingService } from "@application/deployment/EndpointRoutingService";
+import { DeploymentHealthMonitor } from "@application/deployment/DeploymentHealthMonitor";
 import { DeploymentBackendApi } from "../DeploymentBackendApi";
 import { DeploymentClient } from "../sdk/DeploymentClient";
 import { DeploymentApiSdkTransport } from "../sdk/DeploymentSdkTransport";
@@ -49,17 +49,17 @@ import { DeploymentEndpointRuntimeInvoker } from "../../system-runtime/Deploymen
 import {
   DeploymentAuditTrailService,
   InMemoryDeploymentAuditRepository,
-} from "../../../../application/deployment/DeploymentAuditTrailService";
+} from "@application/deployment/DeploymentAuditTrailService";
 import {
   DeploymentAuditEventKinds,
   type DeploymentAuditRecord,
-} from "../../../../domain/deployment/DeploymentAuditTrailDomain";
+} from "@domain/deployment/DeploymentAuditTrailDomain";
 import {
   type EnvironmentProvisioningInterface,
   EnvironmentProvisioningStatuses,
-} from "../../../../domain/deployment/EnvironmentProvisioningDomain";
-import { EnvironmentProvisioningService } from "../../../../application/deployment/EnvironmentProvisioningService";
-import { createSystemPackage } from "../../../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/deployment/EnvironmentProvisioningDomain";
+import { EnvironmentProvisioningService } from "@application/deployment/EnvironmentProvisioningService";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -254,7 +254,7 @@ function createHarness(input?: { provisioningInterface?: EnvironmentProvisioning
 }
 
 describe("Deployment lifecycle E2E", () => {
-  it("executes package→target→config→build→provision→deploy→activate→route→health→rollback with coherent SDK/API truth", async () => {
+  it("executes packageâ†’targetâ†’configâ†’buildâ†’provisionâ†’deployâ†’activateâ†’routeâ†’healthâ†’rollback with coherent SDK/API truth", async () => {
     const harness = createHarness();
     await seedSystemVersions(harness.runtimeRepository);
 
@@ -510,3 +510,4 @@ describe("Deployment lifecycle E2E", () => {
     expect(outcomes.has(`${DeploymentAuditEventKinds.deploymentRejected}:rejected`)).toBeTrue();
   });
 });
+

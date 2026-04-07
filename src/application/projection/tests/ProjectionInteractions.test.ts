@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowProjectionService } from "../WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "../WorkflowToolProjectionService";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 describe("projection interactions", () => {
   it("keeps workflow as source of truth when applying form and tool input", () => {
@@ -78,3 +78,4 @@ describe("projection interactions", () => {
     expect(updated.metadata.contextConfiguration?.selectedPackageIds).toEqual(["pkg-b", "pkg-c"]);
   });
 });
+

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,11 +8,11 @@ import {
   StorageBackendTypes,
   createStorageInstance,
   type StorageInstance,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageObjectAccessError,
   StorageObjectErrorCodes,
-} from "../../../../application/storage/ports/StorageObjectPort";
+} from "@application/storage/ports/StorageObjectPort";
 import { ServerManagedLocalStorageObjectAdapter } from "../ServerManagedLocalStorageObjectAdapter";
 
 const createdRoots: string[] = [];
@@ -234,3 +234,4 @@ describe("ServerManagedLocalStorageObjectAdapter", () => {
     } satisfies Partial<StorageObjectAccessError>);
   });
 });
+

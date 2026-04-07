@@ -1,12 +1,12 @@
-import crypto from "node:crypto";
+﻿import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type {
   PersistWorkflowOutputArtifactRequest,
   PersistWorkflowOutputArtifactResult,
   WorkflowOutputArtifactStorage,
-} from "../../../application/system-runtime/WorkflowOutputArtifactStorage";
-import { parseStorageLogicalReference } from "../../../application/system-runtime/StorageInstanceProvisioningContract";
+} from "@application/system-runtime/WorkflowOutputArtifactStorage";
+import { parseStorageLogicalReference } from "@application/system-runtime/StorageInstanceProvisioningContract";
 
 export class LocalSystemOutputArtifactStorage implements WorkflowOutputArtifactStorage {
   public constructor(private readonly rootDirectory: string) {}
@@ -126,3 +126,4 @@ function sanitizeSegment(value: string): string {
   }
   return normalized;
 }
+

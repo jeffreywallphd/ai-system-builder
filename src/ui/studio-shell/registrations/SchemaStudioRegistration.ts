@@ -1,10 +1,10 @@
-import {
+﻿import {
   createEmptySchemaAssetDocument,
   createSchemaAssetMetadata,
   createSchemaStudioTaxonomy,
   serializeSchemaAssetDocument,
   SchemaStudioIdentity,
-} from "../../../domain/schema-studio/SchemaStudioDomain";
+} from "@domain/schema-studio/SchemaStudioDomain";
 import type { AtomicStudioRegistration } from "../StudioShellExtensions";
 import { createAtomicStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -73,3 +73,4 @@ export const schemaStudioRegistration: AtomicStudioRegistration = Object.freeze(
 });
 
 export const schemaStudioTaxonomy = createSchemaStudioTaxonomy();
+

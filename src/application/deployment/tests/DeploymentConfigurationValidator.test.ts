@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createDeploymentConfigurationContract,
-} from "../../../domain/deployment/DeploymentConfigurationDomain";
+} from "@domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
-} from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentConfigurationValidator } from "../DeploymentConfigurationValidator";
 
 function createSamplePackage() {
@@ -146,3 +146,4 @@ describe("DeploymentConfigurationValidator", () => {
     expect(result.issues.map((issue) => issue.code)).toContain("nested-binding-system-not-in-package");
   });
 });
+

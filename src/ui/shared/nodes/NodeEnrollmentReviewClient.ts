@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   ApproveNodeEnrollmentApiResponse,
   GetNodeEnrollmentDetailApiResponse,
   ListPendingNodeEnrollmentsApiResponse,
   NodeTrustApiResponse,
   RejectNodeEnrollmentApiResponse,
-} from "../../../infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
-import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
+} from "@infrastructure/api/nodes/sdk/PublicNodeTrustApiContract";
+import { NodeEnrollmentRequestStatuses } from "@domain/nodes/NodeTrustDomain";
 import type {
   ApproveNodeEnrollmentActionRequestDto,
   RejectNodeEnrollmentActionRequestDto,
-} from "../../../shared/contracts/nodes/NodeTrustApiContracts";
+} from "@shared/contracts/nodes/NodeTrustApiContracts";
 
 export interface NodeEnrollmentReviewClient {
   listPendingNodeEnrollments(
@@ -154,3 +154,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createEmptyWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   deriveWorkflowWizardProgress,
   WorkflowWizardInputReadinessPolicies,
@@ -185,3 +185,4 @@ describe("WorkflowStudioWizardProgress", () => {
     expect(progress.blockingIssueCount).toBe(4);
   });
 });
+

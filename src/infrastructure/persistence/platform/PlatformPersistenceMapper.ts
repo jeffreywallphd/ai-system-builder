@@ -1,4 +1,4 @@
-import {
+﻿import {
   PlatformAuditEventKinds,
   PlatformAuditOutcomes,
   PlatformRunKinds,
@@ -9,17 +9,17 @@ import {
   type PlatformRunKind,
   type PlatformRunPersistenceRecord,
   type PlatformRunStatus,
-} from "../../../shared/dto/platform/PlatformPersistenceDtos";
+} from "@shared/dto/platform/PlatformPersistenceDtos";
 import {
   parsePlatformAuditEventPersistenceRecord,
   parsePlatformRunPersistenceRecord,
-} from "../../../shared/schemas/platform/PlatformPersistenceSchemaContracts";
-import { parsePersistenceReplaySnapshot } from "../../../shared/dto/persistence/PersistenceMapperBoundary";
-import type { PersistenceTenancyMetadata } from "../../../shared/dto/persistence/PersistenceBoundaryDtos";
+} from "@shared/schemas/platform/PlatformPersistenceSchemaContracts";
+import { parsePersistenceReplaySnapshot } from "@shared/dto/persistence/PersistenceMapperBoundary";
+import type { PersistenceTenancyMetadata } from "@shared/dto/persistence/PersistenceBoundaryDtos";
 import type {
   PlatformAuditEventRecord,
   PlatformRunRecord,
-} from "../../../application/common/ports/PlatformPersistenceBoundaryPorts";
+} from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
   createPersistenceTenancyMetadataFromLookup,
   normalizePersistenceLookup,
@@ -308,3 +308,4 @@ function assertPlatformAuditOutcome(value: string): PlatformAuditOutcome {
   }
   throw new Error(`Persisted platform audit outcome '${value}' is invalid.`);
 }
+

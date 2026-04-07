@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -8,24 +8,24 @@ import {
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellBackendApi } from "../StudioShellBackendApi";
 import { InMemoryStudioShellRepository } from "../../../studio-shell/InMemoryStudioShellRepository";
 import { InMemoryWorkflowPersistenceRepository } from "../../../workflows/InMemoryWorkflowPersistenceRepository";
 import { InMemoryWorkflowRunSummaryRepository } from "../../../workflows/InMemoryWorkflowRunSummaryRepository";
-import { DataStudioPreparationWizard } from "../../../../application/data-studio/DataStudioPreparationWizard";
-import { PipelineStageIds } from "../../../../domain/dataset-studio/PipelineStageDomain";
-import { GetPersistedWorkflowUseCase } from "../../../../application/workflow-persistence/GetPersistedWorkflowUseCase";
-import type { IWorkflowPersistenceRepository } from "../../../../application/ports/interfaces/IWorkflowPersistenceRepository";
-import type { PersistedWorkflowRecord } from "../../../../domain/workflow-studio/WorkflowPersistenceDomain";
+import { DataStudioPreparationWizard } from "@application/data-studio/DataStudioPreparationWizard";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import { GetPersistedWorkflowUseCase } from "@application/workflow-persistence/GetPersistedWorkflowUseCase";
+import type { IWorkflowPersistenceRepository } from "@application/ports/interfaces/IWorkflowPersistenceRepository";
+import type { PersistedWorkflowRecord } from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../../domain/workflow-studio/WorkflowRunHistoryDomain";
-import type { StorageInstanceProvisioningContract } from "../../../../application/system-runtime/StorageInstanceProvisioningContract";
-import { createStorageInstanceProvisioningResult } from "../../../../application/system-runtime/StorageInstanceProvisioningContract";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
+import type { StorageInstanceProvisioningContract } from "@application/system-runtime/StorageInstanceProvisioningContract";
+import { createStorageInstanceProvisioningResult } from "@application/system-runtime/StorageInstanceProvisioningContract";
 
 describe("StudioShellBackendApi", () => {
   it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {
@@ -1719,3 +1719,4 @@ describe("StudioShellBackendApi", () => {
   });
 
 });
+

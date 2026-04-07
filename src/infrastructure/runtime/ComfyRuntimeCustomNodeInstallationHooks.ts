@@ -1,21 +1,21 @@
-import path from "node:path";
+﻿import path from "node:path";
 import {
   RuntimeRepositoryInstallationStates,
   type IRuntimeRepositoryInstallerContract,
   type RuntimeRepositoryDiagnosticsResult,
   type RuntimeRepositoryStatusResult,
   type RuntimeRepositoryValidationResult,
-} from "../../application/runtime/RuntimeRepositoryInstallerContract";
+} from "@application/runtime/RuntimeRepositoryInstallerContract";
 import {
   resolveComfyRuntimeCustomNodeInstallRequests,
   resolveComfyRuntimeCustomNodeRequirementsForProfile,
-} from "../../application/runtime/ComfyRuntimeRequirements";
+} from "@application/runtime/ComfyRuntimeRequirements";
 import type {
   IComfyRuntimeCustomNodeInstallationHook,
   ComfyRuntimeOrchestrationContext,
   ComfyRuntimeOrchestrationIssue,
   ComfyRuntimeOrchestrationPhaseHookResult,
-} from "../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+} from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 
 export interface ComfyRuntimeCustomNodeInstallationHooksOptions {
   readonly now?: () => Date;
@@ -193,4 +193,5 @@ function createIssue(input: {
     metadata: input.metadata,
   });
 }
+
 

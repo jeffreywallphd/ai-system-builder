@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { GetAssetTransformationHistoryUseCase } from "../GetAssetTransformationHistoryUseCase";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 
 describe("GetAssetTransformationHistoryUseCase", () => {
   it("loads transformation history via direct asset query when repository supports it", async () => {
@@ -56,3 +56,4 @@ describe("GetAssetTransformationHistoryUseCase", () => {
     expect(history[0]?.transformationId).toBe("tx-v");
   });
 });
+

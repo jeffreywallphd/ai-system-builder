@@ -1,4 +1,4 @@
-import type { ContextPreviewResult } from "../../../application/context/models/ContextPreview";
+﻿import type { ContextPreviewResult } from "@application/context/models/ContextPreview";
 
 function renderSource(entry: ContextPreviewResult["inspection"]["entries"][number]): string {
   const firstSource = entry.provenance[0];
@@ -54,7 +54,7 @@ export default function ContextProvenanceTable({ preview }: ContextProvenanceTab
                 <tr key={`${entry.fragmentId}-${entry.reason}`}>
                   <td>
                     <div><strong>{entry.title ?? entry.fragmentId}</strong></div>
-                    <div className="ui-text-small ui-text-secondary">{entry.kind} · {entry.assemblyKey}</div>
+                    <div className="ui-text-small ui-text-secondary">{entry.kind} Â· {entry.assemblyKey}</div>
                   </td>
                   <td>{entry.status}</td>
                   <td>{entry.stage}</td>
@@ -77,7 +77,7 @@ export default function ContextProvenanceTable({ preview }: ContextProvenanceTab
                   <div className="ui-card__body ui-row ui-row--between ui-row--wrap">
                     <div>
                       <strong>{decision.displayName}</strong>
-                      <div className="ui-text-small ui-text-secondary">{decision.providerLabel} · {decision.capabilityId}</div>
+                      <div className="ui-text-small ui-text-secondary">{decision.providerLabel} Â· {decision.capabilityId}</div>
                     </div>
                     <div className="ui-row ui-row--wrap">
                       <span className={`ui-badge ${decision.status === "allowed" ? "ui-badge--success" : "ui-badge--danger"}`}>{decision.status}</span>
@@ -93,3 +93,4 @@ export default function ContextProvenanceTable({ preview }: ContextProvenanceTab
     </section>
   );
 }
+

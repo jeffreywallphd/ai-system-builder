@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import StorageAdministrationPage from "../StorageAdministrationPage";
-import type { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import type { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { StorageAdministrationService } from "../../services/StorageAdministrationService";
 
 describe("StorageAdministrationPage", () => {
@@ -55,3 +55,4 @@ describe("StorageAdministrationPage", () => {
     expect(html).toContain("No storage instances matched the current query.");
   });
 });
+

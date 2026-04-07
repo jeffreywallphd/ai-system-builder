@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft, serializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import WorkflowStudioDraftAuthoringBoundary from "../WorkflowStudioDraftAuthoringBoundary";
 
 describe("WorkflowStudioDraftAuthoringBoundary", () => {
@@ -203,3 +203,4 @@ describe("WorkflowStudioDraftAuthoringBoundary", () => {
     expect(html).toContain("Select agent");
   });
 });
+

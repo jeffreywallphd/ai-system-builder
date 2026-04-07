@@ -1,4 +1,4 @@
-import {
+﻿import {
   PermissionEffects,
   PermissionGrantScopes,
   PolicyDecisionOutcomes,
@@ -12,13 +12,13 @@ import {
   type PolicyDecision,
   type RoleAssignment,
   type SharingGrant,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import {
   AuthorizationRoleCatalog,
   type AuthorizationRoleCatalog as AuthorizationRoleCatalogContract,
   type WorkspaceAuthorizationRoleKey,
   isWorkspaceAuthorizationRoleKey,
-} from "../../../domain/authorization/AuthorizationRoleDefinitions";
+} from "@domain/authorization/AuthorizationRoleDefinitions";
 import type {
   AuthorizationPolicyEvaluatorRequest,
   AuthorizationPolicyEvaluatorResult,
@@ -427,3 +427,4 @@ function toPermissionAction(permissionKey: PermissionKey): string {
   const action = segments[segments.length - 1] ?? permissionKey;
   return action.trim().toLowerCase();
 }
+

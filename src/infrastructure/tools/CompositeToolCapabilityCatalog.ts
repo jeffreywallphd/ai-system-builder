@@ -1,5 +1,5 @@
-import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { IToolCapabilityCatalog } from "@application/ports/interfaces/IToolCapabilityCatalog";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 
 export class CompositeToolCapabilityCatalog implements IToolCapabilityCatalog {
   constructor(
@@ -42,3 +42,4 @@ export class CompositeToolCapabilityCatalog implements IToolCapabilityCatalog {
     );
   }
 }
+

@@ -1,11 +1,11 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DatasetIngestionStageAssetIds,
   DatasetPipelineStageKinds,
   DatasetTransformationStageAssetIds,
   type DatasetPipelineStageKind,
-} from "../../domain/dataset-studio/StagePipelineDomain";
+} from "@domain/dataset-studio/StagePipelineDomain";
 import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionRouteFailureCodes,
@@ -19,7 +19,7 @@ import {
   type UnifiedIngestionRoutePolicyKind,
   type UnifiedIngestionSourceKind,
   type UnifiedIngestionStrategyKind,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 
 export interface StageAssetMappingAsset {
   readonly assetId: string;
@@ -678,3 +678,4 @@ export function createStageAssetMappingService(
 ): StageAssetMappingService {
   return new StageAssetMappingService(definitions);
 }
+

@@ -1,6 +1,6 @@
-import type { IExecutionArtifact, IExecutionDiagnostics, IExecutionEngineEvent, IExecutionProvenance } from "./ExecutionContracts";
+﻿import type { IExecutionArtifact, IExecutionDiagnostics, IExecutionEngineEvent, IExecutionProvenance } from "./ExecutionContracts";
 import type { IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
-import type { IExecutionRunSummary } from "../../domain/execution/ExecutionRun";
+import type { IExecutionRunSummary } from "@domain/execution/ExecutionRun";
 import type { LocalMcpServerCreateResult } from "../mcp/models/LocalMcpServerCreateResult";
 import type { McpServerOperationAction, McpServerOperationExecutionInput, McpServerOperationExecutionResult } from "./McpServerOperationExecutionPlanFactory";
 
@@ -282,3 +282,4 @@ function isCreateResult(result: McpServerOperationExecutionResult): result is Lo
 export function freezeMcpServerOperationResult<TValue extends McpServerOperationExecutionResult>(value: TValue): TValue {
   return Object.freeze(JSON.parse(JSON.stringify(value)) as TValue);
 }
+

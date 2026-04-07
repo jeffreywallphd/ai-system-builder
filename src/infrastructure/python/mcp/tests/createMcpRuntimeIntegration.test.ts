@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
   RuntimeDependencyUnavailableError,
-} from "../../../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { NodeProcessRuntimeEventSink } from "../../runtime/NodeProcessRuntimeEventSink";
 import { PythonRuntimeConfig } from "../../../config/PythonRuntimeConfig";
 import { DefaultRuntimeDependencyOrchestrator } from "../../../runtime/DefaultRuntimeDependencyOrchestrator";
@@ -125,3 +125,4 @@ describe("createMcpRuntimeIntegration", () => {
     ).rejects.toBeInstanceOf(RuntimeDependencyUnavailableError);
   });
 });
+

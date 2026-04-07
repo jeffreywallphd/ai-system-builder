@@ -1,4 +1,4 @@
-import type { AgentRunControlAction, AgentSessionSummaryReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentRunControlAction, AgentSessionSummaryReadModel } from "@application/agents/contracts/AgentRunContracts";
 import { AgentRunControls } from "./AgentRunControls";
 
 interface SessionListPanelProps {
@@ -27,12 +27,12 @@ export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
                 disabled={props.isBusy}
                 aria-pressed={props.selectedSessionId === session.sessionId}
               >
-                {session.sessionId} — {session.status} ({session.completedStepCount}/{session.attemptedStepCount})
+                {session.sessionId} â€” {session.status} ({session.completedStepCount}/{session.attemptedStepCount})
               </button>
               <div className="ui-text-secondary">
-                {session.terminalReason ?? "active"} •
+                {session.terminalReason ?? "active"} â€¢
                 {` ${session.composition.taxonomy.structuralKind}/${session.composition.taxonomy.semanticRole}/${session.composition.taxonomy.behaviorKind}`}
-                {session.composition.contract ? ` • ${session.composition.contract.id}@${session.composition.contract.version}` : ""}
+                {session.composition.contract ? ` â€¢ ${session.composition.contract.id}@${session.composition.contract.version}` : ""}
               </div>
               <AgentRunControls
                 session={session}
@@ -48,3 +48,4 @@ export function SessionListPanel(props: SessionListPanelProps): JSX.Element {
     </div>
   );
 }
+

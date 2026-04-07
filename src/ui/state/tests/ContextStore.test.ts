@@ -1,20 +1,20 @@
-import { PreviewWorkflowContextUseCase } from "../../../application/context/PreviewWorkflowContextUseCase";
-import { PreviewToolContextUseCase } from "../../../application/context/PreviewToolContextUseCase";
-import { PreviewAgentContextUseCase } from "../../../application/context/PreviewAgentContextUseCase";
+﻿import { PreviewWorkflowContextUseCase } from "@application/context/PreviewWorkflowContextUseCase";
+import { PreviewToolContextUseCase } from "@application/context/PreviewToolContextUseCase";
+import { PreviewAgentContextUseCase } from "@application/context/PreviewAgentContextUseCase";
 import { describe, expect, it } from "bun:test";
 import { ContextStore } from "../ContextStore";
 import { ContextService } from "../../services/ContextService";
-import { CreateContextPackageUseCase } from "../../../application/context/CreateContextPackageUseCase";
-import { CreateContextRecipeUseCase } from "../../../application/context/CreateContextRecipeUseCase";
-import { UpdateContextPackageUseCase } from "../../../application/context/UpdateContextPackageUseCase";
-import { DeleteContextPackageUseCase } from "../../../application/context/DeleteContextPackageUseCase";
-import { ListContextPackagesUseCase } from "../../../application/context/ListContextPackagesUseCase";
-import { ListContextRecipesUseCase } from "../../../application/context/ListContextRecipesUseCase";
-import { LoadContextPackageUseCase } from "../../../application/context/LoadContextPackageUseCase";
-import { LoadContextRecipeUseCase } from "../../../application/context/LoadContextRecipeUseCase";
-import { SearchContextPackagesUseCase } from "../../../application/context/SearchContextPackagesUseCase";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { CreateContextPackageUseCase } from "@application/context/CreateContextPackageUseCase";
+import { CreateContextRecipeUseCase } from "@application/context/CreateContextRecipeUseCase";
+import { UpdateContextPackageUseCase } from "@application/context/UpdateContextPackageUseCase";
+import { DeleteContextPackageUseCase } from "@application/context/DeleteContextPackageUseCase";
+import { ListContextPackagesUseCase } from "@application/context/ListContextPackagesUseCase";
+import { ListContextRecipesUseCase } from "@application/context/ListContextRecipesUseCase";
+import { LoadContextPackageUseCase } from "@application/context/LoadContextPackageUseCase";
+import { LoadContextRecipeUseCase } from "@application/context/LoadContextRecipeUseCase";
+import { SearchContextPackagesUseCase } from "@application/context/SearchContextPackagesUseCase";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 function createStore(): ContextStore {
   const repository = new InMemoryContextPackageRepository();
@@ -84,3 +84,4 @@ describe("ContextStore", () => {
     expect(store.getState().selectedPackage).toBeUndefined();
   });
 });
+

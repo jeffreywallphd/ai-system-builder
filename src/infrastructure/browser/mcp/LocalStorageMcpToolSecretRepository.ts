@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   IMcpToolSecretRepository,
   McpToolSecretReferenceRecord,
   McpToolSecretScope,
   McpToolSecretScopeType,
   ResolvedMcpToolSecretRecord,
-} from "../../../application/ports/interfaces/IMcpToolSecretRepository";
-import type { McpToolCredentialFieldRequirement } from "../../../domain/mcp/McpToolTrust";
+} from "@application/ports/interfaces/IMcpToolSecretRepository";
+import type { McpToolCredentialFieldRequirement } from "@domain/mcp/McpToolTrust";
 
 interface PersistedSecretEnvelope {
   readonly version: 2;
@@ -283,3 +283,4 @@ function resolveDesktopSecretBridge(): DesktopMcpSecretBridge | undefined {
   }
   return window.aiLoomDesktop?.secrets;
 }
+

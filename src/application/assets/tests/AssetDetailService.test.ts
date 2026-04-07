@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import {
   AssetKinds,
@@ -10,7 +10,7 @@ import {
   createContentDescriptor,
   createStorageInstanceRef,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import { AssetDetailService } from "../use-cases/AssetDetailService";
 
@@ -227,3 +227,4 @@ describe("AssetDetailService", () => {
     expect(outcome.error.code).toBe("asset-not-found");
   });
 });
+

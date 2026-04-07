@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   GetModelTrainingStudioSummaryQuery,
   ModelTrainingStudioSummary,
-} from "../../application/model-training/contracts";
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+} from "@application/model-training/contracts";
+import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import { ModelTrainingService } from "../services/ModelTrainingService";
 
 export interface ModelTrainingStoreState {
@@ -266,3 +266,4 @@ export class ModelTrainingStore {
     }
   }
 }
+

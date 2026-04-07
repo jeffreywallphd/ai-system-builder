@@ -1,9 +1,9 @@
-import {
+﻿import {
   RuntimeDependencyIds,
   RuntimeDependencyOperationalStates,
   type RuntimeDependencyProbeResult,
   type RuntimeDependencyRegistration,
-} from "../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { DefaultRuntimeDependencyOrchestrator, type DefaultRuntimeDependencyOrchestratorOptions } from "./DefaultRuntimeDependencyOrchestrator";
 
 export interface RuntimeDependencyCompositionOptions {
@@ -70,3 +70,4 @@ export function createRuntimeDependencyOrchestrator(
 
   return new DefaultRuntimeDependencyOrchestrator(orchestratorOptions);
 }
+

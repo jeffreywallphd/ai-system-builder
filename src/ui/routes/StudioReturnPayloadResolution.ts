@@ -1,4 +1,4 @@
-import type { AssetSelectorAssetReference } from "../../domain/studio-shell/AssetSelectorContract";
+﻿import type { AssetSelectorAssetReference } from "@domain/studio-shell/AssetSelectorContract";
 import {
   InlineAssetCreationService,
   InlineAssetReturnStatuses,
@@ -207,3 +207,4 @@ export class StudioReturnPayloadResolver {
     });
   }
 }
+

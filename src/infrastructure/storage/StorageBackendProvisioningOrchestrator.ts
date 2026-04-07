@@ -1,17 +1,17 @@
-import type {
+﻿import type {
   IStorageCapabilityInspectionPort,
   StorageBackendCapabilitySnapshot,
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
-} from "../../application/storage/ports/StorageCapabilityInspectionPort";
-import { StorageBackendHealthStatuses } from "../../application/storage/ports/StorageCapabilityInspectionPort";
+} from "@application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "@application/storage/ports/StorageCapabilityInspectionPort";
 import {
   StorageProvisioningOperationStatuses,
   type IStorageProvisioningPort,
   type StorageProvisioningReceipt,
   type StorageProvisioningRequest,
-} from "../../application/storage/ports/StorageProvisioningPort";
-import type { StorageBackendType } from "../../domain/storage/StorageDomain";
+} from "@application/storage/ports/StorageProvisioningPort";
+import type { StorageBackendType } from "@domain/storage/StorageDomain";
 import { StorageBackendAdapterRegistry } from "./StorageBackendAdapterRegistry";
 
 export const StorageProvisioningOrchestrationReasonCodes = Object.freeze({
@@ -161,3 +161,4 @@ export class StorageBackendProvisioningOrchestrator implements IStorageProvision
     });
   }
 }
+

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   WorkflowDraftUserTriggerScopes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { mapWorkflowDraftTriggersToExecutionTriggerPlan } from "../WorkflowDraftTriggerExecutionPlanner";
 
 describe("WorkflowDraftTriggerExecutionPlanner", () => {
@@ -142,3 +142,4 @@ describe("WorkflowDraftTriggerExecutionPlanner", () => {
     })).toThrow("requires config.eventName");
   });
 });
+

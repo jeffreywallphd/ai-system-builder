@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetKinds,
   AssetLifecycleStates,
@@ -11,7 +11,7 @@ import {
   createStorageInstanceRef,
   transitionAssetLifecycle,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import { AssetLifecycleService } from "../use-cases/AssetLifecycleService";
@@ -238,3 +238,4 @@ describe("AssetLifecycleService", () => {
     expect((audit.events[0]?.details as Record<string, unknown>)?.reasonCode).toBe("asset-access-denied");
   });
 });
+

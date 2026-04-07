@@ -1,4 +1,4 @@
-import type { AssetSelectorRequest } from "../../../domain/studio-shell/AssetSelectorContract";
+﻿import type { AssetSelectorRequest } from "@domain/studio-shell/AssetSelectorContract";
 import {
   InlineAssetCreationModes,
   InlineAssetCreationService,
@@ -125,4 +125,5 @@ export class AssetSelectorStudioLaunchService {
     return `handoff:${input.sessionKey}:${input.selectorRequest.assetType}:${Date.now()}:${randomSuffix}`;
   }
 }
+
 

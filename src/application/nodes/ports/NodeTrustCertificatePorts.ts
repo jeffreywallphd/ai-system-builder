@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   NodeCapabilityProfilePersistenceRecord,
   NodeCertificateReferencePersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import type { NodeType } from "../../../domain/nodes/NodeTrustDomain";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import type { NodeType } from "@domain/nodes/NodeTrustDomain";
 
 export interface IssueNodeCertificateHookInput {
   readonly actorUserIdentityId: string;
@@ -24,3 +24,4 @@ export interface NodeTrustCertificateHook {
     readonly reason?: string;
   }): Promise<void>;
 }
+

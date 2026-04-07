@@ -1,5 +1,5 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { DatasetInstanceStorageBinding } from "../../domain/system-runtime/DatasetInstanceDomain";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { DatasetInstanceStorageBinding } from "@domain/system-runtime/DatasetInstanceDomain";
 import type { WorkflowOutputMaterializationPayload } from "./WorkflowOutputMaterializationContract";
 
 export interface PersistWorkflowOutputArtifactRequest {
@@ -70,3 +70,4 @@ export class InMemoryWorkflowOutputArtifactStorage implements WorkflowOutputArti
     return this.storage.get(reference);
   }
 }
+

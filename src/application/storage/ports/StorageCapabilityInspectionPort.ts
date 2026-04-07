@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   StorageBackendType,
   StorageInstance,
   StorageReplicationMode,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export const StorageBackendHealthStatuses = Object.freeze({
   healthy: "healthy",
@@ -54,3 +54,4 @@ export interface IStorageCapabilityInspectionPort {
     input: StorageInstanceCapabilityInspectionRequest,
   ): Promise<StorageBackendCapabilitySnapshot>;
 }
+

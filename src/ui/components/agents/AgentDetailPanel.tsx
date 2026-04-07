@@ -1,24 +1,24 @@
-import { useEffect, useState } from "react";
-import type { AgentGoalPriorityLevel } from "../../../domain/agents/AgentGoal";
+﻿import { useEffect, useState } from "react";
+import type { AgentGoalPriorityLevel } from "@domain/agents/AgentGoal";
 import {
   AgentPlanningStrategyModes,
   SupportedAgentPlanningStrategies,
   type AgentPlanningStrategy,
-} from "../../../domain/agents/Agent";
+} from "@domain/agents/Agent";
 import {
   AgentMemoryRetentionModes,
   AgentMemoryRetrievalStrategies,
   AgentMemoryTypes,
   type AgentMemoryConfiguration,
   type AgentMemoryType,
-} from "../../../domain/agents/AgentMemory";
+} from "@domain/agents/AgentMemory";
 import {
   AgentApprovalStatuses,
   type AgentPolicy,
   type AgentToolAccessPolicy,
-} from "../../../domain/agents/AgentPolicy";
-import type { ConfigureAgentGoalsRequest } from "../../../application/agents/ConfigureAgentGoalsUseCase";
-import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
+} from "@domain/agents/AgentPolicy";
+import type { ConfigureAgentGoalsRequest } from "@application/agents/ConfigureAgentGoalsUseCase";
+import type { AgentStudioSnapshotReadModel } from "@infrastructure/api/agents/AgentStudioBackendApi";
 import type { CanonicalAssetManagementService } from "../../services/CanonicalAssetManagementService";
 import { CompositionSummaryCard } from "./CompositionSummaryCard";
 import { OutputAssetExplorerPanel } from "./OutputAssetExplorerPanel";
@@ -169,7 +169,7 @@ export function AgentDetailPanel(props: AgentDetailPanelProps): JSX.Element {
     <section className="ui-stack ui-stack--sm" data-testid="agent-detail-panel">
       <div className="ui-card ui-stack ui-stack--sm">
         <h2 className="ui-heading-2">{agent.name}</h2>
-        <p className="ui-text-secondary">{agent.id} — {agent.status}</p>
+        <p className="ui-text-secondary">{agent.id} â€” {agent.status}</p>
       </div>
       <CompositionSummaryCard
         title="Composition metadata"
@@ -446,3 +446,4 @@ export function AgentDetailPanel(props: AgentDetailPanelProps): JSX.Element {
     </section>
   );
 }
+

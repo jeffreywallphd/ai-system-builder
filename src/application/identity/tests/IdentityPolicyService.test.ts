@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderKinds,
   UserIdentityStatuses,
   createCredentialPolicy,
   createUserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import { IdentityPolicyService } from "../services/IdentityPolicyService";
 import type { IIdentityLookupRepository } from "../ports/IIdentityLookupRepository";
 import type {
@@ -216,3 +216,4 @@ describe("IdentityPolicyService", () => {
     });
   });
 });
+

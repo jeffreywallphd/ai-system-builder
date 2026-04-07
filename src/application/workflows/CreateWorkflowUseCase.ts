@@ -1,19 +1,19 @@
-import type {
+﻿import type {
   IWorkflow,
   IWorkflowAuditInfo,
   IWorkflowMetadata,
   IWorkflowRuntimeProfile,
   WorkflowExecutionPolicy,
   WorkflowStatus,
-} from "../../domain/workflows/interfaces/IWorkflow";
-import type { INode } from "../../domain/nodes/interfaces/INode";
-import type { IWorkflowConnection } from "../../domain/workflows/interfaces/IWorkflowConnection";
-import { Workflow } from "../../domain/workflows/Workflow";
+} from "@domain/workflows/interfaces/IWorkflow";
+import type { INode } from "@domain/nodes/interfaces/INode";
+import type { IWorkflowConnection } from "@domain/workflows/interfaces/IWorkflowConnection";
+import { Workflow } from "@domain/workflows/Workflow";
 import {
   WorkflowAuditInfo,
   WorkflowMetadata,
   WorkflowRuntimeProfile,
-} from "../../domain/workflows/WorkflowMetadata";
+} from "@domain/workflows/WorkflowMetadata";
 
 export interface ICreateWorkflowRequest {
   readonly id?: string;
@@ -75,3 +75,4 @@ function defaultIdFactory(): string {
 
   return `workflow_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { Node } from "../../../../domain/nodes/Node";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
-import { ExecuteMcpToolUseCase } from "../../../../application/mcp/ExecuteMcpToolUseCase";
+﻿import { describe, expect, it } from "bun:test";
+import { Node } from "@domain/nodes/Node";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import { ExecuteMcpToolUseCase } from "@application/mcp/ExecuteMcpToolUseCase";
 import { LangChainNodeExecutor } from "../LangChainNodeExecutor";
 
 function makeNode(id: string, type: string, properties: ReadonlyArray<NodeProperty> = []) {
@@ -304,3 +304,4 @@ describe("MCP node truthfulness", () => {
     expect((result.outputs.mcpError as Record<string, unknown>).category).toBe("runtime");
   });
 });
+

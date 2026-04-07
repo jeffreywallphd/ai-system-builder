@@ -1,8 +1,8 @@
-import type { IStorageCapabilityInspectionPort } from "../../application/storage/ports/StorageCapabilityInspectionPort";
-import type { IStorageObjectAccessResolverPort } from "../../application/storage/ports/StorageObjectAccessResolverPort";
-import type { IStorageObjectPort } from "../../application/storage/ports/StorageObjectPort";
-import type { IStorageProvisioningPort } from "../../application/storage/ports/StorageProvisioningPort";
-import type { StorageBackendType } from "../../domain/storage/StorageDomain";
+﻿import type { IStorageCapabilityInspectionPort } from "@application/storage/ports/StorageCapabilityInspectionPort";
+import type { IStorageObjectAccessResolverPort } from "@application/storage/ports/StorageObjectAccessResolverPort";
+import type { IStorageObjectPort } from "@application/storage/ports/StorageObjectPort";
+import type { IStorageProvisioningPort } from "@application/storage/ports/StorageProvisioningPort";
+import type { StorageBackendType } from "@domain/storage/StorageDomain";
 
 export interface StorageBackendAdapterRegistration {
   readonly backendType: StorageBackendType;
@@ -53,3 +53,4 @@ export function createStorageBackendAdapterRegistry(
 ): StorageBackendAdapterRegistry {
   return new StorageBackendAdapterRegistry(registrations);
 }
+

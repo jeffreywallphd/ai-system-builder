@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RemoveNodeUseCase } from "../RemoveNodeUseCase";
-import { makeConnection, makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeConnection, makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeWorkflowValidator } from "./testUtils";
 
 describe("RemoveNodeUseCase", () => {
@@ -21,3 +21,4 @@ describe("RemoveNodeUseCase", () => {
     expect(result.workflowValidation?.isValid).toBeTrue();
   });
 });
+

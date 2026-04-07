@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkflowDraftBuiltInStepTypes,
   WorkflowDraftInputSourceTypes,
   WorkflowDraftOutputDestinationTypes,
@@ -13,7 +13,7 @@ import {
   type WorkflowDraftStepType,
   type WorkflowDraftTriggerType,
   type WorkflowValidationIssue,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   getWorkflowTriggerSummary,
@@ -1279,3 +1279,4 @@ export function isWorkflowCanvasEditableSection(
     || sectionId === WorkflowCanvasSectionIds.steps
     || sectionId === WorkflowCanvasSectionIds.outputs;
 }
+

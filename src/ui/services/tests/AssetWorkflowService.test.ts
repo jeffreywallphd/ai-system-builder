@@ -1,6 +1,6 @@
-import { describe, expect, it, mock } from "bun:test";
+﻿import { describe, expect, it, mock } from "bun:test";
 import { AssetWorkflowService } from "../AssetWorkflowService";
-import type { AssetWorkflowClient } from "../../shared/assets/AssetWorkflowClient";
+import type { AssetWorkflowClient } from "@shared/assets/AssetWorkflowClient";
 
 describe("AssetWorkflowService", () => {
   it("delegates asset workflow operations to the shared client", async () => {
@@ -34,3 +34,4 @@ describe("AssetWorkflowService", () => {
     expect(client.resolvePreview).toHaveBeenCalledTimes(1);
   });
 });
+

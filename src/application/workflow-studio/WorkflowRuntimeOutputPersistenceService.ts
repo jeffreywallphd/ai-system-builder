@@ -1,7 +1,7 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import { ImageAssetReferenceKinds, type ImageAssetReferenceInput } from "../../domain/dataset-studio/contracts/ImageAssetReference";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import { ImageAssetReferenceKinds, type ImageAssetReferenceInput } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../ports/interfaces/IWorkflowExecutor";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   ImageRunHistoryExecutionStatuses,
   type ImageRunHistoryRecord,
@@ -11,7 +11,7 @@ import {
   createWorkflowOutputBindingDescriptorsFromAssetConfiguration,
   type ImageWorkflowOutputBindingConfiguration,
 } from "../contracts/ImageWorkflowOutputBindingConfiguration";
-import { createImageCrossStudioHandoffContract } from "../../domain/studio-handoff/ImageStudioHandoffContract";
+import { createImageCrossStudioHandoffContract } from "@domain/studio-handoff/ImageStudioHandoffContract";
 import type { SystemDatasetInstanceService } from "../system-runtime/SystemDatasetInstanceService";
 import { materializeWorkflowOutputRecords } from "./WorkflowOutputRecordMaterializationService";
 import { resolveWorkflowOutputBindingWritePlan } from "./WorkflowOutputBindingResolutionService";
@@ -506,3 +506,4 @@ export class DefaultWorkflowRuntimeOutputPersistenceService implements WorkflowR
     });
   }
 }
+

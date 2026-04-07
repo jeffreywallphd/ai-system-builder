@@ -1,6 +1,6 @@
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import type { DataPreviewModel } from "../data-studio/DataPreviewEngine";
-import type { DatasetSchemaIntentId } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionIssueCodes,
@@ -16,7 +16,7 @@ import {
   type UnifiedIngestionRouteHandlerKind,
   type UnifiedIngestionSourceKind,
   type UnifiedIngestionSourceReference,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import {
   SourceDescriptorKinds,
   SourceLocatorInputAbstraction,
@@ -520,3 +520,4 @@ export class UnifiedIngestionBatchOrchestrationService {
     });
   }
 }
+

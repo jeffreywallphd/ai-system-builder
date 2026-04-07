@@ -1,15 +1,15 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { SqliteAssetSystemRepository } from "../../../infrastructure/filesystem/SqliteAssetSystemRepository";
+import { SqliteAssetSystemRepository } from "@infrastructure/filesystem/SqliteAssetSystemRepository";
 import { RegisterAssetUseCase } from "../RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../CreateAssetVersionUseCase";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { AssetTransformation } from "../../../domain/assets/AssetTransformation";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { AssetTransformation } from "@domain/assets/AssetTransformation";
 import { GetAssetDependencyHealthUseCase } from "../GetAssetDependencyHealthUseCase";
 import { ReplayAssetGraphProjectionUseCase } from "../ReplayAssetGraphProjectionUseCase";
-import { InMemoryAssetLineageGraphProjectionSink } from "../../../infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
+import { InMemoryAssetLineageGraphProjectionSink } from "@infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
 import { ExplainCanonicalVersionExistenceUseCase, GetCanonicalProvenanceSummaryUseCase } from "../CanonicalAssetReadUseCases";
 import { GetAssetLineageDiagnosticsUseCase } from "../GetAssetLineageDiagnosticsUseCase";
 import { GetAssetImpactAnalysisUseCase } from "../GetAssetImpactAnalysisUseCase";
@@ -121,3 +121,4 @@ describe("Dependency health and graph projection", () => {
     }
   });
 });
+

@@ -1,4 +1,4 @@
-import type { AssetSelectorAssetReference, AssetSelectorRequest } from "../../../domain/studio-shell/AssetSelectorContract";
+﻿import type { AssetSelectorAssetReference, AssetSelectorRequest } from "@domain/studio-shell/AssetSelectorContract";
 
 export interface AssetSelectorResultItem {
   readonly id: string;
@@ -20,3 +20,4 @@ export interface AssetSelectorDataProvider {
     readonly searchTerm: string;
   }): Promise<AssetSelectorQueryResponse>;
 }
+

@@ -1,5 +1,5 @@
-import type { DocumentConversionGateway, DocumentConversionRequest, DocumentConversionResult } from "../../application/ingestion/DocumentConversionGateway";
-import type { IPythonRuntimeClient } from "../../application/ports/interfaces/IPythonRuntimeClient";
+﻿import type { DocumentConversionGateway, DocumentConversionRequest, DocumentConversionResult } from "@application/ingestion/DocumentConversionGateway";
+import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
 
 export class PythonRuntimeDocumentConversionGateway implements DocumentConversionGateway {
   constructor(private readonly runtimeClient: IPythonRuntimeClient) {}
@@ -37,3 +37,4 @@ export class PythonRuntimeDocumentConversionGateway implements DocumentConversio
     });
   }
 }
+

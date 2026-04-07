@@ -1,7 +1,7 @@
-import { toAgentReadModel, updateAgent, type Agent, type AgentExecutionConfiguration, type AgentPlanningStrategy, type AgentReadModel } from "../../domain/agents/Agent";
-import type { AgentGoal } from "../../domain/agents/AgentGoal";
-import type { AgentMemoryConfiguration } from "../../domain/agents/AgentMemory";
-import type { AgentPolicy } from "../../domain/agents/AgentPolicy";
+﻿import { toAgentReadModel, updateAgent, type Agent, type AgentExecutionConfiguration, type AgentPlanningStrategy, type AgentReadModel } from "@domain/agents/Agent";
+import type { AgentGoal } from "@domain/agents/AgentGoal";
+import type { AgentMemoryConfiguration } from "@domain/agents/AgentMemory";
+import type { AgentPolicy } from "@domain/agents/AgentPolicy";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError, AgentNotFoundError } from "./AgentAuthoringErrors";
 import {
@@ -48,3 +48,4 @@ export class UpdateAgentUseCase {
     return toAgentReadModel(saved);
   }
 }
+

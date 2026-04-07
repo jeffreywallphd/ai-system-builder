@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { WorkflowPresenter, type WorkflowListItemViewModel } from "./WorkflowPresenter";
 
 export interface WorkflowBrowserViewModel {
@@ -36,3 +36,4 @@ export class WorkflowBrowserPresenter {
     });
   }
 }
+

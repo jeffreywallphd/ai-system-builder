@@ -1,4 +1,4 @@
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import { ImageManipulationWorkflowTemplate } from "./ImageManipulationWorkflowTemplate";
 
 function createCoreTemplate(input: WorkflowTemplateDefinition): WorkflowTemplateDefinition {
@@ -141,3 +141,4 @@ export const CoreImageStarterWorkflowTemplates: ReadonlyArray<WorkflowTemplateDe
     metadata: { category: "transform", intent: "batch-transform" },
   }),
 ]);
+

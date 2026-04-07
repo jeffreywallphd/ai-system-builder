@@ -1,14 +1,14 @@
-import { DeploymentBuildPipeline } from "../DeploymentBuildPipeline";
+﻿import { DeploymentBuildPipeline } from "../DeploymentBuildPipeline";
 import {
   createDeploymentConfigurationContract,
   type DeploymentConfigurationContract,
-} from "../../../domain/deployment/DeploymentConfigurationDomain";
+} from "@domain/deployment/DeploymentConfigurationDomain";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
   type DeploymentTarget,
-} from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage, type SystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage, type SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 
 export function createSamplePackage(input?: { readonly includeNestedSystemDependency?: boolean }): SystemPackage {
   const includeNested = input?.includeNestedSystemDependency ?? true;
@@ -125,3 +125,4 @@ export function buildSampleBundle(input?: {
     bundle: result.bundle,
   };
 }
+

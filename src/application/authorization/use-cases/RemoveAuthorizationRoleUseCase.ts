@@ -1,7 +1,7 @@
-import { RoleAssignmentScopes, RoleAssignmentStatuses } from "../../../domain/authorization/AuthorizationDomain";
-import { WorkspaceAuthorizationRoleKeys } from "../../../domain/authorization/AuthorizationRoleDefinitions";
-import type { AuthorizationPersistenceMutationResult, AuthorizationRoleAssignmentPersistenceRecord } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { parseAuthorizationRoleAssignmentRequest } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+﻿import { RoleAssignmentScopes, RoleAssignmentStatuses } from "@domain/authorization/AuthorizationDomain";
+import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
+import type { AuthorizationPersistenceMutationResult, AuthorizationRoleAssignmentPersistenceRecord } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { parseAuthorizationRoleAssignmentRequest } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
 import { AuthorizationPolicyMutationService, type AuthorizationPolicyMutationServiceClock } from "./AuthorizationPolicyMutationService";
@@ -172,3 +172,4 @@ export class RemoveAuthorizationRoleUseCase {
     };
   }
 }
+

@@ -1,4 +1,4 @@
-import type { IModel } from "../../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 
 export type ModelDownloadLifecycleStatus =
   | "queued"
@@ -184,3 +184,4 @@ export interface IModelDownloader {
    */
   canDownload(request: IModelDownloadRequest): boolean;
 }
+

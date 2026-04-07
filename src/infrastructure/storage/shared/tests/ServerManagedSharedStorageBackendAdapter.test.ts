@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,8 +9,8 @@ import {
   StorageReplicationModes,
   createStorageInstance,
   type StorageInstance,
-} from "../../../../domain/storage/StorageDomain";
-import { StorageProvisioningOperationKinds } from "../../../../application/storage/ports/StorageProvisioningPort";
+} from "@domain/storage/StorageDomain";
+import { StorageProvisioningOperationKinds } from "@application/storage/ports/StorageProvisioningPort";
 import {
   ServerManagedSharedStorageBackendAdapter,
   SharedStorageProvisioningReasonCodes,
@@ -381,3 +381,4 @@ describe("ServerManagedSharedStorageBackendAdapter", () => {
     expect(supportedCapabilities.notes).toContain("target-label-key:sharedTargetId");
   });
 });
+

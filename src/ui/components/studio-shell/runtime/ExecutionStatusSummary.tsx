@@ -1,4 +1,4 @@
-import type { RuntimeExecutionStatusReadModel } from "../../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+﻿import type { RuntimeExecutionStatusReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 
 function toTone(status: RuntimeExecutionStatusReadModel["status"]): "success" | "warning" | "danger" | "info" {
   if (status === "succeeded") {
@@ -28,7 +28,7 @@ export function ExecutionStatusSummary({ status }: { readonly status: RuntimeExe
         Progress: {status.progress.completedNodeCount}/{status.progress.totalNodeCount} nodes ({progress}%)
       </div>
       <div className="ui-text-small ui-text-secondary">
-        Running: {status.progress.runningNodeCount} · Failed: {status.progress.failedNodeCount} · Errors: {status.errorCount}
+        Running: {status.progress.runningNodeCount} Â· Failed: {status.progress.failedNodeCount} Â· Errors: {status.errorCount}
       </div>
       <div className="ui-text-small ui-text-secondary">
         Recovery decisions: {status.recovery.decisionCount} (retries: {status.recovery.retryDecisionCount})
@@ -36,3 +36,4 @@ export function ExecutionStatusSummary({ status }: { readonly status: RuntimeExe
     </div>
   );
 }
+

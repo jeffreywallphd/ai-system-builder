@@ -1,5 +1,5 @@
-import { MarkerType, type Edge } from "@xyflow/react";
-import type { WorkflowResponse } from "../../../../application/dto/WorkflowResponse";
+﻿import { MarkerType, type Edge } from "@xyflow/react";
+import type { WorkflowResponse } from "@application/dto/WorkflowResponse";
 
 export function createReactFlowEdgeId(params: {
   readonly sourceNodeId: string;
@@ -58,3 +58,4 @@ export class EdgeAdapter {
     );
   }
 }
+

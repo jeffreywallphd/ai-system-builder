@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 export interface IWorkflowRunSummaryRepository {
   upsert(record: WorkflowRunSummaryRecord): Promise<WorkflowRunSummaryRecord>;
@@ -11,3 +11,4 @@ export interface IWorkflowRunSummaryRepository {
   getDetailByRunId(runId: string): Promise<WorkflowRunDetailRecord | undefined>;
   list(query?: WorkflowRunSummaryListQuery): Promise<ReadonlyArray<WorkflowRunSummaryRecord>>;
 }
+

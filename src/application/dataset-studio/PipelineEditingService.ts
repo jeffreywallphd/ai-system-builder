@@ -1,11 +1,11 @@
-import {
+﻿import {
   deserializePipelineDefinition,
   serializePipelineDefinition,
   validatePipelineDefinition,
   type PipelineDefinition,
   type PipelineTransitionDefinition,
-} from "../../domain/dataset-studio/PipelineDefinitionDomain";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/PipelineDefinitionDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createPipelineStageInstance,
   PipelineStageIds,
@@ -13,8 +13,8 @@ import {
   type PipelineStageDefinition,
   type PipelineStageId,
   type PipelineStageInstance,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import type { PipelineGraphTransition } from "./PipelineGraphConstructionService";
 import { buildPipelineGraph } from "./PipelineGraphConstructionService";
 import {
@@ -29,11 +29,11 @@ import { PipelineValidationService } from "./PipelineValidationService";
 import {
   parseFeatureEngineeringStageConfigFromStageOptions,
   toFeatureEngineeringStageOptions,
-} from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
+} from "@domain/dataset-studio/FeatureEngineeringStageDomain";
 import {
   parseLabelingStageConfigFromStageOptions,
   toLabelingStageOptions,
-} from "../../domain/dataset-studio/LabelingStageDomain";
+} from "@domain/dataset-studio/LabelingStageDomain";
 
 export const PipelineEditErrorCodes = Object.freeze({
   unknownStage: "unknown-stage",
@@ -553,3 +553,4 @@ export function createPipelineEditingService(input?: {
 }): PipelineEditingService {
   return new PipelineEditingService(input);
 }
+

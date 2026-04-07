@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentMemoryEntryReference } from "../../../domain/agents/AgentMemory";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import type { AgentMemoryEntryReference } from "@domain/agents/AgentMemory";
 import { AssetBackedAgentMemoryStore } from "../services/AssetBackedAgentMemoryStore";
 import { AgentExecutionService } from "../services/AgentExecutionService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
@@ -11,9 +11,9 @@ import { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import type { IAgentRepository } from "../../ports/interfaces/IAgentRepository";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import type { IAgentToolOrchestrator } from "../../ports/interfaces/IAgentToolOrchestrator";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetId } from "../../../domain/assets/AssetId";
+import { Asset } from "@domain/assets/Asset";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetId } from "@domain/assets/AssetId";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 
@@ -316,3 +316,4 @@ describe("Agent foundation services", () => {
     expect((persisted[0]?.metadata as AgentMemoryEntryReference["metadata"] | undefined)).toBeDefined();
   });
 });
+

@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   WorkflowExecutionPolicy,
   WorkflowStatus,
-} from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/workflows/interfaces/IWorkflow";
 
 export interface SaveWorkflowRequest {
   readonly id: string;
@@ -78,3 +78,4 @@ export interface SaveWorkflowRequest {
     };
   }>;
 }
+

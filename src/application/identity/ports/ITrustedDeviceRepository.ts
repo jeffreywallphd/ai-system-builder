@@ -1,4 +1,4 @@
-import type { TrustedDevice } from "../../../domain/identity/TrustedDeviceDomain";
+﻿import type { TrustedDevice } from "@domain/identity/TrustedDeviceDomain";
 import type {
   IdentityMutationOutcome,
   IdentityOperationResult,
@@ -25,3 +25,4 @@ export interface ITrustedDeviceRepository {
     >
   >;
 }
+

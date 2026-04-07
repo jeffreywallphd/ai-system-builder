@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type {
   WorkspaceAdminListItemApiRecord,
   WorkspaceInvitationApiRecord,
   WorkspaceMembershipApiRecord,
-} from "../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { presentWorkspaceAdministrationCapabilities } from "../presenters/WorkspaceAdministrationCapabilitiesPresenter";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import { buildWorkspaceInvitationAcceptPath } from "../web/workspaces/WorkspaceThinClientRoutes";
 
 const invitationRoleOptions = Object.freeze(["admin", "member", "viewer"] as const);
@@ -435,3 +435,4 @@ function formatCompactDateTime(value: string): string {
   }
   return new Date(parsed).toLocaleString();
 }
+

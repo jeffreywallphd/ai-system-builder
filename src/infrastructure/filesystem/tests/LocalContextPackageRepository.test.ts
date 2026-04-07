@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { ContextPackage } from "../../../application/context/models/ContextPackage";
+import { ContextPackage } from "@application/context/models/ContextPackage";
 import { LocalFileStorage } from "../LocalFileStorage";
 import { LocalContextPackageRepository } from "../LocalContextPackageRepository";
 
@@ -92,3 +92,4 @@ describe("LocalContextPackageRepository", () => {
     }
   });
 });
+

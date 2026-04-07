@@ -1,18 +1,18 @@
-import {
+﻿import {
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
   type AssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import {
   AssetSelectorUsageContexts,
   type AssetSelectorUsageContext,
-} from "../../../application/studio-entry/AssetSelectorCapabilityRegistry";
+} from "@application/studio-entry/AssetSelectorCapabilityRegistry";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import type { RegistryService } from "../../services/RegistryService";
 import type { AssetSelectorDataProvider, AssetSelectorQueryResponse } from "./AssetSelectorDataProvider";
 
@@ -185,3 +185,4 @@ export class AgentAssistantAssetSelectorAdapter implements AssetSelectorDataProv
     }
   }
 }
+

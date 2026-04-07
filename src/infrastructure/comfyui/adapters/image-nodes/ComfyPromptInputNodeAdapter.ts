@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   ICommonImageNodeContract,
   ICommonImageNodePromptConditioning,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -190,3 +190,4 @@ export class ComfyPromptInputNodeAdapter extends ComfyImageNodeAdapterBase {
     return "unspecified";
   }
 }
+

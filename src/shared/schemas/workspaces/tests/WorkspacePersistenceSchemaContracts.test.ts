@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkspaceStatuses } from "../../../../domain/workspaces/WorkspaceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkspaceStatuses } from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceInvitationPersistenceRecordSchema,
   WorkspacePersistenceRecordSchema,
@@ -67,3 +67,4 @@ describe("WorkspacePersistenceSchemaContracts", () => {
     })).toThrow("WorkspacePersistenceRecord payload is invalid");
   });
 });
+

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
@@ -7,7 +7,7 @@ import type {
   StorageLifecycleState,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type {
   PersistenceAuditStamp,
   PersistenceMutationResult,
@@ -101,3 +101,4 @@ export type StoragePersistenceMutationResult<TRecord> = PersistenceMutationResul
 export function normalizeStorageMutationOperationKey(operationKey: string): string {
   return normalizePersistenceOperationKey(operationKey);
 }
+

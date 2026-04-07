@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretAccessDecisionReasons,
   SecretActorTypes,
   evaluateSecretAccessDecision,
   type SecretAccessDecision,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type { ISecretAccessPolicyPort } from "../ports/SecretServicePorts";
 
 const RuntimeActorTypes = new Set<string>([
@@ -76,3 +76,4 @@ export class SecretAuthorizationPolicyEvaluator implements ISecretAccessPolicyPo
       || action === SecretAccessActions.delete;
   }
 }
+

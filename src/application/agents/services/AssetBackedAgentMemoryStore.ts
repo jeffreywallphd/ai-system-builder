@@ -1,8 +1,8 @@
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetId } from "../../../domain/assets/AssetId";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import type { AgentMemoryEntryReference, AgentMemoryQuery, AgentMemoryStore, AgentMemoryType } from "../../../domain/agents/AgentMemory";
+﻿import { Asset } from "@domain/assets/Asset";
+import { AssetId } from "@domain/assets/AssetId";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import type { AgentMemoryEntryReference, AgentMemoryQuery, AgentMemoryStore, AgentMemoryType } from "@domain/agents/AgentMemory";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 
@@ -197,3 +197,4 @@ export class AssetBackedAgentMemoryStore implements AgentMemoryStore {
     );
   }
 }
+

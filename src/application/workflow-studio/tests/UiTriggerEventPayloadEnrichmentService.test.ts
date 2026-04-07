@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createSystemContextContract } from "../../../domain/system-studio/SystemContextContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createSystemContextContract } from "@domain/system-studio/SystemContextContract";
 import { createUiTriggerEvent, UiTriggerEventKinds } from "../UiTriggerEventContract";
 import { createDefaultUiTriggerEventPayloadEnricher } from "../UiTriggerEventPayloadEnrichmentService";
 import { WorkflowExecutionTriggerSourceKinds } from "../WorkflowExecutionAlignmentContracts";
@@ -47,3 +47,4 @@ describe("UiTriggerEventPayloadEnrichmentService", () => {
     expect((payload.workflowContextBinding as { inputValues: { prompt: string } }).inputValues.prompt).toBe("enhance");
   });
 });
+

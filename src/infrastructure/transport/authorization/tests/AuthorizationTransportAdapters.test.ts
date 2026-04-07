@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthorizationPolicyDecisionDenialReasons,
   AuthorizationPolicyEvaluationTargetKinds,
   type AuthorizationPolicyDecisionEvaluationRequest,
   type AuthorizationPolicyDecisionEvaluationResult,
-} from "../../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationPolicyDecisionEvaluator } from "../../../../application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   AuthorizationTransportFailureCodes,
   AuthorizationTransportPolicyGuard,
@@ -269,3 +269,4 @@ function denyDecision(input: {
     }),
   });
 }
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   AuthProviderStatuses,
   AuthProviderCategories,
   AuthProviderKinds,
@@ -6,7 +6,7 @@ import {
   type AuthProviderCategory,
   type AuthProviderKind,
   type AuthProviderStatus,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityAuthenticatorKinds,
   type IdentityAuthenticatorKind,
@@ -293,3 +293,4 @@ export function validateIdentityProvider(
     descriptor,
   };
 }
+

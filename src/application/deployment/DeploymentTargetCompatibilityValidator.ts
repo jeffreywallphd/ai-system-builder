@@ -1,5 +1,5 @@
-import type { SystemPackage } from "../../domain/system-packaging/SystemPackagingDomain";
-import type { DeploymentTarget } from "../../domain/deployment/DeploymentTargetDomain";
+﻿import type { SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
+import type { DeploymentTarget } from "@domain/deployment/DeploymentTargetDomain";
 
 export interface DeploymentTargetCompatibilityResult {
   readonly compatible: boolean;
@@ -77,3 +77,4 @@ export class DeploymentTargetCompatibilityValidator {
     });
   }
 }
+

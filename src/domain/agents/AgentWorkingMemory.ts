@@ -1,4 +1,4 @@
-import { AssetId } from "../../../domain/assets/AssetId";
+﻿import { AssetId } from "@domain/assets/AssetId";
 import type { AgentMemoryEntryReference } from "./AgentMemory";
 
 export interface AgentWorkingMemoryExecutionOutput {
@@ -131,3 +131,4 @@ export function updateAgentWorkingMemory(
     now: update.now,
   });
 }
+

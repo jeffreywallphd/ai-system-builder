@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ReferenceImageSystemTemplate } from "../../../../application/system-studio/ReferenceImageSystemTemplate";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import ImageManipulationRuntimeEditorPanel from "../ImageManipulationRuntimeEditorPanel";
 
 describe("ImageManipulationRuntimeEditorPanel", () => {
@@ -71,3 +71,4 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("disabled=\"\"");
   });
 });
+

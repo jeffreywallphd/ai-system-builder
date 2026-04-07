@@ -1,4 +1,4 @@
-import type { IModel } from "../../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type { IModelDownloadProgress } from "./IModelDownloader";
 
 export type ModelInstallStatus =
@@ -136,3 +136,4 @@ export interface IModelInstaller {
    */
   canUninstall(model: IModel): boolean;
 }
+

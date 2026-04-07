@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { ContextPreviewResult } from "../../application/context/models/ContextPreview";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { ContextPreviewResult } from "@application/context/models/ContextPreview";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import ContextWorkbench, { type ContextWorkbenchMode } from "../components/context/ContextWorkbench";
 import { useUiDependencies } from "../composition/AppProviders";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
@@ -173,7 +173,7 @@ export default function ContextWorkbenchPage(): JSX.Element {
       {!workflow ? (
         <div className="ui-panel">
           <div className="ui-panel__body ui-text-secondary">
-            {workflowState.isLoading ? "Loading workflow…" : "Select a workflow to inspect its context workbench."}
+            {workflowState.isLoading ? "Loading workflowâ€¦" : "Select a workflow to inspect its context workbench."}
           </div>
         </div>
       ) : (
@@ -209,3 +209,4 @@ export default function ContextWorkbenchPage(): JSX.Element {
     </section>
   );
 }
+

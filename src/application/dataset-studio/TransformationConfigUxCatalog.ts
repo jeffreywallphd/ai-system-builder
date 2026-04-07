@@ -1,4 +1,4 @@
-import type { DatasetPipelineStageKind } from "../../domain/dataset-studio/StagePipelineDomain";
+﻿import type { DatasetPipelineStageKind } from "@domain/dataset-studio/StagePipelineDomain";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 import { getTransformationAssetRegistry } from "./TransformationAssetCatalog";
 import {
@@ -67,3 +67,4 @@ export function listStageTransformationConfigDescriptors(input: {
 
   return Object.freeze(descriptors);
 }
+

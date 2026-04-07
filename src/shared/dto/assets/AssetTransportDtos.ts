@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ArchiveAssetRequest,
   BeginAssetUploadRequest,
   AuthorizeAssetDownloadRequest,
@@ -9,7 +9,7 @@ import type {
   RegisterAssetRequest,
   RegisterGeneratedOutputRequest,
   ResolveAssetPreviewQuery,
-} from "../../../application/assets/use-cases/AssetServiceContracts";
+} from "@application/assets/use-cases/AssetServiceContracts";
 import {
   validateArchiveAssetRequest,
   validateBeginAssetUploadRequest,
@@ -21,8 +21,8 @@ import {
   validateRegisterAssetRequest,
   validateRegisterGeneratedOutputRequest,
   validateResolveAssetPreviewQuery,
-} from "../../../application/assets/use-cases/AssetServiceContracts";
-import type { Asset } from "../../../domain/assets/AssetDomain";
+} from "@application/assets/use-cases/AssetServiceContracts";
+import type { Asset } from "@domain/assets/AssetDomain";
 import {
   toAssetDetailDto,
   toAssetDownloadAuthorizationDto,
@@ -36,7 +36,7 @@ import {
 import type {
   AssetDownloadAuthorization,
   AssetPreviewResolution,
-} from "../../../application/assets/use-cases/AssetServiceContracts";
+} from "@application/assets/use-cases/AssetServiceContracts";
 
 export type RegisterAssetRequestDto = RegisterAssetRequest;
 export type GetAssetByIdQueryDto = GetAssetByIdQuery;
@@ -256,4 +256,5 @@ export function toBeginAssetUploadResponseDto(
     upload,
   });
 }
+
 

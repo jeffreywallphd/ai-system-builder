@@ -1,6 +1,6 @@
-import { useLocation } from "react-router-dom";
+﻿import { useLocation } from "react-router-dom";
 import StudioShellPage from "./StudioShellPage";
-import { resolveSystemBuildTemplate } from "../../application/system-studio/SystemBuildTemplateCatalog";
+import { resolveSystemBuildTemplate } from "@application/system-studio/SystemBuildTemplateCatalog";
 import { systemStudioRegistration } from "../studio-shell/registrations/SystemStudioRegistration";
 
 export default function SystemStudioPage(): JSX.Element {
@@ -25,3 +25,4 @@ export default function SystemStudioPage(): JSX.Element {
 
   return <StudioShellPage studioRegistration={registration} />;
 }
+

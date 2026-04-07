@@ -1,9 +1,9 @@
-import {
+﻿import {
   ExecutionPlan,
   ExecutionStatuses,
   type ExecutionStatus,
   type ExecutionUnitDefinition,
-} from "../../domain/execution/ExecutionPlan";
+} from "@domain/execution/ExecutionPlan";
 import type {
   IExecutionArtifact,
   IExecutionDiagnostics,
@@ -16,7 +16,7 @@ import type {
   IExecutionRunSummary,
   IExecutionRunTransitionRecord,
   IExecutionUnitRunRecord,
-} from "../../domain/execution/ExecutionRun";
+} from "@domain/execution/ExecutionRun";
 import type { IExecutionRunRepository } from "../ports/interfaces/IExecutionRunRepository";
 import { ExecutionRunHandle, type IExecutionRunHandle } from "./ExecutionRunHandle";
 
@@ -774,3 +774,4 @@ export class UnifiedExecutionEngine {
     return `${normalizedPlanId}-run-${Date.now()}`;
   }
 }
+

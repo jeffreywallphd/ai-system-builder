@@ -1,4 +1,4 @@
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import {
   createDefaultSystemStudioContextExtractor,
   type SystemStudioContextExtractionIssue,
@@ -108,3 +108,4 @@ export class SystemContextDebugPreviewService {
     });
   }
 }
+

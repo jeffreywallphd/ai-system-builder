@@ -1,4 +1,4 @@
-import type { EncryptionAtRestPolicyDefinition } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+﻿import type { EncryptionAtRestPolicyDefinition } from "@domain/security/EncryptionAtRestPolicyDomain";
 
 export interface ResolveEncryptionAtRestPolicyContextRequest {
   readonly workspaceId?: string;
@@ -17,3 +17,4 @@ export interface IEncryptionAtRestPolicyContextResolverPort {
     request: ResolveEncryptionAtRestPolicyContextRequest,
   ): Promise<ResolvedEncryptionAtRestPolicyContext>;
 }
+

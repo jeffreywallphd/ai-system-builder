@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AssetKind,
   AssetLifecycleStatus,
   IAsset,
@@ -8,7 +8,7 @@ import type {
   IAssetSemanticMetadata,
   IAssetSourceInfo,
   IAssetTechnicalMetadata,
-} from "../../../domain/assets/interfaces/IAsset";
+} from "@domain/assets/interfaces/IAsset";
 import {
   AssetAuditInfo,
   AssetLocation,
@@ -219,3 +219,4 @@ export class Asset implements IAsset {
     return (currentAudit ?? new AssetAuditInfo()).touch();
   }
 }
+

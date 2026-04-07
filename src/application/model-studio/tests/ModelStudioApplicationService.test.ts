@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IStudioShellRepository } from "../../ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../domain/assets/AssetVersion";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 import { DefaultStudioShellApplicationService } from "../../studio-shell/DefaultStudioShellApplicationService";
 import { ModelStudioApplicationService } from "../ModelStudioApplicationService";
-import { ModelStudioIdentity } from "../../../domain/model-studio/ModelStudioDomain";
+import { ModelStudioIdentity } from "@domain/model-studio/ModelStudioDomain";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
   private readonly studios = new Map<string, Studio>();
@@ -106,3 +106,4 @@ describe("ModelStudioApplicationService", () => {
     })).rejects.toThrow("Atomic studio draft enforcement failed");
   });
 });
+

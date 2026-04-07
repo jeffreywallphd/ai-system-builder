@@ -1,5 +1,5 @@
-import { WorkflowMetadata } from "../../domain/workflows/WorkflowMetadata";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
 import { LoadToolDefinitionUseCase } from "../tools/LoadToolDefinitionUseCase";
 import { WorkflowContextService, type IResolveWorkflowContextRequest } from "./WorkflowContextService";
@@ -74,3 +74,4 @@ export class PreviewToolContextUseCase {
     });
   }
 }
+

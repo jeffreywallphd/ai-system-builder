@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionPlan, ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
 import { McpServerOperationExecutionUnitHandler } from "../McpServerOperationExecutionUnitHandler";
 
 describe("McpServerOperationExecutionUnitHandler", () => {
@@ -82,3 +82,4 @@ describe("McpServerOperationExecutionUnitHandler", () => {
     expect(result.artifacts?.[0]?.kind).toBe("mcp-server-operation-result");
   });
 });
+

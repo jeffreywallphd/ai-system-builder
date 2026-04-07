@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { RegistryService } from "../RegistryService";
 import { StudioShellService } from "../StudioShellService";
 import {
@@ -6,7 +6,7 @@ import {
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 describe("RegistryService", () => {
   const previousBridge = typeof window === "undefined" ? undefined : window.aiLoomDesktop;
@@ -144,3 +144,4 @@ describe("RegistryService", () => {
     expect(listed.data?.assets.some((asset) => asset.displayName === "Fallback workflow")).toBeTrue();
   });
 });
+

@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   type WorkflowDraft,
   type WorkflowDraftOutput,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
@@ -336,4 +336,5 @@ export default function WorkflowStudioOutputSectionEditor({
     </WizardSection>
   );
 }
+
 

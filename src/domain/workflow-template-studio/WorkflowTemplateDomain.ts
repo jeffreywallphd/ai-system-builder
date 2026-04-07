@@ -1,4 +1,4 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type { AssetMetadata } from "../studio-shell/StudioShellDomain";
 import {
   createCompositionTaxonomyDescriptor,
@@ -272,3 +272,4 @@ export function createWorkflowTemplateAssetMetadata(input: {
     },
   });
 }
+

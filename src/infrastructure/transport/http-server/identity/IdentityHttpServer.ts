@@ -1,4 +1,4 @@
-import {
+﻿import {
   createServer as createHttpServer,
   type IncomingMessage,
   type RequestListener,
@@ -129,20 +129,20 @@ import {
   NodeEnrollmentRequestStatuses,
   NodeRoleCapabilities,
   NodeTypes,
-} from "../../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   StorageAccessModes,
   StorageAccessScopes,
   StorageBackendTypes,
   StorageLifecycleStates,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   CertificateRevocationReasons,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../../domain/security/CertificateAuthorityDomain";
-import { CertificateTrustEvaluationStatuses } from "../../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@domain/security/CertificateAuthorityDomain";
+import { CertificateTrustEvaluationStatuses } from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   parseApproveNodeEnrollmentActionRequestDto,
   parseNodeHeartbeatPayloadDto,
@@ -158,7 +158,7 @@ import {
   type NodeEnrollmentSubmissionRequestDtoPayload,
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
-} from "../../../../shared/schemas/nodes/NodeTrustApiSchemaContracts";
+} from "@shared/schemas/nodes/NodeTrustApiSchemaContracts";
 import {
   CreateSecretMetadataCommandSchema,
   DisableSecretMetadataCommandSchema,
@@ -167,7 +167,7 @@ import {
   ListSecretMetadataQuerySchema,
   ReEncryptSecretsCommandSchema,
   RotateSecretMetadataCommandSchema,
-} from "../../../../shared/schemas/security/SecretApiSchemaContracts";
+} from "@shared/schemas/security/SecretApiSchemaContracts";
 import {
   StorageTransportSchemaValidationError,
   parseCreateStorageInstanceRequestDto,
@@ -176,9 +176,9 @@ import {
   parseUpdateStorageInstanceRequestDto,
   type CreateStorageInstanceRequestDtoPayload,
   type UpdateStorageInstanceRequestDtoPayload,
-} from "../../../../shared/schemas/storage/StorageTransportSchemaContracts";
-import type { ValidateTransportConnectionTrustRequest } from "../../../../application/security/ports/TransportTrustValidationPorts";
-import { TransportConnectionDirections } from "../../../../application/security/ports/TransportTrustValidationPorts";
+} from "@shared/schemas/storage/StorageTransportSchemaContracts";
+import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
+import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
   TransportChannelTypes,
   TransportConnectionActorTypes,
@@ -188,9 +188,9 @@ import {
   type TransportConnectionActorType,
   type TransportPeerType,
   type TransportSecurityScenario,
-} from "../../../../domain/security/TransportSecurityDomain";
-import type { HttpTransportTrustValidationResult } from "../../../../infrastructure/transport/TransportTrustValidationAdapters";
-import type { WebSocketTransportTrustValidationResult } from "../../../../infrastructure/transport/TransportTrustValidationAdapters";
+} from "@domain/security/TransportSecurityDomain";
+import type { HttpTransportTrustValidationResult } from "@infrastructure/transport/TransportTrustValidationAdapters";
+import type { WebSocketTransportTrustValidationResult } from "@infrastructure/transport/TransportTrustValidationAdapters";
 import {
   buildWebSocketChannelContext,
   canTransitionWebSocketChannelLifecycleState,
@@ -210,12 +210,12 @@ import {
   type WebSocketChannelContext,
   type WebSocketChannelPurpose,
   type WebSocketChannelRegistry,
-} from "../../../../infrastructure/transport/websocket/SecureWebSocketChannelContext";
+} from "@infrastructure/transport/websocket/SecureWebSocketChannelContext";
 import {
   buildThinClientSessionChannelContext,
   evaluateThinClientWebSocketOriginPolicy,
   type ThinClientSessionChannelContextDto,
-} from "../../../../shared/contracts/security/ThinClientTransportContracts";
+} from "@shared/contracts/security/ThinClientTransportContracts";
 import { validateNodeMutualTlsTransport } from "./NodeMutualTlsTransportAdapter";
 
 const DEFAULT_MAX_BODY_BYTES = 64 * 1024;
@@ -8616,6 +8616,7 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(JSON.stringify(event));
   }
 }
+
 
 
 

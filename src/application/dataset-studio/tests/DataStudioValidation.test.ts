@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createCanonicalRecordsShape } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataAsset } from "../../../domain/dataset-studio/CanonicalDataAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { createCanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
 import {
   DataStudioValidationSections,
   hasErrorIssues,
@@ -137,3 +137,4 @@ describe("DataStudioValidation", () => {
     expect(issues.some((issue) => issue.path === "config.values.formatHint")).toBeTrue();
   });
 });
+

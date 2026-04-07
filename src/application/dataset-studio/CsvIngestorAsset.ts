@@ -1,8 +1,8 @@
-import { parse } from "csv-parse/sync";
+﻿import { parse } from "csv-parse/sync";
 import { z } from "zod";
-import { AssetContractShapeKinds } from "../../domain/contracts/AssetContract";
-import { CanonicalDataAsset } from "../../domain/dataset-studio/CanonicalDataAsset";
-import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+import { AssetContractShapeKinds } from "@domain/contracts/AssetContract";
+import { CanonicalDataAsset } from "@domain/dataset-studio/CanonicalDataAsset";
+import { createCanonicalRecordsShape, type CanonicalRecordValue, type CanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,
@@ -607,3 +607,4 @@ export function createCsvIngestorDataAsset(
     },
   });
 }
+

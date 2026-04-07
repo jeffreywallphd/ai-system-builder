@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   CanonicalRecordValue,
   CanonicalTableColumn,
   CanonicalTableRow,
-} from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 
 export interface TransformationPreviewFieldDelta {
   readonly fieldName: string;
@@ -118,3 +118,4 @@ export function rebuildTableColumnsFromRows(
     } satisfies CanonicalTableColumn);
   }));
 }
+

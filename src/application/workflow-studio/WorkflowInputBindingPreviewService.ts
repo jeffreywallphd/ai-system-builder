@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   WorkflowInputBindingDescriptor,
   WorkflowInputBindingResolutionContext,
   WorkflowInputBindingResolutionDiagnostic,
   WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKind,
-} from "../../domain/workflow-studio/WorkflowInputBindingDomain";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import { resolveWorkflowInputBindings } from "./WorkflowInputBindingResolutionService";
 
 export interface WorkflowInputBindingValueSummary {
@@ -52,10 +52,10 @@ function summarizeValue(value: unknown): WorkflowInputBindingValueSummary {
   }
   if (typeof value === "object") {
     const keys = Object.keys(value as Record<string, unknown>);
-    return Object.freeze({ shape: "object", summary: keys.length === 0 ? "Object{}" : `Object{${keys.slice(0, 3).join(",")}${keys.length > 3 ? ",…" : ""}}` });
+    return Object.freeze({ shape: "object", summary: keys.length === 0 ? "Object{}" : `Object{${keys.slice(0, 3).join(",")}${keys.length > 3 ? ",â€¦" : ""}}` });
   }
   if (typeof value === "string") {
-    return Object.freeze({ shape: "string", summary: value.length > 48 ? `${value.slice(0, 48)}…` : value });
+    return Object.freeze({ shape: "string", summary: value.length > 48 ? `${value.slice(0, 48)}â€¦` : value });
   }
   if (typeof value === "number") {
     return Object.freeze({ shape: "number", summary: `${value}` });
@@ -122,3 +122,4 @@ export function previewWorkflowInputBindings(input: {
     diagnostics: resolution.diagnostics,
   });
 }
+

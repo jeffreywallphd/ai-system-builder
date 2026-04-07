@@ -1,4 +1,4 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
@@ -6,7 +6,7 @@ import type {
 import type { CanonicalAssetIdentityService } from "../assets-system/CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "../assets-system/CanonicalEntityReadResolver";
 import { CanonicalEntityOperationalReadService, type CanonicalOperationalReadSummary } from "../assets-system/CanonicalEntityOperationalReadService";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 
 export interface IListInstalledModelsRequest {
   readonly criteria?: IInstalledModelSearchCriteria;
@@ -63,3 +63,4 @@ export class ListInstalledModelsUseCase {
     });
   }
 }
+

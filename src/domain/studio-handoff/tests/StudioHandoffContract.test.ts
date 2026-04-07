@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
+﻿import { describe, expect, it } from "bun:test";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
@@ -290,3 +290,4 @@ describe("createStudioHandoffContract", () => {
     expect(handoff.payload.systemOfSystems?.nestedSystems[0]?.assetId).toBe("system:nested");
   });
 });
+

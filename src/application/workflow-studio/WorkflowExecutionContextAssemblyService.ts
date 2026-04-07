@@ -1,4 +1,4 @@
-import {
+﻿import {
   type WorkflowExecutionContext,
   type WorkflowExecutionInputBinding,
   type WorkflowExecutionResolvedDatasetAsset,
@@ -12,8 +12,8 @@ import {
   WorkflowInputBindingResolutionDiagnosticCodes,
   WorkflowInputBindingSourceKinds,
   type WorkflowInputBindingDescriptor,
-} from "../../domain/workflow-studio/WorkflowInputBindingDomain";
-import { createImageCrossStudioHandoffContract } from "../../domain/studio-handoff/ImageStudioHandoffContract";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
+import { createImageCrossStudioHandoffContract } from "@domain/studio-handoff/ImageStudioHandoffContract";
 import { resolveWorkflowInputBindings } from "./WorkflowInputBindingResolutionService";
 
 export interface AssembleWorkflowExecutionContextRequest {
@@ -399,3 +399,4 @@ export function assembleWorkflowExecutionContext(
     issues: Object.freeze(issues),
   });
 }
+

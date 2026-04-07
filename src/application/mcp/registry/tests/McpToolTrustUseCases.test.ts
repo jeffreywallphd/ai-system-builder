@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IMcpToolRegistryRepository } from "../../../ports/interfaces/IMcpToolRegistryRepository";
 import type { IMcpToolSecretRepository } from "../../../ports/interfaces/IMcpToolSecretRepository";
-import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import {
   ConfigureMcpToolCredentialsUseCase,
   GetMcpToolEffectivePermissionsUseCase,
@@ -164,3 +164,4 @@ describe("McpToolTrustUseCases", () => {
     expect(sandboxPosture.policy.network.allowed).toBe(true);
   });
 });
+

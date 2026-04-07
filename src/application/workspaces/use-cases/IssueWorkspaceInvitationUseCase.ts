@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+﻿import { createHash, randomBytes } from "node:crypto";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
@@ -10,11 +10,11 @@ import {
   createWorkspaceInvitation,
   type WorkspaceInvitation,
   type WorkspaceRole,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -430,3 +430,4 @@ function normalizeDuration(value: number | undefined, fallback: number): number 
   }
   return value as number;
 }
+

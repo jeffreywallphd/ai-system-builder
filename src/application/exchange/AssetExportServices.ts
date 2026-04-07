@@ -1,33 +1,33 @@
-import { createHash } from "node:crypto";
-import { Asset } from "../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "../../domain/assets/AssetMetadata";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
-import { AssetVersion as CanonicalAssetVersion } from "../../domain/assets/AssetVersion";
+﻿import { createHash } from "node:crypto";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSemanticMetadata, AssetSourceInfo, AssetTechnicalMetadata } from "@domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetVersion as CanonicalAssetVersion } from "@domain/assets/AssetVersion";
 import {
   createAtomicAssetPackageManifest,
   createCompositeAssetPackageManifest,
   type AssetPackageManifest,
   type AssetPackageDependencyReference,
-} from "../../domain/exchange/AssetPackageManifest";
-import { BundleDependencySnapshotBuilder } from "../../domain/exchange/BundleDependencySnapshot";
+} from "@domain/exchange/AssetPackageManifest";
+import { BundleDependencySnapshotBuilder } from "@domain/exchange/BundleDependencySnapshot";
 import {
   ExchangeBundleReferenceRelations,
   ExchangeBundleSubjectKinds,
   createExchangeBundle,
   type ExchangeBundleProvenance,
-} from "../../domain/exchange/ExchangeBundleDomain";
-import { ExchangeFormatCompatibilities } from "../../domain/exchange/ExchangeFormatVersioning";
-import { ExchangeBundleDeserializer, ExchangeBundleSerializer } from "../../domain/exchange/ExchangeBundleSerialization";
-import { ExchangeBundleValidator } from "../../domain/exchange/ExchangeBundleValidation";
+} from "@domain/exchange/ExchangeBundleDomain";
+import { ExchangeFormatCompatibilities } from "@domain/exchange/ExchangeFormatVersioning";
+import { ExchangeBundleDeserializer, ExchangeBundleSerializer } from "@domain/exchange/ExchangeBundleSerialization";
+import { ExchangeBundleValidator } from "@domain/exchange/ExchangeBundleValidation";
 import {
   ExchangeImportConflictResolver,
   ImportConflictResolutionDecisions,
-} from "../../domain/exchange/ExchangeImportConflictResolution";
-import { ExchangeProvenanceTracker } from "../../domain/exchange/ExchangeProvenance";
-import { createSystemPackageManifest, type SystemPackageManifest } from "../../domain/exchange/SystemPackageManifest";
-import { createSystemAsset, type SystemAsset, type SystemCompositionNode, type SystemCompositionReference } from "../../domain/system-studio/SystemAssetDomain";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/exchange/ExchangeImportConflictResolution";
+import { ExchangeProvenanceTracker } from "@domain/exchange/ExchangeProvenance";
+import { createSystemPackageManifest, type SystemPackageManifest } from "@domain/exchange/SystemPackageManifest";
+import { createSystemAsset, type SystemAsset, type SystemCompositionNode, type SystemCompositionReference } from "@domain/system-studio/SystemAssetDomain";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
@@ -1957,3 +1957,4 @@ export class SystemAssetImportService {
     }
   }
 }
+

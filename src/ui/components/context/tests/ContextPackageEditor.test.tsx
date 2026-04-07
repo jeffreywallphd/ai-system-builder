@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ContextPackageEditor from "../ContextPackageEditor";
-import { ContextPackage } from "../../../../application/context/models/ContextPackage";
+import { ContextPackage } from "@application/context/models/ContextPackage";
 
 describe("ContextPackageEditor", () => {
   it("renders package metadata fields and fragment authoring controls", () => {
@@ -26,3 +26,4 @@ describe("ContextPackageEditor", () => {
     expect(html).toContain("Save pack");
   });
 });
+

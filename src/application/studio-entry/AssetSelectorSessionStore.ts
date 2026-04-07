@@ -1,4 +1,4 @@
-import {
+﻿import {
   AssetSelectorResultKinds,
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
@@ -6,8 +6,8 @@ import {
   type AssetSelectorContext,
   type AssetSelectorRequest,
   type AssetSelectorResult,
-} from "../../domain/studio-shell/AssetSelectorContract";
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/studio-shell/AssetSelectorContract";
+import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 import {
   AssetSelectorApplicationValidationService,
   createDefaultAssetSelectorCapabilityRegistry,
@@ -603,3 +603,4 @@ export class AssetSelectorSessionStore {
     }
   }
 }
+

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import { ExecutionRunDetailProjectionService } from "../ExecutionRunDetailProjectionService";
 
 function makeRun(overrides: Partial<IExecutionRunRecord> = {}): IExecutionRunRecord {
@@ -60,3 +60,4 @@ describe("ExecutionRunDetailProjectionService", () => {
     expect(projection.provenanceEntries.some((entry) => entry.value.includes("/tmp/job-1"))).toBe(true);
   });
 });
+

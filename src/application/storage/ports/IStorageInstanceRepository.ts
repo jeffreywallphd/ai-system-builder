@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
   StorageInstance,
   StorageLifecycleState,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export interface StorageInstanceListQuery {
   readonly workspaceId?: string;
@@ -42,3 +42,4 @@ export interface IStorageInstanceRepository {
     mutation: StorageInstanceMutationContext,
   ): Promise<StorageInstanceMutationResult & { readonly storageInstance: StorageInstance }>;
 }
+

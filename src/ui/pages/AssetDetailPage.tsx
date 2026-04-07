@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
 import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
 import { RecentAndFavoritesService } from "../routes/RecentAndFavorites";
@@ -6,8 +6,8 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import type {
   RegistryDependencyGraph,
   RegistryDependencyGraphNode,
-} from "../../application/asset-registry/RegistryDependencyGraphService";
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+} from "@application/asset-registry/RegistryDependencyGraphService";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import {
   AssetContractPanel,
   AssetDependencySummaryPanel,
@@ -23,7 +23,7 @@ import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { RegistryService } from "../services/RegistryService";
 import { StandardAssetDetailView } from "../components/registry/StandardAssetDetailView";
 import AuthorizationSharingManagementPanel from "../components/authorization/AuthorizationSharingManagementPanel";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import { buildAuthorizationSharingDesktopPath, buildAuthorizationSharingThinClientPath } from "../web/authorization/AuthorizationSharingRoutes";
 
 function removeRoot(
@@ -119,7 +119,7 @@ export default function AssetDetailPage(): JSX.Element {
   }, [assetId, recentAndFavoritesService, service]);
 
   if (loading) {
-    return <section className="ui-page"><p className="ui-text-secondary">Loading registry asset detail…</p></section>;
+    return <section className="ui-page"><p className="ui-text-secondary">Loading registry asset detailâ€¦</p></section>;
   }
 
   if (error || !asset) {
@@ -249,3 +249,4 @@ export default function AssetDetailPage(): JSX.Element {
     </section>
   );
 }
+

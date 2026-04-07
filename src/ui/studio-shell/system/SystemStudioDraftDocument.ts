@@ -1,4 +1,4 @@
-import type { SystemAsset } from "../../../domain/system-studio/SystemAssetDomain";
+﻿import type { SystemAsset } from "@domain/system-studio/SystemAssetDomain";
 import {
   normalizeSystemStudioPageModel,
   toSerializableSystemStudioPageModel,
@@ -533,3 +533,4 @@ export function serializeSystemStudioSettings(input: {
 
   return JSON.stringify(root, null, 2);
 }
+

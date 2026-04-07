@@ -1,5 +1,5 @@
-import { DatasetSchemaIntentIds } from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import { DatasetSchemaIntentIds } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import { createDefaultWorkflowSystemContextBindingAdapter } from "../workflow-studio/SystemContextWorkflowInputMapper";
 import { SystemContextValidationService, type SystemContextValidationIssue } from "../workflow-studio/SystemContextValidationService";
 import { ReferenceImageSystemTemplate } from "./ReferenceImageSystemTemplate";
@@ -241,3 +241,4 @@ export function validateReferenceImageCrossStudioContext(
     issues: Object.freeze(issues),
   });
 }
+

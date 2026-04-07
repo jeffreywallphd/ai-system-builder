@@ -1,4 +1,4 @@
-import {
+﻿import {
   type HostCapabilityDescriptor,
   type HostCapabilityFlag,
   HostCapabilityFlags,
@@ -12,7 +12,7 @@ import {
   hasHostCapability,
   inspectHostRuntimeRole,
   resolveHostCapabilityDescriptors,
-} from "../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 
 export class HostCompositionContractError extends Error {
   constructor(message: string) {
@@ -300,4 +300,5 @@ export function createHostRuntimeMetadata(input: {
     metadata: normalizeHostMetadata(input.metadata ?? {}),
   });
 }
+
 

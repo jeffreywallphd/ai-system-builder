@@ -1,8 +1,8 @@
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+﻿import type { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   SerializedSystemAssetReferenceKinds,
   type SerializedSystemAssetReference,
-} from "../../domain/system-studio/SystemSerializationContract";
+} from "@domain/system-studio/SystemSerializationContract";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 
 export const SerializedAssetReferenceResolutionIssueCodes = Object.freeze({
@@ -154,3 +154,4 @@ export class SerializedAssetReferenceResolutionService {
     });
   }
 }
+

@@ -1,5 +1,5 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import { Model, ModelArtifact, ModelSource } from "../../domain/models/Model";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import { Model, ModelArtifact, ModelSource } from "@domain/models/Model";
 import type {
   IModelInstallProgress,
   IModelInstallResult,
@@ -185,3 +185,4 @@ function createInstalledArtifact(
     contentType: artifact.contentType,
   });
 }
+

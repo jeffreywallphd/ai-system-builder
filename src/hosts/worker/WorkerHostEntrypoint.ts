@@ -1,13 +1,13 @@
-import process from "node:process";
+﻿import process from "node:process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { HostCapabilityFlags, type HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
+import { HostCapabilityFlags, type HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
 import {
   HostBootModes,
   createHostBootConfiguration,
   type HostBootConfiguration,
   type HostBootMode,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { WorkerHostRuntime } from "../HostRuntimeCatalog";
 import {
   createWorkerCompositionRoot,
@@ -201,3 +201,4 @@ if (isMainModule(pathToFileURL(thisModulePath).href)) {
     process.exit(1);
   });
 }
+

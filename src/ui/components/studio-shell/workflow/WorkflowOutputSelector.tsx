@@ -1,4 +1,4 @@
-import type { WorkflowOutputTypeRegistryEntry } from "../../../../application/workflow-studio/WorkflowOutputTypeRegistry";
+﻿import type { WorkflowOutputTypeRegistryEntry } from "@application/workflow-studio/WorkflowOutputTypeRegistry";
 
 interface WorkflowOutputSelectorProps {
   readonly outputTypeDefinitions: ReadonlyArray<WorkflowOutputTypeRegistryEntry>;
@@ -89,3 +89,4 @@ export default function WorkflowOutputSelector({
     </div>
   );
 }
+

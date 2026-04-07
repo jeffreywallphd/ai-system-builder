@@ -1,5 +1,5 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataShapeKinds } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   PipelineTemplateCategories,
   validatePipelineTemplateDefinition,
@@ -7,13 +7,13 @@ import {
   type PipelineTemplateDefinition,
   type PipelineTemplateId,
   type PipelineTemplateInstantiationOptions,
-} from "../../domain/dataset-studio/MidLevelPipelineTemplateDomain";
+} from "@domain/dataset-studio/MidLevelPipelineTemplateDomain";
 import {
   createPipelineStageInstance,
   type PipelineStageId,
   type PipelineStageInstance,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   createDocumentPreparationPipelineDefinition,
   createImagePreparationPipelineDefinition,
@@ -459,3 +459,4 @@ export function createMidLevelPipelineTemplateService(input?: {
 }): MidLevelPipelineTemplateService {
   return new MidLevelPipelineTemplateService(input);
 }
+

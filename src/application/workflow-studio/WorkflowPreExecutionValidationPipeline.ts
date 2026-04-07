@@ -1,8 +1,8 @@
-import {
+﻿import {
   normalizeWorkflowDraft,
   validateWorkflowDraft,
   type WorkflowDraft,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   translateWorkflowDefinitionToExecutionPlan,
   type WorkflowDraftExecutionPlan,
@@ -241,3 +241,4 @@ export async function validateWorkflowForExecutionReadiness(
     plan: ready ? translationResult.plan : undefined,
   });
 }
+

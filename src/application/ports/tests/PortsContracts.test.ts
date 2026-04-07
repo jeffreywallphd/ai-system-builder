@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { EnvironmentConfigProvider } from "../EnvironmentConfigProvider";
 import { FileStorage, FileStorageEntryInfo, FileStorageReadResult } from "../FileStorage";
 import { ModelDownloadHandle, ModelDownloadProgress, ModelDownloadResult, ModelDownloader } from "../ModelDownloader";
@@ -18,8 +18,8 @@ import type { IWorkflowSerializationResult, IWorkflowSerializer } from "../inter
 import type { IToolCapabilityCatalog } from "../interfaces/IToolCapabilityCatalog";
 import type { IToolCapabilityExecutor } from "../interfaces/IToolCapabilityExecutor";
 import { makeModel, makeWorkflow } from "./testUtils";
-import { CompositeToolCapabilityCatalog } from "../../../infrastructure/tools/CompositeToolCapabilityCatalog";
-import { CompositeToolCapabilityExecutor } from "../../../infrastructure/tools/CompositeToolCapabilityExecutor";
+import { CompositeToolCapabilityCatalog } from "@infrastructure/tools/CompositeToolCapabilityCatalog";
+import { CompositeToolCapabilityExecutor } from "@infrastructure/tools/CompositeToolCapabilityExecutor";
 
 describe("Application ports contracts", () => {
   it("concrete implementations satisfy declared interfaces", async () => {
@@ -85,3 +85,4 @@ describe("Application ports contracts", () => {
     })).rejects.toThrow("No tool capability executor is registered");
   });
 });
+

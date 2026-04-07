@@ -1,13 +1,13 @@
-import type { McpServerStatus } from "../../application/mcp/models/McpServerStatus";
-import type { McpConnectionStatus } from "../../application/mcp/models/McpConnectionStatus";
+﻿import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
+import type { McpConnectionStatus } from "@application/mcp/models/McpConnectionStatus";
 import type { McpService } from "../services/McpService";
 import {
   PythonRuntimeStatuses,
   type IPythonRuntimeManager,
   type PythonRuntimeManagerStatus,
-} from "../../application/ports/interfaces/IPythonRuntimeManager";
-import type { IRuntimeEventStore } from "../../application/ports/interfaces/IRuntimeEventStore";
-import type { RuntimeEvent } from "../../application/runtime/RuntimeEvent";
+} from "@application/ports/interfaces/IPythonRuntimeManager";
+import type { IRuntimeEventStore } from "@application/ports/interfaces/IRuntimeEventStore";
+import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
 import {
   buildRuntimeDiagnosticSummary,
   buildRuntimeStackPreview,
@@ -15,14 +15,14 @@ import {
   type RuntimeDiagnostics,
   type RuntimeDiagnosticsContext,
   type RuntimeLogVerbosity,
-} from "../../application/runtime/RuntimeDiagnostics";
-import { collapseConsecutiveRuntimeEvents } from "../../application/runtime/RuntimeEventStability";
+} from "@application/runtime/RuntimeDiagnostics";
+import { collapseConsecutiveRuntimeEvents } from "@application/runtime/RuntimeEventStability";
 import {
   RuntimeDependencyIds,
   describeRuntimeDependencyResolution,
   isRuntimeDependencyResolution,
   type IRuntimeDependencyOrchestrator,
-} from "../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 
 const DEFAULT_LOG_CAPACITY = 250;
 
@@ -113,7 +113,7 @@ export class RuntimeConsoleStore {
     healthChecks: Object.freeze([]),
     isRefreshingHealth: false,
     appState: "starting",
-    appStateDetail: "Checking managed runtime status…",
+    appStateDetail: "Checking managed runtime statusâ€¦",
     canRestartRuntime: false,
     isRestartingRuntime: false,
   });
@@ -221,7 +221,7 @@ export class RuntimeConsoleStore {
     this.patch({
       isRestartingRuntime: true,
       appState: this.state.appState === "starting" ? "starting" : "reconnecting",
-      appStateDetail: "Trying to restart the Python runtime…",
+      appStateDetail: "Trying to restart the Python runtimeâ€¦",
     });
 
     try {
@@ -387,7 +387,7 @@ export class RuntimeConsoleStore {
     if ((trigger === "monitor" || trigger === "refresh") && this.shouldAttemptRecovery(status)) {
       this.patch({
         appState: "reconnecting",
-        appStateDetail: "Trying to reconnect to the Python runtime…",
+        appStateDetail: "Trying to reconnect to the Python runtimeâ€¦",
       });
 
       try {
@@ -452,10 +452,10 @@ export class RuntimeConsoleStore {
 
   private describeStartupIntent(): string {
     if (this.runtimeManagement?.isManagedLocal && this.runtimeManagement.autoStartEnabled) {
-      return "Starting the managed Python runtime and waiting for it to become ready…";
+      return "Starting the managed Python runtime and waiting for it to become readyâ€¦";
     }
 
-    return "Checking Python runtime availability…";
+    return "Checking Python runtime availabilityâ€¦";
   }
 
   private async refreshRuntimeDependencyGraph(): Promise<void> {
@@ -1110,6 +1110,7 @@ function getStableReconnectingDetail(
   trigger: "startup" | "startup-failed" | "monitor" | "manual-restart" | "refresh",
 ): string {
   return trigger === "manual-restart"
-    ? "Trying to restart the Python runtime…"
-    : "Trying to reconnect to the Python runtime…";
+    ? "Trying to restart the Python runtimeâ€¦"
+    : "Trying to reconnect to the Python runtimeâ€¦";
 }
+

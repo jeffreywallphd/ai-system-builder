@@ -1,9 +1,9 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
-import { createModelAssetMetadata, createModelStudioTaxonomy, ModelStudioIdentity } from "../../domain/model-studio/ModelStudioDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
+import { createModelAssetMetadata, createModelStudioTaxonomy, ModelStudioIdentity } from "@domain/model-studio/ModelStudioDomain";
 import type { StudioShellApplicationService } from "../studio-shell/StudioShellApplicationService";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
 import type { AssetDraftResult, AssetVersionResult, StudioInitializationResult, StudioSessionResult } from "../studio-shell/contracts";
 import { StudioShellConflictError, StudioShellInvalidRequestError } from "../studio-shell/StudioShellApplicationErrors";
 import { assertAtomicStudioDraftPublishConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
@@ -131,3 +131,4 @@ export class ModelStudioApplicationService {
     });
   }
 }
+

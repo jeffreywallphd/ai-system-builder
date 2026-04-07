@@ -1,9 +1,9 @@
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import type {
   PersistReferenceImageOutputsReadModel,
   PersistReferenceImageOutputsRequest,
-} from "../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import type { RuntimeExecutionResultReadModel } from "../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { RuntimeExecutionResultReadModel } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
   ReferenceImagePerformancePhaseIds,
   ReferenceImagePerformanceTelemetrySession,
@@ -106,11 +106,11 @@ export class ReferenceImageExecutionFlowService {
     publish("running");
     const started = await request.startExecution();
     if (!started.ok || !started.executionId) {
-      upsertStep(ReferenceImageExecutionStepIds.trigger, "failed", "Couldn’t finish this image.");
+      upsertStep(ReferenceImageExecutionStepIds.trigger, "failed", "Couldnâ€™t finish this image.");
       issues.push(Object.freeze({
         stepId: ReferenceImageExecutionStepIds.trigger,
         code: "start-failed",
-        userMessage: "Couldn’t finish this image.",
+        userMessage: "Couldnâ€™t finish this image.",
         technicalMessage: started.errorMessage,
       }));
       telemetry.endPhase(ReferenceImagePerformancePhaseIds.preparation);
@@ -128,19 +128,19 @@ export class ReferenceImageExecutionFlowService {
     const result = await request.getExecutionResult(executionId);
     const runtimeResult = result.ok ? result.data : undefined;
     if (!result.ok) {
-      upsertStep(ReferenceImageExecutionStepIds.execution, "failed", "Couldn’t finish this image.");
+      upsertStep(ReferenceImageExecutionStepIds.execution, "failed", "Couldnâ€™t finish this image.");
       issues.push(Object.freeze({
         stepId: ReferenceImageExecutionStepIds.execution,
         code: "execution-result-read-failed",
-        userMessage: "Couldn’t finish this image.",
+        userMessage: "Couldnâ€™t finish this image.",
         technicalMessage: result.errorMessage,
       }));
     } else if (runtimeResult?.status === "failed" || runtimeResult?.status === "cancelled") {
-      upsertStep(ReferenceImageExecutionStepIds.execution, "failed", "Couldn’t finish this image.");
+      upsertStep(ReferenceImageExecutionStepIds.execution, "failed", "Couldnâ€™t finish this image.");
       issues.push(Object.freeze({
         stepId: ReferenceImageExecutionStepIds.execution,
         code: `execution-${runtimeResult.status}`,
-        userMessage: "Couldn’t finish this image.",
+        userMessage: "Couldnâ€™t finish this image.",
         technicalMessage: runtimeResult.diagnostics[0]?.message,
       }));
     } else {
@@ -163,11 +163,11 @@ export class ReferenceImageExecutionFlowService {
       }
     };
     if (!persisted.ok || !persisted.data) {
-      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "We couldn’t save this result.");
+      upsertStep(ReferenceImageExecutionStepIds.persistence, "failed", "We couldnâ€™t save this result.");
       issues.push(Object.freeze({
         stepId: ReferenceImageExecutionStepIds.persistence,
         code: "save-failed",
-        userMessage: "We couldn’t save this result.",
+        userMessage: "We couldnâ€™t save this result.",
         technicalMessage: persisted.errorMessage,
       }));
     } else if (persisted.data.executionOutcome === "partial-failure" || persisted.data.status === "partial") {
@@ -235,11 +235,11 @@ export class ReferenceImageExecutionFlowService {
       await request.refreshViews();
       upsertStep(ReferenceImageExecutionStepIds.refresh, "completed");
     } catch (error) {
-      upsertStep(ReferenceImageExecutionStepIds.refresh, "failed", "Couldn’t refresh results.");
+      upsertStep(ReferenceImageExecutionStepIds.refresh, "failed", "Couldnâ€™t refresh results.");
       issues.push(Object.freeze({
         stepId: ReferenceImageExecutionStepIds.refresh,
         code: "refresh-failed",
-        userMessage: "Couldn’t refresh results.",
+        userMessage: "Couldnâ€™t refresh results.",
         technicalMessage: error instanceof Error ? error.message : "Result refresh failed.",
       }));
     }
@@ -291,3 +291,4 @@ export function createReferenceImageOutputPersistenceRequest(input: {
       : undefined,
   });
 }
+

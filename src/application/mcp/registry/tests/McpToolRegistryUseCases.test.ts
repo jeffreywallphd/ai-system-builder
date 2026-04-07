@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IMcpToolDependencyScanner } from "../../../ports/interfaces/IMcpToolDependencyScanner";
 import type { IMcpToolRegistryRepository } from "../../../ports/interfaces/IMcpToolRegistryRepository";
-import type { InstalledMcpToolRecord } from "../../../../domain/mcp/InstalledMcpTool";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import {
   ApplyMcpToolUpdateUseCase,
   ExportMcpToolDefinitionsUseCase,
@@ -415,3 +415,4 @@ describe("McpToolRegistryUseCases", () => {
     expect(imported.metadata.categories).toEqual(["forecast", "weather"]);
   });
 });
+

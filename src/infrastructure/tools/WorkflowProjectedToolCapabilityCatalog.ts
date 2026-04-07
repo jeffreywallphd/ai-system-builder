@@ -1,12 +1,12 @@
-import type { IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
-import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
-import { WorkflowToolProjectionService } from "../../application/projection/WorkflowToolProjectionService";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
+import type { IToolCapabilityCatalog } from "@application/ports/interfaces/IToolCapabilityCatalog";
+import { WorkflowToolProjectionService } from "@application/projection/WorkflowToolProjectionService";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 import {
   buildToolCapabilityId,
   createToolCapabilityDescriptor,
-} from "../../application/tools/models/ToolCapabilityDescriptor";
-import type { ProjectedField } from "../../application/projection/models/ProjectedField";
+} from "@application/tools/models/ToolCapabilityDescriptor";
+import type { ProjectedField } from "@application/projection/models/ProjectedField";
 
 export const WORKFLOW_TOOL_CAPABILITY_PROVIDER = Object.freeze({
   kind: "workflow",
@@ -124,3 +124,4 @@ export class WorkflowProjectedToolCapabilityCatalog implements IToolCapabilityCa
     return Object.freeze(capabilities);
   }
 }
+

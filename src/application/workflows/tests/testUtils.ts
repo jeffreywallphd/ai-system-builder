@@ -1,6 +1,6 @@
-import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
+﻿import type { IWorkflowRepository } from "../../ports/interfaces/IWorkflowRepository";
 import type { IWorkflowExecutor } from "../../ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowValidator, IWorkflowValidationResult } from "../../../domain/services/interfaces/IWorkflowValidator";
+import type { IWorkflowValidator, IWorkflowValidationResult } from "@domain/services/interfaces/IWorkflowValidator";
 import { WorkflowExecutionHandle, WorkflowExecutionProgress, WorkflowExecutionResult } from "../../ports/WorkflowExecutor";
 
 const validResult: IWorkflowValidationResult = {
@@ -49,3 +49,4 @@ export function makeWorkflowExecutor(overrides: Partial<IWorkflowExecutor> = {})
     ...overrides,
   };
 }
+

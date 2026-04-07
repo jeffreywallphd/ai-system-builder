@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import type {
   IImageDimensionReader,
   IImageExifReader,
@@ -6,7 +6,7 @@ import type {
   IImageMetadataExtractor,
   ImageExifMetadata,
   ImageMetadataExtractionResult,
-} from "../../../../domain/dataset-studio/interfaces/ImageMetadataExtraction";
+} from "@domain/dataset-studio/interfaces/ImageMetadataExtraction";
 import { ImageSizeDimensionReaderAdapter } from "./ImageDimensionReaderAdapter";
 import { FileTypeImageFormatDetectorAdapter } from "./ImageFormatDetectorAdapter";
 
@@ -144,3 +144,4 @@ export class ImageMetadataExtractorAdapter implements IImageMetadataExtractor {
     });
   }
 }
+

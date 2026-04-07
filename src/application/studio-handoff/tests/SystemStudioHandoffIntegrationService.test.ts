@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { StudioCapabilityQueryService, StudioCapabilityRegistry, type StudioCapabilityDescriptor } from "../StudioCapabilityRegistry";
 import { StudioHandoffCompatibilityValidator } from "../StudioHandoffCompatibilityValidator";
 import { StudioHandoffRoutingService } from "../StudioHandoffRoutingService";
@@ -25,7 +25,7 @@ import {
 } from "../StudioOutputAdapter";
 import { StudioHandoffOrchestrationService } from "../StudioHandoffOrchestrationService";
 import { SystemStudioHandoffIntegrationService } from "../SystemStudioHandoffIntegrationService";
-import { StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+import { StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -299,3 +299,4 @@ describe("SystemStudioHandoffIntegrationService", () => {
     expect(spec.systemSpec.nestedSystems[0]).toEqual({ assetId: "system:child", versionId: "system:child:v2", alias: "primary-1" });
   });
 });
+

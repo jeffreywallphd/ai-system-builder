@@ -1,9 +1,9 @@
-import type { DocumentConversionGateway, DocumentConversionRequest, DocumentConversionResult } from "../../application/ingestion/DocumentConversionGateway";
+﻿import type { DocumentConversionGateway, DocumentConversionRequest, DocumentConversionResult } from "@application/ingestion/DocumentConversionGateway";
 import {
   RuntimeDependencyIds,
   RuntimeDependencyUnavailableError,
   type IRuntimeDependencyOrchestrator,
-} from "../../application/runtime/RuntimeDependencyOrchestrator";
+} from "@application/runtime/RuntimeDependencyOrchestrator";
 import { createRuntimeDependencyDetail } from "../runtime/RuntimeDependencyDiagnostics";
 
 export class OrchestratedDocumentConversionGateway implements DocumentConversionGateway {
@@ -24,3 +24,4 @@ export class OrchestratedDocumentConversionGateway implements DocumentConversion
     return this.delegate.convert(request);
   }
 }
+

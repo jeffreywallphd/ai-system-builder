@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { NodeProcessRuntimeEventSink } from "../NodeProcessRuntimeEventSink";
 import { PythonRuntimeLauncher } from "../PythonRuntimeLauncher";
 import { PythonRuntimeProcessManager } from "../PythonRuntimeProcessManager";
@@ -95,3 +95,4 @@ describe("PythonRuntimeProcessManager", () => {
     expect(store.list().some((event) => event.message.includes("timed out"))).toBeTrue();
   });
 });
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DeviceFingerprintAlgorithms,
   DevicePairingMethods,
@@ -8,7 +8,7 @@ import {
   createTrustedDevice,
   revokeTrustedDevice as revokeTrustedDeviceDomain,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   IdentityErrorCodes,
   identityFailure,
@@ -151,3 +151,4 @@ describe("TrustedDeviceManagementService audit events", () => {
     expect(events.some((event) => event.eventType === IdentityLifecycleEventTypes.trustedDeviceTrustStatusChanged)).toBeTrue();
   });
 });
+

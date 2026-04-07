@@ -1,5 +1,5 @@
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
-import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "../../application/studio-entry/StudioEntryContracts";
+﻿import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
+import { StudioEntryModes, type StudioEntryRequest, type StudioEntryResolution } from "@application/studio-entry/StudioEntryContracts";
 import { StudioEntryResolver } from "./StudioRouteMapping";
 import {
   parseStudioLaunchHandoffContract,
@@ -347,3 +347,4 @@ export class InlineAssetCreationService {
     return next ? `?${next}` : "";
   }
 }
+

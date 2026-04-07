@@ -1,4 +1,4 @@
-import type { ExploreAssetSummary } from "../../application/asset-registry/ExploreAssetQueryService";
+﻿import type { ExploreAssetSummary } from "@application/asset-registry/ExploreAssetQueryService";
 import { RegistryService } from "../services/RegistryService";
 import {
   buildWorkflowStudioOpenExistingPath,
@@ -111,3 +111,4 @@ export class PersistedWorkflowEntryService {
     });
   }
 }
+

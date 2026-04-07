@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LoadCanonicalAssetSummaryUseCase } from "../CanonicalAssetReadUseCases";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetId } from "../../../domain/assets/AssetId";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetId } from "@domain/assets/AssetId";
 
 describe("Canonical asset taxonomy alignment", () => {
   it("attaches taxonomy descriptors to canonical-summary reads when asset ids map to canonical entities", async () => {
@@ -34,3 +34,4 @@ describe("Canonical asset taxonomy alignment", () => {
     });
   });
 });
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentityAuthApiErrorCodes,
   type ChangeLocalPasswordCredentialApiRequest,
   type ChangeLocalPasswordCredentialApiResponse,
@@ -41,7 +41,7 @@ import {
   resolveDesktopTrustedDeviceTransportBootstrap,
   type DesktopTrustedDeviceTransportBootstrapState,
 } from "../../security/DesktopTrustedDeviceTransportBootstrap";
-import type { IdentityAuthClient } from "../../../../ui/shared/identity/IdentityAuthClient";
+import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
 
 export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClient {
   public constructor(
@@ -222,3 +222,4 @@ function trustFailureResponse(
     }),
   });
 }
+

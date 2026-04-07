@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StudioCapabilityQueryService,
   StudioCapabilityRegistry,
@@ -9,9 +9,9 @@ import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { StudioHandoffCompatibilityValidator } from "../StudioHandoffCompatibilityValidator";
-import { createStudioHandoffContract, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContract, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 
 function createDescriptors(): ReadonlyArray<StudioCapabilityDescriptor> {
   return Object.freeze([
@@ -157,3 +157,4 @@ describe("StudioCapabilityRegistry", () => {
     expect(decision.matchedContractId).toBe("workflow-default-input");
   });
 });
+

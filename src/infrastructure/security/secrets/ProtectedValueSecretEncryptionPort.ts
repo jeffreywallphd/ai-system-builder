@@ -1,12 +1,12 @@
-import { createHash, randomUUID } from "node:crypto";
-import type { ISecretEncryptionPort } from "../../../application/security/ports/SecretServicePorts";
-import type { IProtectedValueEncryptionPort } from "../../../application/security/ports/ProtectedValueEncryptionPorts";
-import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
-import type { SecretScopeOwner, SecretVersion } from "../../../domain/security/SecretDomain";
+﻿import { createHash, randomUUID } from "node:crypto";
+import type { ISecretEncryptionPort } from "@application/security/ports/SecretServicePorts";
+import type { IProtectedValueEncryptionPort } from "@application/security/ports/ProtectedValueEncryptionPorts";
+import { ProtectedDataClasses } from "@domain/security/EncryptionAtRestPolicyDomain";
+import type { SecretScopeOwner, SecretVersion } from "@domain/security/SecretDomain";
 import {
   EncryptionMaterialClasses,
   type IEncryptionKeyResolutionService,
-} from "../../../application/security/use-cases/EncryptionKeyResolutionServiceContracts";
+} from "@application/security/use-cases/EncryptionKeyResolutionServiceContracts";
 import {
   SECRET_ENCRYPTED_PAYLOAD_REF_PREFIX,
   FileSystemSecretEncryptedPayloadStore,
@@ -186,3 +186,4 @@ function toSecretMaterialAad(secretId: string, owner: SecretScopeOwner): string 
 function defaultPayloadRefFactory(): string {
   return `${SECRET_ENCRYPTED_PAYLOAD_REF_PREFIX}${randomUUID()}`;
 }
+

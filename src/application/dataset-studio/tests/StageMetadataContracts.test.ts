@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetPipelineStageExecutionModes, DatasetPipelineStageKinds, type DatasetPipelineStageDefinition } from "../../../domain/dataset-studio/StagePipelineDomain";
-import { CanonicalDataShapeKinds } from "../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetPipelineStageExecutionModes, DatasetPipelineStageKinds, type DatasetPipelineStageDefinition } from "@domain/dataset-studio/StagePipelineDomain";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   StageMetadataPropagationPayloadSchema,
   StageMetadataSchema,
@@ -86,3 +86,4 @@ describe("StageMetadataContracts", () => {
     expect(merged.lineage.upstreamStageIds).toContain("raw-storage");
   });
 });
+

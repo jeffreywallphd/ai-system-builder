@@ -1,5 +1,5 @@
-import type { AuthProviderStatus, CredentialPolicy } from "../../domain/identity/IdentityDomain";
-import { AuthProviderStatuses, createCredentialPolicy } from "../../domain/identity/IdentityDomain";
+﻿import type { AuthProviderStatus, CredentialPolicy } from "@domain/identity/IdentityDomain";
+import { AuthProviderStatuses, createCredentialPolicy } from "@domain/identity/IdentityDomain";
 
 export interface IdentityLocalCredentialPolicyDefaults {
   readonly minLength: number;
@@ -253,3 +253,4 @@ function parseOptionalCsvList(value: string | undefined): ReadonlyArray<string> 
 
   return Object.freeze([...deduped.values()]);
 }
+

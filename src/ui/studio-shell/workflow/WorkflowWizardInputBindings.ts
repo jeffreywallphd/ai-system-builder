@@ -1,10 +1,10 @@
-import {
+﻿import {
   createWorkflowInputBindingDescriptor,
   type WorkflowInputBindingDescriptor,
   type WorkflowInputBindingSourceDescriptor,
   WorkflowInputBindingSourceKinds,
-} from "../../../domain/workflow-studio/WorkflowInputBindingDomain";
-import type { WorkflowDraft, WorkflowDraftInput } from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowInputBindingDomain";
+import type { WorkflowDraft, WorkflowDraftInput } from "@domain/workflow-studio/WorkflowStudioDomain";
 
 function asRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -136,3 +136,4 @@ export function createDefaultBindingSource(input: {
       return Object.freeze({ sourceId, kind: WorkflowInputBindingSourceKinds.runtimeParameter, parameterKey: input.inputId, priority: 1, required: false });
   }
 }
+

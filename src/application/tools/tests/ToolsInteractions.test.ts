@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListPublishedToolsUseCase } from "../ListPublishedToolsUseCase";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
-import { InMemoryWorkflowRepository } from "../../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
+import { InMemoryWorkflowRepository } from "@infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 
 describe("tools interactions", () => {
   it("lists only published workflows", async () => {
@@ -9,3 +9,4 @@ describe("tools interactions", () => {
     expect(Array.isArray(result.tools)).toBeTrue();
   });
 });
+

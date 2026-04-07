@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   DataAssetConfigFieldKinds,
   DataAssetConfigFieldVisibilities,
   resolveDataAssetConfigDefaults,
   type DataAssetConfigFieldSchema,
   type DataAssetConfigSchema,
-} from "../../../application/dataset-studio/DataAssetConfiguration";
-import type { DataStudioValidationIssue } from "../../../application/dataset-studio/DataStudioValidation";
+} from "@application/dataset-studio/DataAssetConfiguration";
+import type { DataStudioValidationIssue } from "@application/dataset-studio/DataStudioValidation";
 
 export interface AssetConfigurationPanelProps {
   readonly title?: string;
@@ -337,3 +337,4 @@ export default function AssetConfigurationPanel({
     </section>
   );
 }
+

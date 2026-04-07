@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   WorkflowDraftStateEventCategories,
   WorkflowDraftStateEventSourceTypes,
@@ -12,7 +12,7 @@ import {
   type WorkflowDraftTrigger,
   type WorkflowDraftUserTrigger,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowTrigger,
   canMoveWorkflowTrigger,
@@ -805,3 +805,4 @@ export default function WorkflowStudioTriggerSectionEditor({
     </WizardSection>
   );
 }
+

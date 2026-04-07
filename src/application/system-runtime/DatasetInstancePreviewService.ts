@@ -1,16 +1,16 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createDatasetAssetReference,
   createDatasetInstanceReference,
   createDatasetRecordReference,
   type DatasetRecordReference,
-} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
+} from "@domain/dataset-studio/contracts/StudioDatasetCompatibility";
 import {
   deriveStorageReferenceFromImageRecord,
   type DatasetInstanceImageRecord,
   type DatasetInstanceImageRecordQuery,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
-import type { DatasetInstance } from "../../domain/system-runtime/DatasetInstanceDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
+import type { DatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
 import type { DatasetOperationalLineageContext, DatasetOperationalLineageSink } from "./DatasetOperationalLineage";
 import { SystemDatasetInstanceService } from "./SystemDatasetInstanceService";
 
@@ -380,3 +380,4 @@ function normalizeCacheSize(value: number | undefined): number {
   }
   return value;
 }
+

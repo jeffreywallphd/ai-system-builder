@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyWorkflowAdapter } from "../adapters/ComfyWorkflowAdapter";
 import { ComfyNodeCatalogProvider } from "../catalog/ComfyNodeCatalogProvider";
 
@@ -16,3 +16,4 @@ describe("comfyui cross-subfolder interactions", () => {
     expect(envelope.prompt.n1.class_type).toBe("TestNode");
   });
 });
+

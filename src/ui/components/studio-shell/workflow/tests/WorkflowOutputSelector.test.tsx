@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React, { type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createDefaultWorkflowOutputTypeRegistry } from "../../../../../application/workflow-studio/WorkflowOutputTypeRegistry";
+import { createDefaultWorkflowOutputTypeRegistry } from "@application/workflow-studio/WorkflowOutputTypeRegistry";
 import WorkflowOutputSelector from "../WorkflowOutputSelector";
 
 interface ButtonElementProps {
@@ -94,3 +94,4 @@ describe("WorkflowOutputSelector", () => {
     expect(addedRequests[1]).toEqual(["file-export", "web-viewer", "system-entry", "prompt-response-chat"]);
   });
 });
+

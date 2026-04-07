@@ -1,5 +1,5 @@
-import type { INode } from "../../../../domain/nodes/interfaces/INode";
-import type { INodePort } from "../../../../domain/nodes/interfaces/INodePort";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
+import type { INodePort } from "@domain/nodes/interfaces/INodePort";
 import type { ComfyNodeDto } from "../dto/ComfyNodeDto";
 import { ComfyPropertyAdapter } from "./ComfyPropertyAdapter";
 
@@ -54,3 +54,4 @@ export class ComfyNodeAdapter {
     });
   }
 }
+

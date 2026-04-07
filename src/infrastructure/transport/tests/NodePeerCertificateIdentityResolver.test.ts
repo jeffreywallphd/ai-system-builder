@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodeApprovalStatuses,
   NodeRevocationStates,
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
-import type { INodeTrustIdentityPersistenceRepository } from "../../../application/nodes/ports/INodeTrustIdentityPersistenceRepository";
+} from "@domain/nodes/NodeTrustDomain";
+import type { INodeTrustIdentityPersistenceRepository } from "@application/nodes/ports/INodeTrustIdentityPersistenceRepository";
 import type {
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
@@ -17,7 +17,7 @@ import type {
   UpdateNodeApprovalPersistenceRecordInput,
   UpdateNodeCapabilityProfilePersistenceRecordInput,
   UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import { NodePeerCertificateIdentityResolver } from "../NodePeerCertificateIdentityResolver";
 
 class InMemoryNodeRepository implements INodeTrustIdentityPersistenceRepository {
@@ -161,3 +161,4 @@ function createNodeRecord(input: {
     revision: 0,
   });
 }
+

@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   IssueWorkspaceInvitationUseCase,
   WorkspaceInvitationIssuanceErrorCode,
-} from "../../../application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
+} from "@application/workspaces/use-cases/IssueWorkspaceInvitationUseCase";
 import type {
   ResolveAuthenticatedWorkspaceOnboardingUseCase,
   WorkspaceAuthenticatedOnboardingErrorCode,
-} from "../../../application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
+} from "@application/workspaces/use-cases/ResolveAuthenticatedWorkspaceOnboardingUseCase";
 import {
   WorkspaceInvitationApiErrorCodes,
   type AcceptWorkspaceInvitationOnboardingApiRequest,
@@ -207,5 +207,6 @@ function serializeInvitation(invitation: {
     onboardingMetadata: invitation.onboardingMetadata,
   });
 }
+
 
 

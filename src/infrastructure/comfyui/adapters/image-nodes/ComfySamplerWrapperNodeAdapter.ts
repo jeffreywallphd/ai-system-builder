@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   ICommonImageNodeContract,
   ICommonImageNodeInternalImage,
   ICommonImageNodeLatentRepresentation,
   ICommonImageNodeModelCapabilityRef,
   ICommonImageNodePromptConditioning,
   IImageNodeExecutionRequest,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import {
   ComfyImageNodeAdapterBase,
   type IComfyNodeExecutionContext,
@@ -294,3 +294,4 @@ export class ComfySamplerWrapperNodeAdapter extends ComfyImageNodeAdapterBase {
     return undefined;
   }
 }
+

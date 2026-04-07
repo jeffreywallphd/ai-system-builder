@@ -1,4 +1,4 @@
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+﻿import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 
 export interface IMcpToolRegistryRepository {
   listInstalledTools(): Promise<ReadonlyArray<InstalledMcpToolRecord>>;
@@ -7,3 +7,4 @@ export interface IMcpToolRegistryRepository {
   saveInstalledTool(record: InstalledMcpToolRecord): Promise<InstalledMcpToolRecord>;
   removeInstalledTool(toolId: string): Promise<boolean>;
 }
+

@@ -1,4 +1,4 @@
-import { toAgentReadModel, type AgentReadModel } from "../../domain/agents/Agent";
+﻿import { toAgentReadModel, type AgentReadModel } from "@domain/agents/Agent";
 import type { IAgentRepository } from "../ports/interfaces/IAgentRepository";
 import { AgentInvalidRequestError } from "./AgentAuthoringErrors";
 
@@ -14,3 +14,4 @@ export class GetAgentUseCase {
     return agent ? toAgentReadModel(agent) : undefined;
   }
 }
+

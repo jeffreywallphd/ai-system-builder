@@ -1,16 +1,16 @@
-import { SystemStudioIdentity, type SystemComponentKind } from "../../domain/system-studio/SystemAssetDomain";
+﻿import { SystemStudioIdentity, type SystemComponentKind } from "@domain/system-studio/SystemAssetDomain";
 import {
   createStudioHandoffContract,
   StudioHandoffIntentKinds,
   StudioHandoffAssetRoles,
   type MultiAssetStudioHandoffContract,
   type SystemOfSystemsHandoffContext,
-} from "../../domain/studio-handoff/StudioHandoffContract";
+} from "@domain/studio-handoff/StudioHandoffContract";
 import type { StudioHandoffRoutingService, StudioHandoffRouteDecision } from "./StudioHandoffRoutingService";
 import type { StudioHandoffOrchestrationService, StudioHandoffRequest, UpdatedStudioHandoffResult } from "./StudioHandoffOrchestrationService";
 import type { AdaptedStudioInput, GroupedAdaptedStudioInput } from "./StudioInputAdapter";
 import type { SystemStudioApplicationService } from "../system-studio/SystemStudioApplicationService";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
 
 export interface SystemStudioAcceptedHandoffCapability {
   readonly capabilityId: string;
@@ -351,3 +351,4 @@ export class SystemStudioHandoffIntegrationService {
     });
   }
 }
+

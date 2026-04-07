@@ -1,4 +1,4 @@
-import type { EndpointRuntimeInvocationRequest, EndpointRuntimeInvoker } from "../../../application/deployment/EndpointRoutingService";
+﻿import type { EndpointRuntimeInvocationRequest, EndpointRuntimeInvoker } from "@application/deployment/EndpointRoutingService";
 import { ExternalSystemRuntimeInterface, type ExternalExecutionResponse } from "./ExternalSystemRuntimeInterface";
 import type { SystemRuntimeApiResponse } from "./SystemRuntimeBackendApi";
 
@@ -23,3 +23,4 @@ export class DeploymentEndpointRuntimeInvoker implements EndpointRuntimeInvoker 
     });
   }
 }
+

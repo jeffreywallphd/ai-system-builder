@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createStudioHandoffContract, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createStudioHandoffContract, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 import { ContextualStudioInitializer } from "../ContextualStudioInitializer";
 import { StudioEntryModes } from "../StudioEntryContracts";
 
@@ -63,3 +63,4 @@ describe("ContextualStudioInitializer", () => {
     expect(payload.initialization.context.prefill?.values).toEqual({ selectedComponent: "child-a" });
   });
 });
+

@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
   WorkflowPersistenceStatus,
-} from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 
 export interface WorkflowPersistenceListQuery {
   readonly status?: WorkflowPersistenceStatus;
@@ -19,3 +19,4 @@ export interface IWorkflowPersistenceRepository {
   list(query?: WorkflowPersistenceListQuery): Promise<ReadonlyArray<PersistedWorkflowSummary>>;
   duplicate(sourceWorkflowId: string, duplicateRecord: PersistedWorkflowRecord): Promise<PersistedWorkflowRecord>;
 }
+

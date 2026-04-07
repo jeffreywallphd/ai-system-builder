@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   IComfyAdapterRequest,
   IComfyAdapterExecutionContext,
-} from "../../../../application/execution/comfyui/ComfyAdapterContract";
+} from "@application/execution/comfyui/ComfyAdapterContract";
 import type { ComfyWorkflowDto } from "../../dto/ComfyWorkflowDto";
 import { ComfyWorkflowAdapter } from "../../adapters/ComfyWorkflowAdapter";
 
@@ -99,3 +99,4 @@ function applyPropertyOverrides(
 
   return updatedWorkflow;
 }
+

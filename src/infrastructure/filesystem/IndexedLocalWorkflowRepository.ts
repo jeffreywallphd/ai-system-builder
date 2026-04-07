@@ -1,8 +1,8 @@
-import path from "node:path";
-import type { IWorkflowRecordSummary, IWorkflowRepository } from "../../application/ports/interfaces/IWorkflowRepository";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
-import type { INodeCatalogProvider } from "../../application/ports/interfaces/INodeCatalogProvider";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import path from "node:path";
+import type { IWorkflowRecordSummary, IWorkflowRepository } from "@application/ports/interfaces/IWorkflowRepository";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { LocalWorkflowRepository } from "./LocalWorkflowRepository";
 import { SqliteWorkflowIndexDatabase } from "./SqliteWorkflowIndexDatabase";
 import { WorkflowPersistenceCodec, type WorkflowRecord } from "../workflows/WorkflowPersistenceCodec";
@@ -96,3 +96,4 @@ export class IndexedLocalWorkflowRepository implements IWorkflowRepository {
     return path.join(this.rootDirectory, `${id.trim()}.json`);
   }
 }
+

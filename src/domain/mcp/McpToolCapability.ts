@@ -1,5 +1,5 @@
-import type { McpToolCredentialFieldRequirement, McpToolPermissionScope } from "./McpToolTrust";
-import type { AssetKind } from "../../../domain/assets/interfaces/IAsset";
+﻿import type { McpToolCredentialFieldRequirement, McpToolPermissionScope } from "./McpToolTrust";
+import type { AssetKind } from "@domain/assets/interfaces/IAsset";
 
 export type McpToolSideEffectClass = "none" | "read" | "write" | "network" | "system";
 
@@ -362,3 +362,4 @@ function normalizeMcpToolVersion(version: string): string {
   }
   return trimmed;
 }
+

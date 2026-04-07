@@ -1,4 +1,4 @@
-import type { AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentSessionDetailReadModel } from "@application/agents/contracts/AgentRunContracts";
 
 interface SessionStepOutcomePanelProps {
   readonly session: AgentSessionDetailReadModel;
@@ -16,9 +16,9 @@ export function SessionStepOutcomePanel(props: SessionStepOutcomePanelProps): JS
           {outcomes.map((outcome) => (
             <li key={outcome.stepId} className="ui-text-secondary">
               {outcome.stepId}: {outcome.status} (attempts: {outcome.attempts})
-              {outcome.toolId ? ` • tool ${outcome.toolId}` : ""}
-              {outcome.outputAssetId ? ` • output ${outcome.outputAssetId}` : ""}
-              {outcome.errorMessage ? ` • error ${outcome.errorMessage}` : ""}
+              {outcome.toolId ? ` â€¢ tool ${outcome.toolId}` : ""}
+              {outcome.outputAssetId ? ` â€¢ output ${outcome.outputAssetId}` : ""}
+              {outcome.errorMessage ? ` â€¢ error ${outcome.errorMessage}` : ""}
             </li>
           ))}
         </ul>
@@ -26,3 +26,4 @@ export function SessionStepOutcomePanel(props: SessionStepOutcomePanelProps): JS
     </section>
   );
 }
+

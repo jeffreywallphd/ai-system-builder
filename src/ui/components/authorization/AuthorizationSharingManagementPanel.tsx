@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   AuthorizationAccessStateApiResponse,
   AuthorizationManagementApiError,
   AuthorizationSharingGrantApiRecord,
-} from "../../../infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
-import { AuthorizationPermissionActionMatrix } from "../../../domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationRoleKey, ResourceVisibility, SharingPolicyMode } from "../../../domain/authorization/AuthorizationDomain";
+} from "@infrastructure/api/authorization/sdk/PublicAuthorizationManagementApiContract";
+import { AuthorizationPermissionActionMatrix } from "@domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationRoleKey, ResourceVisibility, SharingPolicyMode } from "@domain/authorization/AuthorizationDomain";
 import { AuthorizationManagementService } from "../../services/AuthorizationManagementService";
-import type { AuthorizationSharingTargetDraft } from "../../shared/authorization/AuthorizationManagementClient";
+import type { AuthorizationSharingTargetDraft } from "@shared/authorization/AuthorizationManagementClient";
 
 const resourceFamilyOptions = Object.freeze(Object.keys(AuthorizationPermissionActionMatrix) as AuthorizationResourceFamily[]);
 const visibilityOptions = Object.freeze([
@@ -713,3 +713,4 @@ function formatPermissionContributions(
 
   return contributions.length > 0 ? contributions.join(", ") : "none";
 }
+

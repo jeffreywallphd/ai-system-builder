@@ -1,5 +1,5 @@
-import { describe, expect, it, mock } from "bun:test";
-import { createRuntimeEvent, RuntimeEventSources } from "../../../application/runtime/RuntimeEvent";
+﻿import { describe, expect, it, mock } from "bun:test";
+import { createRuntimeEvent, RuntimeEventSources } from "@application/runtime/RuntimeEvent";
 import type { ManagedServiceRecord } from "../../services/ManagedServicesService";
 import type { ManagedServiceEventStreamListener } from "../../services/ManagedServiceEventStream";
 import { ManagedServicesStore } from "../ManagedServicesStore";
@@ -91,7 +91,7 @@ describe("ManagedServicesStore", () => {
       canRemove: true,
     }));
     const removeService = mock(async () => undefined);
-    const startService = mock(async () => createServiceRecord({ state: "starting", detail: "Booting…" }));
+    const startService = mock(async () => createServiceRecord({ state: "starting", detail: "Bootingâ€¦" }));
     const stopService = mock(async () => createServiceRecord({ state: "stopped", ownership: "none", isAvailable: false }));
     const restartService = mock(async () => createServiceRecord({ state: "running", detail: "Restart complete." }));
     const ensureRunning = mock(async () => createServiceRecord({ state: "running", detail: "Already running." }));
@@ -178,7 +178,7 @@ describe("ManagedServicesStore", () => {
     const store = new ManagedServicesStore(
       {
         listServices: mock(async () => Object.freeze([createServiceRecord()])),
-        startService: mock(async () => createServiceRecord({ state: "starting", detail: "Booting…" })),
+        startService: mock(async () => createServiceRecord({ state: "starting", detail: "Bootingâ€¦" })),
         mapSupervisorServiceRecord: mock(async () => createServiceRecord()),
       } as any,
       {
@@ -210,7 +210,7 @@ describe("ManagedServicesStore", () => {
 
   it("synchronizes live supervisor snapshots, logs, and reconnect state", async () => {
     let streamListener: ManagedServiceEventStreamListener | undefined;
-    const listServices = mock(async () => Object.freeze([createServiceRecord({ state: "starting", detail: "Booting…" })]));
+    const listServices = mock(async () => Object.freeze([createServiceRecord({ state: "starting", detail: "Bootingâ€¦" })]));
     const mapSupervisorServiceRecord = mock(async (service: any) => createServiceRecord({
       id: service.serviceId,
       name: service.name,
@@ -343,7 +343,7 @@ describe("ManagedServicesStore", () => {
       entry: {
         timestamp: "2026-03-20T10:15:01.000Z",
         level: "stdout",
-        message: "Trying to reconnect…",
+        message: "Trying to reconnectâ€¦",
       },
     });
     streamListener?.onLog?.({
@@ -351,7 +351,7 @@ describe("ManagedServicesStore", () => {
       entry: {
         timestamp: "2026-03-20T10:15:02.000Z",
         level: "stdout",
-        message: "Trying to reconnect…",
+        message: "Trying to reconnectâ€¦",
       },
     });
     streamListener?.onLog?.({
@@ -365,8 +365,9 @@ describe("ManagedServicesStore", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(store.getState().recentLogs.map((entry) => entry.message)).toEqual([
-      "Trying to reconnect…",
+      "Trying to reconnectâ€¦",
       "Runtime ready",
     ]);
   });
 });
+

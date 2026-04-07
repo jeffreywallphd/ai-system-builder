@@ -1,4 +1,4 @@
-import { RuntimeEnvironmentKinds, type RuntimeEnvironmentKind } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+﻿import { RuntimeEnvironmentKinds, type RuntimeEnvironmentKind } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 
 export const ExternalExecutionEnvironmentOptions = Object.freeze({
   local: "local",
@@ -73,4 +73,5 @@ export class ExecutionEnvironmentConfigurationValidator {
     });
   }
 }
+
 

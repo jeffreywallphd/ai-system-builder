@@ -1,4 +1,4 @@
-import { FileIngestionPolicyService } from "../../domain/ingestion/FileIngestionServices";
+﻿import { FileIngestionPolicyService } from "@domain/ingestion/FileIngestionServices";
 import {
   ConversionFailedError,
   FileIngestionError,
@@ -6,7 +6,7 @@ import {
   type FileIngestionRequest,
   type FileIngestionResult,
   RuntimeUnavailableError,
-} from "../../domain/ingestion/interfaces/IFileIngestion";
+} from "@domain/ingestion/interfaces/IFileIngestion";
 import type { DocumentConversionGateway } from "./DocumentConversionGateway";
 import { RuntimeDependencyUnavailableError } from "../runtime/RuntimeDependencyOrchestrator";
 import type { FileIngestionApplicationService } from "./FileIngestionApplicationService";
@@ -96,3 +96,5 @@ export class DefaultFileIngestionApplicationService implements FileIngestionAppl
     return Object.freeze(await Promise.all(requests.map((request) => this.ingestFile(profile, request))));
   }
 }
+
+

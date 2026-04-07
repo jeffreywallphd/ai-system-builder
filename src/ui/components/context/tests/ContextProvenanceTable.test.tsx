@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ContextProvenanceTable from "../ContextProvenanceTable";
-import { ContextInspectionResult } from "../../../../application/context/models/ContextInspectionResult";
-import { ContextAssemblyResult } from "../../../../application/context/models/ContextAssemblyResult";
-import { AssembledContext } from "../../../../application/context/models/AssembledContext";
-import { ExecutionContextEnvelope } from "../../../../application/context/models/ExecutionContextEnvelope";
+import { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
+import { ContextAssemblyResult } from "@application/context/models/ContextAssemblyResult";
+import { AssembledContext } from "@application/context/models/AssembledContext";
+import { ExecutionContextEnvelope } from "@application/context/models/ExecutionContextEnvelope";
 
 describe("ContextProvenanceTable", () => {
   it("keeps trimmed and excluded provenance visible to authors", () => {
@@ -77,3 +77,4 @@ describe("ContextProvenanceTable", () => {
     expect(html).toContain("Persona");
   });
 });
+

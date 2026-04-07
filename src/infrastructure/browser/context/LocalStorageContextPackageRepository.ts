@@ -1,11 +1,11 @@
-import { ContextPackage } from "../../../application/context/models/ContextPackage";
-import { ContextFragment } from "../../../application/context/models/ContextFragment";
-import { ContextPackageReference } from "../../../application/context/models/ContextPackageReference";
+﻿import { ContextPackage } from "@application/context/models/ContextPackage";
+import { ContextFragment } from "@application/context/models/ContextFragment";
+import { ContextPackageReference } from "@application/context/models/ContextPackageReference";
 import type {
   IContextPackageListCriteria,
   IContextPackageRepository,
   IContextPackageSummary,
-} from "../../../application/ports/interfaces/IContextPackageRepository";
+} from "@application/ports/interfaces/IContextPackageRepository";
 
 interface ContextPackageRecord {
   readonly id: string;
@@ -198,3 +198,4 @@ export class LocalStorageContextPackageRepository implements IContextPackageRepo
     });
   }
 }
+

@@ -1,14 +1,14 @@
-import type {
+﻿import type {
   SystemAsset,
   SystemBinding,
   SystemBindingEndpoint,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import type { RuntimeBehaviorProfile } from "./RuntimeBehaviorAlignment";
 import type { RuntimeDependencyResolutionResult } from "./RuntimeDependencyResolution";
 import type { RuntimeExecutionContract } from "./RuntimeExecutionContractMapping";
 import type { RuntimeEnvironmentSelectionRequest } from "./RuntimeEnvironmentSelector";
 import { RuntimeEnvironmentSelector, type IRuntimeEnvironmentSelector } from "./RuntimeEnvironmentSelector";
-import type { RuntimeEnvironment, RuntimeEnvironmentKind } from "../../domain/system-runtime/RuntimeEnvironmentDomain";
+import type { RuntimeEnvironment, RuntimeEnvironmentKind } from "@domain/system-runtime/RuntimeEnvironmentDomain";
 import { requiresPinnedRuntimeComponentVersion } from "./RuntimeComponentVersionPinningPolicy";
 
 export interface ExecutionPlanNode {
@@ -293,3 +293,4 @@ export class ExecutionPlanBuilder {
     });
   }
 }
+

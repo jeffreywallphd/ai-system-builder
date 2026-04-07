@@ -1,5 +1,5 @@
-import type { AuthorizationResourceFamily, CatalogPermissionKey } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
-import type { AuthorizationRoleKey, ResourceOwnershipScope, ResourceVisibility, SharingPolicyMode } from "../../../../domain/authorization/AuthorizationDomain";
+﻿import type { AuthorizationResourceFamily, CatalogPermissionKey } from "@domain/authorization/AuthorizationPermissionCatalog";
+import type { AuthorizationRoleKey, ResourceOwnershipScope, ResourceVisibility, SharingPolicyMode } from "@domain/authorization/AuthorizationDomain";
 
 export const AuthorizationManagementApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -311,3 +311,4 @@ export interface AuthorizationWorkspaceSharingReportApiResponse {
   readonly unusualVisibilityPatterns: ReadonlyArray<AuthorizationUnusualVisibilityPatternApiRecord>;
   readonly recentSharingMutations: ReadonlyArray<AuthorizationSharingMutationReportApiRecord>;
 }
+

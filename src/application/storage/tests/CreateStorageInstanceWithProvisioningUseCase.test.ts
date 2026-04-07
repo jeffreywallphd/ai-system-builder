@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -7,14 +7,14 @@ import {
   StorageAccessScopes,
   StorageBackendTypes,
   StorageLifecycleStates,
-} from "../../../domain/storage/StorageDomain";
-import { SqliteStorageInstancePersistenceAdapter } from "../../../infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
-import { ServerManagedLocalStorageBackendAdapter } from "../../../infrastructure/storage/local/ServerManagedLocalStorageBackendAdapter";
-import { ServerManagedSharedStorageBackendAdapter } from "../../../infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter";
+} from "@domain/storage/StorageDomain";
+import { SqliteStorageInstancePersistenceAdapter } from "@infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter";
+import { ServerManagedLocalStorageBackendAdapter } from "@infrastructure/storage/local/ServerManagedLocalStorageBackendAdapter";
+import { ServerManagedSharedStorageBackendAdapter } from "@infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter";
 import {
   StorageBackendAdapterRegistry,
   StorageBackendProvisioningOrchestrator,
-} from "../../../infrastructure/storage";
+} from "@infrastructure/storage";
 import {
   StoragePolicyActions,
   type IStoragePolicyEvaluationPort,
@@ -324,3 +324,4 @@ describe("CreateStorageInstanceWithProvisioningUseCase", () => {
     repository.dispose();
   });
 });
+

@@ -1,4 +1,4 @@
-import { createContextBundleStudioTaxonomy, ContextBundleStudioIdentity } from "../../../domain/context-bundle-studio/ContextBundleStudioDomain";
+﻿import { createContextBundleStudioTaxonomy, ContextBundleStudioIdentity } from "@domain/context-bundle-studio/ContextBundleStudioDomain";
 import type { CompositeStudioRegistration } from "../StudioShellExtensions";
 import { createCompositeStudioMetadataPatch } from "./AtomicStudioRegistrationDefaults";
 
@@ -56,3 +56,4 @@ export const contextBundleStudioRegistration: CompositeStudioRegistration = Obje
     },
   ]),
 });
+

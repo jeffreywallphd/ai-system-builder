@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export interface ValueNormalizationOptions {
   readonly caseSensitive: boolean;
@@ -78,3 +78,4 @@ export function toComparableString(
   }
   return undefined;
 }
+

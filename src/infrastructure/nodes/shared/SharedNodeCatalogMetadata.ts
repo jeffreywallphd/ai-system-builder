@@ -1,7 +1,7 @@
-import { NodePort, NodePortCompatibilityProfile } from "../../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
-import type { INodeDefinition } from "../../../../domain/nodes/interfaces/INodeDefinition";
-import type { NodePortValueType } from "../../../../domain/nodes/interfaces/INodePort";
+﻿import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { NodePortValueType } from "@domain/nodes/interfaces/INodePort";
 
 interface ISharedNodeCatalogMetadata {
   readonly description: string;
@@ -70,3 +70,4 @@ export function getSharedNodeCatalogMetadata(
 ): ISharedNodeCatalogMetadata | undefined {
   return SHARED_NODE_CATALOG_METADATA[nodeTypeId];
 }
+

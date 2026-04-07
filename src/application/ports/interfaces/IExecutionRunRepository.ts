@@ -1,6 +1,6 @@
-import type { ExecutionStatus, ExecutionUnitKind } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunProvenance } from "../../../domain/execution/ExecutionRun";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import type { ExecutionStatus, ExecutionUnitKind } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunProvenance } from "@domain/execution/ExecutionRun";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 
 export interface IExecutionRunRepositoryListCriteria {
   readonly planId?: string;
@@ -22,3 +22,4 @@ export interface IExecutionRunRepository {
   getRunById(runId: string): Promise<IExecutionRunRecord | undefined>;
   listRuns(criteria?: IExecutionRunRepositoryListCriteria): Promise<ReadonlyArray<IExecutionRunRecord>>;
 }
+

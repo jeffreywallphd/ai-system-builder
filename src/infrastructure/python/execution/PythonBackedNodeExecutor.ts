@@ -1,7 +1,7 @@
-import type { INodeExecutionContext } from "../../../application/ports/interfaces/INodeExecutionContextResolver";
-import type { INodeExecutionResult, INodeExecutor } from "../../../application/ports/interfaces/INodeExecutor";
-import type { IPythonRuntimeClient } from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import type { INode } from "../../../domain/nodes/interfaces/INode";
+﻿import type { INodeExecutionContext } from "@application/ports/interfaces/INodeExecutionContextResolver";
+import type { INodeExecutionResult, INodeExecutor } from "@application/ports/interfaces/INodeExecutor";
+import type { IPythonRuntimeClient } from "@application/ports/interfaces/IPythonRuntimeClient";
+import type { INode } from "@domain/nodes/interfaces/INode";
 
 function nodePropertiesToObject(node: INode): Readonly<Record<string, unknown>> {
   return Object.freeze(
@@ -84,3 +84,4 @@ export class PythonBackedNodeExecutor implements INodeExecutor {
     };
   }
 }
+

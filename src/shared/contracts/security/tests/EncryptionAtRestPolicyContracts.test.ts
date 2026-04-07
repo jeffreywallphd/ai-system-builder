@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   EncryptionKeyScopes,
   EncryptionModes,
@@ -7,7 +7,7 @@ import {
   createEncryptedMaterialReference,
   createEncryptionAtRestPolicyDefinition,
   evaluateEncryptionAtRestPolicy,
-} from "../../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionAtRestPolicyContractError,
   serializeEncryptionPolicyRegistry,
@@ -215,3 +215,4 @@ describe("EncryptionAtRestPolicyContracts", () => {
     });
   });
 });
+

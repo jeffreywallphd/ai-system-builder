@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SecretScopes } from "../../../../domain/security/SecretDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretScopes } from "@domain/security/SecretDomain";
 import {
   SecretEnvelopeEncryptionError,
   SecretEnvelopeEncryptionService,
@@ -101,3 +101,4 @@ describe("SecretEnvelopeEncryptionService", () => {
     })).toThrow(SecretEnvelopeEncryptionError);
   });
 });
+

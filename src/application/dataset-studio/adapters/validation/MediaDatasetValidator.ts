@@ -1,25 +1,25 @@
-import type {
+﻿import type {
   CanonicalDataShape,
   CanonicalImageStructuredItem,
   CanonicalRecordValue,
-} from "../../../../domain/dataset-studio/CanonicalDataShapes";
-import type { ImageRecord, IImageRecordValidator } from "../../../../domain/dataset-studio/contracts/ImageRecord";
+} from "@domain/dataset-studio/CanonicalDataShapes";
+import type { ImageRecord, IImageRecordValidator } from "@domain/dataset-studio/contracts/ImageRecord";
 import type {
   IMediaDatasetValidator,
   IMediaRecordValidator,
   MediaValidationIssue,
   MediaValidationResult,
-} from "../../../../domain/dataset-studio/interfaces/MediaValidation";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
 import {
   MediaValidationIssueSeverities,
   createMediaValidationIssue,
   createMediaValidationResult,
-} from "../../../../domain/dataset-studio/interfaces/MediaValidation";
+} from "@domain/dataset-studio/interfaces/MediaValidation";
 import {
   ZodImageRecordValidator,
   isAllowedMediaImageFormat,
 } from "./ImageRecordValidator";
-import { assessImageRecordVersionCompatibility } from "../../../../domain/dataset-studio/contracts/ImageRecordVersioning";
+import { assessImageRecordVersionCompatibility } from "@domain/dataset-studio/contracts/ImageRecordVersioning";
 
 const MediaRecordLimits = Object.freeze({
   maxDimension: 100_000,
@@ -271,3 +271,4 @@ export class ZodMediaDatasetValidator implements IMediaDatasetValidator {
     return createMediaValidationResult(Object.freeze(issues), recordValidation.value ?? Object.freeze([]));
   }
 }
+

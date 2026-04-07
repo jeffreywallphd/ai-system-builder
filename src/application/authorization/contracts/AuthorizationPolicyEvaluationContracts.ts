@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ActorContext,
   PermissionGrant,
   PermissionKey,
@@ -9,10 +9,10 @@ import type {
   RoleAssignment,
   SharingPolicyMode,
   SharingSubject,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationResourceFamily,
-} from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationPermissionCatalog";
 
 export interface AuthorizationActorReference {
   readonly actorUserIdentityId?: string;
@@ -274,3 +274,4 @@ export type AuthorizationPolicyRecordedEvent =
   | AuthorizationPolicyEvaluationRecordedEvent
   | AuthorizationPolicyDeniedRecordedEvent
   | AuthorizationPolicyMutationRecordedEvent;
+

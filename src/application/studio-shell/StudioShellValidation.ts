@@ -1,11 +1,11 @@
-import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
+﻿import { AssetDraftLifecycleStatuses, type AssetDraft } from "@domain/studio-shell/StudioShellDomain";
 import {
   createCompositionTaxonomyDescriptor,
   type CompositionTaxonomyDescriptor,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   type TaxonomySemanticRole,
-} from "../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 export const StudioShellValidationSections = Object.freeze({
   taxonomy: "taxonomy",
@@ -296,3 +296,4 @@ export function tryReadTaxonomyFromVersionMetadata(metadata: unknown): Compositi
     return undefined;
   }
 }
+

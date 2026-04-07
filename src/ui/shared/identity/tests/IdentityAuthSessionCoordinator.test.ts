@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   IdentityAuthApiErrorCodes,
   type IdentityAuthApiErrorCode,
   type IdentityAuthApiResponse,
   type ResolveAuthenticatedSessionApiResponse,
-} from "../../../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { IdentityAuthSessionCoordinator, IdentitySessionBootstrapStatus, IdentitySessionUnauthenticatedReason } from "../IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "../IdentityAuthSessionStore";
 
@@ -140,3 +140,4 @@ function createFailureResponse(code: IdentityAuthApiErrorCode): IdentityAuthApiR
     },
   };
 }
+

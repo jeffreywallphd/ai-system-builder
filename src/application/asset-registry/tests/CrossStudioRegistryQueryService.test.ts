@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { CrossStudioRegistryQueryService } from "../CrossStudioRegistryQueryService";
 import { RegistryQueryService } from "../RegistryQueryService";
 import type { IAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
@@ -258,3 +258,4 @@ describe("CrossStudioRegistryQueryService", () => {
     expect(taxonomyKinds.some((entry) => entry.structuralKind === "system" && entry.semanticRole === "system")).toBeTrue();
   });
 });
+

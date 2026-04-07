@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   IPythonRuntimeClient,
   IPythonRuntimeDatasetGenerationRequest,
   IPythonRuntimeDatasetGenerationResponse,
@@ -11,8 +11,8 @@ import type {
   IPythonRuntimeFineTuningJobRequest,
   IPythonRuntimeFineTuningJobResponse,
   IPythonRuntimeHealthResponse,
-} from "../../../application/ports/interfaces/IPythonRuntimeClient";
-import { bindSafeFetch } from "../../../application/runtime/RuntimeDiagnostics";
+} from "@application/ports/interfaces/IPythonRuntimeClient";
+import { bindSafeFetch } from "@application/runtime/RuntimeDiagnostics";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { PythonRuntimeError } from "./PythonRuntimeError";
 
@@ -178,3 +178,4 @@ export class HttpPythonRuntimeClient implements IPythonRuntimeClient {
     }
   }
 }
+

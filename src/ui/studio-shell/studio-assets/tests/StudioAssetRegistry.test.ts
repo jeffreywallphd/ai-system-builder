@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ImageManipulationSystemTemplate } from "../../../../application/system-studio/ImageManipulationSystemTemplate";
+﻿import { describe, expect, it } from "bun:test";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import {
   createDefaultStudioAssetRegistry,
   StudioAssetRendererResolutionKinds,
@@ -17,4 +17,5 @@ describe("StudioAssetRegistry", () => {
     expect(typeof renderer.render).toBe("function");
   });
 });
+
 

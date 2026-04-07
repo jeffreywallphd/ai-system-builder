@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ConnectMcpServerUseCase } from "../ConnectMcpServerUseCase";
-import { createUnifiedExecutionInfrastructure } from "../../../infrastructure/execution/createExecutionInfrastructure";
+import { createUnifiedExecutionInfrastructure } from "@infrastructure/execution/createExecutionInfrastructure";
 import type { IMcpServerManager } from "../../ports/interfaces/IMcpServerManager";
 
 function buildResult(serverId: string) {
@@ -123,3 +123,4 @@ describe("ConnectMcpServerUseCase", () => {
     expect(latestRun.units?.["mcp-server-operation:connect:local"]?.outputMetadata?.serverState).toBe("connected");
   });
 });
+

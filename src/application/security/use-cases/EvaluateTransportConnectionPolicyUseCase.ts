@@ -1,9 +1,9 @@
-import {
+﻿import {
   type TransportConnectionContext,
   type TransportConnectionTrustValidationResult,
   type TransportSecurityPolicy,
   evaluateTransportConnectionTrust,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type { TransportSecurityPolicyEvaluationPorts } from "../ports/TransportSecurityPorts";
 
 export const EvaluateTransportConnectionPolicyErrorCodes = Object.freeze({
@@ -161,3 +161,4 @@ function failure(
     }),
   };
 }
+

@@ -1,4 +1,4 @@
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 import type { OutputGalleryItem } from "./OutputGalleryDataContract";
 import { OutputGalleryDatasetIntegrationService } from "./OutputGalleryDatasetIntegrationService";
 import {
@@ -233,3 +233,4 @@ export class ImageRunHistoryService {
     });
   }
 }
+

@@ -1,7 +1,7 @@
-import {
+﻿import {
   createTemplateParameterSchema,
   type WorkflowTemplateParameterDefinition,
-} from "../../domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
+} from "@domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
 
 export interface AppliedTemplateParameters {
   readonly values: Readonly<Record<string, unknown>>;
@@ -61,3 +61,4 @@ export function applyWorkflowTemplateParameterDefaults(input: {
     definitions,
   });
 }
+

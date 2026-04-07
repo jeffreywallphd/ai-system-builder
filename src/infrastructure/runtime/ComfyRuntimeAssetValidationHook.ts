@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+﻿import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import {
   ComfyRuntimeAssetValidationStatuses,
@@ -9,13 +9,13 @@ import {
   type ComfyRuntimeAssetRequirement,
   type ComfyRuntimeAssetValidationEntry,
   type ComfyRuntimeAssetValidationIssue,
-} from "../../application/runtime/ComfyRuntimeRequirements";
+} from "@application/runtime/ComfyRuntimeRequirements";
 import type {
   IComfyRuntimeModelValidationHook,
   ComfyRuntimeOrchestrationContext,
   ComfyRuntimeOrchestrationIssue,
   ComfyRuntimeOrchestrationPhaseHookResult,
-} from "../../application/runtime/ComfyRuntimeInstallerOrchestrationService";
+} from "@application/runtime/ComfyRuntimeInstallerOrchestrationService";
 
 export interface ComfyRuntimeAssetValidationHookOptions {
   readonly now?: () => Date;
@@ -293,3 +293,4 @@ function mapIssueToPhase(
     }),
   });
 }
+

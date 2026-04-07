@@ -1,7 +1,7 @@
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerSearchCriteria } from "../../../application/mcp/models/McpServerSearchCriteria";
-import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
-import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
+﻿import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerSearchCriteria } from "@application/mcp/models/McpServerSearchCriteria";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
+import type { McpToolDescriptor } from "@application/mcp/models/McpToolDescriptor";
 import McpServerCard from "./McpServerCard";
 import McpServerDetailsPanel from "./McpServerDetailsPanel";
 import McpServerSearchBar from "./McpServerSearchBar";
@@ -85,7 +85,7 @@ export default function McpServerBrowser({
               <div className="ui-panel__subtitle">Saved servers for this workspace.</div>
             </div>
             <span className="ui-text-small ui-text-secondary">
-              {isLoadingConfigured ? "Loading…" : `${configuredServers.length} saved`}
+              {isLoadingConfigured ? "Loadingâ€¦" : `${configuredServers.length} saved`}
             </span>
           </div>
           <div className="ui-panel__body ui-stack ui-stack--sm ui-scrollbar ui-mcp-browser__list">
@@ -117,7 +117,7 @@ export default function McpServerBrowser({
               <div className="ui-panel__subtitle">Search known entries and discoverable remote servers.</div>
             </div>
             <span className="ui-text-small ui-text-secondary">
-              {isSearching ? "Searching…" : `${discoverableServers.length} results`}
+              {isSearching ? "Searchingâ€¦" : `${discoverableServers.length} results`}
             </span>
           </div>
           <div className="ui-panel__body ui-stack ui-stack--sm ui-scrollbar ui-mcp-browser__list">
@@ -161,3 +161,4 @@ export default function McpServerBrowser({
     </section>
   );
 }
+

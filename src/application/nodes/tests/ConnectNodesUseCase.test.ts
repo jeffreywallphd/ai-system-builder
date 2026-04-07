@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ConnectNodesUseCase } from "../ConnectNodesUseCase";
-import { makeConnection, makeNode, makeNodePort, makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeConnection, makeNode, makeNodePort, makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeNodeCompatibilityService } from "./testUtils";
 
 describe("ConnectNodesUseCase", () => {
@@ -29,3 +29,4 @@ describe("ConnectNodesUseCase", () => {
     expect(() => new ConnectNodesUseCase(makeNodeCompatibilityService()).execute({ workflow, sourceNodeId: "src", sourcePortId: "out", targetNodeId: "dst", targetPortId: "in" })).toThrow("already exists");
   });
 });
+

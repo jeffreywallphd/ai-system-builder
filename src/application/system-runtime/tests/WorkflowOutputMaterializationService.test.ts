@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   DatasetSchemaIntentIds,
   type DatasetSchemaIntentId,
-} from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import {
@@ -488,3 +488,4 @@ describe("WorkflowOutputMaterializationService", () => {
     expect(provenance).toHaveLength(2);
   });
 });
+

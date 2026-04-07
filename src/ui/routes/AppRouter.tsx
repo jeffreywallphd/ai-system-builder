@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -48,7 +48,7 @@ import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboa
 import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
-import type { LoginLocalIdentityApiResponse } from "../../infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+import type { LoginLocalIdentityApiResponse } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
 
 export interface AppRouterProps {
@@ -168,3 +168,4 @@ export default function AppRouter({
     <RouterProvider router={router} />
   );
 }
+

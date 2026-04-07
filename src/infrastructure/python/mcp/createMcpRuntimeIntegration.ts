@@ -1,12 +1,12 @@
-import type { IMcpConfiguredServerRepository } from "../../../application/ports/interfaces/IMcpConfiguredServerRepository";
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
-import type { IMcpServerCatalog } from "../../../application/ports/interfaces/IMcpServerCatalog";
-import type { IMcpServerManager } from "../../../application/ports/interfaces/IMcpServerManager";
-import type { IMcpToolCatalog } from "../../../application/ports/interfaces/IMcpToolCatalog";
-import type { IMcpToolExecutor } from "../../../application/ports/interfaces/IMcpToolExecutor";
-import type { IRuntimeEventSink } from "../../../application/ports/interfaces/IRuntimeEventSink";
-import type { IRuntimeDependencyOrchestrator } from "../../../application/runtime/RuntimeDependencyOrchestrator";
-import type { LocalMcpToolDraft } from "../../../application/mcp/models/LocalMcpToolDraft";
+﻿import type { IMcpConfiguredServerRepository } from "@application/ports/interfaces/IMcpConfiguredServerRepository";
+import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpServerCatalog } from "@application/ports/interfaces/IMcpServerCatalog";
+import type { IMcpServerManager } from "@application/ports/interfaces/IMcpServerManager";
+import type { IMcpToolCatalog } from "@application/ports/interfaces/IMcpToolCatalog";
+import type { IMcpToolExecutor } from "@application/ports/interfaces/IMcpToolExecutor";
+import type { IRuntimeEventSink } from "@application/ports/interfaces/IRuntimeEventSink";
+import type { IRuntimeDependencyOrchestrator } from "@application/runtime/RuntimeDependencyOrchestrator";
+import type { LocalMcpToolDraft } from "@application/mcp/models/LocalMcpToolDraft";
 import { PythonRuntimeConfig } from "../../config/PythonRuntimeConfig";
 import { HttpMcpRuntimeClient } from "./HttpMcpRuntimeClient";
 import { HttpMcpServerRuntimeClient } from "./HttpMcpServerRuntimeClient";
@@ -230,3 +230,4 @@ function createDisabledConnectionResult(serverId: string, action: "connect" | "d
     metadata: { reason: "python-runtime-disabled" },
   };
 }
+

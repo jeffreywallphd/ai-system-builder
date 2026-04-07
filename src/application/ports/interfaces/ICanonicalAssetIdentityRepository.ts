@@ -1,4 +1,4 @@
-import type { CompositionTaxonomyDescriptor } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 export type CanonicalEntityType = "workflow-definition" | "installed-model" | "dataset-version" | "base-model" | "execution-artifact";
 
 export interface CanonicalAssetIdentityRecord {
@@ -21,3 +21,4 @@ export interface ICanonicalAssetIdentityRepository {
   }): Promise<void>;
   getIdentity(entityType: CanonicalEntityType, entityId: string): Promise<CanonicalAssetIdentityRecord | undefined>;
 }
+

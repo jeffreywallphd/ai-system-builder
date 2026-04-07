@@ -1,11 +1,11 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import type {
   CompositionTaxonomyDescriptor,
   TaxonomyBehaviorKind,
   TaxonomySemanticRole,
   TaxonomyStructuralKind,
-} from "../../domain/taxonomy/CompositionTaxonomy";
-import type { RegistryAsset } from "../../domain/asset-registry/RegistryAsset";
+} from "@domain/taxonomy/CompositionTaxonomy";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
 import type { RegistryFilterParams } from "./RegistryQueryService";
 import { RegistryQueryService } from "./RegistryQueryService";
 
@@ -114,3 +114,4 @@ export class CrossStudioRegistryQueryService {
     return Object.freeze([...deduped.values()]);
   }
 }
+

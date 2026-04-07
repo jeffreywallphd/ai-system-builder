@@ -1,5 +1,5 @@
-import type { ModelTrainingArtifact, ModelTrainingCheckpoint, ModelTrainingConfiguration, ModelTrainingDiagnostic, ModelTrainingJob } from "../../../domain/model-training/ModelTrainingTypes";
-import type { IModelTrainingJobRepository } from "../../../application/ports/interfaces/IModelTrainingJobRepository";
+﻿import type { ModelTrainingArtifact, ModelTrainingCheckpoint, ModelTrainingConfiguration, ModelTrainingDiagnostic, ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
+import type { IModelTrainingJobRepository } from "@application/ports/interfaces/IModelTrainingJobRepository";
 
 interface StorageLike {
   getItem(key: string): string | null;
@@ -134,3 +134,4 @@ export class LocalStorageModelTrainingJobRepository implements IModelTrainingJob
     });
   }
 }
+

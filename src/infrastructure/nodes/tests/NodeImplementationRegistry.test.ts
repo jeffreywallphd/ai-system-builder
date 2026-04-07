@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
+﻿import { describe, expect, it } from "bun:test";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
 
 const implementation = {
   descriptor: new NodeImplementationDescriptor({
@@ -37,3 +37,4 @@ describe("NodeImplementationRegistry", () => {
     ).toBeUndefined();
   });
 });
+

@@ -1,5 +1,5 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextPackage } from "../../../application/context/models/ContextPackage";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextPackage } from "@application/context/models/ContextPackage";
 import ContextPackageCard from "./ContextPackageCard";
 import ContextPackageEditor, { type ContextPackageEditorSubmitDraft } from "./ContextPackageEditor";
 
@@ -114,7 +114,7 @@ export default function ContextPackageBrowser({
         {isLoading ? (
           <div className="ui-card">
             <div className="ui-card__body">
-              <p className="ui-text-secondary">Loading context library…</p>
+              <p className="ui-text-secondary">Loading context libraryâ€¦</p>
             </div>
           </div>
         ) : null}
@@ -130,3 +130,4 @@ export default function ContextPackageBrowser({
     </div>
   );
 }
+

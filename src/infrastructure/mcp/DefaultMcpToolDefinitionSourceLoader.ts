@@ -1,6 +1,6 @@
-import type { IMcpToolDefinitionSourceLoader } from "../../application/ports/interfaces/IMcpToolDefinitionSourceLoader";
-import type { McpToolDefinitionSource } from "../../domain/mcp/InstalledMcpTool";
-import type { McpToolDefinition } from "../../domain/mcp/McpToolCapability";
+﻿import type { IMcpToolDefinitionSourceLoader } from "@application/ports/interfaces/IMcpToolDefinitionSourceLoader";
+import type { McpToolDefinitionSource } from "@domain/mcp/InstalledMcpTool";
+import type { McpToolDefinition } from "@domain/mcp/McpToolCapability";
 
 export interface ITextLoader {
   readText(path: string): Promise<string>;
@@ -56,3 +56,4 @@ function coerceToolDefinition(payload: unknown, sourceLocation: string): McpTool
 
   return candidate as unknown as McpToolDefinition;
 }
+

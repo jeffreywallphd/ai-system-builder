@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { createCompositionTaxonomyDescriptor, TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
-import { createStudioHandoffContract, StudioHandoffAssetRoles, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createCompositionTaxonomyDescriptor, TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
+import { createStudioHandoffContract, StudioHandoffAssetRoles, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 import { StudioHandoffLineageTracker } from "../StudioHandoffLineageTracker";
 import type { StudioHandoffPreparation, StudioHandoffRevision } from "../StudioHandoffOrchestrationService";
 
@@ -164,3 +164,4 @@ describe("StudioHandoffLineageTracker", () => {
     expect(recent[0]?.handoffId).toBe("lineage-handoff:second");
   });
 });
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateRevocationReasons, CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateRevocationReasons, CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import { CertificateRevocationRegistryStatuses } from "../ports/ICertificateRevocationStatusRegistry";
@@ -20,7 +20,7 @@ import type {
   SaveCertificateRevocationHistoryPersistenceRecordInput,
   SaveIssuedCertificatePersistenceRecordInput,
   SupersedeIssuedCertificatePersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 class InMemoryIssuedCertificateRepository implements IIssuedCertificatePersistenceRepository {
   public readonly recordsBySerial = new Map<string, IssuedCertificatePersistenceRecord>();
@@ -270,3 +270,4 @@ function createIssuedRecord(input: {
     revision: 1,
   });
 }
+

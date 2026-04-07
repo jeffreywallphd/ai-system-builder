@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createDeploymentTarget,
   DeploymentTargetTypes,
-} from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+} from "@domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentTargetCompatibilityValidator } from "../DeploymentTargetCompatibilityValidator";
 import { DeploymentTargetSelector } from "../DeploymentTargetSelector";
 
@@ -116,3 +116,4 @@ describe("Deployment target abstraction", () => {
     ]);
   });
 });
+

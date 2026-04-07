@@ -1,4 +1,4 @@
-import type { WorkspaceIdNamespace } from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+﻿import type { WorkspaceIdNamespace } from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 
 export interface WorkspaceRoleAdministrationAuditContext {
   readonly reason?: string;
@@ -42,3 +42,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

@@ -1,4 +1,4 @@
-import type { ModelTrainingJob } from "../../domain/model-training/ModelTrainingTypes";
+﻿import type { ModelTrainingJob } from "@domain/model-training/ModelTrainingTypes";
 import type { IExecutionArtifact, IExecutionProvenance } from "./ExecutionContracts";
 import type { IExecutionUnitExecutionResult } from "./UnifiedExecutionEngine";
 
@@ -50,3 +50,4 @@ export function toModelPreparationExecutionProvenance(job: ModelTrainingJob): IE
     sourceKind: "model-preparation",
   });
 }
+

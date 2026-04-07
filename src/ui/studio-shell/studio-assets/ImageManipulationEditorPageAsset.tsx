@@ -1,4 +1,4 @@
-import {
+﻿import {
   StudioAssetRenderModes,
   StudioUiAssetContractVersion,
   StudioUiAssetKinds,
@@ -6,7 +6,7 @@ import {
 } from "./StudioAssetContracts";
 import type { StudioEmbeddedEvent } from "./StudioEmbeddedEventContracts";
 import type { StudioShellExtensionContext } from "../StudioShellExtensions";
-import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import ImageManipulationRuntimeEditorPanel from "../../components/studio-shell/ImageManipulationRuntimeEditorPanel";
 
 export interface ImageManipulationEditorPageInput {
@@ -64,3 +64,4 @@ export const imageManipulationEditorPageAssetDefinition: StudioAssetDefinition<I
 });
 
 export default imageManipulationEditorPageAssetDefinition;
+

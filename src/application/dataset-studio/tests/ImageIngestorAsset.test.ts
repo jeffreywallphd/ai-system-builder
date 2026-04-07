@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DataSourceReferenceKinds } from "../DataConverterContracts";
-import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
+import { ImageAssetReferenceKinds } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import {
   ImageIngestorAsset,
   ImageIngestorErrorCodes,
@@ -291,3 +291,4 @@ describe("ImageIngestorAsset", () => {
     expect(result.preview.format).toBe("webp");
   });
 });
+

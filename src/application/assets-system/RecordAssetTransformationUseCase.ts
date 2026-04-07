@@ -1,7 +1,7 @@
-import { AssetTransformation } from "../../domain/assets/AssetTransformation";
+﻿import { AssetTransformation } from "@domain/assets/AssetTransformation";
 import type { IAssetTransformationRepository } from "../ports/interfaces/IAssetTransformationRepository";
 import type { IAssetLineageGraphProjectionSink } from "../ports/interfaces/IAssetLineageGraphProjectionSink";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../domain/assets/AssetLineageEdge";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 
 export class RecordAssetTransformationUseCase {
@@ -39,3 +39,4 @@ export class RecordAssetTransformationUseCase {
     return transformation;
   }
 }
+

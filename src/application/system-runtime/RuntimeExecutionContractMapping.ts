@@ -1,14 +1,14 @@
-import type {
+﻿import type {
   AssetContractDescriptor,
   AssetContractParameterDescriptor,
   AssetContractShapeDescriptor,
-} from "../../domain/contracts/AssetContract";
+} from "@domain/contracts/AssetContract";
 import {
   buildNestedSystemReferences,
   type SystemAsset,
   type SystemComponentReference,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 
 export const RuntimeExecutionInterfaceKinds = Object.freeze({
   systemInput: "system-input",
@@ -244,3 +244,4 @@ export async function mapSystemContractToRuntimeExecutionContract(input: {
     }),
   });
 }
+

@@ -1,6 +1,6 @@
-import type {
+﻿import type {
   CertificateSubjectReferenceKind,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   IssuedCertificateLookupQuery,
@@ -8,7 +8,7 @@ import type {
   RevokeIssuedCertificatePersistenceRecordInput,
   SaveIssuedCertificatePersistenceRecordInput,
   SupersedeIssuedCertificatePersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface IIssuedCertificatePersistenceRepository {
   findIssuedCertificateBySerialNumber(serialNumber: string): Promise<IssuedCertificatePersistenceRecord | undefined>;
@@ -30,3 +30,4 @@ export interface IIssuedCertificatePersistenceRepository {
     input: SupersedeIssuedCertificatePersistenceRecordInput,
   ): Promise<CertificateAuthorityPersistenceMutationResult<IssuedCertificatePersistenceRecord>>;
 }
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetKinds,
   AssetStorageAreas,
@@ -9,7 +9,7 @@ import {
   createAssetVersion,
   createContentDescriptor,
   createStorageInstanceRef,
-} from "../../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   AssetTransportContractVersions,
   toAssetAuditEventPayloadDto,
@@ -141,4 +141,5 @@ describe("AssetTransportContracts", () => {
     expect(dto.asset.assetId).toBe("asset-contract-001");
   });
 });
+
 

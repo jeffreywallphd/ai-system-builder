@@ -1,9 +1,9 @@
-import type { CertificateStatus } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import type { CertificateStatus } from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateTrustEvaluationStatuses,
   type CertificateRevocationPersistenceRecord,
   type CertificateTrustEvaluationStatus,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export const CertificateRevocationRegistryStatuses = CertificateTrustEvaluationStatuses;
 export type CertificateRevocationRegistryStatus = CertificateTrustEvaluationStatus;
@@ -31,3 +31,4 @@ export interface ICertificateRevocationStatusRegistry {
     input: ResolveCertificateRevocationStatusInput,
   ): Promise<ResolveCertificateRevocationStatusResult>;
 }
+

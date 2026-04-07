@@ -1,11 +1,11 @@
-import {
+﻿import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
   HostStartupDependencyBoundaryLayers,
   createHostRuntimeIdentity,
   type HostRuntimeIdentity,
-} from "../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 
 export const AuthoritativeServerHostRuntime = createHostRuntimeIdentity({
   hostId: "host:server:authoritative",
@@ -181,4 +181,5 @@ export const HostRuntimeCatalog = Object.freeze({
 export function resolveHostRuntimeFromCatalog(kind: keyof typeof HostRuntimeCatalog): HostRuntimeIdentity {
   return HostRuntimeCatalog[kind];
 }
+
 

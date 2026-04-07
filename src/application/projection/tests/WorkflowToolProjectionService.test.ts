@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { WorkflowToolProjectionService } from "../WorkflowToolProjectionService";
-import { makeNode, makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeNode, makeWorkflow } from "@domain/services/tests/testUtils";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 describe("WorkflowToolProjectionService", () => {
   it("projects workflow to tool definition", () => {
@@ -142,3 +142,4 @@ describe("WorkflowToolProjectionService", () => {
     expect(contextSection?.fields.map((field) => field.id)).toEqual(["workflow.context.visibilityMode"]);
   });
 });
+

@@ -1,12 +1,12 @@
-import { Node } from "../../domain/nodes/Node";
-import { NodeProperty } from "../../domain/nodes/NodeProperty";
-import type { INode } from "../../domain/nodes/interfaces/INode";
+﻿import { Node } from "@domain/nodes/Node";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
+import type { INode } from "@domain/nodes/interfaces/INode";
 import type {
   INodeProperty,
   INodePropertyConstraint,
   INodePropertyOption,
   NodePropertyType,
-} from "../../domain/nodes/interfaces/INodeProperty";
+} from "@domain/nodes/interfaces/INodeProperty";
 import type { McpToolArgumentDescriptor, McpToolDescriptor } from "./models/McpToolDescriptor";
 
 export const MCP_TOOL_CALL_NODE_TYPE = "mcp.tool_call";
@@ -374,3 +374,4 @@ export class McpToolCallNodeConfigurationService {
     return Object.values(constraints).some((value) => value !== undefined);
   }
 }
+

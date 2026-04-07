@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
 import {
   AssetDomainError,
   AssetLifecycleStates,
@@ -9,16 +9,16 @@ import {
   createAssetVersion,
   createContentDescriptor,
   createStorageInstanceRef,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import {
   StorageAccessModes,
   StorageLifecycleStates,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   WorkspaceMembershipStatuses,
   WorkspaceRoles,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type { IStorageInstanceRepository } from "../../storage/ports/IStorageInstanceRepository";
 import {
   StoragePolicyActions,
@@ -470,3 +470,4 @@ function buildUploadObjectKey(
     sanitizeFileName(fileName),
   ].join("/");
 }
+

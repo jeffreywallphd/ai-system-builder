@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import { InMemoryDatasetOperationalLineageSink } from "../DatasetOperationalLineage";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
@@ -145,3 +145,4 @@ describe("Dataset operational lineage hooks", () => {
     expect(writeOps).toEqual(expect.arrayContaining(["create", "update", "delete"]));
   });
 });
+

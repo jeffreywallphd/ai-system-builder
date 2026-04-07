@@ -1,4 +1,4 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type {
   IAssetCatalog,
   IAssetSearchCriteria,
@@ -64,3 +64,4 @@ export class ListAssetsUseCase {
     return Object.freeze(Object.fromEntries(entries.filter((entry): entry is readonly [string, CanonicalAssetSummary] => !!entry[1])));
   }
 }
+

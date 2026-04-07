@@ -1,4 +1,4 @@
-import {
+﻿import {
   DatasetEventContractVersions,
   createDatasetEvent,
   validateDatasetEventPayloadForType,
@@ -8,11 +8,11 @@ import {
   type DatasetEventPayload,
   type DatasetEventPayloadMetadata,
   type DatasetEventType,
-} from "../../domain/dataset-studio/contracts/DatasetEvent";
+} from "@domain/dataset-studio/contracts/DatasetEvent";
 import type {
   DatasetAssetReference,
   DatasetInstanceReference,
-} from "../../domain/dataset-studio/contracts/StudioDatasetCompatibility";
+} from "@domain/dataset-studio/contracts/StudioDatasetCompatibility";
 
 export interface PublishDatasetEventInput {
   readonly event: DatasetEvent;
@@ -254,3 +254,4 @@ export class InMemoryDatasetEventPublisher implements DatasetEventPublisher, Dat
 function createDatasetEventId(): string {
   return `dataset-event-${Math.random().toString(36).slice(2, 12)}`;
 }
+

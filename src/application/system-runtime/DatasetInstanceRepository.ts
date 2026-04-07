@@ -1,12 +1,12 @@
-import type { DatasetInstance, DatasetInstanceRole } from "../../domain/system-runtime/DatasetInstanceDomain";
+﻿import type { DatasetInstance, DatasetInstanceRole } from "@domain/system-runtime/DatasetInstanceDomain";
 import type {
   DatasetInstanceImageRecord,
   DatasetInstanceImageRecordQuery,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import {
   matchesDatasetInstanceImageRecordQuery,
   normalizeDatasetInstanceImageRecordQuery,
-} from "../../domain/system-runtime/DatasetInstanceRecordDomain";
+} from "@domain/system-runtime/DatasetInstanceRecordDomain";
 import type { DatasetInstanceStorageAdapter } from "./DatasetInstanceStorageAdapter";
 
 export interface DatasetInstanceImageRecordWindow {
@@ -383,3 +383,4 @@ export class InMemoryDatasetInstanceRepository extends StorageBackedDatasetInsta
     super(new InMemoryDatasetInstanceStorageAdapter());
   }
 }
+

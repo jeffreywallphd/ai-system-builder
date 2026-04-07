@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   IWorkflowPersistenceRepository,
   WorkflowPersistenceListQuery,
-} from "../../application/ports/interfaces/IWorkflowPersistenceRepository";
+} from "@application/ports/interfaces/IWorkflowPersistenceRepository";
 import type {
   PersistedWorkflowRecord,
   PersistedWorkflowSummary,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import {
   normalizePersistedWorkflowRecord,
   toPersistedWorkflowSummary,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
 
 export class InMemoryWorkflowPersistenceRepository implements IWorkflowPersistenceRepository {
   private readonly records = new Map<string, PersistedWorkflowRecord>();
@@ -79,3 +79,4 @@ export class InMemoryWorkflowPersistenceRepository implements IWorkflowPersisten
     return this.create(duplicateRecord);
   }
 }
+

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   ActivateStorageInstanceApiResponse,
   CreateStorageInstanceApiResponse,
   DeactivateStorageInstanceApiResponse,
@@ -7,7 +7,7 @@ import type {
   ListStorageInstancesApiResponse,
   StorageManagementApiResponse,
   UpdateStorageInstanceMetadataApiResponse,
-} from "../../../infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
+} from "@infrastructure/api/storage/sdk/PublicStorageManagementApiContract";
 import type {
   StorageAccessMode,
   StorageAccessScope,
@@ -17,7 +17,7 @@ import type {
   StorageLifecycleState,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export interface StorageAdministrationClient {
   createStorageInstance(
@@ -413,3 +413,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

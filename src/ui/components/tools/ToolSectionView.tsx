@@ -1,4 +1,4 @@
-import type { ToolSection } from "../../../application/projection/models/ToolSection";
+﻿import type { ToolSection } from "@application/projection/models/ToolSection";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ProjectedSectionCard from "../projection/ProjectedSectionCard";
 
@@ -13,3 +13,4 @@ export default function ToolSectionView({
 }): JSX.Element {
   return <ProjectedSectionCard section={section} onChange={onChange} availableModels={availableModels} />;
 }
+

@@ -1,7 +1,7 @@
-import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
+﻿import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
-import type { AssetDraftDependencyReference } from "../../domain/studio-shell/StudioShellDomain";
-import { AssetDraftLifecycleStatuses } from "../../domain/studio-shell/StudioShellDomain";
+import type { AssetDraftDependencyReference } from "@domain/studio-shell/StudioShellDomain";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import type {
   AssetDraftResult,
   AssetVersionResult,
@@ -15,7 +15,7 @@ import {
   createTrainingRecipeAssetMetadata,
   createTrainingRecipeStudioTaxonomy,
   TrainingRecipeStudioIdentity,
-} from "../../domain/training-recipe-studio/TrainingRecipeStudioDomain";
+} from "@domain/training-recipe-studio/TrainingRecipeStudioDomain";
 
 export interface EnsureTrainingRecipeStudioResult {
   readonly initialized: boolean;
@@ -140,3 +140,4 @@ export class TrainingRecipeStudioApplicationService {
     });
   }
 }
+

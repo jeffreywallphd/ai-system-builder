@@ -1,4 +1,4 @@
-import type { Edge, Node } from "@xyflow/react";
+﻿import type { Edge, Node } from "@xyflow/react";
 import {
   PipelineGraphEdgeKinds,
   PipelineGraphNodeKinds,
@@ -7,11 +7,11 @@ import {
   type PipelineGraph,
   type PipelineGraphEdge,
   type PipelineGraphNode,
-} from "../../domain/dataset-studio/PipelineGraphDomain";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineStageIds } from "../../domain/dataset-studio/PipelineStageDomain";
-import { parseFeatureEngineeringStageConfigFromStageOptions } from "../../domain/dataset-studio/FeatureEngineeringStageDomain";
-import { parseLabelingStageConfigFromStageOptions } from "../../domain/dataset-studio/LabelingStageDomain";
+} from "@domain/dataset-studio/PipelineGraphDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
+import { parseFeatureEngineeringStageConfigFromStageOptions } from "@domain/dataset-studio/FeatureEngineeringStageDomain";
+import { parseLabelingStageConfigFromStageOptions } from "@domain/dataset-studio/LabelingStageDomain";
 
 export interface StageNodeData {
   readonly nodeKind: "stage";
@@ -247,3 +247,4 @@ export function buildReactFlowGraph(
     edges: Object.freeze(edges),
   });
 }
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { ListContextPackagesUseCase } from "../ListContextPackagesUseCase";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("ListContextPackagesUseCase", () => {
   it("lists reusable context package summaries", async () => {
@@ -56,3 +56,4 @@ describe("ListContextPackagesUseCase", () => {
     ]);
   });
 });
+

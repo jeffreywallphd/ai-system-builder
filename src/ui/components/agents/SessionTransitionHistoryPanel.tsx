@@ -1,4 +1,4 @@
-import type { AgentSessionDetailReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentSessionDetailReadModel } from "@application/agents/contracts/AgentRunContracts";
 
 interface SessionTransitionHistoryPanelProps {
   readonly session: AgentSessionDetailReadModel;
@@ -22,3 +22,4 @@ export function SessionTransitionHistoryPanel(props: SessionTransitionHistoryPan
     </section>
   );
 }
+

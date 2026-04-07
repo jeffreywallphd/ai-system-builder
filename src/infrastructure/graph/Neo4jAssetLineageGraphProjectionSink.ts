@@ -1,6 +1,6 @@
-import type { IAssetLineageGraphProjectionSink } from "../../application/ports/interfaces/IAssetLineageGraphProjectionSink";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
-import type { AssetTransformation } from "../../domain/assets/AssetTransformation";
+﻿import type { IAssetLineageGraphProjectionSink } from "@application/ports/interfaces/IAssetLineageGraphProjectionSink";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
+import type { AssetTransformation } from "@domain/assets/AssetTransformation";
 
 export interface INeo4jCypherExecutor {
   runWrite(cypher: string, params: Readonly<Record<string, unknown>>): Promise<void>;
@@ -76,3 +76,4 @@ export class Neo4jAssetLineageGraphProjectionSink implements IAssetLineageGraphP
     return (rows[0]?.path_count ?? 0) > 0;
   }
 }
+

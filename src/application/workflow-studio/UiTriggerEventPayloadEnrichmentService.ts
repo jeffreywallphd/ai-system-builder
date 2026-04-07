@@ -1,4 +1,4 @@
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
 import type { UiTriggerEvent } from "./UiTriggerEventContract";
 import type { WorkflowExecutionTriggerEntry } from "./WorkflowTriggerExecutionEntryService";
@@ -61,3 +61,4 @@ export function createDefaultUiTriggerEventPayloadEnricher(): UiTriggerEventPayl
     },
   });
 }
+

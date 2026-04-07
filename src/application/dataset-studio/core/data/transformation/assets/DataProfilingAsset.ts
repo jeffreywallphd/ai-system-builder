@@ -1,9 +1,9 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import type {
   CanonicalRecordValue,
   CanonicalRecordsShape,
   CanonicalTableShape,
-} from "../../../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import { BaseTransformationAsset } from "../BaseTransformationAsset";
 import {
   TransformationInputSchema,
@@ -412,3 +412,4 @@ export class DataProfilingAsset extends BaseTransformationAsset<
     });
   }
 }
+

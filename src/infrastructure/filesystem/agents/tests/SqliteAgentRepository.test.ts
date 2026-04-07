@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { createAgent } from "../../../../domain/agents/Agent";
-import { GetAgentUseCase } from "../../../../application/agents/GetAgentUseCase";
-import { AssetId } from "../../../../domain/assets/AssetId";
+import { createAgent } from "@domain/agents/Agent";
+import { GetAgentUseCase } from "@application/agents/GetAgentUseCase";
+import { AssetId } from "@domain/assets/AssetId";
 import { SqliteAgentRepository } from "../SqliteAgentRepository";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 
@@ -173,3 +173,4 @@ describe("SqliteAgentRepository", () => {
     repository.dispose();
   });
 });
+

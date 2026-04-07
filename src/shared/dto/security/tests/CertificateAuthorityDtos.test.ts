@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
-} from "../../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateAuthorityIntrospectionDiagnosticSeverities,
   CertificateAuthorityIntrospectionStates,
@@ -85,3 +85,4 @@ describe("CertificateAuthorityDtos", () => {
     expect(candidate.protectedReferences).toHaveLength(1);
   });
 });
+

@@ -1,4 +1,4 @@
-import type { ContextFragmentKind, IContextFragment } from "../../../application/context/models/ContextFragment";
+﻿import type { ContextFragmentKind, IContextFragment } from "@application/context/models/ContextFragment";
 
 export interface ContextFragmentEditorProps {
   readonly fragment: IContextFragment;
@@ -133,3 +133,4 @@ export default function ContextFragmentEditor({
     </article>
   );
 }
+

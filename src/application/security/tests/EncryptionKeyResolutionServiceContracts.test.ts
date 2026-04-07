@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { EncryptionKeyScopes, ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { EncryptionKeyScopes, ProtectedDataClasses } from "@domain/security/EncryptionAtRestPolicyDomain";
 import type { EncryptionKeyDescriptor } from "../ports/EncryptionKeyResolutionPorts";
 import type {
   EncryptionKeyResolutionServiceResult,
@@ -93,4 +93,5 @@ function createKey(
     activatedAt: "2026-01-01T00:00:00.000Z",
   };
 }
+
 

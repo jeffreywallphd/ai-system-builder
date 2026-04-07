@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionReferenceKinds,
   type UnifiedIngestionDetectionResult,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { UnifiedIngestionRoutingService } from "../UnifiedIngestionRoutingService";
 
 function createDetectionResult(kind: UnifiedIngestionDetectionResult["detectedKind"]): UnifiedIngestionDetectionResult {
@@ -107,4 +107,5 @@ describe("UnifiedIngestionRoutingService", () => {
     }
   });
 });
+
 

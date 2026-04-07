@@ -1,5 +1,5 @@
-import type { DataAssetBase } from "../../domain/dataset-studio/DataAssetBase";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { DataAssetBase } from "@domain/dataset-studio/DataAssetBase";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const DataAssetConfigFieldKinds = Object.freeze({
   string: "string",
@@ -195,3 +195,4 @@ export function resolveDataAssetConfigDefaults(
 
   return Object.freeze(Object.fromEntries(resolved.entries()));
 }
+

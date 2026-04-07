@@ -1,4 +1,4 @@
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import type { StorageInstance } from "@domain/storage/StorageDomain";
 
 export type StorageObjectStreamSource = Uint8Array | AsyncIterable<Uint8Array>;
 
@@ -114,3 +114,4 @@ export interface IStorageObjectPort {
   openObjectReadStream(reference: StorageObjectReference): Promise<AsyncIterable<Uint8Array>>;
   deleteObject(input: StorageObjectDeleteRequest): Promise<StorageObjectDeleteResult>;
 }
+

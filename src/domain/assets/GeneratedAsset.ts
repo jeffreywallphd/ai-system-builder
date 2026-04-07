@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   AssetKind,
   IAssetLocation,
   IAssetRelationship,
   IAssetSemanticMetadata,
   IAssetSourceInfo,
   IAssetTechnicalMetadata,
-} from "../../../domain/assets/interfaces/IAsset";
+} from "@domain/assets/interfaces/IAsset";
 import type { RuntimeEngine } from "../models/interfaces/IModelCompatibility";
 import { Asset } from "./Asset";
 
@@ -129,3 +129,4 @@ export class GeneratedAsset extends Asset {
     });
   }
 }
+

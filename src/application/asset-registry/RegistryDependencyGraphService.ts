@@ -1,5 +1,5 @@
-import type { RegistryAsset, RegistryDependencyReference } from "../../domain/asset-registry/RegistryAsset";
-import type { AssetLineageRelationshipType } from "../../domain/assets/AssetLineageEdge";
+﻿import type { RegistryAsset, RegistryDependencyReference } from "@domain/asset-registry/RegistryAsset";
+import type { AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import type {
   IRegistryGraphProjectionRepository,
@@ -379,3 +379,4 @@ export class RegistryDependencyGraphService {
     });
   }
 }
+

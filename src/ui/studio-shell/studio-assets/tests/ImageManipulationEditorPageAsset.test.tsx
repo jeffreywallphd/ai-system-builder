@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ImageManipulationSystemTemplate } from "../../../../application/system-studio/ImageManipulationSystemTemplate";
+﻿import { describe, expect, it } from "bun:test";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import { StudioUiAssetKinds } from "../StudioAssetContracts";
 import { imageManipulationEditorPageAssetDefinition } from "../ImageManipulationEditorPageAsset";
 
@@ -12,3 +12,4 @@ describe("ImageManipulationEditorPageAsset", () => {
     expect(imageManipulationEditorPageAssetDefinition.contract.supportedModes).toContain("embedded");
   });
 });
+

@@ -1,8 +1,8 @@
-import type { PipelineStageId } from "../../../../domain/dataset-studio/PipelineStageDomain";
+﻿import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
 import type {
   DataStudioWizardFieldSnapshot,
   DataStudioWizardStageSnapshot,
-} from "../../../../application/data-studio/DataStudioPreparationWizard";
+} from "@application/data-studio/DataStudioPreparationWizard";
 import type { DataStudioStageInternalsSnapshot } from "../../../studio-shell/data/DataStudioPreparationWizardStateAdapter";
 
 export interface DataStudioStageMetadataPanelProps {
@@ -246,3 +246,4 @@ export function DataStudioNodePaletteDrawer(props: DataStudioNodePaletteDrawerPr
     </aside>
   );
 }
+

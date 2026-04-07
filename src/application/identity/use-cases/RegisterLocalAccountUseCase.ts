@@ -1,15 +1,15 @@
-import {
+﻿import {
   UserIdentityStatuses,
   createLocalCredentialState,
   createUserIdentity,
   type AuthProvider,
   type CredentialPolicy,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
@@ -19,12 +19,12 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
 import type { IIdentityClock } from "../ports/IIdentityClock";
 import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityPersistenceRepository } from "@application/identity/ports/IIdentityPersistenceRepository";
 import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
 import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
 import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
@@ -376,3 +376,4 @@ export class RegisterLocalAccountUseCase {
     return identityFailure(error);
   }
 }
+

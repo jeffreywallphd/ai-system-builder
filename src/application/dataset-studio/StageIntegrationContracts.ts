@@ -1,13 +1,13 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { DatasetPipelineStageKinds } from "../../domain/dataset-studio/StagePipelineDomain";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { DatasetPipelineStageKinds } from "@domain/dataset-studio/StagePipelineDomain";
 import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionRouteHandlerKinds,
   UnifiedIngestionSourceKinds,
   type UnifiedIngestionExecutionMetadata,
   type UnifiedIngestionLineageRecord,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import type { UnifiedIngestionResult } from "./UnifiedIngestionOrchestrationService";
 
 export const StageExecutionStatusKinds = Object.freeze({
@@ -575,3 +575,4 @@ export function readPreparedStorageStageOutput(
 
   return fromLegacyPreparedStorageStageOutput(value);
 }
+

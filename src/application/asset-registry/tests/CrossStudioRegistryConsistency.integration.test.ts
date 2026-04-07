@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import { CrossStudioRegistryQueryService } from "../CrossStudioRegistryQueryService";
 import { RegistryDependencyGraphService } from "../RegistryDependencyGraphService";
 import { RegistryQueryService } from "../RegistryQueryService";
@@ -316,3 +316,4 @@ describe("Cross-studio registry consistency integration", () => {
     expect(upstreamV2.graph.nodes.some((node) => node.versionId === "asset:context:v1")).toBeFalse();
   });
 });
+

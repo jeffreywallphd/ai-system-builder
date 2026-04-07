@@ -1,23 +1,23 @@
-import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
+﻿import type { IAssetRecordRepository } from "../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../ports/interfaces/IAssetVersionRepository";
 import type { IAssetSystemQueryRepository } from "../ports/interfaces/IAssetSystemQueryRepository";
 import type { IAssetLineageRepository } from "../ports/interfaces/IAssetLineageRepository";
 import type { IAssetContractResolver } from "../contracts/CompositionAssetContractResolver";
 import { CompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetLineageEdge } from "../../domain/assets/AssetLineageEdge";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 import {
   createRegistryAsset,
   type RegistryAsset,
   type RegistryAssetValidationInsights,
   type RegistryAssetValidationIssue,
   type RegistryDependencyReference,
-} from "../../domain/asset-registry/RegistryAsset";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+} from "@domain/asset-registry/RegistryAsset";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import { evaluateStudioDraftConsistency } from "../studio-shell/AtomicStudioAssetEnforcement";
 import { buildStudioShellValidationIssues } from "../studio-shell/StudioShellValidation";
-import { AssetDraftLifecycleStatuses, type AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
-import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+import { AssetDraftLifecycleStatuses, type AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import { TaxonomySemanticRoles, TaxonomyStructuralKinds, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 import { RegistryCacheLayer } from "./RegistryCacheLayer";
 import {
   aggregateSystemDependencies,
@@ -25,8 +25,8 @@ import {
   createSystemAsset,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../domain/system-studio/SystemAssetDomain";
-import type { AssetVersion } from "../../domain/assets/AssetVersion";
+} from "@domain/system-studio/SystemAssetDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
 
 export interface RegistryFilterParams {
   readonly structuralKinds?: ReadonlyArray<CompositionTaxonomyDescriptor["structuralKind"]>;
@@ -979,3 +979,4 @@ const studioExpectationBySemanticRole: Readonly<
     allowedBehaviorKinds: Object.freeze(["deterministic", "conditional", "iterative", "autonomous"]),
   }),
 });
+

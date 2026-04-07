@@ -1,5 +1,5 @@
-import type { IAssetCatalog, IAssetSearchCriteria } from "../../../application/ports/interfaces/IAssetCatalog";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import type { IAssetCatalog, IAssetSearchCriteria } from "@application/ports/interfaces/IAssetCatalog";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import { SqliteAssetSystemRepository } from "../SqliteAssetSystemRepository";
 
 export class SqliteAssetSystemAgentMemoryCatalog implements IAssetCatalog {
@@ -29,3 +29,4 @@ export class SqliteAssetSystemAgentMemoryCatalog implements IAssetCatalog {
     return this.repository.exists(id);
   }
 }
+

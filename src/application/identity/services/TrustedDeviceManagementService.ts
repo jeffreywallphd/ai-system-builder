@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   IdentityMutationOutcome,
   IdentityOperationResult,
   TrustedDeviceDisplayNameUpdate,
@@ -25,7 +25,7 @@ import {
   pairTrustedDevice,
   touchTrustedDevice,
   updateTrustedDeviceDisplayName,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import { mapTrustedDeviceRecord } from "./TrustedDeviceServiceMappers";
 import { publishIdentityLifecycleEventBestEffort } from "./IdentityLifecycleEventPublishing";
 
@@ -166,3 +166,4 @@ export class TrustedDeviceManagementService implements ITrustedDeviceManagementS
     return result;
   }
 }
+

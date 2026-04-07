@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
@@ -7,8 +7,8 @@ import {
   type IdentityOperationResult,
   type TrustedDevicePairingInitiationRequest,
   type TrustedDevicePairingInitiationResponse,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ITrustedDevicePairingService } from "../../../../application/identity/ports/ITrustedDevicePairingService";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ITrustedDevicePairingService } from "@application/identity/ports/ITrustedDevicePairingService";
 
 export type InitiateTrustedDevicePairingErrorCode =
   | typeof IdentityErrorCodes.invalidRequest
@@ -66,3 +66,4 @@ function normalizeErrorMessage(error: unknown): string {
   }
   return "Trusted device pairing initiation failed.";
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   ICommonImageNodeContract,
   IImageNodeExecutionError,
   IImageNodeExecutionRequest,
   IImageNodeExecutionResponse,
   IImageNodeInspectionMetadata,
-} from "../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 
 export interface IComfyNodeExecutionContext {
   readonly promptId?: string;
@@ -136,3 +136,4 @@ export abstract class ComfyImageNodeAdapterBase implements ICommonImageNodeAdapt
     }
   }
 }
+

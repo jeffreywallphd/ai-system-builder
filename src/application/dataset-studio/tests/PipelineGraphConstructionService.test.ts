@@ -1,18 +1,18 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createPipelineStageInstance,
   PipelineStageConfigModes,
   PipelineStageIds,
   type PipelineStageDefinition,
   type PipelineStageInstance,
-} from "../../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import {
   PipelineGraphEdgeKinds,
   deserializePipelineGraph,
   inspectPipelineGraph,
   serializePipelineGraph,
-} from "../../../domain/dataset-studio/PipelineGraphDomain";
+} from "@domain/dataset-studio/PipelineGraphDomain";
 import { buildPipelineGraph } from "../PipelineGraphConstructionService";
 
 function stageInstance(
@@ -122,3 +122,4 @@ describe("PipelineGraphConstructionService", () => {
     expect(unifiedOutEdges.length).toBeGreaterThan(2);
   });
 });
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { renderToStaticMarkup } from "react-dom/server";
-import { createEmptyWorkflowDraft } from "../../../../../domain/workflow-studio/WorkflowStudioDomain";
+import { createEmptyWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import { readSource } from "../../../../tests/testUtils";
 import WorkflowStudioStepSectionEditor from "../WorkflowStudioStepSectionEditor";
 
@@ -42,4 +42,5 @@ describe("WorkflowStudioStepSectionEditor", () => {
     expect(source).toContain("WorkflowStudioHandoffStatusKinds.recovered");
   });
 });
+
 

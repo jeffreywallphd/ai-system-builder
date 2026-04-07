@@ -1,7 +1,7 @@
-import { createDeploymentBundle, buildDeploymentBundleDeterminismKey, type DeploymentBundle } from "../../domain/deployment/DeploymentBundleDomain";
-import type { DeploymentConfigurationContract } from "../../domain/deployment/DeploymentConfigurationDomain";
-import type { DeploymentTarget } from "../../domain/deployment/DeploymentTargetDomain";
-import type { SystemPackage } from "../../domain/system-packaging/SystemPackagingDomain";
+﻿import { createDeploymentBundle, buildDeploymentBundleDeterminismKey, type DeploymentBundle } from "@domain/deployment/DeploymentBundleDomain";
+import type { DeploymentConfigurationContract } from "@domain/deployment/DeploymentConfigurationDomain";
+import type { DeploymentTarget } from "@domain/deployment/DeploymentTargetDomain";
+import type { SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentConfigurationValidator } from "./DeploymentConfigurationValidator";
 
 export interface DeploymentBuildRequest {
@@ -122,3 +122,4 @@ export class DeploymentBuildPipeline {
     }
   }
 }
+

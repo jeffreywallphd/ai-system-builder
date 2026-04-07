@@ -1,4 +1,4 @@
-import type { AgentRunControlAction, AgentSessionSummaryReadModel } from "../../../application/agents/contracts/AgentRunContracts";
+﻿import type { AgentRunControlAction, AgentSessionSummaryReadModel } from "@application/agents/contracts/AgentRunContracts";
 
 interface AgentRunControlsProps {
   readonly session?: AgentSessionSummaryReadModel;
@@ -31,3 +31,4 @@ export function AgentRunControls(props: AgentRunControlsProps): JSX.Element | nu
     </div>
   );
 }
+

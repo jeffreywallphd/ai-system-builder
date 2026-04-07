@@ -1,8 +1,8 @@
-import type { IAgentToolOrchestrator, AgentToolOrchestrationRequest } from "../../application/ports/interfaces/IAgentToolOrchestrator";
-import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
-import type { AgentExecutionResult } from "../../application/agents/models/AgentExecutionResult";
-import type { AgentStepResult } from "../../application/agents/models/AgentStepResult";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { IAgentToolOrchestrator, AgentToolOrchestrationRequest } from "@application/ports/interfaces/IAgentToolOrchestrator";
+import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
+import type { AgentExecutionResult } from "@application/agents/models/AgentExecutionResult";
+import type { AgentStepResult } from "@application/agents/models/AgentStepResult";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 
 const KEYWORDS = ["search", "find", "lookup", "retrieve", "sum", "echo", "tool"] as const;
 
@@ -156,3 +156,4 @@ export class DeterministicToolCapabilityAgentOrchestrator implements IAgentToolO
     });
   }
 }
+

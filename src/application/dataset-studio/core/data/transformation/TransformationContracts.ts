@@ -1,5 +1,5 @@
-import { z } from "zod";
-import type { CanonicalRecordsShape, CanonicalTableShape } from "../../../../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { z } from "zod";
+import type { CanonicalRecordsShape, CanonicalTableShape } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export const TransformationInputDataKinds = Object.freeze({
   records: "records",
@@ -161,3 +161,4 @@ export const TransformationInputSchema: z.ZodType<ITransformationInput> = z.obje
 });
 
 export const TransformationConfigSchema: z.ZodType<ITransformationConfig> = z.record(z.unknown());
+

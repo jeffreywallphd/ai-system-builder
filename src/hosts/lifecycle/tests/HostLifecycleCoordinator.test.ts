@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createHostBootConfiguration } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { createHostBootConfiguration } from "@application/common/HostCompositionContracts";
 import { DesktopHostRuntime } from "../../HostRuntimeCatalog";
 import { createHostLifecycleCoordinator } from "../HostLifecycleCoordinator";
 
@@ -92,3 +92,4 @@ describe("HostLifecycleCoordinator", () => {
     expect(lifecycle.lifecycleEvents.some((event) => event.type === "startup-failed")).toBeTrue();
   });
 });
+

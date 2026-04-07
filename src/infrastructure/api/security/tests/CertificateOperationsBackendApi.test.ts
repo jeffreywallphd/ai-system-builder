@@ -1,16 +1,16 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CertificateOperationsBackendApi } from "../CertificateOperationsBackendApi";
 import { CertificateOperationsApiErrorCodes } from "../sdk/PublicCertificateOperationsApiContract";
-import { ListIssuedCertificateMetadataErrorCodes } from "../../../../application/security/use-cases/ListIssuedCertificateMetadataUseCase";
-import { GetIssuedCertificateMetadataErrorCodes } from "../../../../application/security/use-cases/GetIssuedCertificateMetadataUseCase";
+import { ListIssuedCertificateMetadataErrorCodes } from "@application/security/use-cases/ListIssuedCertificateMetadataUseCase";
+import { GetIssuedCertificateMetadataErrorCodes } from "@application/security/use-cases/GetIssuedCertificateMetadataUseCase";
 import {
   IssuedCertificateAlreadyRevokedError,
   RevokeIssuedCertificateInvalidRequestError,
-} from "../../../../application/security/use-cases/RevokeIssuedCertificateUseCase";
+} from "@application/security/use-cases/RevokeIssuedCertificateUseCase";
 import {
   IssuedCertificateRenewalNotAllowedError,
   RenewIssuedCertificateInvalidRequestError,
-} from "../../../../application/security/use-cases/RenewIssuedCertificateUseCase";
+} from "@application/security/use-cases/RenewIssuedCertificateUseCase";
 
 describe("CertificateOperationsBackendApi", () => {
   it("returns certificate authority status introspection", async () => {
@@ -273,3 +273,4 @@ function createBackend(overrides: Record<string, unknown>): CertificateOperation
     ...overrides,
   } as never);
 }
+

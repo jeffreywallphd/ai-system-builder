@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SecretKinds, SecretRecordStates, SecretScopes, type SecretReference } from "../../../../domain/security/SecretDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretKinds, SecretRecordStates, SecretScopes, type SecretReference } from "@domain/security/SecretDomain";
 import { toSecretMetadataQueryDto } from "../SecretTransportDtos";
 
 describe("SecretTransportDtos", () => {
@@ -27,3 +27,4 @@ describe("SecretTransportDtos", () => {
     expect((dto as Record<string, unknown>).encryptedPayloadRef).toBeUndefined();
   });
 });
+

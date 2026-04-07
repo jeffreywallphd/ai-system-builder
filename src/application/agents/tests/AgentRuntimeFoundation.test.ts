@@ -1,27 +1,27 @@
-import { describe, expect, it } from "bun:test";
-import { createAgent, type Agent } from "../../../domain/agents/Agent";
-import { AssetId } from "../../../domain/assets/AssetId";
+﻿import { describe, expect, it } from "bun:test";
+import { createAgent, type Agent } from "@domain/agents/Agent";
+import { AssetId } from "@domain/assets/AssetId";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import { AssetBackedAgentMemoryStore } from "../services/AssetBackedAgentMemoryStore";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
+import { Asset } from "@domain/assets/Asset";
+import { AssetVersion } from "@domain/assets/AssetVersion";
 import type { IAgentToolOrchestrator } from "../../ports/interfaces/IAgentToolOrchestrator";
 import { ExecuteAgentToolsUseCase } from "../ExecuteAgentToolsUseCase";
 import { DefaultAgentMemoryRetrievalService } from "../services/AgentMemoryRetrievalService";
 import { AgentMemoryWriteService } from "../services/AgentMemoryWriteService";
 import { DeterministicAgentPlanningService } from "../services/AgentPlanningInterface";
 import { AgentRunnerService } from "../services/AgentRunnerService";
-import type { AgentExecutionSession } from "../../../domain/agents/AgentExecutionSession";
+import type { AgentExecutionSession } from "@domain/agents/AgentExecutionSession";
 import type {
   AgentExecutionSessionTransitionRecord,
   IAgentExecutionSessionRepository,
 } from "../../ports/interfaces/IAgentExecutionSessionRepository";
 import { AgentMcpToolGovernanceService } from "../services/AgentMcpToolGovernanceService";
-import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+import { createInstalledMcpToolRecord, type InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import type { IMcpToolRegistryRepository } from "../../ports/interfaces/IMcpToolRegistryRepository";
-import { createAgentPlan } from "../../../domain/agents/AgentPlan";
+import { createAgentPlan } from "@domain/agents/AgentPlan";
 
 class InMemoryAssetRepo implements IAssetCatalog, IAssetVersionRepository {
   private readonly assets = new Map<string, Asset>();
@@ -590,3 +590,4 @@ describe("Agent runtime foundation", () => {
     expect(result.session.stepOutcomes[1]?.status).toBe("cancelled");
   });
 });
+

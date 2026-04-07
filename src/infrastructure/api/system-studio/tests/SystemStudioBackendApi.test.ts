@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import type { IStudioShellRepository } from "../../../../application/ports/interfaces/IStudioShellRepository";
-import type { Studio, AssetSession, AssetDraft } from "../../../../domain/studio-shell/StudioShellDomain";
-import type { AssetVersion } from "../../../../domain/assets/AssetVersion";
-import { DefaultStudioShellApplicationService } from "../../../../application/studio-shell/DefaultStudioShellApplicationService";
-import { SystemStudioApplicationService } from "../../../../application/system-studio/SystemStudioApplicationService";
-import { SystemStudioIdentity } from "../../../../domain/system-studio/SystemAssetDomain";
+﻿import { describe, expect, it } from "bun:test";
+import type { IStudioShellRepository } from "@application/ports/interfaces/IStudioShellRepository";
+import type { Studio, AssetSession, AssetDraft } from "@domain/studio-shell/StudioShellDomain";
+import type { AssetVersion } from "@domain/assets/AssetVersion";
+import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
+import { SystemStudioApplicationService } from "@application/system-studio/SystemStudioApplicationService";
+import { SystemStudioIdentity } from "@domain/system-studio/SystemAssetDomain";
 import { SystemStudioBackendApi } from "../SystemStudioBackendApi";
 
 class InMemoryStudioShellRepository implements IStudioShellRepository {
@@ -198,3 +198,4 @@ describe("SystemStudioBackendApi", () => {
     expect(loaded.ok).toBeTrue();
   });
 });
+

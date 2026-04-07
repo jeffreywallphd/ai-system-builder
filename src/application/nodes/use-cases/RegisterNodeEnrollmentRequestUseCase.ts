@@ -1,16 +1,16 @@
-import {
+﻿import {
   NodeEnrollmentRequestStatuses,
   createNodeEnrollmentRequest,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeRoleCapability,
   NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeCapabilityProfilePersistenceRecord,
   NodeTrustPersistenceMutationResult,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
@@ -278,3 +278,4 @@ export class RegisterNodeEnrollmentRequestUseCase {
     return requestedAtEpoch <= staleAfterEpoch;
   }
 }
+

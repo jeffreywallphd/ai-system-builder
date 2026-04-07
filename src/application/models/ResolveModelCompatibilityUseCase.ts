@@ -1,8 +1,8 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IModelCompatibilityContext, IModelCompatibilityService } from "../../domain/services/interfaces/IModelCompatibilityService";
-import type { IModelCompatibility } from "../../domain/models/interfaces/IModelCompatibility";
-import type { IModelDependency } from "../../domain/models/interfaces/IModelDependency";
-import type { IModelRequirement } from "../../domain/models/interfaces/IModelRequirement";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import type { IModelCompatibilityContext, IModelCompatibilityService } from "@domain/services/interfaces/IModelCompatibilityService";
+import type { IModelCompatibility } from "@domain/models/interfaces/IModelCompatibility";
+import type { IModelDependency } from "@domain/models/interfaces/IModelDependency";
+import type { IModelRequirement } from "@domain/models/interfaces/IModelRequirement";
 
 export type ResolveModelCompatibilityMode =
   | "model-to-model"
@@ -154,3 +154,4 @@ export class ResolveModelCompatibilityUseCase {
     }
   }
 }
+

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { CanonicalDataShapeKinds } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   PipelineStageConfigModes,
   PipelineStageIds,
-} from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageRegistry } from "../../domain/dataset-studio/PipelineStageRegistry";
+} from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageRegistry } from "@domain/dataset-studio/PipelineStageRegistry";
 import { StageAssetCompositionService } from "../StageAssetCompositionService";
 
 describe("StageAssetCompositionService", () => {
@@ -180,3 +180,4 @@ describe("StageAssetCompositionService", () => {
     expect(roleSet.has("annotation-validation")).toBeTrue();
   });
 });
+

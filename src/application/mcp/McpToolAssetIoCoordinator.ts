@@ -1,8 +1,8 @@
-import { Asset } from "../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../domain/assets/AssetMetadata";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { InstalledMcpToolRecord } from "../../domain/mcp/InstalledMcpTool";
-import type { McpToolAssetInputContract, McpToolAssetOutputContract } from "../../domain/mcp/McpToolCapability";
+﻿import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
+import type { McpToolAssetInputContract, McpToolAssetOutputContract } from "@domain/mcp/McpToolCapability";
 import { McpToolRegistryError } from "./registry/McpToolRegistryErrors";
 import { RegisterAssetUseCase } from "../assets-system/RegisterAssetUseCase";
 import { CreateAssetVersionUseCase } from "../assets-system/CreateAssetVersionUseCase";
@@ -450,3 +450,4 @@ function deepClone(value: Readonly<Record<string, unknown>>): Record<string, unk
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
+

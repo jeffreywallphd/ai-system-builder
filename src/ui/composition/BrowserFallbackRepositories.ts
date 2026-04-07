@@ -1,6 +1,6 @@
-import { InMemoryStudioShellRepository } from "../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { InMemoryWorkflowPersistenceRepository } from "../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
-import { LocalStorageWorkflowRunSummaryRepository } from "../../infrastructure/workflows/LocalStorageWorkflowRunSummaryRepository";
+﻿import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "@infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
+import { LocalStorageWorkflowRunSummaryRepository } from "@infrastructure/workflows/LocalStorageWorkflowRunSummaryRepository";
 
 let studioShellRepository: InMemoryStudioShellRepository | undefined;
 let workflowPersistenceRepository: InMemoryWorkflowPersistenceRepository | undefined;
@@ -27,3 +27,4 @@ export function resolveBrowserWorkflowRunSummaryRepository(): LocalStorageWorkfl
   }
   return workflowRunSummaryRepository;
 }
+

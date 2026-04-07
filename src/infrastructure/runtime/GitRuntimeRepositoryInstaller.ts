@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+﻿import { execFile } from "node:child_process";
 import { mkdirSync, existsSync, rmSync, readdirSync, renameSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -32,7 +32,7 @@ import {
   type RuntimeRepositoryUpdateResult,
   type RuntimeRepositoryValidationRequest,
   type RuntimeRepositoryValidationResult,
-} from "../../application/runtime/RuntimeRepositoryInstallerContract";
+} from "@application/runtime/RuntimeRepositoryInstallerContract";
 
 const DEFAULT_METADATA_FILENAME = ".ai-loom-runtime-repository-install.json";
 const execFileAsync = promisify(execFile);
@@ -582,3 +582,4 @@ function toOperationError(error: unknown): RuntimeRepositoryOperationError {
     metadata: {},
   });
 }
+

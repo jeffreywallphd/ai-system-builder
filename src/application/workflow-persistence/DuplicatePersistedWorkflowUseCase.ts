@@ -1,9 +1,9 @@
-import {
+﻿import {
   createPersistedWorkflowRecord,
   type PersistedWorkflowRecord,
   type WorkflowPersistenceOwnershipContext,
-} from "../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { WorkflowLifecycleStates } from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowPersistenceDomain";
+import { WorkflowLifecycleStates } from "@domain/workflow-studio/WorkflowStudioDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
 import {
   WorkflowPersistenceConflictError,
@@ -109,3 +109,4 @@ export class DuplicatePersistedWorkflowUseCase {
     }
   }
 }
+

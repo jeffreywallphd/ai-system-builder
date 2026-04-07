@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   IModelExecutionRequest,
   IModelExecutionResult,
   IModelExecutor,
-} from "../../../application/ports/interfaces/IModelExecutor";
+} from "@application/ports/interfaces/IModelExecutor";
 
 export class ComfyModelExecutor implements IModelExecutor {
   public readonly runtime = "comfyui";
@@ -34,3 +34,4 @@ export class ComfyModelExecutor implements IModelExecutor {
     };
   }
 }
+

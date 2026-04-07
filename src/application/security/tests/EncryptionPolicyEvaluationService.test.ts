@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   EncryptionKeyScopes,
   EncryptionModes,
@@ -6,7 +6,7 @@ import {
   ProtectedDataClasses,
   createEncryptionAtRestPolicyDefinition,
   type EncryptionAtRestPolicyDefinition,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type {
   IEncryptionAtRestPolicyContextResolverPort,
   ResolveEncryptionAtRestPolicyContextRequest,
@@ -299,3 +299,4 @@ function createStoragePolicy(assetMode: typeof EncryptionModes[keyof typeof Encr
     ],
   });
 }
+

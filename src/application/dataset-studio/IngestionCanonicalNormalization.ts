@@ -1,4 +1,4 @@
-import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
+﻿import { DataPreviewEngine, type DataPreviewModel } from "../data-studio/DataPreviewEngine";
 import {
   createCanonicalImageMetadataRecordsShape,
   createCanonicalRecordsShape,
@@ -9,7 +9,7 @@ import {
   type CanonicalRecordValue,
   type CanonicalRecordsShape,
   type CanonicalTextItemsShape,
-} from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   IngestionExecutionModes,
   IngestionExecutionStatuses,
@@ -438,3 +438,4 @@ export function buildIngestionPreviewEnvelope(input: {
     partialFailures: input.partialFailures,
   });
 }
+

@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   IAssetAuditInfo,
   IAssetLocation,
   IAssetRelationship,
   IAssetSemanticMetadata,
   IAssetSourceInfo,
   IAssetTechnicalMetadata,
-} from "../../../domain/assets/interfaces/IAsset";
+} from "@domain/assets/interfaces/IAsset";
 import type { RuntimeEngine } from "../models/interfaces/IModelCompatibility";
 
 function freezeArray<T>(values?: ReadonlyArray<T>): ReadonlyArray<T> | undefined {
@@ -327,3 +327,4 @@ export class AssetRelationship implements IAssetRelationship {
     });
   }
 }
+

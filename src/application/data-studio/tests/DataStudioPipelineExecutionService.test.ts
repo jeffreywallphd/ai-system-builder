@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { UnifiedExecutionEngine } from "../../execution/UnifiedExecutionEngine";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import { PipelineStageIds } from "../../../domain/dataset-studio/PipelineStageDomain";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import { DataStudioPreparationWizard } from "../DataStudioPreparationWizard";
 import { DataStudioPipelineExecutionService } from "../DataStudioPipelineExecutionService";
-import { DataStudioPipelineExecutionUnitHandler } from "../../../infrastructure/execution/DataStudioPipelineExecutionUnitHandler";
+import { DataStudioPipelineExecutionUnitHandler } from "@infrastructure/execution/DataStudioPipelineExecutionUnitHandler";
 
 function withStageOptions(
   wizard: DataStudioPreparationWizard,
@@ -67,3 +67,4 @@ describe("DataStudioPipelineExecutionService", () => {
     expect(result.result?.lineageId).toBeDefined();
   });
 });
+

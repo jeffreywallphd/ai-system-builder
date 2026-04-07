@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
-} from "../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   AggregationAsset,
   DataClassificationAsset,
@@ -169,3 +169,4 @@ describe("Transformation assets", () => {
     expect((pipelineResult.finalOutput as Awaited<ReturnType<SchemaInferenceAsset["execute"]>> | undefined)?.schema.fields.length).toBeGreaterThan(0);
   });
 });
+

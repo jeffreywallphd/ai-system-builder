@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CreateNodeUseCase } from "../CreateNodeUseCase";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
-import { NodePort } from "../../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodePort } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import { makeNodeCatalogProvider } from "./testUtils";
 
 const definition = new NodeDefinition({
@@ -105,3 +105,4 @@ describe("CreateNodeUseCase", () => {
     ).rejects.toThrow("Created node 'generated-required' is invalid: Document is required.");
   });
 });
+

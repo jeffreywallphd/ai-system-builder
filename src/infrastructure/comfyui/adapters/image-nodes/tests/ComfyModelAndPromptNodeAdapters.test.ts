@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type {
   ICommonImageNodeModelCapabilityRef,
   ICommonImageNodePromptConditioning,
-} from "../../../../../application/execution/comfyui/image-nodes/CommonImageNodeContracts";
+} from "@application/execution/comfyui/image-nodes/CommonImageNodeContracts";
 import { ComfyModelLoaderNodeAdapter } from "../ComfyModelLoaderNodeAdapter";
 import { ComfyPromptInputNodeAdapter } from "../ComfyPromptInputNodeAdapter";
 
@@ -103,3 +103,4 @@ describe("Comfy model loader and prompt input node adapters", () => {
     expect(Object.keys(module).some((key) => key.toLowerCase().includes("comfy"))).toBe(false);
   });
 });
+

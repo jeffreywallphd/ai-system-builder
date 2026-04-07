@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
-import { createPersistedWorkflowRecord } from "../../../domain/workflow-studio/WorkflowPersistenceDomain";
-import { createEmptyWorkflowDraft } from "../../../domain/workflow-studio/WorkflowStudioDomain";
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "../../../domain/taxonomy/CompositionTaxonomy";
+﻿import { describe, expect, it } from "bun:test";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
+import { createPersistedWorkflowRecord } from "@domain/workflow-studio/WorkflowPersistenceDomain";
+import { createEmptyWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles, TaxonomyStructuralKinds } from "@domain/taxonomy/CompositionTaxonomy";
 import { ExploreAssetKinds, ExploreAssetQueryService } from "../ExploreAssetQueryService";
 
 const seedAssets: ReadonlyArray<RegistryAsset> = Object.freeze([
@@ -220,3 +220,4 @@ describe("ExploreAssetQueryService", () => {
     expect(library.assets.some((entry) => entry.id.assetId === "asset:workflow")).toBeTrue();
   });
 });
+

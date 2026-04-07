@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
 import { OutputGalleryDatasetIntegrationService } from "../OutputGalleryDatasetIntegrationService";
@@ -121,3 +121,4 @@ describe("ImageRunHistoryService", () => {
     expect(lineage?.edges.some((edge) => edge.kind === "run-to-output")).toBeTrue();
   });
 });
+

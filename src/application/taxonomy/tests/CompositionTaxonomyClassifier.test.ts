@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionTaxonomyClassifier } from "../CompositionTaxonomyClassifier";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import type { IWorkflow } from "../../../domain/workflows/interfaces/IWorkflow";
-import type { Agent } from "../../../domain/agents/Agent";
+import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
+import type { Agent } from "@domain/agents/Agent";
 
 describe("CompositionTaxonomyClassifier", () => {
   const classifier = new CompositionTaxonomyClassifier();
@@ -183,3 +183,4 @@ describe("CompositionTaxonomyClassifier", () => {
     });
   });
 });
+

@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { ToolDefinition } from "./models/ToolDefinition";
 import { WorkflowApplicationProjectionService } from "./WorkflowApplicationProjectionService";
 
@@ -60,3 +60,4 @@ export class WorkflowToolProjectionService {
     return this.applicationProjectionService.applyInput(workflow, values);
   }
 }
+

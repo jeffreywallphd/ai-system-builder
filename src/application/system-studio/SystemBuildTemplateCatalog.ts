@@ -1,6 +1,6 @@
-import type { AssetDraftDependencyReference, AssetMetadataPatch } from "../../domain/studio-shell/StudioShellDomain";
-import { serializeSystemSerializationDocument } from "../../domain/system-studio/SystemSerializationContract";
-import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { AssetDraftDependencyReference, AssetMetadataPatch } from "@domain/studio-shell/StudioShellDomain";
+import { serializeSystemSerializationDocument } from "@domain/system-studio/SystemSerializationContract";
+import { TaxonomyBehaviorKinds, TaxonomySemanticRoles } from "@domain/taxonomy/CompositionTaxonomy";
 import { ImageManipulationSystemTemplate } from "./ImageManipulationSystemTemplate";
 import { createComfyImageManipulationDefaultConfig } from "./ComfyImageManipulationPropertySchema";
 import {
@@ -235,3 +235,4 @@ export function resolveSystemBuildTemplate(templateId: string | undefined): Syst
   }
   return SystemBuildTemplateCatalog.find((entry) => entry.templateId === normalized);
 }
+

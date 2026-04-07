@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { SaveWorkflowUseCase } from "../SaveWorkflowUseCase";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeWorkflowRepository, makeWorkflowValidator } from "./testUtils";
 
 describe("SaveWorkflowUseCase", () => {
@@ -41,3 +41,4 @@ describe("SaveWorkflowUseCase", () => {
     expect(result.validation).toBeUndefined();
   });
 });
+

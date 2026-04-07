@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { HostBootModes } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { HostBootModes } from "@application/common/HostCompositionContracts";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
   WebHostEnvironmentKeys,
@@ -115,3 +115,4 @@ describe("WebHostEntrypoint", () => {
     expect(options.boot?.environment?.[WebHostEnvironmentKeys.basePath]).toBe("/app");
   });
 });
+

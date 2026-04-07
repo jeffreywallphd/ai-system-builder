@@ -1,8 +1,8 @@
-import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
+﻿import { resolveDesktopIdentityApiBaseUrl } from "../desktop/identity/resolveDesktopIdentityApiBaseUrl";
 import {
   HttpAssetWorkflowClient,
   type AssetWorkflowClient,
-} from "../shared/assets/AssetWorkflowClient";
+} from "@shared/assets/AssetWorkflowClient";
 import { resolveWebIdentityApiBaseUrl } from "../web/identity/resolveWebIdentityApiBaseUrl";
 
 export class AssetWorkflowService {
@@ -38,3 +38,4 @@ function createDefaultAssetWorkflowClient(): AssetWorkflowClient {
   const baseUrl = desktopBaseUrl ?? resolveWebIdentityApiBaseUrl();
   return new HttpAssetWorkflowClient(baseUrl);
 }
+

@@ -1,5 +1,5 @@
-import type { ComfyImageManipulationConfig } from "../../application/system-studio/ComfyImageManipulationPropertySchema";
-import type { SystemRuntimeWindowLaunchContract } from "../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+﻿import type { ComfyImageManipulationConfig } from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import type { SystemRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import type {
   ImageManipulationSelectionSnapshot,
 } from "./ImageManipulationRuntimeDatasetBindingService";
@@ -280,3 +280,4 @@ export class SystemRuntimeWindowSessionPersistenceService {
     });
   }
 }
+

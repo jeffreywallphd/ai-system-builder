@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createEmptyWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createEmptyWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   applyInlineDatasetReturnToDraft,
   listDatasetInputs,
@@ -214,3 +214,4 @@ describe("WorkflowWizardDatasetInputs", () => {
     expect(listDatasetInputs(result.draft)).toHaveLength(0);
   });
 });
+

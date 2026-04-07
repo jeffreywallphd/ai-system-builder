@@ -1,11 +1,11 @@
-import {
+﻿import {
   createActorContext,
   createPermissionKey,
   createResourcePolicyContext,
   createSharingPolicy,
   createSharingGrant,
   AuthorizationDomainError,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationPolicyDeniedRecordedEvent,
   AuthorizationPolicyEvaluationDecisionDto,
@@ -278,3 +278,4 @@ function toDenialReason(reasonCode: string) {
   }
   return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;
 }
+

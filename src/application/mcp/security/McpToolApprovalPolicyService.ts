@@ -1,11 +1,11 @@
-import type { InstalledMcpToolRecord } from "../../../domain/mcp/InstalledMcpTool";
+﻿import type { InstalledMcpToolRecord } from "@domain/mcp/InstalledMcpTool";
 import {
   deriveRequiredMcpToolPermissions,
   type McpToolExecutionApprovalDecision,
   type McpToolPermissionApprovalStatus,
   type McpToolPermissionScope,
   type McpToolTrustScope,
-} from "../../../domain/mcp/McpToolTrust";
+} from "@domain/mcp/McpToolTrust";
 
 export class McpToolApprovalPolicyService {
   public evaluate(
@@ -87,3 +87,4 @@ export class McpToolApprovalPolicyService {
     return undefined;
   }
 }
+

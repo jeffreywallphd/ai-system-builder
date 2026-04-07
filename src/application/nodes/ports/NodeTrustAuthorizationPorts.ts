@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   NodeEnrollmentRequestPersistenceLookupQuery,
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
   NodeRevocationPersistenceRecord,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export interface NodeTrustAuthorizationHook {
   assertCanRegisterEnrollmentRequest(input: {
@@ -49,3 +49,4 @@ export interface NodeTrustAuthorizationHook {
     readonly nodeId?: string;
   }): Promise<void>;
 }
+

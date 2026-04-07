@@ -1,6 +1,6 @@
-import type { IToolCapabilityExecutor } from "../../application/ports/interfaces/IToolCapabilityExecutor";
-import type { ToolCapabilityInvocationRequest } from "../../application/tools/models/ToolCapabilityInvocationRequest";
-import type { ToolCapabilityInvocationResult } from "../../application/tools/models/ToolCapabilityInvocationResult";
+﻿import type { IToolCapabilityExecutor } from "@application/ports/interfaces/IToolCapabilityExecutor";
+import type { ToolCapabilityInvocationRequest } from "@application/tools/models/ToolCapabilityInvocationRequest";
+import type { ToolCapabilityInvocationResult } from "@application/tools/models/ToolCapabilityInvocationResult";
 
 export type LocalToolCapabilityHandler = (
   request: ToolCapabilityInvocationRequest
@@ -25,3 +25,4 @@ export class StaticLocalToolCapabilityExecutor implements IToolCapabilityExecuto
     return handler(request);
   }
 }
+

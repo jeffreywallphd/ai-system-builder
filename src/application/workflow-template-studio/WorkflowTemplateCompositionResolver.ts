@@ -1,7 +1,7 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { WorkflowTemplateComposition } from "../../domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { WorkflowTemplateComposition } from "@domain/workflow-template-studio/WorkflowTemplateCompositionDomain";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import type { IAssetCatalog } from "../ports/interfaces/IAssetCatalog";
 
 export interface WorkflowTemplateWorkflowContractResolver {
@@ -134,3 +134,4 @@ export class WorkflowTemplateCompositionResolver {
     });
   }
 }
+

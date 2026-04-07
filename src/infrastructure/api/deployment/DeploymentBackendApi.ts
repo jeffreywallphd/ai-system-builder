@@ -1,19 +1,19 @@
-import { DeploymentBuildPipeline } from "../../../application/deployment/DeploymentBuildPipeline";
+﻿import { DeploymentBuildPipeline } from "@application/deployment/DeploymentBuildPipeline";
 import {
   DeploymentExecutionService,
   type DeploymentRecordRepository,
-} from "../../../application/deployment/DeploymentExecutionService";
-import { DeploymentHealthMonitor } from "../../../application/deployment/DeploymentHealthMonitor";
-import { DeploymentRollbackService } from "../../../application/deployment/DeploymentRollbackService";
-import { DeploymentVersionManager } from "../../../application/deployment/DeploymentVersionManager";
+} from "@application/deployment/DeploymentExecutionService";
+import { DeploymentHealthMonitor } from "@application/deployment/DeploymentHealthMonitor";
+import { DeploymentRollbackService } from "@application/deployment/DeploymentRollbackService";
+import { DeploymentVersionManager } from "@application/deployment/DeploymentVersionManager";
 import {
   DeploymentAccessDeniedError,
   type DeploymentAccessContext,
-} from "../../../application/deployment/DeploymentAccessControl";
-import { DeploymentQuotaExceededError } from "../../../application/deployment/DeploymentQuotaEvaluator";
-import { createDeploymentConfigurationContract } from "../../../domain/deployment/DeploymentConfigurationDomain";
-import { createDeploymentTarget } from "../../../domain/deployment/DeploymentTargetDomain";
-import { createSystemPackage } from "../../../domain/system-packaging/SystemPackagingDomain";
+} from "@application/deployment/DeploymentAccessControl";
+import { DeploymentQuotaExceededError } from "@application/deployment/DeploymentQuotaEvaluator";
+import { createDeploymentConfigurationContract } from "@domain/deployment/DeploymentConfigurationDomain";
+import { createDeploymentTarget } from "@domain/deployment/DeploymentTargetDomain";
+import { createSystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import type {
   DeploymentSdkAccessContext,
   DeploymentSdkDeploymentStatusRequest,
@@ -466,3 +466,4 @@ function normalizeSystemPackage<T extends { readonly packageId: unknown }>(pkg: 
     packageId: normalizeString(pkg.packageId),
   });
 }
+

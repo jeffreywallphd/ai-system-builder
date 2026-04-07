@@ -1,4 +1,4 @@
-import type { EncryptionKeyScope } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+﻿import type { EncryptionKeyScope } from "@domain/security/EncryptionAtRestPolicyDomain";
 
 export const EncryptionKeyLifecycleStates = Object.freeze({
   active: "active",
@@ -44,4 +44,5 @@ export interface IEncryptionKeyCatalogPort {
     request: ResolveEncryptionKeyByReferenceRequest,
   ): Promise<EncryptionKeyDescriptor | undefined>;
 }
+
 

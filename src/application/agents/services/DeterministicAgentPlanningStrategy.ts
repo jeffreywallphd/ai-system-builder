@@ -1,5 +1,5 @@
-import { createAgentPlan, type AgentPlan } from "../../../domain/agents/AgentPlan";
-import type { AgentMemoryEntryReference, AgentMemoryStore } from "../../../domain/agents/AgentMemory";
+﻿import { createAgentPlan, type AgentPlan } from "@domain/agents/AgentPlan";
+import type { AgentMemoryEntryReference, AgentMemoryStore } from "@domain/agents/AgentMemory";
 import type { IToolCapabilityCatalog } from "../../ports/interfaces/IToolCapabilityCatalog";
 import type {
   AgentPlanToolSelectionService,
@@ -124,3 +124,4 @@ export class DeterministicAgentPlanningStrategy implements AgentPlanningStrategy
     return plan;
   }
 }
+

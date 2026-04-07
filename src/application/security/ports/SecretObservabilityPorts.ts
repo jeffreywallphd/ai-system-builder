@@ -1,5 +1,5 @@
-import type { SecretScope } from "../../../domain/security/SecretDomain";
-import { redactSecretMaterial } from "../../../shared/security/SecretRedaction";
+﻿import type { SecretScope } from "@domain/security/SecretDomain";
+import { redactSecretMaterial } from "@shared/security/SecretRedaction";
 
 export const SecretOperationalOutcomes = Object.freeze({
   succeeded: "succeeded",
@@ -60,3 +60,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
 }
+

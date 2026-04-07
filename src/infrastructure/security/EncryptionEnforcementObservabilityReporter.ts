@@ -1,10 +1,10 @@
-import {
+﻿import {
   EncryptionEnforcementOutcomes,
   publishEncryptionEnforcementEventBestEffort,
   sanitizeEncryptionEnforcementEvent,
   type EncryptionEnforcementEvent,
   type IEncryptionEnforcementObservabilityPort,
-} from "../../application/security/ports/EncryptionEnforcementObservabilityPorts";
+} from "@application/security/ports/EncryptionEnforcementObservabilityPorts";
 
 export interface EncryptionEnforcementOperationalLogger {
   info(event: EncryptionEnforcementEvent): void;
@@ -58,3 +58,4 @@ class ConsoleEncryptionEnforcementOperationalLogger implements EncryptionEnforce
     console.error(JSON.stringify(event));
   }
 }
+

@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   TrustedDevicePairingCompletionRequest,
   TrustedDevicePairingCompletionResponse,
-} from "../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import type { ITrustedDevicePairingService } from "../ports/ITrustedDevicePairingService";
 
 interface CompleteTrustedDevicePairingUseCaseDependencies {
@@ -15,3 +15,4 @@ export class CompleteTrustedDevicePairingUseCase {
     return this.dependencies.pairingService.completePairing(request);
   }
 }
+

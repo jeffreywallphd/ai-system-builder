@@ -1,4 +1,4 @@
-import {
+﻿import {
   SecretKinds,
   SecretRecordStates,
   SecretScopes,
@@ -14,13 +14,13 @@ import {
   type SecretScopeOwner,
   type SecretVersion,
   type SecretVersionState,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import {
   SecretReEncryptionOperationStates,
   type SecretReEncryptionFailure,
   type SecretReEncryptionOperationRecord,
   type SecretReEncryptionTarget,
-} from "../../../application/security/ports/SecretServicePorts";
+} from "@application/security/ports/SecretServicePorts";
 
 export interface SecretRecordRow {
   readonly secret_id: string;
@@ -542,3 +542,4 @@ function assertSecretVersionState(value: string): SecretVersionState {
   }
   throw new Error(`Persisted secret version state '${value}' is invalid.`);
 }
+

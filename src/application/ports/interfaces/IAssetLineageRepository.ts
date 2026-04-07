@@ -1,4 +1,4 @@
-import type { AssetLineageEdge } from "../../../domain/assets/AssetLineageEdge";
+﻿import type { AssetLineageEdge } from "@domain/assets/AssetLineageEdge";
 
 export type AssetLineageDirection = "upstream" | "downstream" | "both";
 
@@ -9,3 +9,4 @@ export interface IAssetLineageRepository {
     direction?: AssetLineageDirection,
   ): Promise<ReadonlyArray<AssetLineageEdge>>;
 }
+

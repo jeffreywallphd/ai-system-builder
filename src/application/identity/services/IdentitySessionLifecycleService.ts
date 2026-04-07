@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentitySessionAccessChannels,
   IdentitySessionStatuses,
   createSession,
@@ -9,7 +9,7 @@ import {
   type SessionDeviceTrustContext,
   type Session,
   type SessionRevocationReason,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   type IdentityErrorCode,
@@ -365,3 +365,4 @@ function assertPoliciesAreValid(policies: IdentitySessionLifecyclePolicies): voi
     }
   }
 }
+

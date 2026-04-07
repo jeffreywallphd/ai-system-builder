@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { createImageWorkflowUiTriggerBindingConfiguration } from "../../contracts/ImageWorkflowUiTriggerBindingConfiguration";
 import { createUiTriggerEvent, UiTriggerEventKinds } from "../UiTriggerEventContract";
 import { WorkflowUiInteractionIssueCodes } from "../WorkflowUiInteractionContracts";
@@ -269,3 +269,4 @@ describe("WorkflowUiEventRuntimeDispatcher", () => {
     expect(traceStages).toContain("dispatch-failed");
   });
 });
+

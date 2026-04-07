@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkspaceStatuses,
   WorkspaceMembershipStatuses,
@@ -13,8 +13,8 @@ import {
   type WorkspaceMembership,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   WorkspaceInvitationMutationActions,
   WorkspaceIdNamespaces,
@@ -31,7 +31,7 @@ import {
   type WorkspacePendingInvitationByTokenHashLookupQuery,
   type WorkspacePendingInvitationLookupQuery,
   type WorkspaceRoleAssignmentListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
@@ -477,3 +477,4 @@ describe("workspace repository ports and shared contracts", () => {
     expect(loaded?.slug).toBe("bundle-team");
   });
 });
+

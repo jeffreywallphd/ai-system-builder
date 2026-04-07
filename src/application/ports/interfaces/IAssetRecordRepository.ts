@@ -1,4 +1,4 @@
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
 
 export interface IAssetRecordRepository {
   save(asset: IAsset): Promise<void>;
@@ -6,3 +6,4 @@ export interface IAssetRecordRepository {
   list(): Promise<ReadonlyArray<IAsset>>;
   exists(assetId: string): Promise<boolean>;
 }
+

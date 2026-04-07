@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { ComfyNodeAdapter } from "../ComfyNodeAdapter";
 
 describe("ComfyNodeAdapter", () => {
@@ -13,3 +13,4 @@ describe("ComfyNodeAdapter", () => {
     expect(adapter.getOutputPortIndex(node, "out_a")).toBe(0);
   });
 });
+

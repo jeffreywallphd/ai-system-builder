@@ -1,21 +1,21 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createStudioHandoffContract,
   StudioHandoffAssetRoles,
   StudioHandoffIntentKinds,
-} from "../../../domain/studio-handoff/StudioHandoffContract";
+} from "@domain/studio-handoff/StudioHandoffContract";
 import {
   createCompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   StudioHandoffDependencyEdgeKinds,
   StudioHandoffDependencyTracker,
 } from "../CrossStudioDependencyGraph";
-import { createStudioHandoffContext } from "../../../domain/studio-handoff/StudioHandoffContext";
+import { createStudioHandoffContext } from "@domain/studio-handoff/StudioHandoffContext";
 import type { StudioHandoffPreparation } from "../StudioHandoffOrchestrationService";
 
 const resolver = new CompositionAssetContractResolver();
@@ -263,3 +263,4 @@ describe("CrossStudioDependencyGraphBuilder/Tracker", () => {
     expect(graph.edges.every((edge) => edge.handoffId === "handoff:system:second")).toBeTrue();
   });
 });
+

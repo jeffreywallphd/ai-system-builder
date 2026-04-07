@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from "bun:test";
+﻿import { beforeEach, describe, expect, it } from "bun:test";
 import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
   WorkflowValidationIssueCodes,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   clearWorkflowStudioModeStateStoresForTests,
   getWorkflowStudioModeStateStore,
@@ -604,3 +604,4 @@ describe("WorkflowStudioModeStateStore", () => {
     expect(store.getState().handoffStatus).toBeUndefined();
   });
 });
+

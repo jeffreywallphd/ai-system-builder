@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { DeploymentLogLevels } from "../../../domain/deployment/DeploymentDiagnosticsDomain";
-import { DeploymentStates } from "../../../domain/deployment/DeploymentStateDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DeploymentLogLevels } from "@domain/deployment/DeploymentDiagnosticsDomain";
+import { DeploymentStates } from "@domain/deployment/DeploymentStateDomain";
 import { DeploymentDiagnosticsService } from "../DeploymentDiagnosticsService";
 import { DeploymentStateTracker } from "../DeploymentStateTracker";
 
@@ -87,3 +87,4 @@ describe("DeploymentDiagnosticsService", () => {
     expect(boundedDiagnostics[1]?.code).toBe("code-4");
   });
 });
+

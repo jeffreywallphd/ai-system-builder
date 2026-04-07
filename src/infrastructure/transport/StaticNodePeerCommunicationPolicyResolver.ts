@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   NodePeerCapability,
   NodePeerOperationClass,
   ResolveNodePeerCommunicationPolicyRequest,
   ResolveNodePeerCommunicationPolicyResult,
   INodePeerCommunicationPolicyResolverPort,
-} from "../../application/security/ports/NodePeerCommunicationPolicyPorts";
+} from "@application/security/ports/NodePeerCommunicationPolicyPorts";
 
 export interface NodePeerCommunicationPolicyRule {
   readonly localNodeId: string;
@@ -87,3 +87,4 @@ function normalizeOptional(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

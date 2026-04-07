@@ -1,6 +1,6 @@
-import {
+﻿import {
   DatasetPipelineStageKinds,
-} from "../../domain/dataset-studio/StagePipelineDomain";
+} from "@domain/dataset-studio/StagePipelineDomain";
 import {
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionRouteFailureCodes,
@@ -14,7 +14,7 @@ import {
   type UnifiedIngestionRouteResolution,
   type UnifiedIngestionRouteResult,
   type UnifiedIngestionSourceKind,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { StageAssetMappingService } from "./StageAssetMappingService";
 
 export interface UnifiedIngestionRouteDescriptor {
@@ -198,4 +198,5 @@ export function createUnifiedIngestionRoutingService(
 ): IUnifiedIngestionRouter {
   return new UnifiedIngestionRoutingService(descriptors);
 }
+
 

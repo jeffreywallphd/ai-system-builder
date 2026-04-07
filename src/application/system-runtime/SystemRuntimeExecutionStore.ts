@@ -1,4 +1,4 @@
-import type { SystemExecution } from "../../domain/system-runtime/SystemRuntimeDomain";
+﻿import type { SystemExecution } from "@domain/system-runtime/SystemRuntimeDomain";
 
 export interface ExecutionMetadataSnapshot {
   readonly executionId: string;
@@ -117,3 +117,4 @@ export class InMemorySystemRuntimeExecutionStore implements ISystemRuntimeExecut
     }
   }
 }
+

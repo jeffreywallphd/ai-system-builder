@@ -1,6 +1,6 @@
-import type { IContextPackageSummary } from "../../../application/ports/interfaces/IContextPackageRepository";
-import type { IContextRecipeSummary } from "../../../application/ports/interfaces/IContextRecipeRepository";
-import type { FormSection } from "../../../application/projection/models/FormSection";
+﻿import type { IContextPackageSummary } from "@application/ports/interfaces/IContextPackageRepository";
+import type { IContextRecipeSummary } from "@application/ports/interfaces/IContextRecipeRepository";
+import type { FormSection } from "@application/projection/models/FormSection";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ProjectedSectionCard from "../projection/ProjectedSectionCard";
 
@@ -27,3 +27,4 @@ export default function WorkflowFormSection({
     />
   );
 }
+

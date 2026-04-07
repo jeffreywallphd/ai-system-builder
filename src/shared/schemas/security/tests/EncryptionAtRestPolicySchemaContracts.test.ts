@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   EncryptionKeyScopes,
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionAtRestPolicyContractVersions,
 } from "../../../contracts/security/EncryptionAtRestPolicyContracts";
@@ -221,3 +221,4 @@ describe("EncryptionAtRestPolicySchemaContracts", () => {
     })).toThrow(EncryptionAtRestPolicySchemaValidationError);
   });
 });
+

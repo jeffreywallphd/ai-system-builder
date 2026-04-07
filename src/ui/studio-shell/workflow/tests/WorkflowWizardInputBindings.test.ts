@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { deserializeWorkflowDraft, serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { WorkflowInputBindingSourceKinds } from "../../../../domain/workflow-studio/WorkflowInputBindingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { deserializeWorkflowDraft, serializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
+import { WorkflowInputBindingSourceKinds } from "@domain/workflow-studio/WorkflowInputBindingDomain";
 import {
   createDefaultBindingSource,
   createSingleSourceBinding,
@@ -69,3 +69,4 @@ describe("WorkflowWizardInputBindings", () => {
     expect(listWorkflowInputBindings(removed)).toHaveLength(0);
   });
 });
+

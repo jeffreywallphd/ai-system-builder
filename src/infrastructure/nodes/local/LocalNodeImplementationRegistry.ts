@@ -1,11 +1,11 @@
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
+﻿import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import type { INodeRuntimeImplementation } from "@shared/INodeRuntimeImplementation";
 import {
   createFallbackNodeCatalogDefinitionDescriptor,
   toNodeCatalogDefinitionDescriptor,
-} from "../shared/NodeCatalogDefinitionDescriptor";
-import { getSharedNodeCatalogMetadata } from "../shared/SharedNodeCatalogMetadata";
+} from "@shared/NodeCatalogDefinitionDescriptor";
+import { getSharedNodeCatalogMetadata } from "@shared/SharedNodeCatalogMetadata";
 
 function sharedImplementation(
   nodeTypeId: string,
@@ -52,3 +52,4 @@ export class LocalNodeImplementationRegistry extends NodeImplementationRegistry 
     super({ providerId: "local", implementations: LOCAL_IMPLEMENTATIONS });
   }
 }
+

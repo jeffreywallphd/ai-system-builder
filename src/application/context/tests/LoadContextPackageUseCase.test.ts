@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LoadContextPackageUseCase } from "../LoadContextPackageUseCase";
 import { ContextPackage } from "../models/ContextPackage";
-import { InMemoryContextPackageRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextPackageRepository";
+import { InMemoryContextPackageRepository } from "@infrastructure/mocks/repositories/InMemoryContextPackageRepository";
 
 describe("LoadContextPackageUseCase", () => {
   it("loads a reusable context package with ordered fragments intact", async () => {
@@ -38,3 +38,4 @@ describe("LoadContextPackageUseCase", () => {
     expect(result.contextPackage).toBeUndefined();
   });
 });
+

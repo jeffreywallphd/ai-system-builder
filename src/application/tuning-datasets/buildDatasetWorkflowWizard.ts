@@ -1,4 +1,4 @@
-import { DATASET_WORKFLOW_STAGES, type DatasetWorkflowStage, type DatasetWorkflowState, type WorkflowStageStatus } from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+﻿import { DATASET_WORKFLOW_STAGES, type DatasetWorkflowStage, type DatasetWorkflowState, type WorkflowStageStatus } from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import { buildLinearWizardDefinition, type LinearWizardDefinition } from "../wizards/contracts";
 
 const DATASET_WORKFLOW_STEP_COPY = Object.freeze<Record<DatasetWorkflowStage, { readonly title: string; readonly description: string }>>({
@@ -67,3 +67,4 @@ export function buildDatasetWorkflowWizard(params: {
     })),
   });
 }
+

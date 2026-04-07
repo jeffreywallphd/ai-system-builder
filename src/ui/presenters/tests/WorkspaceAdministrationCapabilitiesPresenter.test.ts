@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { WorkspaceAdminListItemApiRecord } from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+﻿import { describe, expect, it } from "bun:test";
+import type { WorkspaceAdminListItemApiRecord } from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import { presentWorkspaceAdministrationCapabilities } from "../WorkspaceAdministrationCapabilitiesPresenter";
 
 describe("WorkspaceAdministrationCapabilitiesPresenter", () => {
@@ -44,3 +44,4 @@ describe("WorkspaceAdministrationCapabilitiesPresenter", () => {
     expect(presented.canManageRoles).toBe(true);
   });
 });
+

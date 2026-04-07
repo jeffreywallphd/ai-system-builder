@@ -1,4 +1,4 @@
-import type { PersistedWorkflowRecord } from "../../domain/workflow-studio/WorkflowPersistenceDomain";
+﻿import type { PersistedWorkflowRecord } from "@domain/workflow-studio/WorkflowPersistenceDomain";
 import type { IWorkflowPersistenceRepository } from "../ports/interfaces/IWorkflowPersistenceRepository";
 import { toWorkflowPersistenceFailureError } from "./WorkflowPersistenceErrors";
 import { normalizeRequired } from "./WorkflowPersistenceValidation";
@@ -15,3 +15,4 @@ export class GetPersistedWorkflowUseCase {
     }
   }
 }
+

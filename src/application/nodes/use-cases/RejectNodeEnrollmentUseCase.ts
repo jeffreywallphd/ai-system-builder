@@ -1,16 +1,16 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
   NodeRevocationStates,
   NodeTrustStates,
   createNodeEnrollmentRequest,
   transitionNodeEnrollmentRequestStatus,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeIdentityPersistenceRecord,
   NodeTrustPersistenceMutationResult,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
@@ -273,3 +273,4 @@ export class RejectNodeEnrollmentUseCase {
     };
   }
 }
+

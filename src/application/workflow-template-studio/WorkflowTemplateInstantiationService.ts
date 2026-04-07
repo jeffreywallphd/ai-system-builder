@@ -1,10 +1,10 @@
-import {
+﻿import {
   createWorkflowTemplateInstance,
   type WorkflowTemplateInstance,
-} from "../../domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+} from "@domain/workflow-template-studio/WorkflowTemplateInstanceDomain";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import type { WorkflowTemplateAssetService } from "./WorkflowTemplateAssetService";
-import { AssetValidationStatuses } from "../../domain/contracts/AssetValidation";
+import { AssetValidationStatuses } from "@domain/contracts/AssetValidation";
 
 export interface InstantiateWorkflowTemplateCommand {
   readonly templateId: string;
@@ -114,3 +114,4 @@ export class WorkflowTemplateInstantiationService {
     });
   }
 }
+

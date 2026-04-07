@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   ManagedSupervisorServiceLogEntry,
   ManagedSupervisorServiceRecord,
-} from "../../application/services/interfaces/IManagedServiceSupervisorClient";
+} from "@application/services/interfaces/IManagedServiceSupervisorClient";
 
 export type ManagedServiceStreamConnectionState = "connecting" | "open" | "closed";
 
@@ -202,3 +202,4 @@ export class ManagedServiceEventStream {
 function parseEventPayload<T>(event: MessageEvent<string>): T {
   return JSON.parse(event.data) as T;
 }
+

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import ContextualRecommendationsPanel from "../components/navigation/ContextualRecommendationsPanel";
 import RecentAndFavoritesPanel from "../components/navigation/RecentAndFavoritesPanel";
 import { ContextualRecommendationService, ContextualRecommendationSurfaces } from "../routes/ContextualRecommendations";
 import { RecentAndFavoritesService } from "../routes/RecentAndFavorites";
 import { Link, useLocation } from "react-router-dom";
-import type { ExecutionRunProjection } from "../../application/execution/ExecutionRunProjectionService";
+import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import ExecutionHistoryPanel from "../components/execution/ExecutionHistoryPanel";
 import { useUiDependencies } from "../composition/AppProviders";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
@@ -170,3 +170,4 @@ export default function RunPage(): JSX.Element {
     </section>
   );
 }
+

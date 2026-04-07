@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../domain/workflows/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
 import { InterpretedWorkflowExecutionStrategy } from "../InterpretedWorkflowExecutionStrategy";
 
 describe("InterpretedWorkflowExecutionStrategy", () => {
@@ -42,3 +42,4 @@ describe("InterpretedWorkflowExecutionStrategy", () => {
     expect(called).toEqual(["n1", "n2"]);
   });
 });
+

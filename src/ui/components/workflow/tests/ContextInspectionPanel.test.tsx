@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ContextInspectionResult } from "../../../../application/context/models/ContextInspectionResult";
-import { ContextAssemblyResult } from "../../../../application/context/models/ContextAssemblyResult";
-import { AssembledContext } from "../../../../application/context/models/AssembledContext";
+import { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
+import { ContextAssemblyResult } from "@application/context/models/ContextAssemblyResult";
+import { AssembledContext } from "@application/context/models/AssembledContext";
 import ContextInspectionPanel from "../ContextInspectionPanel";
 
 const inspection = new ContextInspectionResult({
@@ -73,7 +73,7 @@ const inspection = new ContextInspectionResult({
       matchedSources: ["memory-bank", "package"],
       provenance: [{ sourceType: "package", packageAlias: "memory-bank", fragmentId: "mem-1" }],
       originalContent: "Long memory",
-      finalContent: "Long…",
+      finalContent: "Longâ€¦",
       originalCharacterCount: 11,
       finalCharacterCount: 5,
       title: "Memory",
@@ -115,3 +115,4 @@ describe("ContextInspectionPanel", () => {
     expect(html).toContain("Filtered by kind");
   });
 });
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   attachDraftToSession,
   createAssetDraft,
   createAssetSession,
@@ -9,8 +9,8 @@ import {
   transitionAssetDraftLifecycle,
   updateAssetDraft,
   withStudioSession,
-} from "../../domain/studio-shell/StudioShellDomain";
-import type { AssetDraft } from "../../domain/studio-shell/StudioShellDomain";
+} from "@domain/studio-shell/StudioShellDomain";
+import type { AssetDraft } from "@domain/studio-shell/StudioShellDomain";
 import type { IStudioShellRepository } from "../ports/interfaces/IStudioShellRepository";
 import {
   StudioShellConflictError,
@@ -389,3 +389,4 @@ export class DefaultStudioShellApplicationService implements StudioShellApplicat
     return draft;
   }
 }
+

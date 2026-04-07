@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AuthorizationActorRoleGrantSnapshot,
   AuthorizationActorRoleGrantSnapshotQuery,
   AuthorizationResourcePolicyMetadata,
@@ -6,13 +6,13 @@ import type {
   AuthorizationResourcePolicyMetadataLookupQuery,
   AuthorizationSharingGrantLookupQuery,
   AuthorizationSharingGrantRecord,
-} from "../../../application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
-import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
-import type { IAuthorizationRoleGrantReadRepository } from "../../../application/authorization/ports/IAuthorizationRoleGrantReadRepository";
-import type { IAuthorizationSharingGrantReadRepository } from "../../../application/authorization/ports/IAuthorizationSharingGrantReadRepository";
-import type { IWorkspaceAuthorizationReadRepository } from "../../../application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
-import { RoleAssignmentScopes, RoleAssignmentStatuses, type PermissionGrant, createRoleAssignment } from "../../../domain/authorization/AuthorizationDomain";
-import { WorkspaceMembershipStatuses, WorkspaceRoleAssignmentStatuses } from "../../../domain/workspaces/WorkspaceDomain";
+} from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
+import type { IAuthorizationResourcePolicyMetadataReadRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataReadRepository";
+import type { IAuthorizationRoleGrantReadRepository } from "@application/authorization/ports/IAuthorizationRoleGrantReadRepository";
+import type { IAuthorizationSharingGrantReadRepository } from "@application/authorization/ports/IAuthorizationSharingGrantReadRepository";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import { RoleAssignmentScopes, RoleAssignmentStatuses, type PermissionGrant, createRoleAssignment } from "@domain/authorization/AuthorizationDomain";
+import { WorkspaceMembershipStatuses, WorkspaceRoleAssignmentStatuses } from "@domain/workspaces/WorkspaceDomain";
 
 export interface WorkspaceAuthorizationPolicyReadAdapterDependencies {
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
@@ -92,3 +92,4 @@ function emptyRoleGrantSnapshot(): AuthorizationActorRoleGrantSnapshot {
     permissionGrants: Object.freeze([]),
   });
 }
+

@@ -1,5 +1,5 @@
-import { NodePort, NodePortCompatibilityProfile } from "../../../domain/nodes/NodePort";
-import { NodeProperty } from "../../../domain/nodes/NodeProperty";
+﻿import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import type { ILangChainNodeCatalogDefinition } from "./VectorStoreUpsertNodeDefinition";
 
 const projection = Object.freeze({
@@ -149,3 +149,4 @@ export const OUTPUT_PARSER_NODE_DEFINITION: ILangChainNodeCatalogDefinition = Ob
   ]),
   projection,
 });
+

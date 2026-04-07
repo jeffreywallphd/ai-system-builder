@@ -1,4 +1,4 @@
-import type { IExecutionRunRecord, IExecutionRunSummary } from "../../domain/execution/ExecutionRun";
+﻿import type { IExecutionRunRecord, IExecutionRunSummary } from "@domain/execution/ExecutionRun";
 
 function freezeSummary(summary?: IExecutionRunSummary): IExecutionRunSummary | undefined {
   return summary
@@ -44,3 +44,4 @@ export function freezeExecutionRunRecord(run: IExecutionRunRecord): IExecutionRu
     diagnosticsSummary: freezeSummary(run.diagnosticsSummary),
   });
 }
+

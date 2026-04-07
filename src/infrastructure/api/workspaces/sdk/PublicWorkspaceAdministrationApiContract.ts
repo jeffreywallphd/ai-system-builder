@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   WorkspaceInvitationStatus,
   WorkspaceMembershipStatus,
   WorkspaceRole,
   WorkspaceRoleAssignmentStatus,
   WorkspaceStatus,
-} from "../../../../domain/workspaces/WorkspaceDomain";
-import type { WorkspaceVisibility } from "../../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 
 export const WorkspaceAdministrationApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
@@ -366,3 +366,4 @@ export interface CancelWorkspaceAdministrationInvitationApiResponse {
   readonly invitation: WorkspaceInvitationApiRecord;
   readonly changed: boolean;
 }
+

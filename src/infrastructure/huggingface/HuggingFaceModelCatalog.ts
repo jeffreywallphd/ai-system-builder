@@ -1,22 +1,22 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { ModelTask } from "../../domain/models/interfaces/IModelCompatibility";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import type { ModelTask } from "@domain/models/interfaces/IModelCompatibility";
 import {
   Model,
   ModelArtifact,
   ModelResourceProfile,
   ModelSource,
-} from "../../domain/models/Model";
-import { ModelCompatibility } from "../../domain/models/ModelCompatibility";
+} from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
 import type {
   IRemoteModelCatalog,
   IRemoteModelCatalogItem,
   IRemoteModelCatalogSearchCriteria,
   IRemoteModelCatalogSearchResult,
-} from "../../application/ports/interfaces/IRemoteModelCatalog";
+} from "@application/ports/interfaces/IRemoteModelCatalog";
 import {
   RemoteModelCatalogItem,
   RemoteModelCatalogSearchResult,
-} from "../../application/ports/RemoteModelCatalog";
+} from "@application/ports/RemoteModelCatalog";
 import {
   HuggingFaceApiClient,
   type IHuggingFaceModelFileInfo,
@@ -546,3 +546,4 @@ export class HuggingFaceModelCatalog implements IRemoteModelCatalog {
     return undefined;
   }
 }
+

@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { ImplementationRegistryNodeCatalogProvider } from "../../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { LangChainNodeImplementationRegistry } from "../../../infrastructure/nodes/langchain/LangChainNodeImplementationRegistry";
-import { LangChainNodeExecutor } from "../../../infrastructure/interpreted/execution/LangChainNodeExecutor";
+﻿import { describe, expect, it } from "bun:test";
+import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { LangChainNodeImplementationRegistry } from "@infrastructure/nodes/langchain/LangChainNodeImplementationRegistry";
+import { LangChainNodeExecutor } from "@infrastructure/interpreted/execution/LangChainNodeExecutor";
 
 function createProvider() {
   return new ImplementationRegistryNodeCatalogProvider(new LangChainNodeImplementationRegistry());
@@ -32,3 +32,4 @@ describe("CombineSummariesNode", () => {
     expect(result.outputs.combinedSummary).toBe("First summary Second summary");
   });
 });
+

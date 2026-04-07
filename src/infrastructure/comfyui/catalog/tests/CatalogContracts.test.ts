@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import type { INodeCatalogProvider } from "../../../../application/ports/interfaces/INodeCatalogProvider";
+﻿import { describe, expect, it } from "bun:test";
+import type { INodeCatalogProvider } from "@application/ports/interfaces/INodeCatalogProvider";
 import { ComfyNodeCatalogProvider } from "../ComfyNodeCatalogProvider";
 
 describe("catalog contracts", () => {
@@ -8,3 +8,4 @@ describe("catalog contracts", () => {
     expect(await provider.getAllDefinitions()).toEqual([]);
   });
 });
+

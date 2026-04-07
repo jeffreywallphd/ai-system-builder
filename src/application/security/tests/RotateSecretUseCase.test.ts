@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   SecretAccessActions,
   SecretActorTypes,
@@ -9,7 +9,7 @@ import {
   rotateSecretRecord,
   type SecretAccessActor,
   type SecretRecord,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -497,3 +497,4 @@ function createServerAdminActor(
     grantedActions: actions,
   };
 }
+

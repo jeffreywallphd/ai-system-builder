@@ -1,11 +1,11 @@
-import type { ExecutionStatus } from "../../domain/execution/ExecutionPlan";
+﻿import type { ExecutionStatus } from "@domain/execution/ExecutionPlan";
 import type {
   IExecutionRunArtifact,
   IExecutionRunDiagnostics,
   IExecutionRunProvenance,
   IExecutionRunRecord,
   IExecutionRunSummary,
-} from "../../domain/execution/ExecutionRun";
+} from "@domain/execution/ExecutionRun";
 
 export type IExecutionDiagnostics = IExecutionRunDiagnostics;
 export type IExecutionProvenance = IExecutionRunProvenance;
@@ -25,3 +25,4 @@ export interface IExecutionEngineEvent {
   readonly artifacts?: ReadonlyArray<IExecutionArtifact>;
   readonly detail?: IExecutionArtifact;
 }
+

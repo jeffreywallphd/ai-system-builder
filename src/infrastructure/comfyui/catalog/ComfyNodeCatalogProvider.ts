@@ -1,29 +1,29 @@
-import type {
+﻿import type {
   INodeCatalogProvider,
   INodeCatalogSearchCriteria,
-} from "../../../application/ports/interfaces/INodeCatalogProvider";
-import { NodeDefinition, NodeDefinitionCapabilityProfile } from "../../../../domain/nodes/NodeDefinition";
-import { NodePort, NodePortCompatibilityProfile } from "../../../../domain/nodes/NodePort";
+} from "@application/ports/interfaces/INodeCatalogProvider";
+import { NodeDefinition, NodeDefinitionCapabilityProfile } from "@domain/nodes/NodeDefinition";
+import { NodePort, NodePortCompatibilityProfile } from "@domain/nodes/NodePort";
 import {
   NodeProperty,
   NodePropertyBindingProfile,
-} from "../../../../domain/nodes/NodeProperty";
+} from "@domain/nodes/NodeProperty";
 import type {
   INodeDefinition,
   NodeExecutionKind,
-} from "../../../../domain/nodes/interfaces/INodeDefinition";
+} from "@domain/nodes/interfaces/INodeDefinition";
 import type {
   NodePortValueType,
-} from "../../../../domain/nodes/interfaces/INodePort";
+} from "@domain/nodes/interfaces/INodePort";
 import type {
   INodePropertyOption,
   NodePropertyType,
-} from "../../../../domain/nodes/interfaces/INodeProperty";
+} from "@domain/nodes/interfaces/INodeProperty";
 import type {
   ModelModality,
   ModelTask,
   RuntimeEngine,
-} from "../../../domain/models/interfaces/IModelCompatibility";
+} from "@domain/models/interfaces/IModelCompatibility";
 
 export interface IComfyObjectInfo {
   readonly input?: {
@@ -567,3 +567,4 @@ function getNumericConfig(inputSpec: ComfyInputSpec, key: string): number | unde
   const value = config[key];
   return typeof value === "number" ? value : undefined;
 }
+

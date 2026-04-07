@@ -1,19 +1,19 @@
-import path from "node:path";
-import type { IModel } from "../../domain/models/interfaces/IModel";
+﻿import path from "node:path";
+import type { IModel } from "@domain/models/interfaces/IModel";
 import {
   Model,
   ModelArtifact,
   ModelResourceProfile,
   ModelSource,
-} from "../../domain/models/Model";
-import { ModelCompatibility } from "../../domain/models/ModelCompatibility";
-import { ModelDependency } from "../../domain/models/ModelDependency";
-import { ModelRequirement } from "../../domain/models/ModelRequirement";
+} from "@domain/models/Model";
+import { ModelCompatibility } from "@domain/models/ModelCompatibility";
+import { ModelDependency } from "@domain/models/ModelDependency";
+import { ModelRequirement } from "@domain/models/ModelRequirement";
 import type {
   IInstalledModelCatalog,
   IInstalledModelSearchCriteria,
-} from "../../application/ports/interfaces/IInstalledModelCatalog";
-import type { IFileStorage } from "../../application/ports/interfaces/IFileStorage";
+} from "@application/ports/interfaces/IInstalledModelCatalog";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
 
 interface ModelRecord {
   readonly id: string;
@@ -566,3 +566,4 @@ export class LocalModelRepository implements IInstalledModelCatalog {
     });
   }
 }
+

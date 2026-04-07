@@ -1,5 +1,5 @@
-import type { Agent } from "../../../domain/agents/Agent";
-import type { AgentMemoryEntryReference, AgentMemoryType } from "../../../domain/agents/AgentMemory";
+﻿import type { Agent } from "@domain/agents/Agent";
+import type { AgentMemoryEntryReference, AgentMemoryType } from "@domain/agents/AgentMemory";
 
 export interface AgentMemoryRetrievalRequest {
   readonly agent: Agent;
@@ -13,3 +13,4 @@ export interface AgentMemoryRetrievalRequest {
 export interface AgentMemoryRetrievalService {
   retrieveMemory(request: AgentMemoryRetrievalRequest): Promise<ReadonlyArray<AgentMemoryEntryReference>>;
 }
+

@@ -1,6 +1,6 @@
-import type { DeploymentTarget } from "../../domain/deployment/DeploymentTargetDomain";
-import type { DeploymentConfigurationContract } from "../../domain/deployment/DeploymentConfigurationDomain";
-import type { SystemPackage } from "../../domain/system-packaging/SystemPackagingDomain";
+﻿import type { DeploymentTarget } from "@domain/deployment/DeploymentTargetDomain";
+import type { DeploymentConfigurationContract } from "@domain/deployment/DeploymentConfigurationDomain";
+import type { SystemPackage } from "@domain/system-packaging/SystemPackagingDomain";
 import { DeploymentTargetCompatibilityValidator } from "./DeploymentTargetCompatibilityValidator";
 
 export interface DeploymentConfigurationValidationIssue {
@@ -208,3 +208,4 @@ export class DeploymentConfigurationValidator {
     });
   }
 }
+

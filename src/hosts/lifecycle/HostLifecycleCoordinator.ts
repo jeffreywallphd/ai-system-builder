@@ -1,4 +1,4 @@
-import {
+﻿import {
   HostCompositionContractError,
   HostLifecycleEventTypes,
   HostLifecyclePhases,
@@ -8,7 +8,7 @@ import {
   type HostLifecyclePhase,
   type HostLifecycleReadinessMarker,
   type HostLifecycleTransition,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 
 export type HostLifecycleCleanupHook = (context: {
   readonly hostId: string;
@@ -272,3 +272,4 @@ export class HostLifecycleCoordinator {
 export function createHostLifecycleCoordinator(options: HostLifecycleCoordinatorOptions): HostLifecycleCoordinator {
   return new HostLifecycleCoordinator(options);
 }
+

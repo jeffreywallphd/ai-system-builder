@@ -1,11 +1,11 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { ManagedModelLibrarySnapshot } from "../../application/models/ManagedModelLibrary";
-import type { IInstalledModelSearchCriteria } from "../../application/ports/interfaces/IInstalledModelCatalog";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import type { ManagedModelLibrarySnapshot } from "@application/models/ManagedModelLibrary";
+import type { IInstalledModelSearchCriteria } from "@application/ports/interfaces/IInstalledModelCatalog";
 import type {
   IRemoteModelCatalogItem,
   IRemoteModelCatalogSearchCriteria,
-} from "../../application/ports/interfaces/IRemoteModelCatalog";
-import type { IModelInstallProgress } from "../../application/ports/interfaces/IModelInstaller";
+} from "@application/ports/interfaces/IRemoteModelCatalog";
+import type { IModelInstallProgress } from "@application/ports/interfaces/IModelInstaller";
 import { ModelService } from "../services/ModelService";
 
 export interface IModelStoreState {
@@ -266,3 +266,4 @@ export class ModelStore {
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown model store error.";
 }
+

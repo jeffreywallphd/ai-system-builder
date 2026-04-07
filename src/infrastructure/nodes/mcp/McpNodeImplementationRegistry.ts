@@ -1,10 +1,10 @@
-import {
+﻿import {
   buildMcpNodeCatalogDescriptor,
   MCP_NODE_REGISTRATIONS,
 } from "./McpNodeRegistrationCatalog";
-import { NodeImplementationDescriptor } from "../shared/NodeImplementationDescriptor";
-import { NodeImplementationRegistry } from "../shared/NodeImplementationRegistry";
-import type { INodeRuntimeImplementation } from "../shared/INodeRuntimeImplementation";
+import { NodeImplementationDescriptor } from "@shared/NodeImplementationDescriptor";
+import { NodeImplementationRegistry } from "@shared/NodeImplementationRegistry";
+import type { INodeRuntimeImplementation } from "@shared/INodeRuntimeImplementation";
 
 function mcpImplementation(nodeTypeId: string): INodeRuntimeImplementation {
   const registration = MCP_NODE_REGISTRATIONS.find(
@@ -57,3 +57,4 @@ export class McpNodeImplementationRegistry extends NodeImplementationRegistry {
     });
   }
 }
+

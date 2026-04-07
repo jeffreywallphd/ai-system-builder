@@ -1,16 +1,16 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   SharingPolicyModes,
   SharingSubjectKinds,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import {
   AuthorizationResourceFamilies,
-} from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   WorkspaceAuthorizationRoleKeys,
-} from "../../../domain/authorization/AuthorizationRoleDefinitions";
+} from "@domain/authorization/AuthorizationRoleDefinitions";
 
 export interface AuthorizationSchemaValidationIssue {
   readonly path: string;
@@ -630,3 +630,4 @@ export function parseAuthorizationResourcePolicyMetadata(
     payload,
   );
 }
+

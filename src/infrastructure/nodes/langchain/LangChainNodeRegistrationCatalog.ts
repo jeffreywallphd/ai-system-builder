@@ -1,6 +1,6 @@
-import type { INodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
-import { toNodeCatalogDefinitionDescriptor } from "../shared/NodeCatalogDefinitionDescriptor";
-import type { NodeExecutionStyle } from "../shared/NodeImplementationDescriptor";
+﻿import type { INodeCatalogDefinitionDescriptor } from "@shared/NodeCatalogDefinitionDescriptor";
+import { toNodeCatalogDefinitionDescriptor } from "@shared/NodeCatalogDefinitionDescriptor";
+import type { NodeExecutionStyle } from "@shared/NodeImplementationDescriptor";
 import { getLangChainNodeCatalogMetadata } from "./LangChainNodeCatalogMetadata";
 
 export interface ILangChainNodeRegistrationDescriptor {
@@ -74,3 +74,4 @@ export function buildLangChainNodeCatalogDescriptor(
     projection: metadata.projection,
   });
 }
+

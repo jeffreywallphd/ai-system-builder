@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { ExecutionAuditRepository } from "../../../application/system-runtime/ExecutionAuditRepository";
-import type { ExecutionAuditRecord } from "../../../domain/system-runtime/ExecutionAuditTrailDomain";
+import type { ExecutionAuditRepository } from "@application/system-runtime/ExecutionAuditRepository";
+import type { ExecutionAuditRecord } from "@domain/system-runtime/ExecutionAuditTrailDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface AuditRecordRow {
@@ -167,3 +167,4 @@ export class SqliteExecutionAuditRepository implements ExecutionAuditRepository 
 function parseRecord(raw: string): ExecutionAuditRecord {
   return Object.freeze(JSON.parse(raw) as ExecutionAuditRecord);
 }
+

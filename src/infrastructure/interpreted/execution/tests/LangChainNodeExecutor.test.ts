@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { makeNode } from "../../../../domain/workflows/tests/testUtils";
-import { Node } from "../../../../domain/nodes/Node";
-import { NodeDefinition } from "../../../../domain/nodes/NodeDefinition";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
+﻿import { describe, expect, it } from "bun:test";
+import { makeNode } from "@domain/workflows/tests/testUtils";
+import { Node } from "@domain/nodes/Node";
+import { NodeDefinition } from "@domain/nodes/NodeDefinition";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import { LangChainNodeExecutor } from "../LangChainNodeExecutor";
 
 function makeLangChainNode(id: string, type: string, properties: ReadonlyArray<NodeProperty> = []): Node {
@@ -849,3 +849,4 @@ describe("LangChainNodeExecutor", () => {
     expect((result.outputs.citations as Array<unknown>).length).toBe(2);
   });
 });
+

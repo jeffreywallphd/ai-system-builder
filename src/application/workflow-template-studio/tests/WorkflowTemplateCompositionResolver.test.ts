@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
-import type { AssetContractDescriptor } from "../../../domain/contracts/AssetContract";
-import { createWorkflowTemplateDefinition } from "../../../domain/workflow-template-studio/WorkflowTemplateDomain";
-import type { IAsset } from "../../../domain/assets/interfaces/IAsset";
+﻿import { describe, expect, it } from "bun:test";
+import { Asset } from "@domain/assets/Asset";
+import { AssetAuditInfo, AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import { createWorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
+import type { IAsset } from "@domain/assets/interfaces/IAsset";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import { WorkflowTemplateCompositionResolver, type WorkflowTemplateWorkflowContractResolver } from "../WorkflowTemplateCompositionResolver";
 
@@ -85,3 +85,4 @@ describe("WorkflowTemplateCompositionResolver", () => {
     expect(resolved.workflowAssets[0]?.id).toBe("asset:workflow:base");
   });
 });
+

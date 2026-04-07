@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { DependencyContainer } from "../DependencyContainer";
 import { InfrastructureRegistry, TOKENS } from "../InfrastructureRegistry";
 import { SqliteExecutionRunRepository } from "../../filesystem/execution/SqliteExecutionRunRepository";
-import type { IMcpRuntimeClient } from "../../../application/ports/interfaces/IMcpRuntimeClient";
+import type { IMcpRuntimeClient } from "@application/ports/interfaces/IMcpRuntimeClient";
 
 describe("InfrastructureRegistry", () => {
   it("registers default infrastructure services", async () => {
@@ -52,3 +52,4 @@ describe("InfrastructureRegistry", () => {
     (repository as SqliteExecutionRunRepository).dispose();
   });
 });
+

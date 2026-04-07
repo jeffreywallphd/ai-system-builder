@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { readSource } from "../../../ui/tests/testUtils";
+﻿import { describe, expect, it } from "bun:test";
+import { readSource } from "@ui/tests/testUtils";
 
 describe("projection contracts", () => {
   it("defines projection service contracts", () => {
@@ -8,3 +8,4 @@ describe("projection contracts", () => {
     expect(source).toContain("applyFormInput");
   });
 });
+

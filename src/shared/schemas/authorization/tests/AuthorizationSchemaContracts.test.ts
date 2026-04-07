@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
   SharingPolicyModes,
-} from "../../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import {
   AuthorizationResourceFamilies,
-} from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   AuthorizationPolicyEvaluationRequestDtoSchema,
   AuthorizationBulkWorkspaceRoleSharingGrantRequestSchema,
@@ -360,3 +360,4 @@ describe("AuthorizationSchemaContracts", () => {
     });
   });
 });
+

@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
-import { AssetDraftLifecycleStatuses } from "../../../../domain/studio-shell/StudioShellDomain";
-import { DefaultStudioShellApplicationService } from "../../../../application/studio-shell/DefaultStudioShellApplicationService";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
+import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
 import { StudioShellBackendApi } from "../../../api/studio-shell/StudioShellBackendApi";
 import { SqliteStudioShellRepository } from "../SqliteStudioShellRepository";
 import {
@@ -17,7 +17,7 @@ import {
   createEmptyWorkflowDraft,
   deserializeWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 const createdRoots: string[] = [];
 
@@ -498,3 +498,4 @@ describe("SqliteStudioShellRepository", () => {
     reopenedRepository.dispose();
   });
 });
+

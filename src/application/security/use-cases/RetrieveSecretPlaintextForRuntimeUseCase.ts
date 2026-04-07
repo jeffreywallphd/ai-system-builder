@@ -1,9 +1,9 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretActorTypes,
   createSecretScopeOwner,
   type SecretScopeOwner,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -481,3 +481,4 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
+

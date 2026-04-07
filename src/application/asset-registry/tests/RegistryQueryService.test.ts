@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { RegistryQueryService } from "../RegistryQueryService";
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetVersion } from "../../../domain/assets/AssetVersion";
-import { AssetLineageEdge, AssetLineageRelationshipType } from "../../../domain/assets/AssetLineageEdge";
+import { Asset } from "@domain/assets/Asset";
+import { AssetVersion } from "@domain/assets/AssetVersion";
+import { AssetLineageEdge, AssetLineageRelationshipType } from "@domain/assets/AssetLineageEdge";
 import type { IAssetRecordRepository } from "../../ports/interfaces/IAssetRecordRepository";
 import type { IAssetVersionRepository } from "../../ports/interfaces/IAssetVersionRepository";
 import type { IAssetLineageRepository } from "../../ports/interfaces/IAssetLineageRepository";
@@ -11,7 +11,7 @@ import {
   TaxonomyBehaviorKinds,
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 
 class InMemoryAssetRecordRepository implements IAssetRecordRepository {
   constructor(private readonly assets: ReadonlyArray<Asset>) {}
@@ -571,3 +571,4 @@ it("classifies workflow-template assets for registry discovery", async () => {
   expect(rows).toHaveLength(1);
   expect(rows[0]?.taxonomy?.semanticRole).toBe("workflow-template");
 });
+

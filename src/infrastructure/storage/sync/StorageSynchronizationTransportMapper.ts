@@ -1,4 +1,4 @@
-import type { StorageSynchronizationMetadataDto } from "../../../shared/contracts/storage/StorageTransportContracts";
+﻿import type { StorageSynchronizationMetadataDto } from "@shared/contracts/storage/StorageTransportContracts";
 import type { StorageSynchronizationStateSnapshot } from "./ServerManagedStorageSynchronizationAdapter";
 
 export function toStorageSynchronizationMetadataDto(
@@ -12,3 +12,4 @@ export function toStorageSynchronizationMetadataDto(
     evaluatedAt: state.evaluatedAt,
   });
 }
+

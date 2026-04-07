@@ -1,6 +1,6 @@
-import type { WorkflowContextService } from "../context/WorkflowContextService";
+﻿import type { WorkflowContextService } from "../context/WorkflowContextService";
 import type { IWorkflowRepository } from "../ports/interfaces/IWorkflowRepository";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { IWorkflowExecutionResult, IWorkflowExecutor } from "../ports/interfaces/IWorkflowExecutor";
 import { WorkflowToolProjectionService } from "../projection/WorkflowToolProjectionService";
 import type { ToolRunRequest } from "../projection/models/ToolRunRequest";
@@ -105,3 +105,4 @@ export class RunToolUseCase {
     });
   }
 }
+

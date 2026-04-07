@@ -1,8 +1,8 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import type {
   RunWorkflowStudioDraftReadModel,
   WorkflowExecutionReadinessReadModel,
-} from "../../../../infrastructure/api/studio-shell/StudioShellBackendApi";
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 
 export interface WorkflowStudioRunFeedback {
   readonly status: "running" | "blocked" | "launched" | "failed";
@@ -162,4 +162,5 @@ export default function WorkflowStudioExecutionFeedbackPanel({
     </div>
   );
 }
+
 

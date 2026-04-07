@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   EndpointInvocationResult,
   EndpointRouteRequest,
   EndpointRouteResolution,
   ResolvedDeployedEndpoint,
-} from "../../domain/deployment/EndpointRoutingDomain";
-import type { DeploymentRecord } from "../../domain/deployment/DeploymentExecutionDomain";
+} from "@domain/deployment/EndpointRoutingDomain";
+import type { DeploymentRecord } from "@domain/deployment/DeploymentExecutionDomain";
 import type { DeploymentVersionManager } from "./DeploymentVersionManager";
 import type { SystemEndpointExposureService } from "./SystemEndpointExposureService";
 import type { DeploymentRecordRepository } from "./DeploymentExecutionService";
@@ -145,3 +145,4 @@ export class EndpointRoutingService {
     return record;
   }
 }
+

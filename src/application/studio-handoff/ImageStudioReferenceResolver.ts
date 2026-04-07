@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   DatasetInstanceReference,
   ImageCrossStudioHandoffContract,
   VersionedImageAssetReference,
   WorkflowReference,
-} from "../../domain/studio-handoff/ImageStudioHandoffContract";
+} from "@domain/studio-handoff/ImageStudioHandoffContract";
 
 export const ImageStudioReferenceResolutionIssueCodes = Object.freeze({
   missing: "missing",
@@ -258,3 +258,4 @@ export class ImageStudioReferenceResolver {
     });
   }
 }
+

@@ -1,4 +1,4 @@
-import { ExecutionStatuses } from "../../domain/execution/ExecutionPlan";
+﻿import { ExecutionStatuses } from "@domain/execution/ExecutionPlan";
 import type { UnifiedExecutionEngine } from "../execution/UnifiedExecutionEngine";
 import {
   createDataStudioPipelineExecutionPlan,
@@ -146,3 +146,4 @@ export class DataStudioPipelineExecutionService {
     }
   }
 }
+

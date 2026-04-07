@@ -1,4 +1,4 @@
-import type { CanonicalDataShape, CanonicalDataShapeKind } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import type { CanonicalDataShape, CanonicalDataShapeKind } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   createSchemaIntentValidationResult,
   DatasetSchemaIntentIds,
@@ -7,7 +7,7 @@ import {
   type DatasetSchemaIntentDescriptor,
   type IDatasetSchemaIntent,
   type IDatasetSchemaIntentRegistry,
-} from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { MediaSchemaIntentAdapter } from "./adapters/schema-intents/MediaSchemaIntentAdapter";
 
 class PassThroughSchemaIntent implements IDatasetSchemaIntent {
@@ -123,3 +123,4 @@ export function createDefaultDatasetSchemaIntentRegistry(): DatasetSchemaIntentR
   registry.register(new MediaSchemaIntentAdapter());
   return registry;
 }
+

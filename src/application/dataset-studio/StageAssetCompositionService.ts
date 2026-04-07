@@ -1,18 +1,18 @@
-import type { Edge, Node } from "@xyflow/react";
+﻿import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
-import type { CanonicalDataShapeKind, CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import { CanonicalDataShapeKinds } from "../../domain/dataset-studio/CanonicalDataShapes";
+import type { CanonicalDataShapeKind, CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import { CanonicalDataShapeKinds } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   PipelineStageConfigModes,
   PipelineStageIds,
   type PipelineStageConfig,
   type PipelineStageDefinition,
   type PipelineStageId,
-} from "../../domain/dataset-studio/PipelineStageDomain";
+} from "@domain/dataset-studio/PipelineStageDomain";
 import {
   DatasetIngestionStageAssetIds,
   DatasetTransformationStageAssetIds,
-} from "../../domain/dataset-studio/StagePipelineDomain";
+} from "@domain/dataset-studio/StagePipelineDomain";
 
 export interface ConfigMappingRule {
   readonly stageConfigKey: string;
@@ -984,3 +984,4 @@ export function createStageAssetCompositionService(
 ): StageAssetCompositionService {
   return new StageAssetCompositionService(definitions);
 }
+

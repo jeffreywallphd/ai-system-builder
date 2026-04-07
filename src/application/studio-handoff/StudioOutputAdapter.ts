@@ -1,5 +1,5 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
 import { HandoffBoundedCache } from "./HandoffBoundedCache";
 
 export const AdaptedStudioOutputKinds = Object.freeze({
@@ -308,3 +308,4 @@ export class StudioOutputAdapterLayer {
     ].join("::");
   }
 }
+

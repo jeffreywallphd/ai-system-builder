@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { ZodMediaDatasetValidator } from "../../dataset-studio/adapters/validation/MediaDatasetValidator";
 import type { DatasetInstanceAssetCatalog } from "../DatasetInstanceAssetCatalog";
 import { InMemoryDatasetInstanceRepository } from "../DatasetInstanceRepository";
@@ -359,3 +359,4 @@ describe("DatasetInstancePreviewService", () => {
     expect(second.items).toEqual(first.items);
   });
 });
+

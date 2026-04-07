@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   PermissionEffects,
   PermissionGrantScopes,
@@ -9,8 +9,8 @@ import {
   createPermissionGrant,
   createPolicyDecision,
   createRoleAssignment,
-} from "../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   AuthorizationPolicyRecordedEvent,
   AuthorizationActorMembershipLookupQuery,
@@ -384,3 +384,4 @@ describe("authorization application policy ports and evaluator seams", () => {
     });
   });
 });
+

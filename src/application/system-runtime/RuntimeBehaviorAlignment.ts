@@ -1,11 +1,11 @@
-import type { Agent } from "../../domain/agents/Agent";
+﻿import type { Agent } from "@domain/agents/Agent";
 import {
   assertAllowedCompositionTaxonomyCombination,
   type CompositionTaxonomyDescriptor,
   TaxonomyBehaviorKinds,
   type TaxonomyBehaviorKind,
-} from "../../domain/taxonomy/CompositionTaxonomy";
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+} from "@domain/taxonomy/CompositionTaxonomy";
+import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import type { ICompositionTaxonomyClassifier } from "../taxonomy/CompositionTaxonomyClassifier";
 
 export const RuntimeExecutionPatterns = Object.freeze({
@@ -107,3 +107,4 @@ export class RuntimeBehaviorAlignmentService {
     return classifyExecutableBehavior(taxonomy);
   }
 }
+

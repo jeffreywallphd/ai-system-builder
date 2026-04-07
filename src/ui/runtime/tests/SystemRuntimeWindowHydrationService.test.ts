@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
-import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
+﻿import { describe, expect, it } from "bun:test";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import {
   ComfyRuntimeSystemDiagnosticsVersion,
   ComfyRuntimeSystemReadinessStates,
-} from "../../../application/runtime/ComfyRuntimeSystemDiagnostics";
-import { createImageManipulationRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
+} from "@application/runtime/ComfyRuntimeSystemDiagnostics";
+import { createImageManipulationRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchResolver";
 import { SystemRuntimeWindowHydrationService } from "../SystemRuntimeWindowHydrationService";
 
 describe("SystemRuntimeWindowHydrationService", () => {
@@ -239,4 +239,5 @@ describe("SystemRuntimeWindowHydrationService", () => {
     expect(invalid.issues.map((entry) => entry.code)).toContain("runtime-window.runtime-diagnostics.invalid");
   });
 });
+
 

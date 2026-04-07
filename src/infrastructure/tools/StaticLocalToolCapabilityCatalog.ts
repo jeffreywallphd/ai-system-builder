@@ -1,9 +1,9 @@
-import type { IToolCapabilityCatalog } from "../../application/ports/interfaces/IToolCapabilityCatalog";
-import type { ToolCapabilityDescriptor } from "../../application/tools/models/ToolCapabilityDescriptor";
+﻿import type { IToolCapabilityCatalog } from "@application/ports/interfaces/IToolCapabilityCatalog";
+import type { ToolCapabilityDescriptor } from "@application/tools/models/ToolCapabilityDescriptor";
 import {
   buildToolCapabilityId,
   createToolCapabilityDescriptor,
-} from "../../application/tools/models/ToolCapabilityDescriptor";
+} from "@application/tools/models/ToolCapabilityDescriptor";
 
 export const LOCAL_TOOL_CAPABILITY_PROVIDER = Object.freeze({
   kind: "local",
@@ -51,3 +51,4 @@ export class StaticLocalToolCapabilityCatalog implements IToolCapabilityCatalog 
     );
   }
 }
+

@@ -1,7 +1,7 @@
-import type { IModel } from "../../domain/models/interfaces/IModel";
-import type { IModelCompatibilityResult } from "../../domain/services/interfaces/IModelCompatibilityService";
-import type { IRemoteModelCatalogItem } from "../../application/ports/interfaces/IRemoteModelCatalog";
-import type { ModelResponse } from "../../application/dto/ModelResponse";
+﻿import type { IModel } from "@domain/models/interfaces/IModel";
+import type { IModelCompatibilityResult } from "@domain/services/interfaces/IModelCompatibilityService";
+import type { IRemoteModelCatalogItem } from "@application/ports/interfaces/IRemoteModelCatalog";
+import type { ModelResponse } from "@application/dto/ModelResponse";
 import { formatBytes, toTitleCase } from "./PresenterFormatting";
 
 export interface ModelDownloadFileViewModel {
@@ -315,6 +315,7 @@ export class ModelPresenter {
       (value): value is string => !!value?.trim()
     );
 
-    return parts.length > 0 ? parts.join(" • ") : undefined;
+    return parts.length > 0 ? parts.join(" â€¢ ") : undefined;
   }
 }
+

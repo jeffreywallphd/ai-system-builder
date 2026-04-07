@@ -1,4 +1,4 @@
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 import {
   RuntimeExecutionInterfaceKinds,
   type RuntimeExecutionContract,
@@ -319,3 +319,4 @@ export class RuntimeInputValidationService {
     }
   }
 }
+

@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
-} from "../../../../application/system-studio/ComfyImageManipulationPropertySchema";
+} from "@application/system-studio/ComfyImageManipulationPropertySchema";
 import { ComfyImageManipulationPropertyEditor } from "../image-system/ComfyImageManipulationPropertyEditor";
 
 describe("ComfyImageManipulationPropertyEditor", () => {
@@ -24,3 +24,4 @@ describe("ComfyImageManipulationPropertyEditor", () => {
     expect(html).toContain("Image and result settings");
   });
 });
+

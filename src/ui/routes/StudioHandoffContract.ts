@@ -1,4 +1,4 @@
-import type { TaxonomySemanticRole } from "../../domain/taxonomy/CompositionTaxonomy";
+﻿import type { TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 
 function normalizeRequired(value: string, label: string): string {
   const normalized = value.trim();
@@ -250,4 +250,5 @@ export function parseStudioLaunchHandoffContract(serialized: string): StudioLaun
     return undefined;
   }
 }
+
 

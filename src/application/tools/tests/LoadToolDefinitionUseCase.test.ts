@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LoadToolDefinitionUseCase } from "../LoadToolDefinitionUseCase";
-import { InMemoryWorkflowRepository } from "../../../infrastructure/mocks/repositories/InMemoryWorkflowRepository";
+import { InMemoryWorkflowRepository } from "@infrastructure/mocks/repositories/InMemoryWorkflowRepository";
 import { WorkflowToolProjectionService } from "../../projection/WorkflowToolProjectionService";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
 
 describe("LoadToolDefinitionUseCase", () => {
   it("throws when tool not found", async () => {
@@ -56,3 +56,4 @@ describe("LoadToolDefinitionUseCase", () => {
   });
 
 });
+

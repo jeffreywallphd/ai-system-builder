@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import type { Agent } from "../../../../domain/agents/Agent";
-import { AssetId } from "../../../../domain/assets/AssetId";
-import type { IAgentRepository } from "../../../../application/ports/interfaces/IAgentRepository";
+﻿import { describe, expect, it } from "bun:test";
+import type { Agent } from "@domain/agents/Agent";
+import { AssetId } from "@domain/assets/AssetId";
+import type { IAgentRepository } from "@application/ports/interfaces/IAgentRepository";
 import { AgentAuthoringBackendApi } from "../AgentAuthoringBackendApi";
 
 class InMemoryAgentRepository implements IAgentRepository {
@@ -197,3 +197,4 @@ describe("AgentAuthoringBackendApi", () => {
     expect(listed.data?.[0]?.contract?.output.description.includes("Agent execution session")).toBe(true);
   });
 });
+

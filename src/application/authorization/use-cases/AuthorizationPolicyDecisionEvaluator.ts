@@ -1,4 +1,4 @@
-import {
+﻿import {
   PolicyDecisionOutcomes,
   ResourceOwnershipScopes,
   ResourceVisibilities,
@@ -7,7 +7,7 @@ import {
   createPermissionKey,
   createResourcePolicyContext,
   createSharingGrant,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import type {
   AuthorizationPolicyDecision,
   AuthorizationPolicyDecisionDebugDetails,
@@ -367,3 +367,4 @@ function toDenialReason(reasonCode: string): AuthorizationPolicyDecisionDenialRe
   }
   return AuthorizationPolicyDecisionDenialReasons.invalidEvaluationContext;
 }
+

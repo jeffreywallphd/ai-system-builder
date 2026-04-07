@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
-import { ManagedServiceRestartPolicies, type ManagedServiceDefinitionInput } from "../../../application/services/ManagedServiceDefinition";
-import { ManagedServiceStartPolicies } from "../../../application/services/interfaces/ManagedServiceTypes";
+﻿import { useMemo, useState } from "react";
+import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
+import { ManagedServiceRestartPolicies, type ManagedServiceDefinitionInput } from "@application/services/ManagedServiceDefinition";
+import { ManagedServiceStartPolicies } from "@application/services/interfaces/ManagedServiceTypes";
 import type { ManagedServiceRecord } from "../../services/ManagedServicesService";
 import { ManagedServicePresenter } from "../../presenters/ManagedServicePresenter";
 
@@ -256,7 +256,7 @@ export default function ManagedServicesPanel({
                     </div>
                     <div className="ui-meta-item">
                       <span className="ui-meta-label">PID</span>
-                      <span className="ui-meta-value">{service.pid ?? "—"}</span>
+                      <span className="ui-meta-value">{service.pid ?? "â€”"}</span>
                     </div>
                     <div className="ui-meta-item">
                       <span className="ui-meta-label">Uptime</span>
@@ -500,9 +500,9 @@ function presentStreamState(streamState: ManagedServicesPanelProps["streamState"
     case "live":
       return "Live monitoring";
     case "reconnecting":
-      return "Reconnecting…";
+      return "Reconnectingâ€¦";
     case "connecting":
-      return "Connecting…";
+      return "Connectingâ€¦";
     case "idle":
     default:
       return "Monitoring idle";
@@ -571,3 +571,4 @@ function toDefinitionInput(
     autoStartPolicy: state.autoStartPolicy,
   };
 }
+

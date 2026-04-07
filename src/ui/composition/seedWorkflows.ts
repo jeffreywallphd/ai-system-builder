@@ -1,14 +1,14 @@
-import { CompositeNodeCatalogProvider } from "../../application/nodes/CompositeNodeCatalogProvider";
-import { Workflow } from "../../domain/workflows/Workflow";
-import { WorkflowConnection } from "../../domain/workflows/WorkflowConnection";
+﻿import { CompositeNodeCatalogProvider } from "@application/nodes/CompositeNodeCatalogProvider";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowConnection } from "@domain/workflows/WorkflowConnection";
 import {
   WorkflowAuditInfo,
   WorkflowMetadata,
   WorkflowRuntimeProfile,
-} from "../../domain/workflows/WorkflowMetadata";
-import { MockNodeCatalogProvider } from "../../infrastructure/mocks/catalog/MockNodeCatalogProvider";
-import { ImplementationRegistryNodeCatalogProvider } from "../../infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
-import { createCompositeNodeImplementationRegistry } from "../../infrastructure/nodes/NodeProviderRegistryIndex";
+} from "@domain/workflows/WorkflowMetadata";
+import { MockNodeCatalogProvider } from "@infrastructure/mocks/catalog/MockNodeCatalogProvider";
+import { ImplementationRegistryNodeCatalogProvider } from "@infrastructure/nodes/ImplementationRegistryNodeCatalogProvider";
+import { createCompositeNodeImplementationRegistry } from "@infrastructure/nodes/NodeProviderRegistryIndex";
 import basicRagPipeline from "../../dev/workflow-data/workflows/basic-rag-pipeline.json";
 import sampleImagePipeline from "../../dev/workflow-data/workflows/sample-image-pipeline.json";
 import sampleTextAnalysis from "../../dev/workflow-data/workflows/sample-text-analysis.json";
@@ -253,3 +253,4 @@ function hydrateSeedWorkflow(record: WorkflowSeedRecord): Workflow {
     connections,
   });
 }
+

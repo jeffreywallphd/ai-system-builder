@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
   AuthProviderStatuses,
   createAuthProvider,
   type AuthProvider,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import type {
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
@@ -221,3 +221,4 @@ describe("VerifyLocalPasswordCredentialUseCase", () => {
     });
   });
 });
+

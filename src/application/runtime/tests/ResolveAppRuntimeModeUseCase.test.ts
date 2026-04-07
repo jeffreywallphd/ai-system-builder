@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AppRuntimeModes } from "../../../domain/runtime/AppRuntimeMode";
+﻿import { describe, expect, it } from "bun:test";
+import { AppRuntimeModes } from "@domain/runtime/AppRuntimeMode";
 import { ResolveAppRuntimeModeUseCase } from "../ResolveAppRuntimeModeUseCase";
 
 describe("ResolveAppRuntimeModeUseCase", () => {
@@ -13,3 +13,4 @@ describe("ResolveAppRuntimeModeUseCase", () => {
     expect(useCase.execute({ hasDesktopHost: true, isPackagedDesktopHost: true })).toBe(AppRuntimeModes.desktopProduction);
   });
 });
+

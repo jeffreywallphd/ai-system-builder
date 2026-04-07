@@ -1,4 +1,4 @@
-import {
+﻿import {
   DataStudioPreparationWizard,
   DataStudioWizardPresentationModes,
   type DataStudioWizardCanvasHandoff,
@@ -7,23 +7,23 @@ import {
   type DataStudioWizardStageSnapshot,
   type DataStudioPreparationTemplateSummary,
   type DataStudioWizardValidationIssue,
-} from "../../../application/data-studio/DataStudioPreparationWizard";
+} from "@application/data-studio/DataStudioPreparationWizard";
 import {
   DataStudioWizardCanvasProjectionService,
   type DataStudioCanvasProjection,
-} from "../../../application/data-studio/DataStudioWizardCanvasProjectionService";
+} from "@application/data-studio/DataStudioWizardCanvasProjectionService";
 import {
   DataStudioPipelineValidationService,
   type DataStudioPipelineValidationIssue,
   type DataStudioPipelineValidationResult,
-} from "../../../application/data-studio/DataStudioPipelineValidation";
-import type { DataStudioPipelineState } from "../../../application/data-studio/DataStudioPipelineState";
-import type { CanonicalRecordValue } from "../../../domain/dataset-studio/CanonicalDataShapes";
-import type { PipelineStageId } from "../../../domain/dataset-studio/PipelineStageDomain";
+} from "@application/data-studio/DataStudioPipelineValidation";
+import type { DataStudioPipelineState } from "@application/data-studio/DataStudioPipelineState";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
 import type {
   UnifiedPreparationStageActivation,
   UnifiedPreparationVisibilityMode,
-} from "../../../domain/dataset-studio/UnifiedPreparationAsset";
+} from "@domain/dataset-studio/UnifiedPreparationAsset";
 
 
 export const DataStudioWizardPersistenceStorageKey = "ai-loom.data-studio.preparation.state.v1";
@@ -297,3 +297,4 @@ export class DataStudioPreparationWizardStateAdapter {
     });
   }
 }
+

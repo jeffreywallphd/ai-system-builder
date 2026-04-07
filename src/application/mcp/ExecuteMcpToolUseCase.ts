@@ -1,4 +1,4 @@
-import { ExecutionContextToolPolicyService } from "../context/ExecutionContextToolPolicyService";
+﻿import { ExecutionContextToolPolicyService } from "../context/ExecutionContextToolPolicyService";
 import type { IMcpToolExecutor } from "../ports/interfaces/IMcpToolExecutor";
 import type { IMcpToolRegistryRepository } from "../ports/interfaces/IMcpToolRegistryRepository";
 import type { IMcpToolExecutionAuditSink } from "../ports/interfaces/IMcpToolExecutionAuditSink";
@@ -11,7 +11,7 @@ import { McpToolAuthService } from "./security/McpToolAuthService";
 import { McpToolApprovalPolicyService } from "./security/McpToolApprovalPolicyService";
 import { McpToolPermissionPolicyService } from "./security/McpToolPermissionPolicyService";
 import { McpToolSandboxPolicyService } from "./security/McpToolSandboxPolicyService";
-import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest, McpToolSandboxPolicy } from "../../domain/mcp/McpToolTrust";
+import type { McpToolPermissionScope, McpToolSandboxCapabilityRequest, McpToolSandboxPolicy } from "@domain/mcp/McpToolTrust";
 import type { McpToolAssetIoCoordinator } from "./McpToolAssetIoCoordinator";
 import type { McpCredentialResolutionContext } from "./security/McpCredentialResolution";
 
@@ -452,3 +452,4 @@ function sanitizeExecutionContextForAudit(request: McpToolExecutionRequest): Rea
 function sanitizeSandboxPolicySnapshot(policy: McpToolSandboxPolicy): Readonly<Record<string, unknown>> {
   return Object.freeze(JSON.parse(JSON.stringify(policy)));
 }
+

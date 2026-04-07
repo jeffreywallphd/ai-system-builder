@@ -1,19 +1,19 @@
-import type {
+﻿import type {
   IWorkflowExecutionEvent,
   IWorkflowExecutionHandle,
   IWorkflowExecutionInput,
   IWorkflowExecutionResult,
   IWorkflowExecutionProvenance,
   IWorkflowExecutor,
-} from "../../application/ports/interfaces/IWorkflowExecutor";
-import type { IWorkflowExecutionStrategy } from "../../application/ports/interfaces/IWorkflowExecutionStrategy";
-import type { IWorkflowRuntimeSelector } from "../../application/ports/interfaces/IWorkflowRuntimeSelector";
-import { WorkflowRuntimeSelector } from "../../application/execution/WorkflowRuntimeSelector";
+} from "@application/ports/interfaces/IWorkflowExecutor";
+import type { IWorkflowExecutionStrategy } from "@application/ports/interfaces/IWorkflowExecutionStrategy";
+import type { IWorkflowRuntimeSelector } from "@application/ports/interfaces/IWorkflowRuntimeSelector";
+import { WorkflowRuntimeSelector } from "@application/execution/WorkflowRuntimeSelector";
 import {
   WorkflowExecutionHandle,
   WorkflowExecutionProgress,
   WorkflowExecutionResult,
-} from "../../application/ports/WorkflowExecutor";
+} from "@application/ports/WorkflowExecutor";
 
 export interface TruthfulWorkflowExecutorOptions {
   readonly strategies: ReadonlyArray<IWorkflowExecutionStrategy>;
@@ -100,3 +100,4 @@ export class TruthfulWorkflowExecutor implements IWorkflowExecutor {
     return this.strategies.some((strategy) => strategy.canHandle(input));
   }
 }
+

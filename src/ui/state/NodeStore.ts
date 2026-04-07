@@ -1,5 +1,5 @@
-import type { INodeDefinition } from "../../domain/nodes/interfaces/INodeDefinition";
-import type { INodeCatalogSearchCriteria } from "../../application/ports/interfaces/INodeCatalogProvider";
+﻿import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
+import type { INodeCatalogSearchCriteria } from "@application/ports/interfaces/INodeCatalogProvider";
 import { NodeService } from "../services/NodeService";
 
 export interface INodeStoreState {
@@ -139,3 +139,4 @@ export class NodeStore {
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown node store error.";
 }
+

@@ -1,9 +1,9 @@
-import path from "node:path";
-import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "../../../application/ports/interfaces/IExecutionRunRepository";
-import type { IFileStorage } from "../../../application/ports/interfaces/IFileStorage";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
-import { freezeExecutionRunRecord } from "../../../application/execution/freezeExecutionRunRecord";
-import { deriveExecutionRunQueryIndex, type IExecutionRunQueryIndex } from "../../../application/execution/ExecutionRunQueryIndex";
+﻿import path from "node:path";
+import type { IExecutionRunRepository, IExecutionRunRepositoryListCriteria } from "@application/ports/interfaces/IExecutionRunRepository";
+import type { IFileStorage } from "@application/ports/interfaces/IFileStorage";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
+import { freezeExecutionRunRecord } from "@application/execution/freezeExecutionRunRecord";
+import { deriveExecutionRunQueryIndex, type IExecutionRunQueryIndex } from "@application/execution/ExecutionRunQueryIndex";
 
 interface PersistedExecutionRunFile {
   readonly run: IExecutionRunRecord;
@@ -133,3 +133,4 @@ function isPersistedExecutionRunFile(
 ): value is PersistedExecutionRunFile {
   return "run" in value && typeof value.run === "object" && value.run !== null;
 }
+

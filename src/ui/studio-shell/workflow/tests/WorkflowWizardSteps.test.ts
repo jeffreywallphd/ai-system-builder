@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftDelayWaitModes,
   WorkflowDraftBuiltInStepTypes,
@@ -7,7 +7,7 @@ import {
   WorkflowDraftStepTypes,
   createEmptyWorkflowDraft,
   validateWorkflowDraft,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   addWorkflowStepDependency,
   addWorkflowStep,
@@ -429,3 +429,4 @@ describe("WorkflowWizardSteps", () => {
     })).toThrow("canonical 'asset:' identity");
   });
 });
+

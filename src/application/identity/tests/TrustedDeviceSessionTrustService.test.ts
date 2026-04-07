@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
-import { DeviceTrustStatuses, createTrustedDevice, createDeviceFingerprint, DeviceFingerprintAlgorithms, DevicePairingMethods, createDeviceTrustMaterialRef, DeviceTrustMaterialKinds } from "../../../domain/identity/TrustedDeviceDomain";
-import type { TrustedDevice } from "../../../domain/identity/TrustedDeviceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DeviceTrustStatuses, createTrustedDevice, createDeviceFingerprint, DeviceFingerprintAlgorithms, DevicePairingMethods, createDeviceTrustMaterialRef, DeviceTrustMaterialKinds } from "@domain/identity/TrustedDeviceDomain";
+import type { TrustedDevice } from "@domain/identity/TrustedDeviceDomain";
 import { TrustedDeviceSessionTrustService } from "../services/TrustedDeviceSessionTrustService";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
-import { createSession, IdentitySessionAccessChannels } from "../../../domain/identity/IdentityDomain";
+import { createSession, IdentitySessionAccessChannels } from "@domain/identity/IdentityDomain";
 import { IdentityErrorCodes, identityFailure, type IdentityMutationOutcome, type IdentityOperationResult, type TrustedDeviceListQuery, type TrustedDeviceLookupByFingerprintQuery, type TrustedDeviceRevocationRequest } from "../../contracts/IdentityApplicationContracts";
 
 class InMemoryTrustedDeviceRepository implements ITrustedDeviceRepository {
@@ -227,3 +227,4 @@ describe("TrustedDeviceSessionTrustService", () => {
     expect(evaluated.reason).toContain("stale or mismatched");
   });
 });
+

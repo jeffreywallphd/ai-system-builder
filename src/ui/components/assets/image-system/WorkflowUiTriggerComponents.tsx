@@ -1,7 +1,7 @@
-import type { JSX, ReactNode } from "react";
-import type { ImageWorkflowUiTriggerBindingConfiguration } from "../../../../application/contracts/ImageWorkflowUiTriggerBindingConfiguration";
-import type { DispatchWorkflowFromUiEventCommand, WorkflowUiEventRuntimeDispatcher } from "../../../../application/workflow-studio/WorkflowUiEventRuntimeDispatcher";
-import { createUiTriggerEvent, type UiTriggerEvent, type UiTriggerEventContextRef, type UiTriggerEventKind } from "../../../../application/workflow-studio/UiTriggerEventContract";
+﻿import type { JSX, ReactNode } from "react";
+import type { ImageWorkflowUiTriggerBindingConfiguration } from "@application/contracts/ImageWorkflowUiTriggerBindingConfiguration";
+import type { DispatchWorkflowFromUiEventCommand, WorkflowUiEventRuntimeDispatcher } from "@application/workflow-studio/WorkflowUiEventRuntimeDispatcher";
+import { createUiTriggerEvent, type UiTriggerEvent, type UiTriggerEventContextRef, type UiTriggerEventKind } from "@application/workflow-studio/UiTriggerEventContract";
 
 export interface WorkflowUiTriggerDispatchAdapter {
   readonly dispatch: (event: UiTriggerEvent) => Promise<void>;
@@ -176,3 +176,4 @@ export function ImageSelectionTriggerSurface({
     </button>
   );
 }
+

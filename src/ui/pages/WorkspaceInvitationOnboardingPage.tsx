@@ -1,8 +1,8 @@
-import { useMemo, useState, type FormEvent } from "react";
+﻿import { useMemo, useState, type FormEvent } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { WorkspaceAdministrationService } from "../services/WorkspaceAdministrationService";
-import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 
 export default function WorkspaceInvitationOnboardingPage(): JSX.Element {
   const { workspaceId, invitationToken } = useParams<{ workspaceId: string; invitationToken: string }>();
@@ -152,3 +152,4 @@ export default function WorkspaceInvitationOnboardingPage(): JSX.Element {
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import type {
   SecretConditionalSaveResult,
@@ -8,8 +8,8 @@ import type {
   SecretCreatePersistenceInput,
   SecretListQuery,
   SecretMutationResult,
-} from "../../../application/security/ports/SecretServicePorts";
-import type { SecretRecord, SecretReference } from "../../../domain/security/SecretDomain";
+} from "@application/security/ports/SecretServicePorts";
+import type { SecretRecord, SecretReference } from "@domain/security/SecretDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapSecretRecordRowAndVersionsToDomain,
@@ -697,3 +697,4 @@ export class SqliteSecretRecordPersistenceAdapter implements ISecretRecordPersis
     return (actual ?? undefined) === (expected ?? undefined);
   }
 }
+

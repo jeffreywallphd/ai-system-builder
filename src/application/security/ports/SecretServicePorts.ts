@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   KeyEncryptionContext,
   SecretAccessDecision,
   SecretAccessDecisionReason,
@@ -9,7 +9,7 @@ import type {
   SecretScope,
   SecretScopeOwner,
   SecretVersion,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 
 export interface SecretListQuery {
   readonly scope?: SecretScope;
@@ -205,3 +205,4 @@ export type SecretAccessAuditEvent = SecretAccessDecisionAuditEvent | SecretOper
 export interface ISecretAccessAuditPort {
   recordSecretAuditEvent(event: SecretAccessAuditEvent): Promise<void>;
 }
+

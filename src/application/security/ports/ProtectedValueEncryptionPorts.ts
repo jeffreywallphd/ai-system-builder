@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   EncryptionKeyScope,
   ProtectedDataClass,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type { EncryptionKeyDescriptor } from "./EncryptionKeyResolutionPorts";
 
 export const ProtectedValuePayloadDescriptorVersions = Object.freeze({
@@ -105,3 +105,4 @@ export interface IProtectedValueEncryptionPort {
     request: DecryptProtectedValueRequest,
   ): Promise<ProtectedValueEncryptionPortResult<DecryptedProtectedValue>>;
 }
+

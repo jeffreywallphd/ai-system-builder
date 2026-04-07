@@ -1,5 +1,5 @@
-import type { NodeEnrollmentRequestPersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import { NodeTrustPersistenceQueryPresets } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+﻿import type { NodeEnrollmentRequestPersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import { NodeTrustPersistenceQueryPresets } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import {
@@ -104,3 +104,4 @@ export class ReviewPendingNodeEnrollmentUseCase {
     };
   }
 }
+

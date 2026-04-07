@@ -1,4 +1,4 @@
-import {
+﻿import {
   ResourceVisibilities,
   SharingPolicyModes,
   SharingSubjectKinds,
@@ -6,11 +6,11 @@ import {
   type PermissionKey,
   type ResourceVisibility,
   type SharingPolicyMode,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 import {
   AuthorizationResourceFamilies,
   type AuthorizationResourceFamily,
-} from "../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationPermissionCatalog";
 
 export class ProtectedResourceAuthorizationContractError extends Error {
   constructor(message: string) {
@@ -511,3 +511,4 @@ export function rehydrateProtectedResourceAuthorizationFromDto(
     publishedAt: value.publishedAt,
   });
 }
+

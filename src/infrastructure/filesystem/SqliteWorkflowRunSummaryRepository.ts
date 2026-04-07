@@ -1,17 +1,17 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { IWorkflowRunSummaryRepository } from "../../application/ports/interfaces/IWorkflowRunSummaryRepository";
+import type { IWorkflowRunSummaryRepository } from "@application/ports/interfaces/IWorkflowRunSummaryRepository";
 import type {
   WorkflowRunDetailRecord,
   WorkflowRunSummaryListQuery,
   WorkflowRunSummaryRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
   normalizeWorkflowRunSummaryRecord,
   normalizeWorkflowRunDetailRecord,
-} from "../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "./sqlite/SqliteCompat";
 
 interface WorkflowRunSummaryRow {
@@ -335,3 +335,4 @@ export class SqliteWorkflowRunSummaryRepository implements IWorkflowRunSummaryRe
     return `${record.workflow.workflowName} ${record.workflow.workflowId}`.trim().toLowerCase();
   }
 }
+

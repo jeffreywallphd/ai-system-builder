@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CreateContextRecipeUseCase } from "../CreateContextRecipeUseCase";
-import { InMemoryContextRecipeRepository } from "../../../infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
+import { InMemoryContextRecipeRepository } from "@infrastructure/mocks/repositories/InMemoryContextRecipeRepository";
 
 describe("CreateContextRecipeUseCase", () => {
   it("derives a stable deterministic recipe id when one is not provided", async () => {
@@ -53,3 +53,4 @@ describe("CreateContextRecipeUseCase", () => {
     expect(result.contextRecipe.guidance?.strictStructuredOutput).toBeTrue();
   });
 });
+

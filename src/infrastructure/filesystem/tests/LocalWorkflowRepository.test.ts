@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { Workflow } from "../../../domain/workflows/Workflow";
-import { WorkflowMetadata } from "../../../domain/workflows/WorkflowMetadata";
-import { makeNode } from "../../../domain/workflows/tests/testUtils";
-import { McpToolCallNodeConfigurationService } from "../../../application/mcp/McpToolCallNodeConfigurationService";
+import { Workflow } from "@domain/workflows/Workflow";
+import { WorkflowMetadata } from "@domain/workflows/WorkflowMetadata";
+import { makeNode } from "@domain/workflows/tests/testUtils";
+import { McpToolCallNodeConfigurationService } from "@application/mcp/McpToolCallNodeConfigurationService";
 import { ImplementationRegistryNodeCatalogProvider } from "../../nodes/ImplementationRegistryNodeCatalogProvider";
 import { McpNodeImplementationRegistry } from "../../nodes/mcp/McpNodeImplementationRegistry";
 import { LocalFileStorage } from "../LocalFileStorage";
@@ -197,3 +197,4 @@ describe("LocalWorkflowRepository", () => {
     }
   });
 });
+

@@ -1,17 +1,17 @@
-import { z } from "zod";
-import type { CanonicalRecordValue } from "../../domain/dataset-studio/CanonicalDataShapes";
-import type { PipelineStageId } from "../../domain/dataset-studio/PipelineStageDomain";
-import { PipelineStageIds } from "../../domain/dataset-studio/PipelineStageDomain";
+﻿import { z } from "zod";
+import type { CanonicalRecordValue } from "@domain/dataset-studio/CanonicalDataShapes";
+import type { PipelineStageId } from "@domain/dataset-studio/PipelineStageDomain";
+import { PipelineStageIds } from "@domain/dataset-studio/PipelineStageDomain";
 import type {
   UnifiedPreparationAssetDefinition,
   UnifiedPreparationStageActivation,
   UnifiedPreparationVisibilityMode,
-} from "../../domain/dataset-studio/UnifiedPreparationAsset";
-import { createUnifiedPreparationAssetDefinition } from "../../domain/dataset-studio/UnifiedPreparationAsset";
+} from "@domain/dataset-studio/UnifiedPreparationAsset";
+import { createUnifiedPreparationAssetDefinition } from "@domain/dataset-studio/UnifiedPreparationAsset";
 import type {
   PreparedDatasetLineageRecord,
   PreparedDatasetReuseReference,
-} from "../../domain/dataset-studio/PreparedDatasetLineage";
+} from "@domain/dataset-studio/PreparedDatasetLineage";
 import type {
   DataStudioWizardPresentationMode,
   DataStudioWizardSnapshot,
@@ -546,3 +546,4 @@ export function serializeDataStudioPipelineState(state: DataStudioPipelineState)
 export function deserializeDataStudioPipelineState(value: string): DataStudioPipelineState {
   return createDataStudioPipelineState(JSON.parse(value) as DataStudioPipelineState);
 }
+

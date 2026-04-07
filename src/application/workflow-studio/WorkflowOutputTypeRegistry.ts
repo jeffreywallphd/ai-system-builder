@@ -1,4 +1,4 @@
-import {
+﻿import {
   listWorkflowDraftOutputDestinationDefinitions,
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftSystemOutputRecordShapes,
@@ -6,7 +6,7 @@ import {
   type WorkflowDraft,
   type WorkflowDraftOutputDestinationDefinition,
   type WorkflowDraftOutputDestinationType,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 
 export const WorkflowOutputRegistryMultiplicityPolicies = Object.freeze({
   allowMultiple: "allow-multiple",
@@ -447,3 +447,4 @@ export class WorkflowOutputTypeRegistry {
 export function createDefaultWorkflowOutputTypeRegistry(): WorkflowOutputTypeRegistry {
   return new WorkflowOutputTypeRegistry();
 }
+

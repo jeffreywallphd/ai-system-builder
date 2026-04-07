@@ -1,5 +1,5 @@
-import type { IAsset } from "../../domain/assets/interfaces/IAsset";
-import type { AssetResponse } from "../../application/dto/AssetResponse";
+﻿import type { IAsset } from "@domain/assets/interfaces/IAsset";
+import type { AssetResponse } from "@application/dto/AssetResponse";
 import { formatBytes, toTitleCase } from "./PresenterFormatting";
 
 export interface AssetListItemViewModel {
@@ -159,7 +159,7 @@ export class AssetPresenter {
       parts.push(sourceLabel);
     }
 
-    return parts.length > 0 ? parts.join(" • ") : undefined;
+    return parts.length > 0 ? parts.join(" â€¢ ") : undefined;
   }
 
   private buildSourceLabel(asset: IAsset): string {
@@ -191,7 +191,7 @@ export class AssetPresenter {
       return undefined;
     }
 
-    return `${width} × ${height}`;
+    return `${width} Ã— ${height}`;
   }
 
   private formatDate(value?: Date): string | undefined {
@@ -202,3 +202,4 @@ export class AssetPresenter {
     return value.toLocaleString();
   }
 }
+

@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SqliteWorkflowRunSummaryRepository } from "../../../infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
+import { SqliteWorkflowRunSummaryRepository } from "@infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowStepRunStats,
@@ -10,7 +10,7 @@ import {
   WorkflowRunStatuses,
   WorkflowStepRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 function makeSummary(overrides?: Partial<ReturnType<typeof createWorkflowRunSummaryRecord>>) {
   const base = createWorkflowRunSummaryRecord({
@@ -217,3 +217,4 @@ describe("SqliteWorkflowRunSummaryRepository", () => {
     }
   });
 });
+

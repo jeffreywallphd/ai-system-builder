@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LoadWorkflowUseCase } from "../LoadWorkflowUseCase";
-import { makeWorkflow } from "../../../domain/services/tests/testUtils";
+import { makeWorkflow } from "@domain/services/tests/testUtils";
 import { makeWorkflowRepository, makeWorkflowValidator } from "./testUtils";
 import { CanonicalAssetIdentityService } from "../../assets-system/CanonicalAssetIdentityService";
 
@@ -81,3 +81,4 @@ describe("LoadWorkflowUseCase", () => {
     expect(result.canonicalRead?.assetId).toBe("workflow-definition:wf-canonical");
   });
 });
+

@@ -1,8 +1,8 @@
-import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
+﻿import type { CanonicalEntityType } from "../ports/interfaces/ICanonicalAssetIdentityRepository";
 import type { CanonicalAssetIdentityService } from "./CanonicalAssetIdentityService";
 import type { CanonicalEntityReadResolver } from "./CanonicalEntityReadResolver";
-import type { CompositionTaxonomyDescriptor } from "../../domain/taxonomy/CompositionTaxonomy";
-import type { AssetContractDescriptor } from "../../domain/contracts/AssetContract";
+import type { CompositionTaxonomyDescriptor } from "@domain/taxonomy/CompositionTaxonomy";
+import type { AssetContractDescriptor } from "@domain/contracts/AssetContract";
 
 export interface CanonicalOperationalReadSummary {
   readonly preferred: boolean;
@@ -136,3 +136,4 @@ export class CanonicalEntityOperationalReadService {
     });
   }
 }
+

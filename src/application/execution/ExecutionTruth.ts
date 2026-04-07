@@ -1,4 +1,4 @@
-import type { INode } from "../../domain/nodes/interfaces/INode";
+﻿import type { INode } from "@domain/nodes/interfaces/INode";
 import type { McpServerStatus } from "../mcp/models/McpServerStatus";
 import type { McpToolDescriptor } from "../mcp/models/McpToolDescriptor";
 import type {
@@ -212,3 +212,4 @@ export function deriveMcpExecutionProvenance(params: {
     checkedAt: status?.checkedAt,
   });
 }
+

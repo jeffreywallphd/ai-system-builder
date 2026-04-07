@@ -1,7 +1,7 @@
-import {
+﻿import {
   EncryptionKeyScopes,
   type EncryptionKeyScope,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionKeyLifecycleStates,
   type EncryptionKeyDescriptor,
@@ -9,12 +9,12 @@ import {
   type IEncryptionKeyCatalogPort,
   type ResolveActiveEncryptionKeyRequest,
   type ResolveEncryptionKeyByReferenceRequest,
-} from "../../../application/security/ports/EncryptionKeyResolutionPorts";
+} from "@application/security/ports/EncryptionKeyResolutionPorts";
 import type {
   EncryptionKeyMaterialDescriptor,
   IEncryptionKeyMaterialPort,
   ResolveEncryptionKeyMaterialRequest,
-} from "../../../application/security/ports/ProtectedValueEncryptionPorts";
+} from "@application/security/ports/ProtectedValueEncryptionPorts";
 
 const VERSION_TAG = "v1";
 
@@ -208,3 +208,4 @@ function normalizeRequired(value: string | undefined, field: string): string {
   }
   return normalized;
 }
+

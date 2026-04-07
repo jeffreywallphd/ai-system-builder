@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AssetSelectorResultKinds,
   AssetSelectorSelectionModes,
   AssetSelectorSelectionTypes,
   createAssetSelectorRequest,
-} from "../../../domain/studio-shell/AssetSelectorContract";
+} from "@domain/studio-shell/AssetSelectorContract";
 import { AssetSelectorUsageContexts } from "../AssetSelectorCapabilityRegistry";
 import {
   AssetSelectorSessionLifecycleStates,
@@ -380,3 +380,4 @@ describe("AssetSelectorSessionStore", () => {
     expect(state?.validationErrors[0]?.code).toBe("validation-failed");
   });
 });
+

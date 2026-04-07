@@ -4,11 +4,21 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const srcAliases = [
+  { find: "@src", replacement: path.resolve(REPOSITORY_ROOT, "src") },
+  { find: "@application", replacement: path.resolve(REPOSITORY_ROOT, "src/application") },
+  { find: "@domain", replacement: path.resolve(REPOSITORY_ROOT, "src/domain") },
+  { find: "@hosts", replacement: path.resolve(REPOSITORY_ROOT, "src/hosts") },
+  { find: "@infrastructure", replacement: path.resolve(REPOSITORY_ROOT, "src/infrastructure") },
+  { find: "@shared", replacement: path.resolve(REPOSITORY_ROOT, "src/shared") },
+  { find: "@ui", replacement: path.resolve(REPOSITORY_ROOT, "src/ui") },
+];
 
 export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      ...srcAliases,
       {
         find: "./modelManagementDependencies",
         replacement: path.resolve(

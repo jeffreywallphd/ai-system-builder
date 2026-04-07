@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import {
   WorkflowExecutionEvent,
   WorkflowExecutionResult,
@@ -162,3 +162,4 @@ export class InterpretedWorkflowExecutionStrategy implements IWorkflowExecutionS
     return graph.topologicalSort();
   }
 }
+

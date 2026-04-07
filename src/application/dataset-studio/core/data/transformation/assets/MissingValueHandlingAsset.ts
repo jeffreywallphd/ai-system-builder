@@ -1,11 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   createCanonicalRecordsShape,
   createCanonicalTableShape,
   type CanonicalRecordItem,
   type CanonicalRecordValue,
   type CanonicalTableRow,
-} from "../../../../../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/CanonicalDataShapes";
 import { BaseTransformationAsset } from "../BaseTransformationAsset";
 import { isMissingValue } from "../MissingValueUtils";
 import {
@@ -533,3 +533,4 @@ export class MissingValueHandlingAsset extends BaseTransformationAsset<
     });
   }
 }
+

@@ -1,6 +1,6 @@
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
-import type { McpServerStatus } from "../../../application/mcp/models/McpServerStatus";
-import type { McpToolDescriptor } from "../../../application/mcp/models/McpToolDescriptor";
+﻿import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
+import type { McpServerStatus } from "@application/mcp/models/McpServerStatus";
+import type { McpToolDescriptor } from "@application/mcp/models/McpToolDescriptor";
 
 export interface McpServerDetailsPanelProps {
   readonly server?: McpServerDescriptor;
@@ -138,7 +138,7 @@ export default function McpServerDetailsPanel({
               <div className="ui-panel__title" style={{ fontSize: "1rem" }}>Available tools</div>
               <div className="ui-text-small ui-text-secondary">Inspect normalized MCP tool descriptors for this server.</div>
             </div>
-            <span className="ui-text-small ui-text-secondary">{isLoadingTools ? "Loading…" : `${tools.length} shown`}</span>
+            <span className="ui-text-small ui-text-secondary">{isLoadingTools ? "Loadingâ€¦" : `${tools.length} shown`}</span>
           </div>
 
           <label className="ui-stack ui-stack--2xs">
@@ -176,7 +176,7 @@ export default function McpServerDetailsPanel({
                       <span className="ui-text-small ui-text-secondary">{tool.description ?? "No description provided yet."}</span>
                       <span className="ui-text-small ui-text-secondary">
                         {tool.arguments.length} argument{tool.arguments.length === 1 ? "" : "s"}
-                        {tool.tags.length > 0 ? ` · ${tool.tags.join(", ")}` : ""}
+                        {tool.tags.length > 0 ? ` Â· ${tool.tags.join(", ")}` : ""}
                       </span>
                     </div>
                   </button>
@@ -223,7 +223,7 @@ export default function McpServerDetailsPanel({
                           <div className="ui-card__body ui-stack ui-stack--2xs">
                             <div className="ui-row" style={{ justifyContent: "space-between", alignItems: "center" }}>
                               <strong>{argument.name}</strong>
-                              <span className="ui-text-small ui-text-secondary">{argument.type}{argument.required ? " · required" : " · optional"}</span>
+                              <span className="ui-text-small ui-text-secondary">{argument.type}{argument.required ? " Â· required" : " Â· optional"}</span>
                             </div>
                             {argument.description ? <span className="ui-text-small ui-text-secondary">{argument.description}</span> : null}
                           </div>
@@ -280,3 +280,4 @@ function friendlyState(state: string): string {
       return state;
   }
 }
+

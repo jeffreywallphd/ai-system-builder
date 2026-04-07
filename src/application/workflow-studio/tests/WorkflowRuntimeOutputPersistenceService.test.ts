@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { InMemoryDatasetInstanceRepository } from "../../system-runtime/DatasetInstanceRepository";
 import { SystemDatasetInstanceService, type SystemDatasetOwnershipValidator } from "../../system-runtime/SystemDatasetInstanceService";
 import type { DatasetInstanceAssetCatalog } from "../../system-runtime/DatasetInstanceAssetCatalog";
-import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "../../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import { DatasetSchemaIntentIds, type DatasetSchemaIntentId } from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
 import { DefaultWorkflowRuntimeOutputPersistenceService } from "../WorkflowRuntimeOutputPersistenceService";
 import type { IWorkflowExecutionInput, IWorkflowExecutionResult } from "../../ports/interfaces/IWorkflowExecutor";
 import { createImageWorkflowOutputBindingConfiguration } from "../../contracts/ImageWorkflowOutputBindingConfiguration";
@@ -231,3 +231,4 @@ describe("DefaultWorkflowRuntimeOutputPersistenceService", () => {
     expect(listing.runs[0]?.outputs.datasetInstance?.instanceId).toBe("instance:out");
   });
 });
+

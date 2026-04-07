@@ -1,8 +1,8 @@
-import {
+﻿import {
   DeviceTrustStatuses,
   type DeviceTrustMaterialRef,
   type TrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   SessionAssuranceLevels,
   SessionDeviceTrustInvalidationReasons,
@@ -12,7 +12,7 @@ import {
   type SessionDeviceTrustContext,
   type SessionDeviceTrustInvalidationReason,
   type SessionDeviceTrustState,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import type { ITrustedDeviceRepository } from "../ports/ITrustedDeviceRepository";
 import {
   IdentitySessionTrustRequirements,
@@ -323,3 +323,4 @@ function buildLegacyTrustMarker(trustedDeviceId: string): string {
 function isCompatibleTrustMarker(existing: string, expected: string, trustedDeviceId: string): boolean {
   return existing === expected || existing === buildLegacyTrustMarker(trustedDeviceId);
 }
+

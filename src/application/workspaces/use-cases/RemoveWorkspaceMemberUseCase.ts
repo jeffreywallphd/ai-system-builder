@@ -1,4 +1,4 @@
-import {
+﻿import {
   ChangeWorkspaceMembershipStatusUseCase,
   WorkspaceMembershipStatusChangeErrorCodes,
   type ChangeWorkspaceMembershipStatusUseCaseOutcome,
@@ -8,7 +8,7 @@ import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceA
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
-import { WorkspaceMembershipStatuses, type WorkspaceMembership } from "../../../domain/workspaces/WorkspaceDomain";
+import { WorkspaceMembershipStatuses, type WorkspaceMembership } from "@domain/workspaces/WorkspaceDomain";
 import type { WorkspaceAdministrationAuditSink } from "./WorkspaceAdministrationAudit";
 
 export const WorkspaceMembershipRemovalErrorCodes = Object.freeze({
@@ -130,3 +130,4 @@ export class RemoveWorkspaceMemberUseCase {
     return WorkspaceMembershipRemovalErrorCodes.invalidState;
   }
 }
+

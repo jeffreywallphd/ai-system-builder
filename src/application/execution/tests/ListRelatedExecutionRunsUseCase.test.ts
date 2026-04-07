@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { ExecutionStatuses, ExecutionUnitKinds } from "../../../domain/execution/ExecutionPlan";
-import type { IExecutionRunRecord } from "../../../domain/execution/ExecutionRun";
+﻿import { describe, expect, it } from "bun:test";
+import { ExecutionStatuses, ExecutionUnitKinds } from "@domain/execution/ExecutionPlan";
+import type { IExecutionRunRecord } from "@domain/execution/ExecutionRun";
 import { ListRelatedExecutionRunsUseCase } from "../ListRelatedExecutionRunsUseCase";
 
 function makeRun(runId: string, flowId?: string): IExecutionRunRecord {
@@ -53,3 +53,4 @@ describe("ListRelatedExecutionRunsUseCase", () => {
     expect(related.map((run) => run.runId)).toEqual(["run-1", "run-3"]);
   });
 });
+

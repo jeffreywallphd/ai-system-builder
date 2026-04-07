@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   DatasetGenerationProvenance,
   DatasetGenerationResult,
-} from "../../domain/tuning-datasets/interfaces/ITuningDatasetStudio";
+} from "@domain/tuning-datasets/interfaces/ITuningDatasetStudio";
 import type {
   IExecutionArtifact,
   IExecutionProvenance,
@@ -73,3 +73,4 @@ export function getDatasetGenerationResult(
   );
   return artifact?.value as DatasetGenerationResult | undefined;
 }
+

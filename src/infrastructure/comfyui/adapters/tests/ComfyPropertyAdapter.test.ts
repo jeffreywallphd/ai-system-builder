@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { NodeProperty } from "../../../../domain/nodes/NodeProperty";
+﻿import { describe, expect, it } from "bun:test";
+import { NodeProperty } from "@domain/nodes/NodeProperty";
 import { ComfyPropertyAdapter } from "../ComfyPropertyAdapter";
 
 describe("ComfyPropertyAdapter", () => {
@@ -11,3 +11,4 @@ describe("ComfyPropertyAdapter", () => {
     expect(adapted?.value).toBe(12);
   });
 });
+

@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
-import { createCanonicalImageMetadataRecordsShape, createCanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { createCanonicalImageMetadataRecordsShape, createCanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionReferenceKinds,
   type IUnifiedIngestionRouter,
   type IUnifiedIngestionSourceTypeDetector,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { DataConverterOperationKinds, type DataConverterResult } from "../DataConverterContracts";
 import { UnifiedIngestionOrchestrationService } from "../UnifiedIngestionOrchestrationService";
 
@@ -701,3 +701,4 @@ describe("UnifiedIngestionOrchestrationService", () => {
     }
   });
 });
+

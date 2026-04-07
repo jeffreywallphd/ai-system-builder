@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { HostBootModes } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { HostBootModes } from "@application/common/HostCompositionContracts";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
   HybridHostAssemblyModes,
@@ -156,3 +156,4 @@ describe("HybridHostEntrypoint", () => {
     expect(options.authoritativeServerOptions?.hostOptions.port).toBe(7400);
   });
 });
+

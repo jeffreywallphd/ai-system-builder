@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import type { ContextInspectionResult } from "../../../application/context/models/ContextInspectionResult";
+﻿import { useMemo } from "react";
+import type { ContextInspectionResult } from "@application/context/models/ContextInspectionResult";
 import type { NodeDetailViewModel } from "../../presenters/NodePresenter";
 import type { InstalledModelOption } from "../../models/buildInstalledModelOptions";
 import ContextInspectionPanel from "../workflow/ContextInspectionPanel";
@@ -44,7 +44,7 @@ export default function NodeInspector({
               <div className="ui-stack ui-stack--2xs">
                 <div className="ui-heading-4">{node.title}</div>
                 <div className="ui-text-secondary ui-text-small">
-                  {node.definitionTitle} • {node.definitionType}
+                  {node.definitionTitle} â€¢ {node.definitionType}
                 </div>
                 {node.notes ? <div className="ui-text-secondary">{node.notes}</div> : null}
               </div>
@@ -156,3 +156,4 @@ export default function NodeInspector({
     </section>
   );
 }
+

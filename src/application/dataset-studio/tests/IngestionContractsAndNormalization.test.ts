@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { ImageAssetReferenceKinds } from "../../../domain/dataset-studio/contracts/ImageAssetReference";
+﻿import { describe, expect, it } from "bun:test";
+import { ImageAssetReferenceKinds } from "@domain/dataset-studio/contracts/ImageAssetReference";
 import {
   CsvIngestorAsset,
   CsvIngestorErrorCodes,
@@ -242,4 +242,5 @@ describe("Ingestion contracts + normalization", () => {
     expect(image.normalized.log.preview).toBeFalse();
   });
 });
+
 

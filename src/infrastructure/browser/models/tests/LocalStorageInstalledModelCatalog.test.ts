@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { LocalStorageInstalledModelCatalog } from "../LocalStorageInstalledModelCatalog";
-import { makeModel } from "../../../../domain/services/tests/testUtils";
+import { makeModel } from "@domain/services/tests/testUtils";
 
 function createStorage() {
   const values = new Map<string, string>();
@@ -28,3 +28,4 @@ describe("LocalStorageInstalledModelCatalog", () => {
     expect(await catalog.isInstalled("model-1")).toBeTrue();
   });
 });
+

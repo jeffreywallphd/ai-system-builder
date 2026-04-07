@@ -1,11 +1,11 @@
-import type { RuntimeEvent } from "../../../application/runtime/RuntimeEvent";
+﻿import type { RuntimeEvent } from "@application/runtime/RuntimeEvent";
 import { useState } from "react";
 import type {
   RuntimeConsoleLogEntry,
   RuntimeConsoleTab,
   RuntimeHealthCheck,
 } from "../../state/RuntimeConsoleStore";
-import type { RuntimeLogVerbosity } from "../../../application/runtime/RuntimeDiagnostics";
+import type { RuntimeLogVerbosity } from "@application/runtime/RuntimeDiagnostics";
 import RuntimeConsoleToolbar from "./RuntimeConsoleToolbar";
 import RuntimeHealthList from "./RuntimeHealthList";
 import RuntimeLogsList, { type RuntimeConsoleLogFilter } from "./RuntimeLogsList";
@@ -83,3 +83,4 @@ export default function RuntimeConsoleDrawer({
     </section>
   );
 }
+

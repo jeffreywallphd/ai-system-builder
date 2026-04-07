@@ -1,5 +1,5 @@
-import { Asset } from "../../../domain/assets/Asset";
-import { AssetLocation, AssetSourceInfo } from "../../../domain/assets/AssetMetadata";
+﻿import { Asset } from "@domain/assets/Asset";
+import { AssetLocation, AssetSourceInfo } from "@domain/assets/AssetMetadata";
 import type { IAssetCatalog } from "../../ports/interfaces/IAssetCatalog";
 import type { IFileStorage } from "../../ports/interfaces/IFileStorage";
 
@@ -39,3 +39,4 @@ export function makeFileStorage(overrides: Partial<IFileStorage> = {}): IFileSto
     ...overrides,
   };
 }
+

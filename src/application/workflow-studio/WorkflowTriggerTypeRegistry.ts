@@ -1,11 +1,11 @@
-import {
+﻿import {
   getWorkflowDraftTriggerDefinition,
   listWorkflowDraftTriggerDefinitions,
   type WorkflowDraftTriggerConfig,
   type WorkflowDraftTriggerDefinition,
   type WorkflowDraftTriggerKind,
   type WorkflowDraftTriggerType,
-} from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { validateWorkflowTriggerTypeConfig } from "./WorkflowTriggerValidationPipeline";
 
 export interface WorkflowTriggerTypeRegistryEntry {
@@ -108,3 +108,4 @@ export class WorkflowTriggerTypeRegistry {
 export function createDefaultWorkflowTriggerTypeRegistry(): WorkflowTriggerTypeRegistry {
   return new WorkflowTriggerTypeRegistry();
 }
+

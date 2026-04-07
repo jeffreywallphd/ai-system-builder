@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -7,7 +7,7 @@ import {
   WorkflowDraftTriggerKinds,
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { validateWorkflowForExecutionReadiness } from "../WorkflowPreExecutionValidationPipeline";
 
 describe("WorkflowPreExecutionValidationPipeline", () => {
@@ -254,3 +254,4 @@ describe("WorkflowPreExecutionValidationPipeline", () => {
     })]);
   });
 });
+

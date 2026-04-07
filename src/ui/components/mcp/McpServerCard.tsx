@@ -1,4 +1,4 @@
-import type { McpServerDescriptor } from "../../../application/mcp/models/McpServerDescriptor";
+﻿import type { McpServerDescriptor } from "@application/mcp/models/McpServerDescriptor";
 
 export interface McpServerCardProps {
   readonly server: McpServerDescriptor;
@@ -116,3 +116,4 @@ function defaultSummary(server: McpServerDescriptor, isConfigured?: boolean): st
 
   return `Discoverable ${describeTransport(server.transport).toLowerCase()} server you can add to this workspace.`;
 }
+

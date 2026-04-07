@@ -1,4 +1,4 @@
-import type { AuthorizationResourceFamily } from "../../../domain/authorization/AuthorizationPermissionCatalog";
+﻿import type { AuthorizationResourceFamily } from "@domain/authorization/AuthorizationPermissionCatalog";
 import { ROUTE_PATHS } from "../../routes/RouteConfig";
 
 export function buildAuthorizationSharingThinClientPath(resource: {
@@ -34,3 +34,4 @@ export function buildAuthorizationSharingDesktopPath(resource: {
 
   return `${ROUTE_PATHS.authorizationSharing}?${query.toString()}`;
 }
+

@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import type { RegistryAsset } from "../../../domain/asset-registry/RegistryAsset";
-import { AssetDetailLayoutResolver, AssetDetailSectionKeys } from "../../../application/asset-registry/AssetDetailPresentationModel";
+import type { RegistryAsset } from "@domain/asset-registry/RegistryAsset";
+import { AssetDetailLayoutResolver, AssetDetailSectionKeys } from "@application/asset-registry/AssetDetailPresentationModel";
 import type { AssetActionContext } from "../../routes/AssetIntentActions";
 import { AssetActionExecutionService, AssetIntentActionResolver } from "../../routes/AssetIntentActions";
 
@@ -94,3 +94,4 @@ export function StandardAssetDetailView({ asset, actionContext, backPath }: Stan
     </section>
   );
 }
+

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import { CompositionTaxonomyClassifier } from "../../taxonomy/CompositionTaxonomyClassifier";
 import {
@@ -6,7 +6,7 @@ import {
   createSystemStudioTaxonomy,
   type SystemAsset,
   type SystemCompositionReference,
-} from "../../../domain/system-studio/SystemAssetDomain";
+} from "@domain/system-studio/SystemAssetDomain";
 import { RuntimeBehaviorAlignmentService } from "../RuntimeBehaviorAlignment";
 import { resolveSystemRuntimeDependencies } from "../RuntimeDependencyResolution";
 import { mapSystemContractToRuntimeExecutionContract } from "../RuntimeExecutionContractMapping";
@@ -366,3 +366,4 @@ describe("ExecutionOrchestrationService", () => {
     expect(result.execution?.runtimeState.errors[0]?.kind).toBe("environment-mismatch");
   });
 });
+

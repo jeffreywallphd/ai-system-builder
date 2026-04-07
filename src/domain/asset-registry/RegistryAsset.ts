@@ -1,6 +1,6 @@
-import type { AssetContractDescriptor } from "../contracts/AssetContract";
+﻿import type { AssetContractDescriptor } from "../contracts/AssetContract";
 import type { CompositionTaxonomyDescriptor } from "../taxonomy/CompositionTaxonomy";
-import type { AssetSourceType } from "../../../domain/assets/interfaces/IAsset";
+import type { AssetSourceType } from "@domain/assets/interfaces/IAsset";
 import type { AssetLineageRelationshipType } from "../assets/AssetLineageEdge";
 
 export interface RegistryDependencyReference {
@@ -349,3 +349,4 @@ export function createRegistryAsset(input: RegistryAsset): RegistryAsset {
       : undefined,
   });
 }
+

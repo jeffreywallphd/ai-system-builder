@@ -1,9 +1,9 @@
-import {
+﻿import {
   createDatasetSchemaValidationResult,
   type IDatasetSchemaIntent,
   type IDatasetSchemaValidationEngine,
-} from "../../domain/dataset-studio/schema-intents/DatasetSchemaIntent";
-import type { CanonicalDataShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+} from "@domain/dataset-studio/schema-intents/DatasetSchemaIntent";
+import type { CanonicalDataShape } from "@domain/dataset-studio/CanonicalDataShapes";
 
 export class DatasetSchemaValidationEngine implements IDatasetSchemaValidationEngine {
   public validate(input: {
@@ -16,3 +16,4 @@ export class DatasetSchemaValidationEngine implements IDatasetSchemaValidationEn
     });
   }
 }
+

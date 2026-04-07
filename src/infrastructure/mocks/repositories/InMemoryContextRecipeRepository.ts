@@ -1,9 +1,9 @@
-import { ContextRecipe } from "../../../application/context/models/ContextRecipe";
+﻿import { ContextRecipe } from "@application/context/models/ContextRecipe";
 import type {
   IContextRecipeListCriteria,
   IContextRecipeRepository,
   IContextRecipeSummary,
-} from "../../../application/ports/interfaces/IContextRecipeRepository";
+} from "@application/ports/interfaces/IContextRecipeRepository";
 
 function normalize(value: string): string {
   return value.trim().toLowerCase();
@@ -96,3 +96,4 @@ export class InMemoryContextRecipeRepository implements IContextRecipeRepository
     this.contextRecipes.delete(id.trim());
   }
 }
+

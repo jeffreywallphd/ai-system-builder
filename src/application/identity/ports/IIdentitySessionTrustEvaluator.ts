@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   Session,
   SessionDeviceTrustContext,
   SessionDeviceTrustInvalidationReason,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 
 export interface IdentitySessionTrustEvaluationInput {
   readonly session: Session;
@@ -35,3 +35,4 @@ export interface IIdentitySessionTrustEvaluator {
     input: IdentitySessionTrustEvaluationInput,
   ): Promise<IdentitySessionTrustEvaluationResult>;
 }
+

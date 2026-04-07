@@ -1,5 +1,5 @@
-import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
-import type { SystemContextContract } from "../../domain/system-studio/SystemContextContract";
+﻿import type { WorkflowExecutionPlanTranslationRequest } from "./WorkflowExecutionAlignmentContracts";
+import type { SystemContextContract } from "@domain/system-studio/SystemContextContract";
 import {
   SystemContextWorkflowMappingContractVersion,
   SystemContextWorkflowMappingSourceRoots,
@@ -8,7 +8,7 @@ import {
   type SystemContextWorkflowMappingConfiguration,
   type SystemContextWorkflowMappingEntry,
   type SystemContextWorkflowMappingSourceRoot,
-} from "../../domain/system-studio/SystemContextWorkflowMappingConfiguration";
+} from "@domain/system-studio/SystemContextWorkflowMappingConfiguration";
 import {
   createDefaultSystemContextDatasetReferenceResolver,
   type ResolveSystemContextDatasetsResult,
@@ -313,3 +313,4 @@ export function createDefaultWorkflowSystemContextBindingAdapter(
     },
   });
 }
+

@@ -1,4 +1,4 @@
-import type { INodeDefinition } from "../../../domain/nodes/interfaces/INodeDefinition";
+﻿import type { INodeDefinition } from "@domain/nodes/interfaces/INodeDefinition";
 import type {
   INodeCatalogProvider,
   INodeCatalogSearchCriteria,
@@ -288,3 +288,4 @@ export class CompositeNodeCatalogProvider implements INodeCatalogProvider {
     });
   }
 }
+

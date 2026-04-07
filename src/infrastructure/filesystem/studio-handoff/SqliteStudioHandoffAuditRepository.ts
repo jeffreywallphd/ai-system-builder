@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { StudioHandoffAuditRepository } from "../../../application/studio-handoff/StudioHandoffAuditTrailService";
-import type { StudioHandoffAuditRecord } from "../../../domain/studio-handoff/StudioHandoffAuditTrail";
+import type { StudioHandoffAuditRepository } from "@application/studio-handoff/StudioHandoffAuditTrailService";
+import type { StudioHandoffAuditRecord } from "@domain/studio-handoff/StudioHandoffAuditTrail";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 
 interface SnapshotRow {
@@ -168,3 +168,4 @@ export class SqliteStudioHandoffAuditRepository implements StudioHandoffAuditRep
     return typeof row?.version === "number" ? row.version : 0;
   }
 }
+

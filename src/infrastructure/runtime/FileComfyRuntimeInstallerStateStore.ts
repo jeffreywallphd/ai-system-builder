@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+﻿import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   ComfyRuntimeInstallerPersistedStateSchema,
   type ComfyRuntimeInstallerPersistedState,
   type ComfyRuntimeInstallerStateLoadResult,
   type IComfyRuntimeInstallerStateStore,
-} from "../../application/runtime/ComfyRuntimeInstallerStateContract";
+} from "@application/runtime/ComfyRuntimeInstallerStateContract";
 
 const DEFAULT_STATE_FILENAME = ".ai-loom-comfy-installer-state.json";
 
@@ -69,3 +69,4 @@ export class FileComfyRuntimeInstallerStateStore implements IComfyRuntimeInstall
     return path.join(path.resolve(installDirectory), this.stateFilename);
   }
 }
+

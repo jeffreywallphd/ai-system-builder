@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
@@ -7,7 +7,7 @@ import {
   AgentExecutionSessionStatuses,
   createAgentExecutionSession,
   transitionAgentExecutionSession,
-} from "../../../../domain/agents/AgentExecutionSession";
+} from "@domain/agents/AgentExecutionSession";
 import { SqliteAgentExecutionSessionRepository } from "../SqliteAgentExecutionSessionRepository";
 
 const createdRoots: string[] = [];
@@ -135,3 +135,4 @@ describe("SqliteAgentExecutionSessionRepository", () => {
     repository.dispose();
   });
 });
+

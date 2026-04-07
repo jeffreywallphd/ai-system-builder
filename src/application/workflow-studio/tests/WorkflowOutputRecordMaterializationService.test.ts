@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { WorkflowOutputTargetTypes } from "../../../domain/workflow-studio/WorkflowOutputBindingDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { WorkflowOutputTargetTypes } from "@domain/workflow-studio/WorkflowOutputBindingDomain";
 import { materializeWorkflowOutputRecords } from "../WorkflowOutputRecordMaterializationService";
 
 describe("materializeWorkflowOutputRecords", () => {
@@ -295,3 +295,4 @@ describe("materializeWorkflowOutputRecords", () => {
     expect(result.missingOutputs).toEqual(["images"]);
   });
 });
+

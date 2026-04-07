@@ -1,5 +1,5 @@
-import type { JSX } from "react";
-import type { DatasetInspectionViewModel } from "../../../application/data-studio/DatasetInspectionViewModel";
+﻿import type { JSX } from "react";
+import type { DatasetInspectionViewModel } from "@application/data-studio/DatasetInspectionViewModel";
 
 export interface DatasetInspectionPanelProps {
   readonly model?: DatasetInspectionViewModel;
@@ -63,7 +63,7 @@ export default function DatasetInspectionPanel({ model, isLoading = false }: Dat
             {model.fields.map((field) => (
               <li key={field.name}>
                 <span>{field.name}</span>
-                {field.valueType ? <span className="ui-subtle"> · {field.valueType}</span> : null}
+                {field.valueType ? <span className="ui-subtle"> Â· {field.valueType}</span> : null}
               </li>
             ))}
           </ul>
@@ -101,3 +101,4 @@ export default function DatasetInspectionPanel({ model, isLoading = false }: Dat
     </section>
   );
 }
+

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { RuntimeEventBuffer } from "../../../../application/runtime/RuntimeEventBuffer";
+﻿import { describe, expect, it } from "bun:test";
+import { RuntimeEventBuffer } from "@application/runtime/RuntimeEventBuffer";
 import { NodeProcessRuntimeEventSink } from "../NodeProcessRuntimeEventSink";
 
 describe("NodeProcessRuntimeEventSink", () => {
@@ -13,3 +13,4 @@ describe("NodeProcessRuntimeEventSink", () => {
     expect(store.list()[0]?.message).toBe("runtime starting");
   });
 });
+

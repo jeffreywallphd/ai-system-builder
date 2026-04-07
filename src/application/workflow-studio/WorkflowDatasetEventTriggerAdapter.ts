@@ -1,10 +1,10 @@
-import {
+﻿import {
   DatasetEventTypes,
   createDatasetEvent,
   type DatasetEvent,
   type DatasetEventType,
-} from "../../domain/dataset-studio/contracts/DatasetEvent";
-import { WorkflowDraftTriggerTypes, type WorkflowDraft } from "../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/dataset-studio/contracts/DatasetEvent";
+import { WorkflowDraftTriggerTypes, type WorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import { WorkflowExecutionTriggerSourceKinds } from "./WorkflowExecutionAlignmentContracts";
 import type { WorkflowExecutionTriggerEntry } from "./WorkflowTriggerExecutionEntryService";
 import { mapWorkflowDraftTriggersToExecutionTriggerPlan } from "./WorkflowDraftTriggerExecutionPlanner";
@@ -111,3 +111,4 @@ export function mapDatasetEventToWorkflowTriggerEntries(input: {
     issues: Object.freeze([]),
   });
 }
+

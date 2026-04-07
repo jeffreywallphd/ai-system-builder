@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetEventTypes, type DatasetEventType } from "../../../domain/dataset-studio/contracts/DatasetEvent";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetEventTypes, type DatasetEventType } from "@domain/dataset-studio/contracts/DatasetEvent";
 import {
   InMemoryDatasetEventPublisher,
   createDatasetEventEnvelope,
@@ -167,3 +167,4 @@ describe("DatasetEventPublisher", () => {
     expect(publisher.listDeliveryFailures()[0]?.message).toContain("subscriber-broken");
   });
 });
+

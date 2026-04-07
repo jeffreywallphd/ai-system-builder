@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkspaceOwnershipError,
   WorkspaceVisibilities,
   createWorkspaceOwnershipMetadata,
@@ -7,7 +7,7 @@ import {
   withWorkspaceOwnershipVisibility,
   type WorkspaceOwnershipMetadata,
   type WorkspaceVisibility,
-} from "../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/workspaces/WorkspaceOwnership";
 
 export class WorkspaceDomainError extends Error {
   constructor(message: string) {
@@ -1030,3 +1030,4 @@ export function expireWorkspaceInvitation(
   assertInvitationState(expired);
   return expired;
 }
+

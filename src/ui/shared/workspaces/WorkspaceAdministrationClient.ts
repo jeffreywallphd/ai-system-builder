@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AddWorkspaceAdministrationMemberApiResponse,
   AssignWorkspaceAdministrationRoleApiResponse,
   CancelWorkspaceAdministrationInvitationApiResponse,
@@ -15,12 +15,12 @@ import type {
   TransitionWorkspaceAdministrationLifecycleApiResponse,
   UpdateWorkspaceAdministrationApiResponse,
   WorkspaceAdministrationApiResponse,
-} from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract";
 import type {
   AcceptWorkspaceInvitationOnboardingApiResponse,
   IssueWorkspaceInvitationApiResponse,
   WorkspaceInvitationApiResponse,
-} from "../../../infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
+} from "@infrastructure/api/workspaces/sdk/PublicWorkspaceInvitationApiContract";
 
 export interface WorkspaceAdministrationClient {
   listWorkspaces(
@@ -640,3 +640,4 @@ function toQuerySuffix(query: URLSearchParams): string {
   const queryString = query.toString();
   return queryString ? `?${queryString}` : "";
 }
+

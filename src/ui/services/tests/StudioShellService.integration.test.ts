@@ -1,16 +1,16 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import type { DesktopStudioShellBridge } from "../../../electron/shared/DesktopContracts";
-import { StudioShellBackendApi } from "../../../infrastructure/api/studio-shell/StudioShellBackendApi";
-import { SystemStudioBackendApi } from "../../../infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../../infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { SqliteStudioShellRepository } from "../../../infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteSystemRuntimeExecutionStore } from "../../../infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
-import { InMemoryStudioShellRepository } from "../../../infrastructure/studio-shell/InMemoryStudioShellRepository";
-import { InMemoryWorkflowPersistenceRepository } from "../../../infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
-import { AssetDraftLifecycleStatuses } from "../../../domain/studio-shell/StudioShellDomain";
+import { StudioShellBackendApi } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import { SystemStudioBackendApi } from "@infrastructure/api/system-studio/SystemStudioBackendApi";
+import { SystemRuntimeBackendApi } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
+import { SqliteStudioShellRepository } from "@infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
+import { SqliteSystemRuntimeExecutionStore } from "@infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { InMemoryWorkflowPersistenceRepository } from "@infrastructure/workflows/InMemoryWorkflowPersistenceRepository";
+import { AssetDraftLifecycleStatuses } from "@domain/studio-shell/StudioShellDomain";
 import {
   WorkflowDraftOutputDestinationTypes,
   WorkflowDraftOutputFormats,
@@ -19,16 +19,16 @@ import {
   WorkflowDraftTriggerTypes,
   createEmptyWorkflowDraft,
   serializeWorkflowDraft,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
 import { StudioShellService } from "../StudioShellService";
-import { CompositionAssetContractResolver } from "../../../application/contracts/CompositionAssetContractResolver";
-import { InMemoryWorkflowRunSummaryRepository } from "../../../infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
+import { CompositionAssetContractResolver } from "@application/contracts/CompositionAssetContractResolver";
+import { InMemoryWorkflowRunSummaryRepository } from "@infrastructure/workflows/InMemoryWorkflowRunSummaryRepository";
 import {
   createWorkflowRunDetailRecord,
   createWorkflowRunSummaryRecord,
   WorkflowRunStatuses,
   WorkflowRunTriggerSources,
-} from "../../../domain/workflow-studio/WorkflowRunHistoryDomain";
+} from "@domain/workflow-studio/WorkflowRunHistoryDomain";
 
 const createdRoots: string[] = [];
 
@@ -2715,3 +2715,4 @@ describe("StudioShellService integration", () => {
     reopenedRepository.dispose();
   });
 });
+

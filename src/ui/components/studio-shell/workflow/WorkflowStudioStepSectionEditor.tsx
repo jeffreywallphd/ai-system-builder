@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   WorkflowDraftBuiltInStepTypes,
@@ -12,12 +12,12 @@ import {
   type WorkflowDraftLoopIterationStepConfig,
   type WorkflowDraftManualApprovalStepConfig,
   type WorkflowValidationIssue,
-} from "../../../../domain/workflow-studio/WorkflowStudioDomain";
-import { serializeWorkflowDraft } from "../../../../domain/workflow-studio/WorkflowStudioDomain";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { serializeWorkflowDraft } from "@domain/workflow-studio/WorkflowStudioDomain";
 import {
   AssetSelectorSessionLifecycleStates,
   type AssetSelectorSessionState,
-} from "../../../../application/studio-entry/AssetSelectorSessionStore";
+} from "@application/studio-entry/AssetSelectorSessionStore";
 import SectionBody from "./SectionBody";
 import SectionHeader from "./SectionHeader";
 import WizardSection from "./WizardSection";
@@ -1570,3 +1570,4 @@ export default function WorkflowStudioStepSectionEditor({
     </WizardSection>
   );
 }
+

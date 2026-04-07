@@ -1,14 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import {
   AgentTriggerKinds,
   type AgentRunControlAction,
   type AgentRunRequest,
   type AgentRunTrigger,
   type AgentSessionSummaryReadModel,
-} from "../../../application/agents/contracts/AgentRunContracts";
-import type { TriggerAgentLaunchRequest } from "../../../application/agents/TriggerAgentLaunchUseCase";
-import type { AgentLaunchReadModel } from "../../../application/agents/contracts/AgentRunContracts";
-import type { AgentStudioSnapshotReadModel } from "../../../infrastructure/api/agents/AgentStudioBackendApi";
+} from "@application/agents/contracts/AgentRunContracts";
+import type { TriggerAgentLaunchRequest } from "@application/agents/TriggerAgentLaunchUseCase";
+import type { AgentLaunchReadModel } from "@application/agents/contracts/AgentRunContracts";
+import type { AgentStudioSnapshotReadModel } from "@infrastructure/api/agents/AgentStudioBackendApi";
 import { AgentRunControls } from "./AgentRunControls";
 import { TriggerSelector } from "./TriggerSelector";
 import { TriggerConfigFields } from "./TriggerConfigFields";
@@ -154,3 +154,4 @@ export function AgentLaunchPanel(props: AgentLaunchPanelProps): JSX.Element {
     </div>
   );
 }
+

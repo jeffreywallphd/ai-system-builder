@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createDatasetInstance } from "../../../domain/system-runtime/DatasetInstanceDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { createDatasetInstance } from "@domain/system-runtime/DatasetInstanceDomain";
 import { createImageToImageWorkflowAsset } from "../ImageToImageWorkflowAsset";
 import {
   createImageWorkflowOutputBindingConfiguration,
@@ -92,3 +92,4 @@ describe("ImageWorkflowOutputBindingConfiguration", () => {
     expect(materialized.records.every((record) => Boolean((record.record.metadata.lineage as Record<string, unknown>).bindingTarget))).toBeTrue();
   });
 });
+

@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import type { IContextPackage } from "../../../application/context/models/ContextPackage";
-import type { IContextFragment } from "../../../application/context/models/ContextFragment";
-import type { IContextPackageReference } from "../../../application/context/models/ContextPackageReference";
+﻿import { useEffect, useMemo, useState } from "react";
+import type { IContextPackage } from "@application/context/models/ContextPackage";
+import type { IContextFragment } from "@application/context/models/ContextFragment";
+import type { IContextPackageReference } from "@application/context/models/ContextPackageReference";
 import ContextFragmentEditor from "./ContextFragmentEditor";
 
 interface ContextPackageDraft {
@@ -226,3 +226,4 @@ export default function ContextPackageEditor({
     </div>
   );
 }
+

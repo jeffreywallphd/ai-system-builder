@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { CompositionAssetContractResolver } from "../../contracts/CompositionAssetContractResolver";
 import {
   createCompositionTaxonomyDescriptor,
@@ -6,7 +6,7 @@ import {
   TaxonomySemanticRoles,
   TaxonomyStructuralKinds,
   type CompositionTaxonomyDescriptor,
-} from "../../../domain/taxonomy/CompositionTaxonomy";
+} from "@domain/taxonomy/CompositionTaxonomy";
 import {
   StudioCapabilityQueryService,
   StudioCapabilityRegistry,
@@ -30,7 +30,7 @@ import {
   type StudioProducedOutput,
 } from "../StudioOutputAdapter";
 import { StudioHandoffOrchestrationService } from "../StudioHandoffOrchestrationService";
-import { createStudioHandoffContract, StudioHandoffIntentKinds } from "../../../domain/studio-handoff/StudioHandoffContract";
+import { createStudioHandoffContract, StudioHandoffIntentKinds } from "@domain/studio-handoff/StudioHandoffContract";
 
 const resolver = new CompositionAssetContractResolver();
 
@@ -435,3 +435,4 @@ describe("Cross-studio handoff interop integration", () => {
     expect(issueCodes.some((code) => ["semantic-role-incompatible", "taxonomy-incompatible", "compatibility-failed"].includes(code))).toBeTrue();
   });
 });
+

@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
-import { createCanonicalRecordsShape } from "../../domain/dataset-studio/CanonicalDataShapes";
+﻿import { describe, expect, it } from "bun:test";
+import { createCanonicalRecordsShape } from "@domain/dataset-studio/CanonicalDataShapes";
 import {
   UnifiedIngestionContractVersion,
   UnifiedIngestionOutputTargetKinds,
   UnifiedIngestionReferenceKinds,
   type UnifiedIngestionNormalizedOutput,
-} from "../../domain/dataset-studio/UnifiedIngestionDomain";
+} from "@domain/dataset-studio/UnifiedIngestionDomain";
 import { UnifiedIngestionPreviewService } from "../UnifiedIngestionPreviewService";
 
 function createSource() {
@@ -103,4 +103,5 @@ describe("UnifiedIngestionPreviewService", () => {
     }
   });
 });
+
 

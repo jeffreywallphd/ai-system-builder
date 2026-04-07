@@ -1,11 +1,11 @@
-import type { HostRuntimeIdentity } from "../../domain/hosts/HostRuntimeDomain";
+﻿import type { HostRuntimeIdentity } from "@domain/hosts/HostRuntimeDomain";
 import {
   AuthoritativeServerHostRuntime,
   DesktopHostRuntime,
   HybridHostRuntime,
   WebHostRuntime,
   WorkerHostRuntime,
-} from "../../hosts/HostRuntimeCatalog";
+} from "@hosts/HostRuntimeCatalog";
 import {
   HostComposableServiceKinds,
   HostServiceExposureBoundaries,
@@ -381,3 +381,4 @@ export function assertWorkerHostServiceCoverage(plan: HostServiceRegistrationPla
     }
   }
 }
+

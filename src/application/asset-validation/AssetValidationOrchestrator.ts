@@ -1,5 +1,5 @@
-import { AssetValidationStatuses, createAssetValidationResult, type AssetValidationIssue, type AssetValidationResult } from "../../domain/contracts/AssetValidation";
-import type { WorkflowTemplateDefinition } from "../../domain/workflow-template-studio/WorkflowTemplateDomain";
+﻿import { AssetValidationStatuses, createAssetValidationResult, type AssetValidationIssue, type AssetValidationResult } from "@domain/contracts/AssetValidation";
+import type { WorkflowTemplateDefinition } from "@domain/workflow-template-studio/WorkflowTemplateDomain";
 import { ValidatedAssetTypes, type AssetValidator, type ValidatedAssetRef } from "./AssetValidationTypes";
 
 export interface AggregatedAssetValidationResult {
@@ -118,3 +118,4 @@ export class AssetValidationOrchestrator {
     return Object.freeze(dependencies);
   }
 }
+

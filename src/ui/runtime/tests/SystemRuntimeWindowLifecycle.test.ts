@@ -1,8 +1,8 @@
-import { describe, expect, it } from "bun:test";
-import { createComfyImageManipulationDefaultConfig } from "../../../application/system-studio/ComfyImageManipulationPropertySchema";
-import { ImageManipulationSystemTemplate } from "../../../application/system-studio/ImageManipulationSystemTemplate";
-import { createImageManipulationRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchResolver";
-import { serializeSystemRuntimeWindowLaunchContract } from "../../../application/system-runtime/SystemRuntimeWindowLaunchContract";
+﻿import { describe, expect, it } from "bun:test";
+import { createComfyImageManipulationDefaultConfig } from "@application/system-studio/ComfyImageManipulationPropertySchema";
+import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
+import { createImageManipulationRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchResolver";
+import { serializeSystemRuntimeWindowLaunchContract } from "@application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { parseLaunchContractFromSearch } from "../../components/studio-shell/SystemRuntimeWindowHost";
 import { SystemRuntimeWindowHydrationService } from "../SystemRuntimeWindowHydrationService";
 import {
@@ -169,3 +169,4 @@ describe("System runtime window lifecycle", () => {
     expect(invalidLaunch.issue).toBe("runtime-window.launch-contract.invalid");
   });
 });
+

@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkflowDraftTriggerTypes,
   type WorkflowDraftStateTriggerConfig,
   WorkflowDraftTriggerKinds,
@@ -10,9 +10,9 @@ import {
   type WorkflowDraftTriggerType,
   type WorkflowDraftUserTriggerConfig,
   type WorkflowValidationIssue,
-} from "../../../domain/workflow-studio/WorkflowStudioDomain";
-import { createDefaultWorkflowTriggerTypeRegistry } from "../../../application/workflow-studio/WorkflowTriggerTypeRegistry";
-import { validateSingleWorkflowTriggerDefinition } from "../../../application/workflow-studio/WorkflowTriggerValidationPipeline";
+} from "@domain/workflow-studio/WorkflowStudioDomain";
+import { createDefaultWorkflowTriggerTypeRegistry } from "@application/workflow-studio/WorkflowTriggerTypeRegistry";
+import { validateSingleWorkflowTriggerDefinition } from "@application/workflow-studio/WorkflowTriggerValidationPipeline";
 
 export interface WorkflowWizardTriggerTypeDefinition {
   readonly kind: WorkflowDraftTriggerKind;
@@ -363,3 +363,4 @@ export function getWorkflowTriggerKindLabel(kind: WorkflowDraftTriggerKind): str
   }
   return "State";
 }
+

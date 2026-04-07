@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   IdentityCredentialHistoryQuery,
   IdentityCredentialMaterialRecord,
   IdentityPersistenceMutationContext,
   IdentityPersistenceMutationResult,
   IdentityProviderSubjectReference,
-} from "../../../shared/dto/identity/IdentityPersistenceDtos";
+} from "@shared/dto/identity/IdentityPersistenceDtos";
 
 export interface ICredentialMaterialQueryRepository {
   getActiveCredentialMaterial(
@@ -29,3 +29,4 @@ export interface ICredentialMaterialWriteRepository {
 
 export interface ICredentialMaterialRepository
   extends ICredentialMaterialQueryRepository, ICredentialMaterialWriteRepository {}
+

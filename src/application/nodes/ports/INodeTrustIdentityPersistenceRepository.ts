@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   NodeIdentityPersistenceLookupQuery,
   NodeIdentityPersistenceRecord,
   NodeTrustPersistenceMutationResult,
@@ -8,7 +8,7 @@ import type {
   UpdateNodeApprovalPersistenceRecordInput,
   UpdateNodeCapabilityProfilePersistenceRecordInput,
   UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export interface INodeTrustIdentityPersistenceRepository {
   findNodeById(nodeId: string): Promise<NodeIdentityPersistenceRecord | undefined>;
@@ -32,3 +32,4 @@ export interface INodeTrustIdentityPersistenceRepository {
     input: RecordNodeLastSeenPersistenceRecordInput,
   ): Promise<NodeTrustPersistenceMutationResult<NodeIdentityPersistenceRecord>>;
 }
+

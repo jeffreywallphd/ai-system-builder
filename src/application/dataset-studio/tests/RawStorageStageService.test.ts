@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { DatasetPipelineStageKinds } from "../../../domain/dataset-studio/StagePipelineDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { DatasetPipelineStageKinds } from "@domain/dataset-studio/StagePipelineDomain";
 import { RawStorageStageService } from "../RawStorageStageService";
 
 describe("RawStorageStageService", () => {
@@ -41,3 +41,4 @@ describe("RawStorageStageService", () => {
     expect(result.log.status).toBe("succeeded");
   });
 });
+

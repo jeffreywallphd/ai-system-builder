@@ -1,4 +1,4 @@
-import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+﻿import type { IWorkflow } from "@domain/workflows/interfaces/IWorkflow";
 import { ExecutionContextToolPolicyService } from "./ExecutionContextToolPolicyService";
 import { WorkflowContextService, type IResolveWorkflowContextRequest } from "./WorkflowContextService";
 import { createBasePreviewResult, createCapabilityDecision, createDeliveryTargets } from "./ContextPreviewSupport";
@@ -55,3 +55,4 @@ export class PreviewAgentContextUseCase {
     });
   }
 }
+
