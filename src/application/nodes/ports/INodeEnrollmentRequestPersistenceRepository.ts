@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   NodeEnrollmentRequestPersistenceLookupQuery,
   NodeEnrollmentRequestPersistenceRecord,
   NodeTrustPersistenceMutationResult,
   SaveNodeEnrollmentRequestPersistenceRecordInput,
   TransitionNodeEnrollmentRequestPersistenceRecordStatusInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export interface INodeEnrollmentRequestPersistenceRepository {
   findEnrollmentRequestById(requestId: string): Promise<NodeEnrollmentRequestPersistenceRecord | undefined>;
@@ -22,3 +22,4 @@ export interface INodeEnrollmentRequestPersistenceRepository {
     input: TransitionNodeEnrollmentRequestPersistenceRecordStatusInput,
   ): Promise<NodeTrustPersistenceMutationResult<NodeEnrollmentRequestPersistenceRecord>>;
 }
+

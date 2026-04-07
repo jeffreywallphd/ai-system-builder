@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ResourceOwnershipScopes,
   ResourceVisibilities,
@@ -6,8 +6,8 @@ import {
   RoleAssignmentStatuses,
   SharingPolicyModes,
   SharingSubjectKinds,
-} from "../../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   mapResourcePolicyMetadataRowToRecord,
   mapRoleAssignmentRowToRecord,
@@ -107,3 +107,4 @@ describe("AuthorizationPersistenceMapper", () => {
     expect(normalizeAuthorizationLookup("   ")).toBeUndefined();
   });
 });
+

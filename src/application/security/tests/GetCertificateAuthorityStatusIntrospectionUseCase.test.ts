@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateAuthorityStatuses, CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateAuthorityStatuses, CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { CertificateAuthorityBootstrapConfiguration } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type { CertificateAuthoritySecretMetadata } from "../ports/ICertificateAuthorityBootstrapSecretService";
 import type { ICertificateAuthorityRootPersistenceRepository } from "../ports/ICertificateAuthorityRootPersistenceRepository";
@@ -8,7 +8,7 @@ import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCe
 import type { ITrustMaterialReferencePersistenceRepository } from "../ports/ITrustMaterialReferencePersistenceRepository";
 import { ResolveCertificateAuthorityStartupStateUseCase } from "../use-cases/ResolveCertificateAuthorityStartupStateUseCase";
 import { GetCertificateAuthorityStatusIntrospectionUseCase } from "../use-cases/GetCertificateAuthorityStatusIntrospectionUseCase";
-import { parseCertificateAuthorityStatusIntrospectionView } from "../../../shared/schemas/security/CertificateAuthoritySchemaContracts";
+import { parseCertificateAuthorityStatusIntrospectionView } from "@shared/schemas/security/CertificateAuthoritySchemaContracts";
 import type {
   AppendCertificateStatusHistoryPersistenceRecordInput,
   CertificateAuthorityPersistenceMutationResult,
@@ -33,8 +33,8 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
-import { CertificateDistributionEventStatuses, CertificateDistributionTargetKinds } from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
+import { CertificateDistributionEventStatuses, CertificateDistributionTargetKinds } from "@shared/dto/security/CertificateAuthorityDtos";
 
 class StubConfigurationProvider {
   public constructor(private readonly configuration: CertificateAuthorityBootstrapConfiguration) {}
@@ -532,3 +532,4 @@ function createIssuedCertificate(input: {
     revision: 1,
   });
 }
+

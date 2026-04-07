@@ -59,6 +59,11 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - When summarizing purity/impurity, say "clean-architecture-style with pragmatic UI-layer convenience logic," not "strict clean architecture."
 - Phase 7 inner contracts now expose authored-agent operations as application use cases (launch/session-read/run-control/trigger-binding) over existing `AgentRunnerService` + `IAgentExecutionSessionRepository` seams; no parallel runtime path was introduced.
 
+## Source import convention
+- `src/` is the canonical architecture root for `domain`, `application`, `infrastructure`, `hosts`, `shared`, and `ui`.
+- Cross-layer imports should use aliases (`@application/*`, `@domain/*`, `@hosts/*`, `@infrastructure/*`, `@shared/*`, `@ui/*`, `@src/*`) instead of deep relative traversal.
+- Legacy renderer/shared contract paths that still import from `@shared/*` are supported through compatibility re-export seams under `src/shared/*` (forwarding to canonical `src/ui/shared/*` or `src/infrastructure/nodes/shared/*` modules).
+
 ## Direction 6 boundary note: Identity domain foundation (story 1.1.1)
 - New inner-layer identity contracts live in `src/domain/identity/IdentityDomain.ts`.
 - The model keeps identity lifecycle, credential lifecycle/policy, and session lifecycle as explicit separate concerns.
@@ -98,12 +103,12 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 - Added infrastructure security implementation `infrastructure/security/identity/ScryptLocalPasswordCredentialService.ts` using scrypt-based password derivation and timing-safe verification.
 
 ## Direction 6 boundary note: Authoritative identity server endpoints (story 1.2.6)
-- Added a thin infrastructure API adapter (`infrastructure/api/identity/IdentityAuthBackendApi.ts`) that maps inner identity results to stable public API error codes.
-- Added authoritative HTTP transport handlers in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for registration/login (`POST /api/v1/identity/register`, `POST /api/v1/identity/login`).
+- Added a thin infrastructure API adapter (`src/infrastructure/api/identity/IdentityAuthBackendApi.ts`) that maps inner identity results to stable public API error codes.
+- Added authoritative HTTP transport handlers in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` for registration/login (`POST /api/v1/identity/register`, `POST /api/v1/identity/login`).
 - Boundary posture is preserved:
   - request validation is transport-only (`zod`);
   - registration/login business rules remain in application use cases;
-  - host wiring is outer-layer only (`hosts/server/IdentityServerHost.ts`).
+  - host wiring is outer-layer only (`src/hosts/server/IdentityServerHost.ts`).
 - Transport logging now redacts credential-sensitive fields before emission, so credential material does not leak through infrastructure logs.
 
 ## Direction 8 boundary note: Secret domain and service contracts foundation (story 8.1.1)
@@ -120,7 +125,7 @@ The architecture is mostly clean, but not all write actions are modeled as appli
 
 ## Direction 8 boundary note: Secret host composition wiring (story 8.1.7)
 - Added host/runtime composition seam at `src/infrastructure/security/secrets/SecretServiceComposition.ts`.
-- Authoritative server wiring in `hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
+- Authoritative server wiring in `src/hosts/server/IdentityServerHost.ts` now composes secret repository, encryption port, access policy, observability, and audit hook collaborators without moving host bootstrap logic into domain/application layers.
 - Host startup fail-closed behavior now rejects partial secret master-key configuration while keeping composition explicit at the outer layer.
 
 ## Direction 12 boundary note: Host runtime composition contracts (story 12.1.1)

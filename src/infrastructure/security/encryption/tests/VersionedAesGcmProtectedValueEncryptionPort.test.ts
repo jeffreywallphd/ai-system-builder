@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { EncryptionKeyScopes, ProtectedDataClasses } from "../../../../domain/security/EncryptionAtRestPolicyDomain";
-import { ProtectedValueEncryptionErrorCodes } from "../../../../application/security/ports/ProtectedValueEncryptionPorts";
+﻿import { describe, expect, it } from "bun:test";
+import { EncryptionKeyScopes, ProtectedDataClasses } from "@domain/security/EncryptionAtRestPolicyDomain";
+import { ProtectedValueEncryptionErrorCodes } from "@application/security/ports/ProtectedValueEncryptionPorts";
 import { StaticEncryptionKeyMaterialPort } from "../StaticEncryptionKeyMaterialPort";
 import { VersionedAesGcmProtectedValueEncryptionPort } from "../VersionedAesGcmProtectedValueEncryptionPort";
 
@@ -146,3 +146,4 @@ function createKey() {
     activatedAt: "2026-01-01T00:00:00.000Z",
   };
 }
+

@@ -1,10 +1,10 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import {
   normalizeCertificateAuthorityMutationOperationKey,
   type IssuedCertificatePersistenceRecord,
   type CertificateSubjectPersistenceRecord,
   type CertificateSubjectReferencePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   CertificateAuthorityStatuses,
   createCertificateSerialNumber,
@@ -12,12 +12,12 @@ import {
   createCertificateValidityWindow,
   createIssuedCertificate,
   TrustMaterialKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateSubjectProfileKinds,
   evaluateCertificateIssuancePolicy,
   type CertificateSubjectProfileKind,
-} from "../../../domain/security/CertificateIssuancePolicyDomain";
+} from "@domain/security/CertificateIssuancePolicyDomain";
 import type {
   ApprovedNodeCertificateEligibilityMetadata,
   INodeCertificateEligibilityPort,
@@ -596,3 +596,4 @@ function toAuditDetails(event: CertificateIssuanceAuditEvent): Readonly<Record<s
       return Object.freeze({});
   }
 }
+

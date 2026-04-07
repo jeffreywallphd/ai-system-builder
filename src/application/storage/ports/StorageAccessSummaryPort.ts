@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageManagedAction,
   StoragePolicyRestrictedCapability,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export const StoragePermissionDecisionEffects = Object.freeze({
   allowed: "allowed",
@@ -50,3 +50,4 @@ export interface StorageInstanceAccessSummary {
   readonly allowedActions: ReadonlyArray<StorageManagedAction>;
   readonly policyRestrictedCapabilities: ReadonlyArray<StoragePolicyRestrictedCapabilitySummary>;
 }
+

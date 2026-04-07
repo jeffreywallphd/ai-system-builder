@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   Asset,
   AssetKind,
   AssetLifecycleState,
   AssetVisibility,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 
 export interface AssetListQuery {
   readonly workspaceId?: string;
@@ -51,3 +51,4 @@ export interface IAssetRepository {
     assetId: string,
   ): Promise<GeneratedOutputSourceRecord | undefined>;
 }
+

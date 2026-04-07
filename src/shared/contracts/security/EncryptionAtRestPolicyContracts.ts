@@ -1,15 +1,15 @@
-import type {
+﻿import type {
   DecryptionAllowance,
   EncryptedMaterialReference,
   EncryptionAtRestPolicyDefinition,
   EncryptionPolicyEvaluationResult,
   ProtectedDataClass,
   ProtectedDataEncryptionRule,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 
 export class EncryptionAtRestPolicyContractError extends Error {
   constructor(message: string) {
@@ -301,3 +301,4 @@ export function serializeEncryptionPolicyRegistry(
 ): string {
   return JSON.stringify(toEncryptionPolicyRegistrySnapshot(policies));
 }
+

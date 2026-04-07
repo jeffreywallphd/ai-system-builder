@@ -1,17 +1,17 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   TransportConnectionRejectionReasons,
   TransportSecurityScenarios,
   resolveBaselineTransportSecurityPolicy,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type {
   ValidateTransportConnectionTrustOutcome,
-} from "../../../application/security/use-cases/ValidateTransportConnectionTrustUseCase";
+} from "@application/security/use-cases/ValidateTransportConnectionTrustUseCase";
 import {
   HttpTransportTrustValidationAdapter,
   WebSocketTransportTrustValidationAdapter,
 } from "../TransportTrustValidationAdapters";
-import type { TransportSecurityAuditEvent, TransportSecurityEventReporter } from "../../../application/security/ports/TransportSecurityAuditPorts";
+import type { TransportSecurityAuditEvent, TransportSecurityEventReporter } from "@application/security/ports/TransportSecurityAuditPorts";
 
 class CapturingTransportSecurityEventReporter implements TransportSecurityEventReporter {
   public readonly events: TransportSecurityAuditEvent[] = [];
@@ -198,4 +198,5 @@ function rejectedOutcome(
     }),
   });
 }
+
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthenticatedTrustStates,
   TransportChannelTypes,
@@ -8,7 +8,7 @@ import {
   TransportSecurityScenarios,
   evaluateTransportConnectionTrust,
   resolveBaselineTransportSecurityPolicy,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type {
   EvaluateTransportConnectionPolicyRequest,
   ResolveTransportSecurityPolicyRequest,
@@ -239,3 +239,4 @@ describe("ValidateTransportConnectionTrustUseCase", () => {
     expect(outcome.error.code).toBe("validate-transport-connection-trust-invalid-request");
   });
 });
+

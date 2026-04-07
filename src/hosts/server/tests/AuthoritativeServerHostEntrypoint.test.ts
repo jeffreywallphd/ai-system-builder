@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { HostBootModes } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { HostBootModes } from "@application/common/HostCompositionContracts";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
   AuthoritativeServerHostEnvironmentKeys,
@@ -132,3 +132,4 @@ describe("AuthoritativeServerHostEntrypoint", () => {
     expect(options.boot?.environment?.[AuthoritativeServerHostEnvironmentKeys.databasePath]).toBe("C:/tmp/host.sqlite");
   });
 });
+

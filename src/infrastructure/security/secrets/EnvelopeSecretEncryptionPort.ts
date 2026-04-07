@@ -1,6 +1,6 @@
-import { randomUUID } from "node:crypto";
-import type { ISecretEncryptionPort } from "../../../application/security/ports/SecretServicePorts";
-import type { SecretScopeOwner, SecretVersion } from "../../../domain/security/SecretDomain";
+﻿import { randomUUID } from "node:crypto";
+import type { ISecretEncryptionPort } from "@application/security/ports/SecretServicePorts";
+import type { SecretScopeOwner, SecretVersion } from "@domain/security/SecretDomain";
 import {
   SecretEnvelopeEncryptionError,
   SecretEnvelopeEncryptionService,
@@ -84,3 +84,4 @@ export function createEnvelopeSecretEncryptionPortFromEnvironment(input: {
 function defaultPayloadRefFactory(): string {
   return `${SECRET_ENCRYPTED_PAYLOAD_REF_PREFIX}${randomUUID()}`;
 }
+

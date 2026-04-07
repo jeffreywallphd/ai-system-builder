@@ -1,29 +1,29 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { EncryptionPolicyEvaluationService } from "../../../../application/security/use-cases/EncryptionPolicyEvaluationService";
-import { EncryptionKeyResolutionService } from "../../../../application/security/use-cases/EncryptionKeyResolutionService";
-import type { IEncryptionAtRestPolicyContextResolverPort } from "../../../../application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
+import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
+import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
+import type { IEncryptionAtRestPolicyContextResolverPort } from "@application/security/ports/EncryptionAtRestPolicyEvaluationPorts";
 import {
   SecretKinds,
   SecretScopes,
   createSecretRecord,
-} from "../../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import {
   createEncryptionAtRestPolicyDefinition,
   EncryptionKeyScopes,
   EncryptionModes,
   EncryptionPolicyScopes,
   ProtectedDataClasses,
-} from "../../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteSecretRecordPersistenceAdapter } from "../SqliteSecretRecordPersistenceAdapter";
 import { ProtectedSecretRecordPersistenceRepository } from "../ProtectedSecretRecordPersistenceRepository";
 import { StaticEncryptionKeyCatalogPort } from "../../../security/encryption/StaticEncryptionKeyCatalogPort";
 import { StaticEncryptionKeyMaterialPort } from "../../../security/encryption/StaticEncryptionKeyMaterialPort";
 import { VersionedAesGcmProtectedValueEncryptionPort } from "../../../security/encryption/VersionedAesGcmProtectedValueEncryptionPort";
-import { EncryptionKeyLifecycleStates } from "../../../../application/security/ports/EncryptionKeyResolutionPorts";
+import { EncryptionKeyLifecycleStates } from "@application/security/ports/EncryptionKeyResolutionPorts";
 
 const createdRoots: string[] = [];
 
@@ -170,3 +170,4 @@ function createProtectedRepository(
     protectedValuePort,
   );
 }
+

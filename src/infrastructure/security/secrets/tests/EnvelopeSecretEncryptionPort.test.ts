@@ -1,11 +1,11 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   SecretScopes,
   createSecretVersion,
-} from "../../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import {
   SecretEnvelopeEncryptionService,
   StaticSecretMasterKeyProvider,
@@ -68,3 +68,4 @@ describe("EnvelopeSecretEncryptionPort", () => {
     rmSync(root, { recursive: true, force: true });
   });
 });
+

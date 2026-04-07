@@ -1,4 +1,4 @@
-import type { RuntimeTrustMaterialPackageViewDto } from "../../../shared/dto/security/CertificateAuthorityDtos";
+﻿import type { RuntimeTrustMaterialPackageViewDto } from "@shared/dto/security/CertificateAuthorityDtos";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import {
   ResolveRuntimeTrustMaterialPackageErrorCodes,
@@ -139,3 +139,4 @@ export class ResolveApprovedNodeRuntimeTrustMaterialUseCase {
     };
   }
 }
+

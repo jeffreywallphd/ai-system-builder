@@ -10,7 +10,7 @@ Story 13.4.3 baseline for Feature 13 / Epic 13.4: keep authoritative persistent 
 - `src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`
 - `src/infrastructure/persistence/sqlite/SqliteTransactionCoordinator.ts`
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/persistence/tests/PersistentPlatformServices.integration.test.ts`
 - `docs/architecture/persistent-platform-service-extension-guidance.md`
 

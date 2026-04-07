@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageBackendTypes,
   StorageLifecycleStates,
   StorageManagedActions,
   StoragePolicyRestrictedCapabilities,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageSensitiveRedactionReasons,
   StorageSyncDeploymentAvailabilities,
@@ -212,3 +212,4 @@ describe("StorageTransportContracts", () => {
     })).toThrow(StorageTransportContractError);
   });
 });
+

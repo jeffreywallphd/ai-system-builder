@@ -1,4 +1,4 @@
-import type { TrustMaterialKind } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import type { TrustMaterialKind } from "@domain/security/CertificateAuthorityDomain";
 
 export interface CertificateAuthorityProtectedMaterialDescriptor {
   readonly materialRef: string;
@@ -51,3 +51,4 @@ export interface ICertificateAuthorityRootMaterialStorage {
     input: LoadCertificateAuthorityRootMaterialsInput,
   ): Promise<ReadonlyArray<LoadedCertificateAuthorityProtectedMaterial>>;
 }
+

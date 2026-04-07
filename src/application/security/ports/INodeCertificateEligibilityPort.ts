@@ -1,4 +1,4 @@
-import type { NodeCapabilityProfilePersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+﻿import type { NodeCapabilityProfilePersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export interface ApprovedNodeCertificateEligibilityInput {
   readonly nodeId: string;
@@ -25,3 +25,4 @@ export interface INodeCertificateEligibilityPort {
     input: ApprovedNodeCertificateEligibilityInput,
   ): Promise<ApprovedNodeCertificateEligibilityDecision>;
 }
+

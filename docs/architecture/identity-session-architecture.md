@@ -57,11 +57,11 @@ Responsibilities:
 
 - `infrastructure/security/identity/OpaqueIdentitySessionTokenService.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `infrastructure/config/IdentitySessionPolicyConfig.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 Responsibilities:
 
@@ -318,8 +318,8 @@ Primary tests for this subsystem:
 - `infrastructure/config/tests/IdentitySessionPolicyConfig.test.ts`
 - `infrastructure/config/tests/IdentitySessionTrustPolicyConfig.test.ts`
 - `infrastructure/security/identity/tests/OpaqueIdentitySessionTokenService.test.ts`
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `application/identity/tests/TrustedDeviceSessionTrustService.test.ts`
-- `infrastructure/filesystem/identity/tests/SqliteIdentityRepository.test.ts`
+- `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 

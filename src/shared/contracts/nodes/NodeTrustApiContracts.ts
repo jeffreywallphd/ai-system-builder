@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   NodeApprovalStatus,
   NodeEnrollmentRequestStatus,
   NodeHeartbeatStatus,
@@ -7,8 +7,8 @@ import type {
   NodeRoleCapability,
   NodeTrustState,
   NodeType,
-} from "../../../domain/nodes/NodeTrustDomain";
-import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
+import { NodeEnrollmentRequestStatuses } from "@domain/nodes/NodeTrustDomain";
 import type { RuntimeTrustMaterialPackageViewDto } from "../../dto/security/CertificateAuthorityDtos";
 
 export class NodeTrustApiContractError extends Error {
@@ -422,3 +422,4 @@ export function toNodeInventoryDetailDto(value: NodeInternalInventoryDetailDto):
       : undefined,
   });
 }
+

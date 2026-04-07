@@ -1,12 +1,12 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
+﻿import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import type {
   AssetDownloadGrantClaims,
   IAssetDownloadGrantPort,
   IssueAssetDownloadGrantRequest,
   IssueAssetDownloadGrantResult,
   ResolveAssetDownloadGrantRequest,
-} from "../../../application/assets/ports/AssetDownloadGrantPort";
-import { AssetDownloadPurposes } from "../../../application/assets/use-cases/AssetServiceContracts";
+} from "@application/assets/ports/AssetDownloadGrantPort";
+import { AssetDownloadPurposes } from "@application/assets/use-cases/AssetServiceContracts";
 
 interface SerializedGrantClaims {
   readonly version: 1;
@@ -212,4 +212,5 @@ function fromBase64Url(value: string | undefined): Buffer | undefined {
     return undefined;
   }
 }
+
 

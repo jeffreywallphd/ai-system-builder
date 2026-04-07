@@ -1,7 +1,7 @@
-import { AuthorizationPolicyEvaluationTargetKinds, type AuthorizationActorReference, type AuthorizationPolicyDecision } from "../contracts/AuthorizationPolicyEvaluationContracts";
+﻿import { AuthorizationPolicyEvaluationTargetKinds, type AuthorizationActorReference, type AuthorizationPolicyDecision } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
-import { AuthorizationSchemaValidationError } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
-import type { AuthorizationPersistenceMutationEnvelope } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+import { AuthorizationSchemaValidationError } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
+import type { AuthorizationPersistenceMutationEnvelope } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 
 export const AuthorizationAdministrationErrorCodes = Object.freeze({
   invalidRequest: "authorization-administration-invalid-request",
@@ -166,3 +166,4 @@ export function normalizeOptionalString(value?: string): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

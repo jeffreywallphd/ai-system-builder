@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -10,7 +10,7 @@ import {
   StoragePolicyRestrictedCapabilities,
   StorageReplicationModes,
   StorageRetentionExpiryActions,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   StorageAccessPermissionEffects,
   StorageAccessSummarySources,
@@ -223,11 +223,19 @@ const StorageRetentionExpiryActionSchema = z.enum([
   StorageRetentionExpiryActions.delete,
 ]);
 
-const StorageReplicationPolicySchema = z.object({
+const StorageReplicationPolicySchemaBase = z.object({
   mode: StorageReplicationModeSchema,
   replicaStorageInstanceId: StorageInstanceIdSchema.optional(),
   syncIntervalSeconds: z.number().int().min(10).optional(),
-}).strict().superRefine((value, context) => {
+}).strict();
+
+const applyStorageReplicationPolicyInvariants = <
+  TSchema extends z.ZodType<{
+    mode: z.infer<typeof StorageReplicationModeSchema>;
+    replicaStorageInstanceId?: string | undefined;
+    syncIntervalSeconds?: number | undefined;
+  }>,
+>(schema: TSchema): z.ZodEffects<TSchema> => schema.superRefine((value, context) => {
   if (value.mode === StorageReplicationModes.none) {
     if (value.replicaStorageInstanceId || value.syncIntervalSeconds !== undefined) {
       context.addIssue({
@@ -263,6 +271,8 @@ const StorageReplicationPolicySchema = z.object({
     });
   }
 });
+
+const StorageReplicationPolicySchema = applyStorageReplicationPolicyInvariants(StorageReplicationPolicySchemaBase);
 
 const StoragePolicyInputSchema = z.object({
   policyId: IdentifierSchema,
@@ -586,7 +596,7 @@ const StorageLifecycleMetadataSchema = z.object({
   extensions: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
-const StorageReplicationStatusSchema = StorageReplicationPolicySchema.extend({
+const StorageReplicationStatusSchema = applyStorageReplicationPolicyInvariants(StorageReplicationPolicySchemaBase.extend({
   lastSyncAt: TimestampSchema.optional(),
   lastSyncStatus: StorageSyncStatusSchema,
   syncLagSeconds: z.number().int().min(0).optional(),
@@ -617,7 +627,7 @@ const StorageReplicationStatusSchema = StorageReplicationPolicySchema.extend({
     }
   }).optional(),
   extensions: z.record(z.string(), z.unknown()).optional(),
-}).strict();
+}).strict());
 
 const StorageSensitiveRedactionEntrySchema = z.object({
   field: IdentifierSchema,
@@ -874,3 +884,4 @@ export function parseGetStorageInstanceDetailResponseDto(
     payload,
   );
 }
+

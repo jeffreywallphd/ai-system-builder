@@ -1,15 +1,15 @@
-import {
+﻿import {
   UserIdentityStatuses,
   createLocalCredentialState,
   createUserIdentity,
   type AuthProvider,
   type CredentialPolicy,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityLifecycleEventContractVersions,
   IdentityLifecycleEventTypes,
   createIdentityLifecycleEvent,
-} from "../../../../application/contracts/IdentityLifecycleEventContracts";
+} from "@application/contracts/IdentityLifecycleEventContracts";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityErrorBoundaries,
@@ -19,17 +19,17 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityClock } from "../../../../application/identity/ports/IIdentityClock";
-import type { IIdentityIdGenerator } from "../../../../application/identity/ports/IIdentityIdGenerator";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import type { IIdentityPersistenceRepository } from "../../../../application/identity/ports/IIdentityPersistenceRepository";
-import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
-import type { IIdentityLifecycleEventPublisher } from "../../../../application/identity/ports/IIdentityLifecycleEventPublisher";
-import { publishIdentityLifecycleEventBestEffort } from "../../../../application/identity/services/IdentityLifecycleEventPublishing";
-import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
+import type { IIdentityClock } from "../ports/IIdentityClock";
+import type { IIdentityIdGenerator } from "../ports/IIdentityIdGenerator";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import type { IIdentityPersistenceRepository } from "@application/identity/ports/IIdentityPersistenceRepository";
+import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLifecycleEventPublisher } from "../ports/IIdentityLifecycleEventPublisher";
+import { publishIdentityLifecycleEventBestEffort } from "../services/IdentityLifecycleEventPublishing";
+import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
 import {
   runInTransactionBoundary,
   type IPlatformTransactionManager,
@@ -376,3 +376,4 @@ export class RegisterLocalAccountUseCase {
     return identityFailure(error);
   }
 }
+

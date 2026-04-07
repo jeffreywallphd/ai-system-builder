@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { CertificateAuthorityStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { CertificateAuthorityStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { InitializeInternalCertificateAuthorityInput, InitializeInternalCertificateAuthorityResult } from "../ports/ICertificateAuthorityIssuerPort";
 import type {
   CertificateAuthorityProtectedMaterialDescriptor,
@@ -24,7 +24,7 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 class InMemoryCertificateAuthorityRepositories
   implements ICertificateAuthorityRootPersistenceRepository, ITrustMaterialReferencePersistenceRepository {
@@ -486,3 +486,4 @@ function createTrustMaterial(
     revision: 1,
   });
 }
+

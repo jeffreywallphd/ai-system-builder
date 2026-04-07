@@ -7,15 +7,15 @@ Story 8.3.6 extends this with trusted administrative master-key re-encryption en
 
 ## Canonical files
 
-- `infrastructure/api/security/sdk/PublicSecretMetadataApiContract.ts`
-- `infrastructure/api/security/SecretMetadataBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/security/sdk/PublicSecretMetadataApiContract.ts`
+- `src/infrastructure/api/security/SecretMetadataBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/shared/contracts/security/SecretTransportContracts.ts`
 - `src/shared/dto/security/SecretTransportDtos.ts`
 - `src/shared/schemas/security/SecretApiSchemaContracts.ts`
-- `hosts/server/IdentityServerHost.ts`
-- `infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerSecretMetadata.test.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/security/tests/SecretMetadataBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerSecretMetadata.test.ts`
 - `src/shared/schemas/security/tests/SecretApiSchemaContracts.test.ts`
 - `src/shared/dto/security/tests/SecretTransportDtos.test.ts`
 - `docs/architecture/secrets-metadata-management-internal-apis.md`

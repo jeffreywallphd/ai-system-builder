@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -6,7 +6,7 @@ import {
   StorageLifecycleStates,
   createStorageInstance,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type {
   IStorageInstanceRepository,
   StorageInstanceListQuery,
@@ -317,3 +317,4 @@ describe("StorageLogicalAccessResolutionService", () => {
     });
   });
 });
+

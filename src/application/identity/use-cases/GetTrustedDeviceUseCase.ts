@@ -1,4 +1,4 @@
-import {
+﻿import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
   identityFailure,
@@ -6,8 +6,8 @@ import {
   type IdentityOperationError,
   type IdentityOperationResult,
   type TrustedDeviceRecord,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ITrustedDeviceManagementService } from "../../../../application/identity/ports/ITrustedDeviceManagementService";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ITrustedDeviceManagementService } from "@application/identity/ports/ITrustedDeviceManagementService";
 
 export type GetTrustedDeviceErrorCode =
   | typeof IdentityErrorCodes.invalidRequest
@@ -64,3 +64,4 @@ function normalizeRequired(value: string): string | undefined {
   const normalized = value.trim();
   return normalized ? normalized : undefined;
 }
+

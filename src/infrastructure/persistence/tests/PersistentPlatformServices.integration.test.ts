@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,7 +9,7 @@ import {
   createAuthProvider,
   createSession,
   createUserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   DevicePairingMethods,
   DeviceTrustMaterialKinds,
@@ -17,11 +17,11 @@ import {
   createDeviceFingerprint,
   createDeviceTrustMaterialRef,
   createTrustedDevice,
-} from "../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   WorkspaceStatuses,
   createWorkspace,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -29,7 +29,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -38,10 +38,10 @@ import {
   createStorageAttribution,
   createStorageInstance,
   transitionStorageLifecycle,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   PlatformAuditEventKinds,
-} from "../../../application/common/ports/PlatformPersistenceBoundaryPorts";
+} from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
   createAuthoritativePersistentPlatformServices,
 } from "../AuthoritativePersistenceComposition";
@@ -353,3 +353,4 @@ describe("PersistentPlatformServices integration", () => {
     }
   });
 });
+

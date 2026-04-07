@@ -1,4 +1,4 @@
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import type { StorageInstance } from "@domain/storage/StorageDomain";
 import type { IStorageObjectPort } from "../ports/StorageObjectPort";
 
 export const StorageLogicalAccessOperationIntents = Object.freeze({
@@ -56,3 +56,4 @@ export interface IStorageLogicalAccessResolutionService {
     command: ResolveStorageLogicalAccessCommand,
   ): Promise<StorageLogicalAccessResolutionResult<StorageLogicalAccessResolutionPlan>>;
 }
+

@@ -1,9 +1,9 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
-import type { IAuthorizationRoleAssignmentPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository";
-import type { IAuthorizationSharingGrantPersistenceRepository } from "../../../application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
-import { RoleAssignmentStatuses } from "../../../domain/authorization/AuthorizationDomain";
+import type { IAuthorizationResourcePolicyMetadataPersistenceRepository } from "@application/authorization/ports/IAuthorizationResourcePolicyMetadataPersistenceRepository";
+import type { IAuthorizationRoleAssignmentPersistenceRepository } from "@application/authorization/ports/IAuthorizationRoleAssignmentPersistenceRepository";
+import type { IAuthorizationSharingGrantPersistenceRepository } from "@application/authorization/ports/IAuthorizationSharingGrantPersistenceRepository";
+import { RoleAssignmentStatuses } from "@domain/authorization/AuthorizationDomain";
 import {
   normalizeAuthorizationMutationOperationKey,
   toAuthorizationResourceLookupKey,
@@ -21,7 +21,7 @@ import {
   type UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   type UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
   type UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapResourcePolicyMetadataRecordToRowValues,
@@ -1110,3 +1110,4 @@ export class SqliteAuthorizationPersistenceAdapter
     ].join("|");
   }
 }
+

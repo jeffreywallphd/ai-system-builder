@@ -1,4 +1,4 @@
-import type { AuthorizationPolicyMutationRecordedEvent } from "../contracts/AuthorizationPolicyEvaluationContracts";
+﻿import type { AuthorizationPolicyMutationRecordedEvent } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import { AuthorizationPolicyEvaluationEventTypes } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyEventRecorder } from "../ports/IAuthorizationPolicyEventRecorder";
@@ -13,7 +13,7 @@ import type {
   UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
   UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import { redactAuthorizationAuditMetadata, redactAuthorizationAuditReason } from "./AuthorizationAuditRedaction";
 
 export interface AuthorizationPolicyMutationServiceClock {
@@ -298,3 +298,4 @@ function toMutationDetails(
 
   return Object.freeze(details);
 }
+

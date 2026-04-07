@@ -1,11 +1,11 @@
-import {
+﻿import {
   StorageDomainError,
   StorageLifecycleStates,
   createStorageAttribution,
   createStorageInstance,
   transitionStorageLifecycle,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type { IStorageCapabilityInspectionPort } from "../ports/StorageCapabilityInspectionPort";
 import type { IStorageInstanceRepository } from "../ports/IStorageInstanceRepository";
 import {
@@ -313,3 +313,4 @@ export function isStorageProvisioningAccepted(receipt: StorageProvisioningReceip
   return receipt.status === StorageProvisioningOperationStatuses.accepted
     || receipt.status === StorageProvisioningOperationStatuses.alreadyApplied;
 }
+

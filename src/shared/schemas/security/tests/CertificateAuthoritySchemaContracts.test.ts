@@ -1,10 +1,10 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import {
   CertificateAuthorityRootPersistenceRecordSchema,
   CertificateAuthoritySchemaValidationError,
@@ -362,3 +362,4 @@ describe("CertificateAuthoritySchemaContracts", () => {
     expect(parsed.protectedReferences).toHaveLength(1);
   });
 });
+

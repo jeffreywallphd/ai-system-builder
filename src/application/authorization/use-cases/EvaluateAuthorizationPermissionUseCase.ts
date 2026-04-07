@@ -1,6 +1,6 @@
-import { AuthorizationPolicyEvaluationTargetKinds, type AuthorizationPolicyDecisionEvaluationResult } from "../contracts/AuthorizationPolicyEvaluationContracts";
+﻿import { AuthorizationPolicyEvaluationTargetKinds, type AuthorizationPolicyDecisionEvaluationResult } from "../contracts/AuthorizationPolicyEvaluationContracts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "../ports/IAuthorizationPolicyDecisionEvaluator";
-import { parseAuthorizationPolicyEvaluationRequestDto } from "../../../shared/schemas/authorization/AuthorizationSchemaContracts";
+import { parseAuthorizationPolicyEvaluationRequestDto } from "@shared/schemas/authorization/AuthorizationSchemaContracts";
 import {
   AuthorizationAdministrationErrorCodes,
   type AuthorizationAdministrationOutcome,
@@ -48,3 +48,4 @@ export class EvaluateAuthorizationPermissionUseCase {
     };
   }
 }
+

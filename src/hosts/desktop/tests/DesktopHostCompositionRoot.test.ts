@@ -1,23 +1,23 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
   createHostRuntimeIdentity,
-} from "../../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 import {
   HostCompositionContractError,
   createHostBootConfiguration,
-} from "../../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { DesktopHostRuntime } from "../../HostRuntimeCatalog";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import { createDesktopCompositionRoot, DesktopServiceRegistrationPlanArtifactKey } from "../DesktopHostCompositionRoot";
-import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
-import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { HostServiceRegistrationError } from "@infrastructure/config/HostServiceRegistration";
 import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
-} from "../../../infrastructure/config/HostStartupConfiguration";
+} from "@infrastructure/config/HostStartupConfiguration";
 
 describe("DesktopHostCompositionRoot", () => {
   it("composes and stops desktop host runtime with lifecycle transitions", async () => {
@@ -238,3 +238,4 @@ describe("DesktopHostCompositionRoot", () => {
     await runtime.stop();
   });
 });
+

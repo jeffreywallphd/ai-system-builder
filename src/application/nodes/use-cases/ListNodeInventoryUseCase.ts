@@ -1,9 +1,9 @@
-import { NodeEnrollmentRequestStatuses } from "../../../domain/nodes/NodeTrustDomain";
+﻿import { NodeEnrollmentRequestStatuses } from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeEnrollmentRequestPersistenceRecord,
   NodeEnrollmentRequestPersistenceLookupQuery,
   NodeIdentityPersistenceLookupQuery,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeEnrollmentRequestPersistenceRepository } from "../ports/INodeEnrollmentRequestPersistenceRepository";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
@@ -236,3 +236,4 @@ export class ListNodeInventoryUseCase {
     return true;
   }
 }
+

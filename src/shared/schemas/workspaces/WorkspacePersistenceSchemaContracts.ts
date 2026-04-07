@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   WorkspaceEncryptionKeyScopes,
   WorkspaceEncryptionModes,
@@ -7,7 +7,7 @@ import {
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
   WorkspaceStatuses,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import { WorkspaceVisibilities } from "../../workspaces/WorkspaceOwnership";
 import {
   PersistenceAuditStampSchema,
@@ -243,3 +243,4 @@ export function parseWorkspaceInvitationPersistenceRecord(
     payload,
   );
 }
+

@@ -7,7 +7,7 @@ Story 8.3.3 baseline for Feature 8 / Epic 8.3: add host startup bootstrap checks
 ## Canonical files
 
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/security/secrets/tests/SystemSecretBootstrapService.test.ts`
 - `hosts/server/tests/IdentityServerHost.test.ts`
 - `.env.example`

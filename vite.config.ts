@@ -5,6 +5,15 @@ import react from "@vitejs/plugin-react";
 import { AppDistributionTargets, getAppRuntimeProfile } from "./domain/runtime/AppRuntimeProfile";
 
 const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
+const srcAliases = [
+  { find: "@src", replacement: path.resolve(REPOSITORY_ROOT, "src") },
+  { find: "@application", replacement: path.resolve(REPOSITORY_ROOT, "src/application") },
+  { find: "@domain", replacement: path.resolve(REPOSITORY_ROOT, "src/domain") },
+  { find: "@hosts", replacement: path.resolve(REPOSITORY_ROOT, "src/hosts") },
+  { find: "@infrastructure", replacement: path.resolve(REPOSITORY_ROOT, "src/infrastructure") },
+  { find: "@shared", replacement: path.resolve(REPOSITORY_ROOT, "src/shared") },
+  { find: "@ui", replacement: path.resolve(REPOSITORY_ROOT, "src/ui") },
+];
 
 export default defineConfig(async ({ mode }) => {
   const runtimeProfile = getAppRuntimeProfile(mode === "browser" ? "browser-development" : "desktop-development");
@@ -23,17 +32,25 @@ export default defineConfig(async ({ mode }) => {
       alias: runtimeProfile.hostKind === "browser"
         ? [
             {
+              find: /^@infrastructure\/execution\/createExecutionInfrastructure$/,
+              replacement: path.resolve(
+                REPOSITORY_ROOT,
+                "src/infrastructure/execution/createExecutionInfrastructure.browser.ts",
+              ),
+            },
+            ...srcAliases,
+            {
               find: "./modelManagementDependencies",
               replacement: path.resolve(
                 REPOSITORY_ROOT,
-                "ui/composition/modelManagementDependencies.browser.ts",
+                "src/ui/composition/modelManagementDependencies.browser.ts",
               ),
             },
             {
               find: "../../infrastructure/execution/createExecutionInfrastructure",
               replacement: path.resolve(
                 REPOSITORY_ROOT,
-                "infrastructure/execution/createExecutionInfrastructure.browser.ts",
+                "src/infrastructure/execution/createExecutionInfrastructure.browser.ts",
               ),
             },
             {
@@ -41,7 +58,7 @@ export default defineConfig(async ({ mode }) => {
               replacement: "csv-parse/browser/esm/sync",
             },
           ]
-        : [],
+        : srcAliases,
     },
     server: {
       host: "0.0.0.0",
@@ -50,3 +67,4 @@ export default defineConfig(async ({ mode }) => {
     },
   };
 });
+

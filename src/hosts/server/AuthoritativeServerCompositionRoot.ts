@@ -1,4 +1,4 @@
-import {
+﻿import {
   HostLifecyclePhases,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
   assertHostCanRunAsControlPlane,
@@ -6,7 +6,7 @@ import {
   type HostBootConfiguration,
   type HostLifecycleTransition,
   type HostRuntimeHandle,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
@@ -18,30 +18,30 @@ import {
   type HostSpecificBootstrapStage,
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
-import type { HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
+import type { HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
 import {
   assertAuthoritativeControlPlaneServiceCoverage,
   composeHostServiceRegistrationPlan,
-} from "../../infrastructure/config/HostServiceRegistrationCatalog";
-import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
-import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
+} from "@infrastructure/config/HostServiceRegistrationCatalog";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "@infrastructure/config/HostStartupConfiguration";
 import {
   startIdentityServerHost,
   type IdentityServerHost,
   type IdentityServerHostOptions,
-} from "../../../hosts/server/IdentityServerHost";
+} from "./IdentityServerHost";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 import {
   createSqlitePersistenceRuntime,
   resolveSqlitePersistenceRuntimeConfiguration,
   type SqlitePersistenceRuntime,
-} from "../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+} from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 import {
   createAuthoritativePersistenceMigrationHooks,
   createAuthoritativePersistentPlatformServices,
   type AuthoritativePersistentPlatformServices,
-} from "../../infrastructure/persistence/AuthoritativePersistenceComposition";
+} from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -371,3 +371,4 @@ export function createAuthoritativeServerCompositionRoot(
     },
   });
 }
+

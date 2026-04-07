@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SecretOperationalOutcomes, type ISecretOperationalLogger, type SecretOperationalLogEvent } from "../../../application/security/ports/SecretObservabilityPorts";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretOperationalOutcomes, type ISecretOperationalLogger, type SecretOperationalLogEvent } from "@application/security/ports/SecretObservabilityPorts";
 import { SecretObservabilityReporter } from "../SecretObservabilityReporter";
 
 class InMemorySecretLogger implements ISecretOperationalLogger {
@@ -48,3 +48,4 @@ describe("SecretObservabilityReporter", () => {
     expect(serialized).toContain("secret:server:openai");
   });
 });
+

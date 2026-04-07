@@ -1,4 +1,4 @@
-import { SecretAccessActions, toSecretReference } from "../../../domain/security/SecretDomain";
+﻿import { SecretAccessActions, toSecretReference } from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretAccessPolicyPort,
@@ -15,7 +15,7 @@ import {
   type GetSecretMetadataRequest,
   type SecretServiceResult,
 } from "./SecretManagementServiceContracts";
-import { toGetSecretMetadataRequestDiagnosticDto } from "../../../shared/dto/security/SecretServiceDtos";
+import { toGetSecretMetadataRequestDiagnosticDto } from "@shared/dto/security/SecretServiceDtos";
 
 export interface GetSecretMetadataUseCaseDependencies {
   readonly secretRecordRepository: ISecretRecordPersistenceRepository;
@@ -269,3 +269,4 @@ function resolveReasonCode(
   }
   return "operation-outcome";
 }
+

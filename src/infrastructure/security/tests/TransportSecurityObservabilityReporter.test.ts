@@ -1,6 +1,6 @@
-import { describe, expect, it } from "bun:test";
-import { AuthenticatedTrustStates, TransportSecurityScenarios } from "../../../domain/security/TransportSecurityDomain";
-import type { TransportSecurityAuditEvent, TransportSecurityAuditSink, TransportSecurityLogEvent, TransportSecurityLogger } from "../../../application/security/ports/TransportSecurityAuditPorts";
+﻿import { describe, expect, it } from "bun:test";
+import { AuthenticatedTrustStates, TransportSecurityScenarios } from "@domain/security/TransportSecurityDomain";
+import type { TransportSecurityAuditEvent, TransportSecurityAuditSink, TransportSecurityLogEvent, TransportSecurityLogger } from "@application/security/ports/TransportSecurityAuditPorts";
 import { TransportSecurityObservabilityReporter } from "../TransportSecurityObservabilityReporter";
 
 class CapturingLogger implements TransportSecurityLogger {
@@ -96,3 +96,4 @@ describe("TransportSecurityObservabilityReporter", () => {
     expect(serializedAudit.includes("token-value")).toBeFalse();
   });
 });
+

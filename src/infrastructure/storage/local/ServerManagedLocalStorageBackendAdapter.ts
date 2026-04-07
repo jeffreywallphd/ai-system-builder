@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type {
@@ -6,15 +6,15 @@ import type {
   StorageBackendCapabilitySnapshot,
   StorageCapabilityInspectionRequest,
   StorageInstanceCapabilityInspectionRequest,
-} from "../../../application/storage/ports/StorageCapabilityInspectionPort";
-import { StorageBackendHealthStatuses } from "../../../application/storage/ports/StorageCapabilityInspectionPort";
+} from "@application/storage/ports/StorageCapabilityInspectionPort";
+import { StorageBackendHealthStatuses } from "@application/storage/ports/StorageCapabilityInspectionPort";
 import type {
   IStorageProvisioningPort,
   StorageProvisioningReceipt,
   StorageProvisioningRequest,
-} from "../../../application/storage/ports/StorageProvisioningPort";
-import { StorageProvisioningOperationStatuses } from "../../../application/storage/ports/StorageProvisioningPort";
-import { StorageBackendTypes, type StorageInstance } from "../../../domain/storage/StorageDomain";
+} from "@application/storage/ports/StorageProvisioningPort";
+import { StorageProvisioningOperationStatuses } from "@application/storage/ports/StorageProvisioningPort";
+import { StorageBackendTypes, type StorageInstance } from "@domain/storage/StorageDomain";
 
 export const LocalStorageProvisioningReasonCodes = Object.freeze({
   backendUnsupported: "local-backend-unsupported",
@@ -371,3 +371,4 @@ export class ServerManagedLocalStorageBackendAdapter implements IStorageProvisio
     });
   }
 }
+

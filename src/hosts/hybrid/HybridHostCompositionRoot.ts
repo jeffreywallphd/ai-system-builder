@@ -1,4 +1,4 @@
-import {
+﻿import {
   HostLifecyclePhases,
   HostCompositionContractError,
   assertExecutableHostBoundarySatisfiesBootConfiguration,
@@ -6,8 +6,8 @@ import {
   type HostBootConfiguration,
   type HostLifecycleTransition,
   type HostRuntimeHandle,
-} from "../../application/common/HostCompositionContracts";
-import { HostCapabilityFlags, type HostCapabilityFlag } from "../../domain/hosts/HostRuntimeDomain";
+} from "@application/common/HostCompositionContracts";
+import { HostCapabilityFlags, type HostCapabilityFlag } from "@domain/hosts/HostRuntimeDomain";
 import { HybridHostRuntime } from "../HostRuntimeCatalog";
 import {
   HostBootstrapStageIds,
@@ -22,9 +22,9 @@ import {
 import {
   assertHybridHostServiceCoverage,
   composeHostServiceRegistrationPlan,
-} from "../../infrastructure/config/HostServiceRegistrationCatalog";
-import type { HostServiceRegistrationPlan } from "../../infrastructure/config/HostServiceRegistration";
-import { resolveHostStartupConfiguration } from "../../infrastructure/config/HostStartupConfiguration";
+} from "@infrastructure/config/HostServiceRegistrationCatalog";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { resolveHostStartupConfiguration } from "@infrastructure/config/HostStartupConfiguration";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
 import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
 
@@ -374,3 +374,4 @@ export function createHybridCompositionRoot(
     },
   });
 }
+

@@ -1,7 +1,7 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import type { AssetAuditEvent, AssetAuditSink } from "../../../application/assets/ports/AssetAuditPort";
+import type { AssetAuditEvent, AssetAuditSink } from "@application/assets/ports/AssetAuditPort";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   ASSET_PERSISTENCE_MIGRATIONS,
@@ -159,3 +159,4 @@ export class SqliteAssetAuditRecorder implements AssetAuditSink {
     return typeof row?.version === "number" ? row.version : 0;
   }
 }
+

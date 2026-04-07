@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
   CertificateAuthorityRootPersistenceRecord,
   SaveCertificateAuthorityRootPersistenceRecordInput,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface ICertificateAuthorityRootPersistenceRepository {
   findCertificateAuthorityById(
@@ -27,3 +27,4 @@ export interface ICertificateAuthorityRootPersistenceRepository {
     input: UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   ): Promise<CertificateAuthorityPersistenceMutationResult<CertificateAuthorityRootPersistenceRecord>>;
 }
+

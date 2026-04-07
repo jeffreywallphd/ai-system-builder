@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { createHostBootConfiguration } from "../../../application/common/HostCompositionContracts";
+﻿import { describe, expect, it } from "bun:test";
+import { createHostBootConfiguration } from "@application/common/HostCompositionContracts";
 import {
   AuthoritativeServerHostRuntime,
   DesktopHostRuntime,
@@ -223,3 +223,4 @@ describe("HostBootstrapPipeline", () => {
     })).rejects.toThrow(HostBootstrapPipelineError);
   });
 });
+

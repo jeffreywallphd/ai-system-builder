@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Workspace,
   WorkspaceInvitation,
   WorkspaceInvitationStatus,
@@ -8,15 +8,15 @@ import type {
   WorkspaceRoleAssignment,
   WorkspaceRoleAssignmentStatus,
   WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   type WorkspaceEncryptionPolicy,
   WorkspaceInvitationStatuses,
   WorkspaceMembershipStatuses,
   WorkspaceRoleAssignmentStatuses,
   WorkspaceRoles,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import type { WorkspaceVisibility } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
@@ -804,3 +804,4 @@ function isAdministrativeRole(role: WorkspaceRole): boolean {
 function hasAdministrativeRole(roles: ReadonlyArray<WorkspaceRole>): boolean {
   return roles.includes(WorkspaceRoles.owner) || roles.includes(WorkspaceRoles.admin);
 }
+

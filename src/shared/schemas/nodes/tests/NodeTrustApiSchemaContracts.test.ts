@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -8,7 +8,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import {
   NodeDetailDtoSchema,
   NodeEnrollmentSubmissionRequestDtoSchema,
@@ -493,3 +493,4 @@ describe("NodeTrustApiSchemaContracts", () => {
     expect(parsed.update.transportAuthenticatedNodeId).toBe("node:compute:009");
   });
 });
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   ProtectedDataClasses,
   type EncryptionPolicyEvaluationSource,
   type ProtectedDataClass,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type {
   ContentEncryptionRequirementDecision,
   EffectiveEncryptionPolicyEvaluation,
@@ -145,3 +145,4 @@ function createEffective(
     allowWorkerDecryption: true,
   };
 }
+

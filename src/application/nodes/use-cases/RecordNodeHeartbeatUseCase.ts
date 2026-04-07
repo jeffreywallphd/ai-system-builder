@@ -1,12 +1,12 @@
-import {
+﻿import {
   createNodeIdentity,
   recordNodeLastSeen,
   type NodeHeartbeatStatus,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeIdentityPersistenceRecord,
   NodeTrustPersistenceMutationResult,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
@@ -227,3 +227,4 @@ export class RecordNodeHeartbeatUseCase {
     };
   }
 }
+

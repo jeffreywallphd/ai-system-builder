@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   SecretAccessActions,
   SecretActorTypes,
@@ -11,7 +11,7 @@ import {
   toSecretReference,
   type SecretAccessActor,
   type SecretRecord,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessAuditPort,
   ISecretEncryptionPort,
@@ -1115,3 +1115,4 @@ function createServerSecretRecord(): SecretRecord {
     },
   });
 }
+

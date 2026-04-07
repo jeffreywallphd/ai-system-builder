@@ -1,15 +1,15 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeRevocationStates,
   NodeTrustStates,
-} from "../../domain/nodes/NodeTrustDomain";
-import { AuthenticatedTrustStates } from "../../domain/security/TransportSecurityDomain";
+} from "@domain/nodes/NodeTrustDomain";
+import { AuthenticatedTrustStates } from "@domain/security/TransportSecurityDomain";
 import type {
   ResolveNodePeerCertificateIdentityRequest,
   ResolveNodePeerCertificateIdentityResult,
   INodePeerCertificateIdentityResolverPort,
-} from "../../application/security/ports/NodePeerCommunicationPolicyPorts";
-import type { INodeTrustIdentityPersistenceRepository } from "../../application/nodes/ports/INodeTrustIdentityPersistenceRepository";
+} from "@application/security/ports/NodePeerCommunicationPolicyPorts";
+import type { INodeTrustIdentityPersistenceRepository } from "@application/nodes/ports/INodeTrustIdentityPersistenceRepository";
 
 type NodeLookupPort = Pick<INodeTrustIdentityPersistenceRepository, "findNodeById">;
 
@@ -130,3 +130,4 @@ function normalizeFingerprint(value?: string): string | undefined {
   const normalized = normalizeOptional(value);
   return normalized ? normalized.replace(/[^a-fA-F0-9]/g, "").toUpperCase() : undefined;
 }
+

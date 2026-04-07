@@ -1,4 +1,4 @@
-import type { AppRuntimeConfigValues } from "../../infrastructure/config/AppRuntimeConfig";
+import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 
 const SELF_SOURCE = "'self'";
 const UNSAFE_INLINE_SOURCE = "'unsafe-inline'";

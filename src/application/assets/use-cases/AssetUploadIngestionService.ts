@@ -1,4 +1,4 @@
-import {
+﻿import {
   AssetDomainError,
   AssetContentEncryptionFormats,
   AssetLifecycleStates,
@@ -6,7 +6,7 @@ import {
   createAssetLocationRef,
   createContentDescriptor,
   type Asset,
-} from "../../../domain/assets/AssetDomain";
+} from "@domain/assets/AssetDomain";
 import type { IStorageLogicalAccessResolutionService } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import { StorageLogicalAccessOperationIntents } from "../../storage/use-cases/StorageLogicalAccessResolutionServiceContracts";
 import {
@@ -14,7 +14,7 @@ import {
   StorageObjectAccessError,
   StorageObjectErrorCodes,
 } from "../../storage/ports/StorageObjectPort";
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+import type { StorageInstance } from "@domain/storage/StorageDomain";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import type { IAssetUploadSessionRepository } from "../ports/IAssetUploadSessionRepository";
 import {
@@ -25,7 +25,7 @@ import type { IAssetContentCipherPort } from "../ports/AssetContentCipherPort";
 import type { IEncryptionKeyResolutionService } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
 import { EncryptionMaterialClasses } from "../../security/use-cases/EncryptionKeyResolutionServiceContracts";
 import type { IEncryptionPolicyEvaluationService } from "../../security/use-cases/EncryptionPolicyEvaluationServiceContracts";
-import { ProtectedDataClasses } from "../../../domain/security/EncryptionAtRestPolicyDomain";
+import { ProtectedDataClasses } from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   publishEncryptionEnforcementEventBestEffort,
   type IEncryptionEnforcementObservabilityPort,
@@ -842,3 +842,4 @@ function buildAssetContentAad(input: {
     `object=${input.objectKey}`,
   ].join(";");
 }
+

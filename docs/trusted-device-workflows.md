@@ -95,6 +95,6 @@ Audit payloads include actor/target linkage where available (`userIdentityId`, `
 
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/TrustedDevicesPage.test.tsx`
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`

@@ -1,11 +1,11 @@
-import { NodeTrustDomainError } from "../../../domain/nodes/NodeTrustDomain";
+﻿import { NodeTrustDomainError } from "@domain/nodes/NodeTrustDomain";
 import {
   NodeApprovalStatuses,
   NodeRevocationStates,
   NodeTrustStates,
-} from "../../../domain/nodes/NodeTrustDomain";
-import type { NodeIdentityPersistenceRecord } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import type { NodeTrustPersistenceMutationEnvelope } from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@domain/nodes/NodeTrustDomain";
+import type { NodeIdentityPersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import type { NodeTrustPersistenceMutationEnvelope } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export const NodeTrustUseCaseErrorCodes = Object.freeze({
   invalidRequest: "node-trust-invalid-request",
@@ -173,3 +173,4 @@ export function isNodeTrustLifecycleRevoked(
     || Boolean(node.revokedAt)
     || Boolean(node.revocation.revokedAt);
 }
+

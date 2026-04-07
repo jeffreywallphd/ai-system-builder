@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   StorageAccessMode,
   StorageAccessScope,
   StorageBackendType,
@@ -9,7 +9,7 @@ import type {
   StoragePolicyRestrictedCapability,
   StorageReplicationMode,
   StorageRetentionExpiryAction,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 
 export class StorageTransportContractError extends Error {
   constructor(message: string) {
@@ -294,3 +294,4 @@ export function toStorageInstanceDetailDto(value: StorageInternalInstanceDetailD
     sensitiveRedaction,
   });
 }
+

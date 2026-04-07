@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
@@ -12,7 +12,7 @@ import {
   type CredentialPolicy,
   type Session,
   type UserIdentity,
-} from "../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityPrincipalLookupKinds,
@@ -28,7 +28,7 @@ import {
   type IdentitySessionTokenMaterialLookupQuery,
   type IdentitySessionTokenMaterialRecord,
   type IdentityUserIdentityListQuery,
-} from "../../../shared/dto/identity/IdentityPersistenceDtos";
+} from "@shared/dto/identity/IdentityPersistenceDtos";
 import type {
   ICredentialMaterialRepository,
 } from "../ports/ICredentialMaterialRepository";
@@ -500,3 +500,4 @@ describe("identity repository ports for authoritative persistence", () => {
     expect(allPorts.transactionManager).toBeDefined();
   });
 });
+

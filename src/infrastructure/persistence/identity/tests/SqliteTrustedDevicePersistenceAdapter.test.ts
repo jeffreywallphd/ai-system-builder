@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createUserIdentity } from "../../../../domain/identity/IdentityDomain";
+import { createUserIdentity } from "@domain/identity/IdentityDomain";
 import {
   DevicePairingMethods,
   DeviceRevocationReasons,
@@ -11,12 +11,12 @@ import {
   createDeviceFingerprint,
   createDeviceTrustMaterialRef,
   createTrustedDevice,
-} from "../../../../domain/identity/TrustedDeviceDomain";
+} from "@domain/identity/TrustedDeviceDomain";
 import {
   PairingSessionStatuses,
   PairingTokenArtifactTypes,
   PairingTokenStatuses,
-} from "../../../../domain/identity/TrustedDevicePairingDomain";
+} from "@domain/identity/TrustedDevicePairingDomain";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteIdentityPersistenceAdapter } from "../SqliteIdentityPersistenceAdapter";
 import { SqliteTrustedDevicePersistenceAdapter } from "../SqliteTrustedDevicePersistenceAdapter";
@@ -234,3 +234,4 @@ describe("SqliteTrustedDevicePersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

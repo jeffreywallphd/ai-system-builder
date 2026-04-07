@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   EncryptionKeyScopes,
   EncryptionModes,
@@ -6,7 +6,7 @@ import {
   ProtectedDataClasses,
   createEncryptionAtRestPolicyDefinition,
   type EncryptionAtRestPolicyDefinition,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import type {
   EncryptionKeyDescriptor,
   IEncryptionKeyCatalogPort,
@@ -398,4 +398,5 @@ function toScopeOwnerId(owner: EncryptionKeyDescriptor["scopeOwner"]): string {
   }
   return `${owner.scope}:${owner.workspaceId}:${owner.storageInstanceId}`;
 }
+
 

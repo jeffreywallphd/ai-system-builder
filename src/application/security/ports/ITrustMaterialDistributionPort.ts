@@ -1,4 +1,4 @@
-import type { TrustMaterialKind } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import type { TrustMaterialKind } from "@domain/security/CertificateAuthorityDomain";
 
 export interface PublishTrustBundleInput {
   readonly trustBundleRef: string;
@@ -59,3 +59,4 @@ export interface ITrustMaterialDistributionPort {
     input: ResolveRuntimeTrustMaterialPackageInput,
   ): Promise<ResolveRuntimeTrustMaterialPackageResult | undefined>;
 }
+

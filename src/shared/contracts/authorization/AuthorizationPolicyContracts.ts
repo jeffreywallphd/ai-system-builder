@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   ActorContext,
   PermissionKey,
   PolicyDecision,
   ResourcePolicyContext,
-} from "../../../domain/authorization/AuthorizationDomain";
+} from "@domain/authorization/AuthorizationDomain";
 
 export interface AuthorizationPolicyEvaluationRequest {
   readonly actor: ActorContext;
@@ -15,3 +15,4 @@ export interface AuthorizationPolicyEvaluationRequest {
 export interface AuthorizationPolicyEvaluationResult {
   readonly decision: PolicyDecision;
 }
+

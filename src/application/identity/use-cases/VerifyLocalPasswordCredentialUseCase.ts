@@ -1,4 +1,4 @@
-import { type AuthProvider } from "../../../domain/identity/IdentityDomain";
+﻿import { type AuthProvider } from "@domain/identity/IdentityDomain";
 import {
   IdentityErrorBoundaries,
   IdentityErrorCodes,
@@ -6,12 +6,12 @@ import {
   identitySuccess,
   type IdentityOperationError,
   type IdentityOperationResult,
-} from "../../../../application/contracts/IdentityApplicationContracts";
-import type { ICredentialMaterialRepository } from "../../../../application/identity/ports/ICredentialMaterialRepository";
-import type { IIdentityCredentialAuthenticator } from "../../../../application/identity/ports/IIdentityCredentialAuthenticator";
-import type { IIdentityLookupRepository } from "../../../../application/identity/ports/IIdentityLookupRepository";
-import { IdentityPolicyService } from "../../../../application/identity/services/IdentityPolicyService";
-import { validateIdentityProvider } from "../../../../application/identity/services/IdentityProviderCatalog";
+} from "@application/contracts/IdentityApplicationContracts";
+import type { ICredentialMaterialRepository } from "@application/identity/ports/ICredentialMaterialRepository";
+import type { IIdentityCredentialAuthenticator } from "../ports/IIdentityCredentialAuthenticator";
+import type { IIdentityLookupRepository } from "@application/identity/ports/IIdentityLookupRepository";
+import { IdentityPolicyService } from "../services/IdentityPolicyService";
+import { validateIdentityProvider } from "../services/IdentityProviderCatalog";
 
 export type VerifyLocalPasswordCredentialErrorCode =
   | typeof IdentityErrorCodes.invalidCredentials
@@ -184,3 +184,4 @@ export class VerifyLocalPasswordCredentialUseCase {
     return identityFailure(error);
   }
 }
+

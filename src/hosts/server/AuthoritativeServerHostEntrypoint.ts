@@ -1,4 +1,4 @@
-import process from "node:process";
+﻿import process from "node:process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -6,14 +6,14 @@ import {
   createHostBootConfiguration,
   type HostBootConfiguration,
   type HostBootMode,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../HostRuntimeCatalog";
 import {
   createAuthoritativeServerCompositionRoot,
   type AuthoritativeServerCompositionRootOptions,
   type AuthoritativeServerHostRuntimeHandle,
 } from "./AuthoritativeServerCompositionRoot";
-import type { IdentityServerHost, IdentityServerHostOptions } from "../../../hosts/server/IdentityServerHost";
+import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
 
 export const AuthoritativeServerHostEnvironmentKeys = Object.freeze({
   databasePath: "AI_LOOM_SERVER_DATABASE_PATH",
@@ -164,3 +164,4 @@ if (isMainModule(pathToFileURL(thisModulePath).href)) {
     process.exit(1);
   });
 }
+

@@ -19,9 +19,9 @@ Story 5.3.1, Story 5.3.2, Story 5.3.3, Story 5.3.4, Story 5.3.5, Story 5.4.1, St
 - `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
 - `src/shared/schemas/nodes/NodeTrustPersistenceSchemaContracts.ts`
 - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `ui/shared/nodes/NodeInventoryClient.ts`
 - `ui/services/NodeInventoryService.ts`
 - `ui/pages/NodeInventoryPage.tsx`

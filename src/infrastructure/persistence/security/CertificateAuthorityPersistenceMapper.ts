@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   CertificateAuthorityRootPersistenceRecord,
   CertificateDistributionEventPersistenceRecord,
   CertificateRevocationHistoryPersistenceRecord,
   CertificateStatusHistoryPersistenceRecord,
   IssuedCertificatePersistenceRecord,
   TrustMaterialReferencePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   parseCertificateAuthorityRootPersistenceRecord,
   parseCertificateDistributionEventPersistenceRecord,
@@ -13,7 +13,7 @@ import {
   parseCertificateStatusHistoryPersistenceRecord,
   parseIssuedCertificatePersistenceRecord,
   parseTrustMaterialReferencePersistenceRecord,
-} from "../../../shared/schemas/security/CertificateAuthoritySchemaContracts";
+} from "@shared/schemas/security/CertificateAuthoritySchemaContracts";
 
 export interface CertificateAuthorityRootRow {
   readonly certificate_authority_id: string;
@@ -439,3 +439,4 @@ function parseStringArray(value: string): ReadonlyArray<string> {
     return Object.freeze([]);
   }
 }
+

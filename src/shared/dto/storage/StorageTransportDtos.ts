@@ -1,14 +1,14 @@
-import {
+﻿import {
   StorageManagedActions,
   StoragePolicyRestrictedCapabilities,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type {
   StorageAccessEffectivePermissionSummary,
   StorageAccessSummarySource,
   StorageInstanceAccessSummary,
   StoragePolicyRestrictedCapabilitySummary,
-} from "../../../application/storage/ports/StorageAccessSummaryPort";
+} from "@application/storage/ports/StorageAccessSummaryPort";
 import type {
   StorageAccessPermissionEffect,
   StorageAccessSummaryDto,
@@ -366,3 +366,4 @@ export function toGetStorageInstanceDetailResponseDto(
     storage: toStorageInstanceDetailDto(toStorageInternalInstanceDetailDto(instance, options)),
   });
 }
+

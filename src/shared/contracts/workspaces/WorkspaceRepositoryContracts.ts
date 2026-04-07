@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Workspace,
   WorkspaceEncryptionKeyScope,
   WorkspaceEncryptionMode,
@@ -10,7 +10,7 @@ import type {
   WorkspaceRoleAssignment,
   WorkspaceRoleAssignmentStatus,
   WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type { WorkspaceVisibility } from "../../workspaces/WorkspaceOwnership";
 
 export const WorkspaceIdNamespaces = Object.freeze({
@@ -236,3 +236,4 @@ export type WorkspaceRecord =
   | WorkspaceMembership
   | WorkspaceRoleAssignment
   | WorkspaceInvitation;
+

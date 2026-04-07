@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
@@ -26,11 +26,11 @@ import {
   type WorkspaceMembership,
   type WorkspaceMembershipStatus,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -781,3 +781,4 @@ function hashInvitationToken(token: string): string {
     .update(token, "utf8")
     .digest("hex");
 }
+

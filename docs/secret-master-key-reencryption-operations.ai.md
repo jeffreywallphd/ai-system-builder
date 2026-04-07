@@ -10,8 +10,8 @@ Story 8.3.6 baseline for Feature 8 / Epic 8.3: controlled, restartable re-encryp
 - `src/application/security/ports/SecretServicePorts.ts`
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceAdapter.ts`
 - `src/infrastructure/persistence/security/SqliteSecretRecordPersistenceMigrations.ts`
-- `infrastructure/api/security/SecretMetadataBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/security/SecretMetadataBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `docs/secret-master-key-reencryption-operations.md`
 
 ## Behavior summary

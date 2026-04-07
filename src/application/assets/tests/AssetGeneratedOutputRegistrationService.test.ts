@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import type { IAssetRepository } from "../ports/IAssetRepository";
 import {
   StorageAccessModes,
@@ -7,11 +7,11 @@ import {
   StorageLifecycleStates,
   createStorageInstance,
   type StorageInstance,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import type { IWorkspaceAuthorizationReadRepository } from "../../workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IStorageInstanceRepository } from "../../storage/ports/IStorageInstanceRepository";
 import type { IStoragePolicyEvaluationPort } from "../../storage/ports/StoragePolicyEvaluationPort";
-import type { Asset } from "../../../domain/assets/AssetDomain";
+import type { Asset } from "@domain/assets/AssetDomain";
 import { AssetGeneratedOutputRegistrationService } from "../use-cases/AssetGeneratedOutputRegistrationService";
 import type { AssetAuditEvent, AssetAuditSink } from "../ports/AssetAuditPort";
 
@@ -381,3 +381,4 @@ describe("AssetGeneratedOutputRegistrationService", () => {
     expect(auditSink.events[0]?.outcome).toBe("success");
   });
 });
+

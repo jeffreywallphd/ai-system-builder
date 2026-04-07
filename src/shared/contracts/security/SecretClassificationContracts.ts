@@ -1,11 +1,11 @@
-import {
+﻿import {
   SecretKinds,
   SecretScopes,
   type SecretKind,
   type SecretReferenceMetadata,
   type SecretScope,
   type SecretScopeOwner,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 
 export class SecretClassificationContractError extends Error {
   constructor(message: string) {
@@ -285,3 +285,4 @@ export function toSecretClassificationRegistrySnapshot(): SecretClassificationRe
 export function serializeSecretClassificationRegistry(): string {
   return JSON.stringify(toSecretClassificationRegistrySnapshot());
 }
+

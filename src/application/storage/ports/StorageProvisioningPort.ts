@@ -1,4 +1,4 @@
-import type { StorageInstance } from "../../../domain/storage/StorageDomain";
+﻿import type { StorageInstance } from "@domain/storage/StorageDomain";
 
 export const StorageProvisioningOperationKinds = Object.freeze({
   create: "create",
@@ -39,3 +39,4 @@ export interface StorageProvisioningReceipt {
 export interface IStorageProvisioningPort {
   requestStorageProvisioning(input: StorageProvisioningRequest): Promise<StorageProvisioningReceipt>;
 }
+

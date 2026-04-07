@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   TransportConnectionContext,
   TransportConnectionTrustValidationResult,
   TransportSecurityPolicy,
   TransportSecurityScenario,
-} from "../../../domain/security/TransportSecurityDomain";
+} from "@domain/security/TransportSecurityDomain";
 import type { TransportSecurityResolvedTrustSnapshot } from "./TransportSecurityAuditPorts";
 
 export interface ResolveTransportSecurityPolicyRequest {
@@ -61,3 +61,4 @@ export interface TransportSecurityPolicyEvaluationPorts {
   readonly transportConnectionPolicyEvaluatorPort: ITransportConnectionPolicyEvaluatorPort;
   readonly transportConnectionPolicyAuditPort?: ITransportConnectionPolicyAuditPort;
 }
+

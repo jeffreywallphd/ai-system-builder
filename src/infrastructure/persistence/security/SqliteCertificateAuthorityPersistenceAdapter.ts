@@ -1,10 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
-import type { ICertificateAuthorityRootPersistenceRepository } from "../../../application/security/ports/ICertificateAuthorityRootPersistenceRepository";
-import type { ICertificateLifecycleEventPersistenceRepository } from "../../../application/security/ports/ICertificateLifecycleEventPersistenceRepository";
-import type { IIssuedCertificatePersistenceRepository } from "../../../application/security/ports/IIssuedCertificatePersistenceRepository";
-import type { ITrustMaterialReferencePersistenceRepository } from "../../../application/security/ports/ITrustMaterialReferencePersistenceRepository";
-import { CertificateStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+import type { ICertificateAuthorityRootPersistenceRepository } from "@application/security/ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ICertificateLifecycleEventPersistenceRepository } from "@application/security/ports/ICertificateLifecycleEventPersistenceRepository";
+import type { IIssuedCertificatePersistenceRepository } from "@application/security/ports/IIssuedCertificatePersistenceRepository";
+import type { ITrustMaterialReferencePersistenceRepository } from "@application/security/ports/ITrustMaterialReferencePersistenceRepository";
+import { CertificateStatuses } from "@domain/security/CertificateAuthorityDomain";
 import {
   normalizeCertificateAuthorityMutationOperationKey,
   type AppendCertificateStatusHistoryPersistenceRecordInput,
@@ -30,7 +30,7 @@ import {
   type TrustMaterialReferencePersistenceRecord,
   type UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   type UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   mapCertificateAuthorityRootRecordToRowValues,
@@ -946,3 +946,4 @@ export class SqliteCertificateAuthorityPersistenceAdapter
     }
   }
 }
+

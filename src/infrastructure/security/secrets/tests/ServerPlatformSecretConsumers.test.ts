@@ -1,7 +1,7 @@
-import { describe, expect, it } from "bun:test";
-import { SecretScopes } from "../../../../domain/security/SecretDomain";
-import type { SecretServiceResult } from "../../../../application/security/use-cases/SecretManagementServiceContracts";
-import type { SecretRuntimeConsumptionAdapters } from "../../../../application/security/services/SecretRuntimeConsumptionAdapters";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretScopes } from "@domain/security/SecretDomain";
+import type { SecretServiceResult } from "@application/security/use-cases/SecretManagementServiceContracts";
+import type { SecretRuntimeConsumptionAdapters } from "@application/security/services/SecretRuntimeConsumptionAdapters";
 import {
   ServerPlatformProviderIds,
   ServerPlatformSecretConsumers,
@@ -119,3 +119,4 @@ describe("ServerPlatformSecretConsumers", () => {
     } satisfies SecretServiceResult<never>);
   });
 });
+

@@ -1,4 +1,4 @@
-import process from "node:process";
+﻿import process from "node:process";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
@@ -6,7 +6,7 @@ import {
   createHostBootConfiguration,
   type HostBootConfiguration,
   type HostBootMode,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { HybridHostRuntime } from "../HostRuntimeCatalog";
 import {
   HybridHostControlPlaneSources,
@@ -261,3 +261,4 @@ if (isMainModule(pathToFileURL(thisModulePath).href)) {
     process.exit(1);
   });
 }
+

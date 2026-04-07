@@ -1,15 +1,15 @@
-import {
+﻿import {
   NodeApprovalStatuses,
   NodeTrustStates,
   assignNodeCertificate,
   createNodeIdentity,
   transitionNodeTrustState,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeCertificateReferencePersistenceRecord,
   NodeIdentityPersistenceRecord,
   NodeTrustPersistenceMutationResult,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import {
@@ -290,3 +290,4 @@ export class ActivateApprovedNodeUseCase {
     });
   }
 }
+

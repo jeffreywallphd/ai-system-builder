@@ -97,10 +97,10 @@ Validation behavior includes:
 Story 5.2.2 adds the first server-side enrollment transport flow on top of these shared contracts:
 
 - Backend API adapter:
-  - `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-  - `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+  - `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+  - `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
 - HTTP transport integration:
-  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
   - `POST /api/v1/nodes/enrollments`
   - `GET /api/v1/nodes/enrollments/pending`
 
@@ -118,11 +118,11 @@ Story 5.2.4 extends the node-trust admin transport surface so trusted admin UIs 
 
 Canonical artifacts:
 
-- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 Added API operations:
 
@@ -154,10 +154,10 @@ Story 5.3.3 extends node-trust transport so trusted nodes can publish liveness a
 
 Canonical artifacts:
 
-- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 Added API operations:
 
@@ -182,11 +182,11 @@ Story 5.3.4 extends node-trust transport with full lifecycle inventory queries a
 
 Canonical artifacts:
 
-- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 Added API operations:
 
@@ -208,10 +208,10 @@ Story 5.4.2 tightens node-authenticated operation enforcement on transport + app
 
 Canonical artifacts:
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/nodes/use-cases/NodeTrustUseCaseShared.ts`
 - `src/application/nodes/use-cases/RecordNodeHeartbeatUseCase.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 
 Heartbeat transport enforcement:
 
@@ -245,9 +245,9 @@ Canonical artifacts:
 
 - `src/shared/contracts/nodes/NodeTrustApiContracts.ts`
 - `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts`
-- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/nodes/use-cases/RecordNodeOperationalUpdateUseCase.ts`
 
 Added API operation:
@@ -305,11 +305,11 @@ Story 5.4.4 adds concrete admin-facing revocation transport and renderer wiring 
 
 Canonical artifacts:
 
-- `infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
-- `infrastructure/api/nodes/NodeTrustBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
-- `infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
+- `src/infrastructure/api/nodes/sdk/PublicNodeTrustApiContract.ts`
+- `src/infrastructure/api/nodes/NodeTrustBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
+- `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
 - `ui/shared/nodes/NodeInventoryClient.ts`
 - `ui/services/NodeInventoryService.ts`
 - `ui/pages/NodeInventoryPage.tsx`

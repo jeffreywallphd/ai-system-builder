@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -13,11 +13,11 @@ import {
   createSession,
   createUserIdentity,
   revokeSession,
-} from "../../../../domain/identity/IdentityDomain";
+} from "@domain/identity/IdentityDomain";
 import {
   IdentityCredentialMaterialStatuses,
   IdentityPrincipalLookupKinds,
-} from "../../../../../application/contracts/IdentityApplicationContracts";
+} from "@application/contracts/IdentityApplicationContracts";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteIdentityPersistenceAdapter } from "../SqliteIdentityPersistenceAdapter";
 
@@ -298,3 +298,4 @@ describe("SqliteIdentityPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+

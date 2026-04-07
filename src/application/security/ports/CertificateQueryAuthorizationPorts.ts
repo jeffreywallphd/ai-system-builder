@@ -1,7 +1,7 @@
-import type {
+﻿import type {
   CertificateTrustEvaluationStatus,
   IssuedCertificateLookupQuery,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 
 export interface CertificateMetadataListAuthorizationQuery extends IssuedCertificateLookupQuery {
   readonly linkedNodeId?: string;
@@ -21,3 +21,4 @@ export interface CertificateQueryAuthorizationHook {
     readonly asOf?: string;
   }): Promise<void>;
 }
+

@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+﻿import { createHash } from "node:crypto";
 import { describe, expect, it } from "bun:test";
 import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceInvitationRepository } from "../ports/IWorkspaceInvitationRepository";
@@ -21,7 +21,7 @@ import {
   type WorkspaceMembership,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import type {
   WorkspaceAuthorizationSnapshot,
   WorkspaceAuthorizationSnapshotQuery,
@@ -32,8 +32,8 @@ import type {
   WorkspaceListQuery,
   WorkspaceMembershipListQuery,
   WorkspaceRoleAssignmentListQuery,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
-import { WorkspaceVisibilities } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
+import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 import {
   ResolveWorkspaceInvitationLifecycleUseCase,
   WorkspaceInvitationLifecycleActions,
@@ -733,3 +733,4 @@ describe("ResolveWorkspaceInvitationLifecycleUseCase", () => {
     expect(canceled.value.invitation.lastModifiedBy).toBe("user:owner");
   });
 });
+

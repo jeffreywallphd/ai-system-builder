@@ -1,4 +1,4 @@
-import {
+﻿import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostStartupDependencyBoundaryLayers,
@@ -6,7 +6,7 @@ import {
   type HostControlPlaneRole,
   type HostRuntimeIdentity,
   type HostStartupDependencyBoundaryLayer,
-} from "../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 
 export class HostServiceRegistrationError extends Error {
   constructor(message: string) {
@@ -373,3 +373,4 @@ export function createHostServiceRegistry(
     },
   });
 }
+

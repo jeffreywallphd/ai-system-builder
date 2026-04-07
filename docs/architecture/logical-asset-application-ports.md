@@ -103,14 +103,14 @@ Payloads remain API-safe and infrastructure-agnostic.
   - `src/application/assets/use-cases/AssetServiceContracts.ts`
   - `src/shared/dto/assets/AssetTransportDtos.ts`
 - Added authoritative API adapter and SDK contracts:
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
 - Added authenticated transport endpoints:
   - `POST /api/v1/assets/register`
   - `POST /api/v1/assets/:assetId/uploads/initiate`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host composition now wires asset upload-initiation services and persistence:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -128,8 +128,8 @@ Behavioral posture in this story:
 Added coverage:
 
 - `src/application/assets/tests/AssetUploadInitiationService.test.ts`
-- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+- `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 
 ## Story 10.2.2: protected upload ingestion and finalization
@@ -142,9 +142,9 @@ Added authoritative upload ingestion/finalization through application and transp
 - New stream-based ingestion/finalization orchestration:
   - `src/application/assets/use-cases/AssetUploadIngestionService.ts`
 - API/transport extensions for upload-session content ingestion:
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
-  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 
 Behavioral posture:
 
@@ -172,13 +172,13 @@ Added authoritative scoped listing/discovery flow across application, API, trans
 - Persistence adapter now supports creator-scoped filtering:
   - `src/infrastructure/persistence/assets/SqliteAssetPersistenceAdapter.ts`
 - Extended API contracts + backend:
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
 - Added authenticated transport endpoint:
   - `GET /api/v1/assets`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host composition now wires asset discovery service:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -198,8 +198,8 @@ Behavioral posture in this story:
 Added coverage:
 
 - `src/application/assets/tests/AssetDiscoveryService.test.ts`
-- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+- `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 10.2.4: protected asset detail lookup and metadata retrieval
 
@@ -219,13 +219,13 @@ Added authoritative secure detail retrieval across application, API, transport, 
   - lineage source hooks
   - implemented in `src/shared/contracts/assets/AssetTransportContracts.ts`
 - Extended API contracts and backend:
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
 - Added authenticated transport endpoint:
   - `GET /api/v1/assets/:assetId`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host wiring now composes asset detail service:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -240,8 +240,8 @@ Added coverage:
 - `src/application/assets/tests/AssetServiceContracts.test.ts`
 - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
 - `src/shared/dto/assets/tests/AssetTransportDtos.test.ts`
-- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+- `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 10.2.5: secure download authorization and protected content streaming
 
@@ -254,14 +254,14 @@ Added authoritative protected download authorization and server-streamed retriev
 - New encrypted token adapter for grant issuance/resolution:
   - `src/infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter.ts`
 - Extended API contracts and backend:
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
 - Added authenticated transport endpoints:
   - `POST /api/v1/assets/:assetId/downloads/authorize`
   - `GET /api/v1/assets/:assetId/downloads/content`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host wiring now composes download grant and streaming dependencies:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -279,8 +279,8 @@ Added coverage:
 
 - `src/application/assets/tests/AssetDownloadService.test.ts`
 - `src/infrastructure/security/assets/tests/EncryptedAssetDownloadGrantAdapter.test.ts`
-- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+- `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 11.3.2: policy-aware encryption enforcement during ingest and retrieval
 
@@ -316,13 +316,13 @@ Added authoritative generated-output registration across application/API/transpo
   - `src/shared/contracts/assets/AssetTransportContracts.ts`
   - `src/shared/dto/assets/AssetTransportDtos.ts`
 - Extended backend API and public SDK contract:
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
 - Added authenticated transport endpoint for generated output registration:
   - `POST /api/v1/assets/generated-outputs/register`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host composition now wires generated-output registration dependencies:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -348,8 +348,8 @@ Added coverage:
   - `src/application/assets/tests/AssetDetailService.test.ts`
   - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
   - `src/infrastructure/persistence/assets/tests/SqliteAssetPersistenceAdapter.test.ts`
-  - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+  - `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 10.3.2: preview and thumbnail derivatives as protected resources
 
@@ -358,13 +358,13 @@ Added protected preview-resolution orchestration across application/API/transpor
 - New application use case for authoritative preview resolution:
   - `src/application/assets/use-cases/AssetPreviewService.ts`
 - Extended backend/public API contracts with preview-resolution operation:
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
-  - `infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/api/assets/sdk/PublicAssetManagementApiContract.ts`
 - Added authenticated transport endpoint:
   - `GET /api/v1/assets/:assetId/preview`
-  - implemented in `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - implemented in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Host composition now wires preview-resolution dependencies:
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Behavioral posture in this story:
 
@@ -379,8 +379,8 @@ Behavioral posture in this story:
 Added/extended coverage:
 
 - `src/application/assets/tests/AssetPreviewService.test.ts`
-- `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+- `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 10.3.3: protected asset operation audit integration
 
@@ -403,12 +403,12 @@ Added structured asset-audit integration for high-value protected asset operatio
 - Added API/transport lifecycle operations:
   - `POST /api/v1/assets/:assetId/archive`
   - `POST /api/v1/assets/:assetId/delete`
-  - `infrastructure/api/assets/AssetManagementBackendApi.ts`
-  - `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+  - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - Added persistent SQLite asset audit recorder and host wiring:
   - `src/infrastructure/persistence/assets/SqliteAssetAuditRecorder.ts`
   - `src/infrastructure/persistence/assets/SqliteAssetPersistenceMigrations.ts` (asset audit event table/indexes)
-  - `hosts/server/IdentityServerHost.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
 
 Audit payload posture in this story:
 
@@ -423,8 +423,8 @@ Added/extended coverage:
 - `src/infrastructure/persistence/assets/tests/SqliteAssetAuditRecorder.test.ts`
 - updated:
   - `src/shared/contracts/assets/tests/AssetTransportContracts.test.ts`
-  - `infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
-  - `infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
+  - `src/infrastructure/api/assets/tests/AssetManagementBackendApi.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAssetManagement.test.ts`
 
 ## Story 10.3.4: shared client-safe contracts and UI asset workflow integration
 

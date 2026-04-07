@@ -1,10 +1,10 @@
-import {
+﻿import {
   WorkspaceMembershipStatuses,
   type WorkspaceInvitation,
   type WorkspaceMembership,
   type WorkspaceMembershipStatus,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceInvitationLifecycleActions,
   WorkspaceInvitationLifecycleErrorCodes,
@@ -334,3 +334,4 @@ function buildResolvedOnboardingMetadata(input: {
     }),
   });
 }
+

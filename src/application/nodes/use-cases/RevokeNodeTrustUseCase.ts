@@ -1,13 +1,13 @@
-import {
+﻿import {
   createNodeIdentity,
   revokeNodeIdentity,
   type NodeRevocationReason,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type {
   NodeIdentityPersistenceRecord,
   NodeTrustPersistenceMutationResult,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
-import { NodeRevocationStates, NodeTrustStates } from "../../../domain/nodes/NodeTrustDomain";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
+import { NodeRevocationStates, NodeTrustStates } from "@domain/nodes/NodeTrustDomain";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type { NodeTrustAuthorizationHook } from "../ports/NodeTrustAuthorizationPorts";
 import type { NodeTrustCertificateHook } from "../ports/NodeTrustCertificatePorts";
@@ -245,3 +245,4 @@ export class RevokeNodeTrustUseCase {
     };
   }
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   EncryptionKeyScope,
   EncryptionPolicyEvaluationResult,
   EncryptionPolicyEvaluationSource,
   ProtectedDataClass,
   ProtectedDataEncryptionRule,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 
 export const EncryptionPolicyEvaluationErrorCodes = Object.freeze({
   invalidRequest: "encryption-policy-invalid-request",
@@ -96,3 +96,4 @@ export interface EncryptionPolicyEvaluationUseCaseContracts {
 }
 
 export interface IEncryptionPolicyEvaluationService extends EncryptionPolicyEvaluationUseCaseContracts {}
+

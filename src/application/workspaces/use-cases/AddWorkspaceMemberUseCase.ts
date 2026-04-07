@@ -1,4 +1,4 @@
-import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
+﻿import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
@@ -13,11 +13,11 @@ import {
   type WorkspaceMembershipStatus,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -340,3 +340,4 @@ export class AddWorkspaceMemberUseCase {
     };
   }
 }
+

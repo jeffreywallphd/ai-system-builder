@@ -123,7 +123,7 @@ Extension standards:
 
 Operational assumptions in current host composition:
 
-- `hosts/server/IdentityServerHost.ts` currently composes storage provisioning orchestration with an empty backend registry (`createStorageBackendAdapterRegistry([])`).
+- `src/hosts/server/IdentityServerHost.ts` currently composes storage provisioning orchestration with an empty backend registry (`createStorageBackendAdapterRegistry([])`).
 - backend provisioning/capability paths therefore return unconfigured posture unless deployment composition explicitly registers backend adapters.
 - admin workflows remain valid for metadata/lifecycle management without requiring backend provisioning toggles.
 - sync posture is projected as a typed eligibility/state seam; it is not a distributed replication scheduler in this slice.

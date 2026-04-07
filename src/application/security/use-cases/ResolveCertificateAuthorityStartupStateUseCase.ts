@@ -1,4 +1,4 @@
-import { CertificateAuthorityStatuses } from "../../../domain/security/CertificateAuthorityDomain";
+﻿import { CertificateAuthorityStatuses } from "@domain/security/CertificateAuthorityDomain";
 import type { CertificateAuthorityBootstrapConfiguration } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type { ICertificateAuthorityBootstrapConfigurationProvider } from "../ports/ICertificateAuthorityBootstrapConfigurationProvider";
 import type {
@@ -386,3 +386,4 @@ function toResult(
     configurationSource,
   });
 }
+

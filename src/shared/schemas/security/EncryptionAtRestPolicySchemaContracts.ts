@@ -1,11 +1,11 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   EncryptionKeyScopes,
   EncryptionModes,
   EncryptionPolicyScopes,
   EncryptionPolicyEvaluationSources,
   ProtectedDataClasses,
-} from "../../../domain/security/EncryptionAtRestPolicyDomain";
+} from "@domain/security/EncryptionAtRestPolicyDomain";
 import {
   EncryptionAtRestPolicyContractVersions,
   type DecryptionAllowanceDto,
@@ -693,3 +693,4 @@ export function parseValidateEncryptedMaterialDescriptorResponseDto(
     payload,
   );
 }
+

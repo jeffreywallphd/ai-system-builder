@@ -1,11 +1,11 @@
-import type { PersistenceTenancyMetadata } from "../../../shared/dto/persistence/PersistenceBoundaryDtos";
+﻿import type { PersistenceTenancyMetadata } from "@shared/dto/persistence/PersistenceBoundaryDtos";
 import {
   createMixedTenancyMetadata,
   createNodeTenancyMetadata,
   createPlatformTenancyMetadata,
   createUserTenancyMetadata,
   createWorkspaceTenancyMetadata,
-} from "../../../shared/persistence/PersistenceTenancyMetadataFactory";
+} from "@shared/persistence/PersistenceTenancyMetadataFactory";
 
 export function normalizePersistenceLookup(value: string | null | undefined): string | undefined {
   const normalized = value?.trim();
@@ -82,3 +82,4 @@ export function toPersistenceTenancyScopeFields(tenancy: PersistenceTenancyMetad
     nodeId: normalizePersistenceLookup(tenancy.nodeId),
   });
 }
+

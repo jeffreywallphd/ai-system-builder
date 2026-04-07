@@ -35,11 +35,11 @@
 - `src/application/identity/use-cases/ListLocalIdentityAccountsUseCase.ts`
 - `src/application/identity/use-cases/GetLocalIdentityAccountStatusUseCase.ts`
 - `src/application/identity/use-cases/SetLocalIdentityAccountStatusUseCase.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
-- `infrastructure/filesystem/identity/SqliteIdentityRepository.ts`
+- `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceAdapter.ts`
 - `application/identity/ports/IIdentityCredentialAuthenticator.ts`
 - `application/identity/ports/IIdentityCredentialResetVerifier.ts`
@@ -143,10 +143,10 @@ Identity data-handling now uses centralized redaction and serializer seams to pr
 
 Primary hardening seams:
 
-- `infrastructure/api/identity/IdentityAuthRedaction.ts`
+- `src/infrastructure/api/identity/IdentityAuthRedaction.ts`
   - recursive object/array redaction by sensitive-key policy
   - freeform string redaction for bearer/session token patterns in error/log text
-- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
+- `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
   - explicit allowlist mapping for identity API response payloads (including admin list/get/status outputs)
 - `ui/shared/identity/IdentityAuthSessionStore.ts`
   - narrowed persisted session allowlist shape (`IdentityAuthPersistedSession`) for local runtime continuity without persisting non-required sensitive/trust metadata
@@ -257,7 +257,7 @@ Operational effect:
 
 ## Session policy configuration and expiry controls (story 1.3.5)
 
-- Session policy is now environment-configurable through `infrastructure/config/IdentitySessionPolicyConfig.ts` and injected by `hosts/server/IdentityServerHost.ts` into `IdentitySessionLifecycleService`.
+- Session policy is now environment-configurable through `infrastructure/config/IdentitySessionPolicyConfig.ts` and injected by `src/hosts/server/IdentityServerHost.ts` into `IdentitySessionLifecycleService`.
 - Per-channel controls now include:
   - absolute TTL (`ttlMinutes`)
   - refresh allowance (`allowRefresh`)
@@ -305,7 +305,7 @@ Operational effect:
 
 - Provider/account policy configuration is now centralized in:
   - `infrastructure/config/IdentityProviderAccountPolicyConfig.ts`
-- `hosts/server/IdentityServerHost.ts` now composes this config from environment and applies startup seeding/feature toggles:
+- `src/hosts/server/IdentityServerHost.ts` now composes this config from environment and applies startup seeding/feature toggles:
   - local provider status enablement (`active` vs `disabled`)
   - startup bootstrap seeding for local provider + credential policy defaults
   - local registration toggle

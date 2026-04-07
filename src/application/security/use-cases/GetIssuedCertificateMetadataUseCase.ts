@@ -1,6 +1,6 @@
-import type {
+﻿import type {
   IssuedCertificateMetadataViewDto,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import type { CertificateQueryAuthorizationHook } from "../ports/CertificateQueryAuthorizationPorts";
 import { CertificateTrustEvaluationService, type CertificateTrustEvaluationClock } from "./CertificateTrustEvaluationService";
@@ -182,3 +182,4 @@ function normalizeOptionalIsoTimestamp(value?: string): string | undefined {
   }
   return new Date(epoch).toISOString();
 }
+

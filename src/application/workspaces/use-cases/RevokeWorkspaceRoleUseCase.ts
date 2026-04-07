@@ -1,4 +1,4 @@
-import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
+﻿import type { IWorkspaceAuthorizationReadRepository } from "../ports/IWorkspaceAuthorizationReadRepository";
 import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
@@ -10,7 +10,7 @@ import {
   revokeWorkspaceRoleAssignment,
   type WorkspaceRole,
   type WorkspaceRoleAssignment,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   normalizeWorkspaceRoleAdministrationAuditContext,
   type WorkspaceRoleAdministrationAuditContext,
@@ -347,3 +347,4 @@ export class RevokeWorkspaceRoleUseCase {
     };
   }
 }
+

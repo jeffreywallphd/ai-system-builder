@@ -16,7 +16,7 @@ The host assembly is responsible for runtime composition and startup orchestrati
 
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint assembly: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
-- Runtime host implementation composed by the root: `hosts/server/IdentityServerHost.ts`
+- Runtime host implementation composed by the root: `src/hosts/server/IdentityServerHost.ts`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 The entrypoint composes and starts the host through:

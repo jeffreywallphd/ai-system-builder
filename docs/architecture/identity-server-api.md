@@ -31,10 +31,10 @@ This note documents the authoritative HTTP server endpoints for local identity r
 
 Implemented transport and host composition:
 
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/api/assets/AssetManagementBackendApi.ts`
-- `hosts/server/IdentityServerHost.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 UI entry points now consume this same HTTP surface through renderer identity adapters:
 
@@ -159,7 +159,7 @@ Validation is performed with `zod` at the HTTP transport boundary.
 
 ### Trusted-device requests
 
-Trusted-device transport contracts are defined in `infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts` and include:
+Trusted-device transport contracts are defined in `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts` and include:
 
 - device management: list, detail, revoke, and display-name update request/response contracts
 - pairing lifecycle: initiation, validation, and completion request/response contracts
@@ -547,9 +547,9 @@ Application identity failures are translated through `IdentityAuthBackendApi` in
 
 Authentication flow observability is centralized in:
 
-- `infrastructure/api/identity/IdentityAuthObservability.ts`
-- `infrastructure/api/identity/IdentityAuthRedaction.ts`
-- `infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
+- `src/infrastructure/api/identity/IdentityAuthObservability.ts`
+- `src/infrastructure/api/identity/IdentityAuthRedaction.ts`
+- `src/infrastructure/api/identity/IdentityAuthResponseSerializers.ts`
 
 `IdentityAuthBackendApi` emits structured auth/admin/trusted-device API completion events through this seam for both success and failure outcomes. The observability seam includes:
 
@@ -591,11 +591,11 @@ Renderer session persistence is intentionally minimized:
 
 ## Test coverage
 
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/api/identity/IdentityAuthObservability.ts`
-- `infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/api/identity/IdentityAuthObservability.ts`
+- `src/infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device API route and contract coverage in the same backend/HTTP test suites
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/IdentityAdminPage.test.tsx`

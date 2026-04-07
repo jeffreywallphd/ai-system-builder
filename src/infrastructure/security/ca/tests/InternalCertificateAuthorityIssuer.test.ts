@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import { generateKeyPairSync, X509Certificate } from "node:crypto";
 import { InternalCertificateAuthorityIssuer } from "../InternalCertificateAuthorityIssuer";
-import type { ICertificateAuthorityRootPersistenceRepository } from "../../../../application/security/ports/ICertificateAuthorityRootPersistenceRepository";
-import type { ITrustMaterialReferencePersistenceRepository } from "../../../../application/security/ports/ITrustMaterialReferencePersistenceRepository";
-import type { ICertificateAuthorityRootMaterialStorage } from "../../../../application/security/ports/ICertificateAuthorityRootMaterialStorage";
+import type { ICertificateAuthorityRootPersistenceRepository } from "@application/security/ports/ICertificateAuthorityRootPersistenceRepository";
+import type { ITrustMaterialReferencePersistenceRepository } from "@application/security/ports/ITrustMaterialReferencePersistenceRepository";
+import type { ICertificateAuthorityRootMaterialStorage } from "@application/security/ports/ICertificateAuthorityRootMaterialStorage";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -14,8 +14,8 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../../shared/dto/security/CertificateAuthorityDtos";
-import { CertificateAuthorityStatuses, CertificateUsageKinds } from "../../../../domain/security/CertificateAuthorityDomain";
+} from "@shared/dto/security/CertificateAuthorityDtos";
+import { CertificateAuthorityStatuses, CertificateUsageKinds } from "@domain/security/CertificateAuthorityDomain";
 
 class InMemoryCertificateAuthorityRepository implements ICertificateAuthorityRootPersistenceRepository {
   public authority?: CertificateAuthorityRootPersistenceRecord;
@@ -355,3 +355,4 @@ describe("InternalCertificateAuthorityIssuer", () => {
     })).rejects.toThrow("was not found");
   });
 });
+

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   HostCapabilityCategory,
   HostCapabilityDescriptor,
   HostCapabilityFlag,
@@ -8,7 +8,7 @@ import type {
   HostRuntimeKind,
   HostStartupDependencyBoundary,
   HostStartupDependencyBoundaryLayer,
-} from "../../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 import type {
   HostBootConfiguration,
   HostBootMode,
@@ -18,7 +18,7 @@ import type {
   HostLifecycleReadinessMarker,
   HostLifecycleTransition,
   HostRuntimeMetadata,
-} from "../../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 
 export class HostCompositionSharedContractError extends Error {
   constructor(message: string) {
@@ -233,4 +233,5 @@ export function toHostLifecycleEventDto(value: HostLifecycleEvent): HostLifecycl
     metadata: value.metadata ? Object.freeze({ ...value.metadata }) : undefined,
   });
 }
+
 

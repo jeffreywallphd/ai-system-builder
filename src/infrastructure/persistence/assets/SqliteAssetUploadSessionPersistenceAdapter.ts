@@ -1,11 +1,11 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import {
   AssetUploadSessionStatuses,
   type AssetUploadSessionRecord,
   type IAssetUploadSessionRepository,
-} from "../../../application/assets/ports/IAssetUploadSessionRepository";
-import type { AssetStorageArea } from "../../../domain/assets/AssetDomain";
+} from "@application/assets/ports/IAssetUploadSessionRepository";
+import type { AssetStorageArea } from "@domain/assets/AssetDomain";
 import { openSqliteCompatDatabase, type SqliteCompatDatabase } from "../sqlite/SqliteCompat";
 import {
   ASSET_UPLOAD_SESSION_PERSISTENCE_MIGRATIONS,
@@ -324,3 +324,4 @@ function normalizeNonNegativeInteger(value: number, field: string): number {
   }
   return value;
 }
+

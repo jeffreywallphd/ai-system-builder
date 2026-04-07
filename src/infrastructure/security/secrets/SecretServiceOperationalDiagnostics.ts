@@ -1,4 +1,4 @@
-import { SecretAccessActions, SecretActorTypes, SecretScopes } from "../../../domain/security/SecretDomain";
+﻿import { SecretAccessActions, SecretActorTypes, SecretScopes } from "@domain/security/SecretDomain";
 import {
   SystemSecretBootstrapStates,
   bootstrapSystemSecretsFromEnvironment,
@@ -12,7 +12,7 @@ import {
   type SecretServiceHealthViewDto,
   type SecretServiceOperationalDiagnosticDto,
   type SecretServiceOperationalDiagnosticsViewDto,
-} from "../../../shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
+} from "@shared/dto/security/SecretServiceOperationalDiagnosticsDtos";
 
 const SECRET_BOOTSTRAP_MIGRATION_ENV_KEY = "AI_LOOM_SECRET_BOOTSTRAP_MIGRATE_LEGACY_ENV";
 
@@ -147,3 +147,4 @@ function resolveHealthState(input: {
 
   return SecretServiceHealthStates.healthy;
 }
+

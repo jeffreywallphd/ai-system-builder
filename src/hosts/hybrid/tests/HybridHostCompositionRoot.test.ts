@@ -1,14 +1,14 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
   createHostRuntimeIdentity,
-} from "../../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 import {
   HostCompositionContractError,
   createHostBootConfiguration,
-} from "../../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { HybridHostRuntime } from "../../HostRuntimeCatalog";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
@@ -17,12 +17,12 @@ import {
   HybridServiceRegistrationPlanArtifactKey,
   createHybridCompositionRoot,
 } from "../HybridHostCompositionRoot";
-import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
-import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { HostServiceRegistrationError } from "@infrastructure/config/HostServiceRegistration";
 import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
-} from "../../../infrastructure/config/HostStartupConfiguration";
+} from "@infrastructure/config/HostStartupConfiguration";
 
 describe("HybridHostCompositionRoot", () => {
   it("composes and stops hybrid host runtime with lifecycle transitions", async () => {
@@ -274,3 +274,4 @@ describe("HybridHostCompositionRoot", () => {
     await runtime.stop();
   });
 });
+

@@ -1,8 +1,8 @@
-import type {
+﻿import type {
   EncryptionKeyMaterialDescriptor,
   IEncryptionKeyMaterialPort,
   ResolveEncryptionKeyMaterialRequest,
-} from "../../../application/security/ports/ProtectedValueEncryptionPorts";
+} from "@application/security/ports/ProtectedValueEncryptionPorts";
 
 interface StaticEncryptionKeyMaterialInput {
   readonly keyReferenceId: string;
@@ -65,3 +65,4 @@ function normalizeRequired(value: string, field: string): string {
   }
   return normalized;
 }
+

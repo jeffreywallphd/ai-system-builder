@@ -1,4 +1,4 @@
-import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
+﻿import type { IWorkspaceMembershipRepository } from "../ports/IWorkspaceMembershipRepository";
 import type { IWorkspaceRepository } from "../ports/IWorkspaceRepository";
 import type { IWorkspaceRoleAssignmentRepository } from "../ports/IWorkspaceRoleAssignmentRepository";
 import type { IWorkspaceTransactionManager } from "../ports/IWorkspaceTransactionManager";
@@ -16,12 +16,12 @@ import {
   type WorkspaceMembership,
   type WorkspaceRoleAssignment,
   type WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
-import type { WorkspaceVisibility } from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@domain/workspaces/WorkspaceDomain";
+import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import {
   WorkspaceIdNamespaces,
   type WorkspaceIdNamespace,
-} from "../../../shared/contracts/workspaces/WorkspaceRepositoryContracts";
+} from "@shared/contracts/workspaces/WorkspaceRepositoryContracts";
 import {
   WorkspaceAdministrationAuditEventTypes,
   publishWorkspaceAdministrationAuditEventBestEffort,
@@ -311,3 +311,4 @@ export class CreateWorkspaceUseCase {
     };
   }
 }
+

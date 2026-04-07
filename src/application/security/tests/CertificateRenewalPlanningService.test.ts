@@ -1,12 +1,12 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateStatuses,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateAuthorityRootPersistenceRecord,
   IssuedCertificatePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   CertificateRenewalPlanningService,
   CertificateRenewalStates,
@@ -194,3 +194,4 @@ function createAuthority(input: {
     revision: 1,
   });
 }
+

@@ -1,9 +1,9 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   CertificateAuthorityStatuses,
   CertificateSubjectReferenceKinds,
   CertificateUsageKinds,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type {
   CertificateAuthorityPersistenceMutationResult,
   CertificateAuthorityRootLookupQuery,
@@ -19,7 +19,7 @@ import type {
   TrustMaterialReferencePersistenceRecord,
   UpdateCertificateAuthorityRotationPolicyPersistenceRecordInput,
   UpdateCertificateAuthorityStatusPersistenceRecordInput,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import type {
   ApprovedNodeCertificateEligibilityDecision,
   ApprovedNodeCertificateEligibilityInput,
@@ -41,7 +41,7 @@ import {
   CertificateIssuancePolicyViolationError,
   IssueCertificateForSubjectUseCase,
 } from "../use-cases/IssueCertificateForSubjectUseCase";
-import { CertificateSubjectProfileKinds } from "../../../domain/security/CertificateIssuancePolicyDomain";
+import { CertificateSubjectProfileKinds } from "@domain/security/CertificateIssuancePolicyDomain";
 import type { CertificateLifecycleAuditEvent, CertificateLifecycleAuditSink } from "../ports/CertificateLifecycleAuditPorts";
 
 class InMemoryCertificateAuthorityRepository implements ICertificateAuthorityRootPersistenceRepository {
@@ -701,3 +701,4 @@ function createServiceIssuanceRequest() {
     occurredAt: "2026-04-05T12:00:00.000Z",
   } as const;
 }
+

@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   AuthorizationPersistenceMutationResult,
   AuthorizationSharingGrantPersistenceLookupQuery,
   AuthorizationSharingGrantPersistenceRecord,
   RevokeAuthorizationSharingGrantPersistenceRecordInput,
   UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 
 export interface IAuthorizationSharingGrantPersistenceRepository {
   findSharingGrantById(sharingGrantId: string): Promise<AuthorizationSharingGrantPersistenceRecord | undefined>;
@@ -18,3 +18,4 @@ export interface IAuthorizationSharingGrantPersistenceRepository {
     input: RevokeAuthorizationSharingGrantPersistenceRecordInput,
   ): Promise<AuthorizationPersistenceMutationResult<AuthorizationSharingGrantPersistenceRecord>>;
 }
+

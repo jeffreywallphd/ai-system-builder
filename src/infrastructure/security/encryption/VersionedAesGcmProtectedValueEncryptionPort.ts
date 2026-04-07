@@ -1,4 +1,4 @@
-import {
+﻿import {
   createCipheriv,
   createDecipheriv,
   createHash,
@@ -13,11 +13,11 @@ import type {
   IProtectedValueEncryptionPort,
   ProtectedValueEncryptionPortResult,
   ProtectedValuePayload,
-} from "../../../application/security/ports/ProtectedValueEncryptionPorts";
+} from "@application/security/ports/ProtectedValueEncryptionPorts";
 import {
   ProtectedValueEncryptionErrorCodes,
   ProtectedValuePayloadDescriptorVersions,
-} from "../../../application/security/ports/ProtectedValueEncryptionPorts";
+} from "@application/security/ports/ProtectedValueEncryptionPorts";
 
 const SupportedAlgorithm = "aes-256-gcm";
 
@@ -421,3 +421,4 @@ function safeEqualHex(left: string, right: string): boolean {
   }
   return timingSafeEqual(leftBuffer, rightBuffer);
 }
+

@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -8,7 +8,7 @@ import {
   StorageLifecycleStates,
   StorageReplicationModes,
   StorageRetentionExpiryActions,
-} from "../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   PersistenceAuditStampSchema,
   PersistenceIdentifierSchema,
@@ -131,3 +131,4 @@ export function parseStorageInstancePersistenceRecord(payload: unknown): Storage
     payload,
   );
 }
+

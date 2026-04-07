@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { AuthorizationResourceFamilies } from "../../../../domain/authorization/AuthorizationPermissionCatalog";
+﻿import { describe, expect, it } from "bun:test";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import {
   normalizeAuthorizationMutationOperationKey,
   toAuthorizationResourceLookupKey,
@@ -43,3 +43,4 @@ describe("AuthorizationPersistenceDtos", () => {
     expect(normalizeAuthorizationMutationOperationKey("  OP-101  ")).toBe("op-101");
   });
 });
+

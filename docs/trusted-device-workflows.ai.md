@@ -10,8 +10,8 @@ Renderer user-facing flow for trusted-device pairing and management.
 - `ui/pages/IdentityAdminPage.tsx`
 - `ui/services/IdentityAuthService.ts`
 - `ui/shared/identity/IdentityAuthClient.ts`
-- `infrastructure/api/identity/IdentityAuthBackendApi.ts`
-- `infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/application/identity/use-cases/TrustedDeviceAdministrativeAuthorization.ts`
 - `ui/routes/AppRouter.tsx`
 - `ui/routes/RouteConfig.ts`
@@ -54,6 +54,6 @@ Renderer user-facing flow for trusted-device pairing and management.
 
 - `ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `ui/pages/tests/TrustedDevicesPage.test.tsx`
-- `infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
-- `infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
+- `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`

@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretScopes,
   createSecretScopeOwner,
   type SecretAccessActor,
   type SecretScopeOwner,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type {
   ISecretAccessPolicyPort,
   ISecretRecordPersistenceRepository,
@@ -303,3 +303,4 @@ function toErrorMessage(error: unknown): string {
   }
   return "Secret scope resolution request is invalid.";
 }
+

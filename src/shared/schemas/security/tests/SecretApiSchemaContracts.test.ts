@@ -1,5 +1,5 @@
-import { describe, expect, it } from "bun:test";
-import { SecretKinds, SecretScopes } from "../../../../domain/security/SecretDomain";
+﻿import { describe, expect, it } from "bun:test";
+import { SecretKinds, SecretScopes } from "@domain/security/SecretDomain";
 import {
   SecretApiSchemaValidationError,
   parseCreateSecretMetadataCommand,
@@ -129,3 +129,4 @@ describe("SecretApiSchemaContracts", () => {
     })).toThrow(SecretApiSchemaValidationError);
   });
 });
+

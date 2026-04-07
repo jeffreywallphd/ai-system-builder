@@ -1,11 +1,11 @@
-import type {
+﻿import type {
   SecretAccessActor,
   SecretKind,
   SecretRecord,
   SecretReference,
   SecretReferenceMetadata,
   SecretScopeOwner,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 
 export const SecretServiceErrorCodes = Object.freeze({
   invalidRequest: "secret-invalid-request",
@@ -202,3 +202,4 @@ export type SecretServiceRecordSnapshot = Pick<
   SecretRecord,
   "secretId" | "state" | "kind" | "owner" | "currentVersionId" | "lastModifiedAt"
 >;
+

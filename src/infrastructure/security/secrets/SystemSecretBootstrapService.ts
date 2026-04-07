@@ -1,10 +1,10 @@
-import {
+﻿import {
   SecretAccessActions,
   SecretActorTypes,
   SecretKinds,
   SecretScopes,
   type SecretKind,
-} from "../../../domain/security/SecretDomain";
+} from "@domain/security/SecretDomain";
 import type { ServerComposedSecretService } from "./SecretServiceComposition";
 import {
   ServerPlatformProviderIds,
@@ -324,3 +324,4 @@ function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
 }
+

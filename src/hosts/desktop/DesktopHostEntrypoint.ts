@@ -1,10 +1,10 @@
-import process from "node:process";
+﻿import process from "node:process";
 import {
   HostBootModes,
   createHostBootConfiguration,
   type HostBootConfiguration,
   type HostBootMode,
-} from "../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { DesktopHostRuntime } from "../HostRuntimeCatalog";
 import {
   createDesktopCompositionRoot,
@@ -73,3 +73,4 @@ export async function startDesktopHostAssembly(
   const assembly = constructDesktopHostAssembly(options);
   return assembly.compositionRoot.compose(assembly.boot);
 }
+

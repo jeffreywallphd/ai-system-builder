@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   PermissionEffects,
   PermissionGrantScopes,
@@ -9,9 +9,9 @@ import {
   RoleAssignmentStatuses,
   createPermissionGrant,
   createRoleAssignment,
-} from "../../../domain/authorization/AuthorizationDomain";
-import { AuthorizationResourceFamilies } from "../../../domain/authorization/AuthorizationPermissionCatalog";
-import { WorkspaceAuthorizationRoleKeys } from "../../../domain/authorization/AuthorizationRoleDefinitions";
+} from "@domain/authorization/AuthorizationDomain";
+import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
+import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
 import type {
   AuthorizationActorRoleGrantSnapshotQuery,
   AuthorizationPolicyDecisionEvaluationRequest,
@@ -38,8 +38,8 @@ import type {
   UpsertAuthorizationResourcePolicyMetadataPersistenceRecordInput,
   UpsertAuthorizationRoleAssignmentPersistenceRecordInput,
   UpsertAuthorizationSharingGrantPersistenceRecordInput,
-} from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
-import { toAuthorizationResourceLookupKey } from "../../../shared/dto/authorization/AuthorizationPersistenceDtos";
+} from "@shared/dto/authorization/AuthorizationPersistenceDtos";
+import { toAuthorizationResourceLookupKey } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import type { AuthorizationPolicyPersistencePorts } from "../ports/AuthorizationPolicyPersistencePorts";
 import type { IAuthorizationPolicyEventRecorder } from "../ports/IAuthorizationPolicyEventRecorder";
 import type { IAuthorizationResourcePolicyMetadataReadRepository } from "../ports/IAuthorizationResourcePolicyMetadataReadRepository";
@@ -1178,3 +1178,4 @@ describe("Authorization administration use cases", () => {
     }
   });
 });
+

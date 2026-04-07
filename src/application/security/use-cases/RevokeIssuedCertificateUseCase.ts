@@ -1,4 +1,4 @@
-import {
+﻿import {
   type CertificateRevocationReason,
   CertificateRevocationReasons,
   CertificateStatuses,
@@ -7,14 +7,14 @@ import {
   createCertificateValidityWindow,
   createIssuedCertificate,
   revokeIssuedCertificate,
-} from "../../../domain/security/CertificateAuthorityDomain";
+} from "@domain/security/CertificateAuthorityDomain";
 import type { ICertificateLifecycleEventPersistenceRepository } from "../ports/ICertificateLifecycleEventPersistenceRepository";
 import type { IIssuedCertificatePersistenceRepository } from "../ports/IIssuedCertificatePersistenceRepository";
 import {
   normalizeCertificateAuthorityMutationOperationKey,
   type CertificateRevocationPersistenceRecord,
   type IssuedCertificatePersistenceRecord,
-} from "../../../shared/dto/security/CertificateAuthorityDtos";
+} from "@shared/dto/security/CertificateAuthorityDtos";
 import {
   publishCertificateLifecycleAuditEventBestEffort,
   type CertificateLifecycleAuditSink,
@@ -381,3 +381,4 @@ function toAuditDetails(event: CertificateRevocationAuditEvent): Readonly<Record
       return Object.freeze({});
   }
 }
+

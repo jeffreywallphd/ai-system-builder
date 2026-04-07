@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { SecretAccessActions, SecretActorTypes } from "../../../../domain/security/SecretDomain";
+import { SecretAccessActions, SecretActorTypes } from "@domain/security/SecretDomain";
 import {
   SystemSecretBootstrapDiagnosticCodes,
   SystemSecretBootstrapStates,
@@ -152,3 +152,4 @@ describe("SystemSecretBootstrapService", () => {
     }
   });
 });
+

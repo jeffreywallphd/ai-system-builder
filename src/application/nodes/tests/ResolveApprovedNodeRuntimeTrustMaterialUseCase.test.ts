@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   NodeApprovalStatuses,
   NodeHeartbeatStatuses,
@@ -6,7 +6,7 @@ import {
   NodeRoleCapabilities,
   NodeTrustStates,
   NodeTypes,
-} from "../../../domain/nodes/NodeTrustDomain";
+} from "@domain/nodes/NodeTrustDomain";
 import type { INodeTrustIdentityPersistenceRepository } from "../ports/INodeTrustIdentityPersistenceRepository";
 import type {
   NodeIdentityPersistenceLookupQuery,
@@ -18,7 +18,7 @@ import type {
   UpdateNodeApprovalPersistenceRecordInput,
   UpdateNodeCapabilityProfilePersistenceRecordInput,
   UpdateNodeCertificateReferencePersistenceRecordInput,
-} from "../../../shared/dto/nodes/NodeTrustPersistenceDtos";
+} from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 import type {
   ITrustMaterialDistributionPort,
   PublishTrustBundleInput,
@@ -247,3 +247,4 @@ function createNodeRecord(input: {
     revision: 0,
   });
 }
+

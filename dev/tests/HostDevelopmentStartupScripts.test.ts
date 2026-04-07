@@ -18,6 +18,15 @@ describe("host development startup scripts", () => {
   it("keeps the default dev workflow on desktop host startup", () => {
     const scripts = readPackageScripts();
     expect(scripts.dev).toBe("npm run dev:desktop");
+    expect(scripts["dev:desktop:prepare"]).toBe(
+      "node --preserve-symlinks-main dev/prepare-electron-forge-dev.cjs",
+    );
+    expect(scripts["dev:desktop:start"]).toBe(
+      "node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start",
+    );
+    expect(scripts["dev:desktop"]).toBe(
+      "npm run dev:desktop:prepare && npm run dev:desktop:start",
+    );
   });
 
   it("routes individual host startup scripts through host entrypoint assemblies", () => {
@@ -52,7 +61,7 @@ describe("host development startup scripts", () => {
   it("does not expose legacy direct identity server startup as a package script", () => {
     const scripts = readPackageScripts();
     const scriptValues = Object.values(scripts);
-    const legacyReference = scriptValues.find((value) => value.includes("hosts/server/IdentityServerHost.ts"));
-    expect(legacyReference).toBeUndefined();
+    const legacyHostReference = scriptValues.find((value) => value.includes("bun run hosts/server/IdentityServerHost.ts"));
+    expect(legacyHostReference).toBeUndefined();
   });
 });

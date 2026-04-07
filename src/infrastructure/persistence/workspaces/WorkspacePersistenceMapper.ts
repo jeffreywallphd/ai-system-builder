@@ -1,4 +1,4 @@
-import {
+﻿import {
   WorkspaceInvitationStatuses,
   WorkspaceEncryptionKeyScopes,
   WorkspaceEncryptionModes,
@@ -17,12 +17,12 @@ import {
   type WorkspaceRoleAssignment,
   type WorkspaceRoleAssignmentStatus,
   type WorkspaceStatus,
-} from "../../../domain/workspaces/WorkspaceDomain";
+} from "@domain/workspaces/WorkspaceDomain";
 import {
   WorkspaceVisibilities,
   rehydrateWorkspaceOwnershipMetadata,
   type WorkspaceVisibility,
-} from "../../../shared/workspaces/WorkspaceOwnership";
+} from "@shared/workspaces/WorkspaceOwnership";
 
 export interface WorkspaceRow {
   readonly workspace_id: string;
@@ -361,3 +361,4 @@ function assertWorkspaceInvitationStatus(value: string): WorkspaceInvitationStat
   }
   throw new Error(`Persisted workspace invitation status '${value}' is invalid.`);
 }
+

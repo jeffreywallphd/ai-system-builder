@@ -1,19 +1,19 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   HostCapabilityFlags,
   HostControlPlaneRoles,
   HostRuntimeKinds,
   createHostRuntimeIdentity,
-} from "../../../domain/hosts/HostRuntimeDomain";
+} from "@domain/hosts/HostRuntimeDomain";
 import {
   HostCompositionContractError,
   createHostBootConfiguration,
-} from "../../../application/common/HostCompositionContracts";
+} from "@application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../../HostRuntimeCatalog";
 import { createAuthoritativeServerCompositionRoot } from "../AuthoritativeServerCompositionRoot";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
-import type { HostServiceRegistrationPlan } from "../../../infrastructure/config/HostServiceRegistration";
-import { HostServiceRegistrationError } from "../../../infrastructure/config/HostServiceRegistration";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
+import { HostServiceRegistrationError } from "@infrastructure/config/HostServiceRegistration";
 import {
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
@@ -21,9 +21,9 @@ import {
 import {
   HostDeploymentProfileIds,
   HostStartupEnvironmentKeys,
-} from "../../../infrastructure/config/HostStartupConfiguration";
-import type { SqlitePersistenceRuntime } from "../../../infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
-import type { AuthoritativePersistentPlatformServices } from "../../../infrastructure/persistence/AuthoritativePersistenceComposition";
+} from "@infrastructure/config/HostStartupConfiguration";
+import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
+import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -452,4 +452,5 @@ describe("AuthoritativeServerCompositionRoot", () => {
     ]);
   });
 });
+
 

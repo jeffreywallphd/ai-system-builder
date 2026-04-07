@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+﻿import { describe, expect, it } from "bun:test";
 import {
   StorageAccessModes,
   StorageAccessScopes,
@@ -7,7 +7,7 @@ import {
   createStorageInstance,
   type StorageBackendType,
   type StorageInstance,
-} from "../../../../domain/storage/StorageDomain";
+} from "@domain/storage/StorageDomain";
 import {
   ServerManagedStorageSynchronizationAdapter,
   StorageSyncDeploymentAvailabilities,
@@ -148,3 +148,4 @@ describe("ServerManagedStorageSynchronizationAdapter", () => {
     expect(state.reasonCode).toBe(StorageSynchronizationReasonCodes.replicationModeUnsupported);
   });
 });
+

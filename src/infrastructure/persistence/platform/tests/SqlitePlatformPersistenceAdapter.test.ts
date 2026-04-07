@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, it } from "bun:test";
+﻿import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { PlatformAuditEventKinds } from "../../../../application/common/ports/PlatformPersistenceBoundaryPorts";
+import { PlatformAuditEventKinds } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqlitePlatformPersistenceAdapter } from "../SqlitePlatformPersistenceAdapter";
 
@@ -291,3 +291,4 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     adapter.dispose();
   });
 });
+
