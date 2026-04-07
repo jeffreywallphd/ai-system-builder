@@ -5,11 +5,13 @@ import path from "node:path";
 import {
   AuditActorKinds,
   AuditEventCategories,
+  AuditImmutabilityPostures,
   AuditScopeKinds,
   createCanonicalAuditEvent,
   type CanonicalAuditEvent,
 } from "@domain/audit/AuditDomain";
 import { SharedApiSortDirections } from "@shared/contracts/api/SharedApiContractPrimitives";
+import { openSqliteCompatDatabase } from "../../sqlite/SqliteCompat";
 import { SqliteAuditLedgerRepository } from "../SqliteAuditLedgerRepository";
 
 const createdRoots: string[] = [];
@@ -248,6 +250,129 @@ describe("SqliteAuditLedgerRepository", () => {
       "audit:event:run",
     ]);
 
+    repository.dispose();
+  });
+
+  it("prohibits update and delete mutations against persisted audit ledger rows", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-audit-ledger-immutable-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "audit.sqlite");
+    const repository = new SqliteAuditLedgerRepository(databasePath);
+
+    await repository.appendAuditEvent(createEvent({
+      eventId: "audit:event:immutable",
+      eventType: "policy-updated",
+      category: AuditEventCategories.policy,
+      action: "policy.updated",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+        eventDigest: "digest:immutable:1",
+      },
+    }), {
+      operationKey: "audit:immutable:1",
+      actorId: "user:auditor",
+      occurredAt: "2026-04-07T20:11:00.000Z",
+    });
+
+    repository.dispose();
+
+    const database = openSqliteCompatDatabase(databasePath);
+    expect(() => database.prepare(`
+      UPDATE authoritative_audit_ledger_events
+      SET outcome = 'failed'
+      WHERE event_id = 'audit:event:immutable'
+    `).run()).toThrow("append-only");
+
+    expect(() => database.prepare(`
+      DELETE FROM authoritative_audit_ledger_events
+      WHERE event_id = 'audit:event:immutable'
+    `).run()).toThrow("append-only");
+
+    expect(() => database.prepare(`
+      UPDATE authoritative_audit_ledger_mutation_replays
+      SET actor_id = 'user:tampered'
+      WHERE operation_key = 'audit:immutable:1'
+    `).run()).toThrow("append-only");
+    database.close();
+  });
+
+  it("enforces hash-chain integrity continuity when appending", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-audit-ledger-hash-chain-"));
+    createdRoots.push(root);
+    const repository = new SqliteAuditLedgerRepository(path.join(root, "audit.sqlite"));
+
+    await repository.appendAuditEvent(createEvent({
+      eventId: "audit:event:chain:1",
+      eventType: "policy-updated",
+      category: AuditEventCategories.policy,
+      action: "policy.updated",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+        eventDigest: "digest:chain:1",
+      },
+      immutability: AuditImmutabilityPostures.appendOnlyHashChained,
+    }), {
+      operationKey: "audit:chain:1",
+      actorId: "user:auditor",
+      occurredAt: "2026-04-07T20:12:00.000Z",
+    });
+
+    await expect(repository.appendAuditEvent(createEvent({
+      eventId: "audit:event:chain:2",
+      eventType: "policy-updated",
+      category: AuditEventCategories.policy,
+      action: "policy.updated",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+      },
+      immutability: AuditImmutabilityPostures.appendOnlyHashChained,
+    }), {
+      operationKey: "audit:chain:2-missing-digest",
+      actorId: "user:auditor",
+      occurredAt: "2026-04-07T20:12:10.000Z",
+    })).rejects.toThrow("requires integrity.eventDigest");
+
+    await expect(repository.appendAuditEvent(createEvent({
+      eventId: "audit:event:chain:2b",
+      eventType: "policy-updated",
+      category: AuditEventCategories.policy,
+      action: "policy.updated",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+        eventDigest: "digest:chain:2b",
+        previousEventDigest: "digest:wrong",
+      },
+      immutability: AuditImmutabilityPostures.appendOnlyHashChained,
+    }), {
+      operationKey: "audit:chain:2-mismatch",
+      actorId: "user:auditor",
+      occurredAt: "2026-04-07T20:12:20.000Z",
+    })).rejects.toThrow("does not match latest ledger digest");
+
+    const appended = await repository.appendAuditEvent(createEvent({
+      eventId: "audit:event:chain:2c",
+      eventType: "policy-updated",
+      category: AuditEventCategories.policy,
+      action: "policy.updated",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+        eventDigest: "digest:chain:2c",
+        previousEventDigest: "digest:chain:1",
+      },
+      immutability: AuditImmutabilityPostures.appendOnlyHashChained,
+    }), {
+      operationKey: "audit:chain:2-valid",
+      actorId: "user:auditor",
+      occurredAt: "2026-04-07T20:12:30.000Z",
+    });
+
+    expect(appended.changed).toBeTrue();
+    expect(appended.sequence).toBe(2);
     repository.dispose();
   });
 });

@@ -1,4 +1,4 @@
-export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 1;
+export const AUDIT_LEDGER_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -98,5 +98,71 @@ export const AUDIT_LEDGER_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number
 
     CREATE INDEX IF NOT EXISTS authoritative_audit_ledger_mutation_replays_event_idx
       ON authoritative_audit_ledger_mutation_replays(event_id, created_at DESC);
+  `],
+  [2, `
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_hash_chain_digest_required
+    BEFORE INSERT ON authoritative_audit_ledger_events
+    WHEN NEW.immutability = 'append-only-hash-chained'
+      AND (NEW.integrity_event_digest IS NULL OR LENGTH(TRIM(NEW.integrity_event_digest)) = 0)
+    BEGIN
+      SELECT RAISE(ABORT, 'Hash-chained audit events require integrity_event_digest.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_hash_chain_previous_required
+    BEFORE INSERT ON authoritative_audit_ledger_events
+    WHEN NEW.immutability = 'append-only-hash-chained'
+      AND EXISTS (SELECT 1 FROM authoritative_audit_ledger_events)
+      AND (NEW.integrity_previous_event_digest IS NULL OR LENGTH(TRIM(NEW.integrity_previous_event_digest)) = 0)
+    BEGIN
+      SELECT RAISE(ABORT, 'Hash-chained audit events require integrity_previous_event_digest when prior events exist.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_previous_digest_without_tail
+    BEFORE INSERT ON authoritative_audit_ledger_events
+    WHEN NEW.integrity_previous_event_digest IS NOT NULL
+      AND LENGTH(TRIM(NEW.integrity_previous_event_digest)) > 0
+      AND NOT EXISTS (SELECT 1 FROM authoritative_audit_ledger_events)
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit events cannot set integrity_previous_event_digest when no prior events exist.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_previous_digest_mismatch
+    BEFORE INSERT ON authoritative_audit_ledger_events
+    WHEN NEW.integrity_previous_event_digest IS NOT NULL
+      AND LENGTH(TRIM(NEW.integrity_previous_event_digest)) > 0
+      AND EXISTS (SELECT 1 FROM authoritative_audit_ledger_events)
+      AND COALESCE((
+        SELECT TRIM(integrity_event_digest)
+        FROM authoritative_audit_ledger_events
+        ORDER BY sequence DESC
+        LIMIT 1
+      ), '') <> TRIM(NEW.integrity_previous_event_digest)
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit integrity_previous_event_digest must match the latest event digest.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_append_only_no_update
+    BEFORE UPDATE ON authoritative_audit_ledger_events
+    BEGIN
+      SELECT RAISE(ABORT, 'authoritative_audit_ledger_events is append-only; UPDATE is prohibited.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_events_append_only_no_delete
+    BEFORE DELETE ON authoritative_audit_ledger_events
+    BEGIN
+      SELECT RAISE(ABORT, 'authoritative_audit_ledger_events is append-only; DELETE is prohibited.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_mutation_replays_append_only_no_update
+    BEFORE UPDATE ON authoritative_audit_ledger_mutation_replays
+    BEGIN
+      SELECT RAISE(ABORT, 'authoritative_audit_ledger_mutation_replays is append-only; UPDATE is prohibited.');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS authoritative_audit_ledger_mutation_replays_append_only_no_delete
+    BEFORE DELETE ON authoritative_audit_ledger_mutation_replays
+    BEGIN
+      SELECT RAISE(ABORT, 'authoritative_audit_ledger_mutation_replays is append-only; DELETE is prohibited.');
+    END;
   `],
 ]);

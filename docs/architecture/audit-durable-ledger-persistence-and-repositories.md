@@ -1,6 +1,6 @@
 # Audit Durable Ledger Persistence and Repositories
 
-This note captures Story 18.2.1 for Feature 18 / Epic 18.2.
+This note captures Story 18.2.1 and Story 18.2.2 for Feature 18 / Epic 18.2.
 
 ## Purpose
 
@@ -49,6 +49,36 @@ Secondary indexes support common governance query paths:
 
 This preserves append-oriented ledger behavior while allowing safe mutation replay/idempotency metadata.
 
+## Story 18.2.2 immutable-enough safeguards
+
+Baseline production safeguards now enforce immutable-enough audit persistence behavior:
+
+- SQLite triggers prohibit `UPDATE` and `DELETE` on both:
+  - `authoritative_audit_ledger_events`
+  - `authoritative_audit_ledger_mutation_replays`
+- Hash-chain posture guardrails are enforced for inserts:
+  - `append-only-hash-chained` events must include an `integrity_event_digest`.
+  - hash-chained events after the first persisted event must include `integrity_previous_event_digest`.
+  - `integrity_previous_event_digest` must match the latest persisted event digest when present.
+  - `integrity_previous_event_digest` cannot be set when there is no prior event.
+- Repository append flow validates integrity continuity against the current ledger tail before insert and verifies sequence monotonicity after persistence.
+
+These controls prevent ordinary application and repository pathways from silently mutating or replacing persisted historical rows.
+
+## Current trust guarantees and limits
+
+Current guarantees for supported production scope:
+
+- append-only behavior is enforced at repository and database-trigger levels;
+- replay/idempotency metadata cannot be silently rewritten through normal SQL update/delete paths;
+- hash-chain metadata continuity checks provide integrity-oriented sequencing posture for events using hash-chain immutability mode.
+
+Current limits (explicit, non-cryptographic):
+
+- this implementation does not provide external notarization or independently verifiable cryptographic immutability;
+- operators with direct filesystem/database-level write access outside normal runtime controls can still tamper with a copied/offline database;
+- stronger tamper-evidence guarantees (for example signed digests anchored outside SQLite) remain future work.
+
 ## Composition and host wiring
 
 - `createAuthoritativePersistentPlatformServices(...)` now composes `auditLedgerRepository`.
@@ -57,6 +87,6 @@ This preserves append-oriented ledger behavior while allowing safe mutation repl
 
 ## Tests
 
-- `SqliteAuditLedgerRepository.test.ts` validates durable append/reload, idempotent replay, immutable conflict handling, and query filters/sorting.
+- `SqliteAuditLedgerRepository.test.ts` validates durable append/reload, idempotent replay, immutable conflict handling, query filters/sorting, prohibited direct mutation paths, and hash-chain continuity guardrails.
 - `AuditLedgerPersistencePorts.test.ts` validates operation-key normalization guardrails.
 - `AuthoritativePersistenceComposition.test.ts` and host composition tests are updated for the new audit-ledger service seam.
