@@ -654,6 +654,9 @@ describe("Run orchestration lifecycle regression", () => {
       dispatchAttemptId: claimed.dispatchPreparation.dispatchAttemptId,
     });
     expect(dispatchResult.command.run.runId).toBe(selected.run.runId);
+    const queueAfterDispatchAccepted = await queueRepository.getQueueEntryByRunId(selected.run.runId);
+    expect(queueAfterDispatchAccepted?.lifecycleState).toBe("running");
+    expect(queueAfterDispatchAccepted?.claimToken).toBeUndefined();
 
     const ingest = new IngestRunExecutionUpdateUseCase({
       runRepository,

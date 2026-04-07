@@ -27,6 +27,7 @@ import {
 } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
 import {
+  DispatchOutcomeQueueActions,
   HandleRunDispatchResultUseCase,
   createDispatchAcceptedOutcome,
   createDispatchFailureOutcome,
@@ -133,6 +134,34 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
     readonly releasedAt: string;
   }): Promise<boolean> {
     return false;
+  }
+
+  public async requeueAssignedRunForRecovery(input: {
+    readonly runId: string;
+    readonly requeuedAt: string;
+    readonly eligibilityMarker?: "ready" | "deferred" | "blocked";
+  }): Promise<boolean> {
+    const entry = this.queue.get(input.runId);
+    if (!entry || entry.lifecycleState !== "assigned") {
+      return false;
+    }
+    this.queue.set(input.runId, Object.freeze({
+      ...entry,
+      lifecycleState: "queued",
+      eligibilityMarker: input.eligibilityMarker ?? "ready",
+      claimToken: undefined,
+      claimedBy: undefined,
+      claimedAt: undefined,
+      claimExpiresAt: undefined,
+      assignmentNodeId: undefined,
+      assignmentClaimedAt: undefined,
+      dispatchPreparedAt: undefined,
+      lastDispatchAttemptId: undefined,
+      dequeuedAt: undefined,
+      updatedAt: input.requeuedAt,
+      revision: entry.revision + 1,
+    }));
+    return true;
   }
 
   public async claimQueuedRunForNodeDispatch(_input: {
@@ -398,14 +427,60 @@ describe("HandleRunDispatchResultUseCase", () => {
     });
 
     expect(result.run.state).toBe("running");
+    expect(result.queueAction).toBe(DispatchOutcomeQueueActions.runningReservationReleased);
     expect(result.run.execution.startedAt).toBe("2026-04-07T09:03:10.000Z");
     expect(result.run.execution.adapterRunId).toBe("backend-run-1");
     expect(result.dispatchAttemptResult.status).toBe("accepted");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("accepted");
+    expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("running");
+    expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
     expect([...auditRepository.events.values()].length).toBe(2);
   });
 
   it("transitions run to failed for dispatch failures and stores user-safe/internal failure reasons", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    seedAssignedRun(runRepository);
+    seedDispatchAttempt(queueRepository);
+
+    const useCase = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: auditRepository,
+      idGenerator: {
+        nextId: (prefix) => `${prefix}:${auditRepository.events.size + 1}`,
+      },
+    });
+
+    const result = await useCase.execute({
+      command,
+      dispatchStartedAt: "2026-04-07T09:03:00.000Z",
+      outcome: createDispatchFailureOutcome({
+        failedAt: "2026-04-07T09:03:20.000Z",
+        error: Object.freeze({
+          code: "backend-unavailable",
+          message: "Socket connection timeout.",
+          retryable: false,
+        }),
+      }),
+    });
+
+    expect(result.run.state).toBe("failed");
+    expect(result.queueAction).toBe(DispatchOutcomeQueueActions.terminalFinalized);
+    expect(result.run.assignment.status).toBe("released");
+    expect(result.run.execution.errorCode).toBe("dispatch-failed-to-start");
+    expect(result.run.execution.errorMessage).toBe("Run failed to start on the selected execution backend.");
+    expect(result.run.finalization?.outcome).toBe("failed");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.internalMessage)
+      .toContain("Socket connection timeout");
+    expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("failed");
+    expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
+    expect([...auditRepository.events.values()].length).toBe(2);
+  });
+
+  it("requeues retryable failed-to-start dispatch outcomes when retry budget remains", async () => {
     const runRepository = new InMemoryRunRepository();
     const queueRepository = new InMemoryQueueRepository();
     const auditRepository = new InMemoryAuditRepository();
@@ -434,15 +509,13 @@ describe("HandleRunDispatchResultUseCase", () => {
       }),
     });
 
-    expect(result.run.state).toBe("failed");
-    expect(result.run.assignment.status).toBe("released");
-    expect(result.run.execution.errorCode).toBe("dispatch-failed-to-start");
-    expect(result.run.execution.errorMessage).toBe("Run failed to start on the selected execution backend.");
-    expect(result.run.finalization?.outcome).toBe("failed");
+    expect(result.run.state).toBe("queued");
+    expect(result.queueAction).toBe(DispatchOutcomeQueueActions.failedStartRequeued);
+    expect(result.run.assignment.status).toBe("unassigned");
+    expect(result.run.execution.outcome).toBe("none");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
-    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.internalMessage)
-      .toContain("Socket connection timeout");
-    expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("failed");
+    expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("queued");
+    expect(queueRepository.queue.get("run-1")?.assignmentNodeId).toBeUndefined();
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
     expect([...auditRepository.events.values()].length).toBe(2);
   });
