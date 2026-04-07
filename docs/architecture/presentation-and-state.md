@@ -1056,3 +1056,9 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
   - download authorization,
   - preview resolution.
 - UI state remains logical-id focused and path-free for this workflow (`workspaceId`, `assetId`, `storageInstanceId`, `versionId`), aligned with protected asset governance boundaries.
+
+## Multi-surface shell primitives update (story 15.1.2)
+
+- Shared shell primitives and responsive region containers now live in src/ui/shared/components/shell/SurfaceShellPrimitives.tsx and are documented in docs/architecture/multi-surface-ui-shell-primitives.md.
+- Desktop and thin-client assembly wrappers now live in src/ui/desktop/shell/DesktopAdminSurfaceFrame.tsx and src/ui/web/shell/ThinClientOperationalSurfaceFrame.tsx so production pages can share layout vocabulary without duplicating host-neutral shell logic.
+

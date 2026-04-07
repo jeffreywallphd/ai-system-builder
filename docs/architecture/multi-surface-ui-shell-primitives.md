@@ -1,0 +1,59 @@
+# Multi-Surface UI Shell Primitives
+
+This document defines the shared shell vocabulary introduced for Feature 15 / Epic 15.1 / Story 15.1.2.
+
+## Scope
+
+The shell primitives provide reusable, host-neutral layout and guard containers for desktop and thin-client operational/admin surfaces:
+
+- app frame
+- header bar
+- navigation/content/detail regions
+- status region
+- empty state
+- permission-aware guard container
+
+## Source locations
+
+- Shared primitives: `src/ui/shared/components/shell/SurfaceShellPrimitives.tsx`
+- Shared export barrel: `src/ui/shared/components/shell/index.ts`
+- Desktop shell wrapper: `src/ui/desktop/shell/DesktopSurfaceShell.tsx`
+- Desktop admin assembly: `src/ui/desktop/shell/DesktopAdminSurfaceFrame.tsx`
+- Thin-client shell wrapper: `src/ui/web/shell/ThinClientSurfaceShell.tsx`
+- Thin-client operational assembly: `src/ui/web/shell/ThinClientOperationalSurfaceFrame.tsx`
+- Shared shell styles: `src/ui/styles/components/shell.css`
+
+## Composition rules
+
+1. Use shared primitives from `src/ui/shared/components/shell` for all shell-level page structure.
+2. Use desktop/web wrappers only for host-specific shell assembly defaults.
+3. Keep domain/business logic in services/stores/presenters; shell containers should only compose state already prepared by those layers.
+4. Use `PermissionGuardContainer` for unauthorized and unavailable states instead of ad hoc per-page guard markup.
+
+## Responsive behavior
+
+Responsive layout is explicit in `shell.css`:
+
+- Desktop shells default to `navigation + content + detail` columns.
+- Desktop shells collapse detail below content at medium widths.
+- Thin-client shells default to `navigation + content` with detail below.
+- All shell region layouts stack on narrow screens via `ui-shell-regions--collapse`.
+
+## Usage example
+
+```tsx
+<DesktopAdminSurfaceFrame
+  title="Trusted node inventory"
+  subtitle="Inspect trust posture and node status."
+  notices={[{ tone: "warning", content: <p role="alert">Offline nodes detected.</p> }]}
+  navigation={<FiltersPanel />}
+  content={<InventoryTable />}
+  detail={<NodeDetailPane />}
+/>
+```
+
+## Testing coverage
+
+- `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
+- `src/ui/desktop/shell/tests/DesktopAdminSurfaceFrame.test.tsx`
+- `src/ui/web/shell/tests/ThinClientOperationalSurfaceFrame.test.tsx`

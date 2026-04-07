@@ -125,3 +125,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Presenters shape output; they do not fetch or mutate.
 - Stores coordinate UI workflows; they do not own host detection.
 
+
+## Story 15.1.2 update
+
+- Shared shell primitives and responsive region layout vocabulary now live in docs/architecture/multi-surface-ui-shell-primitives.md with implementation in src/ui/shared/components/shell/*, src/ui/desktop/shell/*, and src/ui/web/shell/*.
+- New admin and operational pages should compose app frame, header, region layout, status, empty-state, and permission guard surfaces from those primitives instead of bespoke page shell markup.
+
