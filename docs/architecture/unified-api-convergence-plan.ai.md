@@ -44,3 +44,8 @@
 - `docs/architecture/unified-api-convergence-plan.md`
 - Follow-on rules for production extension/migration governance: `docs/architecture/unified-api-authoritative-surface.md`
 - Contributor checklist: `docs/unified-api-contributor-guide.md`
+- Runtime convergence now includes authoritative read/list transport for core run/queue resources:
+  - `GET /api/v1/runtime/runs/:executionId/status`
+  - `GET /api/v1/runtime/runs/:executionId/result`
+  - `GET /api/v1/runtime/runs/:executionId/trace`
+  - `GET /api/v1/runtime/queue`

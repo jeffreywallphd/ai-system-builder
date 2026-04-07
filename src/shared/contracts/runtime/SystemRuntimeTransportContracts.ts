@@ -34,6 +34,7 @@ export type RuntimeQueueItemStatus =
   typeof RuntimeQueueItemStatuses[keyof typeof RuntimeQueueItemStatuses];
 
 export interface RuntimeQueueListRequest {
+  readonly workspaceId: string;
   readonly systemId?: string;
   readonly tenantId?: string;
   readonly statuses?: ReadonlyArray<RuntimeQueueItemStatus>;

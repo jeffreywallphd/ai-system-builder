@@ -19,6 +19,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
         [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
         [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: true,
       }),
     });
 
@@ -29,12 +30,15 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(selectedRouteFamilyIds.has("workspace-invitations")).toBeTrue();
     expect(selectedRouteFamilyIds.has("workspace-administration")).toBeTrue();
     expect(selectedRouteFamilyIds.has("authorization-management")).toBeTrue();
+    expect(selectedRouteFamilyIds.has("system-runtime")).toBeTrue();
     expect(selectedRouteFamilyIds.has("node-trust")).toBeFalse();
     expect(selectedDomains.has("identity")).toBeTrue();
     expect(selectedDomains.has("workspaces")).toBeTrue();
     expect(selectedDomains.has("authorization")).toBeTrue();
+    expect(selectedDomains.has("runtime")).toBeTrue();
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/identity");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/workspaces");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime");
   });
 
   it("throws when required route family coverage is missing", () => {
@@ -49,6 +53,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.secretMetadata]: false,
         [AuthoritativeApiRouteBackendKeys.storageManagement]: false,
         [AuthoritativeApiRouteBackendKeys.assetManagement]: false,
+        [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
       }),
     });
 

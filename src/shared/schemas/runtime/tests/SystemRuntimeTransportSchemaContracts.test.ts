@@ -16,6 +16,7 @@ describe("SystemRuntimeTransportSchemaContracts", () => {
     expect(start.systemId).toBe("system:root");
 
     const queue = parseRuntimeQueueListRequest({
+      workspaceId: "workspace:alpha",
       statuses: ["queued", "running"],
       limit: 10,
       offset: 0,
@@ -46,6 +47,7 @@ describe("SystemRuntimeTransportSchemaContracts", () => {
 
   it("rejects malformed runtime queue payloads", () => {
     expect(() => parseRuntimeQueueListRequest({
+      workspaceId: "workspace:alpha",
       limit: -1,
     })).toThrow(SystemRuntimeTransportSchemaValidationError);
   });

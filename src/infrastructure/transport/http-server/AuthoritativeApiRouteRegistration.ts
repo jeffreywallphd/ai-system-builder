@@ -6,6 +6,7 @@ export const AuthoritativeApiRouteDomains = Object.freeze({
   security: "security",
   storage: "storage",
   assets: "assets",
+  runtime: "runtime",
 });
 
 export type AuthoritativeApiRouteDomain =
@@ -21,6 +22,7 @@ export const AuthoritativeApiRouteBackendKeys = Object.freeze({
   secretMetadata: "secret-metadata",
   storageManagement: "storage-management",
   assetManagement: "asset-management",
+  systemRuntime: "system-runtime",
 });
 
 export type AuthoritativeApiRouteBackendKey =

@@ -66,6 +66,12 @@ import {
   type RuntimeRealtimeEventSubscription,
   type RuntimeRealtimeSubscriptionRequest,
 } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import {
+  RuntimeQueueItemStatuses,
+  type RuntimeQueueItem,
+  type RuntimeQueueItemStatus,
+  type RuntimeQueueListResponse,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import { AuthoritativeRuntimeEventStream } from "./AuthoritativeRuntimeEventStream";
 import {
   HttpExecutionCallbackDispatcher,
@@ -168,6 +174,15 @@ export interface RuntimeApiRequestContext {
   readonly retryAttempt?: RetryAttemptRecord;
 }
 
+export interface ListRuntimeQueueItemsRequest {
+  readonly workspaceId: string;
+  readonly systemId?: string;
+  readonly statuses?: ReadonlyArray<RuntimeQueueItemStatus>;
+  readonly limit?: number;
+  readonly offset?: number;
+  readonly requestContext?: RuntimeApiRequestContext;
+}
+
 export interface ExecutionCallbackRegistrationRequest {
   readonly callbackId?: string;
   readonly targetUrl: string;
@@ -184,6 +199,23 @@ export interface SystemRuntimeAuthorizationOptions {
   readonly queueProtectedResourceType?: string;
   readonly logProtectedResourceType?: string;
   readonly now?: () => Date;
+}
+
+function mapExecutionStatusToQueueItemStatus(status: RuntimeExecutionStatusReadModel["status"]): RuntimeQueueItemStatus | undefined {
+  switch (status) {
+    case "pending":
+      return RuntimeQueueItemStatuses.queued;
+    case "running":
+      return RuntimeQueueItemStatuses.running;
+    case "succeeded":
+      return RuntimeQueueItemStatuses.completed;
+    case "failed":
+      return RuntimeQueueItemStatuses.failed;
+    case "cancelled":
+      return RuntimeQueueItemStatuses.cancelled;
+    default:
+      return undefined;
+  }
 }
 
 const RuntimeExecutionTracePartialRedactionRules = Object.freeze([
@@ -676,6 +708,102 @@ export class SystemRuntimeBackendApi {
         partialRules: RuntimeExecutionResultPartialRedactionRules,
       });
       return shaped.value ?? projected;
+    });
+  }
+
+  public async listQueueItems(input: ListRuntimeQueueItemsRequest): Promise<SystemRuntimeApiResponse<RuntimeQueueListResponse>> {
+    return this.wrap(async () => {
+      const workspaceId = input.workspaceId.trim();
+      if (!workspaceId) {
+        throw new Error("invalid-request:workspaceId is required.");
+      }
+      this.assertWorkspaceScopeAccess({
+        workspaceId,
+        requestContext: input.requestContext,
+      });
+
+      const normalizedSystemId = input.systemId?.trim() || undefined;
+      const limit = this.normalizeOptionalBoundedInteger(input.limit, 1, 200, "limit");
+      const offset = this.normalizeOptionalBoundedInteger(input.offset, 0, 50_000, "offset") ?? 0;
+      const statusFilter = input.statuses && input.statuses.length > 0
+        ? new Set(input.statuses)
+        : undefined;
+      const executionIds = new Set<string>();
+      for (const session of this.executionSessionRepository.list()) {
+        for (const executionId of session.executionIds) {
+          executionIds.add(executionId);
+        }
+      }
+
+      const items: RuntimeQueueItem[] = [];
+      for (const executionId of executionIds) {
+        const normalizedExecutionId = executionId.trim();
+        if (!normalizedExecutionId) {
+          continue;
+        }
+        const executionWorkspaceId = this.resolveExecutionWorkspaceId({ executionId: normalizedExecutionId });
+        if (!executionWorkspaceId || executionWorkspaceId !== workspaceId) {
+          continue;
+        }
+
+        let status: RuntimeExecutionStatusReadModel;
+        try {
+          status = this.service.getExecutionStatus(normalizedExecutionId);
+        } catch {
+          continue;
+        }
+        if (normalizedSystemId && status.rootAssetId !== normalizedSystemId) {
+          continue;
+        }
+        const queueStatus = mapExecutionStatusToQueueItemStatus(status.status);
+        if (!queueStatus) {
+          continue;
+        }
+        if (statusFilter && !statusFilter.has(queueStatus)) {
+          continue;
+        }
+
+        const queueResourceId = this.createQueueResourceId(status.rootAssetId, status.rootVersionId);
+        if (!await this.isOperationalResourceAllowed({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "queue.read",
+          resourceFamily: AuthorizationResourceFamilies.queue,
+          resourceType: this.queueProtectedResourceType,
+          resourceId: queueResourceId,
+        })) {
+          continue;
+        }
+        if (!await this.isOperationalResourceAllowed({
+          requestContext: input.requestContext,
+          requiredPermissionKey: "run.read",
+          resourceFamily: AuthorizationResourceFamilies.run,
+          resourceType: this.runProtectedResourceType,
+          resourceId: normalizedExecutionId,
+        })) {
+          continue;
+        }
+
+        items.push(Object.freeze({
+          queueItemId: `runtime-queue:${normalizedExecutionId}`,
+          executionId: normalizedExecutionId,
+          systemId: status.rootAssetId,
+          status: queueStatus,
+          enqueuedAt: status.startedAt,
+          startedAt: queueStatus === RuntimeQueueItemStatuses.running || queueStatus === RuntimeQueueItemStatuses.completed || queueStatus === RuntimeQueueItemStatuses.failed || queueStatus === RuntimeQueueItemStatuses.cancelled
+            ? status.startedAt
+            : undefined,
+          completedAt: status.completedAt,
+        }));
+      }
+
+      items.sort((left, right) => right.enqueuedAt.localeCompare(left.enqueuedAt));
+      const sliced = limit !== undefined
+        ? items.slice(offset, offset + limit)
+        : items.slice(offset);
+      return Object.freeze({
+        items: Object.freeze(sliced),
+        totalCount: items.length,
+      });
     });
   }
 
@@ -1388,6 +1516,10 @@ export class SystemRuntimeBackendApi {
       return cached;
     }
     const status = await this.service.getExecutionStatus(executionId);
+    this.assertExecutionWorkspaceScope({
+      executionId,
+      requestContext,
+    });
     this.assertExternalRateLimit({ requestContext, callerContext, tenantId: tenantContext?.tenantId, operation: "get-execution-status" });
     this.assertExecutionAccess({
       accessContext: callerContext,
@@ -1409,6 +1541,48 @@ export class SystemRuntimeBackendApi {
       this.rememberExternalStatusCache(cacheKey, status);
     }
     return status;
+  }
+
+  private assertWorkspaceScopeAccess(input: {
+    readonly workspaceId: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): void {
+    if (input.requestContext?.trustedInternal) {
+      return;
+    }
+    const callerWorkspaceId = this.readRequestedWorkspaceId(input.requestContext);
+    if (callerWorkspaceId && callerWorkspaceId !== input.workspaceId) {
+      throw new Error("forbidden:Runtime workspace scope does not match authenticated caller workspace.");
+    }
+  }
+
+  private assertExecutionWorkspaceScope(input: {
+    readonly executionId: string;
+    readonly requestContext?: RuntimeApiRequestContext;
+  }): void {
+    const requestedWorkspaceId = this.readRequestedWorkspaceId(input.requestContext);
+    if (!requestedWorkspaceId) {
+      return;
+    }
+    const executionWorkspaceId = this.resolveExecutionWorkspaceId({ executionId: input.executionId });
+    if (executionWorkspaceId && executionWorkspaceId !== requestedWorkspaceId) {
+      throw new Error("not-found:Execution was not found.");
+    }
+  }
+
+  private readRequestedWorkspaceId(requestContext?: RuntimeApiRequestContext): string | undefined {
+    const callerContext = this.resolveCallerContext({ requestContext });
+    const metadata = callerContext?.metadata as {
+      readonly workspaceId?: unknown;
+      readonly activeWorkspaceId?: unknown;
+    } | undefined;
+    const workspaceId = typeof metadata?.activeWorkspaceId === "string"
+      ? metadata.activeWorkspaceId
+      : typeof metadata?.workspaceId === "string"
+        ? metadata.workspaceId
+        : undefined;
+    const normalized = workspaceId?.trim();
+    return normalized || undefined;
   }
 
   private createQueueResourceId(assetId: string, versionId?: string): string {

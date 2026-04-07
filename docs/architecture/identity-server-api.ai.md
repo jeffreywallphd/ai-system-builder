@@ -35,6 +35,11 @@
 - Authenticated asset upload initiation endpoints:
   - `POST /api/v1/assets/register`
   - `POST /api/v1/assets/:assetId/uploads/initiate`
+- Authenticated runtime read/list endpoints:
+  - `GET /api/v1/runtime/runs/:executionId/status`
+  - `GET /api/v1/runtime/runs/:executionId/result`
+  - `GET /api/v1/runtime/runs/:executionId/trace`
+  - `GET /api/v1/runtime/queue`
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -203,8 +208,13 @@ Persisted session records now intentionally exclude:
 - The guard enforces a shared sequence: resolve authenticated session -> resolve workspace scope -> execute route handler.
 - Shared guard context now carries actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so downstream transport handlers avoid repeated parsing logic.
 - Storage and asset converged routes now use this shared pipeline and preserve shared failure semantics:
+- Runtime run-read and queue-read routes now also use this shared pipeline and preserve shared failure semantics:
   - unauthenticated requests return `401` + `authentication-failed`
   - authenticated requests missing required workspace scope return `400` + `invalid-request`
+- Runtime queue route follows shared list query conventions:
+  - required `workspaceId`
+  - optional `limit`/`offset`
+  - repeatable `status` filters (`queued`, `running`, `completed`, `failed`, `cancelled`)
 
 ## Converged session + actor-context bootstrap endpoint (story 14.2.2)
 

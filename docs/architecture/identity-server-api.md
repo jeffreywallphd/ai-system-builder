@@ -29,6 +29,10 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/security/certificates/:serialNumber/renew` (authenticated, trusted session required)
 - `POST /api/v1/assets/register` (authenticated)
 - `POST /api/v1/assets/:assetId/uploads/initiate` (authenticated)
+- `GET /api/v1/runtime/runs/:executionId/status` (authenticated, workspace-scoped)
+- `GET /api/v1/runtime/runs/:executionId/result` (authenticated, workspace-scoped)
+- `GET /api/v1/runtime/runs/:executionId/trace` (authenticated, workspace-scoped)
+- `GET /api/v1/runtime/queue` (authenticated, workspace-scoped)
 
 Implemented transport and host composition:
 
@@ -184,8 +188,40 @@ Trusted-device transport contracts are defined in `src/infrastructure/api/identi
 - The guard first resolves authenticated session context, then resolves workspace context, then enters route handlers.
 - Guard-provided context includes shared actor metadata (`actor.userIdentityId`, `actor.username`) and workspace metadata (`workspace.workspaceId`) so handlers and backend calls avoid repeated session/workspace parsing.
 - Storage and asset converged routes now run through this shared pipeline and preserve shared failure semantics:
+- Runtime run-read and queue-read converged routes now run through this shared pipeline and preserve shared failure semantics:
   - unauthenticated requests fail with `401` + `authentication-failed`
   - authenticated requests missing required workspace scope fail with `400` + `invalid-request`
+
+### Runtime read/list requests
+
+`GET /api/v1/runtime/runs/:executionId/status`
+
+`GET /api/v1/runtime/runs/:executionId/result`
+
+Optional query params:
+
+- `nodeResultLimit` (integer)
+- `diagnosticsLimit` (integer)
+
+`GET /api/v1/runtime/runs/:executionId/trace`
+
+Optional query params:
+
+- `eventLimit` (integer)
+- `logLimit` (integer)
+
+`GET /api/v1/runtime/queue`
+
+Required query params:
+
+- `workspaceId`
+
+Optional query params:
+
+- `systemId`
+- repeatable `status` (`queued | running | completed | failed | cancelled`)
+- `limit` (integer >= 1, <= 200)
+- `offset` (integer >= 0)
 
 ### Admin account list request
 
