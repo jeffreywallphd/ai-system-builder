@@ -83,9 +83,6 @@ import {
   createDependentRuntimeCapabilityRegistration,
   createRuntimeDependencyOrchestrator,
 } from "@infrastructure/runtime/RuntimeDependencyComposition";
-import { LocalStorageManagedServiceDefinitionRepository } from "@infrastructure/browser/services/LocalStorageManagedServiceDefinitionRepository";
-import { HttpManagedServiceDefinitionRepository } from "@infrastructure/services/HttpManagedServiceDefinitionRepository";
-import { HttpManagedServiceSupervisorClient } from "@infrastructure/services/HttpManagedServiceSupervisorClient";
 
 import { WorkflowProjectionService } from "@application/projection/WorkflowProjectionService";
 import { WorkflowToolProjectionService } from "@application/projection/WorkflowToolProjectionService";
@@ -102,7 +99,6 @@ import { TuningDatasetService } from "../services/TuningDatasetService";
 import { ContextStore } from "../state/ContextStore";
 import { TuningDatasetStore } from "../state/TuningDatasetStore";
 import { ManagedServicesService } from "../services/ManagedServicesService";
-import { ManagedServiceEventStream } from "../services/ManagedServiceEventStream";
 import { ManagedServicesStore } from "../state/ManagedServicesStore";
 import type { CreateUiDependenciesOptions, UiDependencies } from "./types";
 import { createSeedWorkflows } from "./seedWorkflows";
@@ -157,6 +153,7 @@ import { CanonicalAssetManagementService } from "../services/CanonicalAssetManag
 import { WorkflowConversationSessionService } from "../workflow-conversation/WorkflowConversationSessionService";
 import { resolveDesktopWorkflowRunSummaryBridge } from "./DesktopWorkflowRunSummaryBridgeAdapter";
 import { WorkflowRunHistoryService } from "@application/workflow-run-history/WorkflowRunHistoryService";
+import { resolveLegacyManagedServiceBypassBoundary } from "./legacy/LegacyManagedServiceBypassBoundary";
 
 export function createUiDependencies(
   options: CreateUiDependenciesOptions = {}
@@ -202,13 +199,13 @@ export function createUiDependencies(
     healthPollIntervalMs: settings.runtime.healthPollIntervalMs,
     autoStartEnabled: settings.runtime.autoStartEnabled,
   }));
-  const managedServiceSupervisorClient = pythonRuntimeConfig.isManagedLocal
-    ? new HttpManagedServiceSupervisorClient({
-      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
-      timeoutMs: pythonRuntimeConfig.timeoutMs,
-      authToken: pythonRuntimeConfig.authToken,
-    })
-    : undefined;
+  const managedServiceLegacyBypassBoundary = resolveLegacyManagedServiceBypassBoundary({
+    enableLegacyBypass: pythonRuntimeConfig.isManagedLocal,
+    pythonRuntimeConfig,
+    desktopStorage: durableDesktopStorage,
+  });
+  const managedServiceSupervisorClient =
+    managedServiceLegacyBypassBoundary.supervisorClient;
   const pythonManagedService = createPythonManagedService({
     config: pythonRuntimeConfig,
     client: runtimeClient,
@@ -498,22 +495,15 @@ export function createUiDependencies(
       healthPollIntervalMs: pythonRuntimeConfig.healthPollIntervalMs,
     },
   });
-  const managedServiceDefinitionRepository = managedServiceSupervisorClient
-    ? new HttpManagedServiceDefinitionRepository(managedServiceSupervisorClient)
-    : new LocalStorageManagedServiceDefinitionRepository(undefined, durableDesktopStorage);
   const managedServicesService = new ManagedServicesService({
     serviceManager: pythonManagedService.manager,
     serviceSupervisor: pythonManagedService.manager,
     supervisorClient: managedServiceSupervisorClient,
     runtimeEventStore,
     builtinDefinitions: [pythonRuntimeDefinition],
-    definitionRepository: managedServiceDefinitionRepository,
+    definitionRepository: managedServiceLegacyBypassBoundary.definitionRepository,
   });
-  const managedServiceEventStream = settings.runtime.mode === "disabled"
-    ? undefined
-    : new ManagedServiceEventStream({
-      baseUrl: pythonRuntimeConfig.supervisorBaseUrl,
-    });
+  const managedServiceEventStream = managedServiceLegacyBypassBoundary.eventStream;
   const managedServicesStore = new ManagedServicesStore(
     managedServicesService,
     managedServiceEventStream,

@@ -3,10 +3,10 @@ import { StudioShellBackendApi } from "@infrastructure/api/studio-shell/StudioSh
 import { SystemStudioBackendApi } from "@infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "@infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
-  resolveBrowserStudioShellRepository,
-  resolveBrowserWorkflowPersistenceRepository,
-  resolveBrowserWorkflowRunSummaryRepository,
-} from "./BrowserFallbackRepositories";
+  resolveLegacyBrowserStudioShellRepository,
+  resolveLegacyBrowserWorkflowPersistenceRepository,
+  resolveLegacyBrowserWorkflowRunSummaryRepository,
+} from "./legacy/LegacyBrowserFallbackRepositories";
 
 let fallbackBridge: DesktopStudioShellBridge | undefined;
 
@@ -15,9 +15,9 @@ export function resolveBrowserStudioShellBridgeFallback(): DesktopStudioShellBri
     return fallbackBridge;
   }
 
-  const repository = resolveBrowserStudioShellRepository();
-  const workflowPersistenceRepository = resolveBrowserWorkflowPersistenceRepository();
-  const workflowRunSummaryRepository = resolveBrowserWorkflowRunSummaryRepository();
+  const repository = resolveLegacyBrowserStudioShellRepository();
+  const workflowPersistenceRepository = resolveLegacyBrowserWorkflowPersistenceRepository();
+  const workflowRunSummaryRepository = resolveLegacyBrowserWorkflowRunSummaryRepository();
   const studioApi = new StudioShellBackendApi(repository, workflowPersistenceRepository, workflowRunSummaryRepository);
   const systemApi = new SystemStudioBackendApi(repository);
   const runtimeApi = new SystemRuntimeBackendApi(repository);

@@ -191,3 +191,21 @@ These can remain implementation details as long as protected business actions fl
   - validates lifecycle-resume reconnect behavior and queued fallback refresh execution for stale thin-client subscription states.
 - `src/ui/pages/tests/RunPage.test.ts`
   - validates run monitoring UX includes lifecycle-aware realtime behavior notes while continuing to rely on shared subscription abstractions.
+
+## Story 14.3.7 migration note: legacy bypass isolation boundaries
+
+- Remaining non-converged access shortcuts are now isolated behind explicit legacy boundary modules so new composition work naturally depends on shared API/client layers first.
+- Managed-service supervisor direct HTTP/SSE side-channel wiring is isolated in:
+  - `src/ui/composition/legacy/LegacyManagedServiceBypassBoundary.ts`
+  - This bypass boundary is enabled only for explicit managed-local runtime mode and otherwise resolves to local definition persistence without supervisor transport wiring.
+- Browser fallback repository singletons are isolated in:
+  - `src/ui/composition/legacy/LegacyBrowserFallbackRepositories.ts`
+  - `src/ui/composition/BrowserFallbackRepositories.ts` remains as a compatibility shim only.
+- UI composition now consumes managed-service bypass wiring through the named legacy boundary rather than direct side-channel helpers in `createUiDependencies.ts`.
+
+### Story 14.3.7 tests
+
+- `src/ui/composition/tests/LegacyManagedServiceBypassBoundary.test.ts`
+  - validates bypass boundary isolation outside managed-local mode and explicit enablement semantics for managed-local mode.
+- `src/ui/composition/tests/LegacyBrowserFallbackIsolation.test.ts`
+  - validates browser fallback bridge wiring imports the explicit legacy boundary module and keeps the compatibility shim explicit.

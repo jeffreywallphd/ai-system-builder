@@ -22,6 +22,11 @@
 - Preload protected shortcuts: converge to authoritative HTTP/WSS.
 - Managed-service direct side channels: broker through authoritative API/WSS.
 - Browser fallback persistence: degraded-mode-only, no protected/admin mutations.
+- Keep remaining bypass helpers isolated under explicit legacy boundaries:
+  - `src/ui/composition/legacy/LegacyManagedServiceBypassBoundary.ts`
+  - `src/ui/composition/legacy/LegacyBrowserFallbackRepositories.ts`
+  - `src/ui/composition/BrowserFallbackRepositories.ts` is compatibility-shim-only.
+- New feature modules should not import bypass helpers directly; use shared API clients/contracts first.
 
 ## Canonical docs
 
