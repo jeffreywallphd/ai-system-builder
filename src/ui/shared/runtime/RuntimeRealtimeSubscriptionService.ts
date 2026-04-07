@@ -11,6 +11,7 @@ import {
   type RuntimeRealtimeRunStatusPayload,
   type RuntimeRealtimeSubscriptionTopic,
 } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import type { OfflineConnectivitySurfaceStateDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 import {
   parseRuntimeRealtimeWebSocketErrorMessage,
   parseRuntimeRealtimeWebSocketEventMessage,
@@ -28,18 +29,12 @@ const DEFAULT_FALLBACK_REFRESH_INTERVAL_MS = 8_000;
 const RUNTIME_REALTIME_PROTOCOL = "ai-loom-runtime-realtime.v1";
 const RUNTIME_REALTIME_AUTH_PROTOCOL_PREFIX = "ai-loom-auth-bearer.";
 
-export type RuntimeRealtimeOperationalConnectionState =
-  | "connecting"
-  | "connected"
-  | "reconnecting"
-  | "degraded"
-  | "disconnected";
+export type RuntimeRealtimeOperationalConnectionState = OfflineConnectivitySurfaceStateDto["state"];
 
-export interface RuntimeRealtimeConnectionStateSnapshot {
-  readonly state: RuntimeRealtimeOperationalConnectionState;
-  readonly stale: boolean;
-  readonly detail?: string;
-}
+export type RuntimeRealtimeConnectionStateSnapshot = Pick<
+  OfflineConnectivitySurfaceStateDto,
+  "state" | "stale" | "detail"
+>;
 
 export interface RuntimeRealtimeOperationalSubscriptionOptions {
   readonly executionId?: string;

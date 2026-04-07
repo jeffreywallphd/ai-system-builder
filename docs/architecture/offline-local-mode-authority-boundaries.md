@@ -16,6 +16,24 @@ The objective is limited local autonomy with explicit authority boundaries:
   - `src/application/common/OfflineLocalModeResynchronization.ts`
 - Desktop host profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- Shared offline-state and synchronization contracts:
+  - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
+  - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
+  - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+  - usage notes: `docs/architecture/offline-sync-shared-contracts.md`
+
+## Shared offline/sync contract package (Story 19.1.2)
+
+Canonical shared contracts now define stable cross-layer DTO/state shapes for:
+- cached resource metadata
+- offline draft state and local change records
+- pending operation envelopes and queue state
+- synchronization status summaries
+- conflict indicators and reconciliation outcomes
+- connectivity-aware surface state
+- workspace snapshot payloads for offline/resync views
+
+This keeps offline/sync payload semantics consistent across desktop host logic, API DTO/schema validation, and UI surfaces without ad hoc local object shapes.
 
 ## Authority model
 

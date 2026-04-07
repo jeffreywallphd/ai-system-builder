@@ -10,6 +10,21 @@ Story 19.1.1 defines the canonical offline/local-mode authority model so desktop
 - `src/application/common/OfflineLocalModeResynchronization.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
+- `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
+- `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
+- `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+- `docs/architecture/offline-sync-shared-contracts.md`
+
+## Story 19.1.2 shared contract additions
+
+Cross-surface offline synchronization contracts are now centralized in shared runtime contracts/schemas/DTO adapters for:
+- cached resource metadata
+- local draft/change tracking
+- queued pending operation envelopes
+- synchronization status summaries
+- conflict indicators and reconciliation outcomes
+- connectivity-aware offline surface state
+- full workspace offline-sync state snapshot payloads
 
 ## Core stance
 
