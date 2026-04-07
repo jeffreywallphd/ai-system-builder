@@ -41,6 +41,10 @@ import {
   resolveDesktopTrustedDeviceTransportBootstrap,
   type DesktopTrustedDeviceTransportBootstrapState,
 } from "../../security/DesktopTrustedDeviceTransportBootstrap";
+import type {
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
+} from "@shared/contracts/identity/IdentityTransportContracts";
 import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
 
 export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClient {
@@ -100,6 +104,12 @@ export class DesktopTrustedDeviceIdentityAuthClient implements IdentityAuthClien
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> {
     return this.innerClient.resolveAuthenticatedSession(sessionToken);
+  }
+
+  public resolveSessionActorContext(
+    request: ResolveSessionActorContextApiRequest,
+  ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> {
+    return this.innerClient.resolveSessionActorContext(request);
   }
 
   public logoutAuthenticatedSession(

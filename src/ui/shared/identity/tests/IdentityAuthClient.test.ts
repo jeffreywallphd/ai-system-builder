@@ -31,6 +31,10 @@ describe("HttpIdentityAuthClient", () => {
       credential: { candidate: "password-1" },
     });
     await client.resolveAuthenticatedSession("token-0");
+    await client.resolveSessionActorContext({
+      sessionToken: "token-0b",
+      workspaceId: "workspace:alpha",
+    });
     await client.logoutAuthenticatedSession("token-1");
     await client.revokeIdentitySession({ sessionId: "identity-session:1", reason: "security" }, "token-2");
     await client.changeLocalPasswordCredential({
@@ -119,6 +123,7 @@ describe("HttpIdentityAuthClient", () => {
       "POST",
       "POST",
       "GET",
+      "GET",
       "POST",
       "POST",
       "GET",
@@ -140,6 +145,7 @@ describe("HttpIdentityAuthClient", () => {
       "http://127.0.0.1:8788/api/v1/identity/dev-login",
       "http://127.0.0.1:8788/api/v1/identity/login",
       "http://127.0.0.1:8788/api/v1/identity/session",
+      "http://127.0.0.1:8788/api/v1/identity/session/context?workspaceId=workspace%3Aalpha",
       "http://127.0.0.1:8788/api/v1/identity/logout",
       "http://127.0.0.1:8788/api/v1/identity/session/revoke",
       "http://127.0.0.1:8788/api/v1/identity/credential/change",
@@ -157,20 +163,21 @@ describe("HttpIdentityAuthClient", () => {
       "http://127.0.0.1:8788/api/v1/identity/trusted-devices/pairing/complete",
     ]);
     expect(requests[3]?.authorization).toBe("Bearer token-0");
-    expect(requests[4]?.authorization).toBe("Bearer token-1");
-    expect(requests[5]?.authorization).toBe("Bearer token-2");
-    expect(requests[6]?.authorization).toBe("Bearer token-2b");
-    expect(requests[7]?.authorization).toBe("Bearer token-3");
-    expect(requests[8]?.authorization).toBe("Bearer token-4");
-    expect(requests[9]?.authorization).toBe("Bearer token-5");
-    expect(requests[10]?.authorization).toBe("Bearer token-5b");
-    expect(requests[11]?.authorization).toBe("Bearer token-5c");
-    expect(requests[12]?.authorization).toBe("Bearer token-6");
-    expect(requests[13]?.authorization).toBe("Bearer token-7");
-    expect(requests[14]?.authorization).toBe("Bearer token-8");
-    expect(requests[15]?.authorization).toBe("Bearer token-9");
-    expect(requests[16]?.authorization).toBe("Bearer token-10");
-    expect(requests[17]?.authorization).toBe("Bearer token-11");
-    expect(requests[18]?.authorization).toBe("Bearer token-12");
+    expect(requests[4]?.authorization).toBe("Bearer token-0b");
+    expect(requests[5]?.authorization).toBe("Bearer token-1");
+    expect(requests[6]?.authorization).toBe("Bearer token-2");
+    expect(requests[7]?.authorization).toBe("Bearer token-2b");
+    expect(requests[8]?.authorization).toBe("Bearer token-3");
+    expect(requests[9]?.authorization).toBe("Bearer token-4");
+    expect(requests[10]?.authorization).toBe("Bearer token-5");
+    expect(requests[11]?.authorization).toBe("Bearer token-5b");
+    expect(requests[12]?.authorization).toBe("Bearer token-5c");
+    expect(requests[13]?.authorization).toBe("Bearer token-6");
+    expect(requests[14]?.authorization).toBe("Bearer token-7");
+    expect(requests[15]?.authorization).toBe("Bearer token-8");
+    expect(requests[16]?.authorization).toBe("Bearer token-9");
+    expect(requests[17]?.authorization).toBe("Bearer token-10");
+    expect(requests[18]?.authorization).toBe("Bearer token-11");
+    expect(requests[19]?.authorization).toBe("Bearer token-12");
   });
 });

@@ -546,6 +546,140 @@ describe("IdentityHttpServer", () => {
     expect(expiredBody.error.code).toBe("authentication-failed");
   });
 
+  it("returns unified session actor-context bootstrap payload with safe trusted-device and workspace projections", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl, harness } = await startServer(
+      logger,
+      {},
+      {
+        workspaceAdministrationBackendApi: {
+          listWorkspaces: async () => Object.freeze({
+            ok: true,
+            data: Object.freeze({
+              workspaces: Object.freeze([
+                Object.freeze({
+                  workspaceId: "workspace:alpha",
+                  slug: "alpha",
+                  displayName: "Workspace Alpha",
+                  status: "active",
+                  visibility: "team",
+                  actorAccess: Object.freeze({
+                    membershipStatus: "active",
+                    effectiveRoles: Object.freeze(["member"]),
+                    canAdministrate: false,
+                    isWorkspaceOwner: false,
+                    capabilities: Object.freeze({
+                      canManageWorkspaceSettings: false,
+                      canManageMembers: false,
+                      canManageInvitations: false,
+                      canManageRoles: false,
+                    }),
+                  }),
+                }),
+                Object.freeze({
+                  workspaceId: "workspace:beta",
+                  slug: "beta",
+                  displayName: "Workspace Beta",
+                  status: "active",
+                  visibility: "private",
+                  actorAccess: Object.freeze({
+                    membershipStatus: "active",
+                    effectiveRoles: Object.freeze(["owner"]),
+                    canAdministrate: true,
+                    isWorkspaceOwner: true,
+                    capabilities: Object.freeze({
+                      canManageWorkspaceSettings: true,
+                      canManageMembers: true,
+                      canManageInvitations: true,
+                      canManageRoles: true,
+                    }),
+                  }),
+                }),
+              ]),
+              pagination: Object.freeze({
+                limit: 200,
+                offset: 0,
+                returned: 2,
+                hasMore: false,
+              }),
+            }),
+          }),
+        } as never,
+      },
+    );
+
+    const registerResponse = await fetch(`${baseUrl}/api/v1/identity/register`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        username: "context.user",
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(registerResponse.status).toBe(200);
+    const registerBody = await registerResponse.json();
+
+    await harness.provisionTrustedDevice({
+      trustedDeviceId: "trusted-device:context",
+      userIdentityId: registerBody.data.userIdentityId,
+      trustStatus: "trusted",
+    });
+
+    const loginResponse = await fetch(`${baseUrl}/api/v1/identity/login`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        providerSubject: "context.user",
+        sessionTrustRequirement: "require-trusted",
+        client: {
+          trustedDeviceBindingId: "trusted-device:context",
+          trustMarker: "marker:private-material",
+        },
+        credential: {
+          candidate: "StrongPass!2026",
+        },
+      }),
+    });
+    expect(loginResponse.status).toBe(200);
+    const loginBody = await loginResponse.json();
+
+    const unauthenticatedResponse = await fetch(`${baseUrl}/api/v1/identity/session/context`, {
+      method: "GET",
+    });
+    expect(unauthenticatedResponse.status).toBe(401);
+
+    const contextResponse = await fetch(
+      `${baseUrl}/api/v1/identity/session/context?workspaceId=${encodeURIComponent("workspace:beta")}`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${loginBody.data.sessionToken}`,
+        },
+      },
+    );
+    expect(contextResponse.status).toBe(200);
+    const contextBody = await contextResponse.json();
+    expect(contextBody.ok).toBe(true);
+    expect(contextBody.data.actor.userIdentityId).toBe(registerBody.data.userIdentityId);
+    expect(contextBody.data.session.sessionId).toBe(loginBody.data.sessionId);
+    expect(contextBody.data.session.trustedDeviceId).toBe("trusted-device:context");
+    expect(contextBody.data.workspaceContext.requestedWorkspaceId).toBe("workspace:beta");
+    expect(contextBody.data.workspaceContext.resolvedWorkspaceId).toBe("workspace:beta");
+    expect(contextBody.data.workspaceContext.workspaces.length).toBe(2);
+    expect(contextBody.data.trustedDevice.trustedDeviceId).toBe("trusted-device:context");
+
+    const serialized = JSON.stringify(contextBody);
+    expect(serialized.includes("trustMarker")).toBeFalse();
+    expect(serialized.includes("trustedDeviceBindingId")).toBeFalse();
+    expect(serialized.includes("trustMaterialRef")).toBeFalse();
+  });
+
   it("supports bearer-authenticated logout and targeted session revocation", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);

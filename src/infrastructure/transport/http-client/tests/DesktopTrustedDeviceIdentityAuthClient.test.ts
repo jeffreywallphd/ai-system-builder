@@ -39,6 +39,10 @@ import type {
 import {
   DesktopTrustedDeviceBootstrapFailureReasons,
 } from "../../../security/DesktopTrustedDeviceTransportBootstrap";
+import type {
+  ResolveSessionActorContextApiRequest,
+  ResolveSessionActorContextApiResponse,
+} from "@shared/contracts/identity/IdentityTransportContracts";
 import { DesktopTrustedDeviceIdentityAuthClient } from "../DesktopTrustedDeviceIdentityAuthClient";
 import type { IdentityAuthClient } from "@ui/shared/identity/IdentityAuthClient";
 
@@ -208,6 +212,9 @@ function createStubClient(overrides: {
       return overrides.loginResponse ?? defaultLoginResponse;
     },
     resolveAuthenticatedSession: async (_sessionToken: string): Promise<IdentityAuthApiResponse<ResolveAuthenticatedSessionApiResponse>> => ({ ok: false, error: { code: "internal", message: "not implemented" } }),
+    resolveSessionActorContext: async (
+      _request: ResolveSessionActorContextApiRequest,
+    ): Promise<IdentityAuthApiResponse<ResolveSessionActorContextApiResponse>> => ({ ok: false, error: { code: "internal", message: "not implemented" } }),
     logoutAuthenticatedSession: async (sessionToken: string): Promise<IdentityAuthApiResponse<LogoutAuthenticatedSessionApiResponse>> => {
       logoutTokens.push(sessionToken);
       return overrides.logoutResponse ?? defaultLogoutResponse;

@@ -8,6 +8,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/identity/login`
 - `POST /api/v1/identity/dev-login` (development-only, enabled when `NODE_ENV` is not `production` unless overridden)
 - `GET /api/v1/identity/session` (authenticated)
+- `GET /api/v1/identity/session/context` (authenticated)
 - `POST /api/v1/identity/credential/change` (authenticated)
 - `POST /api/v1/identity/logout` (authenticated)
 - `POST /api/v1/identity/session/revoke` (authenticated)
@@ -101,6 +102,18 @@ Development-login route guard:
 Requires:
 
 - `Authorization: Bearer <session-token>`
+
+### Authenticated session actor-context bootstrap request
+
+`GET /api/v1/identity/session/context`
+
+Requires:
+
+- `Authorization: Bearer <session-token>`
+
+Optional query params:
+
+- `workspaceId` (preferred workspace context to resolve when available)
 
 ### Logout request
 
@@ -305,6 +318,11 @@ Trusted-device responses are allowlist-projected and intentionally exclude:
 - pairing token hashes
 - trust material references and other internal trust persistence fields
 
+Session actor-context bootstrap responses are allowlist-projected and intentionally exclude:
+
+- trusted-device trust material references and secret locators
+- legacy session trust markers and trusted-device binding marker fields
+
 Certificate operations responses are metadata/action projected and intentionally exclude:
 
 - private keys, PEM leaf material, and certificate chain payloads
@@ -374,6 +392,67 @@ Certificate operations responses are metadata/action projected and intentionally
       "trustMarker": "marker:example",
       "issuedAt": "2026-04-04T18:00:00.000Z",
       "expiresAt": "2026-04-05T06:00:00.000Z"
+    }
+  }
+}
+```
+
+### Session actor-context bootstrap success
+
+```json
+{
+  "ok": true,
+  "data": {
+    "actor": {
+      "userIdentityId": "user-identity:...",
+      "username": "normalized-username",
+      "email": "user@example.com",
+      "displayName": "optional"
+    },
+    "session": {
+      "sessionId": "identity-session:...",
+      "providerId": "provider:local-password",
+      "accessChannel": "thin-client",
+      "deviceId": "device:example",
+      "issuedAt": "2026-04-06T18:00:00.000Z",
+      "expiresAt": "2026-04-07T06:00:00.000Z",
+      "assuranceLevel": "authenticated-trusted",
+      "trustedDeviceId": "trusted-device:example",
+      "issuedOnTrustedDevice": true,
+      "trustState": "trusted",
+      "trustEvaluatedAt": "2026-04-06T18:00:00.000Z",
+      "trustInvalidationReasons": []
+    },
+    "trustedDevice": {
+      "trustedDeviceId": "trusted-device:example",
+      "userIdentityId": "user-identity:...",
+      "displayName": "Alice Laptop",
+      "pairingMethod": "one-time-code",
+      "trustStatus": "trusted",
+      "registeredAt": "2026-04-06T17:30:00.000Z",
+      "pairedAt": "2026-04-06T18:00:00.000Z",
+      "lastSeenAt": "2026-04-06T18:00:00.000Z",
+      "metadata": {
+        "platform": "desktop"
+      },
+      "updatedAt": "2026-04-06T18:00:00.000Z"
+    },
+    "workspaceContext": {
+      "requestedWorkspaceId": "workspace:alpha",
+      "resolvedWorkspaceId": "workspace:alpha",
+      "workspaces": [
+        {
+          "workspaceId": "workspace:alpha",
+          "slug": "alpha",
+          "displayName": "Workspace Alpha",
+          "status": "active",
+          "visibility": "team",
+          "membershipStatus": "active",
+          "effectiveRoles": ["owner"],
+          "canAdministrate": true,
+          "isWorkspaceOwner": true
+        }
+      ]
     }
   }
 }
