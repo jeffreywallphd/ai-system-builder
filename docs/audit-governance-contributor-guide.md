@@ -28,6 +28,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
    - `src/application/audit/ports/AuditLedgerPersistencePorts.ts`
 4. Add/update audit query retrieval service and authorization scoping:
    - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
+   - `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 5. Add/update durable ledger persistence implementation:
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerPersistenceMigrations.ts`
@@ -57,6 +58,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Keep UI and route handlers read/query only for governance review.
 - Keep canonical ledger append ownership under `IAuditLedgerRepository` via authoritative service.
 - Keep audit retrieval authorization and logical scope enforcement in application query services, not UI state services.
+- Keep audit detail visibility (`user-safe` vs `admin`) role-derived in application authorizer/query use cases.
 
 ## Redaction and payload rules
 

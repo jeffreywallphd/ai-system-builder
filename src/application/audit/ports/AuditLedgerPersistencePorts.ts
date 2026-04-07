@@ -28,6 +28,7 @@ export interface IAuditLedgerRepository {
   appendAuditEvent(event: CanonicalAuditEvent, context: AuditLedgerAppendContext): Promise<AuditLedgerAppendResult>;
   listAuditEvents(query: AuditLedgerQuery): Promise<ReadonlyArray<CanonicalAuditEvent>>;
   countAuditEvents(query: AuditLedgerQuery): Promise<number>;
+  getAuditEventById(eventId: string): Promise<CanonicalAuditEvent | undefined>;
 }
 
 export function normalizeAuditLedgerOperationKey(operationKey: string): string {

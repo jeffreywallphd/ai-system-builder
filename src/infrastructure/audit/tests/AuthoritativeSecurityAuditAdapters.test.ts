@@ -50,6 +50,10 @@ class InMemoryAuditLedgerRepository implements IAuditLedgerRepository {
   public async countAuditEvents(_query: AuditLedgerQuery): Promise<number> {
     return this.events.length;
   }
+
+  public async getAuditEventById(eventId: string): Promise<CanonicalAuditEvent | undefined> {
+    return this.events.find((event) => event.eventId === eventId);
+  }
 }
 
 describe("Authoritative security audit adapters", () => {

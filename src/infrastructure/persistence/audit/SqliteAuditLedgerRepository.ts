@@ -195,6 +195,14 @@ export class SqliteAuditLedgerRepository extends SafeSqliteRepositoryBase implem
     return typeof row?.total_count === "number" ? row.total_count : 0;
   }
 
+  public async getAuditEventById(eventId: string): Promise<CanonicalAuditEvent | undefined> {
+    const normalizedEventId = normalizeOptional(eventId);
+    if (!normalizedEventId) {
+      return undefined;
+    }
+    return this.getAuditEventByIdInternal(normalizedEventId);
+  }
+
   public dispose(): void {
     this.database?.close();
     this.database = undefined;

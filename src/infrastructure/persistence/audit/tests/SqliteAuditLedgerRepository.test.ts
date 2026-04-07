@@ -270,6 +270,12 @@ describe("SqliteAuditLedgerRepository", () => {
     });
     expect(offsetWindow.map((event) => event.eventId)).toEqual(["audit:event:secret"]);
 
+    const detail = await repository.getAuditEventById("audit:event:secret");
+    expect(detail?.eventId).toBe("audit:event:secret");
+    expect(detail?.category).toBe("protected-data");
+    const missing = await repository.getAuditEventById("audit:event:missing");
+    expect(missing).toBeUndefined();
+
     repository.dispose();
   });
 
