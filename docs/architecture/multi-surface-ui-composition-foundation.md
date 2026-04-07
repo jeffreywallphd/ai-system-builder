@@ -186,3 +186,17 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Result/output review now includes shared output-card, result-detail, and protected-asset action seams in `src/ui/shared/operations/OperationalResultReviewPanels.tsx`.
 - `RunPage` now composes these result-review seams for both desktop and thin-client operational surfaces using authoritative runtime result metadata plus protected asset APIs (`getAssetDetail`, `resolvePreview`, `authorizeDownload`) via `AssetWorkflowService`.
 - Protected preview/download interactions now remain tokenized and server-mediated, with explicit restricted/unavailable messaging and no raw filesystem-path assumptions in UI flows.
+
+## Story 15.2.6 update
+
+- Shared operational realtime indicators now live in `src/ui/shared/operations/OperationalRealtimeIndicators.tsx`:
+  - `OperationalRealtimeBanner` for consistent reconnect/disconnected/stale visibility and refresh/reconnect affordances.
+  - `OperationalRealtimeStatusPill` for inline live-vs-stale state markers in panel subtitles.
+- `RunPage` now keeps reconnect behavior centralized with `RuntimeRealtimeSubscriptionService` and one page-level reconnect trigger, rather than scattering websocket reconnect logic in dashboard/run/queue components.
+- Prioritized operational surfaces now consume the same realtime indicator seam:
+  - `OperationalWorkspaceDashboard`,
+  - `OperationalRunListPanel` / `OperationalRunDetailStatusPanel`,
+  - `OperationalQueueVisibilityPanel` / `OperationalQueueDetailPanel`.
+- Connectivity-state regression coverage now includes shared indicator rendering and state assertions in:
+  - `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`,
+  - operational dashboard/run/queue shared UI suites.

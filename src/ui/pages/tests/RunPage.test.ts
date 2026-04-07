@@ -28,6 +28,9 @@ describe("RunPage", () => {
     expect(source).toContain("assetWorkflowService.getAssetDetail");
     expect(source).toContain("RuntimeRealtimeSubscriptionService");
     expect(source).toContain("subscribeOperationalUpdates");
+    expect(source).toContain("OperationalRealtimeBanner");
+    expect(source).toContain("requestRealtimeReconnect");
+    expect(source).toContain("realtimeConnectionState={runtimeRealtimeConnectionState}");
     expect(source).toContain("resolveIdentityAccessChannel");
   });
 });

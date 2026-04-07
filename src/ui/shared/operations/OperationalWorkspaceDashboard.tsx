@@ -1,8 +1,10 @@
 import type { ExecutionRunProjection } from "@application/execution/ExecutionRunProjectionService";
 import type { RuntimeQueueItem } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { RuntimeRealtimeConnectionStateSnapshot } from "@shared/runtime/RuntimeRealtimeSubscriptionService";
 import type { OperationalWorkspaceDashboardModel, OperationalWorkspaceRecentOutputSummary } from "../../presenters/OperationalWorkspaceDashboardPresenter";
 import { SurfaceResponsiveStatusCardGroup } from "../components/shell";
 import type { SurfaceResponsiveProfile } from "../responsive";
+import { OperationalRealtimeStatusPill } from "./OperationalRealtimeIndicators";
 
 export interface OperationalWorkspaceDashboardProps {
   readonly model: OperationalWorkspaceDashboardModel;
@@ -13,6 +15,7 @@ export interface OperationalWorkspaceDashboardProps {
   readonly isRecentOutputsLoading: boolean;
   readonly queueError?: string;
   readonly recentOutputsError?: string;
+  readonly realtimeConnectionState: RuntimeRealtimeConnectionStateSnapshot;
   readonly responsiveProfile: SurfaceResponsiveProfile;
   readonly onRefreshQueue: () => void;
   readonly onInspectRun: (executionId: string) => void;
@@ -30,6 +33,7 @@ export default function OperationalWorkspaceDashboard({
   isRecentOutputsLoading,
   queueError,
   recentOutputsError,
+  realtimeConnectionState,
   responsiveProfile,
   onRefreshQueue,
   onInspectRun,
@@ -129,8 +133,7 @@ export default function OperationalWorkspaceDashboard({
           <div className="ui-card__header">
             <h2 className="ui-card__title">Queue state</h2>
             <p className="ui-card__subtitle">
-              Realtime channel: <strong>{model.realtime.state}</strong>
-              {model.realtime.stale ? " (stale fallback active)" : ""}
+              <OperationalRealtimeStatusPill connectionState={realtimeConnectionState} staleLabel="stale fallback" />
             </p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--sm">

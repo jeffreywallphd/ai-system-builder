@@ -28,6 +28,7 @@ import {
 } from "../presenters/OperationalWorkspaceDashboardPresenter";
 import {
   OperationalApprovedRunLaunchPanel,
+  OperationalRealtimeBanner,
   OperationalResultReviewPanels,
   OperationalQueueDetailPanel,
   OperationalQueueVisibilityPanel,
@@ -144,6 +145,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     state: "connecting",
     stale: false,
   });
+  const [realtimeReconnectRequestId, setRealtimeReconnectRequestId] = useState(0);
 
   const [runtimeExecutionId, setRuntimeExecutionId] = useState("");
   const [runtimeExecutionState, setRuntimeExecutionState] = useState<{
@@ -309,6 +311,15 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     }
   }, [executionHistoryService]);
 
+  const requestRealtimeReconnect = useCallback((): void => {
+    setRuntimeRealtimeConnectionState(() => Object.freeze({
+      state: "connecting",
+      stale: true,
+      detail: "Manual reconnect requested. Re-establishing live runtime channel.",
+    }));
+    setRealtimeReconnectRequestId((current) => current + 1);
+  }, []);
+
   useEffect(() => {
     recentAndFavoritesService.recordRecentRunContext({
       request: presentation.request,
@@ -401,6 +412,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
     };
   }, [
     inspectRuntimeExecution,
+    realtimeReconnectRequestId,
     refreshRuntimeQueue,
     runtimeExecutionId,
     runtimeExecutionState?.executionId,
@@ -706,6 +718,13 @@ export default function RunPage(props: RunPageProps): JSX.Element {
 
   const content = (
     <div className="ui-stack ui-stack--md">
+      <OperationalRealtimeBanner
+        connectionState={runtimeRealtimeConnectionState}
+        onRefresh={() => {
+          void refreshRuntimeQueue();
+        }}
+        onReconnect={requestRealtimeReconnect}
+      />
       <OperationalWorkspaceDashboard
         model={dashboardModel}
         queueItems={runtimeQueueItems}
@@ -715,6 +734,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         isRecentOutputsLoading={isRecentOutputsLoading}
         queueError={runtimeQueueError}
         recentOutputsError={recentOutputsError}
+        realtimeConnectionState={runtimeRealtimeConnectionState}
         responsiveProfile={responsiveProfile}
         onRefreshQueue={() => {
           void refreshRuntimeQueue();
@@ -758,6 +778,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         selectedExecutionId={runtimeExecutionId || runtimeExecutionState?.executionId}
         isQueueLoading={isRuntimeQueueLoading}
         queueError={runtimeQueueError}
+        realtimeConnectionState={runtimeRealtimeConnectionState}
         responsiveProfile={responsiveProfile}
         actorPermissionIds={actorPermissionIds}
         surface={isDesktopSurface ? "desktop" : "thin-client"}
@@ -801,6 +822,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         filters={queueFilters}
         isLoading={isRuntimeQueueLoading}
         error={runtimeQueueError}
+        realtimeConnectionState={runtimeRealtimeConnectionState}
         responsiveProfile={responsiveProfile}
         actorPermissionIds={actorPermissionIds}
         surface={isDesktopSurface ? "desktop" : "thin-client"}
@@ -906,6 +928,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         runDetail={selectedRunDetail}
         isLoading={isRunDetailLoading}
         error={runtimeExecutionError}
+        realtimeConnectionState={runtimeRealtimeConnectionState}
         responsiveProfile={responsiveProfile}
         actorPermissionIds={actorPermissionIds}
         surface={isDesktopSurface ? "desktop" : "thin-client"}
@@ -938,6 +961,7 @@ export default function RunPage(props: RunPageProps): JSX.Element {
         surface={isDesktopSurface ? "desktop" : "thin-client"}
         isLoading={isRuntimeQueueLoading}
         error={runtimeQueueError}
+        realtimeConnectionState={runtimeRealtimeConnectionState}
         onRefreshQueue={() => {
           void refreshRuntimeQueue();
         }}

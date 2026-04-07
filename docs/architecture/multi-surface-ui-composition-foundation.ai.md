@@ -99,3 +99,11 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared result-review seams now live in `src/ui/shared/operations/OperationalResultReviewPanels.tsx` with reusable output cards, result detail panels, protected preview/download action components, and explicit protected-state messaging.
 - `RunPage` now composes result review for desktop and thin-client operational surfaces using authoritative runtime result metadata and protected asset workflow APIs (`getAssetDetail`, `resolvePreview`, `authorizeDownload`) through `AssetWorkflowService`.
 - Protected asset interactions stay logical and server-mediated (tokenized preview/download paths), with clear restricted/unavailable UX states and no raw file-path assumptions.
+
+## Story 15.2.6 update
+- Shared operational realtime indicator seams now live in `src/ui/shared/operations/OperationalRealtimeIndicators.tsx`:
+  - `OperationalRealtimeBanner` for consistent reconnect/disconnected/stale visibility plus refresh/reconnect affordances.
+  - `OperationalRealtimeStatusPill` for inline live-vs-stale panel markers.
+- `RunPage` now keeps reconnect orchestration centralized at page/service integration level (single reconnect trigger over `RuntimeRealtimeSubscriptionService`) instead of per-panel websocket/reconnect logic.
+- Dashboard/run/queue operational surfaces now consume the same indicator seam (`OperationalWorkspaceDashboard`, run monitoring panels, queue monitoring panels) so connection-state rendering is consistent across desktop and thin-client layouts.
+- Connectivity-state regression coverage now includes shared indicator rendering assertions (`src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`) plus updated dashboard/run/queue shared-surface tests.
