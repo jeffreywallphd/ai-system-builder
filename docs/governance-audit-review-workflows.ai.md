@@ -4,6 +4,11 @@
 
 Story 15.3.6 admin-facing audit/governance review surfaces for prioritized security and operational events.
 
+For canonical audit taxonomy/capture extension guidance, also reference:
+
+- `docs/architecture/audit-taxonomy-capture-boundaries-and-extension-rules.md`
+- `docs/audit-governance-contributor-guide.md`
+
 ## Canonical files
 
 - `src/ui/pages/GovernanceAuditReviewPage.tsx`
