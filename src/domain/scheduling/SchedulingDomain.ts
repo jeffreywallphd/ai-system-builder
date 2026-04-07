@@ -63,6 +63,11 @@ export interface SchedulingPolicyReason {
 export interface SchedulingRunRequirements {
   readonly requiredCapabilities: ReadonlyArray<NodeRoleCapability>;
   readonly requiresRemoteScheduling: boolean;
+  readonly placementAffinity?: Readonly<{
+    readonly preferredNodeIds?: ReadonlyArray<string>;
+    readonly preferredNodeTypes?: ReadonlyArray<NodeType>;
+    readonly preferredDeploymentProfileIds?: ReadonlyArray<string>;
+  }>;
 }
 
 export interface SchedulingRunPolicyInput {

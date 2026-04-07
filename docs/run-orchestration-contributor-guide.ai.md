@@ -12,6 +12,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-policy-framework-and-rule-pipeline.md`
 - `docs/architecture/run-orchestration-scheduling-role-priority-first-release.md`
 - `docs/architecture/run-orchestration-scheduling-hybrid-node-local-interactive-protection.md`
+- `docs/architecture/run-orchestration-scheduling-required-capability-affinity-eligibility.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
