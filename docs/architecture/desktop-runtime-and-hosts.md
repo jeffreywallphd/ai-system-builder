@@ -299,3 +299,25 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
   - `src/ui/runtime/tests/SystemRuntimeWindowHydrationService.test.ts`
   - `src/application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
   - `src/application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
+
+## Desktop initialization progress, timing, and auth bootstrap resilience
+
+- Renderer startup now uses an explicit initialization stage contract in `src/ui/shared/initialization/AppInitializationProgress.ts` with user-facing labels for:
+  - preparing desktop runtime
+  - starting local services
+  - starting identity services
+  - loading saved session
+  - validating session
+  - loading workspace context
+  - ready for sign in
+  - ready
+- App bootstrap UI in `src/ui/App.tsx` now renders changing status text + staged progress while session bootstrap executes, including a bounded “Still working on setup...” message when a phase exceeds the expected duration.
+- Session bootstrap in `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts` is now explicitly timed/logged and bounded with timeout defaults for startup-critical identity calls:
+  - `resolveAuthenticatedSession`
+  - `resolveSessionActorContext`
+- Shared API request timeout behavior now classifies timeout aborts as `domainCode: request-timeout` in `src/ui/shared/api/SharedApiClient.ts` so startup flows can distinguish timeout from user cancellation and route users to sign-in instead of leaving bootstrap pending.
+- Electron desktop startup now emits concise timing checkpoints in `electron/main/main.ts` for:
+  - `desktop-host-bootstrap`
+  - `desktop-runtime-bootstrap`
+  - `local-service-supervisor-start`
+  - `authoritative-server-startup`

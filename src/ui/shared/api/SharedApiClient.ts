@@ -156,6 +156,16 @@ export class SharedApiClient {
         }
       } catch (error) {
         if (isAbortError(error)) {
+          if (requestSignal.didTimeout()) {
+            return this.normalizeErrorResponse(
+              SharedApiErrorCodes.temporarilyUnavailable,
+              "Request timed out.",
+              Object.freeze({
+                retryable: true,
+                domainCode: "request-timeout",
+              }),
+            ) as TResponse;
+          }
           return this.normalizeErrorResponse(
             SharedApiErrorCodes.temporarilyUnavailable,
             "Request was cancelled.",
@@ -364,6 +374,7 @@ function hasHeader(headers: Readonly<Record<string, string>>, targetName: string
 function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number | undefined): {
   readonly signal: AbortSignal | undefined;
   readonly dispose: () => void;
+  readonly didTimeout: () => boolean;
 } {
   if (!signal && typeof timeoutMs !== "number") {
     return {
@@ -371,11 +382,13 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
       dispose: () => {
         // no-op
       },
+      didTimeout: () => false,
     };
   }
 
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   const onAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) {
@@ -386,11 +399,15 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
   }
 
   if (typeof timeoutMs === "number" && timeoutMs >= 0) {
-    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
   }
 
   return {
     signal: controller.signal,
+    didTimeout: () => timedOut,
     dispose: () => {
       if (signal) {
         signal.removeEventListener("abort", onAbort);

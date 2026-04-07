@@ -337,6 +337,16 @@ function normalizeHttpOrigin(value: string): string | undefined {
   }
 }
 
+function logInitializationStart(phase: string): number {
+  const startedAt = Date.now();
+  console.info(`[ai-loom][init] ${phase}:start`);
+  return startedAt;
+}
+
+function logInitializationEnd(phase: string, startedAt: number): void {
+  console.info(`[ai-loom][init] ${phase}:end durationMs=${Date.now() - startedAt}`);
+}
+
 function createDesktopAgentRunner(params: {
   readonly assetSystemRepository: SqliteAssetSystemRepository;
   readonly sessionRepository: SqliteAgentExecutionSessionRepository;
@@ -483,6 +493,8 @@ async function launchRuntimeWindowFromContract(
 }
 
 async function bootstrapDesktopRuntime(): Promise<void> {
+  const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
+  try {
   const storagePaths = resolveDesktopStoragePaths({
     userDataPath: app.getPath("userData"),
     logsPath: app.getPath("logs"),
@@ -505,7 +517,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     storagePaths,
     pythonRuntime,
   });
+  const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
   await serviceSupervisor.start();
+  logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
 
   const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -521,6 +535,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         serviceSupervisorPort: 8790,
       });
   const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+  const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");
   authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
     hostOptions: {
       databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
@@ -536,6 +551,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       environment: process.env,
     },
   });
+  logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://${authoritativeServerRuntime.address}`,
     resolveHostSecureTransportConfig({
@@ -1264,6 +1280,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       `[ai-loom] Packaged private Python runtime was not found at '${pythonRuntime.executablePath ?? pythonRuntime.runtimeRoot}'.`,
     );
   }
+  } finally {
+    logInitializationEnd("desktop-runtime-bootstrap", bootstrapStartedAt);
+  }
 }
 
 async function disposeDesktopRuntimeResources(): Promise<void> {
@@ -1278,25 +1297,30 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  desktopHostRuntime = await startDesktopHostAssembly({
-    startHost: async () => {
-      await bootstrapDesktopRuntime();
-      try {
-        installRendererContentSecurityPolicy();
-        await createMainWindow();
-      } catch (error) {
-        await disposeDesktopRuntimeResources();
-        throw error;
-      }
-      return Object.freeze({
-        close: disposeDesktopRuntimeResources,
-      });
-    },
-    boot: {
-      startupReason: "electron-main-desktop-host-startup",
-      environment: process.env,
-    },
-  });
+  const desktopHostStartupAt = logInitializationStart("desktop-host-bootstrap");
+  try {
+    desktopHostRuntime = await startDesktopHostAssembly({
+      startHost: async () => {
+        await bootstrapDesktopRuntime();
+        try {
+          installRendererContentSecurityPolicy();
+          await createMainWindow();
+        } catch (error) {
+          await disposeDesktopRuntimeResources();
+          throw error;
+        }
+        return Object.freeze({
+          close: disposeDesktopRuntimeResources,
+        });
+      },
+      boot: {
+        startupReason: "electron-main-desktop-host-startup",
+        environment: process.env,
+      },
+    });
+  } finally {
+    logInitializationEnd("desktop-host-bootstrap", desktopHostStartupAt);
+  }
 
   app.on("activate", async () => {
     if (BrowserWindow.getAllWindows().length === 0) {

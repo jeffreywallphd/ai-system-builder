@@ -176,3 +176,19 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
   - `src/ui/runtime/tests/SystemRuntimeWindowHydrationService.test.ts`
   - `src/application/system-studio/tests/ImageManipulationSystemTemplate.test.ts`
   - `src/application/system-studio/tests/ReferenceImageSystemTemplate.test.ts`
+
+## Desktop initialization progress + bootstrap timing update
+
+- Renderer startup now uses a dedicated initialization progress contract in `src/ui/shared/initialization/AppInitializationProgress.ts` with user-facing phases (`preparing desktop runtime` through `ready`).
+- `src/ui/App.tsx` now renders real phase changes + detail text during startup session bootstrap, plus a bounded “Still working on setup...” indicator for slower phases.
+- `src/ui/shared/identity/IdentityAuthSessionCoordinator.ts` now:
+  - emits phase progress callbacks,
+  - logs bootstrap timing checkpoints,
+  - applies bounded timeout defaults for startup-critical identity reads (`resolveAuthenticatedSession`, `resolveSessionActorContext`),
+  - and transitions to sign-in-ready state on timeout/transport failures instead of leaving pending bootstrap.
+- `src/ui/shared/api/SharedApiClient.ts` now classifies timeout aborts as `domainCode: request-timeout` (distinct from `request-cancelled`) for clearer startup failure handling.
+- Electron desktop startup timing checkpoints are now logged in `electron/main/main.ts` for:
+  - `desktop-host-bootstrap`
+  - `desktop-runtime-bootstrap`
+  - `local-service-supervisor-start`
+  - `authoritative-server-startup`

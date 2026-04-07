@@ -1507,6 +1507,42 @@ body {
   font-size: var(--font-size-sm);
 }
 
+.ui-auth-page__progress-detail,
+.ui-auth-page__progress-still-working {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.ui-auth-page__progress-detail {
+  color: var(--color-text-secondary);
+}
+
+.ui-auth-page__progress-still-working {
+  color: var(--color-text-muted);
+}
+
+.ui-auth-page__progress-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0 var(--space-lg) var(--space-lg);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-auth-page__progress-step {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ui-auth-page__progress-step--complete {
+  color: var(--color-success);
+}
+
+.ui-auth-page__progress-step--current {
+  color: var(--color-text-primary);
+  font-weight: 600;
+}
+
 .ui-identity-admin-page__grid {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);

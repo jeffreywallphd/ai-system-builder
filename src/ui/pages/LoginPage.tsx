@@ -11,7 +11,7 @@ import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
 
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
-  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable";
+  readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
   readonly devLoginEnabled?: boolean;
 }
 
@@ -147,6 +147,9 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
           ) : null}
           {authNotice === "session-context-unavailable" ? (
             <p className="ui-auth-page__error" role="status">Session context could not be initialized from the server. Verify API connectivity and sign in again.</p>
+          ) : null}
+          {authNotice === "session-bootstrap-timeout" ? (
+            <p className="ui-auth-page__error" role="status">Saved sign-in verification took too long. Sign in again to continue.</p>
           ) : null}
 
           <div className="ui-page__actions">

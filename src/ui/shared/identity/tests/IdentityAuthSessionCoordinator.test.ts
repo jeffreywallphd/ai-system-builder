@@ -204,6 +204,46 @@ describe("IdentityAuthSessionCoordinator", () => {
     expect(store.hasSession()).toBeTrue();
   });
 
+  it("classifies actor context timeout failures distinctly", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveAuthenticatedSession: async () => ({
+        ok: true,
+        data: {
+          principal: {
+            userIdentityId: "user-1",
+            username: "alice",
+          },
+          session: {
+            sessionId: "identity-session:1",
+            providerId: "provider:local-password",
+            providerSubject: "alice",
+            accessChannel: "desktop",
+            issuedAt: "2026-04-04T20:00:00.000Z",
+            expiresAt: "2026-04-05T20:00:00.000Z",
+          },
+        },
+      }),
+      resolveSessionActorContext: async () => ({
+        ok: false,
+        error: {
+          code: "internal",
+          message: "Request timed out.",
+          domainCode: "request-timeout",
+        },
+      }),
+    });
+
+    const result = await coordinator.bootstrap();
+    expect(result.status).toBe(IdentitySessionBootstrapStatus.unauthenticated);
+    if (result.status === IdentitySessionBootstrapStatus.unauthenticated) {
+      expect(result.reason).toBe(IdentitySessionUnauthenticatedReason.contextUnavailable);
+      expect(result.error?.code).toBe("timeout");
+      expect(result.error?.retryable).toBeTrue();
+    }
+  });
+
   it("passes requested workspace context through bootstrap and refresh", async () => {
     const store = createSessionStore();
     store.saveSession(createSession());

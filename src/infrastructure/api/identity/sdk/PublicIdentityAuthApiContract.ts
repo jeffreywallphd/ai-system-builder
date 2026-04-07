@@ -22,6 +22,9 @@ export interface IdentityAuthApiValidationError {
 export interface IdentityAuthApiError {
   readonly code: IdentityAuthApiErrorCode;
   readonly message: string;
+  readonly sharedCode?: string;
+  readonly domainCode?: string;
+  readonly retryable?: boolean;
   readonly validationErrors?: ReadonlyArray<IdentityAuthApiValidationError>;
   readonly trustFailure?: {
     readonly reason?: string;

@@ -136,6 +136,36 @@ describe("SharedApiClient", () => {
     expect(response.error?.domainCode).toBe("request-cancelled");
   });
 
+  it("normalizes timed out requests", async () => {
+    const fetchImplementation: typeof fetch = async (_input, init) => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      if (init?.signal?.aborted) {
+        throw new DOMException("aborted", "AbortError");
+      }
+      return new Response(JSON.stringify({ ok: true, data: { ignored: true } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+
+    const client = new SharedApiClient({
+      baseUrl: "http://127.0.0.1:8788",
+      fetchImplementation,
+      retryPolicy: {
+        maxAttempts: 1,
+      },
+    });
+    const response = await client.requestJson<{ ok: boolean; error?: { sharedCode?: string; domainCode?: string } }>({
+      method: "GET",
+      path: "/api/v1/timeout",
+      timeoutMs: 1,
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.sharedCode).toBe("temporarily-unavailable");
+    expect(response.error?.domainCode).toBe("request-timeout");
+  });
+
   it("maps parser failures to normalized internal errors", async () => {
     const client = new SharedApiClient({
       baseUrl: "http://127.0.0.1:8788",
