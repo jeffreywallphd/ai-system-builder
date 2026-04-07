@@ -377,4 +377,61 @@ describe("AssembleAuthoritativeSchedulingInputUseCase", () => {
     expect(unavailableNode?.schedulable).toBeFalse();
     expect(unavailableNode?.unschedulableReason?.code).toBe(SchedulingCandidateDenialCodes.nodeStateUnavailable);
   });
+
+  it("resolves deployment-profile policy context through an explicit port seam", async () => {
+    const runRepository = new InMemoryRunRepository();
+    runRepository.runs.set("run:owner", createRunRecord());
+
+    const useCase = new AssembleAuthoritativeSchedulingInputUseCase({
+      selectAssignmentReadyRunsUseCase: {
+        execute: async () => Object.freeze({
+          asOf: "2026-04-07T12:01:00.000Z",
+          items: Object.freeze([Object.freeze({
+            run: Object.freeze({
+              runId: "run:owner",
+              workflowId: "workflow:demo",
+              source: "api",
+              state: "queued",
+              assignmentStatus: "unassigned",
+              executionOutcome: "none",
+              submittedAt: "2026-04-07T12:00:00.000Z",
+              updatedAt: "2026-04-07T12:00:00.000Z",
+              submission: Object.freeze({
+                submittedByActorId: "user:owner",
+              }),
+              assignment: Object.freeze({ status: "unassigned" }),
+              execution: Object.freeze({ outcome: "none" }),
+              retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              contractVersion: "run-orchestration-transport/v1",
+            }),
+            queue: Object.freeze({
+              queueId: "queue:default",
+              enteredAt: "2026-04-07T12:00:00.000Z",
+              eligibleAt: "2026-04-07T12:00:00.000Z",
+              orderKey: "2026-04-07T12:00:00.000Z:run:owner",
+              claimToken: "claim:run:owner",
+              claimExpiresAt: "2026-04-07T12:01:30.000Z",
+            }),
+          })]),
+        }),
+      } as never,
+      runRepository,
+      nodeRepository: new RecordingNodeRepository(Object.freeze([createNode("node:compute:1")])),
+      roleAssignmentRepository: new RecordingRoleAssignmentRepository(),
+      deploymentProfilePolicyContextPort: {
+        resolveDeploymentProfilePolicyContext: async () => Object.freeze({
+          deploymentProfileId: "profile:organization",
+        }),
+      },
+    });
+
+    const snapshot = await useCase.assemble({
+      asOf: "2026-04-07T12:01:00.000Z",
+      reservationOwner: "scheduler:alpha",
+      limit: 1,
+      workspaceId: "workspace-alpha",
+    });
+
+    expect(snapshot.deploymentProfileId).toBe("profile:organization");
+  });
 });

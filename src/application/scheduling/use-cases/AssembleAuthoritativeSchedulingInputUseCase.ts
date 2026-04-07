@@ -20,6 +20,7 @@ import {
   SchedulingNodeUsageModes,
   type SchedulingPolicyReason,
 } from "@domain/scheduling/SchedulingDomain";
+import type { ISchedulingDeploymentProfilePolicyContextPort } from "@application/scheduling/ports/SchedulingPolicyProfilePorts";
 import type { NodeIdentityPersistenceRecord } from "@shared/dto/nodes/NodeTrustPersistenceDtos";
 
 export interface AuthoritativeSchedulingNodePolicyState {
@@ -81,6 +82,7 @@ interface AssembleAuthoritativeSchedulingInputUseCaseDependencies {
   readonly roleAssignmentRepository?: Pick<IAuthorizationRoleAssignmentPersistenceRepository, "listRoleAssignments">;
   readonly nodePolicyStatePort?: IAuthoritativeSchedulingNodePolicyStatePort;
   readonly nodeStateRefreshPort?: IAuthoritativeSchedulingNodeStateRefreshPort;
+  readonly deploymentProfilePolicyContextPort?: ISchedulingDeploymentProfilePolicyContextPort;
   readonly nodeFreshnessPolicy?: Partial<AuthoritativeSchedulingNodeFreshnessPolicy>;
 }
 
@@ -144,12 +146,23 @@ export class AssembleAuthoritativeSchedulingInputUseCase implements IAuthoritati
       workspaceId: input.workspaceId,
       nodeScope: input.nodeScope,
     });
+    const deploymentProfileContext = this.dependencies.deploymentProfilePolicyContextPort
+      ? await this.dependencies.deploymentProfilePolicyContextPort.resolveDeploymentProfilePolicyContext({
+        asOf: input.asOf,
+        reservationOwner: input.reservationOwner,
+        workspaceId: input.workspaceId,
+        queueLeases,
+        runs: runInputs,
+        nodes,
+      })
+      : undefined;
 
     return Object.freeze({
       asOf: input.asOf,
       queueLeases,
       runs: runInputs,
       nodes,
+      deploymentProfileId: normalizeOptional(deploymentProfileContext?.deploymentProfileId),
     });
   }
 
