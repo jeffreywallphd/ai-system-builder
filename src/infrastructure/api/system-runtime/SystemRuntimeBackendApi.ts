@@ -59,6 +59,15 @@ import {
   type ExecutionUpdateSubscription,
 } from "./ExecutionUpdateStream";
 import {
+  RuntimeRealtimeSubscriptionModes,
+  type RuntimeRealtimeAdminChangePayload,
+  type RuntimeRealtimeConnectivityStatePayload,
+  type RuntimeRealtimeEventEnvelope,
+  type RuntimeRealtimeEventSubscription,
+  type RuntimeRealtimeSubscriptionRequest,
+} from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import { AuthoritativeRuntimeEventStream } from "./AuthoritativeRuntimeEventStream";
+import {
   HttpExecutionCallbackDispatcher,
   type ExecutionCallbackDispatcher,
   type ExecutionCallbackPayload,
@@ -206,6 +215,7 @@ export class SystemRuntimeBackendApi {
     state: ExecutionPollResponse["acceptedState"];
   }>();
   private readonly updateStream = new ExecutionUpdateStream();
+  private readonly realtimeEventStream = new AuthoritativeRuntimeEventStream();
   private readonly emittedTraceCountsByExecutionId = new Map<string, number>();
   private readonly lastStreamEmitByExecutionId = new Map<string, number>();
   private readonly cachedExternalPollsByKey = new Map<string, {
@@ -430,6 +440,29 @@ export class SystemRuntimeBackendApi {
         sessionId,
         kind: ExecutionUpdateEventKinds.executionAccepted,
         status: "pending",
+      });
+      this.realtimeEventStream.publishQueueMovementEvent({
+        actorUserIdentityId: session.context?.callerId,
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId, sessionId }),
+        payload: Object.freeze({
+          queueItemId: `runtime-queue:${executionId}`,
+          executionId,
+          status: "queued",
+          sessionId,
+          changedAt: new Date().toISOString(),
+        }),
+      });
+      this.realtimeEventStream.publishRunStatusEvent({
+        actorUserIdentityId: session.context?.callerId,
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId, sessionId }),
+        payload: Object.freeze({
+          executionId,
+          sessionId,
+          status: "pending",
+          rootAssetId: request.systemId ?? this.deriveSystemIdFromVersionId(request.versionId),
+          rootVersionId: request.versionId,
+          changedAt: new Date().toISOString(),
+        }),
       });
       this.recordAudit({
         eventKind: ExecutionAuditEventKinds.requested,
@@ -887,6 +920,88 @@ export class SystemRuntimeBackendApi {
     }
   }
 
+  public subscribeToRealtimeEvents(input: {
+    readonly request: RuntimeRealtimeSubscriptionRequest;
+    readonly requestContext?: RuntimeApiRequestContext;
+    readonly listener: (event: RuntimeRealtimeEventEnvelope) => void;
+  }): SystemRuntimeApiResponse<RuntimeRealtimeEventSubscription> {
+    try {
+      const caller = this.resolveCallerContext({ requestContext: input.requestContext });
+      const tenantContext = this.resolveTenantContext({ requestContext: input.requestContext, callerContext: caller });
+      this.assertExternalRateLimit({
+        requestContext: input.requestContext,
+        callerContext: caller,
+        tenantId: tenantContext?.tenantId,
+        operation: "subscribe-realtime-events",
+      });
+      const request = Object.freeze({
+        ...input.request,
+        mode: input.request.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+      });
+
+      if (!input.requestContext?.trustedInternal && caller?.callerKind === "user") {
+        const callerId = caller.callerId?.trim();
+        const actorUserIdentityId = request.actor.actorUserIdentityId.trim();
+        if (callerId && callerId !== actorUserIdentityId) {
+          throw new Error("forbidden:Realtime subscription actor must match authenticated caller identity.");
+        }
+      }
+
+      if (!input.requestContext?.trustedInternal) {
+        const workspaceMetadata = caller?.metadata as { readonly workspaceId?: unknown; readonly activeWorkspaceId?: unknown } | undefined;
+        const callerWorkspaceId = typeof workspaceMetadata?.activeWorkspaceId === "string"
+          ? workspaceMetadata.activeWorkspaceId.trim()
+          : typeof workspaceMetadata?.workspaceId === "string"
+            ? workspaceMetadata.workspaceId.trim()
+            : "";
+        const actorWorkspaceId = request.actor.workspaceId?.trim() ?? "";
+        if (callerWorkspaceId && actorWorkspaceId && callerWorkspaceId !== actorWorkspaceId) {
+          throw new Error("forbidden:Realtime subscription workspace scope must match authenticated caller workspace.");
+        }
+      }
+
+      const subscription = this.realtimeEventStream.subscribe({
+        request,
+        listener: input.listener,
+      });
+      return Object.freeze({
+        ok: true,
+        data: subscription,
+      });
+    } catch (error) {
+      return Object.freeze({
+        ok: false,
+        error: this.toApiError(error),
+      });
+    }
+  }
+
+  public publishRuntimeConnectivityState(input: {
+    readonly payload: RuntimeRealtimeConnectivityStatePayload;
+    readonly workspaceId?: string;
+    readonly sessionId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishConnectivityStateEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      payload: input.payload,
+    });
+  }
+
+  public publishRuntimeAdminChange(input: {
+    readonly payload: RuntimeRealtimeAdminChangePayload;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.realtimeEventStream.publishAdminChangeEvent({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      payload: input.payload,
+    });
+  }
+
 
   private assertExecutionAccess(request: { readonly accessContext?: ExecutionAccessContext; readonly systemId?: string; readonly versionId?: string }): void {
     const decision = this.runtimeAccessControl.evaluate({
@@ -1137,6 +1252,24 @@ export class SystemRuntimeBackendApi {
         status: status.status,
         progress: status.progress,
       });
+      this.realtimeEventStream.publishRunStatusEvent({
+        actorUserIdentityId: this.resolveExecutionActorUserIdentityId(input.executionId, input.sessionId),
+        workspaceId: this.resolveExecutionWorkspaceId({ executionId: input.executionId, sessionId: input.sessionId }),
+        payload: Object.freeze({
+          executionId: input.executionId,
+          sessionId: input.sessionId,
+          status: status.status,
+          rootAssetId: status.rootAssetId,
+          rootVersionId: status.rootVersionId,
+          progress: status.progress,
+          changedAt: new Date().toISOString(),
+        }),
+      });
+      this.publishQueueStateFromExecutionStatus({
+        executionId: input.executionId,
+        sessionId: input.sessionId,
+        status: status.status,
+      });
       for (const traceEvent of nextEvents.slice(0, 20)) {
         this.updateStream.emit({
           executionId: input.executionId,
@@ -1178,6 +1311,69 @@ export class SystemRuntimeBackendApi {
     }
     const index = normalized.lastIndexOf(":v");
     return index > 0 ? normalized.slice(0, index) : normalized;
+  }
+
+  private publishQueueStateFromExecutionStatus(input: {
+    readonly executionId: string;
+    readonly sessionId?: string;
+    readonly status: RuntimeExecutionStatusReadModel["status"];
+  }): void {
+    const queueStatus = (() => {
+      switch (input.status) {
+        case "pending":
+          return "queued" as const;
+        case "running":
+          return "running" as const;
+        case "succeeded":
+          return "completed" as const;
+        case "failed":
+          return "failed" as const;
+        case "cancelled":
+          return "cancelled" as const;
+        default:
+          return undefined;
+      }
+    })();
+    if (!queueStatus) {
+      return;
+    }
+
+    this.realtimeEventStream.publishQueueMovementEvent({
+      actorUserIdentityId: this.resolveExecutionActorUserIdentityId(input.executionId, input.sessionId),
+      workspaceId: this.resolveExecutionWorkspaceId({ executionId: input.executionId, sessionId: input.sessionId }),
+      payload: Object.freeze({
+        queueItemId: `runtime-queue:${input.executionId}`,
+        executionId: input.executionId,
+        status: queueStatus,
+        sessionId: input.sessionId,
+        changedAt: new Date().toISOString(),
+      }),
+    });
+  }
+
+  private resolveExecutionWorkspaceId(input: {
+    readonly executionId: string;
+    readonly sessionId?: string;
+  }): string | undefined {
+    const session = input.sessionId
+      ? this.executionSessionRepository.getById(input.sessionId)
+      : this.executionSessionRepository.getByExecutionId(input.executionId);
+    const metadata = session?.context?.metadata as { readonly workspaceId?: unknown; readonly activeWorkspaceId?: unknown } | undefined;
+    const workspaceId = typeof metadata?.activeWorkspaceId === "string"
+      ? metadata.activeWorkspaceId
+      : typeof metadata?.workspaceId === "string"
+        ? metadata.workspaceId
+        : undefined;
+    const normalized = workspaceId?.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private resolveExecutionActorUserIdentityId(executionId: string, sessionId?: string): string | undefined {
+    const session = sessionId
+      ? this.executionSessionRepository.getById(sessionId)
+      : this.executionSessionRepository.getByExecutionId(executionId);
+    const actorUserIdentityId = session?.context?.callerId?.trim();
+    return actorUserIdentityId ? actorUserIdentityId : undefined;
   }
 
   private async getExecutionStatusAuthorized(

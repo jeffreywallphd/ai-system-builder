@@ -8,6 +8,7 @@
 - Story: 14.1.3, Standardize API error, permission-denied, and not-found response semantics
 - Story: 14.1.5, Build a shared API client library for desktop and thin-client consumers
 - Story: 14.1.6, Add shared query key, pagination, and filter conventions for multi-surface data access
+- Story: 14.1.7, Implement real-time event contract foundations for status, queue, and run updates
 
 ## Purpose
 
@@ -31,11 +32,14 @@ Provide a canonical shared transport package so desktop, browser, and responsive
   - Workspace administration and invitation transport contracts.
 - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
   - Runtime run lifecycle and queue transport contracts.
+- `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`
+  - Runtime real-time envelope, topic, and subscription contracts for converged desktop/thin-client event handling.
 - `src/shared/contracts/deployment/DeploymentTransportContracts.ts`
   - Deployment lifecycle transport contracts.
 - `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts`
 - `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts`
 - `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`
+- `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`
 - `src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts`
   - Schema-backed payload parsers and validation error shaping for shared contracts.
 
@@ -91,6 +95,18 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 3. Converged clients should build list/read query strings with helpers from `SharedApiQueryConventions`.
 4. HTTP transport handlers should parse and validate list/read pagination/sort/search with `parseSharedApiListQueryConventions`.
 5. Client list caches should use `buildSharedApiListQueryKey` so key semantics are stable across desktop and thin surfaces.
+
+## Realtime event contracts (Story 14.1.7)
+
+1. Shared event envelope and topic semantics are defined in `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`.
+2. Initial converged categories are schema-backed in `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts`:
+   - `run-status`
+   - `queue-movement`
+   - `connectivity-state`
+   - `admin-change`
+3. Subscription semantics include actor and workspace scope, topic-level filters (`workspaceId`, `executionId`), and reconnect-safe cursors (`runtime-realtime:<sequence>`).
+4. The first server-side publish/subscribe seam is implemented at `src/infrastructure/api/system-runtime/AuthoritativeRuntimeEventStream.ts` and integrated into `SystemRuntimeBackendApi`.
+5. Desktop and thin clients can consume one stable envelope shape and topic taxonomy without client-specific shortcuts.
 
 ### Example: adding a new endpoint to a domain client
 
