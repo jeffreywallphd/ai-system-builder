@@ -10,6 +10,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-transport-contracts.md`
 - `docs/architecture/run-orchestration-queue-assignment-selection.md`
 - `docs/architecture/run-orchestration-node-capability-matching.md`
+- `docs/architecture/run-orchestration-scheduling-policy-domain-model.md`
 - `docs/architecture/run-orchestration-node-claim-dispatch-preparation.md`
 - `docs/architecture/run-orchestration-execution-command-dispatch-seams.md`
 - `docs/architecture/run-orchestration-dispatch-result-lifecycle-progression.md`
@@ -44,10 +45,12 @@ Provide an implementation checklist for contributors extending the authoritative
 ## Extending scheduler policy
 
 1. Add or evolve scheduler logic above queue persistence APIs; do not move policy into queue schema adapters.
-2. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
-3. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
-4. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
-5. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
+2. Keep canonical scheduling policy models in `src/domain/scheduling/SchedulingDomain.ts`.
+3. Keep scheduling decision-pipeline orchestration in `src/application/scheduling/*`.
+4. Reuse `SelectAssignmentReadyRunsUseCase` reservation semantics for queue leasing.
+5. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
+6. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
+7. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
 
 ## Extending backend dispatch integrations
 
@@ -92,6 +95,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Lifecycle transition legality is domain-owned (`RunDomain`) and must remain single-source.
 - Queue reservations, assignment claim, and dispatch-attempt lineage are persistence-backed control-plane truth.
 - Scheduling policy selects candidate work; dispatch adapters execute backend translation only.
+- Scheduling policy decisions should remain explainable (reason-bearing) and source-traceable.
 - Transport handlers authenticate/validate/map requests but do not own orchestration decisions.
 - Completion/failure terminal handling must preserve user-safe outputs and internal diagnostics separation.
 - Observability/redaction concerns must stay in dedicated infrastructure seams, not in domain transition logic.
