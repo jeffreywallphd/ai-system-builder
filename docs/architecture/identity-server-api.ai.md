@@ -261,3 +261,15 @@ Persisted session records now intentionally exclude:
 ## Related docs
 
 - `docs/architecture/identity-session-architecture.md` (session subsystem baseline)
+
+## Converged protected asset transfer seam update (story 14.2.5)
+
+- Converged asset transfer routes for upload/download/preview remain authoritative server routes under `/api/v1/assets/*`.
+- Upload-content ingestion remains server-mediated through upload session endpoints:
+  - `POST /api/v1/assets/upload-sessions/:uploadSessionId/content`
+- Download and preview content retrieval remain policy-gated through tokenized routes:
+  - `POST /api/v1/assets/:assetId/downloads/authorize`
+  - `GET /api/v1/assets/:assetId/downloads/content`
+- Transport response posture was tightened for converged clients:
+  - upload-initiation responses no longer expose `storageInstanceId`/`objectKey`
+  - preview-resolution responses no longer expose `previewStorageInstanceId`/`previewObjectKey`

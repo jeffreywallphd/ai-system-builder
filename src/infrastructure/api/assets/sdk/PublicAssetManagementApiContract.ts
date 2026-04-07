@@ -142,8 +142,6 @@ export interface InitiateAssetUploadApiResponse {
     readonly uploadSessionId: string;
     readonly assetId: string;
     readonly workspaceId: string;
-    readonly storageInstanceId: string;
-    readonly objectKey: string;
     readonly area: AssetStorageArea;
     readonly uploadEndpoint: string;
     readonly uploadMethod: "POST";

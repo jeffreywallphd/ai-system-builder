@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AssetWorkflowTransportRoutes,
   AssetWorkflowClientContractVersions,
+  buildAssetUploadSessionContentPath,
   buildAuthorizedAssetDownloadPath,
   toAssetWorkflowDetailQueryParams,
   toAssetWorkflowListQueryParams,
@@ -51,6 +53,25 @@ describe("AssetWorkflowClientContracts", () => {
     });
 
     expect(path).toBe("/api/v1/assets/asset%3A1/downloads/content?workspaceId=workspace-1&contentToken=token-1");
+    expect(path).not.toContain("objectKey");
+    expect(path).not.toContain("storageInstanceId");
+  });
+
+  it("defines canonical protected asset transfer routes", () => {
+    expect(AssetWorkflowTransportRoutes.initiateUpload).toBe("/api/v1/assets/:assetId/uploads/initiate");
+    expect(AssetWorkflowTransportRoutes.uploadSessionContent).toBe("/api/v1/assets/upload-sessions/:uploadSessionId/content");
+    expect(AssetWorkflowTransportRoutes.authorizeDownload).toBe("/api/v1/assets/:assetId/downloads/authorize");
+    expect(AssetWorkflowTransportRoutes.downloadContent).toBe("/api/v1/assets/:assetId/downloads/content");
+    expect(AssetWorkflowTransportRoutes.resolvePreview).toBe("/api/v1/assets/:assetId/preview");
+  });
+
+  it("builds upload-session content paths without exposing storage object internals", () => {
+    const path = buildAssetUploadSessionContentPath({
+      workspaceId: "workspace-1",
+      uploadSessionId: "session:1",
+    });
+
+    expect(path).toBe("/api/v1/assets/upload-sessions/session%3A1/content?workspaceId=workspace-1");
     expect(path).not.toContain("objectKey");
     expect(path).not.toContain("storageInstanceId");
   });

@@ -444,6 +444,8 @@ describe("AssetManagementBackendApi", () => {
     }
     expect(initiated.data.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
     expect(initiated.data.upload.uploadMethod).toBe("POST");
+    expect((initiated.data.upload as Record<string, unknown>).storageInstanceId).toBeUndefined();
+    expect((initiated.data.upload as Record<string, unknown>).objectKey).toBeUndefined();
 
     const ingested = await backendApi.ingestAssetUploadContent({
       actorUserIdentityId: "user-owner",
@@ -524,6 +526,8 @@ describe("AssetManagementBackendApi", () => {
     }
     expect(preview.data.preview.previewAssetId).toBe("preview-asset-upload-001-main");
     expect(preview.data.preview.previewMimeType).toBe("image/webp");
+    expect((preview.data.preview as Record<string, unknown>).previewStorageInstanceId).toBeUndefined();
+    expect((preview.data.preview as Record<string, unknown>).previewObjectKey).toBeUndefined();
   });
 
   it("returns invalid-request for missing actor identity", async () => {

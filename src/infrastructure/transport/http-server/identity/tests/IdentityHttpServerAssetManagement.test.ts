@@ -524,6 +524,8 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(initiateBody.ok).toBe(true);
     expect(initiateBody.data.upload.uploadMethod).toBe("POST");
     expect(initiateBody.data.upload.uploadEndpoint).toContain("/api/v1/assets/upload-sessions/");
+    expect(initiateBody.data.upload.storageInstanceId).toBeUndefined();
+    expect(initiateBody.data.upload.objectKey).toBeUndefined();
 
     const ingestResponse = await fetch(`${baseUrl}/api/v1/assets/upload-sessions/asset-upload-session%3Atest-001/content?workspaceId=workspace-alpha`, {
       method: "POST",
@@ -857,6 +859,8 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.ok).toBe(true);
     expect(body.data.preview.previewAssetId).toBe("preview-asset-upload-001-main");
     expect(body.data.preview.previewMimeType).toBe("image/webp");
+    expect(body.data.preview.previewStorageInstanceId).toBeUndefined();
+    expect(body.data.preview.previewObjectKey).toBeUndefined();
   });
 
   it("maps missing preview resolution to not-found", async () => {
