@@ -145,6 +145,57 @@ export interface RuntimeRealtimeEventSubscription {
   readonly unsubscribe: () => void;
 }
 
+export const RuntimeRealtimeWebSocketActions = Object.freeze({
+  subscribe: "runtime-realtime.subscribe",
+});
+
+export type RuntimeRealtimeWebSocketAction =
+  typeof RuntimeRealtimeWebSocketActions[keyof typeof RuntimeRealtimeWebSocketActions];
+
+export const RuntimeRealtimeWebSocketMessageTypes = Object.freeze({
+  subscriptionAck: "runtime-realtime.subscription-ack",
+  event: "runtime-realtime.event",
+  error: "runtime-realtime.error",
+});
+
+export type RuntimeRealtimeWebSocketMessageType =
+  typeof RuntimeRealtimeWebSocketMessageTypes[keyof typeof RuntimeRealtimeWebSocketMessageTypes];
+
+export interface RuntimeRealtimeWebSocketSubscribeMessage {
+  readonly action: typeof RuntimeRealtimeWebSocketActions.subscribe;
+  readonly request: {
+    readonly topics: ReadonlyArray<RuntimeRealtimeSubscriptionTopic>;
+    readonly mode?: RuntimeRealtimeSubscriptionMode;
+    readonly reconnect?: {
+      readonly afterCursor?: string;
+    };
+  };
+}
+
+export interface RuntimeRealtimeWebSocketSubscriptionAckMessage {
+  readonly type: typeof RuntimeRealtimeWebSocketMessageTypes.subscriptionAck;
+  readonly subscriptionId: string;
+  readonly acceptedAt: string;
+  readonly mode: RuntimeRealtimeSubscriptionMode;
+  readonly topics: ReadonlyArray<RuntimeRealtimeSubscriptionTopic>;
+  readonly reconnect?: {
+    readonly afterCursor?: string;
+  };
+}
+
+export interface RuntimeRealtimeWebSocketEventMessage {
+  readonly type: typeof RuntimeRealtimeWebSocketMessageTypes.event;
+  readonly event: RuntimeRealtimeEventEnvelope;
+}
+
+export interface RuntimeRealtimeWebSocketErrorMessage {
+  readonly type: typeof RuntimeRealtimeWebSocketMessageTypes.error;
+  readonly error: {
+    readonly code: "invalid-request" | "forbidden" | "internal";
+    readonly message: string;
+  };
+}
+
 export function buildRuntimeRealtimeCursor(sequence: number): string {
   const normalized = Math.max(1, Math.floor(sequence));
   return `runtime-realtime:${normalized}`;

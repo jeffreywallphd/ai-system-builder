@@ -43,6 +43,8 @@
   - `GET /api/v1/runtime/runs/:executionId/trace`
   - `GET /api/v1/runtime/queue`
   - `POST /api/v1/runtime/queue/:queueItemId/dequeue`
+- Authenticated authoritative runtime realtime websocket endpoint:
+  - `GET /ws` websocket upgrade (bearer-authenticated)
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
 - Transport validation at the boundary (`zod`) with stable failure envelopes.
 - Deterministic translation from inner identity errors to public API error codes.
@@ -219,6 +221,31 @@ Persisted session records now intentionally exclude:
   - optional `limit`/`offset`
   - repeatable `status` filters (`queued`, `running`, `completed`, `failed`, `cancelled`)
 
+## Runtime realtime websocket delivery (story 14.2.6)
+
+- Transport endpoint: `GET /ws` with websocket upgrade headers and `Authorization: Bearer <session-token>`.
+- Runtime realtime subscribe action is message-driven after upgrade:
+  - client masked text frame:
+    - `action: "runtime-realtime.subscribe"`
+    - `request.topics[]` with shared topic contracts (`runtime.run.status`, `runtime.queue`, `runtime.connectivity`, `runtime.admin`)
+    - optional `mode` (`live-only` | `resume-from-cursor`)
+    - optional reconnect cursor (`reconnect.afterCursor`)
+- Server frame contracts:
+  - `runtime-realtime.subscription-ack`
+  - `runtime-realtime.event` (canonical shared envelope from `SystemRuntimeRealtimeEventContracts`)
+  - `runtime-realtime.error` (`invalid-request` | `forbidden` | `internal`)
+- Session-aware enforcement:
+  - actor identity is derived from authenticated session context, not accepted from client payload
+  - websocket `workspaceId` and topic `workspaceId` must align when scoped
+  - purpose/topic gating is enforced:
+    - `status` -> connectivity
+    - `queue-monitoring` -> queue/run-status/connectivity
+    - `run-monitoring` -> run-status/queue/connectivity
+    - `stream-control` -> admin/connectivity
+- Reconnect and initial-state posture:
+  - bounded replay is supported with `resume-from-cursor` + cursor
+  - initial queue/run snapshots are not auto-streamed on subscribe; clients should call authoritative HTTP read APIs first, then subscribe for live deltas
+
 ## Converged session + actor-context bootstrap endpoint (story 14.2.2)
 
 - Added authenticated bootstrap endpoint: `GET /api/v1/identity/session/context`.
@@ -253,6 +280,8 @@ Persisted session records now intentionally exclude:
 - `src/infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
 - `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `src/ui/pages/tests/IdentityAdminPage.test.tsx`

@@ -36,6 +36,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `GET /api/v1/runtime/runs/:executionId/trace` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/queue` (authenticated, workspace-scoped)
 - `POST /api/v1/runtime/queue/:queueItemId/dequeue` (authenticated, workspace-scoped)
+- `GET /ws` (authenticated websocket upgrade for authoritative runtime realtime delivery)
 
 Implemented transport and host composition:
 
@@ -264,6 +265,124 @@ Optional query params:
 - repeatable `status` (`queued | running | completed | failed | cancelled`)
 - `limit` (integer >= 1, <= 200)
 - `offset` (integer >= 0)
+
+### Runtime realtime websocket requests
+
+`GET /ws`
+
+Required headers:
+
+- `Connection: Upgrade`
+- `Upgrade: websocket`
+- `Sec-WebSocket-Version: 13`
+- `Sec-WebSocket-Key`
+- `Authorization: Bearer <session-token>`
+
+Common query params:
+
+- `purpose` (`status | queue-monitoring | run-monitoring | stream-control`)
+- `workspaceId` (recommended for workspace-scoped subscriptions and required for workspace-bound topic filters)
+
+After successful upgrade (`101`), clients send masked JSON text frames:
+
+```json
+{
+  "action": "runtime-realtime.subscribe",
+  "request": {
+    "topics": [
+      {
+        "topic": "runtime.run.status",
+        "workspaceId": "workspace-alpha",
+        "executionId": "execution-123"
+      }
+    ],
+    "mode": "live-only",
+    "reconnect": {
+      "afterCursor": "runtime-realtime:12"
+    }
+  }
+}
+```
+
+Server text-frame responses:
+
+- subscription acknowledgement:
+
+```json
+{
+  "type": "runtime-realtime.subscription-ack",
+  "subscriptionId": "runtime-realtime-sub-...",
+  "acceptedAt": "2026-04-07T12:00:00.000Z",
+  "mode": "live-only",
+  "topics": [
+    {
+      "topic": "runtime.run.status",
+      "workspaceId": "workspace-alpha",
+      "executionId": "execution-123"
+    }
+  ]
+}
+```
+
+- canonical realtime event envelope:
+
+```json
+{
+  "type": "runtime-realtime.event",
+  "event": {
+    "eventId": "runtime-realtime-event-...",
+    "schemaVersion": "2026-04-07",
+    "emittedAt": "2026-04-07T12:00:00.000Z",
+    "sequence": 13,
+    "cursor": "runtime-realtime:13",
+    "category": "run-status",
+    "topic": "runtime.run.status",
+    "workspaceScope": {
+      "workspaceId": "workspace-alpha"
+    },
+    "actorScope": {},
+    "runScope": {
+      "executionId": "execution-123"
+    },
+    "payload": {
+      "executionId": "execution-123",
+      "status": "running",
+      "changedAt": "2026-04-07T12:00:00.000Z"
+    }
+  }
+}
+```
+
+- validation/policy error envelope:
+
+```json
+{
+  "type": "runtime-realtime.error",
+  "error": {
+    "code": "forbidden",
+    "message": "Topic workspace scope must match websocket workspace scope."
+  }
+}
+```
+
+Purpose-to-topic policy:
+
+- `status` -> `runtime.connectivity`
+- `queue-monitoring` -> `runtime.queue`, `runtime.run.status`, `runtime.connectivity`
+- `run-monitoring` -> `runtime.run.status`, `runtime.queue`, `runtime.connectivity`
+- `stream-control` -> `runtime.admin`, `runtime.connectivity`
+
+Workspace/topic enforcement:
+
+- actor identity is always derived from authenticated session, not from client-supplied actor payload
+- when websocket `workspaceId` is provided, topic workspace scopes must match it
+- disallowed purpose/topic combinations are denied with `runtime-realtime.error` and websocket close
+
+Reconnect and initial-state behavior:
+
+- reconnect-safe replay is partially implemented via `mode=resume-from-cursor` and `reconnect.afterCursor`
+- replay is bounded to retained events; clients should treat cursor replay as best-effort
+- initial state snapshots (queue/status) are not auto-sent on subscribe; clients should fetch authoritative HTTP read endpoints and then subscribe for live updates
 
 ### Admin account list request
 
@@ -762,6 +881,8 @@ Renderer session persistence is intentionally minimized:
 - `src/infrastructure/api/security/tests/CertificateOperationsBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWebSocketTransportTrust.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
 - trusted-device API route and contract coverage in the same backend/HTTP test suites
 - `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
 - `src/ui/pages/tests/IdentityAdminPage.test.tsx`

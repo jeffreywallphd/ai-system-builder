@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
   RuntimeRealtimeTopics,
+  RuntimeRealtimeWebSocketActions,
+  RuntimeRealtimeWebSocketMessageTypes,
   buildRuntimeRealtimeCursor,
   parseRuntimeRealtimeCursor,
   runtimeRealtimeEventMatchesSubscriptionTopic,
@@ -65,5 +67,12 @@ describe("SystemRuntimeRealtimeEventContracts", () => {
       topics: [{ topic: RuntimeRealtimeTopics.queue, workspaceId: "workspace-b" }],
     });
     expect(invalid.ok).toBeFalse();
+  });
+
+  it("defines canonical websocket control and envelope message type constants", () => {
+    expect(RuntimeRealtimeWebSocketActions.subscribe).toBe("runtime-realtime.subscribe");
+    expect(RuntimeRealtimeWebSocketMessageTypes.subscriptionAck).toBe("runtime-realtime.subscription-ack");
+    expect(RuntimeRealtimeWebSocketMessageTypes.event).toBe("runtime-realtime.event");
+    expect(RuntimeRealtimeWebSocketMessageTypes.error).toBe("runtime-realtime.error");
   });
 });

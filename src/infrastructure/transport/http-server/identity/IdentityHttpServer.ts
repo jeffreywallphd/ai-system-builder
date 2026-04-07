@@ -119,6 +119,14 @@ import {
   SystemRuntimeTransportRoutes,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import {
+  RuntimeRealtimeSubscriptionModes,
+  RuntimeRealtimeTopics,
+  RuntimeRealtimeWebSocketActions,
+  RuntimeRealtimeWebSocketMessageTypes,
+  type RuntimeRealtimeSubscriptionRequest,
+  type RuntimeRealtimeSubscriptionTopic,
+} from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
+import {
   StorageManagementApiErrorCodes,
   type ActivateStorageInstanceApiRequest,
   type DeactivateStorageInstanceApiRequest,
@@ -192,6 +200,11 @@ import {
   parseRuntimeDequeueRequest,
   parseRuntimeStartRunRequest,
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
+import {
+  RuntimeRealtimeSchemaValidationError,
+  parseRuntimeRealtimeWebSocketSubscribeMessage,
+  parseRuntimeRealtimeWebSocketSubscriptionAckMessage,
+} from "@shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts";
 import type { ValidateTransportConnectionTrustRequest } from "@application/security/ports/TransportTrustValidationPorts";
 import { TransportConnectionDirections } from "@application/security/ports/TransportTrustValidationPorts";
 import {
@@ -5903,6 +5916,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         socket,
         logger,
         backendApi: options.backendApi,
+        systemRuntimeBackendApi: options.systemRuntimeBackendApi,
         secureTransport: options.secureTransport,
         transportTrust: options.transportTrust,
         webSocket: options.webSocket,
@@ -5931,6 +5945,7 @@ async function handleWebSocketUpgrade(input: {
   readonly socket: Socket;
   readonly logger: IdentityHttpServerLogger;
   readonly backendApi: IdentityAuthBackendApi;
+  readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
   readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
   readonly transportTrust: IdentityHttpServerTransportTrustOptions | undefined;
   readonly webSocket: IdentityHttpServerWebSocketOptions;
@@ -6154,7 +6169,407 @@ async function handleWebSocketUpgrade(input: {
     initialCertificateBinding,
   });
 
+  initializeRuntimeRealtimeWebSocketChannel({
+    requestId,
+    logger: input.logger,
+    socket: input.socket,
+    channelContext,
+    systemRuntimeBackendApi: input.systemRuntimeBackendApi,
+  });
+
   await input.webSocket.onChannelEstablished?.(channelContext, input.socket);
+}
+
+interface RuntimeRealtimeWebSocketSessionState {
+  subscription?: {
+    readonly unsubscribe: () => void;
+    readonly subscriptionId: string;
+  };
+  incomingBuffer: Buffer;
+}
+
+interface ParsedWebSocketFrame {
+  readonly fin: boolean;
+  readonly opcode: number;
+  readonly payload: Buffer;
+  readonly nextOffset: number;
+  readonly masked: boolean;
+}
+
+function initializeRuntimeRealtimeWebSocketChannel(input: {
+  readonly requestId: string;
+  readonly logger: IdentityHttpServerLogger;
+  readonly socket: Socket;
+  readonly channelContext: WebSocketChannelContext;
+  readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
+}): void {
+  if (!input.systemRuntimeBackendApi) {
+    return;
+  }
+
+  const state: RuntimeRealtimeWebSocketSessionState = {
+    subscription: undefined,
+    incomingBuffer: Buffer.alloc(0),
+  };
+
+  const teardown = () => {
+    state.subscription?.unsubscribe();
+    state.subscription = undefined;
+  };
+  input.socket.once("close", teardown);
+  input.socket.once("error", teardown);
+
+  input.socket.on("data", (chunk) => {
+    state.incomingBuffer = Buffer.concat([state.incomingBuffer, chunk]);
+    let offset = 0;
+    try {
+      while (offset < state.incomingBuffer.length) {
+        const frame = tryParseWebSocketFrame(state.incomingBuffer, offset);
+        if (!frame) {
+          break;
+        }
+        offset = frame.nextOffset;
+        if (!frame.masked) {
+          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Client frames must be masked.");
+          sendWebSocketCloseFrame(input.socket, 1002, "Protocol error");
+          return;
+        }
+        if (!frame.fin) {
+          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Fragmented websocket frames are not supported.");
+          sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+          return;
+        }
+        if (frame.opcode === 8) {
+          sendWebSocketCloseFrame(input.socket, 1000, "normal-close");
+          return;
+        }
+        if (frame.opcode === 9) {
+          input.socket.write(buildWebSocketDataFrame(10, frame.payload));
+          continue;
+        }
+        if (frame.opcode !== 1) {
+          sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Only text websocket frames are supported.");
+          sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+          return;
+        }
+
+        const payloadText = frame.payload.toString("utf8");
+        void handleRuntimeRealtimeWebSocketTextFrame({
+          requestId: input.requestId,
+          logger: input.logger,
+          socket: input.socket,
+          channelContext: input.channelContext,
+          runtimeBackendApi: input.systemRuntimeBackendApi,
+          state,
+          payloadText,
+        });
+      }
+    } catch {
+      sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Websocket frame parsing failed.");
+      sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+      return;
+    }
+
+    state.incomingBuffer = offset >= state.incomingBuffer.length
+      ? Buffer.alloc(0)
+      : state.incomingBuffer.subarray(offset);
+  });
+}
+
+async function handleRuntimeRealtimeWebSocketTextFrame(input: {
+  readonly requestId: string;
+  readonly logger: IdentityHttpServerLogger;
+  readonly socket: Socket;
+  readonly channelContext: WebSocketChannelContext;
+  readonly runtimeBackendApi: SystemRuntimeBackendApi;
+  readonly state: RuntimeRealtimeWebSocketSessionState;
+  readonly payloadText: string;
+}): Promise<void> {
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(input.payloadText);
+  } catch {
+    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Websocket payload must be valid JSON.");
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  let subscribeMessage;
+  try {
+    subscribeMessage = parseRuntimeRealtimeWebSocketSubscribeMessage(parsedPayload);
+  } catch (error) {
+    const message = error instanceof RuntimeRealtimeSchemaValidationError
+      ? error.message
+      : "Realtime subscription payload is invalid.";
+    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", message);
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  if (subscribeMessage.action !== RuntimeRealtimeWebSocketActions.subscribe) {
+    sendRuntimeRealtimeWebSocketError(input.socket, "invalid-request", "Unsupported realtime websocket action.");
+    sendWebSocketCloseFrame(input.socket, 4400, "invalid-request");
+    return;
+  }
+
+  const actorWorkspaceId = input.channelContext.workspaceScope.workspaceId?.trim();
+  const hasDisallowedTopic = subscribeMessage.request.topics.some(
+    (topic) => !isRuntimeRealtimeTopicAllowedForPurpose(topic.topic, input.channelContext.purpose),
+  );
+  if (hasDisallowedTopic) {
+    sendRuntimeRealtimeWebSocketError(
+      input.socket,
+      "forbidden",
+      `One or more realtime topics are not allowed for websocket purpose '${input.channelContext.purpose}'.`,
+    );
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+  const requestedTopics: RuntimeRealtimeSubscriptionTopic[] = subscribeMessage.request.topics.map((topic) => Object.freeze({
+    topic: topic.topic,
+    workspaceId: topic.workspaceId ?? actorWorkspaceId,
+    executionId: topic.executionId,
+  }));
+
+  if (requestedTopics.length < 1) {
+    sendRuntimeRealtimeWebSocketError(
+      input.socket,
+      "forbidden",
+      `No requested realtime topics are allowed for websocket purpose '${input.channelContext.purpose}'.`,
+    );
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+
+  const workspaceMismatch = requestedTopics.some((topic) => {
+    const topicWorkspaceId = topic.workspaceId?.trim();
+    return Boolean(actorWorkspaceId && topicWorkspaceId && actorWorkspaceId !== topicWorkspaceId);
+  });
+  if (workspaceMismatch) {
+    sendRuntimeRealtimeWebSocketError(input.socket, "forbidden", "Topic workspace scope must match websocket workspace scope.");
+    sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+    return;
+  }
+
+  const subscriptionRequest: RuntimeRealtimeSubscriptionRequest = Object.freeze({
+    actor: Object.freeze({
+      actorUserIdentityId: input.channelContext.actor.userIdentityId,
+      accessChannel: input.channelContext.actor.accessChannel,
+      sessionId: input.channelContext.actor.sessionId,
+      workspaceId: actorWorkspaceId,
+    }),
+    topics: Object.freeze(requestedTopics),
+    mode: subscribeMessage.request.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    reconnect: subscribeMessage.request.reconnect,
+  });
+
+  const subscription = input.runtimeBackendApi.subscribeToRealtimeEvents({
+    request: subscriptionRequest,
+    requestContext: Object.freeze({
+      requestSource: "identity-websocket-runtime-realtime",
+      accessContext: Object.freeze({
+        callerKind: "user" as const,
+        callerId: input.channelContext.actor.userIdentityId,
+        sessionId: input.channelContext.actor.sessionId,
+        metadata: Object.freeze({
+          workspaceId: actorWorkspaceId,
+          activeWorkspaceId: actorWorkspaceId,
+          accessChannel: input.channelContext.actor.accessChannel,
+        }),
+      }),
+    }),
+    listener: (event) => {
+      if (input.socket.destroyed) {
+        return;
+      }
+      const eventMessage = Object.freeze({
+        type: RuntimeRealtimeWebSocketMessageTypes.event,
+        event,
+      });
+      input.socket.write(buildWebSocketTextFrame(JSON.stringify(eventMessage)));
+    },
+  });
+
+  if (!subscription.ok || !subscription.data) {
+    const mappedCode = mapRuntimeRealtimeErrorCode(subscription.error?.code);
+    const message = subscription.error?.message ?? "Realtime subscription failed.";
+    sendRuntimeRealtimeWebSocketError(input.socket, mappedCode, message);
+    sendWebSocketCloseFrame(input.socket, mappedCode === "forbidden" ? 4403 : 4400, mappedCode);
+    return;
+  }
+
+  input.state.subscription?.unsubscribe();
+  input.state.subscription = Object.freeze({
+    subscriptionId: subscription.data.subscriptionId,
+    unsubscribe: subscription.data.unsubscribe,
+  });
+
+  const ackMessage = parseRuntimeRealtimeWebSocketSubscriptionAckMessage({
+    type: RuntimeRealtimeWebSocketMessageTypes.subscriptionAck,
+    subscriptionId: subscription.data.subscriptionId,
+    acceptedAt: new Date().toISOString(),
+    mode: subscriptionRequest.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    topics: requestedTopics,
+    reconnect: subscriptionRequest.reconnect,
+  });
+  input.socket.write(buildWebSocketTextFrame(JSON.stringify(ackMessage)));
+  input.logger.info(Object.freeze({
+    event: "identity-websocket.runtime-realtime.subscription.accepted",
+    requestId: input.requestId,
+    statusCode: 101,
+    details: Object.freeze({
+      channelId: input.channelContext.channelId,
+      purpose: input.channelContext.purpose,
+      subscriptionId: subscription.data.subscriptionId,
+      topics: requestedTopics,
+      mode: subscriptionRequest.mode ?? RuntimeRealtimeSubscriptionModes.liveOnly,
+    }),
+  }));
+}
+
+function mapRuntimeRealtimeErrorCode(
+  code: "not-found" | "invalid-request" | "forbidden" | "unauthorized" | "quota-exceeded" | "rate-limit-exceeded" | "internal" | undefined,
+): "invalid-request" | "forbidden" | "internal" {
+  if (code === "forbidden" || code === "unauthorized") {
+    return "forbidden";
+  }
+  if (code === "invalid-request" || code === "not-found" || code === "quota-exceeded" || code === "rate-limit-exceeded") {
+    return "invalid-request";
+  }
+  return "internal";
+}
+
+function isRuntimeRealtimeTopicAllowedForPurpose(
+  topic: RuntimeRealtimeSubscriptionTopic["topic"],
+  purpose: WebSocketChannelPurpose,
+): boolean {
+  switch (purpose) {
+    case WebSocketChannelPurposes.status:
+      return topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.queueMonitoring:
+      return topic === RuntimeRealtimeTopics.queue || topic === RuntimeRealtimeTopics.runStatus || topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.runMonitoring:
+      return topic === RuntimeRealtimeTopics.runStatus || topic === RuntimeRealtimeTopics.queue || topic === RuntimeRealtimeTopics.connectivity;
+    case WebSocketChannelPurposes.streamControl:
+      return topic === RuntimeRealtimeTopics.admin || topic === RuntimeRealtimeTopics.connectivity;
+    default:
+      return false;
+  }
+}
+
+function sendRuntimeRealtimeWebSocketError(
+  socket: Socket,
+  code: "invalid-request" | "forbidden" | "internal",
+  message: string,
+): void {
+  if (socket.destroyed) {
+    return;
+  }
+  const payload = Object.freeze({
+    type: RuntimeRealtimeWebSocketMessageTypes.error,
+    error: Object.freeze({
+      code,
+      message: message.trim() || "Realtime websocket operation failed.",
+    }),
+  });
+  socket.write(buildWebSocketTextFrame(JSON.stringify(payload)));
+}
+
+function sendWebSocketCloseFrame(socket: Socket, closeCode: number, reason: string): void {
+  if (socket.destroyed) {
+    return;
+  }
+  const normalizedReason = reason.trim().slice(0, 120);
+  const reasonBytes = Buffer.from(normalizedReason, "utf8");
+  const payload = Buffer.alloc(2 + reasonBytes.length);
+  payload.writeUInt16BE(closeCode, 0);
+  reasonBytes.copy(payload, 2);
+  socket.write(buildWebSocketDataFrame(8, payload));
+  socket.end();
+}
+
+function buildWebSocketTextFrame(payload: string): Buffer {
+  return buildWebSocketDataFrame(1, Buffer.from(payload, "utf8"));
+}
+
+function buildWebSocketDataFrame(opcode: number, payload: Buffer): Buffer {
+  const payloadLength = payload.length;
+  if (payloadLength <= 125) {
+    const frame = Buffer.alloc(2 + payloadLength);
+    frame[0] = 0x80 | (opcode & 0x0f);
+    frame[1] = payloadLength;
+    payload.copy(frame, 2);
+    return frame;
+  }
+  if (payloadLength <= 65535) {
+    const frame = Buffer.alloc(4 + payloadLength);
+    frame[0] = 0x80 | (opcode & 0x0f);
+    frame[1] = 126;
+    frame.writeUInt16BE(payloadLength, 2);
+    payload.copy(frame, 4);
+    return frame;
+  }
+
+  const frame = Buffer.alloc(10 + payloadLength);
+  frame[0] = 0x80 | (opcode & 0x0f);
+  frame[1] = 127;
+  frame.writeBigUInt64BE(BigInt(payloadLength), 2);
+  payload.copy(frame, 10);
+  return frame;
+}
+
+function tryParseWebSocketFrame(buffer: Buffer, offset: number): ParsedWebSocketFrame | undefined {
+  if (buffer.length - offset < 2) {
+    return undefined;
+  }
+  const first = buffer[offset];
+  const second = buffer[offset + 1];
+  const fin = (first & 0x80) === 0x80;
+  const opcode = first & 0x0f;
+  const masked = (second & 0x80) === 0x80;
+  let payloadLength = second & 0x7f;
+  let cursor = offset + 2;
+
+  if (payloadLength === 126) {
+    if (buffer.length - cursor < 2) {
+      return undefined;
+    }
+    payloadLength = buffer.readUInt16BE(cursor);
+    cursor += 2;
+  } else if (payloadLength === 127) {
+    if (buffer.length - cursor < 8) {
+      return undefined;
+    }
+    const bigLength = buffer.readBigUInt64BE(cursor);
+    cursor += 8;
+    if (bigLength > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("WebSocket frame payload exceeds safe integer range.");
+    }
+    payloadLength = Number(bigLength);
+  }
+
+  const maskLength = masked ? 4 : 0;
+  if (buffer.length - cursor < maskLength + payloadLength) {
+    return undefined;
+  }
+
+  const mask = masked ? buffer.subarray(cursor, cursor + 4) : undefined;
+  cursor += maskLength;
+  const payload = Buffer.from(buffer.subarray(cursor, cursor + payloadLength));
+  if (mask) {
+    for (let index = 0; index < payload.length; index += 1) {
+      payload[index] = payload[index] ^ mask[index % 4];
+    }
+  }
+  cursor += payloadLength;
+
+  return Object.freeze({
+    fin,
+    opcode,
+    payload,
+    nextOffset: cursor,
+    masked,
+  });
 }
 
 function startWebSocketChannelLifecycleMonitoring(input: {
