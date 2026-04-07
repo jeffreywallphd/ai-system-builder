@@ -268,6 +268,8 @@ const DEFAULT_API_CORS_ALLOWED_HEADERS = Object.freeze(["content-type", "authori
 const REQUEST_ID_HEADER = "x-request-id";
 const CORRELATION_ID_HEADER = "x-correlation-id";
 const MAX_CORRELATION_ID_LENGTH = 128;
+const RuntimeRealtimeWebSocketSubprotocol = "ai-loom-runtime-realtime.v1";
+const RuntimeRealtimeWebSocketAuthSubprotocolPrefix = "ai-loom-auth-bearer.";
 const DEV_LOGIN_DEFAULT_PROVIDER_ID = "provider:local-password";
 const DEV_LOGIN_DEFAULT_USERNAME = "dev.local.user";
 const DEV_LOGIN_DEFAULT_PASSWORD = "DevOnlyPass!2026";
@@ -6000,7 +6002,9 @@ async function handleWebSocketUpgrade(input: {
     return;
   }
 
-  const sessionToken = extractBearerToken(input.request.headers.authorization);
+  const requestedSubprotocols = parseWebSocketSubprotocolHeader(input.request.headers["sec-websocket-protocol"]);
+  const sessionToken = extractBearerToken(input.request.headers.authorization)
+    ?? extractWebSocketBearerTokenFromSubprotocols(requestedSubprotocols);
   if (!sessionToken) {
     denyWebSocketUpgrade(input, requestId, correlationId, 401, {
       code: "authentication-failed",
@@ -6159,7 +6163,12 @@ async function handleWebSocketUpgrade(input: {
     input.channelRegistry.release(channelContext.channelId);
   });
 
-  input.socket.write(buildWebSocketUpgradeAcceptedResponse(handshake.websocketKey, requestId, correlationId));
+  input.socket.write(buildWebSocketUpgradeAcceptedResponse(
+    handshake.websocketKey,
+    requestId,
+    correlationId,
+    resolveAcceptedWebSocketSubprotocol(requestedSubprotocols),
+  ));
   input.logger.info(Object.freeze({
     event: "identity-websocket.upgrade.accepted",
     requestId,
@@ -7588,20 +7597,28 @@ function denyWebSocketUpgrade(
   }));
 }
 
-function buildWebSocketUpgradeAcceptedResponse(websocketKey: string, requestId: string, correlationId: string): string {
+function buildWebSocketUpgradeAcceptedResponse(
+  websocketKey: string,
+  requestId: string,
+  correlationId: string,
+  selectedProtocol?: string,
+): string {
   const accept = createHash("sha1")
     .update(`${websocketKey}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`, "utf8")
     .digest("base64");
-  return [
+  const responseLines = [
     "HTTP/1.1 101 Switching Protocols",
     "Upgrade: websocket",
     "Connection: Upgrade",
     `Sec-WebSocket-Accept: ${accept}`,
     `${REQUEST_ID_HEADER}: ${requestId}`,
     `${CORRELATION_ID_HEADER}: ${correlationId}`,
-    "",
-    "",
-  ].join("\r\n");
+  ];
+  if (selectedProtocol) {
+    responseLines.push(`Sec-WebSocket-Protocol: ${selectedProtocol}`);
+  }
+  responseLines.push("", "");
+  return responseLines.join("\r\n");
 }
 
 function resolveHttpStatusText(statusCode: number): string {
@@ -10015,6 +10032,47 @@ function extractBearerToken(authorizationHeader: string | string[] | undefined):
 
   const token = match[1]?.trim();
   return token ? token : undefined;
+}
+
+function parseWebSocketSubprotocolHeader(headerValue: string | string[] | undefined): ReadonlyArray<string> {
+  if (!headerValue) {
+    return Object.freeze([]);
+  }
+
+  const combined = Array.isArray(headerValue) ? headerValue.join(",") : headerValue;
+  return Object.freeze(
+    combined
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  );
+}
+
+function extractWebSocketBearerTokenFromSubprotocols(subprotocols: ReadonlyArray<string>): string | undefined {
+  const encodedToken = subprotocols
+    .find((value) => value.startsWith(RuntimeRealtimeWebSocketAuthSubprotocolPrefix))
+    ?.slice(RuntimeRealtimeWebSocketAuthSubprotocolPrefix.length);
+  if (!encodedToken) {
+    return undefined;
+  }
+
+  return decodeBase64UrlToUtf8(encodedToken);
+}
+
+function resolveAcceptedWebSocketSubprotocol(subprotocols: ReadonlyArray<string>): string | undefined {
+  const runtimeRealtimeProtocol = subprotocols.find((value) => value === RuntimeRealtimeWebSocketSubprotocol);
+  return runtimeRealtimeProtocol || undefined;
+}
+
+function decodeBase64UrlToUtf8(value: string): string | undefined {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  try {
+    const decoded = Buffer.from(padded, "base64").toString("utf8").trim();
+    return decoded || undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function buildAuthenticationFailedResponse(message: string): IdentityAuthApiResponse<never> {

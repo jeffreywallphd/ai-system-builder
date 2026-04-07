@@ -179,7 +179,8 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 async function openWebSocketUpgradeSocket(input: {
   readonly port: number;
   readonly path: string;
-  readonly authorization: string;
+  readonly authorization?: string;
+  readonly subprotocols?: ReadonlyArray<string>;
 }): Promise<{ readonly socket: Socket; readonly response: string }> {
   return await new Promise<{ readonly socket: Socket; readonly response: string }>((resolve, reject) => {
     const socket = connect({ host: "127.0.0.1", port: input.port });
@@ -210,7 +211,10 @@ async function openWebSocketUpgradeSocket(input: {
         "Upgrade: websocket",
         "Sec-WebSocket-Version: 13",
         "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
-        `Authorization: Bearer ${input.authorization}`,
+        ...(input.authorization ? [`Authorization: Bearer ${input.authorization}`] : []),
+        ...(input.subprotocols && input.subprotocols.length > 0
+          ? [`Sec-WebSocket-Protocol: ${input.subprotocols.join(", ")}`]
+          : []),
         "",
         "",
       ];
@@ -324,6 +328,36 @@ describe("IdentityHttpServer runtime realtime websocket delivery", () => {
     expect(event.type).toBe("runtime-realtime.event");
     expect(event.event.topic).toBe(RuntimeRealtimeTopics.runStatus);
     expect(event.event.runScope.executionId).toBe("exec-1");
+    socket.destroy();
+  });
+
+  it("accepts websocket auth token supplied through runtime auth subprotocol", async () => {
+    const runtimeBackend = new RuntimeRealtimeBackendStub();
+    const { baseUrl, port } = await startServer(runtimeBackend);
+    const token = await registerAndLogin(baseUrl, "runtime.ws.subprotocol-auth.1");
+
+    const { socket, response } = await openWebSocketUpgradeSocket({
+      port,
+      path: "/ws?purpose=run-monitoring&workspaceId=workspace-a",
+      subprotocols: [
+        "ai-loom-runtime-realtime.v1",
+        `ai-loom-auth-bearer.${Buffer.from(token, "utf8").toString("base64url")}`,
+      ],
+    });
+    expect(response.startsWith("HTTP/1.1 101")).toBeTrue();
+    expect(response.toLowerCase()).toContain("sec-websocket-protocol: ai-loom-runtime-realtime.v1");
+
+    const reader = new WebSocketFrameReader(socket);
+    socket.write(buildMaskedClientTextFrame(JSON.stringify({
+      action: "runtime-realtime.subscribe",
+      request: {
+        topics: [{ topic: RuntimeRealtimeTopics.queue, workspaceId: "workspace-a" }],
+      },
+    })));
+
+    const ackFrame = await reader.nextFrame();
+    const ack = parseRuntimeRealtimeWebSocketSubscriptionAckMessage(JSON.parse(ackFrame.payload.toString("utf8")));
+    expect(ack.type).toBe("runtime-realtime.subscription-ack");
     socket.destroy();
   });
 

@@ -223,7 +223,10 @@ Persisted session records now intentionally exclude:
 
 ## Runtime realtime websocket delivery (story 14.2.6)
 
-- Transport endpoint: `GET /ws` with websocket upgrade headers and `Authorization: Bearer <session-token>`.
+- Transport endpoint: `GET /ws` with websocket upgrade headers.
+- Authentication for websocket upgrade accepts:
+  - `Authorization: Bearer <session-token>` header (canonical),
+  - runtime auth subprotocol token on `Sec-WebSocket-Protocol` (`ai-loom-auth-bearer.<base64url(session-token)>`) with runtime protocol `ai-loom-runtime-realtime.v1`.
 - Runtime realtime subscribe action is message-driven after upgrade:
   - client masked text frame:
     - `action: "runtime-realtime.subscribe"`

@@ -154,3 +154,23 @@ These can remain implementation details as long as protected business actions fl
   - validates thin-client run launch, queue review, and inspection calls use workspace/session-scoped shared runtime client contracts.
 - `src/ui/pages/tests/RunPage.test.ts`
   - validates thin-client operational screen wiring includes allowed launch, approved-parameter handling entry points, queue review, and shared inspection/mutation calls.
+
+## Story 14.3.5 migration note: desktop/thin runtime realtime subscription convergence
+
+- Shared runtime realtime subscription behavior is now centralized in `src/ui/shared/runtime/RuntimeRealtimeSubscriptionService.ts` and re-exported via `src/shared/runtime/RuntimeRealtimeSubscriptionService.ts`.
+- Desktop and thin run/queue operational UX on `src/ui/pages/RunPage.tsx` now binds queue changes, run status changes, and runtime connectivity state updates to authoritative runtime realtime websocket topics (`runtime.queue`, `runtime.run.status`, `runtime.connectivity`).
+- Reconnect and stale-data fallback behavior is normalized in the shared subscription service:
+  - reconnect attempts with cursor resume (`resume-from-cursor`) after transient disconnects,
+  - shared fallback refresh loop while channel state is stale/reconnecting/degraded,
+  - centralized connection-state snapshots (`connecting`, `connected`, `reconnecting`, `degraded`, `disconnected`) for screen rendering.
+- Run screen components no longer embed websocket mechanics directly; page-level code consumes shared callbacks and keeps operational rendering focused on state presentation.
+- Identity websocket upgrade now accepts runtime auth token transport via runtime auth subprotocol for browser/Electron websocket compatibility while preserving bearer-header support.
+
+### Story 14.3.5 tests
+
+- `src/ui/shared/runtime/tests/RuntimeRealtimeSubscriptionService.test.ts`
+  - validates canonical runtime topic subscription payloads, realtime event routing, reconnect cursor resume behavior, and stale-data fallback refresh execution.
+- `src/ui/pages/tests/RunPage.test.ts`
+  - validates Run screen wiring includes shared realtime subscription service usage and runtime connectivity/stale-state presentation.
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerRuntimeRealtimeWebSocket.test.ts`
+  - validates websocket upgrade authentication supports runtime auth subprotocol token flow and preserves canonical realtime subscribe/ack behavior.

@@ -276,7 +276,9 @@ Required headers:
 - `Upgrade: websocket`
 - `Sec-WebSocket-Version: 13`
 - `Sec-WebSocket-Key`
-- `Authorization: Bearer <session-token>`
+- one authenticated session token transport:
+  - `Authorization: Bearer <session-token>` (canonical),
+  - or `Sec-WebSocket-Protocol: ai-loom-runtime-realtime.v1, ai-loom-auth-bearer.<base64url(session-token)>`
 
 Common query params:
 
