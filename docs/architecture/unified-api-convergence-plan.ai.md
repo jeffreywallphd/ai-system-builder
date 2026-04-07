@@ -84,3 +84,19 @@
 
 - `src/ui/shared/identity/tests/IdentityAuthSessionCoordinator.test.ts`
   - validates workspace-id forwarding for bootstrap and authenticated refresh flows
+
+## Story 14.3.3 migration note: desktop operational run monitoring and queue-control convergence
+
+- Desktop Run operational surface now consumes runtime queue list/read/mutation APIs through shared runtime client contracts instead of desktop-local operational shortcuts.
+- Run monitoring reads (`status`, `result`, `trace`) and approved control actions (`cancel`, `dequeue`) flow through shared `RuntimeControlClient` contracts bound to authoritative `/api/v1/runtime/*` routes.
+- Workspace/session scoping for runtime operations is now centralized in `RuntimeOperationsService`, reusing persisted identity session context and surfacing policy-denied/failure responses through the shared runtime error envelope.
+- The desktop operational Run panel now presents queue visibility and run-inspection controls backed by shared contracts and shared error semantics.
+
+### Story 14.3.3 tests
+
+- `src/ui/shared/runtime/tests/RuntimeControlClient.test.ts`
+  - validates authoritative runtime read/list/mutation route usage and shared auth/header/query conventions
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+  - validates session/workspace scoped runtime operations and shared unauthorized error handling
+- `src/ui/pages/tests/RunPage.test.ts`
+  - validates Run surface wiring for queue visibility and runtime control actions through `RuntimeOperationsService`
