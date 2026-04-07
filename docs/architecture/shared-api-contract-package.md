@@ -7,6 +7,7 @@
 - Story: 14.1.2, Create the shared API contract and schema package for multi-surface clients
 - Story: 14.1.3, Standardize API error, permission-denied, and not-found response semantics
 - Story: 14.1.5, Build a shared API client library for desktop and thin-client consumers
+- Story: 14.1.6, Add shared query key, pagination, and filter conventions for multi-surface data access
 
 ## Purpose
 
@@ -16,6 +17,10 @@ Provide a canonical shared transport package so desktop, browser, and responsive
 
 - `src/shared/contracts/api/SharedApiContractPrimitives.ts`
   - Canonical identifier envelopes, pagination/filtering primitives, mutation result envelopes, and standardized error semantics.
+- `src/shared/contracts/api/SharedApiQueryConventions.ts`
+  - Canonical query parameter keys, list/read query-string builders, and centralized list query key generation.
+- `src/shared/schemas/api/SharedApiQuerySchemaContracts.ts`
+  - Shared query parser/validation helpers for pagination, sorting, and search semantics.
 - `src/ui/shared/api/SharedApiClient.ts`
   - Shared thin/desktop-ready transport client for authenticated JSON requests, retry/cancellation, response-envelope parsing, and error normalization.
 - `src/shared/api/SharedApiClient.ts`
@@ -78,6 +83,14 @@ Provide a canonical shared transport package so desktop, browser, and responsive
    - cancellation via `AbortSignal` and timeout controls,
    - normalized error envelopes for transport and non-envelope failures.
 3. Domain-specific schema parsing can be injected per call with `parseResponse`.
+
+## Shared list query conventions (Story 14.1.6)
+
+1. Canonical list/read keys are `workspaceId`, `actorWorkspaceId`, `limit`, `offset`, `search`, `sortBy`, and `sortDirection`.
+2. Multi-value filters use repeated parameters (`status=a&status=b`), not one-off names for new endpoints.
+3. Converged clients should build list/read query strings with helpers from `SharedApiQueryConventions`.
+4. HTTP transport handlers should parse and validate list/read pagination/sort/search with `parseSharedApiListQueryConventions`.
+5. Client list caches should use `buildSharedApiListQueryKey` so key semantics are stable across desktop and thin surfaces.
 
 ### Example: adding a new endpoint to a domain client
 

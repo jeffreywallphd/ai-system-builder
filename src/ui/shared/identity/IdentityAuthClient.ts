@@ -35,6 +35,12 @@ import type {
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
 } from "@shared/contracts/identity/IdentityTransportContracts";
+import {
+  appendSharedApiListQueryConventions,
+  appendSharedApiQueryList,
+  appendSharedApiQueryValue,
+  toSharedApiQuerySuffix,
+} from "@shared/contracts/api/SharedApiQueryConventions";
 import { SharedApiClient } from "../api/SharedApiClient";
 
 export interface IdentityAuthClient {
@@ -162,22 +168,15 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ListIdentityAdminAccountsApiResponse>> {
     const query = new URLSearchParams();
-    if (request.providerId) {
-      query.set("providerId", request.providerId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
+    appendSharedApiQueryValue(query, "providerId", request.providerId);
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
     return this.get(`/api/v1/identity/admin/accounts${suffix}`, sessionToken);
   }
 
@@ -186,11 +185,8 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<GetIdentityAdminAccountStatusApiResponse>> {
     const query = new URLSearchParams();
-    if (request.providerId) {
-      query.set("providerId", request.providerId);
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
+    appendSharedApiQueryValue(query, "providerId", request.providerId);
+    const suffix = toSharedApiQuerySuffix(query);
     return this.get(`/api/v1/identity/admin/accounts/${encodeURIComponent(request.userIdentityId)}${suffix}`, sessionToken);
   }
 
@@ -214,22 +210,17 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
   ): Promise<IdentityAuthApiResponse<ListIdentityAdminTrustedDevicesApiResponse>> {
     const query = new URLSearchParams();
     query.set("userIdentityId", request.userIdentityId);
-    if (request.workspaceId) {
-      query.set("workspaceId", request.workspaceId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
+    appendSharedApiListQueryConventions(query, {
+      workspaceId: request.workspaceId,
+    });
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
     return this.get(`/api/v1/identity/admin/trusted-devices${suffix}`, sessionToken);
   }
 
@@ -264,22 +255,17 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     sessionToken: string,
   ): Promise<IdentityAuthApiResponse<ListTrustedDevicesApiResponse>> {
     const query = new URLSearchParams();
-    if (request.workspaceId) {
-      query.set("workspaceId", request.workspaceId);
-    }
-    if (request.includeStatuses) {
-      for (const status of request.includeStatuses) {
-        query.append("status", status);
-      }
-    }
-    if (typeof request.limit === "number") {
-      query.set("limit", String(request.limit));
-    }
-    if (typeof request.offset === "number") {
-      query.set("offset", String(request.offset));
-    }
-    const queryString = query.toString();
-    const suffix = queryString ? `?${queryString}` : "";
+    appendSharedApiListQueryConventions(query, {
+      workspaceId: request.workspaceId,
+    });
+    appendSharedApiQueryList(query, "status", request.includeStatuses);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    const suffix = toSharedApiQuerySuffix(query);
     return this.get(`/api/v1/identity/trusted-devices${suffix}`, sessionToken);
   }
 

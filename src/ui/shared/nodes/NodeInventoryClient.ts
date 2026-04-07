@@ -15,6 +15,12 @@ import type {
   NodeRoleCapability,
   NodeType,
 } from "@domain/nodes/NodeTrustDomain";
+import {
+  appendSharedApiListQueryConventions,
+  appendSharedApiQueryList,
+  appendSharedApiQueryValue,
+  toSharedApiQuerySuffix,
+} from "@shared/contracts/api/SharedApiQueryConventions";
 
 export interface NodeInventoryClient {
   listNodeInventory(
@@ -70,17 +76,22 @@ export class HttpNodeInventoryClient implements NodeInventoryClient {
     sessionToken: string,
   ): Promise<NodeTrustApiResponse<ListNodeInventoryApiResponse>> {
     const query = new URLSearchParams();
-    appendList(query, "nodeType", request.nodeTypes);
-    appendList(query, "approvalStatus", request.approvalStatuses);
-    appendList(query, "operationalState", request.operationalStates);
-    appendList(query, "enrollmentStatus", request.enrollmentStatuses);
-    appendList(query, "presenceState", request.presenceStates);
-    appendList(query, "capability", request.capabilityAnyOf);
-    appendList(query, "deploymentTag", request.deploymentTagAnyOf);
-    appendOptional(query, "lastSeenAfter", request.lastSeenAfter);
-    appendOptional(query, "lastSeenBefore", request.lastSeenBefore);
-    appendPagination(query, request.limit, request.offset);
-    return this.get(`/api/v1/nodes/inventory${toQuerySuffix(query)}`, sessionToken);
+    appendSharedApiQueryList(query, "nodeType", request.nodeTypes);
+    appendSharedApiQueryList(query, "approvalStatus", request.approvalStatuses);
+    appendSharedApiQueryList(query, "operationalState", request.operationalStates);
+    appendSharedApiQueryList(query, "enrollmentStatus", request.enrollmentStatuses);
+    appendSharedApiQueryList(query, "presenceState", request.presenceStates);
+    appendSharedApiQueryList(query, "capability", request.capabilityAnyOf);
+    appendSharedApiQueryList(query, "deploymentTag", request.deploymentTagAnyOf);
+    appendSharedApiQueryValue(query, "lastSeenAfter", request.lastSeenAfter);
+    appendSharedApiQueryValue(query, "lastSeenBefore", request.lastSeenBefore);
+    appendSharedApiListQueryConventions(query, {
+      pagination: {
+        limit: request.limit,
+        offset: request.offset,
+      },
+    });
+    return this.get(`/api/v1/nodes/inventory${toSharedApiQuerySuffix(query)}`, sessionToken);
   }
 
   public async getNodeInventoryDetail(
@@ -137,29 +148,4 @@ export class HttpNodeInventoryClient implements NodeInventoryClient {
   }
 }
 
-function appendList(query: URLSearchParams, key: string, values?: ReadonlyArray<string>): void {
-  for (const value of values ?? []) {
-    query.append(key, value);
-  }
-}
-
-function appendOptional(query: URLSearchParams, key: string, value?: string): void {
-  if (value) {
-    query.set(key, value);
-  }
-}
-
-function appendPagination(query: URLSearchParams, limit?: number, offset?: number): void {
-  if (typeof limit === "number") {
-    query.set("limit", String(limit));
-  }
-  if (typeof offset === "number") {
-    query.set("offset", String(offset));
-  }
-}
-
-function toQuerySuffix(query: URLSearchParams): string {
-  const queryString = query.toString();
-  return queryString ? `?${queryString}` : "";
-}
 

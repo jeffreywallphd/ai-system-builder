@@ -491,6 +491,27 @@ describe("IdentityHttpServer workspace administration routes", () => {
     expect(Array.isArray(invalidCreateBody.error.validationErrors)).toBe(true);
   });
 
+  it("rejects invalid list pagination query values for workspace administration lists", async () => {
+    const { baseUrl, workspaceRepository } = await startServer();
+    const owner = await registerAndLogin(baseUrl, { username: "workspace.admin.owner.5", email: "admin-owner5@example.com" });
+    await seedWorkspaceAdmin(workspaceRepository, {
+      workspaceId: "workspace:alpha",
+      ownerUserIdentityId: owner.userIdentityId,
+    });
+
+    const invalidLimit = await fetch(`${baseUrl}/api/v1/workspaces?limit=0`, {
+      headers: {
+        authorization: `Bearer ${owner.sessionToken}`,
+      },
+    });
+
+    expect(invalidLimit.status).toBe(400);
+    const invalidLimitBody = await invalidLimit.json();
+    expect(invalidLimitBody.ok).toBe(false);
+    expect(invalidLimitBody.error.code).toBe("invalid-request");
+    expect(invalidLimitBody.error.validationErrors[0].path).toBe("limit");
+  });
+
   it("denies workspace access mutations for non-admin members", async () => {
     const { baseUrl, workspaceRepository } = await startServer();
     const owner = await registerAndLogin(baseUrl, { username: "workspace.admin.owner.4", email: "admin-owner4@example.com" });

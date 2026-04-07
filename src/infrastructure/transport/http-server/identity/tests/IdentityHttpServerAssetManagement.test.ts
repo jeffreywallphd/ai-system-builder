@@ -660,6 +660,27 @@ describe("IdentityHttpServer asset management routes", () => {
     expect(body.data.pagination.returned).toBe(1);
   });
 
+  it("accepts canonical repeated filter parameter names for asset list retrieval", async () => {
+    const service = new StubAssetUploadInitiationService();
+    const baseUrl = await startServer(service);
+    const token = await registerAndLogin(baseUrl, "asset.http.owner.4b");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/assets?workspaceId=workspace-alpha&assetKind=uploaded-file&visibility=private&lifecycleState=active&limit=10&offset=0`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.items).toHaveLength(1);
+  });
+
   it("supports authenticated asset detail retrieval", async () => {
     const service = new StubAssetUploadInitiationService();
     const baseUrl = await startServer(service);
