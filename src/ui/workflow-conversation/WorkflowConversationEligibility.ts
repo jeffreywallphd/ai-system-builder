@@ -1,5 +1,5 @@
-import type { IWorkflow } from "../../src/domain/workflows/interfaces/IWorkflow";
-import { WorkflowDraftOutputDestinationTypes } from "../../src/domain/workflow-studio/WorkflowStudioDomain";
+import type { IWorkflow } from "../../domain/workflows/interfaces/IWorkflow";
+import { WorkflowDraftOutputDestinationTypes } from "../../domain/workflow-studio/WorkflowStudioDomain";
 import type { IExecuteWorkflowRequest, IExecuteWorkflowResult } from "../../application/workflows/ExecuteWorkflowUseCase";
 import type { WorkflowConversationPromptBinding } from "./WorkflowConversationContracts";
 
