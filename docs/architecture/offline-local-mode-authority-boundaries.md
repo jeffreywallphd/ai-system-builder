@@ -21,8 +21,14 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineLocalModeResynchronization.ts`
 - application classification seam:
   - `src/application/common/OfflineResourceClassificationPolicy.ts`
+- application authoritative snapshot cache service and contracts:
+  - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - desktop host local-mode profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- desktop host cache runtime factory:
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+- desktop offline snapshot cache persistence adapter:
+  - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - shared contract package for runtime DTO/schema/state:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -36,6 +42,14 @@ Local state is split into explicit buckets so authority is always visible:
 - `mutation-queue`: pending authoritative mutation intents;
 - `local-ephemeral-state`: local runtime/session activity that is never authoritative;
 - `server-authoritative-only`: non-cacheable server-only material.
+
+Authoritative snapshot cache records must include:
+- workspace context (`workspaceId`) and logical resource identity (`resourceClass`, `resourceId`);
+- authoritative version metadata (`authoritativeRevision`, `authoritativeSnapshotRevision`);
+- sync timing metadata (`cachedAt`, `lastSynchronizedAt`, optional `expiresAt`);
+- eligibility markers (`workspace visibility/role/sharing`, `sensitivity`, `storageRule`, `deviceTrustPosture`);
+- authority and storage posture markers (`authorityScope`, `storageBucket`, `behaviorClass`, cache protection posture);
+- logical snapshot payload + digest only (no raw file-system references).
 
 Authority scopes remain explicit:
 - `authoritative-server`

@@ -9,7 +9,10 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/domain/platform/OfflineLocalModeBoundaries.ts`
 - `src/application/common/OfflineResourceClassificationPolicy.ts`
 - `src/application/common/OfflineLocalModeResynchronization.ts`
+- `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+- `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
@@ -32,6 +35,8 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Explicit reconnect decision actions (`apply-to-authoritative`, `conflict-requires-review`, `reject-not-allowed`).
 - Canonical bounded conflict classes + decision-rule taxonomy.
 - Explicitly limited offline execution classes and reconnect registration envelope flow.
+- Dedicated desktop authoritative snapshot cache service + SQLite persistence with bounded retention and metadata integrity digest checks.
+- Snapshot records persist logical resource snapshots and offline eligibility markers, not raw filesystem references.
 
 ## Server-authoritative-only baseline
 
