@@ -13,8 +13,14 @@ import type { IAuthorizationRoleAssignmentPersistenceRepository } from "@applica
 import type { AuthorizationRoleAssignmentPersistenceLookupQuery } from "@shared/dto/authorization/AuthorizationPersistenceDtos";
 import { WorkspaceAuthorizationRoleKeys } from "@domain/authorization/AuthorizationRoleDefinitions";
 import { RoleAssignmentScopes, RoleAssignmentStatuses } from "@domain/authorization/AuthorizationDomain";
-import { NodeApprovalStatuses, NodeTrustStates, NodeTypes } from "@domain/nodes/NodeTrustDomain";
-import { SchedulingNodeUsageModes } from "@domain/scheduling/SchedulingDomain";
+import {
+  NodeApprovalStatuses,
+  NodeHeartbeatStatuses,
+  NodeRevocationStates,
+  NodeTrustStates,
+  NodeTypes,
+} from "@domain/nodes/NodeTrustDomain";
+import { SchedulingCandidateDenialCodes, SchedulingNodeUsageModes } from "@domain/scheduling/SchedulingDomain";
 import { AssembleAuthoritativeSchedulingInputUseCase } from "../use-cases/AssembleAuthoritativeSchedulingInputUseCase";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
@@ -122,6 +128,11 @@ function createNode(nodeId: string, nodeType = NodeTypes.compute): NodeIdentityP
       certificateRef: `cert:${nodeId}`,
     }),
     deploymentTags: Object.freeze([]),
+    lastSeen: Object.freeze({
+      lastSeenAt: "2026-04-07T12:00:30.000Z",
+      heartbeatStatus: NodeHeartbeatStatuses.online,
+      observedBy: "system:heartbeat",
+    }),
     revocation: Object.freeze({
       state: "active",
     }),
@@ -214,5 +225,156 @@ describe("AssembleAuthoritativeSchedulingInputUseCase", () => {
     expect(snapshot.nodes[0]?.nodeId).toBe("node:hybrid:1");
     expect(snapshot.nodes[0]?.usageMode).toBe("interactive-local-session");
     expect(snapshot.nodes[0]?.hybridLocalUseProtection?.reservedLocalCapacityUnits).toBe(1);
+  });
+
+  it("marks stale heartbeat nodes as unschedulable with explicit stale-node reason codes", async () => {
+    const runRepository = new InMemoryRunRepository();
+    runRepository.runs.set("run:owner", createRunRecord());
+
+    const useCase = new AssembleAuthoritativeSchedulingInputUseCase({
+      selectAssignmentReadyRunsUseCase: {
+        execute: async () => Object.freeze({
+          asOf: "2026-04-07T12:10:00.000Z",
+          items: Object.freeze([Object.freeze({
+            run: Object.freeze({
+              runId: "run:owner",
+              workflowId: "workflow:demo",
+              source: "api",
+              state: "queued",
+              assignmentStatus: "unassigned",
+              executionOutcome: "none",
+              submittedAt: "2026-04-07T12:00:00.000Z",
+              updatedAt: "2026-04-07T12:00:00.000Z",
+              submission: Object.freeze({
+                submittedByActorId: "user:owner",
+              }),
+              assignment: Object.freeze({ status: "unassigned" }),
+              execution: Object.freeze({ outcome: "none" }),
+              retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              contractVersion: "run-orchestration-transport/v1",
+            }),
+            queue: Object.freeze({
+              queueId: "queue:default",
+              enteredAt: "2026-04-07T12:00:00.000Z",
+              eligibleAt: "2026-04-07T12:00:00.000Z",
+              orderKey: "2026-04-07T12:00:00.000Z:run:owner",
+              claimToken: "claim:run:owner",
+              claimExpiresAt: "2026-04-07T12:10:30.000Z",
+            }),
+          })]),
+        }),
+      } as never,
+      runRepository,
+      nodeRepository: new RecordingNodeRepository(Object.freeze([
+        Object.freeze({
+          ...createNode("node:stale"),
+          lastSeen: Object.freeze({
+            lastSeenAt: "2026-04-07T12:00:00.000Z",
+            heartbeatStatus: NodeHeartbeatStatuses.online,
+            observedBy: "system:heartbeat",
+          }),
+        }),
+      ])),
+      roleAssignmentRepository: new RecordingRoleAssignmentRepository(),
+      nodeFreshnessPolicy: Object.freeze({
+        maxHeartbeatAgeSeconds: 30,
+      }),
+    });
+
+    const snapshot = await useCase.assemble({
+      asOf: "2026-04-07T12:10:00.000Z",
+      reservationOwner: "scheduler:alpha",
+      limit: 3,
+    });
+
+    expect(snapshot.nodes).toHaveLength(1);
+    expect(snapshot.nodes[0]?.nodeId).toBe("node:stale");
+    expect(snapshot.nodes[0]?.schedulable).toBeFalse();
+    expect(snapshot.nodes[0]?.unschedulableReason?.code).toBe(SchedulingCandidateDenialCodes.nodeStateStale);
+  });
+
+  it("uses refreshed node eligibility state and treats unavailable refresh data as ineligible", async () => {
+    const runRepository = new InMemoryRunRepository();
+    runRepository.runs.set("run:owner", createRunRecord());
+
+    const useCase = new AssembleAuthoritativeSchedulingInputUseCase({
+      selectAssignmentReadyRunsUseCase: {
+        execute: async () => Object.freeze({
+          asOf: "2026-04-07T12:01:00.000Z",
+          items: Object.freeze([Object.freeze({
+            run: Object.freeze({
+              runId: "run:owner",
+              workflowId: "workflow:demo",
+              source: "api",
+              state: "queued",
+              assignmentStatus: "unassigned",
+              executionOutcome: "none",
+              submittedAt: "2026-04-07T12:00:00.000Z",
+              updatedAt: "2026-04-07T12:00:00.000Z",
+              submission: Object.freeze({
+                submittedByActorId: "user:owner",
+              }),
+              assignment: Object.freeze({ status: "unassigned" }),
+              execution: Object.freeze({ outcome: "none" }),
+              retry: Object.freeze({ attempt: 1, maxAttempts: 1 }),
+              contractVersion: "run-orchestration-transport/v1",
+            }),
+            queue: Object.freeze({
+              queueId: "queue:default",
+              enteredAt: "2026-04-07T12:00:00.000Z",
+              eligibleAt: "2026-04-07T12:00:00.000Z",
+              orderKey: "2026-04-07T12:00:00.000Z:run:owner",
+              claimToken: "claim:run:owner",
+              claimExpiresAt: "2026-04-07T12:01:30.000Z",
+            }),
+          })]),
+        }),
+      } as never,
+      runRepository,
+      nodeRepository: new RecordingNodeRepository(Object.freeze([
+        createNode("node:refresh-revoked"),
+        createNode("node:refresh-unavailable"),
+      ])),
+      roleAssignmentRepository: new RecordingRoleAssignmentRepository(),
+      nodeStateRefreshPort: {
+        refreshNodeState: async () => Object.freeze([
+          Object.freeze({
+            nodeId: "node:refresh-revoked",
+            state: Object.freeze({
+              ...createNode("node:refresh-revoked"),
+              trustState: NodeTrustStates.revoked,
+              revokedAt: "2026-04-07T12:00:45.000Z",
+              revocation: Object.freeze({
+                state: NodeRevocationStates.revoked,
+                revokedAt: "2026-04-07T12:00:45.000Z",
+                reason: "policy-violation",
+              }),
+            }),
+          }),
+          Object.freeze({
+            nodeId: "node:refresh-unavailable",
+            unavailableReason: Object.freeze({
+              code: SchedulingCandidateDenialCodes.nodeStateUnavailable,
+              message: "Node heartbeat feed unavailable for this node.",
+            }),
+          }),
+        ]),
+      },
+    });
+
+    const snapshot = await useCase.assemble({
+      asOf: "2026-04-07T12:01:00.000Z",
+      reservationOwner: "scheduler:alpha",
+      limit: 3,
+    });
+
+    const revokedNode = snapshot.nodes.find((node) => node.nodeId === "node:refresh-revoked");
+    const unavailableNode = snapshot.nodes.find((node) => node.nodeId === "node:refresh-unavailable");
+
+    expect(revokedNode?.schedulable).toBeFalse();
+    expect(revokedNode?.unschedulableReason?.code).toBe(SchedulingCandidateDenialCodes.nodeRevoked);
+
+    expect(unavailableNode?.schedulable).toBeFalse();
+    expect(unavailableNode?.unschedulableReason?.code).toBe(SchedulingCandidateDenialCodes.nodeStateUnavailable);
   });
 });

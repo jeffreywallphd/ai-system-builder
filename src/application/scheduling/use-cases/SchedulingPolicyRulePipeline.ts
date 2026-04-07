@@ -92,7 +92,7 @@ export class NodeSchedulableSchedulingPolicyRule implements ISchedulingPolicyRul
     return Object.freeze({
       allowed: false,
       reasons: Object.freeze([
-        toReason(
+        input.node.unschedulableReason ?? toReason(
           SchedulingCandidateDenialCodes.nodeNotSchedulable,
           `Node '${input.node.nodeId}' is not schedulable.`,
         ),

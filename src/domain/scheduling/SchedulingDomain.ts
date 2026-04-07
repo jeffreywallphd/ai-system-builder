@@ -45,6 +45,9 @@ export type SchedulingRunPriorityBand =
 
 export const SchedulingCandidateDenialCodes = Object.freeze({
   nodeNotSchedulable: "node-not-schedulable",
+  nodeStateStale: "node-state-stale",
+  nodeStateUnavailable: "node-state-unavailable",
+  nodeRevoked: "node-revoked",
   nodeMissingCapability: "node-missing-capability",
   remoteSchedulingUnsupported: "remote-scheduling-unsupported",
   reservationConflict: "reservation-conflict",
@@ -99,6 +102,7 @@ export interface SchedulingNodePolicyInput {
   readonly nodeId: string;
   readonly nodeType: NodeType;
   readonly schedulable: boolean;
+  readonly unschedulableReason?: SchedulingPolicyReason;
   readonly supportsRemoteScheduling: boolean;
   readonly enabledCapabilities: ReadonlyArray<NodeRoleCapability>;
   readonly usageMode: SchedulingNodeUsageMode;
