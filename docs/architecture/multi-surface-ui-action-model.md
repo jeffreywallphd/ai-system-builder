@@ -53,3 +53,9 @@ Each action descriptor is declarative and host-neutral:
 - action menus expose `aria-haspopup`, `role="menu"`, and `role="menuitem"` semantics
 - action menus now include Escape-close handling and arrow/home/end keyboard traversal for menu items
 - This keyboard and semantics baseline should be reused rather than reimplemented per page.
+
+## Story 15.2.3 update
+
+- Queue visibility/action surfaces now consume shared action descriptors in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx`.
+- Queue row and queue-detail actions use permission-aware descriptor gates for `runtime.run.inspect`, `runtime.run.cancel`, `runtime.queue.manage`, and `runtime.queue.refresh`.
+- Queue action flow tests now validate descriptor guard behavior and invocation outcomes in `src/ui/shared/tests/OperationalQueueVisibilityActions.test.tsx`.

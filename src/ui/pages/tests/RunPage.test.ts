@@ -11,6 +11,9 @@ describe("RunPage", () => {
     expect(source).toContain("RunThinClientOperationalDashboardPage");
     expect(source).toContain("NodeInventoryService");
     expect(source).toContain("RuntimeOperationsService");
+    expect(source).toContain("OperationalQueueVisibilityPanel");
+    expect(source).toContain("OperationalQueueDetailPanel");
+    expect(source).toContain("resolveQueueVisibilityStatuses");
     expect(source).toContain("Launch allowed run");
     expect(source).toContain("runtimeOperationsService.listQueueItems");
     expect(source).toContain("runtimeOperationsService.inspectRun");

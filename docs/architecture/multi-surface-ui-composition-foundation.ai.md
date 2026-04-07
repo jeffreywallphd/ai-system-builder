@@ -89,3 +89,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared operational run list/detail-status panels now live in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx` and are composed by `src/ui/pages/RunPage.tsx` for desktop and thin-client operational surfaces.
 - Run visibility and status monitoring now use authoritative runtime queue/status/result/trace reads plus persisted execution-run detail projection reads on the same shared page composition.
 - Run actions (`refresh`, `inspect`, `cancel`, `dequeue`) now render through shared action descriptor wrappers for permission-aware behavior across both operational surfaces.
+
+## Story 15.2.3 update
+- Shared queue visibility/filter/detail seams now live in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx` with queue row models, visibility-scope filters, and responsive table-card rendering.
+- `RunPage` now composes queue scope filters into authoritative queue list reads and renders selected queue detail in the same desktop/thin operational shell.
+- Queue actions (`refresh`, `inspect`, `cancel`, `dequeue`) now run through shared action descriptors/wrappers for permission-aware queue workflows across surfaces.

@@ -174,3 +174,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Operational run visibility now includes shared run-monitoring presentational seams in `src/ui/shared/operations/OperationalRunMonitoringPanels.tsx` for run list visibility and run detail/status inspection.
 - `RunPage` now composes those shared panels with authoritative runtime queue/status/result/trace data, persisted execution-run detail projections, and realtime update subscriptions, while keeping desktop and thin-client surface frames unchanged.
 - Run monitoring actions now use shared action descriptors (`SurfaceActionButtonStrip` and `SurfaceActionMenu`) with permission-aware cancel/dequeue/refresh behavior so desktop and thin-client surfaces reuse one action contract.
+
+## Story 15.2.3 update
+
+- Queue visibility now includes shared filter/list/detail seams in `src/ui/shared/operations/OperationalQueueMonitoringPanels.tsx` with explicit queue row models, queue visibility scope filters, and responsive table-card rendering.
+- `RunPage` now applies queue visibility scopes to authoritative queue list reads and composes queue detail selection with shared action descriptors for permitted queue/run actions.
+- Queue action flows (`refresh`, `cancel`, `dequeue`, `inspect`) now run through shared action wrappers so desktop and thin-client operational surfaces preserve one permission-aware queue interaction model.
