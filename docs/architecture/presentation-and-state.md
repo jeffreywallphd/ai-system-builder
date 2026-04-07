@@ -157,6 +157,11 @@ The current store-and-service approach is a good fit for that level of interacti
 
 The clean-architecture story would be simpler if the renderer reused the generic container/bootstrap directly, but the current UI composition is hand-written and host-aware. This gives the renderer a lot of flexibility, but also means architecture understanding depends heavily on reading `createUiDependencies.ts`.
 
+## Multi-surface composition baseline (Feature 15 / Epic 15.1 / Story 15.1.1)
+
+- Canonical multi-surface UI layering, folder responsibilities, and page-shell guardrails now live in `docs/architecture/multi-surface-ui-composition-foundation.md`.
+- New desktop, thin-client, tablet, and mobile-responsive admin/operational UI stories should follow that baseline to keep shared presentation logic centralized and host/runtime concerns isolated.
+
 - Phase 9.1 introduces the first bounded Studio Shell renderer surface (`src/ui/pages/StudioShellPage.tsx`) built from reusable panel primitives (`src/ui/components/studio-shell/StudioShellPanel.tsx`) and a thin desktop bridge-backed service (`src/ui/services/StudioShellService.ts`).
 - Studio Shell validation/error UX is backend-authoritative via `StudioShellBackendApi` snapshot/validation contracts (`validationIssues` + typed operation error codes); the page only renders those payloads and does not implement taxonomy/contract/provenance/dependency/lifecycle/version business rules locally.
 - Phase 9.2 adds a bounded Studio Shell extension seam in the renderer (`src/ui/studio-shell/StudioShellExtensions.ts`) with typed `StudioRegistration` (`kind`, semantic role, allowed behavior options, defaults, shell presentation hints, slot contributions) so atomic and composite studios register through the same shell model.
