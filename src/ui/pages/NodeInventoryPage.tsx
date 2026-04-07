@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   NodeApprovalStatuses,
   NodeEnrollmentRequestStatuses,
@@ -30,6 +30,13 @@ import {
   toSurfacePresentationStateFromApiError,
   type SurfacePresentationState,
 } from "../shared/components/presentation-state";
+import {
+  SurfaceActionButtonStrip,
+  SurfaceActionMenu,
+  createSurfaceActionContext,
+  type SurfaceActionContext,
+  type SurfaceActionDescriptor,
+} from "../shared/actions";
 
 interface NodeInventoryPageProps {
   readonly service?: NodeInventoryService;
@@ -61,6 +68,7 @@ const defaultFilters: InventoryFilterState = Object.freeze({
 });
 
 export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): JSX.Element {
+  const navigate = useNavigate();
   const service = useMemo(() => props.service ?? new NodeInventoryService(), [props.service]);
   const sessionStore = useMemo(() => props.sessionStore ?? new IdentityAuthSessionStore(), [props.sessionStore]);
   const [session] = useState(() => sessionStore.getSession());
@@ -84,7 +92,26 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   const [revocationNote, setRevocationNote] = useState("");
   const [revocationConfirmationNodeId, setRevocationConfirmationNodeId] = useState("");
 
-  const selectedNode = nodes.find((node) => node.nodeId === selectedNodeId);
+  const actorPermissionIds = useMemo(
+    () => Object.freeze(["node.inventory.view", "node.inventory.refresh", "node.trust.revoke"]),
+    [],
+  );
+  const buildBaseActionContext = useCallback(
+    (input: {
+      readonly resource?: unknown;
+      readonly selection?: unknown;
+      readonly meta?: unknown;
+      readonly surfaceCapabilities?: ReadonlyArray<string>;
+    }): SurfaceActionContext => createSurfaceActionContext({
+      actorPermissionIds,
+      surface: "desktop",
+      surfaceCapabilities: input.surfaceCapabilities ?? Object.freeze(["inline-actions", "menu-actions", "confirmations"]),
+      resource: input.resource,
+      selection: input.selection,
+      meta: input.meta,
+    }),
+    [actorPermissionIds],
+  );
 
   const loadDetail = async (nodeId: string): Promise<void> => {
     if (!sessionToken) {
@@ -177,6 +204,84 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     }
   };
 
+  const executeNodeRevocation = useCallback(async (node: NodeInventoryDetailDto): Promise<void> => {
+    if (!sessionToken) {
+      return;
+    }
+    if (revocationConfirmationNodeId.trim() !== node.nodeId) {
+      setErrorMessage("Type the exact node id to confirm revocation.");
+      return;
+    }
+    setIsRevoking(true);
+    setErrorMessage(undefined);
+    setStatusMessage(undefined);
+    try {
+      const response = await service.revokeNodeTrust({
+        nodeId: node.nodeId,
+        reason: revocationReason,
+        note: revocationNote.trim() || undefined,
+      }, sessionToken);
+      if (!response.ok || !response.data) {
+        setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
+        return;
+      }
+      setStatusMessage(
+        `Revoked "${response.data.node.displayName}" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`,
+      );
+      await refresh(node.nodeId);
+    } catch {
+      setErrorMessage("Node trust revocation request failed.");
+    } finally {
+      setIsRevoking(false);
+    }
+  }, [
+    refresh,
+    revocationConfirmationNodeId,
+    revocationNote,
+    revocationReason,
+    service,
+    sessionToken,
+  ]);
+
+  const pageActions = useMemo<ReadonlyArray<SurfaceActionDescriptor>>(
+    () => Object.freeze([
+      {
+        id: "node-inventory-back-to-settings",
+        label: "Back to settings",
+        scope: "page",
+        tone: "secondary",
+        priority: 10,
+        onInvoke: () => {
+          navigate(ROUTE_PATHS.settings);
+        },
+      },
+      {
+        id: "node-inventory-refresh",
+        label: isLoadingInventory ? "Refreshing..." : "Refresh",
+        scope: "page",
+        tone: "secondary",
+        requiredPermissions: Object.freeze(["node.inventory.refresh"]),
+        priority: 20,
+        availability: () => (isLoadingInventory
+          ? Object.freeze({ disabled: true, disabledReason: "Inventory refresh is already in progress." })
+          : Object.freeze({})),
+        telemetry: Object.freeze({ eventName: "ui.nodeInventory.refresh" }),
+        onInvoke: async () => {
+          await refresh();
+        },
+      },
+    ]),
+    [isLoadingInventory, navigate, refresh],
+  );
+
+  const pageActionContext = useMemo(
+    () => buildBaseActionContext({
+      selection: Object.freeze({ selectedNodeId }),
+      meta: Object.freeze({ isLoadingInventory }),
+    }),
+    [buildBaseActionContext, isLoadingInventory, selectedNodeId],
+  );
+
   useEffect(() => {
     if (!sessionToken) {
       return;
@@ -215,19 +320,12 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             trust metadata before scheduling, revocation, or certificate lifecycle actions.
           </p>
         </div>
-        <div className="ui-page__actions">
-          <Link className="ui-button ui-button--secondary ui-button--sm" to={ROUTE_PATHS.settings}>Back to settings</Link>
-          <button
-            type="button"
-            className="ui-button ui-button--secondary ui-button--sm"
-            disabled={isLoadingInventory}
-            onClick={() => {
-              void refresh();
-            }}
-          >
-            Refresh
-          </button>
-        </div>
+        <SurfaceActionButtonStrip
+          actions={pageActions}
+          context={pageActionContext}
+          scope="page"
+          className="ui-page__actions"
+        />
       </div>
 
       {errorMessage ? <p className="ui-node-inventory-page__alert ui-node-inventory-page__alert--error" role="alert">{errorMessage}</p> : null}
@@ -400,6 +498,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                       <th scope="col">Approval</th>
                       <th scope="col">Capabilities</th>
                       <th scope="col">Last seen</th>
+                      <th scope="col">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -427,6 +526,33 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                         <td><span className={`ui-badge ${approvalStatusBadgeClass(node.approvalStatus)}`}>{node.approvalStatus}</span></td>
                         <td>{formatCapabilities(node.capabilityProfile)}</td>
                         <td>{formatTimestamp(node.lastSeen?.lastSeenAt) ?? "Never"}</td>
+                        <td>
+                          <SurfaceActionMenu
+                            triggerLabel="Row actions"
+                            actions={Object.freeze([{
+                              id: `node-row-inspect:${node.nodeId}`,
+                              label: "Inspect node",
+                              scope: "row",
+                              tone: "secondary",
+                              availability: () => (isLoadingInventory
+                                ? Object.freeze({ disabled: true, disabledReason: "Inventory list is refreshing." })
+                                : Object.freeze({})),
+                              telemetry: Object.freeze({ eventName: "ui.nodeInventory.inspectRow" }),
+                              onInvoke: async () => {
+                                setSelectedNodeId(node.nodeId);
+                                setErrorMessage(undefined);
+                                await loadDetail(node.nodeId);
+                              },
+                            } satisfies SurfaceActionDescriptor])}
+                            context={buildBaseActionContext({
+                              resource: node,
+                              selection: Object.freeze({ selectedNodeId }),
+                              meta: Object.freeze({ isLoadingInventory }),
+                              surfaceCapabilities: Object.freeze(["menu-actions"]),
+                            })}
+                            scope="row"
+                          />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -595,46 +721,49 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                           />
                         </label>
                         <div className="ui-page__actions">
-                          <button
-                            type="button"
-                            className="ui-button ui-button--danger ui-button--sm"
-                            disabled={isRevoking || revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId}
-                            onClick={() => {
-                              if (!sessionToken) {
-                                return;
-                              }
-                              if (revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId) {
-                                setErrorMessage("Type the exact node id to confirm revocation.");
-                                return;
-                              }
-                              setIsRevoking(true);
-                              setErrorMessage(undefined);
-                              setStatusMessage(undefined);
-                              void (async () => {
-                                try {
-                                  const response = await service.revokeNodeTrust({
-                                    nodeId: selectedNodeDetail.nodeId,
-                                    reason: revocationReason,
-                                    note: revocationNote.trim() || undefined,
-                                  }, sessionToken);
-                                  if (!response.ok || !response.data) {
-                                    setErrorMessage(response.error?.message ?? "Unable to revoke node trust.");
-                                    return;
-                                  }
-                                  setStatusMessage(
-                                    `Revoked "${response.data.node.displayName}" at ${formatTimestamp(response.data.node.revocation.revokedAt) ?? "current time"}.`,
-                                  );
-                                  await refresh(selectedNodeDetail.nodeId);
-                                } catch {
-                                  setErrorMessage("Node trust revocation request failed.");
-                                } finally {
-                                  setIsRevoking(false);
+                          <SurfaceActionButtonStrip
+                            scope="bulk"
+                            actions={Object.freeze([{
+                              id: "node-detail-revoke-trust",
+                              label: isRevoking ? "Revoking..." : "Revoke node trust",
+                              scope: "bulk",
+                              tone: "danger",
+                              requiredPermissions: Object.freeze(["node.trust.revoke"]),
+                              requiredSurfaceCapabilities: Object.freeze(["confirmations"]),
+                              telemetry: Object.freeze({
+                                eventName: "ui.nodeInventory.revokeTrust",
+                                auditCategory: "node-trust-administration",
+                              }),
+                              confirmation: Object.freeze({
+                                title: "Revoke trusted node?",
+                                message: `Revoke trust for ${selectedNodeDetail.displayName} (${selectedNodeDetail.nodeId}). This action is administrative and should follow your incident/change process.`,
+                                confirmLabel: "Revoke node trust",
+                                cancelLabel: "Cancel",
+                                tone: "danger",
+                              }),
+                              availability: () => {
+                                if (isRevoking) {
+                                  return Object.freeze({ disabled: true, disabledReason: "A revocation request is already running." });
                                 }
-                              })();
-                            }}
-                          >
-                            {isRevoking ? "Revoking..." : "Revoke node trust"}
-                          </button>
+                                if (revocationConfirmationNodeId.trim() !== selectedNodeDetail.nodeId) {
+                                  return Object.freeze({
+                                    disabled: true,
+                                    disabledReason: "Type the exact node id in the confirmation field.",
+                                  });
+                                }
+                                return Object.freeze({});
+                              },
+                              onInvoke: async () => {
+                                await executeNodeRevocation(selectedNodeDetail);
+                              },
+                            } satisfies SurfaceActionDescriptor])}
+                            context={buildBaseActionContext({
+                              resource: selectedNodeDetail,
+                              selection: Object.freeze({ selectedNodeId }),
+                              meta: Object.freeze({ isRevoking, revocationConfirmationNodeId }),
+                              surfaceCapabilities: Object.freeze(["inline-actions", "confirmations"]),
+                            })}
+                          />
                         </div>
                         <p className="ui-text-secondary ui-text-small">
                           Revoked nodes remain visible in inventory and are blocked from active trusted participation.
@@ -752,4 +881,5 @@ function approvalStatusBadgeClass(status: NodeInventorySummaryDto["approvalStatu
       return "ui-badge--neutral";
   }
 }
+
 
