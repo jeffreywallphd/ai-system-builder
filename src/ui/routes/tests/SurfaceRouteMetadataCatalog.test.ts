@@ -35,6 +35,8 @@ describe("Surface route metadata catalog", () => {
     expect(routes.some((route) => route.key === "workspace-thin-membership")).toBeTrue();
     expect(routes.some((route) => route.key === "trusted-devices")).toBeTrue();
     expect(routes.some((route) => route.key === "governance-review-thin")).toBeTrue();
+    expect(routes.some((route) => route.key === "node-inventory")).toBeTrue();
+    expect(routes.some((route) => route.key === "node-enrollment-review")).toBeFalse();
     expect(routes.some((route) => route.key === "workspace-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "identity-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "governance-review")).toBeFalse();
@@ -53,6 +55,8 @@ describe("Surface route metadata catalog", () => {
 
     expect(routes.some((route) => route.key === "security-policy")).toBeTrue();
     expect(routes.some((route) => route.key === "governance-review")).toBeTrue();
+    expect(routes.some((route) => route.key === "workspace-admin")).toBeTrue();
+    expect(routes.some((route) => route.key === "node-enrollment-review")).toBeTrue();
   });
 
   it("derives command palette entries from centralized route metadata", () => {

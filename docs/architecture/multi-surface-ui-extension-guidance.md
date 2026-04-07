@@ -150,6 +150,23 @@ When extending admin/operational screens, keep these suites updated as relevant:
   - `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx`
   - update affected dashboard/run/queue shared-surface suites to assert live/stale/reconnecting/disconnected rendering behavior
 
+Story 15.3.8 final admin/admin-lite baseline additionally requires representative coverage for:
+
+- workspace administration flow validation:
+  - `src/ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
+- trusted-device and session oversight boundaries:
+  - `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
+- node approval and node inventory boundaries:
+  - `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
+  - `src/ui/pages/tests/NodeInventoryPage.test.tsx`
+- security/policy selection and editability boundaries:
+  - `src/ui/pages/tests/SecurityPolicyConfigurationPage.test.tsx`
+- governance/audit query normalization and thin-safe behavior:
+  - `src/ui/shared/admin/tests/GovernanceAuditReviewModel.test.ts`
+- strict route metadata and access policy enforcement:
+  - `src/ui/routes/tests/SurfaceRouteMetadataCatalog.test.ts`
+  - `src/ui/routes/tests/SurfaceRouteAccessPolicy.test.ts`
+
 ## Related docs
 
 - `docs/architecture/multi-surface-ui-composition-foundation.md`

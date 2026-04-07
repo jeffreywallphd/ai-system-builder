@@ -60,6 +60,11 @@ Trusted-device UI now includes active session visibility and revocation controls
 3. Select a session to view channel, trust state, assurance, issue/expiry, and redacted device/trust binding identifiers.
 4. End a selected session with explicit confirmation when the session should no longer remain valid.
 
+Admin-lite boundary hardening:
+
+- non-admin thin/admin-lite sessions can only revoke trusted devices and sessions tied to their own `userIdentityId`.
+- cross-identity revocation remains admin-only and is blocked in UI before API calls.
+
 API paths used by self-service session oversight:
 
 - `GET /api/v1/identity/sessions?status=<optional>&accessChannel=<optional>`

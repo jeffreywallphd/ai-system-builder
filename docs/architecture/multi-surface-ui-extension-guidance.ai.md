@@ -54,3 +54,14 @@ See `docs/architecture/multi-surface-ui-extension-guidance.md`.
 ## Connectivity-state tests
 
 - Add or update connectivity-state rendering coverage in shared operational UI suites and include `src/ui/shared/tests/OperationalRealtimeIndicators.test.tsx` when extending operational realtime behavior.
+
+## Story 15.3.8 contributor regression baseline
+
+For admin/admin-lite changes, maintain representative coverage across these prioritized flows:
+
+- workspace administration: `src/ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
+- trusted device and session oversight boundaries: `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
+- node approval and inventory boundaries: `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`, `src/ui/pages/tests/NodeInventoryPage.test.tsx`
+- security-policy selection and read/write boundaries: `src/ui/pages/tests/SecurityPolicyConfigurationPage.test.tsx`
+- governance/audit query behavior: `src/ui/shared/admin/tests/GovernanceAuditReviewModel.test.ts`
+- strict route/surface gating: `src/ui/routes/tests/SurfaceRouteAccessPolicy.test.ts`, `src/ui/routes/tests/SurfaceRouteMetadataCatalog.test.ts`

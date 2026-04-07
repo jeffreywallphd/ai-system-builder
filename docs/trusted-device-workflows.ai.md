@@ -36,6 +36,9 @@ Renderer user-facing flow for trusted-device pairing and management.
   - admin session listing scoped by target identity
   - user/admin session revocation actions
   - redacted trust-sensitive identifier presentation (no trust marker exposure)
+- Admin-lite boundary hardening:
+  - non-admin thin/admin-lite sessions can only revoke trusted devices and sessions scoped to their own `userIdentityId`
+  - cross-identity revocation remains admin-only and is blocked in UI before transport calls
 - Admin flow supports:
   - trusted-device listing filtered by selected user and optional workspace id
   - administrative revocation through the same revoke use case path as self-service
