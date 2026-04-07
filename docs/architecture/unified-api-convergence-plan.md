@@ -79,3 +79,8 @@ These can remain implementation details as long as protected business actions fl
 - Inventory and plan are documented in architecture docs and tied to concrete source entry points.
 - Each target API domain has an identified shared contract home (existing or proposed path under `src/shared/contracts` or `src/shared/schemas`).
 - Violating raw/direct access pathways are explicitly enumerated for migration.
+
+## Follow-on governance docs
+
+- Production-facing extension and prohibition rules for future work are documented in `docs/architecture/unified-api-authoritative-surface.md` (Story 14.1.8).
+- Contributor execution checklist is documented in `docs/unified-api-contributor-guide.md`.
