@@ -19,6 +19,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-audit-operational-hooks.md`
 - `docs/architecture/run-orchestration-scheduling-realtime-event-publication.md`
 - `docs/architecture/run-orchestration-scheduling-observability-metrics-and-redaction.md`
+- `docs/architecture/run-orchestration-scheduling-deployment-profile-policy-seams.md`
 - `docs/architecture/run-orchestration-scheduling-architecture-extension-guidance.md`
 - `docs/architecture/run-orchestration-scheduling-authoritative-queue-selection-and-assignment-integration.md`
 - `docs/architecture/run-orchestration-scheduling-reservation-aware-node-arbitration-and-placement-holds.md`

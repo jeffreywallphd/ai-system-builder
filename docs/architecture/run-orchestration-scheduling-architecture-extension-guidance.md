@@ -18,6 +18,7 @@ Document the production scheduling architecture as implemented today, make curre
   - `src/application/scheduling/AuthoritativeSchedulingDecisionPipeline.ts`
 - Scheduling policy rule contracts and ordered rule-pipeline implementation
   - `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts`
+  - `src/application/scheduling/ports/SchedulingPolicyProfilePorts.ts`
   - `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`
 - Authoritative policy evaluation and arbitration orchestration
   - `src/application/scheduling/use-cases/EvaluateAuthoritativeSchedulingPolicyUseCase.ts`
@@ -86,6 +87,7 @@ After eligibility gating:
 - Reservation time windows/calendars are not implemented; only ownership conflict checks are enforced.
 - Affinity behavior is basic preference filtering, not weighted multi-objective scoring.
 - Deployment-profile behavior is limited to snapshot metadata and optional affinity matching.
+- Deployment-profile context/rule wiring seams are present, but classroom/organization policy variants are not implemented yet.
 - Rich resource arbitration (GPU/CPU/memory pressure, cost, fairness balancing) is not implemented.
 - Scheduling outcomes are explainable and source-traceable but are not by themselves dispatch mutations.
 

@@ -4,12 +4,15 @@ import { NodeRoleCapabilities, NodeTypes } from "@domain/nodes/NodeTrustDomain";
 import {
   SchedulingCandidateDenialCodes,
   SchedulingNodeUsageModes,
+  SchedulingPolicySourceKinds,
   type SchedulingPolicyReason,
 } from "@domain/scheduling/SchedulingDomain";
 import type {
   ISchedulingPolicyRule,
   SchedulingPolicyRuleContext,
 } from "@application/scheduling/ports/SchedulingPolicyRulePorts";
+import type { ISchedulingPolicyRuleSetProvider } from "@application/scheduling/ports/SchedulingPolicyProfilePorts";
+import type { SchedulingEvaluationSnapshot } from "@shared/contracts/runtime/SchedulingPolicyEvaluationContracts";
 import { EvaluateAuthoritativeSchedulingPolicyUseCase } from "../use-cases/EvaluateAuthoritativeSchedulingPolicyUseCase";
 
 function createSnapshot() {
@@ -96,6 +99,22 @@ class OrderedTrackingRule implements ISchedulingPolicyRule {
     return Object.freeze({
       allowed: reasons.length === 0,
       reasons,
+    });
+  }
+}
+
+class TrackingRuleSetProvider implements ISchedulingPolicyRuleSetProvider {
+  public readonly observedDeploymentProfiles: string[] = [];
+
+  public constructor(private readonly rules: ReadonlyArray<ISchedulingPolicyRule>) {}
+
+  public resolveRuleSet(input: { readonly snapshot: SchedulingEvaluationSnapshot }) {
+    if (input.snapshot.deploymentProfileId) {
+      this.observedDeploymentProfiles.push(input.snapshot.deploymentProfileId);
+    }
+    return Object.freeze({
+      rules: this.rules,
+      policySources: Object.freeze([SchedulingPolicySourceKinds.futureQuotaPolicy]),
     });
   }
 }
@@ -192,6 +211,43 @@ describe("EvaluateAuthoritativeSchedulingPolicyUseCase", () => {
     const pipelineReason = bundle.decision.reasons.find((reason) => reason.code === "rule-pipeline-evaluated");
     expect(pipelineReason?.details).toEqual(Object.freeze({
       ruleOrder: Object.freeze(["rule:first", "rule:deny-viewer"]),
+      candidateCount: 2,
+      eligibleCandidateCount: 1,
+      affinityPreferredCandidateCount: 1,
+    }));
+  });
+
+  it("supports deployment-profile-aware rule-set providers without changing baseline evaluator wiring", async () => {
+    const visited: string[] = [];
+    const ruleSetProvider = new TrackingRuleSetProvider(Object.freeze([
+      new OrderedTrackingRule("rule:profile-seam", visited, (input) => (
+        input.run.runId === "run:viewer"
+          ? Object.freeze([Object.freeze({
+            code: SchedulingCandidateDenialCodes.policyDenied,
+            message: "Deployment-profile rule denied the candidate.",
+          })])
+          : Object.freeze([])
+      )),
+    ]));
+    const useCase = new EvaluateAuthoritativeSchedulingPolicyUseCase({
+      now: () => new Date("2026-04-07T20:00:01.000Z"),
+      decisionIdFactory: () => "decision:profile-seam",
+      ruleSetProvider,
+    });
+
+    const bundle = await useCase.evaluate(createSnapshot());
+
+    expect(ruleSetProvider.observedDeploymentProfiles).toEqual(["profile:production"]);
+    expect(visited).toEqual([
+      "rule:profile-seam",
+      "rule:profile-seam",
+    ]);
+    expect(bundle.decision.evaluatedCandidates.find((candidate) => candidate.runId === "run:viewer")?.eligible).toBeFalse();
+    expect(bundle.decision.policySources).toContain(SchedulingPolicySourceKinds.deploymentProfile);
+    expect(bundle.decision.policySources).toContain(SchedulingPolicySourceKinds.futureQuotaPolicy);
+    const pipelineReason = bundle.decision.reasons.find((reason) => reason.code === "rule-pipeline-evaluated");
+    expect(pipelineReason?.details).toEqual(Object.freeze({
+      ruleOrder: Object.freeze(["rule:profile-seam"]),
       candidateCount: 2,
       eligibleCandidateCount: 1,
       affinityPreferredCandidateCount: 1,

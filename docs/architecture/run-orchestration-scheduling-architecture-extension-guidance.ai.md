@@ -10,6 +10,7 @@ Story 17.1.8 documents the production scheduling architecture baseline, current 
 - `src/domain/scheduling/SchedulingDomain.ts`
 - `src/application/scheduling/AuthoritativeSchedulingDecisionPipeline.ts`
 - `src/application/scheduling/ports/SchedulingPolicyRulePorts.ts`
+- `src/application/scheduling/ports/SchedulingPolicyProfilePorts.ts`
 - `src/application/scheduling/use-cases/SchedulingPolicyRulePipeline.ts`
 - `src/application/scheduling/use-cases/EvaluateAuthoritativeSchedulingPolicyUseCase.ts`
 - `src/application/scheduling/use-cases/RolePrioritySchedulingArbitration.ts`
@@ -32,6 +33,7 @@ Story 17.1.8 documents the production scheduling architecture baseline, current 
 - No reservation calendar-window policy yet.
 - No rich resource/cost/fairness arbitration yet.
 - Deployment profile is metadata + basic affinity matching only.
+- Deployment-profile policy seams exist (context + rule-set provider), but classroom/organization variants are not yet implemented.
 
 ## Extension rules
 - Add new policy checks as `ISchedulingPolicyRule` implementations and compose them in ordered pipeline construction.

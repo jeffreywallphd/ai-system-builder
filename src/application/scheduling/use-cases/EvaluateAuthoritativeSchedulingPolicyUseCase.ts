@@ -13,6 +13,7 @@ import {
   SchedulingPolicySourceKinds,
   type SchedulingCandidateDecision,
   type SchedulingPolicyReason,
+  type SchedulingPolicySourceKind,
 } from "@domain/scheduling/SchedulingDomain";
 import {
   DefaultSchedulingPolicyRules,
@@ -30,31 +31,42 @@ import type {
   ISchedulingCandidateScorePolicy,
   ISchedulingPolicyRule,
 } from "@application/scheduling/ports/SchedulingPolicyRulePorts";
+import type {
+  ISchedulingPolicyRuleSetProvider,
+  SchedulingPolicyRuleSetDefinition,
+} from "@application/scheduling/ports/SchedulingPolicyProfilePorts";
 
 interface EvaluateAuthoritativeSchedulingPolicyUseCaseDependencies {
   readonly now?: () => Date;
   readonly decisionIdFactory?: () => string;
   readonly scorePolicy?: ISchedulingCandidateScorePolicy;
   readonly rules?: ReadonlyArray<ISchedulingPolicyRule>;
+  readonly ruleSetProvider?: ISchedulingPolicyRuleSetProvider;
 }
 
 export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritativeSchedulingPolicyEvaluator {
   private readonly now: () => Date;
   private readonly decisionIdFactory: () => string;
-  private readonly rulePipeline: SchedulingPolicyRulePipeline;
+  private readonly defaultScorePolicy: ISchedulingCandidateScorePolicy;
+  private readonly defaultRules: ReadonlyArray<ISchedulingPolicyRule>;
+  private readonly ruleSetProvider?: ISchedulingPolicyRuleSetProvider;
 
   public constructor(dependencies: EvaluateAuthoritativeSchedulingPolicyUseCaseDependencies = {}) {
     this.now = dependencies.now ?? (() => new Date());
     this.decisionIdFactory = dependencies.decisionIdFactory ?? (() => randomUUID());
-    this.rulePipeline = new SchedulingPolicyRulePipeline(
-      dependencies.scorePolicy ?? new RolePriorityQueueAgeSchedulingScorePolicy(),
-      dependencies.rules ?? DefaultSchedulingPolicyRules,
-    );
+    this.defaultScorePolicy = dependencies.scorePolicy ?? new RolePriorityQueueAgeSchedulingScorePolicy();
+    this.defaultRules = dependencies.rules ?? DefaultSchedulingPolicyRules;
+    this.ruleSetProvider = dependencies.ruleSetProvider;
   }
 
   public async evaluate(snapshot: SchedulingEvaluationSnapshot): Promise<SchedulingDecisionBundle> {
     const occurredAt = this.now().toISOString();
-    const evaluatedCandidates = await this.evaluateCandidates(snapshot);
+    const resolvedRuleSet = await this.resolveRuleSet(snapshot);
+    const rulePipeline = new SchedulingPolicyRulePipeline(
+      resolvedRuleSet.scorePolicy ?? this.defaultScorePolicy,
+      resolvedRuleSet.rules ?? this.defaultRules,
+    );
+    const evaluatedCandidates = await this.evaluateCandidates(snapshot, rulePipeline);
     const orderedEvaluatedCandidates = orderRolePrioritySchedulingCandidates(evaluatedCandidates);
     const eligibleCandidates = orderedEvaluatedCandidates.filter((candidate) => candidate.eligible);
     const affinityPreference = applyBasicPlacementAffinityPreference({
@@ -73,7 +85,7 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
         code: "rule-pipeline-evaluated",
         message: "Scheduling policy rules were evaluated in configured order.",
         details: Object.freeze({
-          ruleOrder: this.rulePipeline.getRuleOrder(),
+          ruleOrder: rulePipeline.getRuleOrder(),
           candidateCount: orderedEvaluatedCandidates.length,
           eligibleCandidateCount: eligibleCandidates.length,
           affinityPreferredCandidateCount: rankedCandidates.length,
@@ -110,13 +122,17 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
       ));
     }
 
-    const policySources = Object.freeze([
+    const basePolicySources = Object.freeze([
       SchedulingPolicySourceKinds.runSubmission,
       SchedulingPolicySourceKinds.workspaceMembershipRoles,
       SchedulingPolicySourceKinds.nodeTrustInventory,
       SchedulingPolicySourceKinds.activeReservations,
       ...(snapshot.deploymentProfileId ? [SchedulingPolicySourceKinds.deploymentProfile] : []),
     ]);
+    const policySources = collectPolicySources({
+      basePolicySources,
+      extendedPolicySources: resolvedRuleSet.policySources,
+    });
 
     const decision = createSchedulingPolicyDecision({
       decisionId: this.decisionIdFactory(),
@@ -154,14 +170,26 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
     });
   }
 
-  private async evaluateCandidates(snapshot: SchedulingEvaluationSnapshot): Promise<ReadonlyArray<SchedulingCandidateDecision>> {
+  private async resolveRuleSet(snapshot: SchedulingEvaluationSnapshot): Promise<SchedulingPolicyRuleSetDefinition> {
+    if (!this.ruleSetProvider) {
+      return Object.freeze({});
+    }
+    return this.ruleSetProvider.resolveRuleSet({
+      snapshot,
+    });
+  }
+
+  private async evaluateCandidates(
+    snapshot: SchedulingEvaluationSnapshot,
+    rulePipeline: SchedulingPolicyRulePipeline,
+  ): Promise<ReadonlyArray<SchedulingCandidateDecision>> {
     const results: SchedulingCandidateDecision[] = [];
     const orderedRuns = [...snapshot.runs].sort((left, right) => left.runId.localeCompare(right.runId));
     const orderedNodes = [...snapshot.nodes].sort((left, right) => left.nodeId.localeCompare(right.nodeId));
 
     for (const run of orderedRuns) {
       for (const node of orderedNodes) {
-        const evaluated = await this.rulePipeline.evaluateCandidate({
+        const evaluated = await rulePipeline.evaluateCandidate({
           asOf: snapshot.asOf,
           run,
           node,
@@ -172,4 +200,16 @@ export class EvaluateAuthoritativeSchedulingPolicyUseCase implements IAuthoritat
 
     return Object.freeze(results.sort(compareRolePrioritySchedulingCandidates));
   }
+}
+
+function collectPolicySources(input: {
+  readonly basePolicySources: ReadonlyArray<SchedulingPolicySourceKind>;
+  readonly extendedPolicySources?: ReadonlyArray<SchedulingPolicySourceKind>;
+}): ReadonlyArray<SchedulingPolicySourceKind> {
+  return Object.freeze([
+    ...new Set([
+      ...input.basePolicySources,
+      ...(input.extendedPolicySources ?? []),
+    ]),
+  ]);
 }
