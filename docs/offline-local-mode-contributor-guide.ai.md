@@ -16,6 +16,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 2. Domain offline boundary catalog and policy model.
 3. Application classification/resynchronization/cache seams.
 4. Desktop host profile + offline cache runtime gating.
+   - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
 
@@ -38,4 +39,5 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 ## Test and doc checklist
 
 - update relevant offline tests across domain/application/host/shared contract modules;
+- include desktop connectivity-state transition coverage in host tests when connectivity semantics change;
 - keep `.md` and `.ai.md` offline docs paired and updated together.

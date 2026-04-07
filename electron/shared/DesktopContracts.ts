@@ -201,6 +201,11 @@ export interface DesktopMcpSecretBridge {
   removeSecret(key: string): void;
 }
 
+export interface DesktopConnectivityBridge {
+  getConnectivityState(): Promise<string>;
+  setOfflineMode(requestJson: string): Promise<string>;
+}
+
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
@@ -213,4 +218,5 @@ export interface DesktopBridge {
   readonly agents?: DesktopAgentAuthoringBridge;
   readonly studioShell?: DesktopStudioShellBridge;
   readonly registry?: DesktopRegistryBridge;
+  readonly connectivity?: DesktopConnectivityBridge;
 }

@@ -187,10 +187,13 @@ The most natural next architectural steps are:
   - `src/domain/platform/OfflineLocalModeBoundaries.ts`
   - `src/application/common/OfflineLocalModeResynchronization.ts`
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - Canonical architecture note:
   - `docs/architecture/offline-local-mode-authority-boundaries.md`
 - Core posture:
   - desktop can cache/view/edit selected resources and queue explicit mutation envelopes while disconnected,
+  - desktop connectivity transitions are host-owned and explicit (`connected`, `degraded`, `reconnecting`, `disconnected`) using transport/session/trust probes,
+  - deliberate offline local-mode intent is distinct from transient reconnecting transport failures,
   - authoritative control-plane truth remains server-owned,
   - reconnect requires explicit apply/conflict/reject reconciliation outcomes and prohibits silent global divergence.
 

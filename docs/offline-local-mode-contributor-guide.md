@@ -22,6 +22,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - desktop host local-mode binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - desktop persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
@@ -112,6 +113,7 @@ At minimum, update:
 - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
 - `src/application/common/tests/OfflineAuthoritativeSnapshotCache.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`
+- `src/hosts/desktop/tests/DesktopConnectivityStateService.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineSnapshotCacheHost.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflineSnapshotCacheRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`

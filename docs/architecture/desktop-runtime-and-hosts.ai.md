@@ -66,11 +66,14 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
   - `src/domain/platform/OfflineLocalModeBoundaries.ts`
   - `src/application/common/OfflineLocalModeResynchronization.ts`
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - Canonical architecture note for this slice:
   - `docs/architecture/offline-local-mode-authority-boundaries.md`
 - Boundary stance:
   - desktop remains control-plane client only,
   - offline cache/draft/queued mutation/ephemeral local state are explicitly separated,
+  - connectivity transitions are host-owned and explicit (`connected`, `degraded`, `reconnecting`, `disconnected`) from transport/session/trust/offline-intent probes,
+  - deliberate offline mode is distinguished from transient transport reconnecting states through structured reason metadata,
   - reconnect decisions are explicit (`apply`, `conflict`, `reject`) and no-silent-divergence is enforced.
 
 ## AI Loom image manipulation update: runtime launch window contract and host flow (stories 8.1-8.2)

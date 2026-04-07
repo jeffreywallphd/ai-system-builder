@@ -307,6 +307,14 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
       return ipcRenderer.invoke("ai-loom-desktop-registry:traverse-downstream", queryJson) as Promise<string>;
     },
   },
+  connectivity: {
+    getConnectivityState() {
+      return ipcRenderer.invoke("ai-loom-desktop-connectivity:get-state") as Promise<string>;
+    },
+    setOfflineMode(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-connectivity:set-offline-mode", requestJson) as Promise<string>;
+    },
+  },
   agents: {
     createAgent(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-agents:create", requestJson) as Promise<string>;

@@ -2,6 +2,7 @@ import type {
   DesktopAgentAuthoringBridge,
   DesktopBootstrapContext,
   DesktopCanonicalAssetBridge,
+  DesktopConnectivityBridge,
   DesktopExecutionRunBridge,
   DesktopModelFileBridge,
   DesktopRegistryBridge,
@@ -35,6 +36,7 @@ declare global {
       agents?: DesktopAgentAuthoringBridge;
       studioShell?: DesktopStudioShellBridge;
       registry?: DesktopRegistryBridge;
+      connectivity?: DesktopConnectivityBridge;
     };
   }
 }
