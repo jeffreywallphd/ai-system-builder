@@ -22,6 +22,7 @@ export const AuthoritativeServerRequiredRouteFamilyIds = Object.freeze([
   "asset-management",
   "run-submission",
   "run-read",
+  "run-mutation",
   "run-execution-update",
 ]);
 
@@ -40,6 +41,7 @@ export function composeAuthoritativeServerApiRouteRegistrationPlan(): Authoritat
       [AuthoritativeApiRouteBackendKeys.systemRuntime]: false,
       [AuthoritativeApiRouteBackendKeys.runSubmission]: true,
       [AuthoritativeApiRouteBackendKeys.runRead]: true,
+      [AuthoritativeApiRouteBackendKeys.runMutation]: true,
       [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]: true,
     }),
   });

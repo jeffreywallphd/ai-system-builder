@@ -22,6 +22,7 @@ import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/
 import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
 import type { AuthoritativeRunSubmissionBackendApi } from "../../../api/runs/AuthoritativeRunSubmissionBackendApi";
 import type { AuthoritativeRunQueryBackendApi } from "../../../api/runs/AuthoritativeRunQueryBackendApi";
+import type { AuthoritativeRunMutationBackendApi } from "../../../api/runs/AuthoritativeRunMutationBackendApi";
 import type { AuthoritativeRunExecutionUpdateBackendApi } from "../../../api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import {
   ChangeLocalPasswordCredentialVerificationModes,
@@ -210,6 +211,7 @@ import {
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import {
   RunOrchestrationTransportSchemaValidationError,
+  parseRunCancellationRequest,
   parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
   parseRunSubmissionRequest,
@@ -884,6 +886,7 @@ export interface IdentityHttpServerOptions {
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
   readonly authoritativeRunQueryBackendApi?: AuthoritativeRunQueryBackendApi;
+  readonly authoritativeRunMutationBackendApi?: AuthoritativeRunMutationBackendApi;
   readonly authoritativeRunExecutionUpdateBackendApi?: AuthoritativeRunExecutionUpdateBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
@@ -4718,6 +4721,78 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               runId,
               workspaceId: context.workspace.workspaceId,
               actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunMutationBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/runtime/runs/")
+        && path.endsWith("/cancel")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/runtime/runs/", "/cancel");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAuthoritativeRunCancellationMutationRequest({
+              payload: parsedBody.value,
+              runId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunMutationBackendApi.cancelRun({
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+              cancellation: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              runId,
             }), apiResponse);
           },
         );
@@ -9591,6 +9666,49 @@ function parseAndValidateAuthoritativeRunExecutionUpdateMutationRequest(input: {
   }
 }
 
+function parseAndValidateAuthoritativeRunCancellationMutationRequest(input: {
+  readonly payload: unknown;
+  readonly runId: string;
+  readonly actorUserIdentityId: string;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseRunCancellationRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(input.payload);
+  try {
+    const parsed = parseRunCancellationRequest({
+      ...bodyRecord,
+      runId: input.runId,
+    });
+
+    if (parsed.requestedByActorId && parsed.requestedByActorId !== input.actorUserIdentityId) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse("cancellation.requestedByActorId must match authenticated actor."),
+      };
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        ...parsed,
+        runId: input.runId,
+        requestedByActorId: input.actorUserIdentityId,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Run cancellation payload is invalid."),
+      };
+    }
+    throw error;
+  }
+}
+
 function parseAndValidateRuntimeCancelRunMutationRequest(executionId: string, payload: unknown):
   | {
     readonly ok: true;
@@ -10112,6 +10230,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
     [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
     [AuthoritativeApiRouteBackendKeys.runRead]: Boolean(options.authoritativeRunQueryBackendApi),
+    [AuthoritativeApiRouteBackendKeys.runMutation]: Boolean(options.authoritativeRunMutationBackendApi),
     [AuthoritativeApiRouteBackendKeys.runExecutionUpdate]:
       Boolean(options.authoritativeRunExecutionUpdateBackendApi && options.nodeTrustBackendApi),
   });

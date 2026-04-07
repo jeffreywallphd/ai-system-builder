@@ -11,6 +11,18 @@ const architectureDocPath = path.join(
   "architecture",
   "run-orchestration-queue-assignment-dispatch-control-plane.md",
 );
+const cancellationDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md",
+);
+const cancellationAiDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "run-orchestration-authoritative-cancellation-workflow-and-state-matrix.ai.md",
+);
 const architectureAiDocPath = path.join(
   repoRoot,
   "docs",
@@ -26,6 +38,8 @@ describe("run orchestration control-plane documentation", () => {
   it("keeps architecture and contributor docs checked in with AI companion docs", () => {
     expect(existsSync(architectureDocPath)).toBeTrue();
     expect(existsSync(architectureAiDocPath)).toBeTrue();
+    expect(existsSync(cancellationDocPath)).toBeTrue();
+    expect(existsSync(cancellationAiDocPath)).toBeTrue();
     expect(existsSync(contributorDocPath)).toBeTrue();
     expect(existsSync(contributorAiDocPath)).toBeTrue();
   });
@@ -50,6 +64,7 @@ describe("run orchestration control-plane documentation", () => {
     expect(doc).toContain("## Required implementation path");
     expect(doc).toContain("## Extending scheduler policy");
     expect(doc).toContain("## Extending backend dispatch integrations");
+    expect(doc).toContain("## Extending cancellation orchestration");
     expect(doc).toContain("## Extending progress ingestion and finalization");
     expect(doc).toContain("## Invariants and non-negotiable boundaries");
     expect(doc).toContain("## Prohibited patterns");
@@ -64,14 +79,17 @@ describe("run orchestration control-plane documentation", () => {
       "src/application/runs/ports/RunOrchestrationPersistencePorts.ts",
       "src/application/runs/ports/RunAssignmentEligibilityPorts.ts",
       "src/application/runs/ports/RunExecutionDispatchPorts.ts",
+      "src/application/runs/ports/RunExecutionCancellationPorts.ts",
       "src/application/runs/use-cases/SelectAssignmentReadyRunsUseCase.ts",
       "src/application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase.ts",
       "src/application/runs/use-cases/DispatchAssignedRunExecutionUseCase.ts",
       "src/application/runs/use-cases/HandleRunDispatchResultUseCase.ts",
       "src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts",
+      "src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts",
       "src/application/runs/use-cases/FinalizeRunExecutionOutcomeUseCase.ts",
       "src/infrastructure/execution/runs/RunExecutionDispatchRouter.ts",
       "src/infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi.ts",
+      "src/infrastructure/api/runs/AuthoritativeRunMutationBackendApi.ts",
       "src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts",
     ];
 
@@ -85,8 +103,10 @@ describe("run orchestration control-plane documentation", () => {
     const readmeAi = readFileSync(architectureReadmeAiPath, "utf8");
 
     expect(readme).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
+    expect(readme).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
     expect(readme).toContain("../run-orchestration-contributor-guide.md");
     expect(readmeAi).toContain("run-orchestration-queue-assignment-dispatch-control-plane.md");
+    expect(readmeAi).toContain("run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
     expect(readmeAi).toContain("docs/run-orchestration-contributor-guide.md");
   });
 
@@ -96,6 +116,9 @@ describe("run orchestration control-plane documentation", () => {
 
     expect(architectureAiDoc).toContain("docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md");
     expect(architectureAiDoc).toContain("Scheduling policy decides which lease-claimed run/node pair should be attempted.");
+    const cancellationAiDoc = readFileSync(cancellationAiDocPath, "utf8");
+    expect(cancellationAiDoc).toContain("docs/architecture/run-orchestration-authoritative-cancellation-workflow-and-state-matrix.md");
+    expect(cancellationAiDoc).toContain("state-matrix");
     expect(contributorAiDoc).toContain("docs/run-orchestration-contributor-guide.md");
     expect(contributorAiDoc).toContain("Bypassing authoritative node claim use case before dispatch is prohibited.");
   });

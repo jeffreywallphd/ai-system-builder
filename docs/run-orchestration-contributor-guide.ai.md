@@ -24,6 +24,12 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Add backend mapping only through `IRunExecutionBackendAdapter` + router registration.
 - Route all outcomes through authoritative dispatch-result handling.
 
+## Cancellation extension guidance
+- Keep cancellation orchestration in `RequestAuthoritativeRunCancellationUseCase`.
+- Add backend cancellation integration only behind `IRunExecutionCancellationSignalPort`.
+- Keep lifecycle-position-dependent outcomes explicit (terminal cancel, cancelling request, terminal no-op).
+- Keep queue claim release/finalization coordination in application seams, not transport handlers.
+
 ## Prohibited patterns
 - Bypassing reservation claim semantics is prohibited.
 - Bypassing authoritative node claim use case before dispatch is prohibited.
