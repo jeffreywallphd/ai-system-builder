@@ -219,6 +219,72 @@ function createNoPlacementDecisionBundle(): SchedulingDecisionBundle {
   });
 }
 
+function createDuplicateNodeIntentDecisionBundle(): SchedulingDecisionBundle {
+  const snapshot = Object.freeze({
+    asOf: "2026-04-07T12:05:00.000Z",
+    queueLeases: Object.freeze([
+      Object.freeze({
+        runId: "run:1",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T12:00:00.000Z",
+        eligibleAt: "2026-04-07T12:00:00.000Z",
+        claimToken: "claim:1",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T12:06:00.000Z",
+      }),
+      Object.freeze({
+        runId: "run:2",
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T12:00:10.000Z",
+        eligibleAt: "2026-04-07T12:00:10.000Z",
+        claimToken: "claim:2",
+        claimOwner: "scheduler:alpha",
+        claimExpiresAt: "2026-04-07T12:06:00.000Z",
+      }),
+    ]),
+    runs: Object.freeze([]),
+    nodes: Object.freeze([]),
+  });
+  const decision = createSchedulingPolicyDecision({
+    decisionId: "decision:duplicate-node",
+    occurredAt: "2026-04-07T12:05:00.000Z",
+    outcome: SchedulingDecisionOutcomes.assignmentRecommended,
+    selected: Object.freeze({
+      runId: "run:1",
+      nodeId: "node:shared",
+      claimToken: "claim:1",
+      reservationOwner: "scheduler:alpha",
+    }),
+    evaluatedCandidates: [],
+    policySources: [SchedulingPolicySourceKinds.activeReservations],
+  });
+
+  return createSchedulingDecisionBundle({
+    snapshot,
+    decision,
+    assignmentIntents: Object.freeze([
+      Object.freeze({
+        runId: "run:2",
+        nodeId: "node:shared",
+        queueId: "queue:default",
+        claimToken: "claim:2",
+        reservationOwner: "scheduler:alpha",
+        decisionId: "decision:duplicate-node",
+        decidedAt: "2026-04-07T12:04:58.000Z",
+      }),
+      Object.freeze({
+        runId: "run:1",
+        nodeId: "node:shared",
+        queueId: "queue:default",
+        claimToken: "claim:1",
+        reservationOwner: "scheduler:alpha",
+        decisionId: "decision:duplicate-node",
+        decidedAt: "2026-04-07T12:05:00.000Z",
+      }),
+    ]),
+  });
+}
+
 describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
   it("acquires and releases node placement holds while materializing selected assignment intent", async () => {
     const queueRepository = new RecordingQueueRepository();
@@ -369,5 +435,47 @@ describe("MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase", () => {
     expect(governanceSink.events).toHaveLength(2);
     expect(governanceSink.events.every((event) => event.type === "scheduling-deferred-no-placement")).toBeTrue();
     expect(governanceSink.events[0]?.runId).toBe("run:2");
+  });
+
+  it("suppresses duplicate run/node assignment intents deterministically and records conflict visibility", async () => {
+    const queueRepository = new RecordingQueueRepository();
+    const placementHoldRepository = new RecordingPlacementHoldRepository();
+    const governanceSink = new RecordingGovernanceEventSink();
+    const claimed: string[] = [];
+    const useCase = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
+      queueRepository,
+      placementHoldRepository,
+      governanceEventSink: governanceSink,
+      claimRunForNodeDispatchPreparationUseCase: {
+        execute: async (input) => {
+          claimed.push(`${input.runId}:${input.nodeId}:${input.claimToken}`);
+          return Promise.resolve(undefined as never);
+        },
+      },
+      now: () => new Date("2026-04-07T12:05:00.000Z"),
+      idGenerator: {
+        nextId: () => "node-hold:dedupe",
+      },
+    });
+
+    const result = await useCase.materializeAssignmentIntents({
+      decisionBundle: createDuplicateNodeIntentDecisionBundle(),
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.runId).toBe("run:1");
+    expect(claimed).toEqual(["run:1:node:shared:claim:1"]);
+    expect(queueRepository.releases).toHaveLength(1);
+    expect(queueRepository.releases[0]?.runId).toBe("run:2");
+    expect(placementHoldRepository.acquisitions).toHaveLength(1);
+    expect(placementHoldRepository.acquisitions[0]?.runId).toBe("run:1");
+
+    const conflictEvents = governanceSink.events.filter((event) => (
+      event.type === "scheduling-assignment-materialization-conflict"
+    ));
+    expect(conflictEvents).toHaveLength(2);
+    expect((conflictEvents[0]?.details as { conflictReason?: string } | undefined)?.conflictReason).toBe(
+      "duplicate-node-intent",
+    );
   });
 });

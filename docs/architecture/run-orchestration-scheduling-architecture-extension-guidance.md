@@ -142,3 +142,19 @@ After eligibility gating:
   - `src/shared/schemas/runtime/tests/SchedulingPolicyEvaluationSchemaContracts.test.ts`
 - Documentation discoverability and guardrail assertions:
   - `src/application/runs/tests/SchedulingArchitectureExtensionGuidanceDocumentation.test.ts`
+
+## Story 17.3.7 production-readiness hardening baseline
+
+This baseline now includes an explicit production hardening pass for Feature 17 / Epic 17.3 lifecycle behavior:
+
+- Deterministic arbitration and tie-break ordering are verified at policy level and integration boundaries.
+- Duplicate run/node assignment intents are deterministically suppressed before claim materialization to prevent duplicate assignment attempts.
+- No-placement outcomes are explicit and reason-bearing, with defer/backoff metadata persisted for queue visibility and administrative intervention.
+- Scheduling admin interventions (stale reservation release and deferred re-evaluation) remain auditable and contract-bound.
+- Scheduling admin API payloads are schema-validated in backend API tests to detect contract drift.
+
+### Deferred edges (explicit)
+
+- Multi-intent batching is still out of scope for this release; policy currently emits at most one assignment recommendation per pass.
+- Quota, reservation calendars/windows, and richer resource arbitration remain deferred to future scheduling policy layers.
+- Deployment-profile governance variants remain a seam (rule-set provider + policy source), not an active production policy package.

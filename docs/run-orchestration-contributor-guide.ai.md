@@ -93,3 +93,9 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 
 ## Regression hardening check
 - Keep integrated lifecycle regression coverage healthy in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts` to catch cross-seam drift across submission, queueing, assignment, dispatch, progress, completion, cancellation/retry checks, recovery, and visibility contracts.
+- Include scheduling hardening checks for duplicate-intent suppression (`MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`), no-placement defer/backoff outcomes, and scheduling-admin schema validation.
+
+## Deferred scheduling edges
+- Single-assignment recommendation per scheduling pass remains current scope.
+- Quotas, reservation windows/calendars, and richer resource arbitration remain deferred.
+- Deployment-profile governance variants remain seam-only.

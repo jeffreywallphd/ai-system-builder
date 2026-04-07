@@ -21,6 +21,10 @@ import {
   ReevaluateDeferredSchedulingRunsUseCase,
   type ReevaluateDeferredSchedulingRunsResult,
 } from "@application/runs/use-cases/ReevaluateDeferredSchedulingRunsUseCase";
+import {
+  parseSchedulingAdminReevaluateDeferredRunsResponse,
+  parseSchedulingAdminReleaseStaleReservationResponse,
+} from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import { AuthoritativeRunMutationBackendApi } from "../AuthoritativeRunMutationBackendApi";
 import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 
@@ -365,6 +369,9 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     expect(released.ok).toBeTrue();
     expect(released.data?.mutation.changed).toBeTrue();
     expect(released.data?.runId).toBe("run:stale:1");
+    const parsedRelease = parseSchedulingAdminReleaseStaleReservationResponse(released.data);
+    expect(parsedRelease.staleSeconds).toBe(120);
+    expect(parsedRelease.mutation.changed).toBeTrue();
 
     const reevaluated = await api.reevaluateDeferredSchedulingRuns({
       workspaceId: "workspace-alpha",
@@ -380,6 +387,9 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     expect(reevaluated.ok).toBeTrue();
     expect(reevaluated.data?.reEvaluatedCount).toBe(2);
     expect(reevaluated.data?.mutation.changed).toBeTrue();
+    const parsedReevaluate = parseSchedulingAdminReevaluateDeferredRunsResponse(reevaluated.data);
+    expect(parsedReevaluate.reEvaluatedCount).toBe(2);
+    expect(parsedReevaluate.runIds).toEqual(["run:deferred:1", "run:deferred:2"]);
   });
 
   it("publishes scheduling-requeued realtime events for deferred-run re-evaluation results", async () => {

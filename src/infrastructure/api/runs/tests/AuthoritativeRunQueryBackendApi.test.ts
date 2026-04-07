@@ -49,6 +49,7 @@ import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAutho
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
+import { parseSchedulingAdminListStaleReservationsResponse } from "@shared/schemas/runtime/RunOrchestrationTransportSchemaContracts";
 import { AuthoritativeRunQueryBackendApi } from "../AuthoritativeRunQueryBackendApi";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
@@ -1081,6 +1082,9 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(admin.ok).toBeTrue();
     expect(admin.data?.items).toHaveLength(1);
     expect(admin.data?.items[0]?.runId).toBe("run:stale:1");
+    const parsedAdmin = parseSchedulingAdminListStaleReservationsResponse(admin.data);
+    expect(parsedAdmin.totalCount).toBe(1);
+    expect(parsedAdmin.items[0]?.staleSeconds).toBe(60);
   });
 });
 
