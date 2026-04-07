@@ -22,11 +22,20 @@ describe("Surface route metadata catalog", () => {
   });
 
   it("derives admin-lite settings shortcuts from structured route metadata", () => {
-    const routes = listSettingsShortcutRouteMetadata({ surface: UiSurfaceKeys.adminLite });
+    const routes = listSettingsShortcutRouteMetadata({
+      surface: UiSurfaceKeys.adminLite,
+      strict: true,
+      roleKeys: Object.freeze(["member"]),
+      capabilityKeys: Object.freeze(["workflow.share", "node-trust.read", "system.read"]),
+      hasWorkspaceContext: true,
+    });
 
-    expect(routes.some((route) => route.key === "workspace-admin")).toBeTrue();
-    expect(routes.some((route) => route.key === "identity-admin")).toBeTrue();
-    expect(routes.some((route) => route.key === "secrets-admin")).toBeTrue();
+    expect(routes.some((route) => route.key === "admin-lite-shell")).toBeTrue();
+    expect(routes.some((route) => route.key === "authorization-sharing-thin")).toBeTrue();
+    expect(routes.some((route) => route.key === "workspace-thin-membership")).toBeTrue();
+    expect(routes.some((route) => route.key === "workspace-admin")).toBeFalse();
+    expect(routes.some((route) => route.key === "identity-admin")).toBeFalse();
+    expect(routes.some((route) => route.key === "secrets-admin")).toBeFalse();
   });
 
   it("derives command palette entries from centralized route metadata", () => {

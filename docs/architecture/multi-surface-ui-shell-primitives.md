@@ -72,3 +72,9 @@ Responsive layout is explicit in `shell.css`:
 - detail regions render as `aside`
 - status regions expose `role`/`aria-live` behavior tuned by tone
 - Header action groups now expose toolbar semantics and shell frames support accessible labels for composed surface wrappers.
+
+## Story 15.3.1 update
+
+- Desktop administration now uses a dedicated shell entry page at `src/ui/pages/DesktopAdministrationShellPage.tsx`, composed with `DesktopAdminSurfaceFrame` and metadata-driven route projections.
+- Thin admin-lite now uses a dedicated entry page at `src/ui/pages/AdminLiteEntryPage.tsx`, composed with `ThinClientOperationalSurfaceFrame` and a constrained lightweight route set.
+- Both entry shells derive authorized navigation entries from shared route metadata and strict session-based access context instead of page-local route lists.

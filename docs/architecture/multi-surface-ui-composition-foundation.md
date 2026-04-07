@@ -226,3 +226,11 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
   - browser-level end-to-end automation of these flows against a live backend/runtime,
   - expanded longitudinal analytics/reporting UX beyond current operational monitoring scope,
   - deeper workspace-admin authoring surfaces not required for thin operational control in Epic 15.2.
+
+## Story 15.3.1 update
+
+- Added production administration entry composition surfaces:
+  - desktop admin shell (`/settings/admin`) for full administration navigation and detail-pane composition,
+  - thin admin-lite entry (`/settings/admin-lite`) for lightweight policy/workspace/node workflows.
+- Route access now enforces metadata-driven role/capability/workspace checks in the route seam (`src/ui/routes/AppRouter.tsx`) through shared policy helpers in `src/ui/routes/SurfaceRouteAccessPolicy.ts`.
+- Shortcut discovery surfaces (settings shortcuts, command palette) now consume strict session-derived access context so protected admin routes are not exposed to unauthorized sessions.

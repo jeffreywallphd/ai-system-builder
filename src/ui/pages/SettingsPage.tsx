@@ -8,9 +8,13 @@ import type { RuntimeConsoleState } from "../state/RuntimeConsoleStore";
 import McpRuntimeStatusPanel from "../components/execution/McpRuntimeStatusPanel";
 import { listSettingsShortcutRouteMetadata } from "../routes/SurfaceRouteMetadataCatalog";
 import { UiSurfaceKeys } from "../shared/navigation/SurfaceNavigationMetadata";
+import { IdentityAuthSessionStore } from "../shared/identity/IdentityAuthSessionStore";
+import { resolveNavigationAvailabilityContextForSession } from "../routes/SurfaceRouteAccessPolicy";
 
 export default function SettingsPage(): JSX.Element {
   const { settingsStore, mcpStore, runtimeConsoleStore } = useUiDependencies();
+  const sessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
+  const [session] = useState(() => sessionStore.getSession());
   const [state, setState] = useState<UiSettingsState>(() => settingsStore.getState());
   const [mcpState, setMcpState] = useState<McpStoreState>(() => mcpStore.getState());
   const [runtimeState, setRuntimeState] = useState<RuntimeConsoleState>(() => runtimeConsoleStore.getState());
@@ -40,8 +44,16 @@ export default function SettingsPage(): JSX.Element {
 
   const isAdvancedExpanded = (sectionId: string): boolean => expandedAdvancedSections.includes(sectionId);
   const settingsShortcutRoutes = useMemo(
-    () => listSettingsShortcutRouteMetadata({ surface: UiSurfaceKeys.desktopAdmin }),
-    [],
+    () => listSettingsShortcutRouteMetadata(
+      resolveNavigationAvailabilityContextForSession(session, {
+        preferredSurface: session?.sessionAccessChannel === "desktop"
+          ? UiSurfaceKeys.desktopAdmin
+          : UiSurfaceKeys.adminLite,
+        fallbackSurface: UiSurfaceKeys.desktopAdmin,
+        strict: true,
+      }),
+    ),
+    [session],
   );
 
   const toggleAdvancedSection = (sectionId: string): void => {

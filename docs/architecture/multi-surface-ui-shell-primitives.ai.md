@@ -48,3 +48,8 @@ Feature 15.1.2 adds shared shell primitives so desktop and thin-client admin/ope
   - header action groups expose toolbar semantics
   - status surfaces map tone to live-region alert behavior
 - Desktop/thin wrappers now pass accessible frame labels so screen-reader users can identify active surface context.
+
+## Story 15.3.1 update
+- `DesktopAdminSurfaceFrame` now anchors a dedicated desktop administration shell entry in `src/ui/pages/DesktopAdministrationShellPage.tsx`.
+- `ThinClientOperationalSurfaceFrame` now anchors the thin admin-lite entry in `src/ui/pages/AdminLiteEntryPage.tsx`.
+- Both entry pages project available admin destinations from shared route metadata under strict session-derived access context (no page-local shortcut catalogs).

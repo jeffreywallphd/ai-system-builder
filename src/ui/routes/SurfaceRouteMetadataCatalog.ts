@@ -122,6 +122,38 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       ]),
     }),
   }),
+  "admin-shell": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+      showInCommandPalette: true,
+      commandPaletteOrder: 55,
+      commandPaletteLabel: "Administration",
+      commandPaletteDescription: "Open desktop administration shell.",
+      commandPaletteKeywords: Object.freeze(["go", "open", "administration", "admin", "security", "policy"]),
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([UiSurfaceKeys.desktopAdmin]),
+      requiredRoles: Object.freeze(["owner", "admin"]),
+      requiredCapabilities: Object.freeze(["system.manage"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
+  "admin-lite-shell": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([
+        UiSurfaceKeys.thinClientOperational,
+        UiSurfaceKeys.adminLite,
+      ]),
+      requiredRoles: Object.freeze(["owner", "admin", "member"]),
+      requiredCapabilities: Object.freeze(["system.read"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
   "authorization-sharing": Object.freeze({
     group: UiRouteGroupKeys.administration,
     navigation: Object.freeze({
@@ -131,7 +163,6 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
-        UiSurfaceKeys.adminLite,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["workflow.share", "asset.share"]),
@@ -163,7 +194,6 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
-        UiSurfaceKeys.adminLite,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["log.read"]),
@@ -179,7 +209,6 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
-        UiSurfaceKeys.adminLite,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["storage-instance.manage"]),
@@ -195,7 +224,6 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
-        UiSurfaceKeys.adminLite,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["system.manage"]),
@@ -211,6 +239,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.adminLite,
+        UiSurfaceKeys.thinClientOperational,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["node-trust.manage"]),
@@ -225,6 +254,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.adminLite,
+        UiSurfaceKeys.thinClientOperational,
       ]),
       requiredRoles: Object.freeze(["owner", "admin", "member"]),
       requiredCapabilities: Object.freeze(["node-trust.read"]),
@@ -254,7 +284,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
     access: Object.freeze({
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
-        UiSurfaceKeys.adminLite,
+        UiSurfaceKeys.desktopOperational,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["system.manage"]),
@@ -274,7 +304,6 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
         UiSurfaceKeys.desktopOperational,
-        UiSurfaceKeys.adminLite,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["system.manage"]),
@@ -288,7 +317,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
     access: Object.freeze({
       eligibleSurfaces: Object.freeze([
         UiSurfaceKeys.desktopAdmin,
-        UiSurfaceKeys.adminLite,
+        UiSurfaceKeys.desktopOperational,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
       requiredCapabilities: Object.freeze(["secret-metadata.manage"]),
