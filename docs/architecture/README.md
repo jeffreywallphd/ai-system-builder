@@ -139,6 +139,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the inner clean-architecture core, read [`domain-and-application-core.md`](./domain-and-application-core.md).
 - For layer boundaries and dependency rules, read [`layers-and-boundaries.md`](./layers-and-boundaries.md).
 - For execution, tools, MCP, and runtime selection, read [`workflow-execution-and-tools.md`](./workflow-execution-and-tools.md).
+- For canonical run identity/lifecycle/queue-assignment semantics and orchestration ownership boundaries, read [`run-orchestration-domain-foundation.md`](./run-orchestration-domain-foundation.md).
 - For host/runtime composition and desktop delivery, read [`desktop-runtime-and-hosts.md`](./desktop-runtime-and-hosts.md).
 - For explicit host runtime kinds, authoritative control-plane role contracts, and composition-root boundary expectations, read [`host-runtime-composition-boundaries.md`](./host-runtime-composition-boundaries.md).
 - For shared host startup pipeline contracts, startup-context model, and contributor startup-sequence guidance, read [`host-bootstrap-pipeline.md`](./host-bootstrap-pipeline.md).
