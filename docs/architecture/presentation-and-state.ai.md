@@ -933,3 +933,15 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Desktop/thin assemblies: src/ui/desktop/shell/DesktopAdminSurfaceFrame.tsx and src/ui/web/shell/ThinClientOperationalSurfaceFrame.tsx.
 - Usage guide: docs/architecture/multi-surface-ui-shell-primitives.md.
 
+## Story 15.1.4 presentation-state update
+- Shared presentation-state components now live in `src/ui/shared/components/presentation-state/*`.
+- Canonical page-state handling is now shared through `SurfaceStateBoundary` + `SurfaceStatePanel` for:
+  - `loading`
+  - `empty`
+  - `not-found`
+  - `disconnected`
+  - `error`
+  - `permission-denied`
+- API error to UI-state mapping is centralized through `toSurfacePresentationStateFromApiError` to keep converged UI behavior aligned with shared API error semantics.
+- `NodeInventoryPage` and `StorageAdministrationPage` now use these shared state seams for list/detail loading/error/empty rendering.
+

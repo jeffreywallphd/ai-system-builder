@@ -15,6 +15,7 @@ import {
 } from "@shared/identity/IdentityAuthSessionCoordinator";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import { buildWorkspaceInvitationAcceptPath } from "../web/workspaces/WorkspaceThinClientRoutes";
+import { SurfaceStatePanel } from "../shared/components/presentation-state";
 
 const invitationRoleOptions = Object.freeze(["admin", "member", "viewer"] as const);
 const membershipStatusOptions = Object.freeze(["pending", "active", "suspended", "removed"] as const);
@@ -177,17 +178,14 @@ export default function WorkspaceMembershipThinClientPage(): JSX.Element {
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-workspace-thin-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Workspace memberships</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated account before managing workspace memberships and invitations.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Workspace memberships",
+            message: "Sign in with an authenticated account before managing workspace memberships and invitations.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }

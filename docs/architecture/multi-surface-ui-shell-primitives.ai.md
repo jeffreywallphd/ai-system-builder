@@ -34,3 +34,9 @@ Feature 15.1.2 adds shared shell primitives so desktop and thin-client admin/ope
 - `src/ui/shared/tests/SurfaceShellPrimitives.test.tsx`
 - `src/ui/desktop/shell/tests/DesktopAdminSurfaceFrame.test.tsx`
 - `src/ui/web/shell/tests/ThinClientOperationalSurfaceFrame.test.tsx`
+
+## Story 15.1.4 update
+- Shared presentation-state seam is now in `src/ui/shared/components/presentation-state/*` (re-exported via `src/ui/shared/components/shell/index.ts`).
+- Canonical state kinds now include: `loading`, `empty`, `not-found`, `disconnected`, `error`, `permission-denied`.
+- Use `SurfaceStateBoundary` + `SurfaceStatePanel` for converged list/detail page-state rendering instead of per-page ad hoc status markup.
+- Use `toSurfacePresentationStateFromApiError` to map API error semantics into UI state consistently across surfaces.

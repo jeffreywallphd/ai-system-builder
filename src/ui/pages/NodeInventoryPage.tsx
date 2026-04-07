@@ -21,6 +21,15 @@ import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { NodeInventoryService } from "../services/NodeInventoryService";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
+import {
+  SurfaceStatePanel,
+  SurfaceStateBoundary,
+  createEmptyState,
+  createLoadingState,
+  toDisconnectedState,
+  toSurfacePresentationStateFromApiError,
+  type SurfacePresentationState,
+} from "../shared/components/presentation-state";
 
 interface NodeInventoryPageProps {
   readonly service?: NodeInventoryService;
@@ -62,8 +71,13 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   const [selectedNodeId, setSelectedNodeId] = useState<string>();
   const [selectedNodeDetail, setSelectedNodeDetail] = useState<NodeInventoryDetailDto>();
   const [isLoadingInventory, setIsLoadingInventory] = useState(false);
-  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [isRevoking, setIsRevoking] = useState(false);
+  const [inventoryState, setInventoryState] = useState<SurfacePresentationState | undefined>(
+    createLoadingState("Loading node inventory", "Loading trusted node inventory from the authoritative API."),
+  );
+  const [detailState, setDetailState] = useState<SurfacePresentationState | undefined>(
+    createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."),
+  );
   const [errorMessage, setErrorMessage] = useState<string>();
   const [statusMessage, setStatusMessage] = useState<string>();
   const [revocationReason, setRevocationReason] = useState<NodeRevocationReason>(NodeRevocationReasons.operatorAction);
@@ -76,20 +90,22 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     if (!sessionToken) {
       return;
     }
-    setIsLoadingDetail(true);
+    setDetailState(createLoadingState("Loading node detail", "Loading node trust detail."));
     try {
       const detailResponse = await service.getNodeInventoryDetail({ nodeId }, sessionToken);
       if (!detailResponse.ok || !detailResponse.data) {
         setSelectedNodeDetail(undefined);
-        setErrorMessage(detailResponse.error?.message ?? "Unable to load node detail.");
+        setDetailState(toSurfacePresentationStateFromApiError(detailResponse.error, {
+          fallbackTitle: "Unable to load node detail",
+          fallbackMessage: "Node detail is currently unavailable.",
+        }));
         return;
       }
       setSelectedNodeDetail(detailResponse.data.node);
+      setDetailState(undefined);
     } catch {
       setSelectedNodeDetail(undefined);
-      setErrorMessage("Node inventory detail request failed.");
-    } finally {
-      setIsLoadingDetail(false);
+      setDetailState(toDisconnectedState("Node detail unavailable", "Unable to reach the node inventory service."));
     }
   };
 
@@ -102,6 +118,9 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
     }
     setIsLoadingInventory(true);
     setErrorMessage(undefined);
+    if (nodes.length < 1) {
+      setInventoryState(createLoadingState("Loading node inventory", "Loading trusted node inventory from the authoritative API."));
+    }
     try {
       const response = await service.listNodeInventory({
         nodeTypes: toOptionalSingleValueArray(nextFilters.nodeType),
@@ -120,11 +139,20 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
         setNodes(Object.freeze([]));
         setSelectedNodeId(undefined);
         setSelectedNodeDetail(undefined);
-        setErrorMessage(response.error?.message ?? "Unable to load node inventory.");
+        setInventoryState(toSurfacePresentationStateFromApiError(response.error, {
+          fallbackTitle: "Unable to load node inventory",
+          fallbackMessage: "Node inventory is currently unavailable.",
+        }));
+        setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
         return;
       }
 
       setNodes(response.data.nodes);
+      if (response.data.nodes.length < 1) {
+        setInventoryState(createEmptyState("No nodes found", "No nodes matched the current inventory filters."));
+      } else {
+        setInventoryState(undefined);
+      }
       const nextNodeId = preferredNodeId
         ?? (
           selectedNodeId && response.data.nodes.some((node) => node.nodeId === selectedNodeId)
@@ -134,6 +162,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       setSelectedNodeId(nextNodeId);
       if (!nextNodeId) {
         setSelectedNodeDetail(undefined);
+        setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
         return;
       }
       await loadDetail(nextNodeId);
@@ -141,7 +170,8 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
       setNodes(Object.freeze([]));
       setSelectedNodeId(undefined);
       setSelectedNodeDetail(undefined);
-      setErrorMessage("Node inventory request failed.");
+      setInventoryState(toDisconnectedState("Node inventory unavailable", "Unable to reach the node inventory service."));
+      setDetailState(createEmptyState("Select a node", "Select a node to inspect detailed trust and capability data."));
     } finally {
       setIsLoadingInventory(false);
     }
@@ -163,17 +193,14 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-node-inventory-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Trusted node inventory</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated admin account before inspecting trusted node inventory and presence status.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Trusted node inventory",
+            message: "Sign in with an authenticated admin account before inspecting trusted node inventory and presence status.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }
@@ -362,9 +389,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             <p className="ui-card__subtitle">Pending, active, offline, and revoked nodes from the live trust inventory.</p>
           </div>
           <div className="ui-card__body">
-            {isLoadingInventory && nodes.length === 0 ? <p className="ui-text-secondary">Loading node inventory...</p> : null}
-            {!isLoadingInventory && nodes.length === 0 ? <p className="ui-text-secondary">No nodes matched the current inventory filters.</p> : null}
-            {nodes.length > 0 ? (
+            <SurfaceStateBoundary state={inventoryState}>
               <div className="ui-table-wrapper">
                 <table className="ui-table">
                   <thead>
@@ -407,7 +432,7 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                   </tbody>
                 </table>
               </div>
-            ) : null}
+            </SurfaceStateBoundary>
           </div>
         </section>
 
@@ -417,9 +442,8 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
             <p className="ui-card__subtitle">Identity, trust state, enrollment context, capability profile, and revocation metadata.</p>
           </div>
           <div className="ui-card__body ui-stack ui-stack--md">
-            {!selectedNode ? <p className="ui-text-secondary">Select a node to inspect detailed trust and capability data.</p> : null}
-            {isLoadingDetail ? <p className="ui-text-secondary">Loading node detail...</p> : null}
-            {selectedNodeDetail ? (
+            <SurfaceStateBoundary state={detailState}>
+              {selectedNodeDetail ? (
               <>
                 <div className="ui-node-inventory-page__detail-grid">
                   <div>
@@ -630,7 +654,8 @@ export default function NodeInventoryPage(props: NodeInventoryPageProps = {}): J
                   </div>
                 ) : null}
               </>
-            ) : null}
+              ) : null}
+            </SurfaceStateBoundary>
           </div>
         </section>
       </div>

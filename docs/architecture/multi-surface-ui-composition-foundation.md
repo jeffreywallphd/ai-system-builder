@@ -137,3 +137,9 @@ If behavior is host/runtime-only, keep it in `desktop`/`web` and expose a host-n
 - Route grouping and navigation projections for desktop admin, desktop operational, thin-client operational, and admin-lite surfaces are defined centrally in src/ui/routes/SurfaceRouteMetadataCatalog.ts and consumed by shell/context/menu/settings surfaces.
 - Contributors should add route access/surface rules in metadata first and avoid scattering route gating logic across page components.
 
+## Story 15.1.4 update
+
+- Shared presentation-state handling is now centralized in `src/ui/shared/components/presentation-state/*`.
+- Converged admin/operational pages should render loading/empty/not-found/disconnected/error/permission-denied states through shared `SurfaceStateBoundary` and `SurfaceStatePanel` seams.
+- Error-to-state projection should use `toSurfacePresentationStateFromApiError` so client rendering aligns with shared API error semantics instead of page-local error-code branching.
+

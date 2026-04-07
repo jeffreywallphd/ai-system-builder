@@ -7,6 +7,7 @@ import type { AuthorizationManagementService } from "../services/AuthorizationMa
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import type { IdentityAuthSessionStore as IdentityAuthSessionStoreContract } from "@shared/identity/IdentityAuthSessionStore";
 import { buildAuthorizationSharingThinClientPath } from "../web/authorization/AuthorizationSharingRoutes";
+import { SurfaceStatePanel } from "../shared/components/presentation-state";
 
 interface AuthorizationSharingManagementPageProps {
   readonly service?: AuthorizationManagementService;
@@ -33,17 +34,14 @@ export default function AuthorizationSharingManagementPage(props: AuthorizationS
   if (!sessionToken || !session || sessionStore.isSessionExpired(session)) {
     return (
       <section className="ui-page ui-authorization-management-page">
-        <div className="ui-card">
-          <div className="ui-card__header">
-            <h1 className="ui-card__title">Resource sharing and visibility</h1>
-            <p className="ui-card__subtitle">
-              Sign in with an authenticated account before reviewing or updating sharing access.
-            </p>
-          </div>
-          <div className="ui-card__body">
-            <Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>
-          </div>
-        </div>
+        <SurfaceStatePanel
+          state={Object.freeze({
+            kind: "permission-denied",
+            title: "Resource sharing and visibility",
+            message: "Sign in with an authenticated account before reviewing or updating sharing access.",
+          })}
+          action={<Link className="ui-button ui-button--primary" to={ROUTE_PATHS.login}>Go to sign in</Link>}
+        />
       </section>
     );
   }

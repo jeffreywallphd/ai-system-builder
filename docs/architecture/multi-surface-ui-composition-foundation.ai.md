@@ -59,3 +59,8 @@ See `docs/architecture/multi-surface-ui-composition-foundation.md`.
 - Shared route/navigation metadata and surface gating are now documented in docs/architecture/multi-surface-ui-navigation-metadata.md.
 - Desktop admin, desktop operational, thin-client operational, and admin-lite route availability and navigation projections now derive from src/ui/routes/SurfaceRouteMetadataCatalog.ts plus shared contracts in src/ui/shared/navigation/SurfaceNavigationMetadata.ts.
 
+## Story 15.1.4 update
+- Shared presentation-state handling now lives in `src/ui/shared/components/presentation-state/*`.
+- Converged page-state rendering should use `SurfaceStateBoundary`/`SurfaceStatePanel` for `loading`, `empty`, `not-found`, `disconnected`, `error`, and `permission-denied`.
+- API error semantics should map through `toSurfacePresentationStateFromApiError` instead of page-local code checks.
+
