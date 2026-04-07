@@ -62,3 +62,75 @@ export interface GetAuditLedgerEventDetailApiResponse {
   readonly event: AuditEventDetailViewDto;
 }
 
+export interface GovernanceAuditProjectionFacetOptionApiDto {
+  readonly value: string;
+  readonly count: number;
+}
+
+export interface GovernanceAuditProjectionFacetApiDto {
+  readonly key: "eventType" | "outcome" | "category";
+  readonly options: ReadonlyArray<GovernanceAuditProjectionFacetOptionApiDto>;
+}
+
+export interface GovernanceAuditEventSummaryProjectionApiDto {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly category: string;
+  readonly action: string;
+  readonly outcome: string;
+  readonly occurredAt: string;
+  readonly recordedAt: string;
+  readonly summary: string;
+  readonly actorId: string;
+  readonly actorKind: string;
+  readonly workspaceId?: string;
+  readonly targetRef?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+  readonly hasProtectedData: boolean;
+  readonly redactionReasons: ReadonlyArray<string>;
+}
+
+export interface GovernanceAuditEventDetailProjectionApiDto {
+  readonly summary: GovernanceAuditEventSummaryProjectionApiDto;
+  readonly visibility: "user-safe" | "admin";
+  readonly adminOnlyDetails?: Readonly<Record<string, unknown>>;
+  readonly explanatory: {
+    readonly roleSensitivity: "workspace-member" | "workspace-admin";
+    readonly notes: ReadonlyArray<string>;
+  };
+}
+
+export interface ListGovernanceAuditEventsApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly query?: AuditLedgerListQueryDto;
+}
+
+export interface ListGovernanceAuditEventsApiResponse {
+  readonly events: ReadonlyArray<GovernanceAuditEventSummaryProjectionApiDto>;
+  readonly facets: ReadonlyArray<GovernanceAuditProjectionFacetApiDto>;
+  readonly totalCount: number;
+  readonly query: AuditLedgerListQueryDto;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
+  readonly explanatory: {
+    readonly detailVisibility: "user-safe";
+    readonly facetCoverage: "page";
+    readonly notes: ReadonlyArray<string>;
+  };
+}
+
+export interface GetGovernanceAuditEventDetailApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly eventId: string;
+}
+
+export interface GetGovernanceAuditEventDetailApiResponse {
+  readonly event: GovernanceAuditEventDetailProjectionApiDto;
+}
+

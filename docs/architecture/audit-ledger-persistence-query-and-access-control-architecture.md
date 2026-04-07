@@ -68,7 +68,14 @@ Canonical read path:
    - `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
 3. `AuditLedgerQueryService` validates/normalizes queries and applies scoped retrieval:
    - `src/application/audit/use-cases/AuditLedgerQueryService.ts`
-4. Repository filters by canonical dimensions, linkage/correlation, retention/lifecycle selectors, and paging/sort:
+4. `AuditGovernanceProjectionQueryService` builds UI-ready governance/admin summary/detail projections and page-bounded filter facets without moving projection logic into UI:
+   - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
+5. `AuditLedgerBackendApi` exposes both canonical and projection retrieval seams:
+   - `GET /api/v1/audit/events`
+   - `GET /api/v1/audit/events/:eventId`
+   - `GET /api/v1/audit/governance/events`
+   - `GET /api/v1/audit/governance/events/:eventId`
+6. Repository filters by canonical dimensions, linkage/correlation, retention/lifecycle selectors, and paging/sort:
    - `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
 
 Query coverage includes:
@@ -93,6 +100,8 @@ View shaping:
 - summary/detail DTOs are produced from shared contracts:
   - `src/shared/contracts/audit/AuditEventContracts.ts`
   - `src/shared/dto/audit/AuditEventDtos.ts`
+- governance projection DTOs/facets are produced in the application query boundary:
+  - `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`
 - detail projection is visibility-driven via `toAuditEventDetailView(...)`:
   - `user-safe` excludes `adminOnlyDetails`
   - `admin` includes `adminOnlyDetails`

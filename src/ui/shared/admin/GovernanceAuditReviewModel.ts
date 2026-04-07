@@ -1,15 +1,14 @@
 import type { SharedApiListQueryConventions, SharedApiListQuerySorting } from "@shared/contracts/api/SharedApiQueryConventions";
 
 export const GovernanceAuditEventTypes = Object.freeze({
-  login: "login",
-  deviceRevocation: "device-revocation",
-  nodeApproval: "node-approval",
-  permissionChange: "permission-change",
-  runGovernance: "run-governance",
+  session: "identity-session-issued",
+  deviceRevocation: "identity-trusted-device-revoked",
+  nodeApproval: "node-enrollment-approved",
+  permissionChange: "authorization-sharing-granted",
+  runGovernance: "run-submission-evaluated",
 });
 
-export type GovernanceAuditEventType =
-  typeof GovernanceAuditEventTypes[keyof typeof GovernanceAuditEventTypes];
+export type GovernanceAuditEventType = string;
 
 export const GovernanceAuditEventOutcomes = Object.freeze({
   succeeded: "succeeded",
@@ -42,6 +41,24 @@ export interface GovernanceAuditReviewListQuery extends SharedApiListQueryConven
 export interface GovernanceAuditReviewListResult {
   readonly events: ReadonlyArray<GovernanceAuditEventRecord>;
   readonly totalCount: number;
+  readonly facets?: ReadonlyArray<GovernanceAuditFacet>;
+  readonly explanatory?: GovernanceAuditProjectionExplanatoryMetadata;
+}
+
+export interface GovernanceAuditFacetOption {
+  readonly value: string;
+  readonly count: number;
+}
+
+export interface GovernanceAuditFacet {
+  readonly key: "eventType" | "outcome" | "category";
+  readonly options: ReadonlyArray<GovernanceAuditFacetOption>;
+}
+
+export interface GovernanceAuditProjectionExplanatoryMetadata {
+  readonly detailVisibility: "user-safe";
+  readonly facetCoverage: "page";
+  readonly notes: ReadonlyArray<string>;
 }
 
 export const GovernanceAuditSortBy = Object.freeze({

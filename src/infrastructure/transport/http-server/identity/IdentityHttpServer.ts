@@ -4580,6 +4580,53 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       if (
         options.auditLedgerBackendApi
         && request.method === "GET"
+        && path === "/api/v1/audit/governance/events"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildAuditLedgerInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedQuery = parseAndValidateAuditLedgerListQuery(searchParams);
+            if (!parsedQuery.ok) {
+              writeJson(response, parsedQuery.statusCode, parsedQuery.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedQuery.statusCode,
+                Object.freeze({ query: Object.fromEntries(searchParams.entries()) }),
+                parsedQuery.body,
+              );
+              return;
+            }
+
+            const apiResponse = await options.auditLedgerBackendApi.listGovernanceAuditEvents(Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              query: parsedQuery.data,
+            }));
+            const statusCode = mapAuditLedgerStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              query: parsedQuery.data,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.auditLedgerBackendApi
+        && request.method === "GET"
         && path.startsWith("/api/v1/audit/events/")
       ) {
         await requireAuthenticatedWorkspaceSession(
@@ -4603,6 +4650,47 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             const apiResponse = await options.auditLedgerBackendApi.getAuditEventDetail(Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              eventId,
+            }));
+            const statusCode = mapAuditLedgerStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              eventId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.auditLedgerBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/audit/governance/events/")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and eventId are required.",
+            buildInvalidResponse: buildAuditLedgerInvalidRequestResponse,
+          },
+          async (context) => {
+            const eventId = decodePathTail(path, "/api/v1/audit/governance/events/");
+            if (!eventId || eventId.includes("/")) {
+              const invalid = buildAuditLedgerInvalidRequestResponse("workspaceId and eventId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.auditLedgerBackendApi.getGovernanceAuditEventDetail(Object.freeze({
               actorUserIdentityId: context.actor.userIdentityId,
               workspaceId: context.workspace.workspaceId,
               eventId,
