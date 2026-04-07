@@ -15,3 +15,15 @@ export const RuntimeAuthoritativeApiRouteFamily = Object.freeze({
     AuthoritativeApiRouteBackendKeys.systemRuntime,
   ]),
 }) satisfies AuthoritativeApiRouteFamilyRegistration;
+
+export const RunSubmissionAuthoritativeApiRouteFamily = Object.freeze({
+  routeFamilyId: "run-submission",
+  domain: AuthoritativeApiRouteDomains.runtime,
+  description: "Authoritative run submission endpoint surface.",
+  routePrefixes: Object.freeze([
+    "/api/v1/runtime/runs/start",
+  ]),
+  requiredBackendKeys: Object.freeze([
+    AuthoritativeApiRouteBackendKeys.runSubmission,
+  ]),
+}) satisfies AuthoritativeApiRouteFamilyRegistration;

@@ -43,6 +43,10 @@
   - `GET /api/v1/runtime/runs/:executionId/trace`
   - `GET /api/v1/runtime/queue`
   - `POST /api/v1/runtime/queue/:queueItemId/dequeue`
+- Authoritative run submission now resolves through canonical run orchestration validation + creation flow instead of local-only runtime launch shims:
+  - authenticated actor/workspace context is enforced at transport boundary
+  - canonical run identifiers and mutation metadata are returned from authoritative backend composition
+  - stable shared failure semantics are preserved (`invalid-request`, `forbidden`, `not-found`, `conflict`, etc.)
 - Authenticated authoritative runtime realtime websocket endpoint:
   - `GET /ws` websocket upgrade (bearer-authenticated)
 - Login success now issues and persists authenticated sessions and returns bearer session credentials.
@@ -55,6 +59,7 @@
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+- `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`
 - `src/infrastructure/api/identity/sdk/PublicIdentityAuthApiContract.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 

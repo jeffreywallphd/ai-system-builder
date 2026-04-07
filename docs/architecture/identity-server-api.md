@@ -43,6 +43,7 @@ Implemented transport and host composition:
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/infrastructure/api/identity/IdentityAuthBackendApi.ts`
 - `src/infrastructure/api/assets/AssetManagementBackendApi.ts`
+- `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
 UI entry points now consume this same HTTP surface through renderer identity adapters:
@@ -200,18 +201,40 @@ Trusted-device transport contracts are defined in `src/infrastructure/api/identi
 
 `POST /api/v1/runtime/runs/start`
 
+Authenticated workspace-scoped run submission now uses the canonical run orchestration contract and authoritative server orchestration surface.
+Actor/workspace context is always derived from authenticated session state, not trusted from client payload.
+
 Request body:
 
 ```json
 {
-  "systemId": "string",
-  "versionId": "string",
-  "executionId": "string (optional)",
-  "async": "boolean (optional, if provided must be true)",
-  "tenantId": "string (optional)",
-  "idempotencyKey": "string (optional)"
+  "workflowId": "string (optional)",
+  "workspaceId": "string (optional, if provided must match authenticated workspace)",
+  "source": "ui-manual | ui-rerun | api | schedule-trigger | event-trigger | internal-orchestrator (optional)",
+  "submittedByActorId": "string (optional, if provided must match authenticated actor)",
+  "clientRequestId": "string (optional)",
+  "correlationId": "string (optional)",
+  "idempotencyKey": "string (optional)",
+  "runtimeTarget": {
+    "systemId": "string",
+    "versionId": "string",
+    "executionId": "string (optional)",
+    "tenantId": "string (optional)",
+    "async": "boolean (optional, if provided must be true)"
+  },
+  "tags": ["string (optional)"],
+  "metadata": {
+    "key": "unknown (optional)"
+  }
 }
 ```
+
+Response envelope:
+
+- success: `200` + canonical run submission accepted payload (`run` detail + shared `mutation` metadata)
+- failure: stable shared failure semantics (`invalid-request`, `authentication-failed`, `forbidden`, `not-found`, `conflict`, `internal`)
+
+Compatibility note: legacy start-run payloads (`systemId`, `versionId`, ...) are still accepted at the transport boundary and normalized into the canonical submission contract.
 
 `POST /api/v1/runtime/runs/:executionId/cancel`
 

@@ -55,6 +55,8 @@ import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMet
 import { StorageManagementBackendApi } from "@infrastructure/api/storage/StorageManagementBackendApi";
 import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
+import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
+import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { StorageSyncDeploymentAvailabilities } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { WorkspaceAuthorizationPolicyReadAdapter } from "@infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter";
@@ -130,6 +132,8 @@ import { RevokeIssuedCertificateUseCase } from "@application/security/use-cases/
 import { RenewIssuedCertificateUseCase } from "@application/security/use-cases/RenewIssuedCertificateUseCase";
 import { TrustMaterialKinds } from "@domain/security/CertificateAuthorityDomain";
 import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
+import { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
+import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -931,6 +935,22 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     previewService: assetPreviewService,
     lifecycleService: assetLifecycleService,
   });
+  const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
+    validateRunSubmissionUseCase: new ValidateRunSubmissionUseCase({
+      workspaceRepository,
+      authorizationDecisionEvaluator,
+      targetResolver: new AssetBackedRunSubmissionTargetResolver(assetRepository),
+      storageInstanceRepository,
+      storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+      encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+      clock: workspaceClock,
+    }),
+    createAuthoritativeRunUseCase: new CreateAuthoritativeRunUseCase({
+      runRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      transactionManager: persistentPlatformServices.platformPersistenceRepository,
+    }),
+  });
   const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
     trustedDeviceManagementService: trustedDeviceManagementService,
     nodeTrustIdentityRepository: nodeTrustRepository,
@@ -1000,6 +1020,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     secretMetadataBackendApi,
     storageManagementBackendApi,
     assetManagementBackendApi,
+    authoritativeRunSubmissionBackendApi,
     nodeTrustBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,

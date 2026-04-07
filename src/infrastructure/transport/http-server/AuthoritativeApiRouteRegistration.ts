@@ -23,6 +23,7 @@ export const AuthoritativeApiRouteBackendKeys = Object.freeze({
   storageManagement: "storage-management",
   assetManagement: "asset-management",
   systemRuntime: "system-runtime",
+  runSubmission: "run-submission",
 });
 
 export type AuthoritativeApiRouteBackendKey =
