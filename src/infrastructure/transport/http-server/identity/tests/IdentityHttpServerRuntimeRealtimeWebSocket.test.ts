@@ -34,6 +34,17 @@ class RuntimeRealtimeBackendStub {
     readonly request: Parameters<AuthoritativeRuntimeEventStream["subscribe"]>[0]["request"];
     readonly listener: Parameters<AuthoritativeRuntimeEventStream["subscribe"]>[0]["listener"];
   }) {
+    const hasSecretFailureTopic = input.request.topics.some((topic) => topic.executionId === "exec-secret");
+    if (hasSecretFailureTopic) {
+      return {
+        ok: false as const,
+        error: {
+          code: "internal" as const,
+          message: "sqlite error at C:\\private\\secrets\\runtime.db with token Bearer ws-secret-token",
+        },
+      };
+    }
+
     try {
       return {
         ok: true as const,
@@ -340,6 +351,42 @@ describe("IdentityHttpServer runtime realtime websocket delivery", () => {
     expect(errorFrame.opcode).toBe(1);
     const error = parseRuntimeRealtimeWebSocketErrorMessage(JSON.parse(errorFrame.payload.toString("utf8")));
     expect(error.error.code).toBe("forbidden");
+    const closeFrame = await reader.nextFrame();
+    expect(closeFrame.opcode).toBe(8);
+    socket.destroy();
+  });
+
+  it("redacts realtime websocket failure details and returns correlation metadata", async () => {
+    const runtimeBackend = new RuntimeRealtimeBackendStub();
+    const { baseUrl, port } = await startServer(runtimeBackend);
+    const token = await registerAndLogin(baseUrl, "runtime.ws.secret.1");
+
+    const { socket, response } = await openWebSocketUpgradeSocket({
+      port,
+      path: "/ws?purpose=run-monitoring&workspaceId=workspace-a",
+      authorization: token,
+    });
+    expect(response.startsWith("HTTP/1.1 101")).toBeTrue();
+    const correlationHeader = response.split("\r\n").find((line) => line.toLowerCase().startsWith("x-correlation-id:"));
+    const correlationId = correlationHeader?.split(":")[1]?.trim();
+    expect((correlationId ?? "").length).toBeGreaterThan(10);
+
+    const reader = new WebSocketFrameReader(socket);
+    socket.write(buildMaskedClientTextFrame(JSON.stringify({
+      action: "runtime-realtime.subscribe",
+      request: {
+        topics: [{ topic: RuntimeRealtimeTopics.runStatus, workspaceId: "workspace-a", executionId: "exec-secret" }],
+      },
+    })));
+
+    const errorFrame = await reader.nextFrame();
+    expect(errorFrame.opcode).toBe(1);
+    const error = parseRuntimeRealtimeWebSocketErrorMessage(JSON.parse(errorFrame.payload.toString("utf8")));
+    expect(error.error.code).toBe("internal");
+    expect(error.error.correlationId).toBe(correlationId);
+    expect(error.error.message.toLowerCase()).not.toContain("sqlite");
+    expect(error.error.message.toLowerCase()).not.toContain("secret");
+    expect(error.error.message.toLowerCase()).not.toContain("token");
     const closeFrame = await reader.nextFrame();
     expect(closeFrame.opcode).toBe(8);
     socket.destroy();

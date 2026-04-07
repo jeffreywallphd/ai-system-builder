@@ -27,3 +27,4 @@
 - `docs/unified-api-contributor-guide.md`
 - `docs/architecture/unified-api-authoritative-surface.md`
 - `docs/architecture/shared-api-contract-package.md`
+- `docs/unified-api-observability-troubleshooting.md`

@@ -201,6 +201,7 @@ export const RuntimeRealtimeWebSocketErrorMessageSchema = z.object({
   error: z.object({
     code: z.enum(["invalid-request", "forbidden", "internal"]),
     message: z.string().trim().min(1).max(512),
+    correlationId: z.string().trim().min(1).max(128).optional(),
   }).strict(),
 }).strict();
 
