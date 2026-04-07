@@ -38,9 +38,12 @@ import {
   PLATFORM_PERSISTENCE_SCHEMA_VERSION,
 } from "./SqlitePlatformPersistenceMigrations";
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
+import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
+  AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
+  AuthoritativeRunNodeClaimResult,
   IRunOrchestrationQueuePersistenceRepository,
   RunQueueEligibilityMarker,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
@@ -61,9 +64,25 @@ interface PlatformRunQueueRow {
   readonly claimed_by: string | null;
   readonly claimed_at: string | null;
   readonly claim_expires_at: string | null;
+  readonly assignment_node_id: string | null;
+  readonly assignment_claimed_at: string | null;
+  readonly dispatch_prepared_at: string | null;
+  readonly last_dispatch_attempt_id: string | null;
   readonly dequeued_at: string | null;
   readonly updated_at: string;
   readonly revision: number;
+}
+
+interface PlatformRunDispatchAttemptRow {
+  readonly attempt_id: string;
+  readonly run_id: string;
+  readonly queue_id: string;
+  readonly workspace_id: string | null;
+  readonly node_id: string;
+  readonly reservation_owner: string;
+  readonly claim_token: string;
+  readonly prepared_at: string;
+  readonly dispatch_metadata_json: string;
 }
 
 export class SqlitePlatformPersistenceAdapter
@@ -219,6 +238,10 @@ export class SqlitePlatformPersistenceAdapter
       claimed_by: null,
       claimed_at: null,
       claim_expires_at: null,
+      assignment_node_id: null,
+      assignment_claimed_at: null,
+      dispatch_prepared_at: null,
+      last_dispatch_attempt_id: null,
       dequeued_at: null,
       updated_at: record.updatedAt.trim(),
       revision: 1,
@@ -238,10 +261,14 @@ export class SqlitePlatformPersistenceAdapter
           claimed_by,
           claimed_at,
           claim_expires_at,
+          assignment_node_id,
+          assignment_claimed_at,
+          dispatch_prepared_at,
+          last_dispatch_attempt_id,
           dequeued_at,
           updated_at,
           revision
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
       persistedRow.run_id,
       persistedRow.queue_id,
@@ -255,6 +282,10 @@ export class SqlitePlatformPersistenceAdapter
       persistedRow.claimed_by,
       persistedRow.claimed_at,
       persistedRow.claim_expires_at,
+      persistedRow.assignment_node_id,
+      persistedRow.assignment_claimed_at,
+      persistedRow.dispatch_prepared_at,
+      persistedRow.last_dispatch_attempt_id,
       persistedRow.dequeued_at,
       persistedRow.updated_at,
       persistedRow.revision,
@@ -293,6 +324,10 @@ export class SqlitePlatformPersistenceAdapter
         claimed_by,
         claimed_at,
         claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
         dequeued_at,
         updated_at,
         revision
@@ -413,6 +448,10 @@ export class SqlitePlatformPersistenceAdapter
         claimed_by,
         claimed_at,
         claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
         dequeued_at,
         updated_at,
         revision
@@ -455,6 +494,218 @@ export class SqlitePlatformPersistenceAdapter
     ));
 
     return mutationResult.changes === 1;
+  }
+
+  public async claimQueuedRunForNodeDispatch(input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult> {
+    const runId = normalizePlatformLookup(input.runId);
+    const nodeId = normalizePlatformLookup(input.nodeId);
+    const reservationOwner = normalizePlatformLookup(input.reservationOwner);
+    const claimToken = normalizePlatformLookup(input.claimToken);
+    const dispatchAttemptId = normalizePlatformLookup(input.dispatchAttemptId);
+    if (!runId || !nodeId || !reservationOwner || !claimToken || !dispatchAttemptId) {
+      throw new Error("Node dispatch claim requires runId, nodeId, reservationOwner, claimToken, and dispatchAttemptId.");
+    }
+
+    const preparedAt = input.preparedAt.trim();
+    const existing = this.getQueueRowByRunId(runId);
+    if (!existing) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.notFound,
+          runId,
+          nodeId,
+          message: `Queued run '${runId}' was not found for node claim.`,
+        }),
+      });
+    }
+
+    if (existing.assignment_node_id) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.alreadyAssigned,
+          runId,
+          nodeId,
+          message: `Run '${runId}' is already claimed by node '${existing.assignment_node_id}'.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    if (
+      existing.dequeued_at
+      || (existing.lifecycle_state !== "queued" && existing.lifecycle_state !== "assignment-pending")
+    ) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.queueStateConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' is not claimable from queue lifecycle state '${existing.lifecycle_state}'.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    if (
+      existing.claim_token !== claimToken
+      || existing.claimed_by !== reservationOwner
+      || !existing.claim_expires_at
+      || existing.claim_expires_at < preparedAt
+    ) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.reservationConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' reservation claim no longer matches the provided claim token and owner.`,
+          currentEntry: this.mapQueueRowToRecord(existing),
+        }),
+      });
+    }
+
+    const claimed = this.getDatabase().transaction(() => {
+      const updateResult = this.getDatabase().prepare(`
+          UPDATE platform_run_orchestration_queue
+          SET
+            lifecycle_state = 'assigned',
+            assignment_node_id = ?,
+            assignment_claimed_at = ?,
+            dispatch_prepared_at = ?,
+            last_dispatch_attempt_id = ?,
+            dequeued_at = ?,
+            updated_at = ?,
+            revision = revision + 1
+          WHERE run_id = ?
+            AND claim_token = ?
+            AND claimed_by = ?
+            AND claim_expires_at IS NOT NULL
+            AND claim_expires_at >= ?
+            AND assignment_node_id IS NULL
+            AND dequeued_at IS NULL
+            AND lifecycle_state IN ('queued', 'assignment-pending')
+        `).run(
+        nodeId,
+        preparedAt,
+        preparedAt,
+        dispatchAttemptId,
+        preparedAt,
+        preparedAt,
+        runId,
+        claimToken,
+        reservationOwner,
+        preparedAt,
+      );
+      if (updateResult.changes !== 1) {
+        return false;
+      }
+
+      this.getDatabase().prepare(`
+          INSERT INTO platform_run_dispatch_attempts (
+            attempt_id,
+            run_id,
+            queue_id,
+            workspace_id,
+            node_id,
+            reservation_owner,
+            claim_token,
+            prepared_at,
+            dispatch_metadata_json,
+            created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+        dispatchAttemptId,
+        runId,
+        existing.queue_id,
+        existing.workspace_id,
+        nodeId,
+        reservationOwner,
+        claimToken,
+        preparedAt,
+        JSON.stringify(input.dispatchMetadata),
+        preparedAt,
+      );
+      return true;
+    })();
+
+    if (!claimed) {
+      const conflicted = this.getQueueRowByRunId(runId);
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.queueStateConflict,
+          runId,
+          nodeId,
+          message: `Run '${runId}' could not be claimed due to a concurrent queue state change.`,
+          currentEntry: conflicted ? this.mapQueueRowToRecord(conflicted) : undefined,
+        }),
+      });
+    }
+
+    const claimedRow = this.getQueueRowByRunId(runId);
+    if (!claimedRow) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodeClaimConflictReasons.notFound,
+          runId,
+          nodeId,
+          message: `Run '${runId}' disappeared after claim update.`,
+        }),
+      });
+    }
+
+    return Object.freeze({
+      outcome: "claimed",
+      queueEntry: this.mapQueueRowToRecord(claimedRow),
+      dispatchAttempt: Object.freeze({
+        attemptId: dispatchAttemptId,
+        runId,
+        queueId: existing.queue_id,
+        workspaceId: normalizePlatformLookup(existing.workspace_id ?? ""),
+        nodeId,
+        reservationOwner,
+        claimToken,
+        preparedAt,
+        dispatchMetadata: Object.freeze({ ...input.dispatchMetadata }),
+      }),
+    });
+  }
+
+  public async listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
+    const normalizedRunId = normalizePlatformLookup(runId);
+    if (!normalizedRunId) {
+      return Object.freeze([]);
+    }
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        attempt_id,
+        run_id,
+        queue_id,
+        workspace_id,
+        node_id,
+        reservation_owner,
+        claim_token,
+        prepared_at,
+        dispatch_metadata_json
+      FROM platform_run_dispatch_attempts
+      WHERE run_id = ?
+      ORDER BY prepared_at DESC, attempt_id ASC
+    `).all(normalizedRunId) as PlatformRunDispatchAttemptRow[];
+
+    return Object.freeze(rows.map((row) => this.mapDispatchAttemptRowToRecord(row)));
   }
 
   public async appendAuditEvent(
@@ -873,6 +1124,10 @@ export class SqlitePlatformPersistenceAdapter
         claimed_by,
         claimed_at,
         claim_expires_at,
+        assignment_node_id,
+        assignment_claimed_at,
+        dispatch_prepared_at,
+        last_dispatch_attempt_id,
         dequeued_at,
         updated_at,
         revision
@@ -896,9 +1151,27 @@ export class SqlitePlatformPersistenceAdapter
       claimedBy: normalizePlatformLookup(row.claimed_by ?? ""),
       claimedAt: normalizePlatformLookup(row.claimed_at ?? ""),
       claimExpiresAt: normalizePlatformLookup(row.claim_expires_at ?? ""),
+      assignmentNodeId: normalizePlatformLookup(row.assignment_node_id ?? ""),
+      assignmentClaimedAt: normalizePlatformLookup(row.assignment_claimed_at ?? ""),
+      dispatchPreparedAt: normalizePlatformLookup(row.dispatch_prepared_at ?? ""),
+      lastDispatchAttemptId: normalizePlatformLookup(row.last_dispatch_attempt_id ?? ""),
       dequeuedAt: normalizePlatformLookup(row.dequeued_at ?? ""),
       updatedAt: row.updated_at,
       revision: row.revision,
+    });
+  }
+
+  private mapDispatchAttemptRowToRecord(row: PlatformRunDispatchAttemptRow): AuthoritativeRunDispatchAttemptRecord {
+    return Object.freeze({
+      attemptId: row.attempt_id,
+      runId: row.run_id,
+      queueId: row.queue_id,
+      workspaceId: normalizePlatformLookup(row.workspace_id ?? ""),
+      nodeId: row.node_id,
+      reservationOwner: row.reservation_owner,
+      claimToken: row.claim_token,
+      preparedAt: row.prepared_at,
+      dispatchMetadata: Object.freeze(JSON.parse(row.dispatch_metadata_json) as Record<string, unknown>),
     });
   }
 

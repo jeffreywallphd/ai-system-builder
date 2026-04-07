@@ -6,6 +6,8 @@ import type {
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type {
+  AuthoritativeRunDispatchAttemptRecord,
+  AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
@@ -34,6 +36,18 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   public async createRun(
     record: PlatformRunRecord,
     _mutation: PlatformPersistenceMutationContext,
+  ): Promise<PlatformRunMutationResult> {
+    this.runs.set(record.runId, record);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      record,
+    });
+  }
+
+  public async saveRun(
+    record: PlatformRunRecord,
+    _mutation: PlatformPersistenceMutationContext & { readonly expectedRevision?: number },
   ): Promise<PlatformRunMutationResult> {
     this.runs.set(record.runId, record);
     return Object.freeze({
@@ -149,6 +163,22 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       revision: existing.revision + 1,
     }));
     return true;
+  }
+
+  public async claimQueuedRunForNodeDispatch(_input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult> {
+    throw new Error("Not implemented.");
+  }
+
+  public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
+    return Object.freeze([]);
   }
 }
 

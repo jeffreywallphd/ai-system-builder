@@ -16,6 +16,12 @@ export interface IAuthoritativeRunPersistenceRepository {
     record: PlatformRunRecord,
     mutation: AuthoritativeRunPersistenceMutationContext,
   ): Promise<PlatformRunMutationResult>;
+  saveRun(
+    record: PlatformRunRecord,
+    mutation: AuthoritativeRunPersistenceMutationContext & {
+      readonly expectedRevision?: number;
+    },
+  ): Promise<PlatformRunMutationResult>;
 }
 
 export interface IRunOrchestrationIntentRepository {
@@ -47,6 +53,10 @@ export interface AuthoritativeRunQueueEntryRecord {
   readonly claimedBy?: string;
   readonly claimedAt?: string;
   readonly claimExpiresAt?: string;
+  readonly assignmentNodeId?: string;
+  readonly assignmentClaimedAt?: string;
+  readonly dispatchPreparedAt?: string;
+  readonly lastDispatchAttemptId?: string;
   readonly dequeuedAt?: string;
   readonly updatedAt: string;
   readonly revision: number;
@@ -56,6 +66,51 @@ export interface AuthoritativeRunQueueMutationResult {
   readonly changed: boolean;
   readonly record: AuthoritativeRunQueueEntryRecord;
 }
+
+export const RunNodeClaimConflictReasons = Object.freeze({
+  notFound: "not-found",
+  alreadyAssigned: "already-assigned",
+  queueStateConflict: "queue-state-conflict",
+  reservationConflict: "reservation-conflict",
+});
+
+export type RunNodeClaimConflictReason =
+  typeof RunNodeClaimConflictReasons[keyof typeof RunNodeClaimConflictReasons];
+
+export interface AuthoritativeRunNodeClaimConflict {
+  readonly reason: RunNodeClaimConflictReason;
+  readonly runId: string;
+  readonly nodeId: string;
+  readonly message: string;
+  readonly currentEntry?: AuthoritativeRunQueueEntryRecord;
+}
+
+export interface AuthoritativeRunDispatchAttemptRecord {
+  readonly attemptId: string;
+  readonly runId: string;
+  readonly queueId: string;
+  readonly workspaceId?: string;
+  readonly nodeId: string;
+  readonly reservationOwner: string;
+  readonly claimToken: string;
+  readonly preparedAt: string;
+  readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+}
+
+export interface AuthoritativeRunNodeClaimSuccess {
+  readonly outcome: "claimed";
+  readonly queueEntry: AuthoritativeRunQueueEntryRecord;
+  readonly dispatchAttempt: AuthoritativeRunDispatchAttemptRecord;
+}
+
+export interface AuthoritativeRunNodeClaimConflictResult {
+  readonly outcome: "conflict";
+  readonly conflict: AuthoritativeRunNodeClaimConflict;
+}
+
+export type AuthoritativeRunNodeClaimResult =
+  | AuthoritativeRunNodeClaimSuccess
+  | AuthoritativeRunNodeClaimConflictResult;
 
 export interface IRunOrchestrationQueuePersistenceRepository {
   getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined>;
@@ -85,5 +140,15 @@ export interface IRunOrchestrationQueuePersistenceRepository {
     readonly claimToken: string;
     readonly releasedAt: string;
   }): Promise<boolean>;
+  claimQueuedRunForNodeDispatch(input: {
+    readonly runId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly dispatchAttemptId: string;
+    readonly preparedAt: string;
+    readonly dispatchMetadata: Readonly<Record<string, unknown>>;
+  }): Promise<AuthoritativeRunNodeClaimResult>;
+  listDispatchAttemptsByRunId(runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>;
 }
 

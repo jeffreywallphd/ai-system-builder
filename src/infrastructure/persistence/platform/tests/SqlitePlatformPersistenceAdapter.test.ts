@@ -49,7 +49,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(2);
+    expect(versionRow.version).toBe(3);
 
     const tables = database.prepare(`
       SELECT name
@@ -59,7 +59,8 @@ describe("SqlitePlatformPersistenceAdapter", () => {
           'platform_run_records',
           'platform_audit_events',
           'platform_persistence_mutation_replays',
-          'platform_run_orchestration_queue'
+          'platform_run_orchestration_queue',
+          'platform_run_dispatch_attempts'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
@@ -67,6 +68,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     expect(tables.map((table) => table.name)).toEqual([
       "platform_audit_events",
       "platform_persistence_mutation_replays",
+      "platform_run_dispatch_attempts",
       "platform_run_orchestration_queue",
       "platform_run_records",
     ]);
@@ -496,6 +498,130 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       limit: 10,
     });
     expect(readyAfterRelease.map((entry) => entry.runId)).toEqual(["run-queue-2"]);
+
+    adapter.dispose();
+  });
+
+  it("claims queued runs for node dispatch once and surfaces controlled duplicate conflicts", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-node-claim-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await adapter.createRun({
+      runId: "run-dispatch-1",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:dispatch",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      metadata: {
+        canonicalRun: {
+          identity: {
+            runId: "run-dispatch-1",
+            workflowId: "workflow:dispatch",
+            workspaceId: "workspace-alpha",
+          },
+          submission: {
+            source: "api",
+            submittedAt: "2026-04-06T12:00:00.000Z",
+          },
+          state: "queued",
+          queue: {
+            queueId: "queue:default",
+            enteredAt: "2026-04-06T12:00:00.000Z",
+            position: null,
+            positionAsOf: "2026-04-06T12:00:00.000Z",
+          },
+          assignment: {
+            status: "unassigned",
+          },
+          execution: {
+            outcome: "none",
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 1,
+          },
+          updatedAt: "2026-04-06T12:00:00.000Z",
+        },
+      },
+      revision: 0,
+    }, {
+      operationKey: "op-run-dispatch-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    await adapter.enqueueRunForAssignment({
+      runId: "run-dispatch-1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      lifecycleState: "queued",
+      enteredAt: "2026-04-06T12:00:00.000Z",
+      orderKey: "2026-04-06T12:00:00.000Z:run-dispatch-1",
+      eligibilityMarker: "ready",
+      eligibleAt: "2026-04-06T12:00:00.000Z",
+      updatedAt: "2026-04-06T12:00:00.000Z",
+    }, {
+      operationKey: "op-run-dispatch-enqueue",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    const reservation = await adapter.claimAssignmentReadyRuns({
+      asOf: "2026-04-06T12:01:00.000Z",
+      reservationOwner: "orchestrator:alpha",
+      reservationTtlSeconds: 300,
+      limit: 1,
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+    });
+    const claimToken = reservation[0]?.claimToken;
+    expect(claimToken).toBeDefined();
+
+    const [claimA, claimB] = await Promise.all([
+      adapter.claimQueuedRunForNodeDispatch({
+        runId: "run-dispatch-1",
+        nodeId: "node:trusted-alpha",
+        reservationOwner: "orchestrator:alpha",
+        claimToken: claimToken!,
+        dispatchAttemptId: "dispatch-attempt:1",
+        preparedAt: "2026-04-06T12:02:00.000Z",
+        dispatchMetadata: Object.freeze({
+          runId: "run-dispatch-1",
+        }),
+      }),
+      adapter.claimQueuedRunForNodeDispatch({
+        runId: "run-dispatch-1",
+        nodeId: "node:trusted-beta",
+        reservationOwner: "orchestrator:alpha",
+        claimToken: claimToken!,
+        dispatchAttemptId: "dispatch-attempt:2",
+        preparedAt: "2026-04-06T12:02:00.000Z",
+        dispatchMetadata: Object.freeze({
+          runId: "run-dispatch-1",
+        }),
+      }),
+    ]);
+
+    const outcomes = [claimA, claimB].map((entry) => entry.outcome).sort();
+    expect(outcomes).toEqual(["claimed", "conflict"]);
+    const claimed = [claimA, claimB].find((entry) => entry.outcome === "claimed");
+    const conflicted = [claimA, claimB].find((entry) => entry.outcome === "conflict");
+    expect(claimed).toBeDefined();
+    expect(conflicted).toBeDefined();
+    if (claimed && claimed.outcome === "claimed") {
+      expect(claimed.queueEntry.assignmentNodeId).toBeDefined();
+      expect(claimed.queueEntry.dispatchPreparedAt).toBe("2026-04-06T12:02:00.000Z");
+    }
+    if (conflicted && conflicted.outcome === "conflict") {
+      expect(conflicted.conflict.reason).toBe("already-assigned");
+    }
+
+    const attempts = await adapter.listDispatchAttemptsByRunId("run-dispatch-1");
+    expect(attempts).toHaveLength(1);
+    expect(["dispatch-attempt:1", "dispatch-attempt:2"]).toContain(attempts[0]?.attemptId);
 
     adapter.dispose();
   });

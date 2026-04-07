@@ -260,3 +260,19 @@ export function mapPlatformRunRecordToCanonicalRun(record: PlatformRunRecord): C
     updatedAt: record.completedAt ?? record.startedAt ?? record.initiatedAt,
   });
 }
+
+export function updatePlatformRunRecordCanonicalState(
+  record: PlatformRunRecord,
+  canonicalRun: CanonicalRunRecord,
+): PlatformRunRecord {
+  const metadata = isObject(record.metadata)
+    ? { ...(record.metadata as Record<string, unknown>) }
+    : {};
+  metadata.canonicalRun = canonicalRun;
+
+  return Object.freeze({
+    ...record,
+    status: mapLifecycleStateToPlatformRunStatus(canonicalRun.state),
+    metadata: Object.freeze(metadata),
+  });
+}
