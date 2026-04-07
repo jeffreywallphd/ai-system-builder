@@ -1092,3 +1092,19 @@ Workflow persistence reuse hardening (stories 11.11-11.14):
 - Shared operational realtime indicator components now live in `src/ui/shared/operations/OperationalRealtimeIndicators.tsx` and are reused across dashboard/run/queue surfaces.
 - `RunPage` now keeps reconnect handling centralized as page-level orchestration around `RuntimeRealtimeSubscriptionService` and shared panel props, rather than panel-local websocket behavior.
 - Dashboard/run/queue components now consume one consistent connection snapshot model for live vs stale marker rendering and refresh/reconnect affordances.
+
+## Workspace management and membership administration update (story 15.3.2)
+
+- Workspace administration and admin-lite membership pages now compose shared workspace list/detail/action panels in:
+  - `src/ui/shared/workspaces/WorkspaceAdministrationPanels.tsx`
+- Shared panels now provide:
+  - workspace list selection composition for desktop and thin-client views,
+  - workspace-scoped operational context summaries with explicit permission-denied and partial-visibility messaging,
+  - membership and role administration actions through shared action descriptors (`SurfaceActionButtonStrip`, `SurfaceActionMenu`, `SurfaceActionList`) rather than page-local action branching.
+- Desktop and thin-client pages now reuse the same shared membership/role components and contracts:
+  - `src/ui/pages/WorkspaceAdministrationPage.tsx`
+  - `src/ui/pages/WorkspaceMembershipThinClientPage.tsx`
+- Added/updated renderer coverage for membership-management flow composition and capability-state rendering:
+  - `src/ui/shared/workspaces/tests/WorkspaceAdministrationPanels.test.tsx`
+  - `src/ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
+  - `src/ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
