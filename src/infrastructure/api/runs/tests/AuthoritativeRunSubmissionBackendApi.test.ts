@@ -6,9 +6,19 @@ import {
 import { RunSubmissionValidationErrorCodes } from "@application/runs/use-cases/RunSubmissionValidationContracts";
 import { AuthoritativeRunSubmissionBackendApi } from "../AuthoritativeRunSubmissionBackendApi";
 import { AssetBackedRunSubmissionTargetResolver } from "../AssetBackedRunSubmissionTargetResolver";
+import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 
 describe("AuthoritativeRunSubmissionBackendApi", () => {
   it("returns canonical run submission acceptance payload when validation passes", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
     const backend = new AuthoritativeRunSubmissionBackendApi({
       validateRunSubmissionUseCase: {
         execute: async () => Object.freeze({
@@ -44,6 +54,7 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
           orchestrationIntentEventId: "audit:1",
         }),
       } as any,
+      realtimePublisher,
     });
 
     const response = await backend.submitRun({
@@ -62,6 +73,11 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
     expect(response.data?.run.runId).toBe("run:1");
     expect(response.data?.mutation.changed).toBe(true);
     expect(response.data?.mutation.mutationId).toBe("audit:1");
+    expect(realtimeEvents).toHaveLength(2);
+    expect(realtimeEvents[0]?.type).toBe("run");
+    expect(realtimeEvents[1]?.type).toBe("queue");
+    expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("submission-accepted");
+    expect((realtimeEvents[1]?.payload as { eventKind?: string }).eventKind).toBe("queue-enqueued");
   });
 
   it("maps policy-ineligible validation denials to stable forbidden semantics with validation details", async () => {

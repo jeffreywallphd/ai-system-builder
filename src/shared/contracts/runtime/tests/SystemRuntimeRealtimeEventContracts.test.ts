@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  RuntimeRealtimeOrchestrationEventKinds,
   RuntimeRealtimeTopics,
   RuntimeRealtimeWebSocketActions,
   RuntimeRealtimeWebSocketMessageTypes,
@@ -74,5 +75,8 @@ describe("SystemRuntimeRealtimeEventContracts", () => {
     expect(RuntimeRealtimeWebSocketMessageTypes.subscriptionAck).toBe("runtime-realtime.subscription-ack");
     expect(RuntimeRealtimeWebSocketMessageTypes.event).toBe("runtime-realtime.event");
     expect(RuntimeRealtimeWebSocketMessageTypes.error).toBe("runtime-realtime.error");
+    expect(RuntimeRealtimeOrchestrationEventKinds.submissionAccepted).toBe("submission-accepted");
+    expect(RuntimeRealtimeOrchestrationEventKinds.queueEnqueued).toBe("queue-enqueued");
+    expect(RuntimeRealtimeOrchestrationEventKinds.progressUpdated).toBe("progress-updated");
   });
 });

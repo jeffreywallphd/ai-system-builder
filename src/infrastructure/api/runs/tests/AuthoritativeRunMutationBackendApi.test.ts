@@ -14,6 +14,7 @@ import {
   type RequestAuthoritativeRunRetryResult,
 } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import { AuthoritativeRunMutationBackendApi } from "../AuthoritativeRunMutationBackendApi";
+import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 
 class StubRequestAuthoritativeRunCancellationUseCase {
   public nextError: unknown;
@@ -128,11 +129,21 @@ function buildRun(runId: string, state: string, attempt: number, previousRunId: 
 
 describe("AuthoritativeRunMutationBackendApi", () => {
   it("returns canonical cancellation mutation payload on success", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
     const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
     const retry = new StubRequestAuthoritativeRunRetryUseCase();
     const api = new AuthoritativeRunMutationBackendApi({
       requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
       requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
+      realtimePublisher,
     });
 
     const response = await api.cancelRun({
@@ -149,6 +160,9 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     expect(response.ok).toBeTrue();
     expect(response.data?.action).toBe("cancel");
     expect(response.data?.run.state).toBe("cancelled");
+    expect(realtimeEvents).toHaveLength(2);
+    expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("cancelled");
+    expect((realtimeEvents[1]?.payload as { eventKind?: string }).eventKind).toBe("queue-updated");
   });
 
   it("maps cancellation validation and not-found failures to shared error semantics", async () => {
@@ -189,11 +203,21 @@ describe("AuthoritativeRunMutationBackendApi", () => {
   });
 
   it("returns canonical retry mutation payload on success", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
     const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
     const retry = new StubRequestAuthoritativeRunRetryUseCase();
     const api = new AuthoritativeRunMutationBackendApi({
       requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
       requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
+      realtimePublisher,
     });
 
     const response = await api.retryRun({
@@ -211,6 +235,9 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     expect(response.data?.action).toBe("retry");
     expect(response.data?.run.retry.previousRunId).toBe("run:1");
     expect(response.data?.run.retry.attempt).toBe(2);
+    expect(realtimeEvents).toHaveLength(2);
+    expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("retry-queued");
+    expect((realtimeEvents[1]?.payload as { eventKind?: string }).eventKind).toBe("queue-enqueued");
   });
 
   it("maps retry eligibility and not-found failures to shared error semantics", async () => {

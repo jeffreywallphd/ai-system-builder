@@ -6,13 +6,18 @@ import {
   type IngestRunExecutionUpdateResult,
 } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "../AuthoritativeRunExecutionUpdateBackendApi";
+import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 
 class StubIngestRunExecutionUpdateUseCase {
   public nextError: unknown;
+  public nextResult: IngestRunExecutionUpdateResult | undefined;
 
   public async execute(): Promise<IngestRunExecutionUpdateResult> {
     if (this.nextError) {
       throw this.nextError;
+    }
+    if (this.nextResult) {
+      return this.nextResult;
     }
 
     return Object.freeze({
@@ -66,9 +71,19 @@ class StubIngestRunExecutionUpdateUseCase {
 
 describe("AuthoritativeRunExecutionUpdateBackendApi", () => {
   it("returns canonical mutation/status payloads for successful ingestion", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
     const ingest = new StubIngestRunExecutionUpdateUseCase();
     const api = new AuthoritativeRunExecutionUpdateBackendApi({
       ingestRunExecutionUpdateUseCase: ingest as never,
+      realtimePublisher,
     });
 
     const response = await api.ingestExecutionUpdate({
@@ -84,6 +99,9 @@ describe("AuthoritativeRunExecutionUpdateBackendApi", () => {
     expect(response.ok).toBeTrue();
     expect(response.data?.mutation.action).toBe("lifecycle-update");
     expect(response.data?.status.runId).toBe("run:1");
+    expect(realtimeEvents).toHaveLength(2);
+    expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("state-changed");
+    expect((realtimeEvents[1]?.payload as { eventKind?: string }).eventKind).toBe("queue-updated");
   });
 
   it("maps validation and conflict errors to shared error envelopes", async () => {
@@ -113,5 +131,90 @@ describe("AuthoritativeRunExecutionUpdateBackendApi", () => {
     });
     expect(conflict.ok).toBeFalse();
     expect(conflict.error?.code).toBe(SharedApiErrorCodes.conflict);
+  });
+
+  it("publishes progress-updated orchestration events when execution progress changes", async () => {
+    const realtimeEvents: Array<{ type: "run" | "queue"; payload: unknown }> = [];
+    const realtimePublisher: RunOrchestrationRealtimePublisher = Object.freeze({
+      publishRunStatus: (input) => {
+        realtimeEvents.push({ type: "run", payload: input.payload });
+      },
+      publishQueueMovement: (input) => {
+        realtimeEvents.push({ type: "queue", payload: input.payload });
+      },
+    });
+    const ingest = new StubIngestRunExecutionUpdateUseCase();
+    ingest.nextResult = Object.freeze({
+      mutation: Object.freeze({
+        action: "lifecycle-update",
+        run: Object.freeze({
+          contractVersion: "run-orchestration-transport/v1",
+          runId: "run:progress",
+          workflowId: "workflow:demo",
+          workspaceId: "workspace-alpha",
+          source: "api",
+          state: "running",
+          assignmentStatus: "assigned",
+          executionOutcome: "none",
+          submittedAt: "2026-04-07T12:00:00.000Z",
+          updatedAt: "2026-04-07T12:05:00.000Z",
+          submission: Object.freeze({}),
+          assignment: Object.freeze({
+            status: "assigned",
+            assignedNodeId: "node:trusted-1",
+            assignedAt: "2026-04-07T12:00:00.000Z",
+          }),
+          execution: Object.freeze({
+            outcome: "none",
+            progress: Object.freeze({
+              updatedAt: "2026-04-07T12:05:00.000Z",
+              percent: 50,
+              stage: "render",
+            }),
+          }),
+          retry: Object.freeze({
+            attempt: 1,
+            maxAttempts: 2,
+          }),
+        }),
+        mutation: Object.freeze({
+          changed: true,
+          mutationId: "mutation-progress",
+          occurredAt: "2026-04-07T12:05:00.000Z",
+        }),
+      }),
+      status: Object.freeze({
+        runId: "run:progress",
+        state: "running",
+        updatedAt: "2026-04-07T12:05:00.000Z",
+        assignmentStatus: "assigned",
+        executionOutcome: "none",
+        retry: Object.freeze({
+          attempt: 1,
+          maxAttempts: 2,
+        }),
+      }),
+    });
+
+    const api = new AuthoritativeRunExecutionUpdateBackendApi({
+      ingestRunExecutionUpdateUseCase: ingest as never,
+      realtimePublisher,
+    });
+
+    const response = await api.ingestExecutionUpdate({
+      runId: "run:progress",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:progress",
+        progress: Object.freeze({
+          updatedAt: "2026-04-07T12:05:00.000Z",
+          percent: 50,
+          stage: "render",
+        }),
+      }),
+    });
+
+    expect(response.ok).toBeTrue();
+    expect((realtimeEvents[0]?.payload as { eventKind?: string }).eventKind).toBe("progress-updated");
   });
 });

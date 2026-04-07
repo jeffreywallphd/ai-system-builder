@@ -667,6 +667,71 @@ describe("SystemRuntimeBackendApi", () => {
     subscription.data?.unsubscribe();
   });
 
+  it("publishes authoritative orchestration run/queue events through runtime realtime subscriptions", () => {
+    const runtimeApi = new SystemRuntimeBackendApi(new InMemoryStudioShellRepository());
+    const captured: Array<{ topic: string; eventKind: unknown }> = [];
+    const subscription = runtimeApi.subscribeToRealtimeEvents({
+      requestContext: {
+        trustedInternal: true,
+        accessContext: { callerKind: "user", callerId: "ops-user" },
+      },
+      request: {
+        actor: {
+          actorUserIdentityId: "ops-user",
+          accessChannel: "desktop",
+          workspaceId: "workspace-ops",
+        },
+        topics: [
+          { topic: RuntimeRealtimeTopics.runStatus, workspaceId: "workspace-ops", executionId: "run:1" },
+          { topic: RuntimeRealtimeTopics.queue, workspaceId: "workspace-ops", executionId: "run:1" },
+        ],
+      },
+      listener: (event) => {
+        captured.push({
+          topic: event.topic,
+          eventKind: (event.payload as { eventKind?: string }).eventKind,
+        });
+      },
+    });
+    expect(subscription.ok).toBeTrue();
+
+    runtimeApi.publishRuntimeRunStatus({
+      workspaceId: "workspace-ops",
+      actorUserIdentityId: "ops-user",
+      payload: {
+        executionId: "run:1",
+        runId: "run:1",
+        workflowId: "workflow:demo",
+        queueId: "queue:default",
+        lifecycleState: "queued",
+        eventKind: "submission-accepted",
+        status: "queued",
+        changedAt: "2026-04-07T12:00:00.000Z",
+      },
+    });
+    runtimeApi.publishRuntimeQueueMovement({
+      workspaceId: "workspace-ops",
+      actorUserIdentityId: "ops-user",
+      payload: {
+        queueItemId: "runtime-queue:run:1",
+        executionId: "run:1",
+        runId: "run:1",
+        workflowId: "workflow:demo",
+        queueId: "queue:default",
+        lifecycleState: "queued",
+        eventKind: "queue-enqueued",
+        status: "queued",
+        changedAt: "2026-04-07T12:00:00.000Z",
+      },
+    });
+
+    expect(captured).toEqual(expect.arrayContaining([
+      { topic: RuntimeRealtimeTopics.runStatus, eventKind: "submission-accepted" },
+      { topic: RuntimeRealtimeTopics.queue, eventKind: "queue-enqueued" },
+    ]));
+    subscription.data?.unsubscribe();
+  });
+
   it("returns structured runtime input validation errors before orchestration", async () => {
     const repository = new InMemoryStudioShellRepository();
     await repository.saveAssetVersion(new AssetVersion({

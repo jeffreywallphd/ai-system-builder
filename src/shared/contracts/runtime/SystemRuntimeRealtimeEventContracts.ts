@@ -47,6 +47,23 @@ export const RuntimeRealtimeAdminChangeKinds = Object.freeze({
 export type RuntimeRealtimeAdminChangeKind =
   typeof RuntimeRealtimeAdminChangeKinds[keyof typeof RuntimeRealtimeAdminChangeKinds];
 
+export const RuntimeRealtimeOrchestrationEventKinds = Object.freeze({
+  submissionAccepted: "submission-accepted",
+  queueEnqueued: "queue-enqueued",
+  queueUpdated: "queue-updated",
+  assignmentUpdated: "assignment-updated",
+  progressUpdated: "progress-updated",
+  cancellationRequested: "cancellation-requested",
+  retryQueued: "retry-queued",
+  completed: "completed",
+  failed: "failed",
+  cancelled: "cancelled",
+  stateChanged: "state-changed",
+});
+
+export type RuntimeRealtimeOrchestrationEventKind =
+  typeof RuntimeRealtimeOrchestrationEventKinds[keyof typeof RuntimeRealtimeOrchestrationEventKinds];
+
 export interface RuntimeRealtimeActorScope {
   readonly actorUserIdentityId: string;
   readonly accessChannel: "desktop" | "thin-client";
@@ -72,6 +89,11 @@ export interface RuntimeRealtimeSubscriptionRequest {
 export interface RuntimeRealtimeRunStatusPayload {
   readonly executionId: string;
   readonly status: string;
+  readonly runId?: string;
+  readonly workflowId?: string;
+  readonly queueId?: string;
+  readonly lifecycleState?: string;
+  readonly eventKind?: RuntimeRealtimeOrchestrationEventKind;
   readonly sessionId?: string;
   readonly rootAssetId?: string;
   readonly rootVersionId?: string;
@@ -88,6 +110,11 @@ export interface RuntimeRealtimeQueueMovementPayload {
   readonly queueItemId: string;
   readonly executionId: string;
   readonly status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  readonly runId?: string;
+  readonly workflowId?: string;
+  readonly queueId?: string;
+  readonly lifecycleState?: string;
+  readonly eventKind?: RuntimeRealtimeOrchestrationEventKind;
   readonly position?: number;
   readonly sessionId?: string;
   readonly changedAt: string;

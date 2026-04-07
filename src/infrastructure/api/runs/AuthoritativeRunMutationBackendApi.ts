@@ -24,6 +24,12 @@ import {
   RunRetrySubmissionValidationError,
   RunRetryValidationError,
 } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
+import {
+  buildQueueMovementPayload,
+  buildRunStatusPayload,
+  publishRunOrchestrationRealtimeEventsBestEffort,
+  type RunOrchestrationRealtimePublisher,
+} from "./RunOrchestrationRealtimePublisher";
 
 const AuthoritativeRunResourceType = "authoritative-run";
 
@@ -51,6 +57,7 @@ export interface AuthoritativeRunMutationBackendApiDependencies {
   readonly requestAuthoritativeRunCancellationUseCase: RequestAuthoritativeRunCancellationUseCase;
   readonly requestAuthoritativeRunRetryUseCase: RequestAuthoritativeRunRetryUseCase;
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
   readonly now?: () => Date;
 }
 
@@ -91,6 +98,28 @@ export class AuthoritativeRunMutationBackendApi {
           runId,
           requestedByActorId: request.cancellation.requestedByActorId?.trim() || actorUserIdentityId,
         }),
+      });
+      await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
+        this.dependencies.realtimePublisher?.publishRunStatus({
+          actorUserIdentityId,
+          workspaceId,
+          payload: buildRunStatusPayload({
+            run: cancelled.mutation.run,
+            eventKind: cancelled.mutation.run.state === "cancelling"
+              ? "cancellation-requested"
+              : "cancelled",
+            changedAt: cancelled.mutation.mutation.occurredAt,
+          }),
+        });
+        this.dependencies.realtimePublisher?.publishQueueMovement({
+          actorUserIdentityId,
+          workspaceId,
+          payload: buildQueueMovementPayload({
+            run: cancelled.mutation.run,
+            eventKind: "queue-updated",
+            changedAt: cancelled.mutation.mutation.occurredAt,
+          }),
+        });
       });
 
       return Object.freeze({
@@ -145,6 +174,26 @@ export class AuthoritativeRunMutationBackendApi {
           runId,
           requestedByActorId: request.retry.requestedByActorId?.trim() || actorUserIdentityId,
         }),
+      });
+      await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
+        this.dependencies.realtimePublisher?.publishRunStatus({
+          actorUserIdentityId,
+          workspaceId,
+          payload: buildRunStatusPayload({
+            run: retried.mutation.run,
+            eventKind: "retry-queued",
+            changedAt: retried.mutation.mutation.occurredAt,
+          }),
+        });
+        this.dependencies.realtimePublisher?.publishQueueMovement({
+          actorUserIdentityId,
+          workspaceId,
+          payload: buildQueueMovementPayload({
+            run: retried.mutation.run,
+            eventKind: "queue-enqueued",
+            changedAt: retried.mutation.mutation.occurredAt,
+          }),
+        });
       });
 
       return Object.freeze({
