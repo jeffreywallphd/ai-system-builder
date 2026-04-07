@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 4;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 5;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -169,5 +169,28 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
   `],
   [4, `
     ALTER TABLE platform_run_dispatch_attempts ADD COLUMN dispatch_result_json TEXT;
+  `],
+  [5, `
+    CREATE TABLE IF NOT EXISTS platform_run_node_placement_holds (
+      node_id TEXT PRIMARY KEY,
+      hold_token TEXT NOT NULL UNIQUE,
+      run_id TEXT NOT NULL,
+      queue_id TEXT NOT NULL,
+      reservation_owner TEXT NOT NULL,
+      claim_token TEXT NOT NULL,
+      decision_id TEXT,
+      held_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES platform_run_records(run_id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS platform_run_node_placement_holds_token_uidx
+      ON platform_run_node_placement_holds(hold_token);
+    CREATE INDEX IF NOT EXISTS platform_run_node_placement_holds_expiry_idx
+      ON platform_run_node_placement_holds(expires_at ASC, node_id ASC);
+    CREATE INDEX IF NOT EXISTS platform_run_node_placement_holds_owner_idx
+      ON platform_run_node_placement_holds(reservation_owner, expires_at ASC, node_id ASC);
   `],
 ]);

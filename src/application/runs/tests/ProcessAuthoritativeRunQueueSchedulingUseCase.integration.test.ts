@@ -9,14 +9,19 @@ import type {
 import type {
   AuthoritativeRunDispatchAttemptRecord,
   AuthoritativeRunDispatchAttemptResult,
+  AuthoritativeRunNodePlacementHoldResult,
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunNodePlacementHoldRepository,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
-import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import {
+  RunNodeClaimConflictReasons,
+  RunNodePlacementHoldConflictReasons,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
 import { SelectAssignmentReadyRunsUseCase } from "@application/runs/use-cases/SelectAssignmentReadyRunsUseCase";
 import { ClaimRunForNodeDispatchPreparationUseCase } from "@application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase";
@@ -87,9 +92,20 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   }
 }
 
-class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository {
+class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceRepository, IRunNodePlacementHoldRepository {
   public readonly entries = new Map<string, AuthoritativeRunQueueEntryRecord>();
   public readonly attempts = new Map<string, AuthoritativeRunDispatchAttemptRecord>();
+  public readonly placementHolds = new Map<string, {
+    readonly holdToken: string;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly decisionId?: string;
+    readonly heldAt: string;
+    readonly expiresAt: string;
+  }>();
 
   public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
     return this.entries.get(runId);
@@ -180,6 +196,71 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
       updatedAt: input.releasedAt,
       revision: existing.revision + 1,
     }));
+    return true;
+  }
+
+  public async acquireNodePlacementHold(input: {
+    readonly holdToken: string;
+    readonly runId: string;
+    readonly queueId: string;
+    readonly nodeId: string;
+    readonly reservationOwner: string;
+    readonly claimToken: string;
+    readonly decisionId?: string;
+    readonly heldAt: string;
+    readonly expiresAt: string;
+  }): Promise<AuthoritativeRunNodePlacementHoldResult> {
+    const existing = this.placementHolds.get(input.nodeId);
+    if (existing && existing.expiresAt > input.heldAt && existing.holdToken !== input.holdToken) {
+      return Object.freeze({
+        outcome: "conflict",
+        conflict: Object.freeze({
+          reason: RunNodePlacementHoldConflictReasons.heldByAnotherOwner,
+          nodeId: input.nodeId,
+          message: "Node already has an active placement hold.",
+          currentHold: Object.freeze({
+            holdToken: existing.holdToken,
+            runId: existing.runId,
+            queueId: existing.queueId,
+            nodeId: existing.nodeId,
+            reservationOwner: existing.reservationOwner,
+            claimToken: existing.claimToken,
+            decisionId: existing.decisionId,
+            heldAt: existing.heldAt,
+            expiresAt: existing.expiresAt,
+          }),
+        }),
+      });
+    }
+
+    const hold = Object.freeze({
+      holdToken: input.holdToken,
+      runId: input.runId,
+      queueId: input.queueId,
+      nodeId: input.nodeId,
+      reservationOwner: input.reservationOwner,
+      claimToken: input.claimToken,
+      decisionId: input.decisionId,
+      heldAt: input.heldAt,
+      expiresAt: input.expiresAt,
+    });
+    this.placementHolds.set(input.nodeId, hold);
+    return Object.freeze({
+      outcome: "acquired",
+      hold,
+    });
+  }
+
+  public async releaseNodePlacementHold(input: {
+    readonly nodeId: string;
+    readonly holdToken: string;
+    readonly releasedAt: string;
+  }): Promise<boolean> {
+    const existing = this.placementHolds.get(input.nodeId);
+    if (!existing || existing.holdToken !== input.holdToken) {
+      return false;
+    }
+    this.placementHolds.delete(input.nodeId);
     return true;
   }
 
@@ -495,6 +576,7 @@ describe("ProcessAuthoritativeRunQueueSchedulingUseCase integration", () => {
     });
     const schedulingAssignmentGateway = new MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase({
       queueRepository,
+      placementHoldRepository: queueRepository,
       claimRunForNodeDispatchPreparationUseCase: claimUseCase,
       now: () => new Date("2026-04-07T12:01:00.000Z"),
     });

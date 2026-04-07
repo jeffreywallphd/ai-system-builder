@@ -49,7 +49,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(4);
+    expect(versionRow.version).toBe(5);
 
     const tables = database.prepare(`
       SELECT name
@@ -60,6 +60,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
           'platform_audit_events',
           'platform_persistence_mutation_replays',
           'platform_run_orchestration_queue',
+          'platform_run_node_placement_holds',
           'platform_run_dispatch_attempts'
         )
       ORDER BY name ASC
@@ -69,6 +70,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       "platform_audit_events",
       "platform_persistence_mutation_replays",
       "platform_run_dispatch_attempts",
+      "platform_run_node_placement_holds",
       "platform_run_orchestration_queue",
       "platform_run_records",
     ]);
@@ -767,6 +769,116 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     expect(queueEntry?.dequeuedAt).toBeUndefined();
     expect(queueEntry?.claimToken).toBeUndefined();
     expect(queueEntry?.lastDispatchAttemptId).toBeUndefined();
+
+    adapter.dispose();
+  });
+
+  it("supports node placement hold conflict and expiry lifecycle semantics", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-node-holds-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    await adapter.createRun({
+      runId: "run-hold-1",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:hold",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      revision: 0,
+    }, {
+      operationKey: "op-run-hold-1-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+    await adapter.createRun({
+      runId: "run-hold-2",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:hold",
+      initiatedAt: "2026-04-06T12:01:00.000Z",
+      revision: 0,
+    }, {
+      operationKey: "op-run-hold-2-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:01:00.000Z",
+    });
+
+    const holdA = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:1",
+      runId: "run-hold-1",
+      queueId: "queue:default",
+      nodeId: "node:trusted-1",
+      reservationOwner: "scheduler:alpha",
+      claimToken: "claim:1",
+      decisionId: "decision:1",
+      heldAt: "2026-04-06T12:05:00.000Z",
+      expiresAt: "2026-04-06T12:05:20.000Z",
+    });
+    expect(holdA.outcome).toBe("acquired");
+
+    const conflict = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:2",
+      runId: "run-hold-2",
+      queueId: "queue:default",
+      nodeId: "node:trusted-1",
+      reservationOwner: "scheduler:beta",
+      claimToken: "claim:2",
+      decisionId: "decision:2",
+      heldAt: "2026-04-06T12:05:10.000Z",
+      expiresAt: "2026-04-06T12:05:40.000Z",
+    });
+    expect(conflict.outcome).toBe("conflict");
+    if (conflict.outcome === "conflict") {
+      expect(conflict.conflict.reason).toBe("held-by-another-owner");
+      expect(conflict.conflict.currentHold.holdToken).toBe("node-hold:1");
+    }
+
+    const releaseWrongToken = await adapter.releaseNodePlacementHold({
+      nodeId: "node:trusted-1",
+      holdToken: "node-hold:missing",
+      releasedAt: "2026-04-06T12:05:11.000Z",
+    });
+    expect(releaseWrongToken).toBeFalse();
+
+    const holdAfterExpiry = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:3",
+      runId: "run-hold-2",
+      queueId: "queue:default",
+      nodeId: "node:trusted-1",
+      reservationOwner: "scheduler:beta",
+      claimToken: "claim:2",
+      decisionId: "decision:2",
+      heldAt: "2026-04-06T12:05:21.000Z",
+      expiresAt: "2026-04-06T12:05:41.000Z",
+    });
+    expect(holdAfterExpiry.outcome).toBe("acquired");
+    if (holdAfterExpiry.outcome === "acquired") {
+      expect(holdAfterExpiry.hold.holdToken).toBe("node-hold:3");
+      expect(holdAfterExpiry.hold.runId).toBe("run-hold-2");
+    }
+
+    const released = await adapter.releaseNodePlacementHold({
+      nodeId: "node:trusted-1",
+      holdToken: "node-hold:3",
+      releasedAt: "2026-04-06T12:05:22.000Z",
+    });
+    expect(released).toBeTrue();
+
+    const reacquired = await adapter.acquireNodePlacementHold({
+      holdToken: "node-hold:4",
+      runId: "run-hold-1",
+      queueId: "queue:default",
+      nodeId: "node:trusted-1",
+      reservationOwner: "scheduler:alpha",
+      claimToken: "claim:4",
+      heldAt: "2026-04-06T12:05:23.000Z",
+      expiresAt: "2026-04-06T12:05:43.000Z",
+    });
+    expect(reacquired.outcome).toBe("acquired");
 
     adapter.dispose();
   });

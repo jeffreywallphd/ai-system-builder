@@ -1,9 +1,13 @@
+import { randomUUID } from "node:crypto";
 import type {
   IAuthoritativeSchedulingAssignmentGateway,
   SchedulingAssignmentIntent,
   SchedulingDecisionBundle,
 } from "@application/scheduling/AuthoritativeSchedulingDecisionPipeline";
-import type { IRunOrchestrationQueuePersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  IRunNodePlacementHoldRepository,
+  IRunOrchestrationQueuePersistenceRepository,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import {
   ClaimRunForNodeDispatchPreparationUseCase,
   RunNodeDispatchClaimConflictError,
@@ -11,17 +15,30 @@ import {
 
 interface MaterializeAuthoritativeSchedulingAssignmentGatewayUseCaseDependencies {
   readonly queueRepository: Pick<IRunOrchestrationQueuePersistenceRepository, "releaseRunClaim">;
+  readonly placementHoldRepository: IRunNodePlacementHoldRepository;
   readonly claimRunForNodeDispatchPreparationUseCase: Pick<ClaimRunForNodeDispatchPreparationUseCase, "execute">;
   readonly now?: () => Date;
+  readonly placementHoldTtlSeconds?: number;
+  readonly idGenerator?: {
+    nextId(prefix: string): string;
+  };
 }
 
 export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implements IAuthoritativeSchedulingAssignmentGateway {
   private readonly now: () => Date;
+  private readonly placementHoldTtlSeconds: number;
+  private readonly idGenerator: {
+    nextId(prefix: string): string;
+  };
 
   public constructor(
     private readonly dependencies: MaterializeAuthoritativeSchedulingAssignmentGatewayUseCaseDependencies,
   ) {
     this.now = dependencies.now ?? (() => new Date());
+    this.placementHoldTtlSeconds = Math.max(1, dependencies.placementHoldTtlSeconds ?? 30);
+    this.idGenerator = dependencies.idGenerator ?? {
+      nextId: (prefix) => `${prefix}:${randomUUID()}`,
+    };
   }
 
   public async materializeAssignmentIntents(input: {
@@ -41,6 +58,29 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
 
     const materialized: SchedulingAssignmentIntent[] = [];
     for (const intent of input.decisionBundle.assignmentIntents) {
+      const holdToken = this.idGenerator.nextId("node-placement-hold");
+      const heldAt = this.now().toISOString();
+      const expiresAt = new Date(Date.parse(heldAt) + (this.placementHoldTtlSeconds * 1000)).toISOString();
+      const hold = await this.dependencies.placementHoldRepository.acquireNodePlacementHold({
+        holdToken,
+        runId: intent.runId,
+        queueId: intent.queueId,
+        nodeId: intent.nodeId,
+        reservationOwner: intent.reservationOwner,
+        claimToken: intent.claimToken,
+        decisionId: intent.decisionId,
+        heldAt,
+        expiresAt,
+      });
+      if (hold.outcome === "conflict") {
+        await this.dependencies.queueRepository.releaseRunClaim({
+          runId: intent.runId,
+          claimToken: intent.claimToken,
+          releasedAt: this.now().toISOString(),
+        });
+        continue;
+      }
+
       try {
         await this.dependencies.claimRunForNodeDispatchPreparationUseCase.execute({
           runId: intent.runId,
@@ -51,14 +91,18 @@ export class MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase implemen
         });
         materialized.push(intent);
       } catch (error) {
-        if (error instanceof RunNodeDispatchClaimConflictError) {
-          continue;
+        if (!(error instanceof RunNodeDispatchClaimConflictError)) {
+          throw error;
         }
-        throw error;
+      } finally {
+        await this.dependencies.placementHoldRepository.releaseNodePlacementHold({
+          nodeId: intent.nodeId,
+          holdToken,
+          releasedAt: this.now().toISOString(),
+        });
       }
     }
 
     return Object.freeze(materialized);
   }
 }
-
