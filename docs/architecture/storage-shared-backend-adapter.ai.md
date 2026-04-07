@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Story 9.2.3 adds the managed shared/network-mounted storage backend adapter for `network-share` storage instances.
+Story 9.2.3 adds the managed src/shared/network-mounted storage backend adapter for `network-share` storage instances.
 
 ## Canonical files
 
-- `src/infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter.ts`
-- `src/infrastructure/storage/shared/index.ts`
-- `src/infrastructure/storage/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
+- `src/infrastructure/storage/src/shared/ServerManagedSharedStorageBackendAdapter.ts`
+- `src/infrastructure/storage/src/shared/index.ts`
+- `src/infrastructure/storage/src/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
 
 ## What it implements
 

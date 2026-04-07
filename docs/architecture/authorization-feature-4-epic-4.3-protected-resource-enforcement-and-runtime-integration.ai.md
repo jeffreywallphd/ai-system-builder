@@ -6,24 +6,24 @@ Story 4.3.1 introduces reusable transport-layer authorization enforcement adapte
 
 ## Canonical files
 
-- `infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
-- `infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
-- `infrastructure/transport/authorization/index.ts`
-- `infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportPolicyGuard.ts`
+- `src/infrastructure/transport/authorization/AuthorizationTransportAdapters.ts`
+- `src/infrastructure/transport/authorization/index.ts`
+- `src/infrastructure/transport/authorization/tests/AuthorizationTransportAdapters.test.ts`
 - `src/infrastructure/persistence/workspaces/WorkspaceAuthorizationPolicyReadAdapter.ts`
 - `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`
 - `src/infrastructure/api/workspaces/sdk/PublicWorkspaceAdministrationApiContract.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
-- `ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
-- `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
-- `infrastructure/api/registry/RegistryBackendApi.ts`
-- `infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
-- `infrastructure/api/registry/tests/RegistryBackendApiAuthorization.test.ts`
-- `infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
-- `infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
-- `infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
-- `infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
-- `infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
+- `src/ui/presenters/WorkspaceAdministrationCapabilitiesPresenter.ts`
+- `src/infrastructure/api/studio-shell/StudioShellBackendApi.ts`
+- `src/infrastructure/api/registry/RegistryBackendApi.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputAuthorization.test.ts`
+- `src/infrastructure/api/registry/tests/RegistryBackendApiAuthorization.test.ts`
+- `src/infrastructure/api/studio-shell/tests/OperationalRunAuthorization.test.ts`
+- `src/infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`
+- `src/infrastructure/api/system-runtime/tests/SystemRuntimeOperationalAuthorization.test.ts`
+- `src/infrastructure/api/system-runtime/RuntimeRequestRouter.ts`
+- `src/infrastructure/api/system-runtime/tests/RuntimeRequestRouter.test.ts`
 - `docs/architecture/authorization-enforcement-integration-patterns.md`
 - `docs/architecture/authorization-enforcement-integration-patterns.ai.md`
 

@@ -38,16 +38,16 @@ Implemented transport and host composition:
 
 UI entry points now consume this same HTTP surface through renderer identity adapters:
 
-- shared transport client: `ui/shared/identity/IdentityAuthClient.ts`
-- desktop endpoint resolver: `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
-- web/thin-client endpoint resolver: `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
-- UI-facing service: `ui/services/IdentityAuthService.ts`
-- admin UI surface: `ui/pages/IdentityAdminPage.tsx` (account list, status inspection, enable/disable actions)
-- trusted-device UI surface: `ui/pages/TrustedDevicesPage.tsx` (pairing initiation/validation/completion + trusted-device list/revocation flows)
+- shared transport client: `src/ui/shared/identity/IdentityAuthClient.ts`
+- desktop endpoint resolver: `src/ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- web/thin-client endpoint resolver: `src/ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- UI-facing service: `src/ui/services/IdentityAuthService.ts`
+- admin UI surface: `src/ui/pages/IdentityAdminPage.tsx` (account list, status inspection, enable/disable actions)
+- trusted-device UI surface: `src/ui/pages/TrustedDevicesPage.tsx` (pairing initiation/validation/completion + trusted-device list/revocation flows)
 
 Browser development host wiring (`npm run dev:browser`) now self-bootstraps the identity server through the Vite runtime plugin:
 
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` starts `IdentityServerHost` on browser-dev startup.
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` starts `IdentityServerHost` on browser-dev startup.
 - The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and web identity resolver use the managed identity base URL without requiring a manual `.env` override.
 
 Development-login route guard:
@@ -585,7 +585,7 @@ Redacted keys include:
 
 Renderer session persistence is intentionally minimized:
 
-- `ui/shared/identity/IdentityAuthSessionStore.ts` now persists a narrowed `IdentityAuthPersistedSession` allowlist instead of the full login/session payload.
+- `src/ui/shared/identity/IdentityAuthSessionStore.ts` now persists a narrowed `IdentityAuthPersistedSession` allowlist instead of the full login/session payload.
 - persisted session records retain only fields required for authenticated runtime continuity (`userIdentityId`, `username`, `displayName`, `providerId`, session id/token/type/timing/channel).
 - recovery-sensitive and trust-seam metadata (`email`, `providerSubject`, trusted-device binding id, trust marker, client-device metadata) is not persisted to local session storage by default.
 
@@ -597,9 +597,9 @@ Renderer session persistence is intentionally minimized:
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device API route and contract coverage in the same backend/HTTP test suites
-- `ui/shared/identity/tests/IdentityAuthClient.test.ts`
-- `ui/pages/tests/IdentityAdminPage.test.tsx`
-- `ui/pages/tests/TrustedDevicesPage.test.tsx`
+- `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/pages/tests/IdentityAdminPage.test.tsx`
+- `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
 
 ## Related docs
 

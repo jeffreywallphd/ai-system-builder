@@ -29,10 +29,10 @@ Today, an existing `.venv` can be treated as healthy too early, and provisioning
 
 ## Implementation scope
 Primary target:
-- `infrastructure/runtime/service-supervisor.js`
+- `src/infrastructure/runtime/service-supervisor.js`
 
 Secondary likely touchpoints:
-- `infrastructure/runtime/tests/ServiceSupervisor.test.ts`
+- `src/infrastructure/runtime/tests/ServiceSupervisor.test.ts`
 - `README.md`
 - relevant docs in `docs/` (and matching `.ai.md` files if applicable)
 

@@ -8,8 +8,8 @@ This document describes the user-facing trusted-device flows available in the re
 - Identity administration -> **Trusted devices**
 - Identity administration -> **Trusted device oversight**
 
-Route: `ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.trustedDevices` (`/settings/trusted-devices`)
-Route: `ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.identityAdmin` (`/settings/identity-admin`)
+Route: `src/ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.trustedDevices` (`/settings/trusted-devices`)
+Route: `src/ui/routes/RouteConfig.ts` -> `ROUTE_PATHS.identityAdmin` (`/settings/identity-admin`)
 
 ## Pairing workflow
 
@@ -73,8 +73,8 @@ Authorization posture:
 
 The trusted-device page uses the shared renderer identity API seam:
 
-- `ui/services/IdentityAuthService.ts`
-- `ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/services/IdentityAuthService.ts`
+- `src/ui/shared/identity/IdentityAuthClient.ts`
 
 No local-only trust shortcuts are used for pairing or revocation state transitions.
 
@@ -93,8 +93,8 @@ Audit payloads include actor/target linkage where available (`userIdentityId`, `
 
 ## Tests
 
-- `ui/shared/identity/tests/IdentityAuthClient.test.ts`
-- `ui/pages/tests/TrustedDevicesPage.test.tsx`
+- `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
 - `src/infrastructure/api/identity/tests/IdentityAuthBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
-- `application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`
+- `src/application/identity/tests/TrustedDeviceAdministrativeAuthorization.test.ts`

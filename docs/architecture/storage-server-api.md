@@ -11,7 +11,7 @@ This note documents Story 9.3.2 and Story 9.3.5 (Feature 9 / Epic 9.3): authorit
 - `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/api/storage/tests/StorageManagementBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Scope and intent
 

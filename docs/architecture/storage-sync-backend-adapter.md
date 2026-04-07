@@ -15,7 +15,7 @@ This note documents Story 9.2.4 (Feature 9 / Epic 9.2): the synchronized-storage
 ## Scope and intent
 
 - Establish synchronized storage as an explicit managed backend seam now, even before full remote replication execution is deployed everywhere.
-- Provide typed eligibility and state reporting so application/API layers can distinguish:
+- Provide typed eligibility and state reporting so src/application/API layers can distinguish:
   - sync-capable instances,
   - sync-inactive deployment profiles,
   - unsupported local/shared posture combinations.

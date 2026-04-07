@@ -2,7 +2,7 @@
 
 This note documents Story 13.1.1 boundary decisions for authoritative persistence in AI Loom.
 
-The goal is to keep repository implementation aligned to domain/application contracts instead of drifting into table-first design.
+The goal is to keep repository implementation aligned to src/domain/application contracts instead of drifting into table-first design.
 
 ## Boundary principles
 
@@ -281,7 +281,7 @@ The goal is to keep repository implementation aligned to domain/application cont
   - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
 - Coverage additions:
   - `src/application/common/tests/PlatformTransactionPorts.test.ts`
-  - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+  - `src/application/identity/tests/RegisterLocalAccountUseCase.test.ts`
   - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 
@@ -367,7 +367,7 @@ The goal is to keep repository implementation aligned to domain/application cont
 - Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for use-case orchestration:
   - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
 - Added verification coverage for transactional orchestration behavior:
-  - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+  - `src/application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
   - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 
 ## Story 13.4.2 host startup and service-composition persistence wiring
@@ -400,7 +400,7 @@ The goal is to keep repository implementation aligned to domain/application cont
 - Mapper boundaries are adapter-local but contract-driven:
   - infrastructure row/document shapes stay in infrastructure mapper files,
   - shared DTO contracts in `src/shared/dto/*` define stable persistence record shapes that repository ports consume.
-- Adapter mappers should validate shared persistence DTO payloads through shared schema parse helpers before returning records to application/domain layers.
+- Adapter mappers should validate shared persistence DTO payloads through shared schema parse helpers before returning records to src/application/domain layers.
 - Sensitive fields must stay explicit in persistence records:
   - include token/hash/encrypted-field descriptors through `PersistenceSensitiveFieldDescriptor`,
   - never expose raw secret/key/token plaintext above infrastructure.

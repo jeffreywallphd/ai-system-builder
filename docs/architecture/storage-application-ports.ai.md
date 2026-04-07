@@ -89,7 +89,7 @@ Rejected provisioning that is not an unsupported backend operation maps to `stor
 - safe delete behavior for absent objects
 - adapter-safe failure mapping through `StorageObjectAccessError` and stable `StorageObjectErrorCodes`
 
-This preserves authoritative server-managed storage access without exposing host paths to application/UI layers.
+This preserves authoritative server-managed storage access without exposing host paths to src/application/UI layers.
 
 ## Story 11.3.1 extension: policy-aware storage administration contracts
 

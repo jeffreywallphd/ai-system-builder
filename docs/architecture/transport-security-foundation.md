@@ -276,13 +276,13 @@ Story 7.1.3 adds explicit host-level transport composition and environment-aware
 
 ### Host secure transport composition artifacts
 
-- `infrastructure/config/HostSecureTransportConfig.ts`
+- `src/infrastructure/config/HostSecureTransportConfig.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `electron/main/main.ts`
-- `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
-- `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
-- `infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts`
+- `src/ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- `src/ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- `src/infrastructure/runtime/browser-development/BrowserDevelopmentManagedRuntime.ts`
 
 ### Runtime behavior updates
 
@@ -404,7 +404,7 @@ Story 7.2.3 adds desktop-side transport bootstrap behavior so desktop client cha
 
 ### Runtime additions
 
-- `electron/shared/DesktopContracts.ts`
+- `electron/src/shared/DesktopContracts.ts`
   - desktop bootstrap context now includes `identityTransportTrust` with:
     - trust enforcement posture (`required` / `optional`);
     - trusted-device registration binding metadata;

@@ -10,13 +10,13 @@ This operational note documents Story 5.2.5 (Feature 5 / Epic 5.2): the first pr
 
 ## Canonical implementation
 
-- `ui/pages/NodeEnrollmentReviewPage.tsx`
-- `ui/services/NodeEnrollmentReviewService.ts`
-- `ui/shared/nodes/NodeEnrollmentReviewClient.ts`
-- `ui/routes/RouteConfig.ts`
-- `ui/routes/AppRouter.tsx`
-- `ui/pages/SettingsPage.tsx`
-- `ui/styles/app.css`
+- `src/ui/pages/NodeEnrollmentReviewPage.tsx`
+- `src/ui/services/NodeEnrollmentReviewService.ts`
+- `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`
+- `src/ui/routes/RouteConfig.ts`
+- `src/ui/routes/AppRouter.tsx`
+- `src/ui/pages/SettingsPage.tsx`
+- `src/ui/styles/app.css`
 
 ## Admin workflow
 
@@ -59,11 +59,11 @@ Backend state remains authoritative; after each decision, the UI refreshes pendi
 
 ## Tests
 
-- `ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
-- `ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
+- `src/ui/shared/nodes/tests/NodeEnrollmentReviewClient.test.ts`
+- `src/ui/pages/tests/NodeEnrollmentReviewPage.test.tsx`
 - route/settings contract updates in:
-  - `ui/routes/tests/RoutesContracts.test.ts`
-  - `ui/routes/tests/RoutesUnit.test.ts`
-  - `ui/pages/tests/SettingsPage.test.ts`
-  - `ui/pages/tests/PagesContracts.test.ts`
-  - `ui/services/tests/ServicesContracts.test.ts`
+  - `src/ui/routes/tests/RoutesContracts.test.ts`
+  - `src/ui/routes/tests/RoutesUnit.test.ts`
+  - `src/ui/pages/tests/SettingsPage.test.ts`
+  - `src/ui/pages/tests/PagesContracts.test.ts`
+  - `src/ui/services/tests/ServicesContracts.test.ts`

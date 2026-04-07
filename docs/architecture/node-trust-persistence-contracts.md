@@ -73,7 +73,7 @@ Application ports define two explicit persistence responsibilities:
   - list/find requests including pending-by-node lookups,
   - transition enrollment status with review metadata.
 
-`NodeTrustPersistencePorts` bundles both seams for use-case composition while keeping domain/application boundaries free of infrastructure detail.
+`NodeTrustPersistencePorts` bundles both seams for use-case composition while keeping src/domain/application boundaries free of infrastructure detail.
 
 ## Query/index posture
 

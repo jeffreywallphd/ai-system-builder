@@ -265,7 +265,7 @@ Command gate examples:
 ## High-risk sharing and visibility safeguards (Story 4.4.5)
 
 - Authorization administration commands now enforce server-side safeguards for irreversible/high-risk policy transitions:
-  - visibility broadening (`private -> shared/workspace`, `shared -> workspace`, and transitions to `published`),
+  - visibility broadening (`private -> src/shared/workspace`, `shared -> workspace`, and transitions to `published`),
   - turning on resharing (`allowResharing` false to true),
   - creating or widening broad-subject shares (`workspace`, `workspace-role`, `public`),
   - escalating shared permission actions (for example `.manage`, `.share`, `.update`, `.delete`, `.execute`, `.publish`),

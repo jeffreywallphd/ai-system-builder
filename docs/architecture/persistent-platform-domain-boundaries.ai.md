@@ -159,7 +159,7 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
   - `src/infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter.ts`
 - Added verification coverage:
   - `src/application/common/tests/PlatformTransactionPorts.test.ts`
-  - `application/identity/tests/RegisterLocalAccountUseCase.test.ts`
+  - `src/application/identity/tests/RegisterLocalAccountUseCase.test.ts`
   - `src/infrastructure/persistence/sqlite/tests/SqliteTransactionCoordinator.test.ts`
   - `src/infrastructure/persistence/identity/tests/SqliteIdentityPersistenceAdapter.test.ts`
 
@@ -242,7 +242,7 @@ Story 13.1.1 formalizes authoritative persistence boundaries across core platfor
 - Node trust SQLite persistence adapter now exposes the shared transaction-manager contract for application-layer coordination:
   - `src/infrastructure/persistence/nodes/SqliteNodeTrustPersistenceAdapter.ts`
 - Transactional orchestration coverage additions:
-  - `application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
+  - `src/application/identity/tests/ChangeLocalPasswordCredentialUseCase.test.ts`
   - `src/application/nodes/tests/NodeTrustApplicationUseCases.test.ts`
 
 ## Story 13.4.2 host startup and service-composition persistence wiring

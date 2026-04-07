@@ -26,7 +26,7 @@ Provide a concise implementation-truth handoff for downstream epics depending on
 Trusted device:
 
 - request/session fields: `trustedDeviceBindingId`, `trustMarker`
-- trust evaluation port: `application/identity/ports/IIdentitySessionTrustEvaluator.ts`
+- trust evaluation port: `src/application/identity/ports/IIdentitySessionTrustEvaluator.ts`
 
 Workspace membership:
 

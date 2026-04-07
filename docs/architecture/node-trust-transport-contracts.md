@@ -269,7 +269,7 @@ Operational metadata posture:
 
 ## Story 7.3.3 node-to-node policy seam (no broad mesh transport)
 
-Story 7.3.3 does not add a new public HTTP node-peer API surface. Instead it adds an explicit application/infrastructure seam that future node-peer channels must use:
+Story 7.3.3 does not add a new public HTTP node-peer API surface. Instead it adds an explicit src/application/infrastructure seam that future node-peer channels must use:
 
 - `src/application/security/ports/NodePeerCommunicationPolicyPorts.ts`
   - operation-class and capability-aware policy contract for node-peer transport.
@@ -310,10 +310,10 @@ Canonical artifacts:
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerNodeTrust.test.ts`
 - `src/infrastructure/api/nodes/tests/NodeTrustBackendApi.test.ts`
-- `ui/shared/nodes/NodeInventoryClient.ts`
-- `ui/services/NodeInventoryService.ts`
-- `ui/pages/NodeInventoryPage.tsx`
-- `ui/shared/nodes/tests/NodeInventoryClient.test.ts`
+- `src/ui/shared/nodes/NodeInventoryClient.ts`
+- `src/ui/services/NodeInventoryService.ts`
+- `src/ui/pages/NodeInventoryPage.tsx`
+- `src/ui/shared/nodes/tests/NodeInventoryClient.test.ts`
 
 Added API operation:
 

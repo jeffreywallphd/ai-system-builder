@@ -64,7 +64,7 @@ This keeps application contracts stable while allowing future profiles (KMS, HSM
 
 ## Persistence posture
 
-- Secret plaintext is never persisted in application/persistence records.
+- Secret plaintext is never persisted in src/application/persistence records.
 - Encrypted envelope JSON is persisted by payload reference through `ISecretEncryptedPayloadStore`.
 - Secret version rows persist structured metadata:
   - `encrypted_payload_ref`

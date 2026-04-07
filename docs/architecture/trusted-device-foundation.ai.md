@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Quick implementation-truth baseline for trusted-device domain/contracts introduced in Feature 2 / Epic 2.1.
+Quick implementation-truth baseline for trusted-device src/domain/contracts introduced in Feature 2 / Epic 2.1.
 
 Session trust integration note:
 - runtime session contracts now use structured `deviceTrust` context (trusted device id, assurance level, trust snapshot, invalidation reasons) with legacy `trustedDeviceBindingId` / `trustMarker` compatibility fields preserved.
@@ -14,14 +14,14 @@ Session trust integration note:
 
 - `src/domain/identity/TrustedDeviceDomain.ts`
 - `src/domain/identity/TrustedDevicePairingDomain.ts`
-- `application/contracts/IdentityApplicationContracts.ts`
-- `application/identity/ports/ITrustedDeviceRepository.ts`
-- `application/identity/ports/ITrustedDeviceManagementService.ts`
-- `application/identity/ports/ITrustedDevicePairingRepository.ts`
-- `application/identity/ports/ITrustedDevicePairingService.ts`
-- `application/identity/services/TrustedDeviceManagementService.ts`
-- `application/identity/services/TrustedDevicePairingService.ts`
-- `application/identity/services/TrustedDeviceServiceMappers.ts`
+- `src/application/contracts/IdentityApplicationContracts.ts`
+- `src/application/identity/ports/ITrustedDeviceRepository.ts`
+- `src/application/identity/ports/ITrustedDeviceManagementService.ts`
+- `src/application/identity/ports/ITrustedDevicePairingRepository.ts`
+- `src/application/identity/ports/ITrustedDevicePairingService.ts`
+- `src/application/identity/services/TrustedDeviceManagementService.ts`
+- `src/application/identity/services/TrustedDevicePairingService.ts`
+- `src/application/identity/services/TrustedDeviceServiceMappers.ts`
 - `src/application/identity/use-cases/CompleteTrustedDevicePairingUseCase.ts`
 - `src/infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter.ts`
 - `src/infrastructure/persistence/identity/TrustedDevicePersistenceMapper.ts`
@@ -106,7 +106,7 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 ## Persistence update (Story 2.1.3)
 
 - SQLite migrations for trusted-device/session persistence now land in schema version `6` for both migration tracks:
-  - `infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
+  - `src/infrastructure/filesystem/identity/SqliteIdentityMigrations.ts`
   - `src/infrastructure/persistence/identity/SqliteIdentityPersistenceMigrations.ts`
 - New tables:
   - `identity_trusted_devices`
@@ -127,14 +127,14 @@ Pairing service lifecycle contract (`ITrustedDevicePairingService`):
 
 - `src/domain/identity/tests/TrustedDeviceDomain.test.ts`
 - `src/domain/identity/tests/TrustedDevicePairingDomain.test.ts`
-- `application/contracts/tests/IdentityApplicationContracts.test.ts`
-- `application/identity/tests/IdentityPortsContracts.test.ts`
+- `src/application/contracts/tests/IdentityApplicationContracts.test.ts`
+- `src/application/identity/tests/IdentityPortsContracts.test.ts`
 - `src/infrastructure/persistence/identity/tests/TrustedDevicePersistenceMapper.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
 - `src/infrastructure/persistence/identity/tests/SqliteTrustedDevicePersistenceAdapter.test.ts`
-- `application/identity/tests/TrustedDevicePairingService.test.ts`
-- `application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
-- `infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
+- `src/application/identity/tests/TrustedDevicePairingService.test.ts`
+- `src/application/identity/tests/CompleteTrustedDevicePairingUseCase.test.ts`
+- `src/infrastructure/filesystem/identity/tests/TrustedDevicePairingCompletionIntegration.test.ts`
 
 ## Audit coverage update (story 2.3.4)
 

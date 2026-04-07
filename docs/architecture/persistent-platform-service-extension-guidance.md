@@ -14,7 +14,7 @@ This note documents Story 13.4.3 (Feature 13 / Epic 13.4): integration-test expe
 ## What must remain true
 
 - Authoritative writes go through composed persistent platform services, not local cache or UI state.
-- Aggregate boundaries are defined in domain/application contracts first, then implemented by infrastructure adapters.
+- Aggregate boundaries are defined in src/domain/application contracts first, then implemented by infrastructure adapters.
 - Repository adapters own migration execution, mapper translation, replay handling, and persistence conflict translation.
 - Logs and diagnostics remain redaction-safe for secrets, prompt content, tokens, and filesystem/database paths.
 
@@ -41,7 +41,7 @@ Do not create a new boundary when only new query filters or projection fields ar
 ## Mapper and transaction wiring rules
 
 - Keep mapper code adapter-local and contract-driven. Do not leak SQL row shape above infrastructure.
-- Parse shared DTO/schema contracts before returning records to application/domain layers.
+- Parse shared DTO/schema contracts before returning records to src/application/domain layers.
 - For multi-record mutations in one use case, wire `IPlatformTransactionManager` and run through `runInTransactionBoundary(...)`.
 - Repositories participating in grouped writes must expose `runInTransaction(...)` through the shared coordinator, not custom transaction APIs.
 

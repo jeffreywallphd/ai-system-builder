@@ -112,7 +112,7 @@ Key behavior captured in schema + adapter:
 - Version tracking is persisted in `authorization_repository_migrations`.
 - New migrations must append to `AUTHORIZATION_PERSISTENCE_MIGRATIONS` and increment `AUTHORIZATION_PERSISTENCE_SCHEMA_VERSION`.
 - Do not modify previously shipped migration SQL blocks; add a new versioned migration instead.
-- Keep authorization persistence SQL in the authorization infrastructure module to avoid ad hoc SQL in application/use-case layers.
+- Keep authorization persistence SQL in the authorization infrastructure module to avoid ad hoc SQL in src/application/use-case layers.
 
 ## Test coverage
 

@@ -48,7 +48,7 @@ Baseline for Story 8.1.2 plus Story 11.2.3: SQLite persistence plus protected re
 - `operationKey` mutation replay semantics for create/save/delete
 - create/fetch/list/update flows aligned to `ISecretRecordPersistenceRepository`
 - `deleteSecret` is implemented as soft-delete status mutation, not hard row deletion
-- protected wrapper decrypts on read to keep domain/application contracts unchanged
+- protected wrapper decrypts on read to keep src/domain/application contracts unchanged
 
 ## Tests in this slice
 

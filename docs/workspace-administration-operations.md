@@ -16,7 +16,7 @@ This runbook documents current workspace administration lifecycle, audit-hook be
   - `allowPreviewDecryption`
   - `allowWorkerDecryption`
 - Workspace list/admin read DTOs now include `encryptionPolicy` for operator visibility and downstream policy consumers.
-- Invalid encryption-policy combinations are rejected by workspace domain/application validation.
+- Invalid encryption-policy combinations are rejected by workspace src/domain/application validation.
 
 ## Event matrix
 

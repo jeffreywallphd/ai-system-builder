@@ -60,7 +60,7 @@ Secret persistence now protects metadata field `secret_records.metadata_descript
 - protected now: freeform metadata description (high leakage risk, low query dependency)
 - intentionally still plaintext: name/scope/status/tags/labels used by query/list semantics and existing governance flows
 
-The wrapper decrypts on repository reads so application/domain contracts remain unchanged.
+The wrapper decrypts on repository reads so src/application/domain contracts remain unchanged.
 
 ## Migration notes
 

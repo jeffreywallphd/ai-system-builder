@@ -17,17 +17,17 @@ Behavior is treated as a property/capability of a structural thing, not as a sep
 ## Current repo alignment
 What is now implemented:
 
-- Shared taxonomy primitives and validated descriptors live in `domain/taxonomy/CompositionTaxonomy.ts`.
-- Classification seams live in `application/taxonomy/CompositionTaxonomyClassifier.ts`.
+- Shared taxonomy primitives and validated descriptors live in `src/domain/taxonomy/CompositionTaxonomy.ts`.
+- Classification seams live in `src/application/taxonomy/CompositionTaxonomyClassifier.ts`.
 - Canonical entity mappings now include: workflow definition, installed/base model, dataset version, execution artifact.
-- Workflow and agent adapter seams are explicit (`application/workflows/WorkflowTaxonomy.ts`, `application/agents/contracts/AgentTaxonomy.ts`).
+- Workflow and agent adapter seams are explicit (`src/application/workflows/WorkflowTaxonomy.ts`, `src/application/agents/contracts/AgentTaxonomy.ts`).
 - Revised semantic roles now cover atomic (`config-profile`), composite (`dataset-pipeline`), and system deployment (`app-template`) assets without introducing a second taxonomy universe.
 - Canonical identity records now persist optional taxonomy metadata (`structural_kind`, `semantic_role`, `behavior_kind`) and canonical resolver/operational summaries can project it.
 - Canonical asset query criteria now includes taxonomy-aware filters (`structuralKinds`, `semanticRoles`, `behaviorKinds`) in addition to kind/source/status criteria.
 - Canonical asset summary/detail reads still expose taxonomy descriptors, with identity metadata as the preferred source and bounded fallback classification where needed.
 - Direction 5 atomic studio usage now concretely applies this taxonomy in Model Studio (`atomic/model/none`), Dataset Studio (`atomic/dataset/none`), Tool Studio (`atomic/tool/conditional|deterministic`), Prompt Template Studio (`atomic/prompt-template/none`), Embedding Index Studio (`atomic/embedding-index/none`), and Config Profile Studio (`atomic/config-profile/none`) via shared shell draft metadata and publish enforcement.
-- Direction 5 composite studio usage now also concretely applies `composite/tool-chain/deterministic` through Tool Chain Studio (`domain/tool-chain-studio/*`, `application/tool-chain-studio/*`, and registration-driven Studio Shell UI integration).
-- End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/application/SQLite) before and after reload.
+- Direction 5 composite studio usage now also concretely applies `composite/tool-chain/deterministic` through Tool Chain Studio (`src/domain/tool-chain-studio/*`, `src/application/tool-chain-studio/*`, and registration-driven Studio Shell UI integration).
+- End-to-end cross-studio consistency tests now verify this taxonomy coherence over real shared seams (service/bridge/backend/src/application/SQLite) before and after reload.
 
 
 ## Specialized composite role interpretation
@@ -88,11 +88,11 @@ Partially implemented / bounded:
 - System composition editing remains intentionally bounded to structural authoring (add/remove/reorder child assets, nested-system visibility, interface/parameter/config surfaces, compatibility summaries). Rich visual graph-canvas editing remains later work.
 
 This shared taxonomy is a guardrail to keep workflow/agent/asset/system language coherent while implementation continues in parallel.
-- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`domain/prompt-template-studio/*`, `application/prompt-template-studio/*`, `domain/embedding-index-studio/*`, `application/embedding-index-studio/*`, `domain/config-profile-studio/*`, `application/config-profile-studio/*`, and registration-driven UI shell integration).
+- Direction 5 atomic studio usage now also concretely applies `atomic/prompt-template/none`, `atomic/embedding-index/none`, and `atomic/config-profile/none` through Prompt Template / Embedding Index / Config Profile studios (`src/domain/prompt-template-studio/*`, `src/application/prompt-template-studio/*`, `src/domain/embedding-index-studio/*`, `src/application/embedding-index-studio/*`, `src/domain/config-profile-studio/*`, `src/application/config-profile-studio/*`, and registration-driven UI shell integration).
 
 ## Direction 5 update: Runtime taxonomy alignment foundation (stories 6.1–6.2)
 
-- A bounded runtime alignment seam now exists in `application/system-runtime/RuntimeBehaviorAlignment.ts` and consumes existing taxonomy truth (`CompositionTaxonomyDescriptor` + `assertAllowedCompositionTaxonomyCombination`) instead of introducing a second behavior ontology.
+- A bounded runtime alignment seam now exists in `src/application/system-runtime/RuntimeBehaviorAlignment.ts` and consumes existing taxonomy truth (`CompositionTaxonomyDescriptor` + `assertAllowedCompositionTaxonomyCombination`) instead of introducing a second behavior ontology.
 - Runtime behavior profiles are now mapped directly from shared behavior kinds:
   - `deterministic` -> fixed execution profile
   - `conditional` -> branch-capable profile

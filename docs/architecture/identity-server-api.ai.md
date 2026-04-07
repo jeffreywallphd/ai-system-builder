@@ -49,16 +49,16 @@
 
 Renderer client surface now uses the same endpoint contract:
 
-- `ui/shared/identity/IdentityAuthClient.ts`
-- `ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
-- `ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
-- `ui/services/IdentityAuthService.ts`
-- `ui/pages/IdentityAdminPage.tsx` (authenticated identity administration UI surface)
-- `ui/pages/TrustedDevicesPage.tsx` (authenticated trusted-device pairing/management UI surface)
+- `src/ui/shared/identity/IdentityAuthClient.ts`
+- `src/ui/desktop/identity/resolveDesktopIdentityApiBaseUrl.ts`
+- `src/ui/web/identity/resolveWebIdentityApiBaseUrl.ts`
+- `src/ui/services/IdentityAuthService.ts`
+- `src/ui/pages/IdentityAdminPage.tsx` (authenticated identity administration UI surface)
+- `src/ui/pages/TrustedDevicesPage.tsx` (authenticated trusted-device pairing/management UI surface)
 
 Browser development host wiring now self-bootstraps identity transport for `dev:browser`:
 
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts `IdentityServerHost` during Vite serve bootstrap.
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts `IdentityServerHost` during Vite serve bootstrap.
 - The plugin injects browser runtime bootstrap env (`window.aiLoomBrowserDevelopment.env.VITE_IDENTITY_API_BASE_URL`) so runtime config and the web identity endpoint resolver consume the managed identity API base URL without requiring manual `.env` setup.
 
 Development-login route policy:
@@ -126,7 +126,7 @@ Certificate operations transport responses are metadata/action projected and int
 
 ## UI state hardening (story 1.4.5)
 
-Renderer session persistence now stores a narrowed allowlist shape (`IdentityAuthPersistedSession`) in `ui/shared/identity/IdentityAuthSessionStore.ts` instead of persisting the full login response payload.
+Renderer session persistence now stores a narrowed allowlist shape (`IdentityAuthPersistedSession`) in `src/ui/shared/identity/IdentityAuthSessionStore.ts` instead of persisting the full login response payload.
 
 Persisted session records now intentionally exclude:
 
@@ -215,9 +215,9 @@ Persisted session records now intentionally exclude:
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServer.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerCertificateOperations.test.ts`
 - trusted-device transport lifecycle coverage in backend + HTTP integration tests (list/detail/revoke/rename + pairing initiate/validate/complete)
-- `ui/shared/identity/tests/IdentityAuthClient.test.ts`
-- `ui/pages/tests/IdentityAdminPage.test.tsx`
-- `ui/pages/tests/TrustedDevicesPage.test.tsx`
+- `src/ui/shared/identity/tests/IdentityAuthClient.test.ts`
+- `src/ui/pages/tests/IdentityAdminPage.test.tsx`
+- `src/ui/pages/tests/TrustedDevicesPage.test.tsx`
 
 ## Related docs
 

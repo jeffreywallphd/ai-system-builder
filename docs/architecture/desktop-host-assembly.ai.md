@@ -2,7 +2,7 @@
 
 ## Purpose
 - Define the production desktop host assembly as an explicit executable boundary for advanced authoring/administration runtime flows.
-- Keep desktop startup orchestration in host composition while application/domain logic stays in inner layers.
+- Keep desktop startup orchestration in host composition while src/application/domain logic stays in inner layers.
 
 ## Main implementation seams
 - Composition root: `src/hosts/desktop/DesktopHostCompositionRoot.ts`

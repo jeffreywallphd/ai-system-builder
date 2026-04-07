@@ -9,7 +9,7 @@ Quick baseline for Story 8.1.7 (Feature 8 / Epic 8.1): compose secret services i
 - `src/infrastructure/security/secrets/SecretServiceComposition.ts`
 - `src/infrastructure/security/secrets/SystemSecretBootstrapService.ts`
 - `src/hosts/server/IdentityServerHost.ts`
-- `hosts/server/tests/IdentityServerHost.test.ts`
+- `src/hosts/server/tests/IdentityServerHost.test.ts`
 - `.env.example`
 
 ## Composition summary

@@ -19,7 +19,7 @@
   - `allowPreviewDecryption`
   - `allowWorkerDecryption`
 - Workspace admin list/read DTOs now surface workspace `encryptionPolicy` so policy posture is inspectable by downstream services and administration surfaces.
-- Invalid workspace encryption-policy combinations are rejected at domain/application boundaries.
+- Invalid workspace encryption-policy combinations are rejected at src/domain/application boundaries.
 
 ## Event coverage
 
@@ -41,7 +41,7 @@ Common fields:
 ## Implementation guidance
 
 - Wire concrete sink adapters in host composition.
-- Keep event handling idempotent/durable at adapter level (outbox/log stream/queue), not inside domain/application mutation logic.
+- Keep event handling idempotent/durable at adapter level (outbox/log stream/queue), not inside src/domain/application mutation logic.
 - Extend this pattern to future workspace-scoped protected resources.
 
 ## Verification

@@ -15,16 +15,16 @@ This note documents Story 9.4.5 (Feature 9 / Epic 9.4): contributor guidance and
 - `src/infrastructure/storage/StorageBackendAdapterRegistry.ts`
 - `src/infrastructure/storage/StorageBackendProvisioningOrchestrator.ts`
 - `src/infrastructure/storage/local/ServerManagedLocalStorageBackendAdapter.ts`
-- `src/infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter.ts`
+- `src/infrastructure/storage/src/shared/ServerManagedSharedStorageBackendAdapter.ts`
 - `src/infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter.ts`
 - `src/infrastructure/persistence/storage/SqliteStorageInstancePersistenceAdapter.ts`
 - `src/infrastructure/api/storage/StorageManagementBackendApi.ts`
 - `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`
-- `ui/shared/storage/StorageAdministrationClient.ts`
-- `ui/services/StorageAdministrationService.ts`
-- `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
-- `ui/pages/StorageAdministrationPage.tsx`
-- `ui/web/storage/StorageAdministrationRoutes.ts`
+- `src/ui/shared/storage/StorageAdministrationClient.ts`
+- `src/ui/services/StorageAdministrationService.ts`
+- `src/ui/components/storage/StorageInstanceWorkflowPanel.tsx`
+- `src/ui/pages/StorageAdministrationPage.tsx`
+- `src/ui/web/storage/StorageAdministrationRoutes.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
 ## Extension objective
@@ -166,7 +166,7 @@ Keep these suites green when extending storage backends or admin behavior:
   - `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
   - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`
   - `src/infrastructure/storage/local/tests/ServerManagedLocalStorageBackendAdapter.test.ts`
-  - `src/infrastructure/storage/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
+  - `src/infrastructure/storage/src/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
   - `src/infrastructure/storage/sync/tests/ServerManagedStorageSynchronizationAdapter.test.ts`
 - persistence and audit:
   - `src/infrastructure/persistence/storage/tests/SqliteStorageInstancePersistenceAdapter.test.ts`
@@ -176,12 +176,12 @@ Keep these suites green when extending storage backends or admin behavior:
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerStorageManagement.test.ts`
   - `src/shared/contracts/storage/tests/StorageTransportContracts.test.ts`
   - `src/shared/schemas/storage/tests/StorageTransportSchemaContracts.test.ts`
-  - `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
-  - `ui/services/tests/StorageAdministrationService.test.ts`
-  - `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
-  - `ui/pages/tests/StorageAdministrationPage.test.tsx`
-  - `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
-  - `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
+  - `src/ui/shared/storage/tests/StorageAdministrationClient.test.ts`
+  - `src/ui/services/tests/StorageAdministrationService.test.ts`
+  - `src/ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
+  - `src/ui/pages/tests/StorageAdministrationPage.test.tsx`
+  - `src/ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
+  - `src/ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 
 ## Related architecture notes
 

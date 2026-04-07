@@ -4,7 +4,7 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 
 ## Scope in this story
 
-- Adds framework-agnostic authorization domain/value contracts in `src/domain/authorization/AuthorizationDomain.ts`.
+- Adds framework-agnostic authorization src/domain/value contracts in `src/domain/authorization/AuthorizationDomain.ts`.
 - Adds deterministic invariant checks for invalid combinations across:
   - role-assignment scope state,
   - permission-grant scope state,
@@ -89,7 +89,7 @@ This note documents Story 4.1.1 (Feature 4 / Epic 4.1): core authorization domai
 - Public sharing subjects are only valid when visibility is `published`.
 - Workspace-oriented sharing subjects require workspace-scoped resources and must match the resource `workspaceId`.
 
-## Workspace/private/shared/published semantics
+## Workspace/private/src/shared/published semantics
 
 - `private`: owner-only resource policy surface; no explicit share grants.
 - `workspace`: workspace-member visibility for workspace-owned resources; no explicit share grants.

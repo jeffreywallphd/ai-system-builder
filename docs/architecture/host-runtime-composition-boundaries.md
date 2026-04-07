@@ -42,7 +42,7 @@ The domain validation contract now enforces:
 
 ### Shared host DTO contracts
 
-`src/shared/contracts/hosts/HostCompositionContracts.ts` now projects:
+`src/shared/contracts/src/hosts/HostCompositionContracts.ts` now projects:
 
 - stable host identity DTOs
 - stable boot configuration DTOs
@@ -226,7 +226,7 @@ The contracts now explicitly state that:
 
 - `src/domain/hosts/tests/HostRuntimeDomain.test.ts`
 - `src/application/common/tests/HostCompositionContracts.test.ts`
-- `src/shared/contracts/hosts/tests/HostCompositionContracts.test.ts`
+- `src/shared/contracts/src/hosts/tests/HostCompositionContracts.test.ts`
 - `src/hosts/tests/HostRuntimeMetadataCatalog.test.ts`
 - `src/hosts/tests/HostRuntimeCatalog.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
@@ -248,7 +248,7 @@ The contracts now explicitly state that:
 The following active runtime entrypoints now delegate authoritative control-plane startup through the authoritative server host assembly entrypoint instead of direct server-host initialization:
 
 - `electron/main/main.ts`
-- `infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts`
 
 This keeps startup control-plane composition on the explicit host framework path for desktop and browser-development runtime workflows.
 

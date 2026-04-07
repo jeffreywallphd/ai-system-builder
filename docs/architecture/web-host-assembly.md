@@ -3,7 +3,7 @@
 ## Intent
 
 - Define the production web host assembly as an explicit executable boundary for thin-client delivery.
-- Keep browser/runtime startup orchestration in host composition code while application/domain logic remains in inner layers.
+- Keep browser/runtime startup orchestration in host composition code while src/application/domain logic remains in inner layers.
 
 ## Main implementation seams
 

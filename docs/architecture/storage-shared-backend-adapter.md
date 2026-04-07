@@ -4,9 +4,9 @@ This note documents Story 9.2.3 (Feature 9 / Epic 9.2): a production-capable bac
 
 ## Canonical artifacts
 
-- `src/infrastructure/storage/shared/ServerManagedSharedStorageBackendAdapter.ts`
-- `src/infrastructure/storage/shared/index.ts`
-- `src/infrastructure/storage/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
+- `src/infrastructure/storage/src/shared/ServerManagedSharedStorageBackendAdapter.ts`
+- `src/infrastructure/storage/src/shared/index.ts`
+- `src/infrastructure/storage/src/shared/tests/ServerManagedSharedStorageBackendAdapter.test.ts`
 
 ## Scope and intent
 

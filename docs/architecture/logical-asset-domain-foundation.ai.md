@@ -27,7 +27,7 @@ Story 10.1.1 establishes the first production logical-asset domain model for pro
 - workspace ownership is always required; owner user is optional.
 - private visibility requires owner user metadata.
 - workspace-owned assets cannot be private.
-- shared/published visibility requires sharing policy references.
+- src/shared/published visibility requires sharing policy references.
 - private/workspace visibility cannot include sharing policy references.
 - storage references must use canonical `storage-instance://<id>` form.
 - location object keys reject filesystem-like absolute/drive-prefixed/path-traversal values.

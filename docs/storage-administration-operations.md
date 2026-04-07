@@ -10,11 +10,11 @@ This note documents Story 9.4.1, Story 9.4.2, Story 9.4.3, Story 9.4.4, Story 9.
 
 ## UI surfaces
 
-- Page: `ui/pages/StorageAdministrationPage.tsx`
-- Workflow panel: `ui/components/storage/StorageInstanceWorkflowPanel.tsx`
-- Service: `ui/services/StorageAdministrationService.ts`
-- HTTP client: `ui/shared/storage/StorageAdministrationClient.ts`
-- Thin-client/admin-lite route helper: `ui/web/storage/StorageAdministrationRoutes.ts`
+- Page: `src/ui/pages/StorageAdministrationPage.tsx`
+- Workflow panel: `src/ui/components/storage/StorageInstanceWorkflowPanel.tsx`
+- Service: `src/ui/services/StorageAdministrationService.ts`
+- HTTP client: `src/ui/shared/storage/StorageAdministrationClient.ts`
+- Thin-client/admin-lite route helper: `src/ui/web/storage/StorageAdministrationRoutes.ts`
 
 ## Operational behavior
 
@@ -134,19 +134,19 @@ Contributor workflow for new backends:
 2. Implement adapter contracts in `src/infrastructure/storage/*`.
 3. Register backend adapter(s) in host composition.
 4. Keep API and UI contracts stable by reusing shared storage DTO/schema contracts.
-5. Validate operational behavior through storage infrastructure/API/UI regression suites.
+5. Validate operational behavior through storage src/infrastructure/API/UI regression suites.
 
 ## Verification
 
-- `ui/shared/storage/tests/StorageAdministrationClient.test.ts`
-- `ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
-- `ui/services/tests/StorageAdministrationService.test.ts`
-- `ui/pages/tests/StorageAdministrationPage.test.tsx`
-- `ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
-- `ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
+- `src/ui/shared/storage/tests/StorageAdministrationClient.test.ts`
+- `src/ui/components/storage/tests/StorageInstanceWorkflowPanel.test.tsx`
+- `src/ui/services/tests/StorageAdministrationService.test.ts`
+- `src/ui/pages/tests/StorageAdministrationPage.test.tsx`
+- `src/ui/pages/tests/StorageAdministrationPage.presentation.test.ts`
+- `src/ui/web/storage/tests/StorageAdministrationRoutes.test.ts`
 - route/page contract updates:
-  - `ui/routes/tests/RoutesContracts.test.ts`
-  - `ui/pages/tests/PagesContracts.test.ts`
+  - `src/ui/routes/tests/RoutesContracts.test.ts`
+  - `src/ui/pages/tests/PagesContracts.test.ts`
 - storage backend/orchestration guardrails:
   - `src/infrastructure/storage/tests/StorageBackendAdapterRegistry.test.ts`
   - `src/infrastructure/storage/tests/StorageBackendProvisioningOrchestrator.test.ts`

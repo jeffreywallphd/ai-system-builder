@@ -2,7 +2,7 @@
 
 ## Purpose
 - Define the production worker host assembly as an explicit executable boundary for runtime/background execution.
-- Keep execution capability composition and worker startup in host composition while application/domain logic stays in inner layers.
+- Keep execution capability composition and worker startup in host composition while src/application/domain logic stays in inner layers.
 
 ## Main implementation seams
 - Composition root: `src/hosts/worker/WorkerHostCompositionRoot.ts`

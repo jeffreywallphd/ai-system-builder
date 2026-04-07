@@ -71,7 +71,7 @@ These normalize data through the same invariant checks used by canonical creatio
 For resources that do not yet expose all canonical fields:
 
 1. Keep existing aggregate shape unchanged for now.
-2. Build a `ProtectedResourceAuthorizationContract` projection at application/service boundaries.
+2. Build a `ProtectedResourceAuthorizationContract` projection at src/application/service boundaries.
 3. Use `adaptLegacyProtectedResourceAuthorizationContract(...)` during migration:
    - if `ownerUserId` is missing, it defaults to `createdBy`,
    - if `lastModifiedBy` is missing, it defaults to `createdBy`,

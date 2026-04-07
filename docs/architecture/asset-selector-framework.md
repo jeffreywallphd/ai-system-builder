@@ -4,8 +4,8 @@
 The Asset Selector Framework defines a reusable, UI-independent contract for selecting assets and returning results across studios, with centralized capability rules for where each asset type is valid.
 
 ## Layer placement
-- Domain contract: `domain/studio-shell/AssetSelectorContract.ts`
-- Application capability matrix and enforcement: `application/studio-entry/AssetSelectorCapabilityRegistry.ts`
+- Domain contract: `src/domain/studio-shell/AssetSelectorContract.ts`
+- Application capability matrix and enforcement: `src/application/studio-entry/AssetSelectorCapabilityRegistry.ts`
 
 This keeps interaction semantics in inner layers and avoids UI-coupled selector logic.
 
@@ -61,7 +61,7 @@ This prevents invalid combinations (for example dataset selection in workflow st
 
 ## Story 4.3: Shared selector state and session infrastructure
 Session/state infrastructure is now implemented in:
-- `application/studio-entry/AssetSelectorSessionStore.ts`
+- `src/application/studio-entry/AssetSelectorSessionStore.ts`
 
 Responsibilities:
 - Canonical session state model per selector session key:
@@ -98,10 +98,10 @@ Boundary note:
 
 ## Story 4.4: Reusable selector shell UI
 Shared selector shell is now implemented in:
-- Presentation shell: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
-- Data-provider seam: `ui/studio-shell/asset-selector/AssetSelectorDataProvider.ts`
-- Registry adapter: `ui/studio-shell/asset-selector/RegistryAssetSelectorDataProvider.ts`
-- Session bridge accessor: `ui/studio-shell/asset-selector/AssetSelectorSessionRegistry.ts`
+- Presentation shell: `src/ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+- Data-provider seam: `src/ui/studio-shell/asset-selector/AssetSelectorDataProvider.ts`
+- Registry adapter: `src/ui/studio-shell/asset-selector/RegistryAssetSelectorDataProvider.ts`
+- Session bridge accessor: `src/ui/studio-shell/asset-selector/AssetSelectorSessionRegistry.ts`
 
 Shell responsibilities:
 - Search input
@@ -127,8 +127,8 @@ Current integration slice:
 
 ## Story 4.5: Dataset asset selector integration
 Dataset-specific selector integration is now implemented through:
-- Adapter/data provider: `ui/studio-shell/asset-selector/DatasetAssetSelectorAdapter.ts`
-- Workflow wizard inputs integration: `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+- Adapter/data provider: `src/ui/studio-shell/asset-selector/DatasetAssetSelectorAdapter.ts`
+- Workflow wizard inputs integration: `src/ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
 
 Responsibilities:
 - Builds canonical dataset selector requests for workflow input usage (`usageContext=workflow-input`).
@@ -143,9 +143,9 @@ Create-new behavior:
 
 ## Story 4.6: Agent/assistant asset selector integration
 Agent/assistant-specific selector integration is now implemented through:
-- Adapter/data provider: `ui/studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter.ts`
-- Workflow wizard steps integration: `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
-- Step payload seam: `ui/studio-shell/workflow/WorkflowWizardSteps.ts`
+- Adapter/data provider: `src/ui/studio-shell/asset-selector/AgentAssistantAssetSelectorAdapter.ts`
+- Workflow wizard steps integration: `src/ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+- Step payload seam: `src/ui/studio-shell/workflow/WorkflowWizardSteps.ts`
 
 Responsibilities:
 - Builds canonical agent selector requests for workflow step usage (`usageContext=workflow-step`).
@@ -160,11 +160,11 @@ Create-new behavior:
 
 ## Story 4.7: Inline studio launch for missing assets
 Implemented seams:
-- `ui/studio-shell/asset-selector/AssetSelectorStudioLaunchService.ts`
-- `ui/routes/InlineAssetCreation.ts`
+- `src/ui/studio-shell/asset-selector/AssetSelectorStudioLaunchService.ts`
+- `src/ui/routes/InlineAssetCreation.ts`
 - Workflow selector integrations:
-  - `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
-  - `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+  - `src/ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+  - `src/ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
 
 Launch contract now carries:
 - selector session id (`selectorSessionId` / `returnContextId`)
@@ -178,8 +178,8 @@ Lifecycle/navigation semantics:
 
 ## Story 4.8: Return-to-selector handoff contract
 Implemented seams:
-- `ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`
-- Return contract extensions in `ui/routes/InlineAssetCreation.ts`
+- `src/ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`
+- Return contract extensions in `src/ui/routes/InlineAssetCreation.ts`
 
 Return payload contract now includes:
 - `assetId`
@@ -202,7 +202,7 @@ Selector return handling:
 
 ## Story 4.9: Workflow wizard inputs selector integration
 Workflow Wizard Inputs now use selector-first dataset attachment flow in:
-- `ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
+- `src/ui/components/studio-shell/workflow/WorkflowStudioInputSectionEditor.tsx`
 
 Implemented behavior:
 - Dataset inputs are rendered as canonical selected dataset rows (title + asset id + optional version) with explicit remove actions.
@@ -214,7 +214,7 @@ Implemented behavior:
 
 ## Story 4.10: Workflow wizard steps selector integration
 Workflow Wizard Steps now use selector-first agent/assistant attachment flow in:
-- `ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
+- `src/ui/components/studio-shell/workflow/WorkflowStudioStepSectionEditor.tsx`
 
 Implemented behavior:
 - Adding an agent/assistant step routes through the shared agent selector shell (single-select) before step insertion.
@@ -226,16 +226,16 @@ Implemented behavior:
 
 ## Story 4.11: Validation, constraints, and error handling hardening
 Validation and guardrails are now enforced at authoritative seams:
-- Domain contract hardening (`domain/studio-shell/AssetSelectorContract.ts`):
+- Domain contract hardening (`src/domain/studio-shell/AssetSelectorContract.ts`):
   - canonical selector return identity enforcement (`assetId`/`versionId` must use `asset:` identity when provided),
   - duplicate selection rejection,
   - existing asset-type, taxonomy, and min/max checks remain canonical.
-- Application session hardening (`application/studio-entry/AssetSelectorSessionStore.ts`):
+- Application session hardening (`src/application/studio-entry/AssetSelectorSessionStore.ts`):
   - centralized selection-set validation for pending/replace flows (asset type, canonical id/version, duplicate checks),
   - proactive over-selection blocking before confirm,
   - confirm-time minimum/required selection enforcement,
   - stricter snapshot/session restoration checks (session key, lifecycle validity, creating-new context consistency, selection validity).
-- Return handoff hardening (`ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`):
+- Return handoff hardening (`src/ui/studio-shell/asset-selector/AssetSelectorReturnHandoffService.ts`):
   - stale created-return payloads are rejected unless selector session is in creation-return lifecycle,
   - malformed return payloads fail safely through session-level validation errors.
 
@@ -246,11 +246,11 @@ Error handling strategy:
 
 ## Story 4.12: Persistence and draft rehydration hardening
 Persistence and rehydration consistency is now tightened across selector and draft seams:
-- Dataset draft persistence consistency (`ui/studio-shell/workflow/WorkflowWizardDatasetInputs.ts`):
+- Dataset draft persistence consistency (`src/ui/studio-shell/workflow/WorkflowWizardDatasetInputs.ts`):
   - replacement equality now includes version/title semantics (not only asset id),
   - canonical dataset id/version guards prevent malformed references,
   - non-dataset inputs remain isolated during dataset replacement.
-- Step draft persistence consistency (`ui/studio-shell/workflow/WorkflowWizardSteps.ts`):
+- Step draft persistence consistency (`src/ui/studio-shell/workflow/WorkflowWizardSteps.ts`):
   - canonical agent/assistant asset id/version guards prevent malformed step references.
 - Rehydration resilience in wizard surfaces:
   - inputs/steps now surface bounded unavailable/deleted asset warnings when attached references are no longer in selector catalog results.
@@ -264,7 +264,7 @@ Selector session <-> workflow draft model:
 
 ## Story 4.13 (Epic 4 closeout): Cross-story tests and documentation hardening
 Epic 4 closeout adds integration-level regression coverage across the full selector lifecycle in:
-- `ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`
+- `src/ui/studio-shell/asset-selector/tests/AssetSelectorFramework.integration.test.ts`
 
 Closeout coverage now validates:
 - Domain contract and application capability matrix enforcement at shared session boundaries.
@@ -277,10 +277,10 @@ Closeout coverage now validates:
 
 System responsibility split (must remain stable):
 - Shared framework responsibilities:
-  - Contract and validation: `domain/studio-shell/AssetSelectorContract.ts`
-  - Capability matrix: `application/studio-entry/AssetSelectorCapabilityRegistry.ts`
-  - Selector lifecycle/session model: `application/studio-entry/AssetSelectorSessionStore.ts`
-  - Shared selector shell UI: `ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
+  - Contract and validation: `src/domain/studio-shell/AssetSelectorContract.ts`
+  - Capability matrix: `src/application/studio-entry/AssetSelectorCapabilityRegistry.ts`
+  - Selector lifecycle/session model: `src/application/studio-entry/AssetSelectorSessionStore.ts`
+  - Shared selector shell UI: `src/ui/components/studio-shell/asset-selector/AssetSelectorShell.tsx`
   - Shared create-new launch/return seams: `AssetSelectorStudioLaunchService` + `AssetSelectorReturnHandoffService`
 - Asset-specific responsibilities:
   - Request construction and registry mapping in selector adapters (`DatasetAssetSelectorAdapter`, `AgentAssistantAssetSelectorAdapter`)
@@ -295,27 +295,27 @@ Future selector-backed asset-type adoption guidance:
 5. Add one cross-story integration test that exercises request validation, create-new return handling, and persistence round-trip for the new type.
 
 ## Story 4.13: Studio Shell authoring promotion and configurable toolbar contract
-- Studio Shell registration contracts now include an optional shell toolbar configuration (`ui/studio-shell/StudioShellExtensions.ts`) with typed actions:
+- Studio Shell registration contracts now include an optional shell toolbar configuration (`src/ui/studio-shell/StudioShellExtensions.ts`) with typed actions:
   - `refresh-snapshot`
   - `save-draft`
   - `run-validation`
   - `set-workflow-mode`
 - Toolbar configuration is registration-owned (not user-authored) and validated/normalized at registration boundaries (required action ids/labels, duplicate-action rejection, workflow-mode validation).
 - `StudioShellPage` renders draft authoring as the primary top-level section outside and above the shell card grid, with a simplified details + lifecycle/validation surface while taxonomy/contract/provenance/dependency/session orchestration remains behind shared backend contracts.
-- Workflow Studio now demonstrates per-studio toolbar configuration through registration metadata (`ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions plus save/validate/refresh controls.
+- Workflow Studio now demonstrates per-studio toolbar configuration through registration metadata (`src/ui/studio-shell/registrations/WorkflowStudioRegistration.ts`) with wizard/canvas mode actions plus save/validate/refresh controls.
 - Toolbar execution reuses existing shell orchestration seams (shared workflow mode state store and existing draft/validation operations) without bypassing selector/session infrastructure or duplicating validation logic.
 
 ## Direction 5 stories 5.1-5.2: Canonical studio launch/return contract
-- Cross-studio selector create-new launches now also carry a canonical studio handoff contract (`ui/routes/StudioHandoffContract.ts`) in addition to legacy query params.
-- Workflow Studio origin launches build this contract through `ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`, including origin route, workflow draft reference/state, selector target context, and return/resume destination.
+- Cross-studio selector create-new launches now also carry a canonical studio handoff contract (`src/ui/routes/StudioHandoffContract.ts`) in addition to legacy query params.
+- Workflow Studio origin launches build this contract through `src/ui/studio-shell/workflow/WorkflowStudioLaunchContext.ts`, including origin route, workflow draft reference/state, selector target context, and return/resume destination.
 - `InlineAssetCreationService` remains backward-compatible with existing selector query params and now falls back to parsing the canonical contract when those params are absent.
 
 ## Direction 5 stories 5.3-5.4: Shared return resolution + workflow session persistence
-- Return payload resolution is now centralized in `ui/routes/StudioReturnPayloadResolution.ts`:
+- Return payload resolution is now centralized in `src/ui/routes/StudioReturnPayloadResolution.ts`:
   - typed resolution (`created`, `cancelled`, `no-selection`, `invalid`)
   - canonical payload validation and selector-target extraction from handoff context
 - `AssetSelectorReturnHandoffService` now uses that shared resolver and explicitly supports `no-selection` without mutating selected assets.
-- Workflow return restoration now uses canonical handoff origin context via `ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts` (mode + draft snapshot + draft/session reference restore).
+- Workflow return restoration now uses canonical handoff origin context via `src/ui/studio-shell/workflow/WorkflowStudioReturnRestorationService.ts` (mode + draft snapshot + draft/session reference restore).
 - Workflow authoring state persistence now lives in `WorkflowStudioModeStateStore` local-storage snapshots keyed by studio id, preserving in-progress draft sections (`triggers`, `inputs`, `steps`, `outputs`) through launch/return and refresh flows.
 
 ## Story 4.14: Workflow wizard focus and layout hardening
@@ -327,10 +327,10 @@ Future selector-backed asset-type adoption guidance:
 
 ## Adding future asset types
 To add a new selector type without modifying shared shell/session layers:
-1. Add a typed adapter in `ui/studio-shell/asset-selector/` that:
+1. Add a typed adapter in `src/ui/studio-shell/asset-selector/` that:
    - builds canonical `AssetSelectorRequest` for the target asset type and usage context
    - queries/mapping from the asset source into `AssetSelectorResultItem`
-2. Register/validate capability matrix support in `application/studio-entry/AssetSelectorCapabilityRegistry.ts`.
+2. Register/validate capability matrix support in `src/application/studio-entry/AssetSelectorCapabilityRegistry.ts`.
 3. Integrate the adapter into the target workflow/studio surface using:
    - shared session store (`AssetSelectorSessionStore`)
    - shared shell UI (`AssetSelectorShell`)

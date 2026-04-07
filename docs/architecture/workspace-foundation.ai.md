@@ -312,7 +312,7 @@ Protected-resource composition pattern is canonical:
   - updated `src/infrastructure/api/workspaces/sdk/index.ts`
 - Added `WorkspaceAdministrationBackendApi` (`src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts`) as the transport-facing orchestration/presenter layer for workspace administration screens.
 - Backend API behavior now:
-  - reuses existing application use cases/query service (no direct domain/persistence bypass),
+  - reuses existing application use cases/query service (no direct src/domain/persistence bypass),
   - exposes explicit response contracts for workspace list/admin-view/members/invitations/roles,
   - exposes admin mutation flows for workspace create/update/lifecycle, member add/status/remove, role assign/reassign/revoke, and invitation cancellation,
   - maps internal use-case/query errors into stable external error codes for UI clients.
@@ -332,63 +332,63 @@ Protected-resource composition pattern is canonical:
 - Host composition now wires the workspace administration backend at runtime in `src/hosts/server/IdentityServerHost.ts`.
 - Added HTTP/host integration coverage updates for route behavior and response shape:
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerWorkspaceAdministration.test.ts`
-  - updated `hosts/server/tests/IdentityServerHost.test.ts`
+  - updated `src/hosts/server/tests/IdentityServerHost.test.ts`
 
 ## Story 3.4.2 desktop workspace administration pages
 
 - Added renderer-side workspace administration client + service seams for real backend usage:
-  - `ui/shared/workspaces/WorkspaceAdministrationClient.ts`
-  - `ui/services/WorkspaceAdministrationService.ts`
-- Added a new authenticated desktop administration page at `ui/pages/WorkspaceAdministrationPage.tsx` with production flows for:
+  - `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts`
+  - `src/ui/services/WorkspaceAdministrationService.ts`
+- Added a new authenticated desktop administration page at `src/ui/pages/WorkspaceAdministrationPage.tsx` with production flows for:
   - workspace creation,
   - workspace settings/lifecycle updates,
   - membership add/status/remove,
   - invitation issuance and cancellation,
   - role assignment and revocation.
 - Added route wiring for the new desktop surface:
-  - `ROUTE_PATHS.workspaceAdmin` (`/settings/workspaces`) in `ui/routes/RouteConfig.ts`
-  - page route mapping in `ui/routes/AppRouter.tsx`
-  - entry link from `ui/pages/SettingsPage.tsx`.
+  - `ROUTE_PATHS.workspaceAdmin` (`/settings/workspaces`) in `src/ui/routes/RouteConfig.ts`
+  - page route mapping in `src/ui/routes/AppRouter.tsx`
+  - entry link from `src/ui/pages/SettingsPage.tsx`.
 - Added renderer/client test coverage for critical behavior and contract usage:
-  - `ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
-  - `ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
+  - `src/ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
+  - `src/ui/pages/tests/WorkspaceAdministrationPage.test.tsx`
   - updated route/pages/services contract/interactions tests for new route/service/page integration.
 
 ## Story 3.4.3 thin-client workspace membership and invitation management views
 
 - Extended renderer workspace client/service seams to include invitation onboarding acceptance through the existing workspace onboarding backend contract:
-  - `ui/shared/workspaces/WorkspaceAdministrationClient.ts`
-  - `ui/services/WorkspaceAdministrationService.ts`
+  - `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts`
+  - `src/ui/services/WorkspaceAdministrationService.ts`
 - Added thin-client-focused workspace surfaces for web/mobile operations:
-  - `ui/pages/WorkspaceMembershipThinClientPage.tsx` for membership review, invitation status review, invitation issuance, and basic role-aware member/invitation management actions.
-  - `ui/pages/WorkspaceInvitationOnboardingPage.tsx` for authenticated invite acceptance (`/onboarding/accept`) using production data paths.
-- Added thin-client web route helper `ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite-acceptance link composition.
+  - `src/ui/pages/WorkspaceMembershipThinClientPage.tsx` for membership review, invitation status review, invitation issuance, and basic role-aware member/invitation management actions.
+  - `src/ui/pages/WorkspaceInvitationOnboardingPage.tsx` for authenticated invite acceptance (`/onboarding/accept`) using production data paths.
+- Added thin-client web route helper `src/ui/web/workspaces/WorkspaceThinClientRoutes.ts` for invite-acceptance link composition.
 - Added thin-client route wiring for focused operations outside the full desktop administration screen:
   - `ROUTE_PATHS.workspaceThinMembership` (`/settings/workspaces/thin`)
   - `ROUTE_PATHS.workspaceInvitationAccept` (`/workspaces/:workspaceId/invitations/:invitationToken/accept`)
-  - route integration in `ui/routes/RouteConfig.ts` and `ui/routes/AppRouter.tsx`, with settings entry-point link updates in `ui/pages/SettingsPage.tsx`.
-- Added responsive thin-client layout styles in `ui/styles/app.css` to keep membership and invitation flows usable on smaller screens.
+  - route integration in `src/ui/routes/RouteConfig.ts` and `src/ui/routes/AppRouter.tsx`, with settings entry-point link updates in `src/ui/pages/SettingsPage.tsx`.
+- Added responsive thin-client layout styles in `src/ui/styles/app.css` to keep membership and invitation flows usable on smaller screens.
 - Added/updated coverage for thin-client route/page/client behavior:
-  - `ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
-  - `ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
-  - `ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
+  - `src/ui/shared/workspaces/tests/WorkspaceAdministrationClient.test.ts`
+  - `src/ui/pages/tests/WorkspaceMembershipThinClientPage.test.tsx`
+  - `src/ui/pages/tests/WorkspaceInvitationOnboardingPage.test.tsx`
   - updated route/settings/pages interaction tests.
 
 ## Story 3.4.4 workspace scoping helpers for protected-resource creation flows
 
 - Added shared workspace-scoping helper conventions for protected-resource creation ownership assignment in:
-  - `application/workflow-persistence/WorkflowWorkspaceScoping.ts`
+  - `src/application/workflow-persistence/WorkflowWorkspaceScoping.ts`
 - Workflow persistence ownership context now carries explicit workspace ownership composition fields:
   - optional `workspaceId`
   - optional canonical `workspaceOwnership` envelope aligned to `src/shared/workspaces/WorkspaceOwnership.ts`
 - Workflow protected-resource creation paths now resolve ownership through the shared helper:
-  - `application/workflow-persistence/CreatePersistedWorkflowUseCase.ts`
-  - `application/workflow-persistence/DuplicatePersistedWorkflowUseCase.ts`
+  - `src/application/workflow-persistence/CreatePersistedWorkflowUseCase.ts`
+  - `src/application/workflow-persistence/DuplicatePersistedWorkflowUseCase.ts`
 - Studio Shell workflow duplication request contract now includes workspace-scoping fragments to support explicit workspace ownership assignment:
-  - `infrastructure/api/studio-shell/StudioShellBackendApi.ts`
+  - `src/infrastructure/api/studio-shell/StudioShellBackendApi.ts`
 - Added coverage for workspace-scoped assignment and persistence round-trip:
-  - `application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
-  - `application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
+  - `src/application/workflow-persistence/tests/WorkflowPersistenceUseCases.test.ts`
+  - `src/application/workflow-persistence/tests/SqliteWorkflowPersistenceRepository.test.ts`
 
 ## Story 3.4.5 workspace administration audit seams
 

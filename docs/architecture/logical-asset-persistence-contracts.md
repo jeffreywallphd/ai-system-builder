@@ -86,7 +86,7 @@ Schema includes:
 - domain -> ordered row values for asset/version writes
 - normalization/assertion helpers for lookup and lineage-relation values
 
-This keeps persistence structures decoupled from domain/application contracts and prevents raw path leakage from database APIs.
+This keeps persistence structures decoupled from src/domain/application contracts and prevents raw path leakage from database APIs.
 
 ## Test coverage
 

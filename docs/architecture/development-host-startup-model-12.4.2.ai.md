@@ -22,7 +22,7 @@
   - `dev:desktop` chains `prepare` then `start`.
 
 ## Test harness updates
-- Server integration harness in `hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
+- Server integration harness in `src/hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
 - Added a host-entrypoint-backed test helper (`startAuthoritativeServerHostForTest(...)`) so tests keep existing host assertions while startup path is host-based.
 
 ## Startup script guardrails

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implementation baseline for Story 4.1.1: core authorization domain/value models for RBAC, visibility, sharing, actor/resource policy context, and reusable policy-decision contracts.
+Implementation baseline for Story 4.1.1: core authorization src/domain/value models for RBAC, visibility, sharing, actor/resource policy context, and reusable policy-decision contracts.
 
 ## Canonical files
 
