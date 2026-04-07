@@ -154,6 +154,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For Story 12.4.3 host extension guardrails (architecture validation tests plus contributor host/layer decision guidance), read [`host-composition-extension-guardrails-12.4.3.md`](./host-composition-extension-guardrails-12.4.3.md).
 - For UI composition and state flow, read [`presentation-and-state.md`](./presentation-and-state.md).
 - For canonical multi-surface UI layering, page-shell boundaries, and shared-vs-host placement rules across desktop/thin-client/mobile-responsive surfaces, read [`multi-surface-ui-composition-foundation.md`](./multi-surface-ui-composition-foundation.md).
+- For contributor extension workflow and prohibited-pattern guardrails when adding new admin/operational screens across converged surfaces, read [`multi-surface-ui-extension-guidance.md`](./multi-surface-ui-extension-guidance.md).
 - For canonical responsive breakpoint/density/touch-target/stacking conventions across desktop and thin-client surfaces, read [`multi-surface-ui-responsive-conventions.md`](./multi-surface-ui-responsive-conventions.md).
 - For cross-studio asset selection contracts and capability rules, read [`asset-selector-framework.md`](./asset-selector-framework.md).
 - For canonical studio launch/return handoff contracts, read [`studio-handoff-contract.md`](./studio-handoff-contract.md).
