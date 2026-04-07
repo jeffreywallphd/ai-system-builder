@@ -26,11 +26,11 @@ export const UnifiedApiDomainConvergenceContracts: ReadonlyArray<UnifiedApiDomai
     contractHomes: Object.freeze([
       Object.freeze({
         path: "src/shared/contracts/identity/IdentityTransportContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
       Object.freeze({
         path: "src/shared/schemas/identity/IdentityTransportSchemaContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
     ]),
   }),
@@ -41,11 +41,11 @@ export const UnifiedApiDomainConvergenceContracts: ReadonlyArray<UnifiedApiDomai
     contractHomes: Object.freeze([
       Object.freeze({
         path: "src/shared/contracts/workspaces/WorkspaceTransportContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
       Object.freeze({
         path: "src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
     ]),
   }),
@@ -135,11 +135,11 @@ export const UnifiedApiDomainConvergenceContracts: ReadonlyArray<UnifiedApiDomai
     contractHomes: Object.freeze([
       Object.freeze({
         path: "src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
       Object.freeze({
         path: "src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
     ]),
   }),
@@ -150,11 +150,11 @@ export const UnifiedApiDomainConvergenceContracts: ReadonlyArray<UnifiedApiDomai
     contractHomes: Object.freeze([
       Object.freeze({
         path: "src/shared/contracts/deployment/DeploymentTransportContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
       Object.freeze({
         path: "src/shared/schemas/deployment/DeploymentTransportSchemaContracts.ts",
-        status: UnifiedApiContractHomeStatuses.proposed,
+        status: UnifiedApiContractHomeStatuses.existing,
       }),
     ]),
   }),

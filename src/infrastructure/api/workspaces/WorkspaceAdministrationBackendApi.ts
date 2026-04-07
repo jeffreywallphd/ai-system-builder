@@ -96,7 +96,7 @@ import {
   type WorkspaceInvitationApiRecord,
   type WorkspaceMembershipApiRecord,
   type WorkspaceRoleAssignmentApiRecord,
-} from "./sdk/PublicWorkspaceAdministrationApiContract";
+} from "@shared/contracts/workspaces/WorkspaceTransportContracts";
 import { AuthorizationPolicyEvaluationTargetKinds } from "@application/authorization/contracts/AuthorizationPolicyEvaluationContracts";
 import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
 

@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   ChangeLocalPasswordCredentialApiRequest,
   ChangeLocalPasswordCredentialApiResponse,
   CompleteTrustedDevicePairingApiRequest,
@@ -34,7 +34,7 @@
   UpdateTrustedDeviceDisplayNameApiResponse,
   ValidateTrustedDevicePairingApiRequest,
   ValidateTrustedDevicePairingApiResponse,
-} from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
+} from "@shared/contracts/identity/IdentityTransportContracts";
 
 export interface IdentityAuthClient {
   registerLocalAccount(
@@ -409,4 +409,5 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
     return payload;
   }
 }
+
 

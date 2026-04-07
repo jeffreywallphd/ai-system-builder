@@ -1,4 +1,5 @@
-﻿import type { WorkspaceInvitationStatus, WorkspaceMembershipStatus, WorkspaceRole, WorkspaceRoleAssignmentStatus } from "@domain/workspaces/WorkspaceDomain";
+/* MIGRATION NOTE: prefer importing shared transport contracts from src/shared/contracts/* for new work. This SDK contract remains for compatibility during convergence. */
+import type { WorkspaceInvitationStatus, WorkspaceMembershipStatus, WorkspaceRole, WorkspaceRoleAssignmentStatus } from "@domain/workspaces/WorkspaceDomain";
 
 export const WorkspaceInvitationApiErrorCodes = Object.freeze({
   invalidRequest: "invalid-request",
