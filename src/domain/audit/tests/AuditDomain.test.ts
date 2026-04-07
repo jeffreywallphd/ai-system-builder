@@ -1,0 +1,155 @@
+import { describe, expect, it } from "bun:test";
+import {
+  AuditActorKinds,
+  AuditDomainError,
+  AuditEventCategories,
+  AuditImmutabilityPostures,
+  AuditRedactionReasons,
+  AuditRetentionPostures,
+  AuditScopeKinds,
+  AuditResourceSensitivityClasses,
+  createAuditActorIdentity,
+  createAuditEventPayloadBoundary,
+  createCanonicalAuditEvent,
+  createAuditScope,
+  toUserSafeAuditEventView,
+} from "../AuditDomain";
+
+describe("AuditDomain", () => {
+  it("enforces actor and scope invariants", () => {
+    expect(() => createAuditActorIdentity({ actorId: "", actorKind: AuditActorKinds.user })).toThrow(
+      AuditDomainError,
+    );
+
+    expect(() => createAuditActorIdentity({
+      actorId: "actor:user:1",
+      actorKind: AuditActorKinds.user,
+    })).toThrow(AuditDomainError);
+
+    expect(createAuditActorIdentity({
+      actorId: "actor:user:1",
+      actorKind: AuditActorKinds.user,
+      actorUserIdentityId: "user:1",
+      actorSessionId: "session:1",
+    })).toEqual({
+      actorId: "actor:user:1",
+      actorKind: AuditActorKinds.user,
+      actorUserIdentityId: "user:1",
+      actorServiceId: undefined,
+      actorSessionId: "session:1",
+    });
+
+    expect(() => createAuditScope({ kind: AuditScopeKinds.workspace })).toThrow(AuditDomainError);
+
+    expect(createAuditScope({ kind: AuditScopeKinds.workspace, workspaceId: "workspace:1" })).toEqual({
+      kind: AuditScopeKinds.workspace,
+      workspaceId: "workspace:1",
+    });
+  });
+
+  it("enforces payload boundary redaction invariants", () => {
+    expect(() => createAuditEventPayloadBoundary({
+      userSafeDetails: {
+        key: "safe",
+      },
+      adminOnlyDetails: {
+        key: "secret",
+      },
+      hasProtectedData: true,
+      redactionReasons: [AuditRedactionReasons.secretMaterial],
+    })).toThrow(AuditDomainError);
+
+    expect(() => createAuditEventPayloadBoundary({
+      hasProtectedData: true,
+      adminOnlyDetails: {
+        credentialHash: "abc",
+      },
+    })).toThrow(AuditDomainError);
+
+    const payload = createAuditEventPayloadBoundary({
+      userSafeDetails: {
+        mutationKind: "role-reassigned",
+      },
+      adminOnlyDetails: {
+        internalPolicyResult: "policy:123",
+      },
+      hasProtectedData: true,
+      redactionReasons: [AuditRedactionReasons.internalOnlyDiagnostic],
+    });
+
+    expect(payload.hasProtectedData).toBeTrue();
+    expect(payload.redactionReasons).toEqual([AuditRedactionReasons.internalOnlyDiagnostic]);
+  });
+
+  it("creates canonical audit events with append-oriented invariants", () => {
+    const event = createCanonicalAuditEvent({
+      eventId: "audit:event:1",
+      eventType: "workspace-role-reassigned",
+      category: AuditEventCategories.administrative,
+      action: "workspace.role.reassigned",
+      outcome: "succeeded",
+      occurredAt: "2026-04-07T12:00:00.000Z",
+      recordedAt: "2026-04-07T12:00:01.000Z",
+      actor: {
+        actorId: "user:admin:1",
+        actorKind: AuditActorKinds.user,
+        actorUserIdentityId: "user:admin:1",
+        actorSessionId: "session:admin:1",
+      },
+      scope: {
+        kind: AuditScopeKinds.workspace,
+        workspaceId: "workspace:1",
+      },
+      protectedResource: {
+        resourceType: "workspace-role-assignment",
+        resourceId: "assignment:1",
+        resourceRef: "workspace-role-assignment:assignment:1",
+        sensitivityClass: AuditResourceSensitivityClasses.sensitive,
+        workspaceId: "workspace:1",
+      },
+      payload: {
+        userSafeDetails: {
+          roleKey: "admin",
+          targetUserIdentityId: "user:member:9",
+        },
+        adminOnlyDetails: {
+          priorRoleKey: "member",
+          internalReasonCodes: ["owner-requested"],
+        },
+        hasProtectedData: true,
+        redactionReasons: [AuditRedactionReasons.personalData],
+      },
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+        eventDigest: "digest:1",
+        previousEventDigest: "digest:0",
+      },
+      retention: AuditRetentionPostures.governance,
+      immutability: AuditImmutabilityPostures.appendOnly,
+      correlationId: "corr:1",
+      requestId: "request:1",
+    });
+
+    expect(event.recordKind).toBe("audit-record");
+    expect(event.immutability).toBe("append-only");
+    expect(event.payload.userSafeDetails?.priorRoleKey).toBeUndefined();
+
+    const userSafe = toUserSafeAuditEventView(event);
+    expect(userSafe.details).toEqual({
+      roleKey: "admin",
+      targetUserIdentityId: "user:member:9",
+    });
+
+    expect(() => createCanonicalAuditEvent({
+      ...event,
+      eventId: "audit:event:2",
+      occurredAt: "2026-04-07T12:00:02.000Z",
+      recordedAt: "2026-04-07T12:00:01.000Z",
+      integrity: {
+        schemaVersion: "1.0",
+        hashAlgorithm: "sha-256",
+      },
+    })).toThrow(AuditDomainError);
+  });
+});
