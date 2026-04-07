@@ -211,6 +211,9 @@ import {
 } from "@shared/schemas/runtime/SystemRuntimeTransportSchemaContracts";
 import {
   RunOrchestrationTransportSchemaValidationError,
+  parseSchedulingAdminListStaleReservationsRequest,
+  parseSchedulingAdminReleaseStaleReservationRequest,
+  parseSchedulingAdminReevaluateDeferredRunsRequest,
   parseRunCancellationRequest,
   parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
@@ -5306,6 +5309,174 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
       if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path === RunOrchestrationTransportRoutes.listSchedulingStaleReservations
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateSchedulingAdminStaleReservationsReadRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunQueryBackendApi.listStaleSchedulingReservations({
+              ...parsedRequest.data,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunMutationBackendApi
+        && request.method === "POST"
+        && path === RunOrchestrationTransportRoutes.releaseSchedulingStaleReservation
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunMutationBackendApi.releaseStaleSchedulingReservation({
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+              release: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              runId: parsedRequest.data.runId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunMutationBackendApi
+        && request.method === "POST"
+        && path === RunOrchestrationTransportRoutes.reevaluateSchedulingDeferredRuns
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunMutationBackendApi.reevaluateDeferredSchedulingRuns({
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+              reevaluate: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              queueId: parsedRequest.data.queueId,
+              runIds: parsedRequest.data.runIds,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
         options.systemRuntimeBackendApi
         && request.method === "GET"
         && path === "/api/v1/runtime/queue"
@@ -9688,6 +9859,105 @@ function parseAndValidateAuthoritativeRunQueueStatusReadRequest(input: {
       statusCode: 400,
       body: buildRuntimeInvalidRequestResponse("Run queue request is invalid."),
     };
+  }
+}
+
+function parseAndValidateSchedulingAdminStaleReservationsReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminListStaleReservationsRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const pagination = parseSharedListPaginationFromQuery(input.searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminListStaleReservationsRequest({
+        workspaceId: input.workspaceId,
+        queueId: normalizeOptionalString(input.searchParams.get("queueId")),
+        asOf: normalizeOptionalString(input.searchParams.get("asOf")),
+        limit: pagination.limit,
+        offset: pagination.offset,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Scheduling stale reservation query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Scheduling stale reservation query is invalid."),
+    };
+  }
+}
+
+function parseAndValidateSchedulingAdminReleaseStaleReservationMutationRequest(
+  payload: unknown,
+):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminReleaseStaleReservationRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminReleaseStaleReservationRequest(bodyRecord),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(
+          error.issues[0]?.message ?? "Scheduling stale reservation release payload is invalid.",
+        ),
+      };
+    }
+    throw error;
+  }
+}
+
+function parseAndValidateSchedulingAdminReevaluateDeferredRunsMutationRequest(
+  payload: unknown,
+):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseSchedulingAdminReevaluateDeferredRunsRequest>;
+  }
+  | { readonly ok: false; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  const bodyRecord = asRecord(payload);
+  try {
+    return {
+      ok: true,
+      data: parseSchedulingAdminReevaluateDeferredRunsRequest(bodyRecord),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        body: buildRuntimeInvalidRequestResponse(
+          error.issues[0]?.message ?? "Scheduling deferred re-evaluation payload is invalid.",
+        ),
+      };
+    }
+    throw error;
   }
 }
 

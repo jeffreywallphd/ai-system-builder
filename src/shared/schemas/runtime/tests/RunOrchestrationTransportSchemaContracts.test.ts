@@ -8,6 +8,12 @@ import {
   parseRunLifecycleUpdateRequest,
   parseRunQueueStatusReadRequest,
   parseRunQueueStatusReadResponse,
+  parseSchedulingAdminListStaleReservationsRequest,
+  parseSchedulingAdminListStaleReservationsResponse,
+  parseSchedulingAdminReleaseStaleReservationRequest,
+  parseSchedulingAdminReleaseStaleReservationResponse,
+  parseSchedulingAdminReevaluateDeferredRunsRequest,
+  parseSchedulingAdminReevaluateDeferredRunsResponse,
   parseRunStatusEnvelope,
   parseRunSubmissionRequest,
   toLegacyRuntimeStartRunRequest,
@@ -120,6 +126,76 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
 
     expect(parsed.schedulingAdminSummary?.deferredRuns).toBe(1);
     expect(parsed.items[0]?.scheduling?.placement.outcome).toBe("deferred");
+  });
+
+  it("parses scheduling admin stale reservation and deferred re-evaluation contracts", () => {
+    const listRequest = parseSchedulingAdminListStaleReservationsRequest({
+      workspaceId: "workspace-1",
+      queueId: "queue-1",
+      asOf: "2026-04-07T10:01:00.000Z",
+      limit: 10,
+      offset: 0,
+    });
+    expect(listRequest.workspaceId).toBe("workspace-1");
+
+    const listResponse = parseSchedulingAdminListStaleReservationsResponse({
+      asOf: "2026-04-07T10:01:00.000Z",
+      totalCount: 1,
+      items: [{
+        runId: "run-1",
+        queueId: "queue-1",
+        workspaceId: "workspace-1",
+        claimToken: "queue-claim:1",
+        claimedBy: "scheduler:1",
+        claimedAt: "2026-04-07T09:58:00.000Z",
+        claimExpiresAt: "2026-04-07T10:00:00.000Z",
+        staleSeconds: 60,
+      }],
+    });
+    expect(listResponse.items[0]?.staleSeconds).toBe(60);
+
+    const releaseRequest = parseSchedulingAdminReleaseStaleReservationRequest({
+      runId: "run-1",
+      claimToken: "queue-claim:1",
+      releasedAt: "2026-04-07T10:01:00.000Z",
+      reason: "operator release",
+    });
+    expect(releaseRequest.runId).toBe("run-1");
+
+    const releaseResponse = parseSchedulingAdminReleaseStaleReservationResponse({
+      runId: "run-1",
+      queueId: "queue-1",
+      releasedAt: "2026-04-07T10:01:00.000Z",
+      staleSeconds: 60,
+      reservationOwner: "scheduler:1",
+      mutation: {
+        changed: true,
+        mutationId: "mutation:1",
+        occurredAt: "2026-04-07T10:01:00.000Z",
+      },
+    });
+    expect(releaseResponse.mutation.changed).toBeTrue();
+
+    const reevaluateRequest = parseSchedulingAdminReevaluateDeferredRunsRequest({
+      queueId: "queue-1",
+      runIds: ["run-1"],
+      requestedAt: "2026-04-07T10:01:00.000Z",
+      reason: "manual re-evaluation",
+      limit: 20,
+    });
+    expect(reevaluateRequest.runIds?.[0]).toBe("run-1");
+
+    const reevaluateResponse = parseSchedulingAdminReevaluateDeferredRunsResponse({
+      requestedAt: "2026-04-07T10:01:00.000Z",
+      reEvaluatedCount: 1,
+      runIds: ["run-1"],
+      mutation: {
+        changed: true,
+        mutationId: "mutation:2",
+        occurredAt: "2026-04-07T10:01:00.000Z",
+      },
+    });
+    expect(reevaluateResponse.reEvaluatedCount).toBe(1);
   });
 
   it("parses authoritative run list read contracts", () => {

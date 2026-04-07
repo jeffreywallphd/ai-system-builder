@@ -13,6 +13,14 @@ import {
   RunRetryValidationError,
   type RequestAuthoritativeRunRetryResult,
 } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
+import {
+  ReleaseStaleSchedulingReservationUseCase,
+  type ReleaseStaleSchedulingReservationResult,
+} from "@application/runs/use-cases/ReleaseStaleSchedulingReservationUseCase";
+import {
+  ReevaluateDeferredSchedulingRunsUseCase,
+  type ReevaluateDeferredSchedulingRunsResult,
+} from "@application/runs/use-cases/ReevaluateDeferredSchedulingRunsUseCase";
 import { AuthoritativeRunMutationBackendApi } from "../AuthoritativeRunMutationBackendApi";
 import type { RunOrchestrationRealtimePublisher } from "../RunOrchestrationRealtimePublisher";
 
@@ -72,6 +80,73 @@ class StubRequestAuthoritativeRunRetryUseCase {
       }),
     });
   }
+}
+
+class StubReleaseStaleSchedulingReservationUseCase {
+  public nextError: unknown;
+
+  public async execute(): Promise<ReleaseStaleSchedulingReservationResult> {
+    if (this.nextError) {
+      throw this.nextError;
+    }
+    return Object.freeze({
+      runId: "run:stale:1",
+      queueId: "queue:default",
+      releasedAt: "2026-04-07T12:12:00.000Z",
+      staleSeconds: 120,
+      reservationOwner: "scheduler:alpha",
+      mutationId: "run:scheduling-admin-release-stale-reservation:1",
+    });
+  }
+}
+
+class StubReevaluateDeferredSchedulingRunsUseCase {
+  public nextError: unknown;
+
+  public async execute(): Promise<ReevaluateDeferredSchedulingRunsResult> {
+    if (this.nextError) {
+      throw this.nextError;
+    }
+    return Object.freeze({
+      requestedAt: "2026-04-07T12:13:00.000Z",
+      reEvaluatedCount: 2,
+      runIds: Object.freeze(["run:deferred:1", "run:deferred:2"]),
+      mutationId: "run:scheduling-admin-reevaluate-deferred:1",
+    });
+  }
+}
+
+function buildApi(dependencies?: {
+  readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
+  readonly authorizationDecisionEvaluator?: {
+    evaluateDecision: (input: { readonly requiredPermissionKey: string }) => Promise<{
+      readonly decision: {
+        readonly outcome: "allow" | "deny";
+        readonly reasonCode: string;
+        readonly reason: string;
+        readonly requiredPermissionKey: string;
+        readonly evaluatedAt: string;
+        readonly isAllowed: boolean;
+        readonly matchedRoleAssignmentIds: ReadonlyArray<string>;
+        readonly matchedPermissionGrantIds: ReadonlyArray<string>;
+        readonly matchedSharingGrantIds: ReadonlyArray<string>;
+      };
+    }>;
+  };
+}) {
+  const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
+  const retry = new StubRequestAuthoritativeRunRetryUseCase();
+  const release = new StubReleaseStaleSchedulingReservationUseCase();
+  const reevaluate = new StubReevaluateDeferredSchedulingRunsUseCase();
+  const api = new AuthoritativeRunMutationBackendApi({
+    requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
+    requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
+    releaseStaleSchedulingReservationUseCase: release as unknown as ReleaseStaleSchedulingReservationUseCase,
+    reevaluateDeferredSchedulingRunsUseCase: reevaluate as unknown as ReevaluateDeferredSchedulingRunsUseCase,
+    realtimePublisher: dependencies?.realtimePublisher,
+    authorizationDecisionEvaluator: dependencies?.authorizationDecisionEvaluator as never,
+  });
+  return { api, cancellation, retry, release, reevaluate };
 }
 
 function buildRun(runId: string, state: string, attempt: number, previousRunId: string | undefined) {
@@ -138,13 +213,7 @@ describe("AuthoritativeRunMutationBackendApi", () => {
         realtimeEvents.push({ type: "queue", payload: input.payload });
       },
     });
-    const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
-    const retry = new StubRequestAuthoritativeRunRetryUseCase();
-    const api = new AuthoritativeRunMutationBackendApi({
-      requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
-      requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
-      realtimePublisher,
-    });
+    const { api } = buildApi({ realtimePublisher });
 
     const response = await api.cancelRun({
       workspaceId: "workspace-alpha",
@@ -166,12 +235,7 @@ describe("AuthoritativeRunMutationBackendApi", () => {
   });
 
   it("maps cancellation validation and not-found failures to shared error semantics", async () => {
-    const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
-    const retry = new StubRequestAuthoritativeRunRetryUseCase();
-    const api = new AuthoritativeRunMutationBackendApi({
-      requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
-      requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
-    });
+    const { api, cancellation } = buildApi();
 
     cancellation.nextError = new RunCancellationValidationError("runId is required.");
     const invalid = await api.cancelRun({
@@ -212,13 +276,7 @@ describe("AuthoritativeRunMutationBackendApi", () => {
         realtimeEvents.push({ type: "queue", payload: input.payload });
       },
     });
-    const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
-    const retry = new StubRequestAuthoritativeRunRetryUseCase();
-    const api = new AuthoritativeRunMutationBackendApi({
-      requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
-      requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
-      realtimePublisher,
-    });
+    const { api } = buildApi({ realtimePublisher });
 
     const response = await api.retryRun({
       workspaceId: "workspace-alpha",
@@ -241,12 +299,7 @@ describe("AuthoritativeRunMutationBackendApi", () => {
   });
 
   it("maps retry eligibility and not-found failures to shared error semantics", async () => {
-    const cancellation = new StubRequestAuthoritativeRunCancellationUseCase();
-    const retry = new StubRequestAuthoritativeRunRetryUseCase();
-    const api = new AuthoritativeRunMutationBackendApi({
-      requestAuthoritativeRunCancellationUseCase: cancellation as unknown as RequestAuthoritativeRunCancellationUseCase,
-      requestAuthoritativeRunRetryUseCase: retry as unknown as RequestAuthoritativeRunRetryUseCase,
-    });
+    const { api, retry } = buildApi();
 
     retry.nextError = new RunRetryValidationError("runId is required.");
     const invalid = await api.retryRun({
@@ -293,5 +346,83 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     });
     expect(notFound.ok).toBeFalse();
     expect(notFound.error?.code).toBe(SharedApiErrorCodes.notFound);
+  });
+
+  it("supports scheduling admin stale reservation release and deferred re-evaluation", async () => {
+    const { api } = buildApi();
+
+    const released = await api.releaseStaleSchedulingReservation({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      release: {
+        runId: "run:stale:1",
+        claimToken: "queue-claim:1",
+      },
+    });
+    expect(released.ok).toBeTrue();
+    expect(released.data?.mutation.changed).toBeTrue();
+    expect(released.data?.runId).toBe("run:stale:1");
+
+    const reevaluated = await api.reevaluateDeferredSchedulingRuns({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      reevaluate: {
+        queueId: "queue:default",
+        limit: 20,
+      },
+    });
+    expect(reevaluated.ok).toBeTrue();
+    expect(reevaluated.data?.reEvaluatedCount).toBe(2);
+    expect(reevaluated.data?.mutation.changed).toBeTrue();
+  });
+
+  it("denies scheduling admin actions when run.manage permission is denied", async () => {
+    const denyManageEvaluator = Object.freeze({
+      evaluateDecision: async (input: { readonly requiredPermissionKey: string }) => Object.freeze({
+        decision: Object.freeze({
+          outcome: input.requiredPermissionKey === "run.manage" ? "deny" : "allow",
+          reasonCode: "test",
+          reason: "test",
+          requiredPermissionKey: input.requiredPermissionKey,
+          evaluatedAt: "2026-04-07T12:00:00.000Z",
+          isAllowed: input.requiredPermissionKey !== "run.manage",
+          matchedRoleAssignmentIds: Object.freeze([]),
+          matchedPermissionGrantIds: Object.freeze([]),
+          matchedSharingGrantIds: Object.freeze([]),
+        }),
+      }),
+    });
+    const { api } = buildApi({ authorizationDecisionEvaluator: denyManageEvaluator });
+
+    const releaseDenied = await api.releaseStaleSchedulingReservation({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      release: {
+        runId: "run:stale:1",
+        claimToken: "queue-claim:1",
+      },
+    });
+    expect(releaseDenied.ok).toBeFalse();
+    expect(releaseDenied.error?.code).toBe(SharedApiErrorCodes.forbidden);
+
+    const reevaluateDenied = await api.reevaluateDeferredSchedulingRuns({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      reevaluate: {},
+    });
+    expect(reevaluateDenied.ok).toBeFalse();
+    expect(reevaluateDenied.error?.code).toBe(SharedApiErrorCodes.forbidden);
   });
 });

@@ -48,6 +48,7 @@ import type {
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
+import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import { AuthoritativeRunQueryBackendApi } from "../AuthoritativeRunQueryBackendApi";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
@@ -101,6 +102,15 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
 class InMemoryRunQueueReadRepository implements IRunOrchestrationQueuePersistenceRepository {
   public readonly dispatchAttempts = new Map<string, ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>>();
   public entries: ReadonlyArray<AuthoritativeRunQueueEntryRecord> = Object.freeze([]);
+  public staleReservations: ReadonlyArray<{
+    readonly runId: string;
+    readonly queueId: string;
+    readonly workspaceId?: string;
+    readonly claimToken: string;
+    readonly claimedBy: string;
+    readonly claimedAt: string;
+    readonly claimExpiresAt: string;
+  }> = Object.freeze([]);
 
   public async getQueueEntryByRunId(runId: string): Promise<AuthoritativeRunQueueEntryRecord | undefined> {
     return this.entries.find((entry) => entry.runId === runId);
@@ -117,6 +127,10 @@ class InMemoryRunQueueReadRepository implements IRunOrchestrationQueuePersistenc
     },
   ): Promise<ReadonlyArray<AuthoritativeRunQueueEntryRecord>> {
     return this.entries;
+  }
+
+  public async listStaleQueueReservations() {
+    return this.staleReservations;
   }
 
   public async enqueueRunForAssignment(
@@ -221,6 +235,13 @@ function createQueueStatusUseCase(runRepository: InMemoryRunRepository): ListAut
       listDispatchAttemptsByRunId: async () => Object.freeze([]),
       listQueueEntries: async () => Object.freeze([]),
     },
+    now: () => new Date("2026-04-07T10:00:00.000Z"),
+  });
+}
+
+function createStaleReservationUseCase(queueRepository: IRunOrchestrationQueuePersistenceRepository) {
+  return new ListStaleSchedulingReservationsUseCase({
+    queueRepository,
     now: () => new Date("2026-04-07T10:00:00.000Z"),
   });
 }
@@ -458,6 +479,22 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
       listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase({
+        getQueueEntryByRunId: async () => undefined,
+        enqueueRunForAssignment: async () => {
+          throw new Error("Not implemented.");
+        },
+        listAssignmentReadyRuns: async () => Object.freeze([]),
+        claimAssignmentReadyRuns: async () => Object.freeze([]),
+        releaseRunClaim: async () => false,
+        claimQueuedRunForNodeDispatch: async () => {
+          throw new Error("Not implemented.");
+        },
+        recordDispatchAttemptResult: async () => false,
+        finalizeRunQueueEntry: async () => false,
+        listDispatchAttemptsByRunId: async () => Object.freeze([]),
+        listQueueEntries: async () => Object.freeze([]),
+      }),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       authorizationDecisionEvaluator: evaluator,
@@ -519,6 +556,22 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
       listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase({
+        getQueueEntryByRunId: async () => undefined,
+        enqueueRunForAssignment: async () => {
+          throw new Error("Not implemented.");
+        },
+        listAssignmentReadyRuns: async () => Object.freeze([]),
+        claimAssignmentReadyRuns: async () => Object.freeze([]),
+        releaseRunClaim: async () => false,
+        claimQueuedRunForNodeDispatch: async () => {
+          throw new Error("Not implemented.");
+        },
+        recordDispatchAttemptResult: async () => false,
+        finalizeRunQueueEntry: async () => false,
+        listDispatchAttemptsByRunId: async () => Object.freeze([]),
+        listQueueEntries: async () => Object.freeze([]),
+      }),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       authorizationDecisionEvaluator: evaluator,
@@ -555,6 +608,22 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
       listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase({
+        getQueueEntryByRunId: async () => undefined,
+        enqueueRunForAssignment: async () => {
+          throw new Error("Not implemented.");
+        },
+        listAssignmentReadyRuns: async () => Object.freeze([]),
+        claimAssignmentReadyRuns: async () => Object.freeze([]),
+        releaseRunClaim: async () => false,
+        claimQueuedRunForNodeDispatch: async () => {
+          throw new Error("Not implemented.");
+        },
+        recordDispatchAttemptResult: async () => false,
+        finalizeRunQueueEntry: async () => false,
+        listDispatchAttemptsByRunId: async () => Object.freeze([]),
+        listQueueEntries: async () => Object.freeze([]),
+      }),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
     });
@@ -622,6 +691,22 @@ describe("AuthoritativeRunQueryBackendApi", () => {
           }]),
         },
         now: () => new Date("2026-04-07T10:00:00.000Z"),
+      }),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase({
+        getQueueEntryByRunId: async () => undefined,
+        enqueueRunForAssignment: async () => {
+          throw new Error("Not implemented.");
+        },
+        listAssignmentReadyRuns: async () => Object.freeze([]),
+        claimAssignmentReadyRuns: async () => Object.freeze([]),
+        releaseRunClaim: async () => false,
+        claimQueuedRunForNodeDispatch: async () => {
+          throw new Error("Not implemented.");
+        },
+        recordDispatchAttemptResult: async () => false,
+        finalizeRunQueueEntry: async () => false,
+        listDispatchAttemptsByRunId: async () => Object.freeze([]),
+        listQueueEntries: async () => Object.freeze([]),
       }),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
@@ -726,6 +811,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
         queueRepository: runQueueRepository,
         now: () => new Date("2026-04-07T10:00:00.000Z"),
       }),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(runQueueRepository),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       queueRepository: runQueueRepository,
@@ -885,6 +971,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     const api = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
       listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(runQueueRepository),
       getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
       runRepository,
       queueRepository: runQueueRepository,
@@ -917,6 +1004,83 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(admin.data?.failureSummary?.diagnostics?.visibility).toBe("admin");
     expect(admin.data?.failureSummary?.diagnostics?.latestDispatchFailure?.internalCode).toBe("adapter-timeout");
     expect(admin.data?.failureSummary?.diagnostics?.latestExecutionTelemetry?.diagnosticKeys).toEqual(["workerPid"]);
+  });
+
+  it("lists stale scheduling reservations only for run.manage audiences", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const runQueueRepository = new InMemoryRunQueueReadRepository();
+    runQueueRepository.staleReservations = Object.freeze([Object.freeze({
+      runId: "run:stale:1",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      claimToken: "queue-claim:1",
+      claimedBy: "scheduler:alpha",
+      claimedAt: "2026-04-07T09:58:00.000Z",
+      claimExpiresAt: "2026-04-07T10:00:00.000Z",
+    })]);
+
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    authRepositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([
+        createRoleAssignment({
+          id: "role-viewer-stale",
+          actorUserIdentityId: "user-viewer",
+          roleKey: "viewer",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+        createRoleAssignment({
+          id: "role-admin-stale",
+          actorUserIdentityId: "user-admin",
+          roleKey: "admin",
+          scope: RoleAssignmentScopes.workspace,
+          workspaceId: "workspace-alpha",
+          assignedByUserIdentityId: "user-owner",
+          assignedAt: "2026-04-07T08:00:00.000Z",
+        }),
+      ]),
+      permissionGrants: Object.freeze([]),
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-07T10:01:00.000Z") },
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(runQueueRepository),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      queueRepository: runQueueRepository,
+      authorizationDecisionEvaluator: evaluator,
+      now: () => new Date("2026-04-07T10:01:00.000Z"),
+    });
+
+    const viewer = await api.listStaleSchedulingReservations({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(viewer.ok).toBeFalse();
+    expect(viewer.error?.code).toBe("forbidden");
+
+    const admin = await api.listStaleSchedulingReservations({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-admin",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+    expect(admin.ok).toBeTrue();
+    expect(admin.data?.items).toHaveLength(1);
+    expect(admin.data?.items[0]?.runId).toBe("run:stale:1");
   });
 });
 

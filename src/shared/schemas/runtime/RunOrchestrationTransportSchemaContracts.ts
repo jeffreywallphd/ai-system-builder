@@ -454,6 +454,62 @@ export const RunQueueStatusReadResponseSchema = z.object({
   schedulingAdminSummary: RunQueueSchedulingAdminSummarySchema.optional(),
 }).strict();
 
+export const SchedulingAdminListStaleReservationsRequestSchema = z.object({
+  workspaceId: IdentifierSchema,
+  queueId: IdentifierSchema.optional(),
+  asOf: TimestampSchema.optional(),
+  limit: z.number().int().min(1).max(200).optional(),
+  offset: z.number().int().min(0).optional(),
+}).strict();
+
+const SchedulingAdminStaleReservationSchema = z.object({
+  runId: IdentifierSchema,
+  queueId: IdentifierSchema,
+  workspaceId: IdentifierSchema.optional(),
+  claimToken: IdentifierSchema,
+  claimedBy: IdentifierSchema,
+  claimedAt: TimestampSchema,
+  claimExpiresAt: TimestampSchema,
+  staleSeconds: z.number().int().min(0),
+}).strict();
+
+export const SchedulingAdminListStaleReservationsResponseSchema = z.object({
+  asOf: TimestampSchema,
+  totalCount: z.number().int().min(0),
+  items: z.array(SchedulingAdminStaleReservationSchema),
+}).strict();
+
+export const SchedulingAdminReleaseStaleReservationRequestSchema = z.object({
+  runId: IdentifierSchema,
+  claimToken: IdentifierSchema,
+  releasedAt: TimestampSchema.optional(),
+  reason: OptionalReasonSchema,
+}).strict();
+
+export const SchedulingAdminReleaseStaleReservationResponseSchema = z.object({
+  runId: IdentifierSchema,
+  queueId: IdentifierSchema,
+  releasedAt: TimestampSchema,
+  staleSeconds: z.number().int().min(0),
+  reservationOwner: IdentifierSchema,
+  mutation: MutationResultSchema,
+}).strict();
+
+export const SchedulingAdminReevaluateDeferredRunsRequestSchema = z.object({
+  queueId: IdentifierSchema.optional(),
+  runIds: z.array(IdentifierSchema).max(200).optional(),
+  requestedAt: TimestampSchema.optional(),
+  reason: OptionalReasonSchema,
+  limit: z.number().int().min(1).max(200).optional(),
+}).strict();
+
+export const SchedulingAdminReevaluateDeferredRunsResponseSchema = z.object({
+  requestedAt: TimestampSchema,
+  reEvaluatedCount: z.number().int().min(0),
+  runIds: z.array(IdentifierSchema),
+  mutation: MutationResultSchema,
+}).strict();
+
 export const RunCancellationRequestSchema = z.object({
   runId: IdentifierSchema,
   reason: OptionalReasonSchema,
@@ -510,6 +566,7 @@ export const RunLifecycleUpdateRequestSchema = z.object({
 const RunMutationActionSchema = z.enum([
   RunMutationActions.cancel,
   RunMutationActions.retry,
+  RunMutationActions.schedulingAdmin,
   RunMutationActions.lifecycleUpdate,
 ]);
 
@@ -565,6 +622,18 @@ export type RunListReadResponsePayload = z.infer<typeof RunListReadResponseSchem
 export type RunStatusEnvelopePayload = z.infer<typeof RunStatusEnvelopeSchema>;
 export type RunQueueStatusReadRequestPayload = z.infer<typeof RunQueueStatusReadRequestSchema>;
 export type RunQueueStatusReadResponsePayload = z.infer<typeof RunQueueStatusReadResponseSchema>;
+export type SchedulingAdminListStaleReservationsRequestPayload =
+  z.infer<typeof SchedulingAdminListStaleReservationsRequestSchema>;
+export type SchedulingAdminListStaleReservationsResponsePayload =
+  z.infer<typeof SchedulingAdminListStaleReservationsResponseSchema>;
+export type SchedulingAdminReleaseStaleReservationRequestPayload =
+  z.infer<typeof SchedulingAdminReleaseStaleReservationRequestSchema>;
+export type SchedulingAdminReleaseStaleReservationResponsePayload =
+  z.infer<typeof SchedulingAdminReleaseStaleReservationResponseSchema>;
+export type SchedulingAdminReevaluateDeferredRunsRequestPayload =
+  z.infer<typeof SchedulingAdminReevaluateDeferredRunsRequestSchema>;
+export type SchedulingAdminReevaluateDeferredRunsResponsePayload =
+  z.infer<typeof SchedulingAdminReevaluateDeferredRunsResponseSchema>;
 export type RunCancellationRequestPayload = z.infer<typeof RunCancellationRequestSchema>;
 export type RunRetryRequestPayload = z.infer<typeof RunRetryRequestSchema>;
 export type RunLifecycleUpdateRequestPayload = z.infer<typeof RunLifecycleUpdateRequestSchema>;
@@ -617,6 +686,66 @@ export function parseRunQueueStatusReadRequest(payload: unknown): RunQueueStatus
 
 export function parseRunQueueStatusReadResponse(payload: unknown): RunQueueStatusReadResponsePayload {
   return parseRunOrchestrationSchema("RunQueueStatusReadResponse", RunQueueStatusReadResponseSchema, payload);
+}
+
+export function parseSchedulingAdminListStaleReservationsRequest(
+  payload: unknown,
+): SchedulingAdminListStaleReservationsRequestPayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminListStaleReservationsRequest",
+    SchedulingAdminListStaleReservationsRequestSchema,
+    payload,
+  );
+}
+
+export function parseSchedulingAdminListStaleReservationsResponse(
+  payload: unknown,
+): SchedulingAdminListStaleReservationsResponsePayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminListStaleReservationsResponse",
+    SchedulingAdminListStaleReservationsResponseSchema,
+    payload,
+  );
+}
+
+export function parseSchedulingAdminReleaseStaleReservationRequest(
+  payload: unknown,
+): SchedulingAdminReleaseStaleReservationRequestPayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminReleaseStaleReservationRequest",
+    SchedulingAdminReleaseStaleReservationRequestSchema,
+    payload,
+  );
+}
+
+export function parseSchedulingAdminReleaseStaleReservationResponse(
+  payload: unknown,
+): SchedulingAdminReleaseStaleReservationResponsePayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminReleaseStaleReservationResponse",
+    SchedulingAdminReleaseStaleReservationResponseSchema,
+    payload,
+  );
+}
+
+export function parseSchedulingAdminReevaluateDeferredRunsRequest(
+  payload: unknown,
+): SchedulingAdminReevaluateDeferredRunsRequestPayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminReevaluateDeferredRunsRequest",
+    SchedulingAdminReevaluateDeferredRunsRequestSchema,
+    payload,
+  );
+}
+
+export function parseSchedulingAdminReevaluateDeferredRunsResponse(
+  payload: unknown,
+): SchedulingAdminReevaluateDeferredRunsResponsePayload {
+  return parseRunOrchestrationSchema(
+    "SchedulingAdminReevaluateDeferredRunsResponse",
+    SchedulingAdminReevaluateDeferredRunsResponseSchema,
+    payload,
+  );
 }
 
 export function parseRunCancellationRequest(payload: unknown): RunCancellationRequestPayload {

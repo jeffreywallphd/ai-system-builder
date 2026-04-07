@@ -142,7 +142,10 @@ import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/Creat
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
+import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
+import { ReevaluateDeferredSchedulingRunsUseCase } from "@application/runs/use-cases/ReevaluateDeferredSchedulingRunsUseCase";
+import { ReleaseStaleSchedulingReservationUseCase } from "@application/runs/use-cases/ReleaseStaleSchedulingReservationUseCase";
 import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
 import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import { RecoverRunOrchestrationStartupStateUseCase } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
@@ -984,6 +987,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),
     }),
+    listStaleSchedulingReservationsUseCase: new ListStaleSchedulingReservationsUseCase({
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }),
     getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
       persistentPlatformServices.platformPersistenceRepository,
     ),
@@ -1006,6 +1013,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       validateRunSubmissionUseCase,
       createAuthoritativeRunUseCase,
+      now: () => workspaceClock.now(),
+    }),
+    releaseStaleSchedulingReservationUseCase: new ReleaseStaleSchedulingReservationUseCase({
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }),
+    reevaluateDeferredSchedulingRunsUseCase: new ReevaluateDeferredSchedulingRunsUseCase({
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),
     }),
     authorizationDecisionEvaluator,

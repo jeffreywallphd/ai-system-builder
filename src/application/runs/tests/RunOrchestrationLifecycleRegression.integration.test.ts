@@ -42,6 +42,7 @@ import {
 } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
+import { ListStaleSchedulingReservationsUseCase } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import {
@@ -564,6 +565,10 @@ describe("Run orchestration lifecycle regression", () => {
     const queryApi = new AuthoritativeRunQueryBackendApi({
       listAuthoritativeRunsUseCase: listRuns,
       listAuthoritativeRunQueueStatusUseCase: listQueueStatus,
+      listStaleSchedulingReservationsUseCase: new ListStaleSchedulingReservationsUseCase({
+        queueRepository,
+        now: () => new Date("2026-04-07T12:00:10.000Z"),
+      }),
       getAuthoritativeRunUseCase: getRun,
       runRepository,
       queueRepository,

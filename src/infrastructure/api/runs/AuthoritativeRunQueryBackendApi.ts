@@ -8,6 +8,9 @@ import { AuthorizationResponseAccessLevels } from "@application/authorization/us
 import type { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import type { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import type { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
+import type {
+  ListStaleSchedulingReservationsUseCase,
+} from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
 import {
   buildOperationalRunStatusTimeline,
   OperationalVisibilityAudiences,
@@ -36,6 +39,7 @@ import type {
   RunStatusEnvelope,
   RunSubmissionSource,
   RunSummary,
+  SchedulingAdminListStaleReservationsResponse,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import type { RunLifecycleState } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
@@ -72,6 +76,15 @@ export interface AuthoritativeRunQueueStatusRequest {
   readonly offset?: number;
 }
 
+export interface AuthoritativeSchedulingStaleReservationsRequest {
+  readonly workspaceId: string;
+  readonly authorization: AuthoritativeRunQueryAuthorizationContext;
+  readonly queueId?: string;
+  readonly asOf?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
 export interface AuthoritativeRunDetailRequest {
   readonly runId: string;
   readonly workspaceId: string;
@@ -83,6 +96,7 @@ export interface AuthoritativeRunStatusRequest extends AuthoritativeRunDetailReq
 export interface AuthoritativeRunQueryBackendApiDependencies {
   readonly listAuthoritativeRunsUseCase: ListAuthoritativeRunsUseCase;
   readonly listAuthoritativeRunQueueStatusUseCase: ListAuthoritativeRunQueueStatusUseCase;
+  readonly listStaleSchedulingReservationsUseCase: ListStaleSchedulingReservationsUseCase;
   readonly getAuthoritativeRunUseCase: GetAuthoritativeRunUseCase;
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository?: IRunOrchestrationQueuePersistenceRepository;
@@ -251,6 +265,79 @@ export class AuthoritativeRunQueryBackendApi {
             items: Object.freeze(adminVisibleItems),
           })
           : undefined,
+      }),
+    });
+  }
+
+  public async listStaleSchedulingReservations(
+    request: AuthoritativeSchedulingStaleReservationsRequest,
+  ): Promise<SharedApiResponseEnvelope<SchedulingAdminListStaleReservationsResponse>> {
+    const workspaceId = request.workspaceId.trim();
+    if (!workspaceId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-stale-scheduling-reservations.completed",
+        operation: "query.list-stale-scheduling-reservations",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
+      return this.invalidRequest("workspaceId is required.");
+    }
+
+    const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
+    if (!actorUserIdentityId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-stale-scheduling-reservations.completed",
+        operation: "query.list-stale-scheduling-reservations",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["forbidden"]),
+      });
+      return this.forbidden("Scheduling admin reservation visibility requires an authenticated actor.");
+    }
+
+    const allowed = await this.isWorkspaceRunManageAllowed(request.authorization);
+    if (!allowed) {
+      await this.recordObservability({
+        event: "run.orchestration.query.list-stale-scheduling-reservations.completed",
+        operation: "query.list-stale-scheduling-reservations",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
+      return this.forbidden("Scheduling stale reservations are not authorized for this actor.");
+    }
+
+    const stale = await this.dependencies.listStaleSchedulingReservationsUseCase.execute({
+      workspaceId,
+      queueId: request.queueId,
+      asOf: request.asOf,
+      limit: request.limit,
+      offset: request.offset,
+    });
+    await this.recordObservability({
+      event: "run.orchestration.query.list-stale-scheduling-reservations.completed",
+      operation: "query.list-stale-scheduling-reservations",
+      outcome: "success",
+      severity: "info",
+      workspaceId,
+      counters: Object.freeze({
+        stale_reservations_total: stale.totalCount,
+      }),
+      details: Object.freeze({
+        asOf: stale.asOf,
+      }),
+    });
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        asOf: stale.asOf,
+        totalCount: stale.totalCount,
+        items: stale.items,
       }),
     });
   }
@@ -569,6 +656,39 @@ export class AuthoritativeRunQueryBackendApi {
     return deriveAuthorizationResponseAccessLevel(decision.decision) === AuthorizationResponseAccessLevels.deny
       ? OperationalVisibilityAudiences.user
       : OperationalVisibilityAudiences.admin;
+  }
+
+  private async isWorkspaceRunManageAllowed(
+    authorization: AuthoritativeRunQueryAuthorizationContext,
+  ): Promise<boolean> {
+    if (!this.dependencies.authorizationDecisionEvaluator) {
+      return true;
+    }
+    const actorUserIdentityId = authorization.actorUserIdentityId.trim();
+    if (!actorUserIdentityId) {
+      return false;
+    }
+    const workspaceId = authorization.activeWorkspaceId.trim();
+    if (!workspaceId) {
+      return false;
+    }
+
+    const decision = await this.dependencies.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: workspaceId,
+        authenticatedAt: authorization.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "run.manage",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        workspaceId,
+        capabilityResourceType: AuthoritativeRunResourceType,
+      }),
+      asOf: this.now().toISOString(),
+    });
+
+    return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
   }
 
   private invalidRequest(message: string): SharedApiResponseEnvelope<never> {
