@@ -1,6 +1,6 @@
 # Authoritative Audit Recording Service and Ports
 
-This note captures Story 18.1.3 for Feature 18 / Epic 18.1.
+This note captures Story 18.1.3 and Story 18.1.5 for Feature 18 / Epic 18.1.
 
 ## Scope
 
@@ -17,11 +17,24 @@ Out of scope in this slice:
 - durable infrastructure repository/schema changes for the canonical ledger
 - transport/UI query endpoint integration for audit review
 
+Story 18.1.5 extends this with baseline production wiring for high-risk security events:
+
+- identity authentication/session lifecycle events (login success/failure, session create/logout/trust invalidation)
+- trusted-device pairing and revocation lifecycle events
+- node trust approval/revocation and related trust-administration mutation events
+- authorization sharing/permission mutation events
+
 ## Canonical files
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
 - `src/application/audit/use-cases/AuthoritativeAuditRecordingService.ts`
 - `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts`
+- `src/infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher.ts`
+- `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
+- `src/infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder.ts`
+- `src/infrastructure/audit/AuditFanoutPublishers.ts`
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 ## Port surface
 
@@ -76,6 +89,13 @@ Cross-feature code can obtain source-scoped recorders through:
 
 The shared service then emits canonical records with source-appropriate action namespace enforcement and centralized payload processing.
 
+Story 18.1.5 integration uses application-boundary adapters and host composition fan-out:
+
+- `FanoutIdentityLifecycleEventPublisher` preserves existing lifecycle event sinks while adding authoritative identity recording.
+- `FanoutNodeTrustAuditSink` preserves existing node-trust audit sinks while adding authoritative node-trust recording.
+- `AuthoritativeAuthorizationPolicyEventRecorder` wires authorization mutation/evaluation recorder output into authoritative sharing/permission audit workflows.
+- Emission remains in application services/use cases, not transport/UI controllers.
+
 ## Tests
 
 `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts` covers:
@@ -85,3 +105,9 @@ The shared service then emits canonical records with source-appropriate action n
 - cross-feature recorder integration (`runs`, `policy`) through one service
 - source/action mismatch rejection
 - immutable-safe canonical event snapshot helper behavior
+
+`src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts` covers:
+
+- identity lifecycle adapter emission into authoritative audit records
+- node trust adapter emission for approval/revocation-style events with sensitive-field redaction
+- authorization mutation adapter emission for sharing/permission changes with redaction-safe admin payload boundaries
