@@ -1,5 +1,5 @@
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
-import type { CanonicalEntityType } from "../../application/ports/interfaces/ICanonicalAssetIdentityRepository";
+import type { CanonicalEntityType } from "../../src/application/ports/interfaces/ICanonicalAssetIdentityRepository";
 
 export interface DesktopStoragePaths {
   readonly appDataDirectory: string;
