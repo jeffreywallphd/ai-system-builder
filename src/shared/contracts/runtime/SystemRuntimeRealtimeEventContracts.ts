@@ -5,6 +5,7 @@ export const RuntimeRealtimeEventCategories = Object.freeze({
   queueMovement: "queue-movement",
   connectivityState: "connectivity-state",
   adminChange: "admin-change",
+  auditGovernance: "audit-governance",
 });
 
 export type RuntimeRealtimeEventCategory =
@@ -15,6 +16,7 @@ export const RuntimeRealtimeTopics = Object.freeze({
   queue: "runtime.queue",
   connectivity: "runtime.connectivity",
   admin: "runtime.admin",
+  auditGovernance: "runtime.audit.governance",
 });
 
 export type RuntimeRealtimeTopic = typeof RuntimeRealtimeTopics[keyof typeof RuntimeRealtimeTopics];
@@ -46,6 +48,18 @@ export const RuntimeRealtimeAdminChangeKinds = Object.freeze({
 
 export type RuntimeRealtimeAdminChangeKind =
   typeof RuntimeRealtimeAdminChangeKinds[keyof typeof RuntimeRealtimeAdminChangeKinds];
+
+export const RuntimeRealtimeAuditGovernanceEventKinds = Object.freeze({
+  securitySensitiveActionRecorded: "security-sensitive-action-recorded",
+  administrativeActionRecorded: "administrative-action-recorded",
+  sharingActionRecorded: "sharing-action-recorded",
+  policyActionRecorded: "policy-action-recorded",
+  orchestrationActionRecorded: "orchestration-action-recorded",
+  protectedDataActionRecorded: "protected-data-action-recorded",
+});
+
+export type RuntimeRealtimeAuditGovernanceEventKind =
+  typeof RuntimeRealtimeAuditGovernanceEventKinds[keyof typeof RuntimeRealtimeAuditGovernanceEventKinds];
 
 export const RuntimeRealtimeOrchestrationEventKinds = Object.freeze({
   submissionAccepted: "submission-accepted",
@@ -144,11 +158,33 @@ export interface RuntimeRealtimeAdminChangePayload {
   readonly metadata?: Readonly<Record<string, string>>;
 }
 
+export interface RuntimeRealtimeAuditGovernancePayload {
+  readonly eventId: string;
+  readonly eventType: string;
+  readonly auditCategory: string;
+  readonly eventKind: RuntimeRealtimeAuditGovernanceEventKind;
+  readonly action: string;
+  readonly outcome: string;
+  readonly occurredAt: string;
+  readonly recordedAt: string;
+  readonly actorId: string;
+  readonly actorKind: string;
+  readonly workspaceId?: string;
+  readonly resourceType?: string;
+  readonly resourceId?: string;
+  readonly correlationId?: string;
+  readonly requestId?: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+  readonly hasProtectedData: boolean;
+  readonly redactionReasons: ReadonlyArray<string>;
+}
+
 export type RuntimeRealtimeEventPayload =
   | RuntimeRealtimeRunStatusPayload
   | RuntimeRealtimeQueueMovementPayload
   | RuntimeRealtimeConnectivityStatePayload
-  | RuntimeRealtimeAdminChangePayload;
+  | RuntimeRealtimeAdminChangePayload
+  | RuntimeRealtimeAuditGovernancePayload;
 
 export interface RuntimeRealtimeEventEnvelope {
   readonly eventId: string;

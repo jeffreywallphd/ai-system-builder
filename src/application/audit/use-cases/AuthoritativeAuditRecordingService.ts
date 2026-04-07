@@ -149,12 +149,26 @@ export class AuthoritativeAuditRecordingService implements AuthoritativeAuditRec
         : undefined,
     });
 
-    return this.dependencies.repository.appendAuditEvent(event, {
+    const appendResult = await this.dependencies.repository.appendAuditEvent(event, {
       operationKey,
       actorId: event.actor.actorId,
       occurredAt: event.occurredAt,
       correlationId: event.correlationId,
     });
+
+    if (appendResult.changed) {
+      try {
+        await this.dependencies.publicationPort?.publishAuthoritativeAuditEvent({
+          source,
+          appendResult,
+          event,
+        });
+      } catch {
+        // Realtime fanout is intentionally best-effort and must not block authoritative append success.
+      }
+    }
+
+    return appendResult;
   }
 
   private assertActionPrefixForSource(source: AuthoritativeAuditEventSource, action: string): void {

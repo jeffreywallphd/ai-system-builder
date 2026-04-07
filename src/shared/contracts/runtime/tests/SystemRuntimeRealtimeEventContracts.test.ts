@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  RuntimeRealtimeAuditGovernanceEventKinds,
   RuntimeRealtimeOrchestrationEventKinds,
   RuntimeRealtimeTopics,
   RuntimeRealtimeWebSocketActions,
@@ -81,5 +82,7 @@ describe("SystemRuntimeRealtimeEventContracts", () => {
     expect(RuntimeRealtimeOrchestrationEventKinds.schedulingAssignmentMaterializationConflict).toBe("scheduling-assignment-materialization-conflict");
     expect(RuntimeRealtimeOrchestrationEventKinds.schedulingRequeued).toBe("scheduling-requeued");
     expect(RuntimeRealtimeOrchestrationEventKinds.progressUpdated).toBe("progress-updated");
+    expect(RuntimeRealtimeTopics.auditGovernance).toBe("runtime.audit.governance");
+    expect(RuntimeRealtimeAuditGovernanceEventKinds.policyActionRecorded).toBe("policy-action-recorded");
   });
 });

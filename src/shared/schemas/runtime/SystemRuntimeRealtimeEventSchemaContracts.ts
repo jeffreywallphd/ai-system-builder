@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   RuntimeRealtimeAdminChangeKinds,
+  RuntimeRealtimeAuditGovernanceEventKinds,
   RuntimeRealtimeConnectivityStates,
   RuntimeRealtimeEventCategories,
   RuntimeRealtimeEventEnvelopeVersion,
@@ -45,12 +46,14 @@ const TopicSchema = z.enum([
   RuntimeRealtimeTopics.queue,
   RuntimeRealtimeTopics.connectivity,
   RuntimeRealtimeTopics.admin,
+  RuntimeRealtimeTopics.auditGovernance,
 ]);
 const CategorySchema = z.enum([
   RuntimeRealtimeEventCategories.runStatus,
   RuntimeRealtimeEventCategories.queueMovement,
   RuntimeRealtimeEventCategories.connectivityState,
   RuntimeRealtimeEventCategories.adminChange,
+  RuntimeRealtimeEventCategories.auditGovernance,
 ]);
 const OrchestrationEventKindSchema = z.enum([
   RuntimeRealtimeOrchestrationEventKinds.submissionAccepted,
@@ -134,11 +137,40 @@ const AdminChangePayloadSchema = z.object({
   metadata: z.record(z.string().trim().min(1), z.string().trim().min(1)).optional(),
 }).strict();
 
+const AuditGovernancePayloadSchema = z.object({
+  eventId: IdentifierSchema,
+  eventType: z.string().trim().min(1).max(128),
+  auditCategory: z.string().trim().min(1).max(64),
+  eventKind: z.enum([
+    RuntimeRealtimeAuditGovernanceEventKinds.securitySensitiveActionRecorded,
+    RuntimeRealtimeAuditGovernanceEventKinds.administrativeActionRecorded,
+    RuntimeRealtimeAuditGovernanceEventKinds.sharingActionRecorded,
+    RuntimeRealtimeAuditGovernanceEventKinds.policyActionRecorded,
+    RuntimeRealtimeAuditGovernanceEventKinds.orchestrationActionRecorded,
+    RuntimeRealtimeAuditGovernanceEventKinds.protectedDataActionRecorded,
+  ]),
+  action: z.string().trim().min(1).max(256),
+  outcome: z.string().trim().min(1).max(64),
+  occurredAt: TimestampSchema,
+  recordedAt: TimestampSchema,
+  actorId: IdentifierSchema,
+  actorKind: z.string().trim().min(1).max(64),
+  workspaceId: IdentifierSchema.optional(),
+  resourceType: z.string().trim().min(1).max(128).optional(),
+  resourceId: IdentifierSchema.optional(),
+  correlationId: IdentifierSchema.optional(),
+  requestId: IdentifierSchema.optional(),
+  details: z.record(z.string().trim().min(1), z.unknown()).optional(),
+  hasProtectedData: z.boolean(),
+  redactionReasons: z.array(z.string().trim().min(1).max(128)).max(16),
+}).strict();
+
 const EventPayloadSchema = z.union([
   RunStatusPayloadSchema,
   QueueMovementPayloadSchema,
   ConnectivityPayloadSchema,
   AdminChangePayloadSchema,
+  AuditGovernancePayloadSchema,
 ]);
 
 export const RuntimeRealtimeEventEnvelopeSchema = z.object({

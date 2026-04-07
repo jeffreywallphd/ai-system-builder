@@ -175,4 +175,45 @@ describe("SystemRuntimeRealtimeEventSchemaContracts", () => {
       eventKind: "scheduling-requeued",
     });
   });
+
+  it("parses audit/governance realtime payloads with user-safe details only", () => {
+    const envelope = parseRuntimeRealtimeEventEnvelope({
+      eventId: "event-audit-1",
+      schemaVersion: "2026-04-07",
+      emittedAt: "2026-04-07T12:00:00.000Z",
+      sequence: 19,
+      cursor: "runtime-realtime:19",
+      category: "audit-governance",
+      topic: "runtime.audit.governance",
+      workspaceScope: { workspaceId: "workspace-a" },
+      actorScope: { actorUserIdentityId: "user-admin" },
+      runScope: {},
+      payload: {
+        eventId: "audit:event:1",
+        eventType: "workspace-policy-updated",
+        auditCategory: "policy",
+        eventKind: "policy-action-recorded",
+        action: "policy.updated",
+        outcome: "succeeded",
+        occurredAt: "2026-04-07T11:59:00.000Z",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+        actorId: "user:admin",
+        actorKind: "user",
+        workspaceId: "workspace-a",
+        details: {
+          summary: "retention policy changed",
+        },
+        hasProtectedData: false,
+        redactionReasons: [],
+      },
+    });
+
+    expect(envelope.topic).toBe("runtime.audit.governance");
+    expect(envelope.category).toBe("audit-governance");
+    expect(envelope.payload).toMatchObject({
+      eventId: "audit:event:1",
+      eventKind: "policy-action-recorded",
+      action: "policy.updated",
+    });
+  });
 });

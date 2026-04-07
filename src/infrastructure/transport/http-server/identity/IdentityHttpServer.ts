@@ -6966,6 +6966,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         socket,
         logger,
         backendApi: options.backendApi,
+        auditLedgerBackendApi: options.auditLedgerBackendApi,
         systemRuntimeBackendApi: options.systemRuntimeBackendApi,
         secureTransport: options.secureTransport,
         transportTrust: options.transportTrust,
@@ -6998,6 +6999,7 @@ async function handleWebSocketUpgrade(input: {
   readonly socket: Socket;
   readonly logger: IdentityHttpServerLogger;
   readonly backendApi: IdentityAuthBackendApi;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
   readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
   readonly secureTransport: IdentityHttpServerSecureTransportOptions | undefined;
   readonly transportTrust: IdentityHttpServerTransportTrustOptions | undefined;
@@ -7244,6 +7246,7 @@ async function handleWebSocketUpgrade(input: {
     socket: input.socket,
     channelContext,
     systemRuntimeBackendApi: input.systemRuntimeBackendApi,
+    auditLedgerBackendApi: input.auditLedgerBackendApi,
   });
 
   await input.webSocket.onChannelEstablished?.(channelContext, input.socket);
@@ -7272,6 +7275,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
   readonly socket: Socket;
   readonly channelContext: WebSocketChannelContext;
   readonly systemRuntimeBackendApi: SystemRuntimeBackendApi | undefined;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
 }): void {
   if (!input.systemRuntimeBackendApi) {
     return;
@@ -7331,6 +7335,7 @@ function initializeRuntimeRealtimeWebSocketChannel(input: {
           socket: input.socket,
           channelContext: input.channelContext,
           runtimeBackendApi: input.systemRuntimeBackendApi,
+          auditLedgerBackendApi: input.auditLedgerBackendApi,
           state,
           payloadText,
         });
@@ -7354,6 +7359,7 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
   readonly socket: Socket;
   readonly channelContext: WebSocketChannelContext;
   readonly runtimeBackendApi: SystemRuntimeBackendApi;
+  readonly auditLedgerBackendApi: AuditLedgerBackendApi | undefined;
   readonly state: RuntimeRealtimeWebSocketSessionState;
   readonly payloadText: string;
 }): Promise<void> {
@@ -7421,6 +7427,40 @@ async function handleRuntimeRealtimeWebSocketTextFrame(input: {
     sendRuntimeRealtimeWebSocketError(input, "forbidden", "Topic workspace scope must match websocket workspace scope.");
     sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
     return;
+  }
+
+  const requestedAuditGovernanceTopic = requestedTopics.some(
+    (topic) => topic.topic === RuntimeRealtimeTopics.auditGovernance,
+  );
+  if (requestedAuditGovernanceTopic) {
+    if (!input.auditLedgerBackendApi || !actorWorkspaceId) {
+      sendRuntimeRealtimeWebSocketError(
+        input,
+        "forbidden",
+        "Audit/governance realtime subscriptions require workspace-scoped audit ledger access.",
+      );
+      sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+      return;
+    }
+    const authorizationProbe = await input.auditLedgerBackendApi.listGovernanceAuditEvents({
+      actorUserIdentityId: input.channelContext.actor.userIdentityId,
+      workspaceId: actorWorkspaceId,
+      query: Object.freeze({
+        pagination: Object.freeze({
+          limit: 1,
+          offset: 0,
+        }),
+      }),
+    });
+    if (!authorizationProbe.ok) {
+      sendRuntimeRealtimeWebSocketError(
+        input,
+        "forbidden",
+        "Audit/governance realtime subscription is not authorized for this actor/workspace.",
+      );
+      sendWebSocketCloseFrame(input.socket, 4403, "forbidden");
+      return;
+    }
   }
 
   const subscriptionRequest: RuntimeRealtimeSubscriptionRequest = Object.freeze({
@@ -7524,7 +7564,9 @@ function isRuntimeRealtimeTopicAllowedForPurpose(
     case WebSocketChannelPurposes.runMonitoring:
       return topic === RuntimeRealtimeTopics.runStatus || topic === RuntimeRealtimeTopics.queue || topic === RuntimeRealtimeTopics.connectivity;
     case WebSocketChannelPurposes.streamControl:
-      return topic === RuntimeRealtimeTopics.admin || topic === RuntimeRealtimeTopics.connectivity;
+      return topic === RuntimeRealtimeTopics.admin
+        || topic === RuntimeRealtimeTopics.connectivity
+        || topic === RuntimeRealtimeTopics.auditGovernance;
     default:
       return false;
   }

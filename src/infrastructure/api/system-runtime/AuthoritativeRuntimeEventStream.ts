@@ -8,6 +8,7 @@ import {
   runtimeRealtimeEventMatchesSubscriptionTopic,
   validateRuntimeRealtimeActorWorkspaceScope,
   type RuntimeRealtimeAdminChangePayload,
+  type RuntimeRealtimeAuditGovernancePayload,
   type RuntimeRealtimeConnectivityStatePayload,
   type RuntimeRealtimeEventEnvelope,
   type RuntimeRealtimeEventSubscription,
@@ -144,6 +145,22 @@ export class AuthoritativeRuntimeEventStream {
     return this.publish({
       topic: RuntimeRealtimeTopics.admin,
       category: RuntimeRealtimeEventCategories.adminChange,
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      executionId: undefined,
+      sessionId: undefined,
+      payload: input.payload,
+    });
+  }
+
+  public publishAuditGovernanceEvent(input: {
+    readonly actorUserIdentityId?: string;
+    readonly workspaceId?: string;
+    readonly payload: RuntimeRealtimeAuditGovernancePayload;
+  }): RuntimeRealtimeEventEnvelope {
+    return this.publish({
+      topic: RuntimeRealtimeTopics.auditGovernance,
+      category: RuntimeRealtimeEventCategories.auditGovernance,
       actorUserIdentityId: input.actorUserIdentityId,
       workspaceId: input.workspaceId,
       executionId: undefined,
