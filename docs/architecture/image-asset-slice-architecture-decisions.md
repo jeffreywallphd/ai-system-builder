@@ -112,6 +112,12 @@ Story 1.3.5 extension:
 - regression assertions verify authorization enforcement across unauthorized actors and confirm API responses do not leak raw storage object-key/path internals
 - integration assertions verify image-asset audit hooks are emitted for successful and rejected protected-content access paths
 
+Story 1.4.1 extension:
+
+- image manipulation studio upload now executes authoritative image-asset create, upload-content ingest, and upload-finalization before dataset admission
+- studio runtime ingestion now accepts an optional logical `sourceImageAssetId` so admitted source/reference records preserve canonical asset references instead of local/path-style identifiers
+- studio UI now surfaces recently used image assets from authoritative list/get metadata contracts to support reopen-ready image library behavior
+
 ## Decision 6: preview-safe access and generated outputs are first-class
 
 The architecture treats preview and generated outputs as normal protected asset flows:

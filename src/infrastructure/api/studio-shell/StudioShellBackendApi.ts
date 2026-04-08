@@ -222,6 +222,7 @@ export interface IngestReferenceImageUploadRequest {
   readonly fileName: string;
   readonly mimeType?: string;
   readonly payloadBase64: string;
+  readonly sourceImageAssetId?: string;
   readonly targetDatasetBindingId?: ReferenceImageDatasetBindingId;
 }
 
@@ -1319,6 +1320,10 @@ export class StudioShellBackendApi {
       if (!fileName) {
         throw new StudioShellInvalidRequestError("Uploaded file name is required.");
       }
+      const sourceImageAssetId = request.sourceImageAssetId?.trim() || undefined;
+      if (sourceImageAssetId && !sourceImageAssetId.startsWith("asset:")) {
+        throw new StudioShellInvalidRequestError("sourceImageAssetId must be a logical asset identifier.");
+      }
       const payload = this.decodeBase64Payload(request.payloadBase64);
       const datasetBindingId = request.targetDatasetBindingId ?? "input-image-dataset";
       const includeOptionalReferenceDatasets = datasetBindingId === "reference-image-dataset";
@@ -1346,11 +1351,29 @@ export class StudioShellBackendApi {
         },
         provenance: {
           sourceType: "upload",
-          sourceReference: `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
+          sourceReference: sourceImageAssetId
+            ? `image-asset:${sourceImageAssetId}`
+            : `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
           sourceSystemId: runtimeSystemId,
           ingestedBy: "studio-shell-ui",
         },
         record: {
+          ...(sourceImageAssetId
+            ? {
+              assetRef: {
+                kind: "canonical-asset",
+                assetId: sourceImageAssetId,
+                stableId: `canonical-asset:${sourceImageAssetId}`,
+                sourceSystem: "image-asset-management",
+                sourceContext: {
+                  sourceKind: "studio-upload",
+                  datasetBindingId,
+                },
+                mimeTypeHint: request.mimeType?.trim(),
+                formatHint: this.deriveFileFormat(fileName, request.mimeType),
+              },
+            }
+            : {}),
           title: fileName,
           format: this.deriveFileFormat(fileName, request.mimeType),
           tags: datasetBindingId === "reference-image-dataset"
