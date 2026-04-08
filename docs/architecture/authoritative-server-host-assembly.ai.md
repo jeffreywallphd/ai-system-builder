@@ -55,7 +55,11 @@
 - Startup behavior:
   - `dependencies` stage composes route registration artifact
   - `dependencies` stage also composes optional ComfyUI execution adapter infrastructure artifact when Comfy adapter config is enabled
+  - `dependencies` stage composes authoritative run-execution adapter registration (`src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`) that resolves:
+    - run dispatch port registration
+    - run cancellation signal port via Comfy cancellation bridge (`src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`)
   - `feature-registration` stage asserts authoritative required route-family coverage before transport start
+  - `feature-registration` stage injects composed run-execution adapter registration into `startIdentityServerHost(...)`
 
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.

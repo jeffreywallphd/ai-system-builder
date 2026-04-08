@@ -62,6 +62,8 @@ Provide an implementation checklist for contributors extending the authoritative
    - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
 5. Keep host composition updated for required route family and backend registration coverage:
    - `src/hosts/server/IdentityServerHost.ts`
+   - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
+   - `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
 
 ## Extending scheduler policy
 
@@ -110,6 +112,8 @@ Provide an implementation checklist for contributors extending the authoritative
 
 1. Keep cancellation transition logic in `RequestAuthoritativeRunCancellationUseCase`.
 2. Add backend cancellation signaling only through `IRunExecutionCancellationSignalPort` implementations.
+   - Authoritative host registration seam: `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
+   - Comfy bridge implementation: `src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`
 3. Preserve explicit cancellation outcomes by lifecycle position (immediate terminal, cancellation-requested, or terminal no-op).
 4. Keep cancellation queue/claim coordination in application use cases; do not release claims directly from route handlers.
 5. Keep cancellation telemetry split: canonical run cancellation state for user-safe visibility, audit + metadata for operator diagnostics.

@@ -36,6 +36,8 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Add persistence/adapter/transport wiring only after application behavior is correct.
 - Keep operational logging/metrics hooks in dedicated run observability seams (`RunOrchestrationObservability*`) rather than mixing log shaping into run-domain transitions.
 - Keep host route-family/backend registration composition aligned.
+  - `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
+  - `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
 
 ## Scheduler extension guidance
 - Build policy above reservation-backed queue selection.
@@ -65,6 +67,8 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 ## Cancellation extension guidance
 - Keep cancellation orchestration in `RequestAuthoritativeRunCancellationUseCase`.
 - Add backend cancellation integration only behind `IRunExecutionCancellationSignalPort`.
+  - authoritative registration seam: `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
+  - Comfy cancellation bridge: `src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`
 - Keep lifecycle-position-dependent outcomes explicit (terminal cancel, cancelling request, terminal no-op).
 - Keep queue claim release/finalization coordination in application seams, not transport handlers.
 
