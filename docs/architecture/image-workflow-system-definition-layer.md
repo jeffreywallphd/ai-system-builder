@@ -15,6 +15,7 @@ This note is the reference implementation baseline for later AI capabilities tha
 
 Story 2.2.5 extends this baseline with authoritative query/list use cases so workflow/system discovery and reopen flows are driven by persisted platform metadata, not studio-local cache state.
 Story 2.2.6 extends the baseline with reusable readiness validation services so draft/incomplete/valid/runnable posture is evaluated consistently before later run-submission orchestration consumes definitions.
+Story 2.3.1 extends the baseline with an explicit initial supported workflow template set so authoring and downstream translation targets remain bounded and deterministic.
 
 ## Canonical implementation seams
 
@@ -37,6 +38,13 @@ Image workflow asset definitions used by Studio-facing configuration:
 - `src/application/contracts/ImageWorkflowUiTriggerBindingConfiguration.ts`
 - `src/application/contracts/ImageWorkflowAssetRegistry.ts`
 - `src/application/image-workflows/ImageWorkflowSystemReadinessValidationService.ts`
+- `src/application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry.ts`
+
+Initial supported workflow template families for this slice:
+
+- `image-to-image` (`image-template:image-to-image-restyle:v1`)
+- `enhance-upscale` (`image-template:enhance-upscale:v1`)
+- `mask-guided-edit` (`image-template:mask-guided-edit:v1`)
 
 ## Layered model and responsibilities
 
@@ -154,6 +162,7 @@ Do not add new AI capability surfaces that bypass workflow/system contracts via 
 - `docs/architecture/image-workflow-parameter-specification-contracts.md`
 - `docs/architecture/image-workflow-input-output-binding-contracts.md`
 - `docs/architecture/image-workflow-system-api-contracts.md`
+- `docs/architecture/image-workflow-initial-supported-set.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/comfyui-adapter-audit.md`
 - `docs/architecture/domain-and-application-core.md`

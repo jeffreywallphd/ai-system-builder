@@ -65,6 +65,7 @@ export const ImageWorkflowOperationKinds = Object.freeze({
   imageToImage: "image-to-image",
   restyle: "restyle",
   enhanceUpscale: "enhance-upscale",
+  maskGuidedEdit: "mask-guided-edit",
   batchTransform: "batch-transform",
 });
 

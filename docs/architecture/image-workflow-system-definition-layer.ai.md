@@ -5,6 +5,7 @@
 Story 2.1.5 defines the architecture contract for the image manipulation slice so later translation, orchestration, and UI integration work builds on typed, reusable platform resources.
 Story 2.2.5 adds the authoritative query/list seam used by workflow/system discovery and reopen behavior.
 Story 2.2.6 adds a reusable readiness validation service seam used by authoring and query flows so incomplete/invalid definitions are surfaced consistently before run submission.
+Story 2.3.1 adds an explicit initial supported workflow template set for bounded authoring and translation-ready operation scope.
 
 ## Canonical seams
 
@@ -16,6 +17,13 @@ Story 2.2.6 adds a reusable readiness validation service seam used by authoring 
 - `src/application/contracts/ImageWorkflowAssetContract.ts`
 - `src/application/contracts/ImageWorkflowAssetRegistry.ts`
 - `src/application/image-workflows/ImageWorkflowSystemReadinessValidationService.ts`
+- `src/application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry.ts`
+
+Initial supported template families:
+
+- `image-to-image` (`image-template:image-to-image-restyle:v1`)
+- `enhance-upscale` (`image-template:enhance-upscale:v1`)
+- `mask-guided-edit` (`image-template:mask-guided-edit:v1`)
 
 ## Layer model
 
@@ -62,3 +70,4 @@ Discovery/reopen rule:
 - `docs/architecture/image-workflow-parameter-specification-contracts.md`
 - `docs/architecture/image-workflow-input-output-binding-contracts.md`
 - `docs/architecture/image-workflow-system-api-contracts.md`
+- `docs/architecture/image-workflow-initial-supported-set.md`
