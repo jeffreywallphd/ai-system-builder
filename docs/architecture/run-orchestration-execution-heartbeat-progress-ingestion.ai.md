@@ -23,6 +23,10 @@ Story 16.2.6 adds an authoritative node-ingested execution update pathway so hea
   - run assignment ownership checks,
   - backend identity consistency checks (`adapterKind` / `adapterRunId`).
 - Applies lifecycle + execution updates through canonical domain transition rules.
+- Synchronizes normalized execution fields into authoritative run records with monotonic merge rules:
+  - progress/heartbeat snapshots only move forward by timestamp,
+  - stale or repeated snapshots become no-op lifecycle mutations (`changed=false`),
+  - stale lifecycle transitions are ignored to avoid regressing durable run state.
 
 ## Safe visibility split
 - User-safe fields:
@@ -34,7 +38,7 @@ Story 16.2.6 adds an authoritative node-ingested execution update pathway so hea
   - not surfaced in canonical run read/status contracts.
 
 ## Operational traceability
-- Emits authoritative run audit event `run.execution-update.ingested` with bounded non-sensitive detail flags.
+- Emits authoritative run audit event `run.execution-update.ingested` with bounded non-sensitive detail flags for state-changing ingestions.
 - Keeps idempotent mutation keys for ingestion persistence flow.
 
 ## Route composition updates
@@ -46,5 +50,6 @@ Story 16.2.6 adds an authoritative node-ingested execution update pathway so hea
 - Domain tests for progress validation constraints.
 - Schema/contract tests for lifecycle update progress/heartbeat fields.
 - Use-case tests for accepted update ingestion and stale sender rejection.
+- Use-case tests for stale progress synchronization behavior and repeated-update no-op behavior.
 - Backend API tests for success and shared error mapping.
 - HTTP identity-server tests for node-authenticated execution update endpoint behavior.

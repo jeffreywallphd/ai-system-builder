@@ -371,4 +371,126 @@ describe("IngestRunExecutionUpdateUseCase", () => {
     expect(result.mutation.run.finalization?.outputs[0]?.assetId).toBe("asset:generated:1");
     expect(result.status.finalization?.externalResultId).toBe("result:run:1");
   });
+
+  it("ignores stale progress snapshots and preserves authoritative progress", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+
+    const first = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        progress: Object.freeze({
+          updatedAt: "2026-04-07T12:01:00.000Z",
+          percent: 72,
+          stage: "decode",
+          message: "step 29/40",
+        }),
+      }),
+    });
+    expect(first.mutation.mutation.changed).toBeTrue();
+    const revisionAfterFirst = runRepository.runs.get("run:1")?.revision;
+
+    const stale = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        progress: Object.freeze({
+          updatedAt: "2026-04-07T12:00:45.000Z",
+          percent: 31,
+          stage: "queued",
+          message: "older snapshot",
+        }),
+      }),
+    });
+
+    expect(stale.mutation.mutation.changed).toBeFalse();
+    expect(stale.status.execution?.progress?.percent).toBe(72);
+    expect(stale.status.execution?.progress?.stage).toBe("decode");
+    expect(runRepository.runs.get("run:1")?.revision).toBe(revisionAfterFirst);
+  });
+
+  it("treats repeated execution updates as no-op mutations", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+
+    const request = Object.freeze({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        heartbeatAt: "2026-04-07T12:01:00.000Z",
+        progress: Object.freeze({
+          updatedAt: "2026-04-07T12:01:00.000Z",
+          percent: 72,
+          stage: "decode",
+          message: "step 29/40",
+        }),
+      }),
+    });
+
+    const first = await useCase.execute(request);
+    expect(first.mutation.mutation.changed).toBeTrue();
+    const revisionAfterFirst = runRepository.runs.get("run:1")?.revision;
+
+    const repeated = await useCase.execute(request);
+    expect(repeated.mutation.mutation.changed).toBeFalse();
+    expect(repeated.status.execution?.progress?.percent).toBe(72);
+    expect(runRepository.runs.get("run:1")?.revision).toBe(revisionAfterFirst);
+  });
+
+  it("ignores non-transitionable lifecycle states from imperfect update streams", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      now: () => new Date("2026-04-07T12:01:00.000Z"),
+    });
+
+    const response = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        toState: "assigned",
+      }),
+    });
+
+    expect(response.mutation.mutation.changed).toBeFalse();
+    expect(response.status.state).toBe("running");
+  });
 });

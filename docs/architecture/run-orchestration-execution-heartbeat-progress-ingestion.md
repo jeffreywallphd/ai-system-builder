@@ -31,7 +31,8 @@ Add an authoritative ingestion path for execution heartbeat/progress/lifecycle s
 4. Update is applied through canonical domain transition rules, including lifecycle transition legality and execution coherence.
 5. User-safe execution progress and heartbeat are persisted on canonical run state.
 6. Internal diagnostics are persisted separately in run metadata (`executionTelemetry.lastInternalUpdate`) and not surfaced in run read contracts.
-7. Run lifecycle update audit record is appended with non-sensitive ingestion metadata.
+7. Synchronization logic applies monotonic merge rules so stale or repeated progress/heartbeat/state updates do not regress authoritative run truth.
+8. Run lifecycle update audit record is appended with non-sensitive ingestion metadata only when authoritative state changes.
 
 ## Validation and rejection posture
 
@@ -39,7 +40,8 @@ Add an authoritative ingestion path for execution heartbeat/progress/lifecycle s
 - Rejects stale/invalid sender identity (node mismatch).
 - Rejects updates for terminal runs.
 - Rejects adapter identity drift (`adapterKind`/`adapterRunId` mismatch).
-- Rejects illegal lifecycle transitions through canonical domain rules.
+- Defensively treats stale/duplicate execution snapshots as no-op mutations (`changed=false`) so imperfect streams do not churn revisions.
+- Defensively ignores stale lifecycle transitions and retains current authoritative lifecycle state.
 
 ## Status visibility additions
 
@@ -61,5 +63,6 @@ Add an authoritative ingestion path for execution heartbeat/progress/lifecycle s
 - Domain progress validation (`RunDomain.test.ts`).
 - Schema/contract coverage for lifecycle update progress/heartbeat fields.
 - Use-case coverage for accepted updates and sender-mismatch rejection.
+- Use-case coverage for stale progress no-op behavior and repeated-update idempotency-like behavior.
 - Backend API error mapping coverage.
 - HTTP route coverage for node-authenticated ingestion and invalid sender rejection.
