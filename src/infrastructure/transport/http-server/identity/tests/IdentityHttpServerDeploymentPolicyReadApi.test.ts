@@ -21,15 +21,31 @@ afterEach(async () => {
 
 class StubDeploymentPolicyReadBackendApi {
   public lastRequest: Readonly<Record<string, unknown>> | undefined;
+  public forceForbidden = false;
 
   public async readPolicyState(request: Readonly<Record<string, unknown>>) {
     this.lastRequest = request;
+    if (this.forceForbidden) {
+      return Object.freeze({
+        ok: false as const,
+        error: Object.freeze({
+          code: "forbidden",
+          message: "Actor is not authorized to inspect deployment policy administration state.",
+        }),
+      });
+    }
     return Object.freeze({
       ok: true as const,
       data: Object.freeze({
         scope: Object.freeze({
           kind: "deployment-policy-scope",
           scopeId: "workspace-alpha",
+        }),
+        authorization: Object.freeze({
+          canReadState: true,
+          canSelectActiveProfile: false,
+          canManageOverrides: false,
+          canManageRuntimeAdminOverrides: false,
         }),
         activeProfile: Object.freeze({
           profileId: "organization",
@@ -163,5 +179,27 @@ describe("IdentityHttpServer deployment policy read routes", () => {
     const body = await response.json();
     expect(body.ok).toBe(false);
     expect(body.error.code).toBe("invalid-request");
+  });
+
+  it("maps forbidden policy-state reads to 403 responses", async () => {
+    const deploymentPolicyReadBackendApi = new StubDeploymentPolicyReadBackendApi();
+    deploymentPolicyReadBackendApi.forceForbidden = true;
+    const baseUrl = await startServer(deploymentPolicyReadBackendApi);
+    const token = await registerAndLogin(baseUrl, "deployment.policy.read.user.3");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/deployment/policy/state?workspaceId=workspace-alpha`,
+      {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("forbidden");
   });
 });

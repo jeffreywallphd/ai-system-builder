@@ -20,12 +20,32 @@ import {
   type ReadDeploymentPolicyStateRequest,
   type ReadDeploymentPolicyStateResponse,
 } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
+import {
+  DeploymentPolicyAdministrationPermissionKeys,
+  type IDeploymentPolicyAdministrationPermissionService,
+} from "./DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 
 export interface ReadDeploymentPolicyAdministrationUseCaseDependencies {
   readonly deploymentPolicyRepository: IDeploymentPolicyPersistenceRepository;
+  readonly permissionService: IDeploymentPolicyAdministrationPermissionService;
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: DeploymentProfilePresetCatalog;
   readonly presetDefinitions?: DeploymentProfilePresetDefinitionCatalog;
+}
+
+export class ReadDeploymentPolicyAdministrationPermissionError extends Error {
+  public readonly reasonCode?: string;
+  public readonly reason?: string;
+
+  public constructor(input: {
+    readonly reasonCode?: string;
+    readonly reason?: string;
+  }) {
+    super("Actor is not authorized to inspect deployment policy administration state.");
+    this.name = "ReadDeploymentPolicyAdministrationPermissionError";
+    this.reasonCode = input.reasonCode;
+    this.reason = input.reason;
+  }
 }
 
 export class ReadDeploymentPolicyAdministrationUseCase {
@@ -47,6 +67,38 @@ export class ReadDeploymentPolicyAdministrationUseCase {
       kind: input.scope.kind,
       scopeId: input.scope.scopeId.trim().toLowerCase(),
     });
+    const readPermission = await this.dependencies.permissionService.evaluatePermission({
+      actorUserIdentityId: input.actorUserIdentityId,
+      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.readState,
+      scope,
+      asOf: input.evaluatedAt,
+    });
+    if (!readPermission.allowed) {
+      throw new ReadDeploymentPolicyAdministrationPermissionError({
+        reasonCode: readPermission.reasonCode,
+        reason: readPermission.reason,
+      });
+    }
+
+    const canSelectActiveProfile = await this.isAllowed({
+      actorUserIdentityId: input.actorUserIdentityId,
+      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.selectActiveProfile,
+      scope,
+      asOf: input.evaluatedAt,
+    });
+    const canManageOverrides = await this.isAllowed({
+      actorUserIdentityId: input.actorUserIdentityId,
+      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageOverrides,
+      scope,
+      asOf: input.evaluatedAt,
+    });
+    const canManageRuntimeAdminOverrides = await this.isAllowed({
+      actorUserIdentityId: input.actorUserIdentityId,
+      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides,
+      scope,
+      asOf: input.evaluatedAt,
+    });
+
     const activeSelection = await this.dependencies.deploymentPolicyRepository.getActiveProfileSelection(scope);
     const activeProfileId = activeSelection?.profileId ?? DeploymentProfileIds.home;
     const resolvedProfileId = input.profileId ?? activeProfileId;
@@ -71,6 +123,12 @@ export class ReadDeploymentPolicyAdministrationUseCase {
 
     return Object.freeze({
       scope,
+      authorization: Object.freeze({
+        canReadState: true,
+        canSelectActiveProfile,
+        canManageOverrides,
+        canManageRuntimeAdminOverrides,
+      }),
       activeProfile: this.toActiveProfileReadModel(activeSelection),
       snapshot: resolved.snapshot,
       validation: resolved.validation,
@@ -80,6 +138,21 @@ export class ReadDeploymentPolicyAdministrationUseCase {
         : undefined,
       catalog: includeCatalog ? this.buildCatalog() : undefined,
     });
+  }
+
+  private async isAllowed(input: {
+    readonly actorUserIdentityId: string;
+    readonly requiredPermission: typeof DeploymentPolicyAdministrationPermissionKeys[keyof typeof DeploymentPolicyAdministrationPermissionKeys];
+    readonly scope: ReadDeploymentPolicyStateRequest["scope"];
+    readonly asOf?: string;
+  }): Promise<boolean> {
+    const permission = await this.dependencies.permissionService.evaluatePermission({
+      actorUserIdentityId: input.actorUserIdentityId,
+      requiredPermission: input.requiredPermission,
+      scope: input.scope,
+      asOf: input.asOf,
+    });
+    return permission.allowed;
   }
 
   private buildCatalog(): NonNullable<ReadDeploymentPolicyStateResponse["catalog"]> {

@@ -68,6 +68,7 @@ describe("AdminLiteEntryPage", () => {
     expect(html).toContain("Governance review (thin)");
     expect(html).toContain("Trusted devices");
     expect(html).toContain("Desktop-only administration capabilities");
+    expect(html).toContain("Deployment profile and policy administration");
     expect(html).toContain("Node trust revocation/disable operations");
     expect(html).not.toContain("/settings/security-policy");
     expect(html).toContain("ui-admin-lite-entry__workflow-grid");

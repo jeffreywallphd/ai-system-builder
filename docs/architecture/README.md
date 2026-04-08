@@ -399,3 +399,4 @@ The runtime is not a single path. The system currently supports multiple executi
 
 - Feature 20.3.2 production-safe admin update workflows for supported profile and override controls with explicit confirmation/validation/result handling and editable vs inspect-only vs unsupported control separation: docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md.
 - Feature 20.3.3 policy explainability and impact-summary metadata/presentation baseline for provenance clarity, current-behavior scope, and governance-sensitive warning posture: docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md.
+- Feature 20.3.4 policy-admin permission boundaries and admin-lite posture hardening baseline for desktop-first control exposure, read-vs-mutation authorization projection, and route loophole prevention: docs/architecture/deployment-profile-policy-admin-permission-boundaries.md.

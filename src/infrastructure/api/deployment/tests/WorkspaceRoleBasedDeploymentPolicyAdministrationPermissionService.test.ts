@@ -7,7 +7,7 @@ import {
 import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "../WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
 
 describe("WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService", () => {
-  it("allows owner and admin role assignments", async () => {
+  it("allows owner and admin role assignments for policy-state inspection", async () => {
     const service = new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
       workspaceRoleAssignmentRepository: {
         findRoleAssignmentById: async () => undefined,
@@ -29,7 +29,7 @@ describe("WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService", ()
 
     const result = await service.evaluatePermission({
       actorUserIdentityId: "user:admin",
-      requiredPermission: "deployment-policy.override.manage",
+      requiredPermission: "deployment-policy.state.read",
       scope: Object.freeze({
         kind: "deployment-policy-scope",
         scopeId: "workspace-alpha",
@@ -62,5 +62,30 @@ describe("WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService", ()
 
     expect(result.allowed).toBeFalse();
     expect(result.reasonCode).toBe("deployment-policy-permission-admin-role-required");
+  });
+
+  it("requires owner role for policy mutations", async () => {
+    const service = new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
+      workspaceRoleAssignmentRepository: {
+        findRoleAssignmentById: async () => undefined,
+        countActiveRoleAssignments: async () => 1,
+        saveRoleAssignment: async () => {
+          throw new Error("unused");
+        },
+        listRoleAssignments: async () => Object.freeze([]),
+      },
+    });
+
+    const result = await service.evaluatePermission({
+      actorUserIdentityId: "user:admin",
+      requiredPermission: "deployment-policy.override.manage",
+      scope: Object.freeze({
+        kind: "deployment-policy-scope",
+        scopeId: "workspace-alpha",
+      }),
+    });
+
+    expect(result.allowed).toBeFalse();
+    expect(result.reason).toContain("owner role");
   });
 });

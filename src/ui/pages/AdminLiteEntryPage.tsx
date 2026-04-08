@@ -56,6 +56,7 @@ const adminLiteWorkflowSummaries = Object.freeze({
 
 const desktopOnlyWorkflows = Object.freeze([
   "Security and policy configuration",
+  "Deployment profile and policy administration",
   "Identity administration and account lifecycle controls",
   "Storage instance administration",
   "Secret metadata administration",

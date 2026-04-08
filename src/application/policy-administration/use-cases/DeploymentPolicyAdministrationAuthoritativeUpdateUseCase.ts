@@ -44,6 +44,7 @@ import {
 } from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
 
 export const DeploymentPolicyAdministrationPermissionKeys = Object.freeze({
+  readState: "deployment-policy.state.read",
   selectActiveProfile: "deployment-policy.profile.select",
   manageOverrides: "deployment-policy.override.manage",
   manageRuntimeAdminOverrides: "deployment-policy.override.runtime-admin.manage",

@@ -50,7 +50,7 @@ describe("Surface route metadata catalog", () => {
       surface: UiSurfaceKeys.desktopAdmin,
       strict: true,
       roleKeys: Object.freeze(["admin"]),
-      capabilityKeys: Object.freeze(["system.manage", "log.read"]),
+      capabilityKeys: Object.freeze(["system.manage", "log.read", "deployment-policy.state.read"]),
       hasWorkspaceContext: true,
     });
 
@@ -59,6 +59,21 @@ describe("Surface route metadata catalog", () => {
     expect(routes.some((route) => route.key === "deployment-policy-admin")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-admin")).toBeTrue();
     expect(routes.some((route) => route.key === "node-enrollment-review")).toBeTrue();
+  });
+
+  it("keeps deployment policy administration desktop-first and out of admin-lite discovery", () => {
+    const deploymentRoute = resolveRouteSurfaceMetadataByPath(ROUTE_PATHS.deploymentPolicyAdmin);
+    expect(deploymentRoute?.access.eligibleSurfaces).toEqual(["desktop-admin", "desktop-operational"]);
+    expect(deploymentRoute?.access.requiredCapabilities).toEqual(["deployment-policy.state.read"]);
+
+    const adminLiteRoutes = listSettingsShortcutRouteMetadata({
+      surface: UiSurfaceKeys.adminLite,
+      strict: true,
+      roleKeys: Object.freeze(["admin"]),
+      capabilityKeys: Object.freeze(["deployment-policy.state.read", "system.read"]),
+      hasWorkspaceContext: true,
+    });
+    expect(adminLiteRoutes.some((route) => route.key === "deployment-policy-admin")).toBeFalse();
   });
 
   it("derives command palette entries from centralized route metadata", () => {

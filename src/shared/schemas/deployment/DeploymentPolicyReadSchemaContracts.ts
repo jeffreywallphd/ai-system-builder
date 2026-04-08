@@ -172,6 +172,12 @@ const CatalogSchema = z.object({
 
 const ResponseEnvelopeSchema = z.object({
   scope: ScopeSchema,
+  authorization: z.object({
+    canReadState: z.boolean(),
+    canSelectActiveProfile: z.boolean(),
+    canManageOverrides: z.boolean(),
+    canManageRuntimeAdminOverrides: z.boolean(),
+  }).strict(),
   activeProfile: ActiveProfileSchema,
   snapshot: z.unknown(),
   validation: z.unknown(),

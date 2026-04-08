@@ -41,6 +41,7 @@ describe("DeploymentPolicyAdministrationReadService", () => {
     expect(result.data.inspection.policyGroups[0]?.settings[0]?.sourceLabel).toBe("Admin override");
     expect(result.data.inspection.policyGroups[0]?.impactSummary).toContain("approval");
     expect(result.data.inspection.policyGroups[0]?.governanceSensitivity).toBe("governance-sensitive");
+    expect(result.data.inspection.canMutateActiveProfile).toBeTrue();
   });
 
   it("returns stable failure when client rejects the request", async () => {
@@ -78,6 +79,12 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
     scope: Object.freeze({
       kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
       scopeId: "workspace-alpha",
+    }),
+    authorization: Object.freeze({
+      canReadState: true,
+      canSelectActiveProfile: true,
+      canManageOverrides: true,
+      canManageRuntimeAdminOverrides: true,
     }),
     activeProfile: Object.freeze({
       profileId: DeploymentProfileIds.organization,

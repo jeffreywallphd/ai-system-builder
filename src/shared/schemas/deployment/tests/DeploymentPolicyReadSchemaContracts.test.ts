@@ -33,6 +33,12 @@ describe("DeploymentPolicyReadSchemaContracts", () => {
         kind: "deployment-policy-scope",
         scopeId: "workspace-alpha",
       },
+      authorization: {
+        canReadState: true,
+        canSelectActiveProfile: false,
+        canManageOverrides: false,
+        canManageRuntimeAdminOverrides: false,
+      },
       activeProfile: {
         profileId: "classroom",
         source: DeploymentPolicyActiveProfileSourceKinds.persistedSelection,

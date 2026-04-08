@@ -19,6 +19,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep authoritative write transport/backend wiring in `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts` and `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`.
 - Keep admin inspection read-model/UI composition aligned with `docs/architecture/deployment-profile-policy-admin-ui-read-models.md`.
 - Keep admin safe-update workflows aligned with `docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md`.
+- Keep admin permission-boundary posture aligned with `docs/architecture/deployment-profile-policy-admin-permission-boundaries.md`.
 - Keep explainability and impact summaries aligned with `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`.
 - Keep admin inspection/update read-model/service/page seams in `src/ui/shared/admin/DeploymentPolicyAdministrationReadModel.ts`, `src/ui/services/DeploymentPolicyAdministrationReadService.ts`, `src/ui/services/DeploymentPolicyAdministrationWriteService.ts`, and `src/ui/pages/DeploymentPolicyAdministrationPage.tsx`.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.

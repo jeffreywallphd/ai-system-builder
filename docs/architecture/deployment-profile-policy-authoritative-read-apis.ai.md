@@ -22,6 +22,7 @@ Story 20.2.4 adds authoritative read pathways for deployment-policy administrati
 
 - Endpoint: `GET /api/v1/deployment/policy/state`
 - Auth model: authenticated workspace session; workspace-scoped read semantics
+- Permission gate: `deployment-policy.state.read`
 - Query options:
   - `profileId` (`home` | `classroom` | `organization`)
   - `includeCatalog`
@@ -31,6 +32,7 @@ Story 20.2.4 adds authoritative read pathways for deployment-policy administrati
 
 Response includes:
 
+- `authorization` projection (`canReadState`, `canSelectActiveProfile`, `canManageOverrides`, `canManageRuntimeAdminOverrides`)
 - `activeProfile` with explicit source (`persisted-selection` or `default-fallback`)
 - effective `snapshot` + `validation`
 - optional `overrideRecords` with provenance
