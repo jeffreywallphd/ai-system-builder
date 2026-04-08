@@ -465,3 +465,51 @@ Architecture posture preserved:
 - tests avoid backend-local path/file assertions as canonical truth,
 - coverage is integrated at the studio API boundary rather than UI-only state snapshots.
 
+## Epic 7.4 Story 7.4.4: Feature 7 completion verification and Feature 8 integration guidance
+
+Story 7.4.4 documents completion criteria for Feature 7 and defines integration boundaries for Feature 8 so resilience work extends this slice without reopening architecture or UX-fragmentation risks.
+
+Completion verification summary:
+
+- Feature 7 now provides one coherent end-to-end studio journey across image entry, edit selection, settings, readiness/precheck, launch, monitoring, result review, and continuation/reopen flows.
+- Authoritative boundaries remain intact:
+  - image/workflow/system/run/result identity and lifecycle truth come from platform APIs and persisted records,
+  - UI shared interaction + presenter contracts drive flow gating and surface-state language,
+  - components remain composition/presentation layers rather than local business-orchestration authorities.
+- User-facing terminology remains stable and non-technical in primary flow (`Choose image` through `Review results`), with technical IDs/diagnostics hidden behind advanced disclosure.
+- Multi-surface behavior is explicitly bounded: desktop is full-authoring; narrow/thin layouts preserve continuity actions and accessibility without introducing alternate local state models.
+
+Authoritative verification references:
+
+- `src/infrastructure/api/studio-shell/tests/ImageManipulationStudioVerticalSlice.integration.test.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputPersistenceFlow.test.ts`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterForm.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowSelectionPresenter.test.ts`
+- `src/ui/services/tests/ImageAssetManagementService.test.ts`
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+
+Feature 8 dependency and extension points (validation, error handling, operational resilience):
+
+- Validation extension point:
+  - extend authoritative readiness/validation payloads and presenter mapping contracts instead of adding new component-local validation engines.
+  - keep blocker/advisory classification stable and machine-readable so retry/recovery UX stays deterministic.
+- Error-handling extension point:
+  - enrich normalized error categories, retryability hints, and safe-message mapping in shared runtime/service seams.
+  - preserve advanced-only technical diagnostics posture; do not regress to raw backend/provider error text in primary UX.
+- Operational-resilience extension point:
+  - add resilience behavior (retry/backoff/reconciliation/timeout clarity) in run-orchestration and runtime service layers first, then project into shared interaction/presenter models.
+  - maintain authoritative history and continuation semantics as the source for recovery and prior-work restoration.
+- Observability extension point:
+  - thread correlation and lifecycle diagnostics through existing run/status/result APIs and structured test assertions.
+  - avoid introducing parallel local telemetry state that can drift from authoritative records.
+
+Known UX limits and intentional non-goals at Feature 7 completion:
+
+- Full mobile authoring parity is out of scope; thin/narrow surfaces are continuity-first.
+- Advanced operational diagnostics are intentionally secondary and not a primary-path UX surface.
+- Feature 7 does not introduce new runtime/provider capability negotiation semantics beyond existing readiness and execution adapters.
+- Feature 7 does not treat backend filesystem paths or provider-local identifiers as user-facing or canonical identity.
+- Feature 7 does not collapse clean boundaries by moving orchestration or persistence truth into renderer-local component state.
+
