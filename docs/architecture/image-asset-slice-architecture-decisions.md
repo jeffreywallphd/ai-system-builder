@@ -14,7 +14,9 @@ This note documents Story 1.1.5 for the image manipulation vertical slice: archi
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
+- `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
+- `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `docs/architecture/image-asset-domain-foundation.md`
 - `docs/architecture/image-asset-authorization-contracts.md`
 - `docs/architecture/image-asset-application-ports.md`
@@ -86,7 +88,7 @@ Client and host integrations consume typed DTO/schema contracts rather than loca
 
 Current implementation boundary (April 8, 2026):
 
-- domain invariants, shared transport/auth contracts, application repository/storage ports, and concrete SQLite image-asset metadata persistence are implemented
+- domain invariants, shared transport/auth contracts, application repository/storage ports, concrete SQLite image-asset metadata persistence, and a concrete managed image-binary storage adapter are implemented
 - host wiring for the full image-asset route surface remains incremental in downstream stories through existing host assembly and API layers
 
 ## Decision 6: preview-safe access and generated outputs are first-class
@@ -119,6 +121,7 @@ When extending image ingestion/retrieval:
 - `src/shared/dto/assets/tests/ImageAssetPersistenceDtos.test.ts`
 - `src/shared/schemas/assets/tests/ImageAssetTransportSchemaContracts.test.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
+- `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 
 ## Related architecture notes
 

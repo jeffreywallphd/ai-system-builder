@@ -17,6 +17,8 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
 - `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
+- `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
+- `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 
 ## Repository port contract
 
@@ -97,3 +99,21 @@ Schema posture now supports both uploaded inputs and generated outputs:
 - file/fingerprint metadata and lifecycle timestamps are persisted durably
 - lineage references (`upstreamAssetIds`, `sourceRunId`, `generationOperationId`) are persisted for future run/history features
 - preview/result pointer columns are present (`preview_asset_id`, `preview_media_type`, `latest_object_key`, `latest_object_version_id`) to support future preview-safe retrieval and generated-result orchestration without a schema break
+
+## Story 1.2.3: managed binary storage adapter for image uploads
+
+This story adds the first production-grade infrastructure adapter implementing `IImageAssetStoragePort` for managed image binaries:
+
+- `ManagedImageAssetStorageAdapter` routes reserve/write/read/delete operations through `IStorageLogicalAccessResolutionService` and `IStorageObjectPort` so image binaries flow through managed storage instances only
+- reservation ids and access handles are opaque encrypted server-issued tokens, never filesystem paths or caller-selected layout hints
+- logical object keys are generated server-side through storage object key contracts using workspace/asset/area segments and safe filename normalization
+- write flows enforce optional expected size/checksum constraints and map backend failures into stable `ImageAssetStorageErrorCodes`
+- read flows open managed object streams and return logical references/metadata without exposing physical storage bindings
+- delete flows remain lifecycle-reason driven (`asset-deleted`, `asset-archived`, `ingest-failure`, `orphan-cleanup`) and use managed object delete semantics
+
+`ManagedImageAssetStorageAdapter.test.ts` verifies:
+
+- reserve/write/read/delete behavior through storage logical access plans
+- reservation claim scoping (workspace/asset/actor/reference)
+- opaque access-handle issue/resolve and expiry behavior
+- logical-access and storage-object error mapping into image-asset storage error contracts

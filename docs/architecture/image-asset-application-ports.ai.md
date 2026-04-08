@@ -19,6 +19,8 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
 - `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
+- `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
+- `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `docs/architecture/image-asset-application-ports.md`
 
 ## Repository port scope
@@ -107,3 +109,16 @@ Schema posture for current and near-future image flows:
 - supports uploaded source and generated result assets (`originKind`)
 - stores tenancy/ownership, storage binding references, fingerprint/file metadata, lifecycle timestamps, and lineage references
 - includes nullable preview/result pointer columns (`preview_asset_id`, `preview_media_type`, `latest_object_key`, `latest_object_version_id`) for future preview/result orchestration without requiring schema redesign
+
+## Story 1.2.3 implementation scope
+
+`ManagedImageAssetStorageAdapter` is now the concrete managed-binary adapter for image uploads/retrieval:
+
+- implements `IImageAssetStoragePort` over `IStorageLogicalAccessResolutionService` + `IStorageObjectPort`
+- generates object keys server-side from workspace/asset/area context, not caller paths
+- issues opaque encrypted reservation ids and access handles (tokenized claims)
+- enforces optional expected-size and checksum integrity checks during writes
+- keeps storage references logical (`storageInstanceId` + `objectKey`) and hides physical layout
+- maps logical-access/object-port failures into stable image-asset storage error codes
+
+`ManagedImageAssetStorageAdapter.test.ts` verifies reserve/write/read/access/delete behavior, claim scoping, expiry handling, and failure mapping.
