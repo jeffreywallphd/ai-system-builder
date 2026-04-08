@@ -5,6 +5,7 @@ import {
   resolveComfyImageManipulationConfig,
   validateComfyImageManipulationConfig,
   type ComfyImageManipulationConfig,
+  type ComfyImageManipulationConfigValidationIssue,
 } from "@application/system-studio/ComfyImageManipulationPropertySchema";
 import { ImageManipulationSystemTemplate } from "@application/system-studio/ImageManipulationSystemTemplate";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
@@ -63,7 +64,10 @@ import {
 } from "../../runtime/ImageManipulationRuntimeDatasetBindingService";
 import { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
 import { RuntimeOperationsService } from "../../services/RuntimeOperationsService";
-import type { RuntimeSdkExecutionResultResponse } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type {
+  RuntimeExecutionReadinessResponse,
+  RuntimeSdkExecutionResultResponse,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -358,6 +362,119 @@ export function resolveSelectionConfirmationMessage(input: {
   return undefined;
 }
 
+export interface ImageRunPrecheckIssue {
+  readonly source: "setup" | "backend";
+  readonly severity: "blocking" | "advisory";
+  readonly message: string;
+}
+
+export interface ImageRunLaunchPrecheckState {
+  readonly launchReady: boolean;
+  readonly setupBlockingIssues: ReadonlyArray<ImageRunPrecheckIssue>;
+  readonly setupAdvisories: ReadonlyArray<ImageRunPrecheckIssue>;
+  readonly backendBlockingIssues: ReadonlyArray<ImageRunPrecheckIssue>;
+  readonly backendAdvisories: ReadonlyArray<ImageRunPrecheckIssue>;
+}
+
+export function buildImageRunLaunchPrecheckState(input: {
+  readonly selectedSourceRecordId?: string;
+  readonly selectedSourceAssetId?: string;
+  readonly selectedSourceDatasetInstanceId?: string;
+  readonly prompt: string;
+  readonly validationIssues: ReadonlyArray<ComfyImageManipulationConfigValidationIssue>;
+  readonly executionReadiness?: RuntimeExecutionReadinessResponse;
+  readonly executionReadinessError?: string;
+}): ImageRunLaunchPrecheckState {
+  const setupBlockingIssues: ImageRunPrecheckIssue[] = [];
+  const setupAdvisories: ImageRunPrecheckIssue[] = [];
+  const backendBlockingIssues: ImageRunPrecheckIssue[] = [];
+  const backendAdvisories: ImageRunPrecheckIssue[] = [];
+
+  if (!input.selectedSourceRecordId || !input.selectedSourceAssetId) {
+    setupBlockingIssues.push(Object.freeze({
+      source: "setup",
+      severity: "blocking",
+      message: "Choose a source photo before launching.",
+    }));
+  }
+  if (!input.selectedSourceDatasetInstanceId) {
+    setupBlockingIssues.push(Object.freeze({
+      source: "setup",
+      severity: "blocking",
+      message: "Source image collection is not linked for this run.",
+    }));
+  }
+  if (!input.prompt.trim()) {
+    setupBlockingIssues.push(Object.freeze({
+      source: "setup",
+      severity: "blocking",
+      message: "Add edit instructions before launching.",
+    }));
+  }
+  for (const validationIssue of input.validationIssues) {
+    setupBlockingIssues.push(Object.freeze({
+      source: "setup",
+      severity: "blocking",
+      message: validationIssue.message,
+    }));
+  }
+  if (input.executionReadinessError) {
+    backendBlockingIssues.push(Object.freeze({
+      source: "backend",
+      severity: "blocking",
+      message: input.executionReadinessError,
+    }));
+  } else if (!input.executionReadiness) {
+    backendBlockingIssues.push(Object.freeze({
+      source: "backend",
+      severity: "blocking",
+      message: "Execution environment readiness has not been checked yet.",
+    }));
+  } else {
+    for (const issue of input.executionReadiness.issues) {
+      if (issue.severity === "error") {
+        backendBlockingIssues.push(Object.freeze({
+          source: "backend",
+          severity: "blocking",
+          message: issue.message,
+        }));
+      } else {
+        backendAdvisories.push(Object.freeze({
+          source: "backend",
+          severity: "advisory",
+          message: issue.message,
+        }));
+      }
+    }
+    if (!input.executionReadiness.readyForExecution && backendBlockingIssues.length < 1) {
+      backendBlockingIssues.push(Object.freeze({
+        source: "backend",
+        severity: "blocking",
+        message: input.executionReadiness.message ?? "Execution environment is not currently available for this run.",
+      }));
+    }
+    if (
+      input.executionReadiness.readyForExecution
+      && input.executionReadiness.readiness === "degraded"
+      && (input.executionReadiness.message?.trim() ?? "").length > 0
+    ) {
+      backendAdvisories.push(Object.freeze({
+        source: "backend",
+        severity: "advisory",
+        message: input.executionReadiness.message!.trim(),
+      }));
+    }
+  }
+
+  return Object.freeze({
+    launchReady: setupBlockingIssues.length < 1 && backendBlockingIssues.length < 1,
+    setupBlockingIssues: Object.freeze(setupBlockingIssues),
+    setupAdvisories: Object.freeze(setupAdvisories),
+    backendBlockingIssues: Object.freeze(backendBlockingIssues),
+    backendAdvisories: Object.freeze(backendAdvisories),
+  });
+}
+
 function isRuntimeTerminalStatus(
   status: RuntimeSdkExecutionResultResponse["status"],
 ): status is "succeeded" | "failed" | "cancelled" {
@@ -516,6 +633,9 @@ export function ImageManipulationRuntimeEditorPanel({
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
+  const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
+  const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
+  const [isCheckingExecutionReadiness, setIsCheckingExecutionReadiness] = useState(false);
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -617,6 +737,29 @@ export function ImageManipulationRuntimeEditorPanel({
     ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId;
   const runtimeWorkflowAssetVersionId = hydratedRuntime?.resolvedWorkflowTemplate.workflowTemplateVersionId
     ?? ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId;
+
+  const refreshExecutionReadiness = (): Promise<void> => {
+    if (!sessionToken) {
+      setExecutionReadiness(undefined);
+      setExecutionReadinessError("Sign in to check execution environment availability.");
+      return Promise.resolve();
+    }
+    setIsCheckingExecutionReadiness(true);
+    setExecutionReadinessError(undefined);
+    return runtimeOperations.getExecutionReadiness({
+      systemId: runtimeWorkflowAssetId,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        setExecutionReadiness(undefined);
+        setExecutionReadinessError(response.error?.message ?? "Could not check execution environment availability.");
+        return;
+      }
+      setExecutionReadiness(response.data);
+      setExecutionReadinessError(undefined);
+    }).finally(() => {
+      setIsCheckingExecutionReadiness(false);
+    });
+  };
 
   const selectedPreviewViewModel = useMemo(() => {
     if (selection.activePreviewRole === "source") {
@@ -996,6 +1139,10 @@ export function ImageManipulationRuntimeEditorPanel({
   }, [actorUserIdentityId, workspaceId, sessionToken, appliedImageLibrarySearch]);
 
   useEffect(() => {
+    void refreshExecutionReadiness();
+  }, [runtimeWorkflowAssetId, sessionToken]);
+
+  useEffect(() => {
     if (!draft?.draftId) {
       setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
       return;
@@ -1139,12 +1286,20 @@ export function ImageManipulationRuntimeEditorPanel({
   const isRunInProgress = runLifecycle.state === "validating"
     || runLifecycle.state === "queued"
     || runLifecycle.state === "running";
-  const runDisabled = !selectedSourceRecordId
-    || !selectedSourceAssetId
-    || !selectedSourceDatasetInstanceId
-    || !config.prompts.positivePrompt.trim()
-    || validationIssues.length > 0
-    || isRunInProgress;
+  const launchPrecheck = buildImageRunLaunchPrecheckState({
+    selectedSourceRecordId,
+    selectedSourceAssetId,
+    selectedSourceDatasetInstanceId,
+    prompt: config.prompts.positivePrompt,
+    validationIssues,
+    executionReadiness,
+    executionReadinessError,
+  });
+  const hasLaunchBlockingIssues = launchPrecheck.setupBlockingIssues.length > 0
+    || launchPrecheck.backendBlockingIssues.length > 0;
+  const runDisabled = isRunInProgress
+    || isCheckingExecutionReadiness
+    || hasLaunchBlockingIssues;
 
   return (
     <section className="ui-image-editor-page ui-stack ui-stack--sm">
@@ -1582,6 +1737,68 @@ export function ImageManipulationRuntimeEditorPanel({
             <header className="ui-image-surface__header">
               <h3 className="ui-image-surface__title">Create image</h3>
             </header>
+            <section className="ui-stack ui-stack--2xs">
+              <ImageStatusNotice
+                title="Launch precheck: setup"
+                message={launchPrecheck.setupBlockingIssues.length > 0
+                  ? `${launchPrecheck.setupBlockingIssues.length} blocking setup issue(s) must be fixed.`
+                  : "Setup is ready for launch."}
+                tone={launchPrecheck.setupBlockingIssues.length > 0 ? "warning" : "success"}
+              />
+              {launchPrecheck.setupBlockingIssues.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary">
+                  {launchPrecheck.setupBlockingIssues.map((issue, index) => (
+                    <li key={`setup-blocking-${index}`}>{issue.message}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <ImageStatusNotice
+                title="Launch precheck: execution environment"
+                message={isCheckingExecutionReadiness
+                  ? "Checking backend and node availability."
+                  : executionReadiness
+                    ? `Backend is ${executionReadiness.readiness}.`
+                    : executionReadinessError ?? "Execution environment readiness has not been confirmed."}
+                tone={isCheckingExecutionReadiness
+                  ? "neutral"
+                  : launchPrecheck.backendBlockingIssues.length > 0
+                    ? "warning"
+                    : launchPrecheck.backendAdvisories.length > 0
+                      ? "warning"
+                      : "success"}
+              />
+              {!isCheckingExecutionReadiness && launchPrecheck.backendBlockingIssues.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary">
+                  {launchPrecheck.backendBlockingIssues.map((issue, index) => (
+                    <li key={`backend-blocking-${index}`}>{issue.message}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {!isCheckingExecutionReadiness && launchPrecheck.backendAdvisories.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary">
+                  {launchPrecheck.backendAdvisories.map((issue, index) => (
+                    <li key={`backend-advisory-${index}`}>{issue.message}</li>
+                  ))}
+                </ul>
+              ) : null}
+              <div className="ui-row ui-row--xs">
+                <button
+                  type="button"
+                  className="ui-button ui-button--ghost ui-button--sm"
+                  onClick={() => {
+                    void refreshExecutionReadiness();
+                  }}
+                  disabled={isCheckingExecutionReadiness}
+                >
+                  {isCheckingExecutionReadiness ? "Checking..." : "Refresh precheck"}
+                </button>
+                {executionReadiness?.checkedAt ? (
+                  <span className="ui-text-small ui-text-secondary">
+                    Checked {toFriendlyTimestamp(executionReadiness.checkedAt) ?? executionReadiness.checkedAt}
+                  </span>
+                ) : null}
+              </div>
+            </section>
             <button
               type="button"
               className="ui-button ui-button--primary"

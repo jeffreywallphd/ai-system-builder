@@ -120,3 +120,29 @@ Implementation posture:
 - validation and saved baselines are normalized to declared parameter specs (unknown ad hoc keys are excluded),
 - save-as-new, update-existing, and reopen flows now reuse one in-panel workflow-parameter map synchronized through authoritative APIs to avoid draft-content/studio-state divergence.
 
+## Epic 7.2 Story 7.2.4 implementation update
+
+Story 7.2.4 hardens "Check readiness" and "Start edit" with authoritative launch prechecks that distinguish setup problems from execution-environment availability.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/services/RuntimeOperationsService.ts`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+
+Precheck UX behavior:
+
+- setup readiness and execution-environment readiness are rendered as separate precheck panels,
+- setup issues are derived from authoritative config validation and required source/prompt state,
+- backend readiness is fetched through the runtime execution-readiness API (workspace/session scoped),
+- blocking issues and advisories are presented in separate lists for backend readiness,
+- users can refresh precheck on demand and see the last authoritative check timestamp.
+
+Launch gating posture:
+
+- launch is blocked when setup has blocking issues,
+- launch is blocked when backend readiness reports blocking issues or cannot be confirmed,
+- launch is allowed when setup is valid and backend readiness is ready (including degraded-ready with advisories),
+- no UI-local backend heuristics are used; gating honors authoritative readiness response semantics.
+

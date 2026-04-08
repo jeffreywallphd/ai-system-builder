@@ -267,3 +267,38 @@ Save/reopen behavior:
 - Draft runtime patches and image-system save/update calls reuse that same map, preventing stale draft-content snapshots from becoming a second configuration truth source.
 - Reopen applies authoritative saved system workflow/version/parameter baselines and then synchronizes the active draft through the same authoritative mutation seam (`modifySystemDefinition`).
 
+## Epic 7.2 Story 7.2.4: Readiness and launch-precheck UX for image runs
+
+Story 7.2.4 hardens "Check readiness" and "Start edit" by surfacing authoritative launch-precheck information before run submission and clearly separating setup correctness from backend execution availability.
+
+Implemented seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/services/RuntimeOperationsService.ts`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+
+Readiness/precheck behavior:
+
+- The editor renders two readiness summaries:
+  - setup precheck (input/configuration readiness),
+  - execution-environment precheck (backend and node availability readiness).
+- Setup blocking issues include missing source selection, missing source dataset binding, empty prompt, and authoritative config validation failures.
+- Execution-environment readiness is loaded through the authoritative runtime readiness endpoint (`getExecutionReadiness`) using authenticated workspace context.
+- Backend readiness issues are split into:
+  - blocking issues (readiness errors, unavailable readiness, non-ready execution environment),
+  - advisories (warning/degraded but still runnable conditions).
+- Users can manually refresh execution precheck and see the latest authoritative `checkedAt` timestamp in friendly form.
+
+Launch gating behavior:
+
+- "Create image" is disabled while an active run is in progress.
+- "Create image" is disabled while execution readiness is actively being checked.
+- "Create image" is disabled whenever setup or backend precheck has blocking issues.
+- "Create image" remains enabled when only advisories exist and readiness is otherwise launchable.
+
+Architecture posture preserved:
+
+- UI does not infer backend availability using local heuristics.
+- Readiness truth stays in authoritative run/node readiness services (Features 4 and 5), with UI acting as presenter and gate consumer.
+
