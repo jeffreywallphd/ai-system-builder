@@ -54,6 +54,10 @@ import {
   type DeploymentPolicyBootstrapResolutionResult,
 } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { PlatformDeploymentPolicyAdministrationObservabilityPort } from "@infrastructure/api/deployment/PlatformDeploymentPolicyAdministrationObservabilityPort";
+import {
+  createComfyUiExecutionAdapterInfrastructure,
+  type ComfyUiExecutionAdapterInfrastructure,
+} from "@infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -90,6 +94,11 @@ export interface AuthoritativeServerCompositionRootOptions {
     }) => AuthoritativePersistentPlatformServices;
     readonly composeApiRouteRegistrationPlan?: () => AuthoritativeApiRouteRegistrationPlan;
     readonly assertApiRouteRegistrationCoverage?: (plan: AuthoritativeApiRouteRegistrationPlan) => void;
+    readonly composeComfyUiExecutionAdapter?: (input: {
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+      readonly deploymentProfile: HostDeploymentProfile;
+    }) => ComfyUiExecutionAdapterInfrastructure | undefined;
     readonly resolveDeploymentPolicyBootstrap?: (input: {
       readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
       readonly hostConfiguration: IdentityServerHostOptions;
@@ -105,6 +114,8 @@ export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
 export const AuthoritativeServerPersistenceRuntimeArtifactKey = "artifact:host:server:authoritative:persistence-runtime";
 export const AuthoritativeServerPersistentPlatformServicesArtifactKey =
   "artifact:host:server:authoritative:persistent-platform-services";
+export const AuthoritativeServerComfyUiExecutionAdapterArtifactKey =
+  "artifact:host:server:authoritative:comfyui-execution-adapter";
 export const AuthoritativeServerDeploymentPolicyBootstrapArtifactKey =
   "artifact:host:server:authoritative:deployment-policy-bootstrap";
 
@@ -218,6 +229,22 @@ export function createAuthoritativeServerCompositionRoot(
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
               apiRouteRegistrationPlan,
             );
+            const comfyUiExecutionAdapter = (
+              input.bootstrap?.composeComfyUiExecutionAdapter
+              ?? ((adapterInput) => createComfyUiExecutionAdapterInfrastructure({
+                env: adapterInput.environment,
+              }))
+            )({
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+              environment: context.environment,
+              deploymentProfile: context.deploymentProfile,
+            });
+            if (comfyUiExecutionAdapter) {
+              context.setArtifact(
+                AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+                comfyUiExecutionAdapter,
+              );
+            }
           },
           [HostBootstrapStageIds.persistence]: async (context) => {
             persistenceRuntime = (

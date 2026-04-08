@@ -296,4 +296,26 @@ describe("ComfyUiTransportClient", () => {
     expect(probe.responsive).toBeTrue();
     expect(probe.capabilities.missingRequiredNodeTypes).toEqual(["SaveImage"]);
   });
+
+  it("applies bearer authorization header when an auth token is configured", async () => {
+    const fetchFn = mock(async () => new Response(JSON.stringify({
+      prompt_id: "prompt-auth-1",
+    })));
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      authToken: "token-123",
+      fetch: fetchFn as unknown as typeof fetch,
+    });
+
+    await client.submitPrompt({
+      request: Object.freeze({
+        client_id: "run-auth",
+        prompt: Object.freeze({}),
+      }),
+    });
+
+    const [, init] = fetchFn.mock.calls[0] as [string, RequestInit];
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBe("Bearer token-123");
+  });
 });

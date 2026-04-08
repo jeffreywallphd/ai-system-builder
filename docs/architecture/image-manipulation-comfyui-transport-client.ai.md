@@ -7,10 +7,13 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 ## Canonical files
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionDispatchAdapter.ts`
+- `src/infrastructure/config/ComfyUiExecutionAdapterConfig.ts`
 - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
 - `docs/architecture/image-manipulation-comfyui-transport-client.md`
 
 ## Operational behavior
@@ -69,3 +72,32 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
   - `degraded|incompatible -> degraded`
   - `unavailable -> unavailable`
 - Readiness detail is carried in diagnostics for later node-assignment and UX readiness messaging.
+
+## Story 3.2.4 config + dependency composition layer
+
+### Added behavior
+
+- Added explicit Comfy adapter config seam at
+  `src/infrastructure/config/ComfyUiExecutionAdapterConfig.ts` with:
+  - enable/disable control,
+  - endpoint URL validation and normalization,
+  - timeout defaulting,
+  - required-node declarations,
+  - capability-probe startup toggle,
+  - optional auth token ingestion.
+- Added canonical composition helper at
+  `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts` that builds:
+  - `ComfyUiTransportClient`
+  - `ComfyUiRunExecutionTransportGateway`
+  - `ComfyUiRunExecutionDispatchAdapter`
+  - `ComfyUiImageManipulationCapabilityProbeAdapter`
+  from one validated config object.
+- Authoritative host dependencies stage now composes this infrastructure and exposes it as startup artifact:
+  `AuthoritativeServerComfyUiExecutionAdapterArtifactKey`
+  in `src/hosts/server/AuthoritativeServerCompositionRoot.ts`.
+
+### Security + maintainability posture
+
+- Sensitive connection details stay in server-side env/config composition and are not pushed into UI code.
+- Safe config snapshots expose `hasAuthToken` only, not token values.
+- Transport requests can include auth token as bearer header without changing application contracts.
