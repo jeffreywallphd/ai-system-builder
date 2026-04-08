@@ -91,3 +91,14 @@ This keeps user-facing messaging safe while preserving diagnostic detail for log
   - machine-readable: `code`, `category`, `retryable`
   - user-safe: `summary`, `userMessage`
   - developer diagnostics: sanitized `diagnostics` payload with path/token redaction
+
+## Story 8.1.1 taxonomy foundation integration
+- Shared validation/failure taxonomy now anchors execution failure categories:
+  - `src/shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy.ts`
+- Normalized execution failures can include `classification` metadata with:
+  - canonical issue code (`im.<layer>.<kind>.<reason>`),
+  - layer ownership (`execution-dispatch`, `node-availability`, `result-collection`, etc.),
+  - kind (`validation` vs `operational`),
+  - disposition (`retryable` vs `terminal`),
+  - user-fixable/degraded and resolution actor semantics.
+- This keeps execution failures compatible with run API/presenter/audit flows while preserving backend-neutral boundaries.

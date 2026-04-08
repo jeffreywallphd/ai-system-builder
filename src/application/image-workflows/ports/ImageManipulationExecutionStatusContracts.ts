@@ -1,3 +1,9 @@
+import type {
+  ImageManipulationFailureSummaryCategory,
+  ImageManipulationIssueClassification,
+} from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import { ImageManipulationFailureSummaryCategories } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+
 export const ImageManipulationBackendJobStates = Object.freeze({
   queued: "queued",
   preparing: "preparing",
@@ -28,21 +34,21 @@ export type ImageManipulationExecutionWarningSeverity =
   typeof ImageManipulationExecutionWarningSeverities[keyof typeof ImageManipulationExecutionWarningSeverities];
 
 export const ImageManipulationExecutionFailureCategories = Object.freeze({
-  validation: "validation",
-  translation: "translation",
-  dependency: "dependency",
-  capacity: "capacity",
-  timeout: "timeout",
-  cancellation: "cancellation",
-  execution: "execution",
-  output: "output",
-  connectivity: "connectivity",
-  internal: "internal",
-  unknown: "unknown",
+  validation: ImageManipulationFailureSummaryCategories.validation,
+  translation: ImageManipulationFailureSummaryCategories.translation,
+  dependency: ImageManipulationFailureSummaryCategories.dependency,
+  capacity: ImageManipulationFailureSummaryCategories.capacity,
+  timeout: ImageManipulationFailureSummaryCategories.timeout,
+  cancellation: ImageManipulationFailureSummaryCategories.cancellation,
+  execution: ImageManipulationFailureSummaryCategories.execution,
+  output: ImageManipulationFailureSummaryCategories.output,
+  connectivity: ImageManipulationFailureSummaryCategories.connectivity,
+  internal: ImageManipulationFailureSummaryCategories.internal,
+  unknown: ImageManipulationFailureSummaryCategories.unknown,
 });
 
 export type ImageManipulationExecutionFailureCategory =
-  typeof ImageManipulationExecutionFailureCategories[keyof typeof ImageManipulationExecutionFailureCategories];
+  ImageManipulationFailureSummaryCategory;
 
 export interface ImageManipulationBackendStateNormalizationInput {
   readonly rawState?: string;
@@ -105,6 +111,7 @@ export interface ImageManipulationExecutionFailure {
   readonly stageCode?: string;
   readonly partialProgressObserved: boolean;
   readonly partialOutputCount: number;
+  readonly classification?: ImageManipulationIssueClassification;
   readonly diagnostics?: Readonly<Record<string, unknown>>;
 }
 
