@@ -8,6 +8,7 @@ Story 2.2.6 adds a reusable readiness validation service seam used by authoring 
 Story 2.3.1 adds an explicit initial supported workflow template set for bounded authoring and translation-ready operation scope.
 Story 2.3.2 adds internal translation metadata for supported templates with consistency checks so backend adapters can translate without leaking backend graph shape into workflow/system source-of-truth models.
 Story 2.3.3 adds template defaults, parameter guidance, and reusable presets so non-technical users can start from sensible settings instead of backend-style tuning.
+Story 2.3.4 adds explicit template compatibility/capability metadata and readiness evaluation seams so node capability and translation-backend eligibility can be evaluated from authoritative template metadata.
 
 ## Canonical seams
 
@@ -30,6 +31,7 @@ Initial supported template families:
 Template metadata split (Story 2.3.2):
 
 - `display`: user-facing labels and rationale
+- `compatibility`: required operation capability, required input/output kinds, translation backend family identifiers, and readiness-check switches
 - `translation`: internal keys, capability hints, and mapping descriptors used by adapters
 - `configuration`: default parameter values, recommended ranges/guardrails, and preset profiles for reusable system-ready baselines
 

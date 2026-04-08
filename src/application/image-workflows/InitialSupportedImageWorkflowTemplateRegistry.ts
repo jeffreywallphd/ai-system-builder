@@ -27,6 +27,22 @@ export const InitialImageWorkflowTemplatePresetScopes = Object.freeze({
 export type InitialImageWorkflowTemplatePresetScope =
   typeof InitialImageWorkflowTemplatePresetScopes[keyof typeof InitialImageWorkflowTemplatePresetScopes];
 
+export const InitialImageWorkflowOperationCapabilities = Object.freeze({
+  imageToImage: "image.workflow.operation.image-to-image.execute",
+  enhanceUpscale: "image.workflow.operation.enhance-upscale.execute",
+  maskGuidedEdit: "image.workflow.operation.mask-guided-edit.execute",
+});
+
+export type InitialImageWorkflowOperationCapability =
+  typeof InitialImageWorkflowOperationCapabilities[keyof typeof InitialImageWorkflowOperationCapabilities] | (string & {});
+
+export const InitialImageWorkflowTemplateBackendFamilies = Object.freeze({
+  comfyUiImageManipulation: "backend-family.comfyui.image-manipulation",
+});
+
+export type InitialImageWorkflowTemplateBackendFamily =
+  typeof InitialImageWorkflowTemplateBackendFamilies[keyof typeof InitialImageWorkflowTemplateBackendFamilies] | (string & {});
+
 export interface InitialImageWorkflowTemplateInputRequirement {
   readonly inputId: string;
   readonly kind: ImageWorkflowInputSlotKind;
@@ -137,10 +153,24 @@ export interface InitialImageWorkflowTemplateConfigurationMetadata {
   readonly parameterGuidance: ReadonlyArray<InitialImageWorkflowTemplateParameterGuidance>;
 }
 
+export interface InitialImageWorkflowTemplateCompatibilityMetadata {
+  readonly requiredOperationCapability: InitialImageWorkflowOperationCapability;
+  readonly requiredInputKinds: ReadonlyArray<ImageWorkflowInputSlotKind>;
+  readonly requiredOutputKinds: ReadonlyArray<ImageWorkflowOutputKind>;
+  readonly translationBackendFamilies: ReadonlyArray<InitialImageWorkflowTemplateBackendFamily>;
+  readonly readinessChecks: {
+    readonly operationCapability: boolean;
+    readonly inputKinds: boolean;
+    readonly outputKinds: boolean;
+    readonly translationBackendFamily: boolean;
+  };
+}
+
 export interface InitialImageWorkflowTemplateDefinition {
   readonly templateFamilyId: InitialImageWorkflowTemplateFamilyId;
   readonly operationKind: ImageWorkflowOperationKind;
   readonly display: InitialImageWorkflowTemplateDisplayMetadata;
+  readonly compatibility: InitialImageWorkflowTemplateCompatibilityMetadata;
   readonly translation: InitialImageWorkflowTemplateTranslationMetadata;
   readonly configuration: InitialImageWorkflowTemplateConfigurationMetadata;
   readonly minimumRequirements: {
@@ -158,6 +188,24 @@ export interface ResolvedImageWorkflowTemplateParameterValues {
   readonly parameterValues: Readonly<Record<string, unknown>>;
 }
 
+export interface InitialImageWorkflowTemplateCompatibilityReadinessIssue {
+  readonly code:
+    | "operation-not-supported"
+    | "required-operation-capability-missing"
+    | "required-input-kind-missing"
+    | "required-output-kind-missing"
+    | "required-translation-backend-family-missing";
+  readonly path: string;
+  readonly message: string;
+}
+
+export interface InitialImageWorkflowTemplateCompatibilityReadinessResult {
+  readonly templateFamilyId?: InitialImageWorkflowTemplateFamilyId;
+  readonly operationKind: ImageWorkflowOperationKind;
+  readonly compatible: boolean;
+  readonly issues: ReadonlyArray<InitialImageWorkflowTemplateCompatibilityReadinessIssue>;
+}
+
 function freezeTemplate(
   template: InitialImageWorkflowTemplateDefinition,
 ): InitialImageWorkflowTemplateDefinition {
@@ -165,6 +213,15 @@ function freezeTemplate(
     ...template,
     display: Object.freeze({
       ...template.display,
+    }),
+    compatibility: Object.freeze({
+      ...template.compatibility,
+      requiredInputKinds: Object.freeze([...template.compatibility.requiredInputKinds]),
+      requiredOutputKinds: Object.freeze([...template.compatibility.requiredOutputKinds]),
+      translationBackendFamilies: Object.freeze([...template.compatibility.translationBackendFamilies]),
+      readinessChecks: Object.freeze({
+        ...template.compatibility.readinessChecks,
+      }),
     }),
     translation: Object.freeze({
       ...template.translation,
@@ -227,6 +284,18 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
       title: "Image-to-image restyle",
       summary: "Prompt-driven variation and restyle from one source image.",
       rationale: "High-value baseline operation that validates prompt + source-image translation and output persistence seams.",
+    },
+    compatibility: {
+      requiredOperationCapability: InitialImageWorkflowOperationCapabilities.imageToImage,
+      requiredInputKinds: ["source-image"],
+      requiredOutputKinds: ["generated-image"],
+      translationBackendFamilies: [InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation],
+      readinessChecks: {
+        operationCapability: true,
+        inputKinds: true,
+        outputKinds: true,
+        translationBackendFamily: true,
+      },
     },
     translation: {
       translationKey: "image-template.translation.image-to-image-restyle.v1",
@@ -351,6 +420,18 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
       summary: "Single-image enhancement and resolution increase with bounded controls.",
       rationale: "Delivers practical quality-improvement output without introducing broad multi-stage graph complexity.",
     },
+    compatibility: {
+      requiredOperationCapability: InitialImageWorkflowOperationCapabilities.enhanceUpscale,
+      requiredInputKinds: ["source-image"],
+      requiredOutputKinds: ["generated-image"],
+      translationBackendFamilies: [InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation],
+      readinessChecks: {
+        operationCapability: true,
+        inputKinds: true,
+        outputKinds: true,
+        translationBackendFamily: true,
+      },
+    },
     translation: {
       translationKey: "image-template.translation.enhance-upscale.v1",
       adapterFamily: "adapter.comfyui.image-manipulation",
@@ -456,6 +537,18 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
       title: "Mask-guided edit",
       summary: "Localized edits constrained by a user-supplied mask image.",
       rationale: "Adds a structurally realistic targeted-edit path for production use while keeping scope bounded to one source and one mask.",
+    },
+    compatibility: {
+      requiredOperationCapability: InitialImageWorkflowOperationCapabilities.maskGuidedEdit,
+      requiredInputKinds: ["source-image", "mask-image"],
+      requiredOutputKinds: ["generated-image"],
+      translationBackendFamilies: [InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation],
+      readinessChecks: {
+        operationCapability: true,
+        inputKinds: true,
+        outputKinds: true,
+        translationBackendFamily: true,
+      },
     },
     translation: {
       translationKey: "image-template.translation.mask-guided-edit.v1",
@@ -632,6 +725,101 @@ export class InitialSupportedImageWorkflowTemplateRegistry {
     return template.configuration.presets;
   }
 
+  public resolveCompatibilityMetadataForOperationKind(
+    operationKind: ImageWorkflowOperationKind,
+  ): InitialImageWorkflowTemplateCompatibilityMetadata | undefined {
+    return this.templatesByOperation.get(operationKind)?.compatibility;
+  }
+
+  public evaluateCompatibilityReadinessForOperationKind(input: {
+    readonly operationKind: ImageWorkflowOperationKind;
+    readonly availableOperationCapabilities: ReadonlyArray<string>;
+    readonly availableInputKinds: ReadonlyArray<ImageWorkflowInputSlotKind>;
+    readonly availableOutputKinds: ReadonlyArray<ImageWorkflowOutputKind>;
+    readonly availableTranslationBackendFamilies: ReadonlyArray<string>;
+  }): InitialImageWorkflowTemplateCompatibilityReadinessResult {
+    const template = this.templatesByOperation.get(input.operationKind);
+    if (!template) {
+      return Object.freeze({
+        operationKind: input.operationKind,
+        compatible: false,
+        issues: Object.freeze([{
+          code: "operation-not-supported",
+          path: "operationKind",
+          message: `Operation '${input.operationKind}' is outside the initial supported image workflow template set.`,
+        }]),
+      });
+    }
+
+    const compatibility = template.compatibility;
+    const issues: InitialImageWorkflowTemplateCompatibilityReadinessIssue[] = [];
+    const availableOperationCapabilities = new Set(input.availableOperationCapabilities.map((entry) => entry.trim()).filter(Boolean));
+    const availableInputKinds = new Set(input.availableInputKinds);
+    const availableOutputKinds = new Set(input.availableOutputKinds);
+    const availableTranslationBackendFamilies = new Set(
+      input.availableTranslationBackendFamilies.map((entry) => entry.trim()).filter(Boolean),
+    );
+
+    if (
+      compatibility.readinessChecks.operationCapability
+      && !availableOperationCapabilities.has(compatibility.requiredOperationCapability)
+    ) {
+      issues.push(Object.freeze({
+        code: "required-operation-capability-missing",
+        path: "compatibility.requiredOperationCapability",
+        message: `Missing required operation capability '${compatibility.requiredOperationCapability}'.`,
+      }));
+    }
+
+    if (compatibility.readinessChecks.inputKinds) {
+      for (const requiredKind of compatibility.requiredInputKinds) {
+        if (!availableInputKinds.has(requiredKind)) {
+          issues.push(Object.freeze({
+            code: "required-input-kind-missing",
+            path: "compatibility.requiredInputKinds",
+            message: `Missing required input kind '${requiredKind}'.`,
+          }));
+        }
+      }
+    }
+
+    if (compatibility.readinessChecks.outputKinds) {
+      for (const requiredKind of compatibility.requiredOutputKinds) {
+        if (!availableOutputKinds.has(requiredKind)) {
+          issues.push(Object.freeze({
+            code: "required-output-kind-missing",
+            path: "compatibility.requiredOutputKinds",
+            message: `Missing required output kind '${requiredKind}'.`,
+          }));
+        }
+      }
+    }
+
+    if (compatibility.readinessChecks.translationBackendFamily) {
+      let hasKnownFamily = false;
+      for (const family of compatibility.translationBackendFamilies) {
+        if (availableTranslationBackendFamilies.has(family)) {
+          hasKnownFamily = true;
+          break;
+        }
+      }
+      if (!hasKnownFamily) {
+        issues.push(Object.freeze({
+          code: "required-translation-backend-family-missing",
+          path: "compatibility.translationBackendFamilies",
+          message: `No compatible translation backend family found (${compatibility.translationBackendFamilies.join(", ")}).`,
+        }));
+      }
+    }
+
+    return Object.freeze({
+      templateFamilyId: template.templateFamilyId,
+      operationKind: template.operationKind,
+      compatible: issues.length === 0,
+      issues: Object.freeze(issues),
+    });
+  }
+
   public resolveDefaultParameterValuesForOperationKind(
     operationKind: ImageWorkflowOperationKind,
   ): ResolvedImageWorkflowTemplateParameterValues | undefined {
@@ -692,6 +880,7 @@ function assertTemplateDefinitionIsTranslationReady(template: InitialImageWorkfl
   assertRequiredString(template.display.title, "display.title");
   assertRequiredString(template.display.summary, "display.summary");
   assertRequiredString(template.display.rationale, "display.rationale");
+  assertTemplateCompatibilityMetadataIsValid(template);
 
   assertRequiredString(template.translation.translationKey, "translation.translationKey");
   assertRequiredString(template.translation.adapterFamily, "translation.adapterFamily");
@@ -746,6 +935,46 @@ function assertTemplateDefinitionIsTranslationReady(template: InitialImageWorkfl
   }
 
   assertTemplateConfigurationIsValid(template);
+}
+
+function assertTemplateCompatibilityMetadataIsValid(template: InitialImageWorkflowTemplateDefinition): void {
+  assertRequiredString(template.compatibility.requiredOperationCapability, "compatibility.requiredOperationCapability");
+  assertUniqueValues(template.compatibility.requiredInputKinds, "compatibility.requiredInputKinds");
+  assertUniqueValues(template.compatibility.requiredOutputKinds, "compatibility.requiredOutputKinds");
+  assertUniqueValues(template.compatibility.translationBackendFamilies, "compatibility.translationBackendFamilies");
+
+  const requiredInputKinds = new Set(
+    template.minimumRequirements.inputSlots.filter((slot) => slot.required).map((slot) => slot.kind),
+  );
+  for (const requiredInputKind of requiredInputKinds) {
+    if (!template.compatibility.requiredInputKinds.includes(requiredInputKind)) {
+      throw new Error(
+        `Template '${template.templateFamilyId}' compatibility.requiredInputKinds must include '${requiredInputKind}'.`,
+      );
+    }
+  }
+
+  const requiredOutputKinds = new Set(
+    template.minimumRequirements.outputExpectations.filter((output) => output.required).map((output) => output.kind),
+  );
+  for (const requiredOutputKind of requiredOutputKinds) {
+    if (!template.compatibility.requiredOutputKinds.includes(requiredOutputKind)) {
+      throw new Error(
+        `Template '${template.templateFamilyId}' compatibility.requiredOutputKinds must include '${requiredOutputKind}'.`,
+      );
+    }
+  }
+
+  if (template.compatibility.readinessChecks.translationBackendFamily) {
+    const hasMatchingTranslationFamily = template.compatibility.translationBackendFamilies.some(
+      (family) => family.endsWith(template.translation.adapterFamily.replace("adapter.", "")),
+    );
+    if (!hasMatchingTranslationFamily) {
+      throw new Error(
+        `Template '${template.templateFamilyId}' compatibility.translationBackendFamilies must align with translation.adapterFamily.`,
+      );
+    }
+  }
 }
 
 function assertRequiredString(value: string, field: string): void {
