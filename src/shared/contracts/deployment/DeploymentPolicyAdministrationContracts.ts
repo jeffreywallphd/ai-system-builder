@@ -45,6 +45,7 @@ export type DeploymentPolicyResolutionSource =
 export const DeploymentPolicyValidationIssueCodes = Object.freeze({
   unknownFamily: "unknown-family",
   unknownSetting: "unknown-setting",
+  overrideScopeMismatch: "override-scope-mismatch",
   profileFixedOverrideDenied: "profile-fixed-override-denied",
   runtimeAdminPresetOverrideDenied: "runtime-admin-preset-override-denied",
   invalidScalarType: "invalid-scalar-type",

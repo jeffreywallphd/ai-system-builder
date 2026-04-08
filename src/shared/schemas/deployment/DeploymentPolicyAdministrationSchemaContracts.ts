@@ -80,6 +80,7 @@ const DeploymentPolicyResolutionSourceSchema = z.enum([
 const DeploymentPolicyValidationIssueCodeSchema = z.enum([
   DeploymentPolicyValidationIssueCodes.unknownFamily,
   DeploymentPolicyValidationIssueCodes.unknownSetting,
+  DeploymentPolicyValidationIssueCodes.overrideScopeMismatch,
   DeploymentPolicyValidationIssueCodes.profileFixedOverrideDenied,
   DeploymentPolicyValidationIssueCodes.runtimeAdminPresetOverrideDenied,
   DeploymentPolicyValidationIssueCodes.invalidScalarType,
