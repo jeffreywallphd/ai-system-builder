@@ -27,6 +27,8 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- application desktop startup recovery and interrupted-resync reconciliation service:
+  - `src/application/common/OfflineDesktopStartupRecovery.ts`
 - application offline audit/operational event hooks:
   - `src/application/common/OfflineOperationalEventPorts.ts`
 - desktop host local-mode binding:
@@ -40,6 +42,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - runtime event adapter for offline hooks:
   - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
@@ -78,6 +81,8 @@ Use this map when deciding where to extend behavior:
   - `DesktopOfflineLocalExecutionRegistrationHost.createDesktopOfflineLocalExecutionRegistrationHostRuntime(...)`
 - reconnect orchestration and post-sync cleanup:
   - `OfflineControlledResynchronizationCoordinator.synchronizeWorkspace(...)`
+  - `OfflineDesktopStartupRecoveryService.inspectWorkspace(...)`
+  - `OfflineDesktopStartupRecoveryService.recoverWorkspaceStartup(...)`
   - `DesktopOfflineResynchronizationHost.createDesktopOfflineResynchronizationHostRuntime(...)`
 - shared contract updates:
   - `OfflineSynchronizationContracts.ts` (types + transitions)
@@ -145,7 +150,9 @@ Use this map when deciding where to extend behavior:
 - add/update tests:
   - `OfflinePendingOperationPersistence.test.ts`
   - `OfflineControlledResynchronizationCoordinator.test.ts`
+  - `OfflineDesktopStartupRecovery.test.ts`
   - `DesktopOfflineResynchronizationHost.test.ts`
+  - `DesktopOfflineResynchronizationRecoveryRepository.test.ts`
 
 ## Adding a new offline resource class
 

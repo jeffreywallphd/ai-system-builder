@@ -16,10 +16,11 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 1. Shared offline contracts/schemas.
 2. Domain offline boundary catalog and policy model.
 3. Application classification/resynchronization/cache/pending-operation persistence seams.
-   - include local-execution registration persistence/replay seams (`src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`) when supported local execution registration behavior changes.
-   - include controlled reconnect coordinator (`src/application/common/OfflineControlledResynchronizationCoordinator.ts`) and keep replay outcome capture explicit.
-   - include structured blocked replay metadata (reason code/message/dependency blockers) in coordinator results so UI/admin surfaces can explain non-replayed operations.
-   - include offline event hook contracts (`src/application/common/OfflineOperationalEventPorts.ts`) and emit sanitized reconnect outcome events.
+  - include local-execution registration persistence/replay seams (`src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`) when supported local execution registration behavior changes.
+  - include controlled reconnect coordinator (`src/application/common/OfflineControlledResynchronizationCoordinator.ts`) and keep replay outcome capture explicit.
+  - include desktop startup recovery/reconciliation seam (`src/application/common/OfflineDesktopStartupRecovery.ts`) when restart-time interrupted-resync behavior changes.
+  - include structured blocked replay metadata (reason code/message/dependency blockers) in coordinator results so UI/admin surfaces can explain non-replayed operations.
+  - include offline event hook contracts (`src/application/common/OfflineOperationalEventPorts.ts`) and emit sanitized reconnect outcome events.
 4. Desktop host profile + offline cache/pending-operation runtime gating.
    - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
    - include desktop controlled-resynchronization host runtime (`src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`) when reconnect workflow composition changes.
@@ -51,7 +52,9 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
   - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - reconnect coordination + cache cleanup:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `src/application/common/OfflineDesktopStartupRecovery.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+  - `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
   - `src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`
   - `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`
 - shared queue/connectivity/outcome contracts:
@@ -79,6 +82,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - reconnect cleanup semantics classify pending operations (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain behavior for queryable local state transitions.
 - revocation/permission-loss replay rejections should persist non-retryable reason codes so rejected local queue state is explicit and not silently reattempted.
 - reconnect diagnostics should include correlatable attempt/replay/cache markers (`requestId`, `correlationId`, `syncAttemptId`) and sanitized replay-failure summaries for production triage.
+- startup recovery should classify retryable vs manual-follow-up interrupted replay cases explicitly and keep unresolved state queryable.
 
 ## Deferred unless explicitly scoped
 
