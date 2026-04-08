@@ -23,6 +23,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep admin observability/redaction/failure-handling posture aligned with `docs/architecture/deployment-profile-policy-admin-observability-redaction-and-failure-handling.md`.
 - Keep explainability and impact summaries aligned with `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`.
 - Keep profile-evolution neutrality safeguards aligned with `docs/architecture/deployment-profile-policy-evolution-seams-and-neutrality-safeguards.md`.
+- Keep final regression hardening baseline aligned with `docs/architecture/deployment-profile-policy-regression-hardening-baseline.md`.
 - Keep admin inspection/update read-model/service/page seams in `src/ui/shared/admin/DeploymentPolicyAdministrationReadModel.ts`, `src/ui/services/DeploymentPolicyAdministrationReadService.ts`, `src/ui/services/DeploymentPolicyAdministrationWriteService.ts`, and `src/ui/pages/DeploymentPolicyAdministrationPage.tsx`.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.
 - Keep docs/tests aligned for `.md` and `.ai.md` surfaces.
@@ -49,3 +50,9 @@ Intentionally deferred families in this story:
 - audit-governance runtime export/redaction/retention enforcement,
 - admin-controls delegated-admin runtime gates,
 - broader scheduling rule overlays.
+
+## Story 20.3.7 baseline
+
+- Keep cross-layer lifecycle regression coverage in `src/application/policy-administration/tests/DeploymentPolicyAdministrationRegressionLifecycle.integration.test.ts`.
+- Keep regression scope representative for bootstrap/read/write/evaluation/permission/audit/observability flows.
+- Keep deferred edges explicit in `docs/architecture/deployment-profile-policy-regression-hardening-baseline.md` and `.ai.md`.
