@@ -12,6 +12,8 @@ import { AUTHORIZATION_PERSISTENCE_MIGRATIONS } from "./authorization/SqliteAuth
 import { SqliteNodeTrustPersistenceAdapter } from "./nodes/SqliteNodeTrustPersistenceAdapter";
 import { SqliteNodeTrustAuditRecorder } from "./nodes/SqliteNodeTrustAuditRecorder";
 import { NODE_TRUST_PERSISTENCE_MIGRATIONS } from "./nodes/SqliteNodeTrustPersistenceMigrations";
+import { SqliteExecutionNodeRepository } from "./nodes/SqliteExecutionNodeRepository";
+import { EXECUTION_NODE_PERSISTENCE_MIGRATIONS } from "./nodes/SqliteExecutionNodePersistenceMigrations";
 import { SqliteCertificateAuthorityPersistenceAdapter } from "./security/SqliteCertificateAuthorityPersistenceAdapter";
 import { CERTIFICATE_AUTHORITY_PERSISTENCE_MIGRATIONS } from "./security/SqliteCertificateAuthorityPersistenceMigrations";
 import { SqliteSecretRecordPersistenceAdapter } from "./security/SqliteSecretRecordPersistenceAdapter";
@@ -49,6 +51,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly authorizationRepository: SqliteAuthorizationPersistenceAdapter;
   readonly nodeTrustRepository: SqliteNodeTrustPersistenceAdapter;
   readonly nodeTrustAuditRecorder: SqliteNodeTrustAuditRecorder;
+  readonly executionNodeRepository: SqliteExecutionNodeRepository;
   readonly certificateAuthorityRepository: SqliteCertificateAuthorityPersistenceAdapter;
   readonly secretRecordRepository: SqliteSecretRecordPersistenceAdapter;
   readonly storageInstanceRepository: SqliteStorageInstancePersistenceAdapter;
@@ -84,6 +87,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     domainId: "nodes",
     migrationTableName: "node_trust_repository_migrations",
     migrations: NODE_TRUST_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "execution-nodes",
+    migrationTableName: "execution_node_repository_migrations",
+    migrations: EXECUTION_NODE_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "storage",
@@ -235,6 +243,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const authorizationRepository = new SqliteAuthorizationPersistenceAdapter(databasePath);
   const nodeTrustRepository = new SqliteNodeTrustPersistenceAdapter(databasePath);
   const nodeTrustAuditRecorder = new SqliteNodeTrustAuditRecorder(databasePath);
+  const executionNodeRepository = new SqliteExecutionNodeRepository(databasePath);
   const certificateAuthorityRepository = new SqliteCertificateAuthorityPersistenceAdapter(databasePath);
   const secretRecordRepository = new SqliteSecretRecordPersistenceAdapter(databasePath);
   const storageInstanceRepository = new SqliteStorageInstancePersistenceAdapter(databasePath);
@@ -256,6 +265,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     authorizationRepository,
     nodeTrustRepository,
     nodeTrustAuditRecorder,
+    executionNodeRepository,
     certificateAuthorityRepository,
     secretRecordRepository,
     storageInstanceRepository,
@@ -275,6 +285,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       authorizationRepository.dispose();
       nodeTrustRepository.dispose();
       nodeTrustAuditRecorder.dispose();
+      executionNodeRepository.dispose();
       certificateAuthorityRepository.dispose();
       secretRecordRepository.dispose();
       storageInstanceRepository.dispose();

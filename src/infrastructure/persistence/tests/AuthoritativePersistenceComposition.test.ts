@@ -20,6 +20,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(ids).toContain("workspaces:v1");
     expect(ids).toContain("authorization:v1");
     expect(ids).toContain("nodes:v1");
+    expect(ids).toContain("execution-nodes:v1");
     expect(ids).toContain("storage:v1");
     expect(ids).toContain("assets:v1");
     expect(ids).toContain("asset-upload-sessions:v1");
@@ -43,6 +44,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(services.databasePath.endsWith("authoritative-composition-test.sqlite")).toBeTrue();
     expect(services.identityRepository).toBeDefined();
     expect(services.workspaceRepository).toBeDefined();
+    expect(services.executionNodeRepository).toBeDefined();
     expect(services.imageAssetRepository).toBeDefined();
     expect(services.imageWorkflowSystemRepository).toBeDefined();
     expect(services.platformPersistenceRepository).toBeDefined();
