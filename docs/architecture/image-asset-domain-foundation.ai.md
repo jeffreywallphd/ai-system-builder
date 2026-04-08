@@ -79,3 +79,13 @@ These contracts provide:
 - metadata create/update/retrieve/list/archive/soft-delete seams
 - managed-storage location reservation, write, read, access-handle, and delete seams
 - storage-instance and logical object-key based references only (no raw host paths)
+
+## Story 6.1.1 generated-result extension
+
+Generated result assets now have a dedicated lifecycle/provenance model in:
+
+- `src/domain/image-assets/GeneratedResultAssetDomain.ts`
+- `src/domain/image-assets/tests/GeneratedResultAssetDomain.test.ts`
+- `docs/architecture/generated-result-asset-domain-foundation.md`
+
+This adds explicit result collection->persistence->preview->archive lifecycle invariants while preserving logical asset id and lineage integration.
