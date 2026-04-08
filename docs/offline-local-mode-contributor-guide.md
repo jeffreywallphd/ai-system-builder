@@ -80,6 +80,10 @@ Required:
 - keep cache bounded (retention cap) to prevent uncontrolled local-cache sprawl;
 - reject raw filesystem references in snapshot payloads;
 - when storage rule requires encrypted cache, gate writes on protected-at-rest cache capability.
+- after reconnect attempts, apply explicit post-sync cache maintenance rules:
+  - refresh stale authoritative snapshots when authoritative revisions change or replay succeeds;
+  - invalidate cached snapshots when authoritative state indicates deleted/revoked resources, replay permission loss, or invalidated run submissions;
+  - when stale snapshots cannot be refreshed, invalidate them so stale local cache does not appear authoritative.
 
 ## Extending pending operation semantics
 
@@ -91,6 +95,11 @@ Required:
 - persist pending operation records with explicit `actorWorkspaceContext`, dependency references, resource base-version metadata, and retryability metadata.
 - preserve canonical replay payload serialization + digest so reconnect replay intent is durable across desktop restart.
 - replay-preparation output must be deterministic and dependency-aware, and must clearly separate replay-eligible unsynced records from blocked/non-eligible records.
+- apply explicit cleanup classification for post-sync pending-operation handling:
+  - `successful`: authoritative apply confirmed and queue entry removed;
+  - `conflicted`: conflict outcome retained for explicit user review;
+  - `failed`: replay attempt failed and record retained with explicit retryability state;
+  - `abandoned`: replay rejected/non-retryable/terminally blocked and retained for explicit manual intervention.
 
 ## Extending reconnect conflict handling
 

@@ -118,6 +118,7 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
     readonly revisionComparable: boolean;
   }>>;
   private readonly replayResultByOperationId: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+  private readonly missingSnapshotResourceKeys: ReadonlySet<string>;
 
   constructor(options?: {
     readonly revisionsByResourceKey?: ReadonlyMap<string, { readonly authoritativeRevision: string } & Partial<{
@@ -129,9 +130,11 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
       readonly revisionComparable: boolean;
     }>>;
     readonly replayResultsByOperationId?: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+    readonly missingSnapshotResourceKeys?: ReadonlySet<string>;
   }) {
     this.revisionByResourceKey = options?.revisionsByResourceKey ?? new Map();
     this.replayResultByOperationId = options?.replayResultsByOperationId ?? new Map();
+    this.missingSnapshotResourceKeys = options?.missingSnapshotResourceKeys ?? new Set();
   }
 
   public async fetchResourceRevisions(input: {
@@ -195,7 +198,19 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
     readonly resourceClass: typeof OfflineResourceClasses[keyof typeof OfflineResourceClasses];
     readonly resourceId: string;
   }) {
-    this.refreshedSnapshots.push(`${input.resourceClass}::${input.resourceId}`);
+    const resourceKey = `${input.resourceClass}::${input.resourceId}`;
+    this.refreshedSnapshots.push(resourceKey);
+    const mapped = this.revisionByResourceKey.get(resourceKey);
+    if (
+      this.missingSnapshotResourceKeys.has(resourceKey)
+      || mapped?.resourceExists === false
+      || mapped?.accessRevoked === true
+      || mapped?.permissionAllowsReplay === false
+      || mapped?.submissionStillValid === false
+    ) {
+      return undefined;
+    }
+
     return Object.freeze({
       workspaceId: "workspace:alpha",
       resourceClass: input.resourceClass,
@@ -345,6 +360,19 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       "conflict-requires-review",
     ]);
     expect(result.outcomes[1]?.conflicts?.[0]?.conflictClass).toBe("stale-base-edit");
+    expect(result.invalidatedSnapshotKeys).toEqual([]);
+    expect(result.pendingOperationCleanupRecords).toEqual([
+      expect.objectContaining({
+        operationId: "operation:apply:1",
+        classification: "successful",
+        cleanupAction: "removed-from-queue",
+      }),
+      expect.objectContaining({
+        operationId: "operation:conflict:1",
+        classification: "conflicted",
+        cleanupAction: "retained-for-review",
+      }),
+    ]);
 
     const persistedConflict = await pendingOperationService.findQueuedOperation(
       "workspace:alpha",
@@ -397,6 +425,8 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(result.replayedOperationIds).toEqual([]);
     expect(result.blockedOperations).toEqual([]);
     expect(result.outcomes).toEqual([]);
+    expect(result.invalidatedSnapshotKeys).toEqual([]);
+    expect(result.pendingOperationCleanupRecords).toEqual([]);
     expect(authoritativePort.replayedOperations).toEqual([]);
   });
 
@@ -441,6 +471,18 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
         now: () => new Date("2026-04-08T12:40:00.000Z"),
       },
     );
+
+    await snapshotCacheService.cacheSnapshot({
+      workspaceId: "workspace:alpha",
+      resourceClass: OfflineResourceClasses.runSubmissionIntent,
+      resourceId: "run:intent:invalid",
+      authoritativeRevision: "run:rev:0",
+      snapshot: Object.freeze({ runIntentId: "run:intent:invalid", stale: true }),
+      policy: createPolicy(),
+      cachedByActorUserIdentityId: "user:alpha",
+      cachedAt: "2026-04-08T12:10:00.000Z",
+      lastSynchronizedAt: "2026-04-08T12:10:00.000Z",
+    });
 
     await pendingOperationService.queueOperation({
       operation: createOfflineQueuedMutationEnvelope({
@@ -580,6 +622,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       true,
     ]);
     expect(result.outcomes[2]?.requiresAdminAttention).toBeTrue();
+    expect(result.invalidatedSnapshotKeys).toEqual(["run-submission-intent::run:intent:invalid"]);
 
     const stale = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:stale");
     const revoked = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:revoked");
@@ -589,12 +632,18 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       "operation:invalid-submission",
     );
     const version = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:version");
+    const invalidatedSnapshot = await snapshotCacheService.getSnapshot({
+      workspaceId: "workspace:alpha",
+      resourceClass: OfflineResourceClasses.runSubmissionIntent,
+      resourceId: "run:intent:invalid",
+    });
 
     expect(stale?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
     expect(revoked?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(permission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(invalidSubmission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(version?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
+    expect(invalidatedSnapshot).toBeUndefined();
   });
 
   it("returns structured blocked replay details and persists terminal blocked states", async () => {
@@ -663,10 +712,69 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       preserveLocalDraftAsUnsynced: true,
     });
     expect(result.outcomes[0]?.conflicts?.[0]?.conflictClass).toBe("authoritative-state-unavailable");
+    expect(result.pendingOperationCleanupRecords).toEqual([
+      expect.objectContaining({
+        operationId: "operation:retry-exhausted",
+        classification: "abandoned",
+        cleanupAction: "retained-for-review",
+        nextStatus: "sync-rejected",
+      }),
+    ]);
 
     const persisted = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:retry-exhausted");
     expect(persisted?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(persisted?.retryability.retryable).toBeFalse();
     expect(persisted?.retryability.nonRetryableReasonCode).toBe("retry-exhausted");
+  });
+
+  it("invalidates stale cached snapshots when authoritative refresh is unavailable", async () => {
+    const pendingOperationService = new OfflinePendingOperationService(
+      new InMemoryOfflinePendingOperationRepository(),
+    );
+    const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
+      new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
+    );
+    const authoritativePort = new FakeAuthoritativeResynchronizationPort({
+      revisionsByResourceKey: new Map([
+        ["workflow-definition::workflow:def:stale", { authoritativeRevision: "workflow-def:rev:2" }],
+      ]),
+      missingSnapshotResourceKeys: new Set(["workflow-definition::workflow:def:stale"]),
+    });
+    const coordinator = new OfflineControlledResynchronizationCoordinator(
+      pendingOperationService,
+      snapshotCacheService,
+      authoritativePort,
+      new StaticConnectivityPort(createConnectedState()),
+      {
+        now: () => new Date("2026-04-08T12:50:00.000Z"),
+      },
+    );
+
+    await snapshotCacheService.cacheSnapshot({
+      workspaceId: "workspace:alpha",
+      resourceClass: OfflineResourceClasses.workflowDefinition,
+      resourceId: "workflow:def:stale",
+      authoritativeRevision: "workflow-def:rev:1",
+      snapshot: Object.freeze({ resourceId: "workflow:def:stale", refreshed: false }),
+      policy: createPolicy(),
+      cachedByActorUserIdentityId: "user:alpha",
+      cachedAt: "2026-04-08T12:40:00.000Z",
+      lastSynchronizedAt: "2026-04-08T12:40:00.000Z",
+    });
+
+    const result = await coordinator.synchronizeWorkspace({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+      attemptedAt: "2026-04-08T12:50:00.000Z",
+    });
+
+    expect(result.refreshedSnapshotKeys).toEqual([]);
+    expect(result.invalidatedSnapshotKeys).toEqual(["workflow-definition::workflow:def:stale"]);
+    const removedSnapshot = await snapshotCacheService.getSnapshot({
+      workspaceId: "workspace:alpha",
+      resourceClass: OfflineResourceClasses.workflowDefinition,
+      resourceId: "workflow:def:stale",
+    });
+    expect(removedSnapshot).toBeUndefined();
   });
 });

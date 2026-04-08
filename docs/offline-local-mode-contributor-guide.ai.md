@@ -31,7 +31,9 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - desktop host remains control-plane-client and non-authoritative.
 - authoritative snapshot cache stores logical payload + sync metadata, not filesystem references.
 - snapshot cache writes respect eligibility and protected-storage requirements.
+- reconnect paths must perform explicit cache refresh/invalidation maintenance so stale/revoked content is not left looking authoritative.
 - pending-operation persistence keeps actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic reconnect replay.
+- reconnect cleanup semantics classify pending operations (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain behavior for queryable local state transitions.
 
 ## Prohibited patterns
 
