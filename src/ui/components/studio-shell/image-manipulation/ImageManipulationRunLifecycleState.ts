@@ -2,14 +2,16 @@ import {
   ReferenceImageExecutionStepIds,
   type ReferenceImageExecutionFlowSnapshot,
 } from "../../../runtime/ReferenceImageExecutionFlowService";
+import type { RuntimeSdkExecutionStatusResponse } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 export type ImageManipulationRunLifecycleState =
   | "idle"
   | "validating"
-  | "preparing"
+  | "queued"
   | "running"
-  | "success"
-  | "failure";
+  | "completed"
+  | "failed"
+  | "cancelled";
 
 export interface ImageManipulationRunLifecycleSnapshot {
   readonly state: ImageManipulationRunLifecycleState;
@@ -27,13 +29,13 @@ export function mapExecutionFlowSnapshotToRunLifecycleState(
 ): ImageManipulationRunLifecycleSnapshot {
   if (snapshot.overallStatus === "completed") {
     return Object.freeze({
-      state: "success",
+      state: "completed",
       message: "Done. Your result is ready.",
     });
   }
   if (snapshot.overallStatus === "failed" || snapshot.overallStatus === "partially-completed") {
     return Object.freeze({
-      state: "failure",
+      state: "failed",
       message: "Run failed. Check advanced details.",
     });
   }
@@ -49,7 +51,7 @@ export function mapExecutionFlowSnapshotToRunLifecycleState(
   const triggerStep = snapshot.steps.find((entry) => entry.stepId === ReferenceImageExecutionStepIds.trigger);
   if (triggerStep && (triggerStep.status === "started" || triggerStep.status === "running")) {
     return Object.freeze({
-      state: "preparing",
+      state: "queued",
       message: triggerStep.userLabel,
     });
   }
@@ -57,5 +59,44 @@ export function mapExecutionFlowSnapshotToRunLifecycleState(
   return Object.freeze({
     state: "running",
     message: snapshot.steps[snapshot.steps.length - 1]?.userLabel,
+  });
+}
+
+export function mapRuntimeStatusToRunLifecycleState(
+  status: RuntimeSdkExecutionStatusResponse["status"] | undefined,
+): ImageManipulationRunLifecycleSnapshot {
+  if (status === "pending") {
+    return Object.freeze({
+      state: "queued",
+      message: "Your run is queued.",
+    });
+  }
+  if (status === "running") {
+    return Object.freeze({
+      state: "running",
+      message: "Creating your image.",
+    });
+  }
+  if (status === "succeeded") {
+    return Object.freeze({
+      state: "completed",
+      message: "Done. Your result is ready.",
+    });
+  }
+  if (status === "cancelled") {
+    return Object.freeze({
+      state: "cancelled",
+      message: "This run was cancelled.",
+    });
+  }
+  if (status === "failed") {
+    return Object.freeze({
+      state: "failed",
+      message: "Run failed. Check advanced details.",
+    });
+  }
+  return Object.freeze({
+    state: "running",
+    message: "Creating your image.",
   });
 }

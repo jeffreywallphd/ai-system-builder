@@ -24,7 +24,6 @@ import { StudioShellService } from "../../services/StudioShellService";
 import { ImageAssetManagementService, type RecentStudioImageAsset } from "../../services/ImageAssetManagementService";
 import ComfyImageManipulationPropertyEditor from "../assets/image-system/ComfyImageManipulationPropertyEditor";
 import {
-  ReferenceImageExecutionFlowService,
   createReferenceImageOutputPersistenceRequest,
   type ReferenceImageExecutionFlowIssue,
   type ReferenceImageExecutionFlowStep,
@@ -39,7 +38,7 @@ import {
 } from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
 import {
   createIdleImageManipulationRunLifecycleState,
-  mapExecutionFlowSnapshotToRunLifecycleState,
+  mapRuntimeStatusToRunLifecycleState,
   type ImageManipulationRunLifecycleSnapshot,
 } from "./image-manipulation/ImageManipulationRunLifecycleState";
 import {
@@ -59,6 +58,8 @@ import {
   type ImageManipulationSelectionSnapshot,
 } from "../../runtime/ImageManipulationRuntimeDatasetBindingService";
 import { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
+import { RuntimeOperationsService } from "../../services/RuntimeOperationsService";
+import type { RuntimeSdkExecutionResultResponse } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -81,10 +82,11 @@ const previewContextLabels: Record<ImageManipulationSelectionRole, string> = Obj
 const runStateLabels: Record<ImageManipulationRunLifecycleSnapshot["state"], string> = Object.freeze({
   idle: "Ready",
   validating: "Checking settings",
-  preparing: "Preparing",
+  queued: "Queued",
   running: "Creating",
-  success: "Finished",
-  failure: "Needs attention",
+  completed: "Finished",
+  failed: "Needs attention",
+  cancelled: "Cancelled",
 });
 
 const emptyHydratedDatasetBindings: ReadonlyArray<HydratedRuntimeDatasetBinding> = Object.freeze([]);
@@ -275,13 +277,13 @@ function toReferenceImageDatasetBindingId(
 }
 
 function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["state"]): "neutral" | "warning" | "danger" | "success" {
-  if (state === "success") {
+  if (state === "completed") {
     return "success";
   }
-  if (state === "failure") {
+  if (state === "failed") {
     return "danger";
   }
-  if (state === "validating") {
+  if (state === "validating" || state === "queued" || state === "running") {
     return "warning";
   }
   return "neutral";
@@ -307,6 +309,45 @@ function toFriendlyValidationMessage(path: string): string {
   return "Review your settings before running.";
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function isRuntimeTerminalStatus(
+  status: RuntimeSdkExecutionResultResponse["status"],
+): status is "succeeded" | "failed" | "cancelled" {
+  return status === "succeeded" || status === "failed" || status === "cancelled";
+}
+
+function mapRuntimeSdkResultToPersistenceResult(
+  result: RuntimeSdkExecutionResultResponse,
+): NonNullable<Parameters<typeof createReferenceImageOutputPersistenceRequest>[0]["runtimeResult"]> {
+  return Object.freeze({
+    executionId: result.executionId,
+    status: result.status,
+    output: result.output,
+    rootAssetId: result.rootAssetId,
+    rootVersionId: result.rootVersionId,
+    completedAt: result.completedAt,
+    outputSummary: Object.freeze({
+      hasOutput: result.outputSummary.hasOutput,
+      hasError: result.outputSummary.hasError,
+      outputFieldCount: result.outputSummary.outputFieldCount,
+      contractOutputIds: Object.freeze([...result.outputSummary.contractOutputIds]),
+    }),
+    nodeResults: Object.freeze([]),
+    nestedSystemResults: Object.freeze([]),
+    diagnostics: Object.freeze([...result.diagnostics]),
+    executedVersionMap: Object.freeze({
+      rootVersionId: result.rootVersionId,
+      nodeVersionIds: Object.freeze({}),
+    }),
+    nestedExecutionLineage: Object.freeze([]),
+  });
+}
+
 export function ImageManipulationRuntimeEditorPanel({
   context,
   runtimeLaunch,
@@ -318,12 +359,13 @@ export function ImageManipulationRuntimeEditorPanel({
     === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
   const studioShell = useMemo(() => new StudioShellService(), []);
   const imageAssets = useMemo(() => new ImageAssetManagementService(), []);
+  const runtimeOperations = useMemo(() => new RuntimeOperationsService(), []);
   const authSessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
-  const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const datasetBindingService = useMemo(() => new ImageManipulationRuntimeDatasetBindingService(), []);
   const sessionPersistence = useMemo(() => new SystemRuntimeWindowSessionPersistenceService(), []);
   const requestIdRef = useRef(0);
+  const runPollRequestIdRef = useRef(0);
 
   const roleBindings = useMemo(
     () => datasetBindingService.resolveRoleBindings(hydratedRuntime?.datasetBindings ?? emptyHydratedDatasetBindings),
@@ -421,6 +463,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
+  const [activeRunId, setActiveRunId] = useState<string | undefined>();
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
@@ -898,6 +941,70 @@ export function ImageManipulationRuntimeEditorPanel({
     sessionScope,
   ]);
 
+  useEffect(() => () => {
+    runPollRequestIdRef.current += 1;
+  }, []);
+
+  const monitorRunUntilTerminal = async (
+    runId: string,
+  ): Promise<{ readonly ok: true; readonly status: "succeeded" | "failed" | "cancelled" } | { readonly ok: false; readonly message: string }> => {
+    const pollRequestId = runPollRequestIdRef.current + 1;
+    runPollRequestIdRef.current = pollRequestId;
+    let attempt = 0;
+    while (attempt < 180) {
+      const statusResponse = await runtimeOperations.getRunStatus(runId);
+      if (pollRequestId !== runPollRequestIdRef.current) {
+        return Object.freeze({
+          ok: false,
+          message: "Run monitoring was replaced by a newer request.",
+        });
+      }
+      if (!statusResponse.ok || !statusResponse.data) {
+        return Object.freeze({
+          ok: false,
+          message: statusResponse.error?.message ?? "We couldn't load run status.",
+        });
+      }
+
+      setRunLifecycle(mapRuntimeStatusToRunLifecycleState(statusResponse.data.status));
+      setFlowSteps(Object.freeze([
+        Object.freeze({
+          stepId: "trigger",
+          status: "completed",
+          userLabel: "Submitted",
+          details: runId,
+        }),
+        Object.freeze({
+          stepId: "execution",
+          status: statusResponse.data.status === "pending"
+            ? "started"
+            : statusResponse.data.status === "running"
+              ? "running"
+              : statusResponse.data.status === "succeeded"
+                ? "completed"
+                : "failed",
+          userLabel: "Monitoring",
+          details: `${statusResponse.data.status} (${statusResponse.data.progress.completedNodeCount}/${statusResponse.data.progress.totalNodeCount})`,
+        }),
+      ]));
+
+      if (isRuntimeTerminalStatus(statusResponse.data.status)) {
+        return Object.freeze({
+          ok: true,
+          status: statusResponse.data.status,
+        });
+      }
+
+      attempt += 1;
+      await delay(1250);
+    }
+
+    return Object.freeze({
+      ok: false,
+      message: "Run monitoring timed out before terminal status.",
+    });
+  };
+
   if (!isImageRuntimeTarget || !draft) {
     return (
       <ImageStatusNotice
@@ -908,10 +1015,9 @@ export function ImageManipulationRuntimeEditorPanel({
   }
 
   const isRunInProgress = runLifecycle.state === "validating"
-    || runLifecycle.state === "preparing"
+    || runLifecycle.state === "queued"
     || runLifecycle.state === "running";
-  const runDisabled = !context.operations.startSystemExecution
-    || !selectedSourceRecordId
+  const runDisabled = !selectedSourceRecordId
     || !selectedSourceAssetId
     || !selectedSourceDatasetInstanceId
     || !config.prompts.positivePrompt.trim()
@@ -1218,10 +1324,8 @@ export function ImageManipulationRuntimeEditorPanel({
               className="ui-button ui-button--primary"
               disabled={runDisabled}
               onClick={() => {
-                if (!context.operations.startSystemExecution) {
-                  return;
-                }
                 setRunLifecycle(Object.freeze({ state: "validating", message: "Checking your setup" }));
+                setActiveRunId(undefined);
                 setIntegrityIssues([]);
                 setFlowSteps([]);
                 setFlowIssues([]);
@@ -1243,7 +1347,7 @@ export function ImageManipulationRuntimeEditorPanel({
                 });
                 if (!mapped.ok) {
                   setRunLifecycle(Object.freeze({
-                    state: "failure",
+                    state: "failed",
                     message: mapped.userMessage,
                   }));
                   setFlowIssues(Object.freeze([Object.freeze({
@@ -1257,64 +1361,196 @@ export function ImageManipulationRuntimeEditorPanel({
                 const integrity = validateReferenceImageCrossStudioContext(mapped.runtimeContext);
                 if (!integrity.valid) {
                   setRunLifecycle(Object.freeze({
-                    state: "failure",
+                    state: "failed",
                     message: "Please check your image and settings.",
                   }));
                   setIntegrityIssues(integrity.blockingIssues);
                   return;
                 }
 
-                setRunLifecycle(Object.freeze({ state: "preparing", message: "Preparing" }));
-
-                void executionFlow.run({
-                  startExecution: async () => {
-                    const response = await context.operations.startSystemExecution?.(mapped.startRequest);
-                    return response && response.ok && response.data
-                      ? { ok: true, executionId: response.data.executionId }
-                      : { ok: false, errorMessage: response?.error?.message ?? "Could not start processing." };
-                  },
-                  getExecutionResult: async (executionId) => {
-                    const response = await studioShell.getSystemExecutionResult(executionId);
-                    return response.ok
-                      ? { ok: true, data: response.data }
-                      : { ok: false, errorMessage: response.error?.message ?? "Could not read runtime output." };
-                  },
-                  persistOutputs: async (persistRequest) => {
-                    const response = await studioShell.persistReferenceImageOutputs(persistRequest);
-                    return response.ok
-                      ? { ok: true, data: response.data }
-                      : { ok: false, errorMessage: response.error?.message };
-                  },
-                  persistenceRequestFactory: ({ executionId, runtimeResult }) => createReferenceImageOutputPersistenceRequest({
-                    studioId: context.studioId,
-                    draftId: draft.draftId,
-                    executionId,
-                    sourceRecordId: mapped.sourceRecordId,
-                    sourceAssetId: mapped.sourceAssetId,
-                    parameterSnapshot: Object.freeze({
-                      presetId,
-                      imageConfig: mapped.resolvedConfig,
-                      selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
-                      selectionSnapshot,
-                    }),
-                    runtimeContext: mapped.runtimeContext,
-                    workflowAssetId: runtimeWorkflowAssetId,
-                    workflowAssetVersionId: runtimeWorkflowAssetVersionId,
-                    systemAssetId: runtimeSystemAssetId ?? draft.assetId,
-                    runtimeResult,
+                setFlowSteps(Object.freeze([
+                  Object.freeze({
+                    stepId: "trigger",
+                    status: "running",
+                    userLabel: "Submitting",
                   }),
-                  refreshViews: async () => {
-                    await loadCollections({ preferLatestOutput: true });
-                    setSelection((current) => setActivePreviewRole(current, "output"));
-                  },
-                  onSnapshot: (snapshot) => {
-                    setFlowSteps(snapshot.steps);
-                    setFlowIssues(snapshot.issues);
-                    setRunLifecycle(mapExecutionFlowSnapshotToRunLifecycleState(snapshot));
-                  },
-                }).catch(() => {
+                ]));
+
+                void (async () => {
+                  const startResponse = await runtimeOperations.startRun({
+                    systemId: runtimeWorkflowAssetId,
+                    versionId: runtimeWorkflowAssetVersionId,
+                    async: true,
+                    trigger: "manual",
+                    inputPayload: mapped.startRequest.context,
+                    metadata: Object.freeze({
+                      studioId: context.studioId,
+                      draftId: draft.draftId,
+                      systemAssetId: runtimeSystemAssetId ?? draft.assetId,
+                    }),
+                  });
+                  if (!startResponse.ok || !startResponse.data) {
+                    setRunLifecycle(Object.freeze({
+                      state: "failed",
+                      message: startResponse.error?.message ?? "Could not submit run.",
+                    }));
+                    setFlowIssues(Object.freeze([Object.freeze({
+                      stepId: "trigger",
+                      code: startResponse.error?.code ?? "run-submit-failed",
+                      userMessage: startResponse.error?.message ?? "Could not submit run.",
+                    })]));
+                    return;
+                  }
+
+                  const runId = startResponse.data.executionId;
+                  setActiveRunId(runId);
+                  setFlowSteps(Object.freeze([
+                    Object.freeze({
+                      stepId: "trigger",
+                      status: "completed",
+                      userLabel: "Submitted",
+                      details: runId,
+                    }),
+                    Object.freeze({
+                      stepId: "execution",
+                      status: startResponse.data.status === "pending" ? "started" : "running",
+                      userLabel: "Monitoring",
+                    }),
+                  ]));
+                  setRunLifecycle(mapRuntimeStatusToRunLifecycleState(startResponse.data.status));
+
+                  const monitored = await monitorRunUntilTerminal(runId);
+                  if (!monitored.ok) {
+                    setRunLifecycle(Object.freeze({
+                      state: "failed",
+                      message: monitored.message,
+                    }));
+                    setFlowIssues(Object.freeze([Object.freeze({
+                      stepId: "execution",
+                      code: "run-monitor-failed",
+                      userMessage: monitored.message,
+                    })]));
+                    return;
+                  }
+                  if (monitored.status === "cancelled") {
+                    setRunLifecycle(Object.freeze({
+                      state: "cancelled",
+                      message: "This run was cancelled.",
+                    }));
+                    return;
+                  }
+
+                  const resultResponse = await runtimeOperations.getRunResult({
+                    executionId: runId,
+                    diagnosticsLimit: 50,
+                    nodeResultLimit: 20,
+                  });
+                  if (!resultResponse.ok || !resultResponse.data) {
+                    setRunLifecycle(Object.freeze({
+                      state: "failed",
+                      message: resultResponse.error?.message ?? "Could not read run results.",
+                    }));
+                    setFlowIssues(Object.freeze([Object.freeze({
+                      stepId: "execution",
+                      code: resultResponse.error?.code ?? "run-result-read-failed",
+                      userMessage: resultResponse.error?.message ?? "Could not read run results.",
+                    })]));
+                    return;
+                  }
+
+                  setFlowSteps((current) => Object.freeze([
+                    ...current.filter((step) => step.stepId !== "persistence"),
+                    Object.freeze({
+                      stepId: "persistence",
+                      status: "running",
+                      userLabel: "Saving",
+                    }),
+                  ]));
+
+                  const persistenceResponse = await studioShell.persistReferenceImageOutputs(
+                    createReferenceImageOutputPersistenceRequest({
+                      studioId: context.studioId,
+                      draftId: draft.draftId,
+                      executionId: runId,
+                      sourceRecordId: mapped.sourceRecordId,
+                      sourceAssetId: mapped.sourceAssetId,
+                      parameterSnapshot: Object.freeze({
+                        presetId,
+                        imageConfig: mapped.resolvedConfig,
+                        selectedReferenceRecordId: selectedReferenceItem?.image.recordId,
+                        selectionSnapshot,
+                      }),
+                      runtimeContext: mapped.runtimeContext,
+                      workflowAssetId: runtimeWorkflowAssetId,
+                      workflowAssetVersionId: runtimeWorkflowAssetVersionId,
+                      systemAssetId: runtimeSystemAssetId ?? draft.assetId,
+                      runtimeResult: mapRuntimeSdkResultToPersistenceResult(resultResponse.data),
+                    }),
+                  );
+
+                  if (!persistenceResponse.ok || !persistenceResponse.data) {
+                    setRunLifecycle(Object.freeze({
+                      state: "failed",
+                      message: persistenceResponse.error?.message ?? "Could not save run results.",
+                    }));
+                    setFlowIssues(Object.freeze([Object.freeze({
+                      stepId: "persistence",
+                      code: persistenceResponse.error?.code ?? "persistence-failed",
+                      userMessage: persistenceResponse.error?.message ?? "Could not save run results.",
+                    })]));
+                    return;
+                  }
+
+                  if (
+                    persistenceResponse.data.executionOutcome === "non-recoverable-failure"
+                    || persistenceResponse.data.executionOutcome === "recoverable-failure"
+                    || persistenceResponse.data.status === "failed"
+                  ) {
+                    setRunLifecycle(Object.freeze({
+                      state: "failed",
+                      message: persistenceResponse.data.userMessage || "Something went wrong while creating this image.",
+                    }));
+                    setFlowIssues(Object.freeze([
+                      ...persistenceResponse.data.failureMessages.map((message, index) => Object.freeze({
+                        stepId: "persistence",
+                        code: `persistence-failure-${index + 1}`,
+                        userMessage: persistenceResponse.data.userMessage || "Something went wrong while creating this image.",
+                        technicalMessage: message,
+                      })),
+                    ]));
+                    return;
+                  }
+
+                  setFlowSteps((current) => Object.freeze([
+                    ...current.filter((step) => step.stepId !== "persistence" && step.stepId !== "refresh"),
+                    Object.freeze({
+                      stepId: "persistence",
+                      status: persistenceResponse.data.executionOutcome === "partial-failure" || persistenceResponse.data.status === "partial"
+                        ? "partially-completed"
+                        : "completed",
+                      userLabel: "Saving",
+                      details: `Saved ${persistenceResponse.data.persistedRecordIds.length} image(s).`,
+                    }),
+                    Object.freeze({
+                      stepId: "refresh",
+                      status: "running",
+                      userLabel: "Refreshing",
+                    }),
+                  ]));
+                  await loadCollections({ preferLatestOutput: true });
+                  setSelection((current) => setActivePreviewRole(current, "output"));
+                  setFlowSteps((current) => Object.freeze(current.map((step) => (
+                    step.stepId === "refresh"
+                      ? Object.freeze({ ...step, status: "completed" as const })
+                      : step
+                  ))));
                   setRunLifecycle(Object.freeze({
-                    state: "failure",
+                    state: "completed",
+                    message: "Done. Your result is ready.",
+                  }));
+                })().catch(() => {
+                  setRunLifecycle(Object.freeze({
+                    state: "failed",
                     message: "Run failed. Check advanced details.",
                   }));
                 });
@@ -1322,6 +1558,30 @@ export function ImageManipulationRuntimeEditorPanel({
             >
               {isRunInProgress ? "Creating..." : "Create image"}
             </button>
+            {isRunInProgress && activeRunId ? (
+              <button
+                type="button"
+                className="ui-button ui-button--ghost"
+                onClick={() => {
+                  void runtimeOperations.cancelRun({
+                    executionId: activeRunId,
+                    reason: "Cancelled from image editor.",
+                  }).then((response) => {
+                    if (!response.ok) {
+                      setFlowIssues(Object.freeze([Object.freeze({
+                        stepId: "execution",
+                        code: response.error?.code ?? "run-cancel-failed",
+                        userMessage: response.error?.message ?? "Couldn't request cancellation.",
+                      })]));
+                      return;
+                    }
+                    setStatusMessage("Cancellation requested.");
+                  });
+                }}
+              >
+                Cancel run
+              </button>
+            ) : null}
             {!selectedSourceRecordId && !isLoadingSources ? (
               <ImageStatusNotice
                 title="Choose a source photo first"
@@ -1341,6 +1601,9 @@ export function ImageManipulationRuntimeEditorPanel({
               }}
             >
               <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
+              {activeRunId ? (
+                <p className="ui-text-small ui-text-secondary">Run ID: {activeRunId}</p>
+              ) : null}
               {flowSteps.map((step) => (
                 <p key={step.stepId} className="ui-text-small ui-text-secondary">
                   {step.userLabel}: {step.status}

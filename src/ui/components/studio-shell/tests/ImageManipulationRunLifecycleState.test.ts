@@ -1,9 +1,12 @@
 import { describe, expect, it } from "bun:test";
-import { mapExecutionFlowSnapshotToRunLifecycleState } from "../image-manipulation/ImageManipulationRunLifecycleState";
+import {
+  mapExecutionFlowSnapshotToRunLifecycleState,
+  mapRuntimeStatusToRunLifecycleState,
+} from "../image-manipulation/ImageManipulationRunLifecycleState";
 
 describe("ImageManipulationRunLifecycleState", () => {
-  it("maps running snapshots to preparing and running UI states", () => {
-    const preparing = mapExecutionFlowSnapshotToRunLifecycleState({
+  it("maps running snapshots to queued and running UI states", () => {
+    const queued = mapExecutionFlowSnapshotToRunLifecycleState({
       overallStatus: "running",
       steps: [{
         stepId: "trigger",
@@ -23,24 +26,32 @@ describe("ImageManipulationRunLifecycleState", () => {
       issues: [],
     });
 
-    expect(preparing.state).toBe("preparing");
+    expect(queued.state).toBe("queued");
     expect(running.state).toBe("running");
   });
 
-  it("maps terminal snapshots to success and failure", () => {
-    const success = mapExecutionFlowSnapshotToRunLifecycleState({
+  it("maps terminal snapshots to completed and failed", () => {
+    const completed = mapExecutionFlowSnapshotToRunLifecycleState({
       overallStatus: "completed",
       steps: [],
       issues: [],
     });
 
-    const failure = mapExecutionFlowSnapshotToRunLifecycleState({
+    const failed = mapExecutionFlowSnapshotToRunLifecycleState({
       overallStatus: "failed",
       steps: [],
       issues: [],
     });
 
-    expect(success.state).toBe("success");
-    expect(failure.state).toBe("failure");
+    expect(completed.state).toBe("completed");
+    expect(failed.state).toBe("failed");
+  });
+
+  it("maps runtime status responses to normalized lifecycle states", () => {
+    expect(mapRuntimeStatusToRunLifecycleState("pending").state).toBe("queued");
+    expect(mapRuntimeStatusToRunLifecycleState("running").state).toBe("running");
+    expect(mapRuntimeStatusToRunLifecycleState("succeeded").state).toBe("completed");
+    expect(mapRuntimeStatusToRunLifecycleState("failed").state).toBe("failed");
+    expect(mapRuntimeStatusToRunLifecycleState("cancelled").state).toBe("cancelled");
   });
 });

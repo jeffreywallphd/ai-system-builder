@@ -86,6 +86,13 @@ Infrastructure and host layers:
 - Result persistence and lineage extend output handoff notifications and logical reference contracts without changing submission/dispatch boundaries.
 - Multi-surface monitoring extends canonical run status/event/read-model contracts rather than provider-specific telemetry payloads.
 
+## Story 4.4.2 studio launch and monitoring integration
+
+- Image Manipulation Studio launch now routes through authoritative runtime run APIs (`RuntimeOperationsService` / `RuntimeControlClient`) instead of direct studio `startSystemExecution` calls.
+- Studio run state now tracks authoritative run identifiers and normalized lifecycle statuses (`validating`, `queued`, `running`, `failed`, `completed`, `cancelled`) for non-technical status visibility.
+- Monitoring and cancellation now use authoritative run status/cancel APIs with the current run ID surfaced in advanced diagnostics.
+- Runtime result handoff stays in place through persistence seams after authoritative terminal status is observed, preserving readiness for downstream result-integration work.
+
 ## Related architecture notes
 
 - `docs/architecture/image-asset-feature-1-final-baseline.md`
