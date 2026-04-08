@@ -18,6 +18,8 @@ import {
   mapPlatformAuditEventRecordToRowValues,
   mapPlatformAuditEventRowToRecord,
   mapPlatformRunRecordToRowValues,
+  mapPlatformRunStatusHistoryRowToRecord,
+  mapRunStatusHistorySnapshotToJson,
   mapPlatformRunRowToRecord,
   normalizePlatformLookup,
   parsePlatformAuditMutationReplayRecord,
@@ -26,6 +28,7 @@ import {
   toPlatformRunReplaySnapshot,
   type PlatformAuditEventRow,
   type PlatformMutationReplayRow,
+  type PlatformRunStatusHistoryRow,
   type PlatformRunRow,
 } from "./PlatformPersistenceMapper";
 import { SafeSqliteRepositoryBase } from "../common/SafeSqliteRepositoryBase";
@@ -40,6 +43,8 @@ import {
 import { SqliteTransactionCoordinator } from "../sqlite/SqliteTransactionCoordinator";
 import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
+  AuthoritativeRunStatusHistoryListQuery,
+  AuthoritativeRunStatusHistoryRecord,
   AuthoritativeRunNodePlacementHoldRecord,
   AuthoritativeRunNodePlacementHoldResult,
   AuthoritativeRunDispatchAttemptResult,
@@ -52,7 +57,7 @@ import type {
   IRunOrchestrationQueuePersistenceRepository,
   RunQueueEligibilityMarker,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
-import type { RunLifecycleState } from "@domain/runs/RunDomain";
+import { RunLifecycleStates, type RunLifecycleState } from "@domain/runs/RunDomain";
 import { RunNodePlacementHoldConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 
 type PlatformMutationKind = "create-run" | "save-run" | "append-audit-event";
@@ -206,6 +211,54 @@ export class SqlitePlatformPersistenceAdapter
     `).all(...where.params, ...paging.params) as PlatformRunRow[];
 
     return Object.freeze(rows.map((row) => mapPlatformRunRowToRecord(row)));
+  }
+
+  public async listRunStatusHistory(
+    query: AuthoritativeRunStatusHistoryListQuery,
+  ): Promise<ReadonlyArray<AuthoritativeRunStatusHistoryRecord>> {
+    const runId = normalizePlatformLookup(query.runId);
+    if (!runId) {
+      return Object.freeze([]);
+    }
+
+    const whereBuilder = createSqliteWhereBuilder();
+    whereBuilder.add("run_id = ?", runId);
+    whereBuilder.addEquals("workspace_id", normalizePlatformLookup(query.workspaceId ?? ""));
+    whereBuilder.addIn("lifecycle_state", query.lifecycleStates);
+    if (query.changedAfter) {
+      whereBuilder.add("changed_at >= ?", query.changedAfter.trim());
+    }
+    if (query.changedBefore) {
+      whereBuilder.add("changed_at <= ?", query.changedBefore.trim());
+    }
+    const where = whereBuilder.build();
+    const paging = this.buildPagingClause(query.limit, query.offset);
+
+    const rows = this.getDatabase().prepare(`
+      SELECT
+        history_entry_id,
+        run_id,
+        workspace_id,
+        lifecycle_state,
+        platform_status,
+        run_revision,
+        changed_at,
+        changed_by_actor_id,
+        reason,
+        dispatch_attempt_id,
+        dispatch_id,
+        backend_kind,
+        backend_run_id,
+        safe_failure_code,
+        safe_failure_message,
+        snapshot_json
+      FROM platform_run_status_history
+      ${where.sql}
+      ORDER BY changed_at DESC, history_entry_id DESC
+      ${paging.sql}
+    `).all(...where.params, ...paging.params) as PlatformRunStatusHistoryRow[];
+
+    return Object.freeze(rows.map(mapPlatformRunStatusHistoryRowToRecord));
   }
 
   public async createRun(
@@ -1644,6 +1697,23 @@ export class SqlitePlatformPersistenceAdapter
       }
     }
 
+    const nextLifecycleState = this.resolveLifecycleStateForStatusHistory(persistedRecord);
+    const previousLifecycleState = existing
+      ? this.resolveLifecycleStateForStatusHistory(existing)
+      : undefined;
+    const shouldAppendStatusHistory = !existing
+      || existing.status !== persistedRecord.status
+      || previousLifecycleState !== nextLifecycleState;
+    if (shouldAppendStatusHistory) {
+      this.appendRunStatusHistoryEntry({
+        record: persistedRecord,
+        lifecycleState: nextLifecycleState,
+        changedAt,
+        changedByActorId: mutation.actorId,
+        correlationId: mutation.correlationId,
+      });
+    }
+
     this.persistMutationReplayRecord(
       operationKey,
       mutationKind,
@@ -1941,6 +2011,154 @@ export class SqlitePlatformPersistenceAdapter
     });
   }
 
+  private resolveLifecycleStateForStatusHistory(record: PlatformRunRecord): RunLifecycleState {
+    const metadata = toOptionalRecord(record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const state = normalizePlatformLookup(
+      typeof canonicalRun?.state === "string" ? canonicalRun.state : "",
+    );
+    if (state) {
+      return state as RunLifecycleState;
+    }
+
+    switch (record.status) {
+      case "running":
+        return RunLifecycleStates.running;
+      case "completed":
+        return RunLifecycleStates.completed;
+      case "failed":
+        return RunLifecycleStates.failed;
+      case "cancelled":
+        return RunLifecycleStates.cancelled;
+      case "blocked":
+      case "pending":
+      default:
+        return RunLifecycleStates.submitted;
+    }
+  }
+
+  private appendRunStatusHistoryEntry(input: {
+    readonly record: PlatformRunRecord;
+    readonly lifecycleState: RunLifecycleState;
+    readonly changedAt: string;
+    readonly changedByActorId: string;
+    readonly correlationId?: string;
+  }): void {
+    const metadata = toOptionalRecord(input.record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const canonicalExecution = toOptionalRecord(canonicalRun?.execution);
+    const dispatch = toOptionalRecord(metadata?.dispatch);
+    const snapshot = this.createRunStatusHistorySnapshot(input.record, input.lifecycleState, input.correlationId);
+    const changedAt = normalizePlatformLookup(
+      typeof canonicalRun?.updatedAt === "string" ? canonicalRun.updatedAt : "",
+    ) ?? input.changedAt;
+    const safeFailureCode = normalizePlatformLookup(
+      typeof canonicalExecution?.errorCode === "string" ? canonicalExecution.errorCode : "",
+    );
+    const safeFailureMessage = normalizePlatformLookup(
+      typeof canonicalExecution?.errorMessage === "string" ? canonicalExecution.errorMessage : "",
+    ) ?? normalizePlatformLookup(input.record.terminalReason ?? "");
+
+    this.executeMutation("append platform run status history", () => this.getDatabase().prepare(`
+        INSERT INTO platform_run_status_history (
+          history_entry_id,
+          run_id,
+          workspace_id,
+          lifecycle_state,
+          platform_status,
+          run_revision,
+          changed_at,
+          changed_by_actor_id,
+          reason,
+          dispatch_attempt_id,
+          dispatch_id,
+          backend_kind,
+          backend_run_id,
+          safe_failure_code,
+          safe_failure_message,
+          snapshot_json,
+          created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(run_id, run_revision) DO UPDATE SET
+          workspace_id = excluded.workspace_id,
+          lifecycle_state = excluded.lifecycle_state,
+          platform_status = excluded.platform_status,
+          changed_at = excluded.changed_at,
+          changed_by_actor_id = excluded.changed_by_actor_id,
+          reason = excluded.reason,
+          dispatch_attempt_id = excluded.dispatch_attempt_id,
+          dispatch_id = excluded.dispatch_id,
+          backend_kind = excluded.backend_kind,
+          backend_run_id = excluded.backend_run_id,
+          safe_failure_code = excluded.safe_failure_code,
+          safe_failure_message = excluded.safe_failure_message,
+          snapshot_json = excluded.snapshot_json
+      `).run(
+      `run-status:${input.record.runId}:r${input.record.revision}`,
+      input.record.runId,
+      input.record.workspaceId ?? null,
+      input.lifecycleState,
+      input.record.status,
+      input.record.revision,
+      changedAt,
+      input.changedByActorId,
+      normalizePlatformLookup(input.record.terminalReason ?? "") ?? null,
+      normalizePlatformLookup(
+        typeof dispatch?.attemptId === "string" ? dispatch.attemptId : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof dispatch?.dispatchId === "string" ? dispatch.dispatchId : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof canonicalExecution?.adapterKind === "string" ? canonicalExecution.adapterKind : "",
+      ) ?? null,
+      normalizePlatformLookup(
+        typeof canonicalExecution?.adapterRunId === "string" ? canonicalExecution.adapterRunId : "",
+      ) ?? null,
+      safeFailureCode ?? null,
+      safeFailureMessage ?? null,
+      mapRunStatusHistorySnapshotToJson(snapshot) ?? null,
+      new Date().toISOString(),
+    ));
+  }
+
+  private createRunStatusHistorySnapshot(
+    record: PlatformRunRecord,
+    lifecycleState: RunLifecycleState,
+    correlationId?: string,
+  ): Readonly<Record<string, unknown>> {
+    const metadata = toOptionalRecord(record.metadata);
+    const canonicalRun = toOptionalRecord(metadata?.canonicalRun);
+    const canonicalExecution = toOptionalRecord(canonicalRun?.execution);
+    const canonicalQueue = toOptionalRecord(canonicalRun?.queue);
+    const canonicalAssignment = toOptionalRecord(canonicalRun?.assignment);
+
+    return Object.freeze({
+      runId: record.runId,
+      revision: record.revision,
+      lifecycleState,
+      platformStatus: record.status,
+      correlationId: normalizePlatformLookup(correlationId ?? ""),
+      queueId: normalizePlatformLookup(typeof canonicalQueue?.queueId === "string" ? canonicalQueue.queueId : ""),
+      assignedNodeId: normalizePlatformLookup(
+        typeof canonicalAssignment?.assignedNodeId === "string" ? canonicalAssignment.assignedNodeId : "",
+      ),
+      dispatchId: normalizePlatformLookup(typeof metadata?.dispatchId === "string" ? metadata.dispatchId : ""),
+      execution: Object.freeze({
+        adapterKind: normalizePlatformLookup(
+          typeof canonicalExecution?.adapterKind === "string" ? canonicalExecution.adapterKind : "",
+        ),
+        adapterRunId: normalizePlatformLookup(
+          typeof canonicalExecution?.adapterRunId === "string" ? canonicalExecution.adapterRunId : "",
+        ),
+        outcome: normalizePlatformLookup(
+          typeof canonicalExecution?.outcome === "string" ? canonicalExecution.outcome : "",
+        ),
+        progress: toOptionalRecord(canonicalExecution?.progress) ?? undefined,
+      }),
+    });
+  }
+
   private assertExpectedRevision(
     expectedRevision: number | undefined,
     persistedRevision: number | undefined,
@@ -1977,5 +2195,12 @@ function parseStringArrayJson(payload: string | null): ReadonlyArray<string> | u
   } catch {
     return undefined;
   }
+}
+
+function toOptionalRecord(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Readonly<Record<string, unknown>>;
 }
 

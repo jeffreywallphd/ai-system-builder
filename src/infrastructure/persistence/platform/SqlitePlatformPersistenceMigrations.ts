@@ -1,4 +1,4 @@
-export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 6;
+export const PLATFORM_PERSISTENCE_SCHEMA_VERSION = 7;
 
 export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -201,5 +201,37 @@ export const PLATFORM_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, st
     ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_decision_id TEXT;
     ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_recorded_at TEXT;
     ALTER TABLE platform_run_orchestration_queue ADD COLUMN last_no_placement_admin_attention INTEGER NOT NULL DEFAULT 0 CHECK (last_no_placement_admin_attention IN (0, 1));
+  `],
+  [7, `
+    CREATE TABLE IF NOT EXISTS platform_run_status_history (
+      history_entry_id TEXT PRIMARY KEY,
+      run_id TEXT NOT NULL,
+      workspace_id TEXT,
+      lifecycle_state TEXT NOT NULL,
+      platform_status TEXT NOT NULL CHECK (platform_status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'blocked')),
+      run_revision INTEGER NOT NULL CHECK (run_revision >= 1),
+      changed_at TEXT NOT NULL,
+      changed_by_actor_id TEXT NOT NULL,
+      reason TEXT,
+      dispatch_attempt_id TEXT,
+      dispatch_id TEXT,
+      backend_kind TEXT,
+      backend_run_id TEXT,
+      safe_failure_code TEXT,
+      safe_failure_message TEXT,
+      snapshot_json TEXT,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (run_id) REFERENCES platform_run_records(run_id) ON DELETE CASCADE
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS platform_run_status_history_run_revision_uidx
+      ON platform_run_status_history(run_id, run_revision);
+    CREATE INDEX IF NOT EXISTS platform_run_status_history_run_changed_idx
+      ON platform_run_status_history(run_id, changed_at DESC, history_entry_id DESC);
+    CREATE INDEX IF NOT EXISTS platform_run_status_history_workspace_changed_idx
+      ON platform_run_status_history(workspace_id, changed_at DESC, history_entry_id DESC)
+      WHERE workspace_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS platform_run_status_history_lifecycle_changed_idx
+      ON platform_run_status_history(lifecycle_state, changed_at DESC, history_entry_id DESC);
   `],
 ]);
