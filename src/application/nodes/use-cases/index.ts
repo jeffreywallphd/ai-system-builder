@@ -15,3 +15,6 @@ export * from "./GetNodeInventoryDetailUseCase";
 export * from "./ResolveApprovedNodeCertificateEligibilityUseCase";
 export * from "./ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 export * from "./ResolveNodeMutualTlsTransportIdentityUseCase";
+export * from "./ExecutionNodeManagementUseCaseShared";
+export * from "./RegisterExecutionNodeUseCase";
+export * from "./ActivateExecutionNodeUseCase";

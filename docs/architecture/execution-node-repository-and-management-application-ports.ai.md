@@ -3,11 +3,17 @@
 ## Story scope
 
 Story 5.1.3 introduces application-layer repository and service ports for execution-node registration, query, health/capability refresh, eligibility evaluation, availability management, and scheduling selection hints.
+Story 5.2.1 adds authoritative application use cases for registering and activating execution nodes for image backend hosting.
 
 ## Implemented files
 
 - `src/application/nodes/ports/ExecutionNodeManagementPorts.ts`
+- `src/application/nodes/ports/ExecutionNodeManagementAuthorizationPorts.ts`
+- `src/application/nodes/use-cases/ExecutionNodeManagementUseCaseShared.ts`
+- `src/application/nodes/use-cases/RegisterExecutionNodeUseCase.ts`
+- `src/application/nodes/use-cases/ActivateExecutionNodeUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
+- `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 - Human doc: `docs/architecture/execution-node-repository-and-management-application-ports.md`
 
 ## Core delivery
@@ -31,3 +37,11 @@ These ports are intended for authoritative run orchestration, scheduling, node-a
 - Backend-family agnostic interface shapes.
 - Compatible with trust/approval/certificate-managed node lifecycle expansion.
 - Supports future policy-aware and multi-node scheduling without rewriting application contracts.
+
+## Story 5.2.1 delivery
+
+- Adds `RegisterExecutionNodeUseCase` for durable, validated execution-node registration with duplicate guardrails.
+- Adds `ActivateExecutionNodeUseCase` for approved/trusted/certificate-backed activation to routable `active` posture.
+- Adds shared use-case error/outcome and mutation-context helpers in `ExecutionNodeManagementUseCaseShared.ts`.
+- Adds optional authorization extension seam (`ExecutionNodeManagementAuthorizationHook`) to keep policy controls extensible.
+- Adds behavior tests covering valid registration, invalid/duplicate submissions, activation success, and activation-policy/posture rejection paths.

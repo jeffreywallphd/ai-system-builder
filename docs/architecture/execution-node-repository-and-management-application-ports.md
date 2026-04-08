@@ -4,7 +4,9 @@
 
 - Feature 5: Node-Based Execution and Backend Management
 - Epic 5.1: Execution Node Domain, Capability Model, and Management Contracts
+- Epic 5.2: Node Registration, Persistence, Health, and Capability Management
 - Story 5.1.3: Define repository and service ports for node registration, query, and management
+- Story 5.2.1: Implement node registration and activation use cases for image execution backends
 
 ## Purpose
 
@@ -13,7 +15,12 @@ Define application-layer port seams so execution nodes are registered, queried, 
 ## Implemented files
 
 - `src/application/nodes/ports/ExecutionNodeManagementPorts.ts`
+- `src/application/nodes/ports/ExecutionNodeManagementAuthorizationPorts.ts`
+- `src/application/nodes/use-cases/ExecutionNodeManagementUseCaseShared.ts`
+- `src/application/nodes/use-cases/RegisterExecutionNodeUseCase.ts`
+- `src/application/nodes/use-cases/ActivateExecutionNodeUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
+- `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 
 ## Repository port responsibilities
 
@@ -58,3 +65,22 @@ These ports are designed for:
 - Trust/approval/certificate constraints remain compatible with existing node-trust domain contracts.
 - Scheduling and policy engines consume explicit eligibility/selection outputs through ports, not adapter internals.
 - User identity concerns remain outside these ports; mutation context references actor ids only for auditable orchestration.
+
+## Story 5.2.1 use-case behavior
+
+`RegisterExecutionNodeUseCase` and `ActivateExecutionNodeUseCase` provide the authoritative application entry points for execution-node inventory onboarding and activation:
+
+- registration:
+  - validates required identity/display metadata, endpoint references, backend family capabilities, and node capability profile through `createExecutionNodeRecord(...)`
+  - rejects duplicate node ids before persistence
+  - persists durable execution-node records through `IExecutionNodeRepository.registerExecutionNode(...)`
+  - returns internal DTO-ready summary shape for management/readiness surfaces
+- activation:
+  - requires existing node record + approved/trusted posture + certificate reference
+  - validates lifecycle transition to active execution status through domain transition rules
+  - persists activated state through `IExecutionNodeRepository.saveExecutionNode(...)`
+  - defaults activated health posture to `ready` (with optional override)
+- policy/trust extensibility:
+  - both use cases accept optional `ExecutionNodeManagementAuthorizationHook` checks so approval/security policies can be tightened without changing core orchestration seams
+
+These use cases keep execution node inventory management explicit and authoritative, decoupled from hidden startup assumptions or adapter-local side effects.
