@@ -28,6 +28,8 @@ import { SqlitePlatformPersistenceAdapter } from "./platform/SqlitePlatformPersi
 import { PLATFORM_PERSISTENCE_MIGRATIONS } from "./platform/SqlitePlatformPersistenceMigrations";
 import { SqliteAuditLedgerRepository } from "./audit/SqliteAuditLedgerRepository";
 import { AUDIT_LEDGER_PERSISTENCE_MIGRATIONS } from "./audit/SqliteAuditLedgerPersistenceMigrations";
+import { SqliteDeploymentPolicyPersistenceAdapter } from "./deployment/SqliteDeploymentPolicyPersistenceAdapter";
+import { DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS } from "./deployment/SqliteDeploymentPolicyPersistenceMigrations";
 
 interface VersionedMigrationSource {
   readonly domainId: string;
@@ -52,6 +54,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly assetUploadSessionRepository: SqliteAssetUploadSessionPersistenceAdapter;
   readonly platformPersistenceRepository: SqlitePlatformPersistenceAdapter;
   readonly auditLedgerRepository: SqliteAuditLedgerRepository;
+  readonly deploymentPolicyRepository: SqliteDeploymentPolicyPersistenceAdapter;
   dispose(): void;
 }
 
@@ -95,6 +98,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     domainId: "platform",
     migrationTableName: "platform_repository_migrations",
     migrations: PLATFORM_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "deployment-policy",
+    migrationTableName: "deployment_policy_repository_migrations",
+    migrations: DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "audit-ledger",
@@ -220,6 +228,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(databasePath);
   const platformPersistenceRepository = new SqlitePlatformPersistenceAdapter(databasePath);
   const auditLedgerRepository = new SqliteAuditLedgerRepository(databasePath);
+  const deploymentPolicyRepository = new SqliteDeploymentPolicyPersistenceAdapter(databasePath);
 
   return Object.freeze({
     databasePath,
@@ -238,6 +247,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     assetUploadSessionRepository,
     platformPersistenceRepository,
     auditLedgerRepository,
+    deploymentPolicyRepository,
     dispose(): void {
       identityRepository.dispose();
       trustedDeviceRepository.dispose();
@@ -254,6 +264,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       assetUploadSessionRepository.dispose();
       platformPersistenceRepository.dispose();
       auditLedgerRepository.dispose();
+      deploymentPolicyRepository.dispose();
     },
   });
 }

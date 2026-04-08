@@ -10,6 +10,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-taxonomy-registry.md`
 - `docs/architecture/deployment-profile-policy-preset-definitions.md`
 - `docs/architecture/deployment-profile-policy-effective-resolution-and-overrides.md`
+- `docs/architecture/deployment-profile-policy-persistence-and-repositories.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 
@@ -30,6 +31,24 @@ Provide a practical implementation workflow for extending deployment-profile pol
    - `src/shared/dto/deployment/DeploymentPolicyAdministrationDtos.ts`
    - `src/shared/schemas/deployment/DeploymentPolicyAdministrationSchemaContracts.ts`
 5. Update `.md` and `.ai.md` docs together and keep architecture discoverability entries current.
+
+## Implementing policy persistence changes
+
+1. Keep deployment-policy persistence contracts in:
+   - `src/application/deployment/ports/IDeploymentPolicyPersistenceRepository.ts`
+   - `src/shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos.ts`
+2. Keep storage adapter logic in:
+   - `src/infrastructure/persistence/deployment/SqliteDeploymentPolicyPersistenceAdapter.ts`
+   - `src/infrastructure/persistence/deployment/DeploymentPolicyPersistenceMapper.ts`
+   - `src/infrastructure/persistence/deployment/SqliteDeploymentPolicyPersistenceMigrations.ts`
+3. Persist and validate:
+   - active profile selection,
+   - typed override values by family/setting,
+   - override provenance and change history,
+   - effective-policy metadata snapshots.
+4. Keep persistence out of UI and transport handlers.
+5. Update authoritative composition wiring when repository availability changes:
+   - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 
 ## Adding a new policy family
 
