@@ -6,7 +6,10 @@ import type {
   AuthoritativeRunNodeClaimResult,
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
+  IRunCollectedResultPersistencePort,
   IRunOrchestrationQueuePersistenceRepository,
+  RunCollectedResultPersistenceRequest,
+  RunCollectedResultPersistenceResult,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { FinalizeRunExecutionOutcomeUseCase } from "../use-cases/FinalizeRunExecutionOutcomeUseCase";
 import {
@@ -92,6 +95,36 @@ class CapturingQueueRepository implements IRunOrchestrationQueuePersistenceRepos
 
   public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
     return Object.freeze([]);
+  }
+}
+
+class CapturingResultCollectionPersistencePort implements IRunCollectedResultPersistencePort {
+  public readonly calls: RunCollectedResultPersistenceRequest[] = [];
+  public readonly result: RunCollectedResultPersistenceResult;
+  public shouldThrow = false;
+
+  public constructor(result?: RunCollectedResultPersistenceResult) {
+    this.result = result ?? Object.freeze({
+      status: "persisted",
+      outputs: Object.freeze([Object.freeze({
+        outputId: "generated:primary",
+        kind: "asset",
+        assetId: "asset:generated:primary",
+      })]),
+      outputAvailabilityHint: "available",
+      terminalQualityHint: "standard",
+      internalDiagnostics: Object.freeze({
+        persistedCount: 1,
+      }),
+    });
+  }
+
+  public async persistCollectedResult(request: RunCollectedResultPersistenceRequest): Promise<RunCollectedResultPersistenceResult> {
+    this.calls.push(request);
+    if (this.shouldThrow) {
+      throw new Error("simulated-storage-write-failure");
+    }
+    return this.result;
   }
 }
 
@@ -210,5 +243,120 @@ describe("FinalizeRunExecutionOutcomeUseCase", () => {
     expect(result.finalization?.outputAvailability).toBe("partial");
     expect(result.finalization?.terminalQuality).toBe("degraded");
     expect(queueRepository.finalized[0]?.lifecycleState).toBe("cancelled");
+  });
+
+  it("hands off collected execution outputs to result persistence and uses returned asset outputs", async () => {
+    const queueRepository = new CapturingQueueRepository();
+    const persistencePort = new CapturingResultCollectionPersistencePort();
+    const useCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository,
+      resultCollectionPersistencePort: persistencePort,
+    });
+    const completedRun = createRun(RunLifecycleStates.completed);
+    const result = await useCase.execute({
+      run: completedRun,
+      runRecord: createRunRecord(completedRun),
+      occurredAt: "2026-04-07T12:03:00.000Z",
+      senderNodeId: "node:trusted-1",
+      lifecycleUpdate: Object.freeze({
+        runId: completedRun.identity.runId,
+        result: Object.freeze({
+          summary: "Collected outputs ready for persistence.",
+        }),
+      }),
+      internalDiagnostics: Object.freeze({
+        collectedExecutionResult: Object.freeze({
+          schemaVersion: "1.0.0",
+          collectionId: "collection:run:completed",
+          discoveryId: "discovery:run:completed",
+          executionJobId: "job:1",
+          runId: completedRun.identity.runId,
+          workspaceId: "workspace-alpha",
+          collectedAt: "2026-04-07T12:02:00.000Z",
+          status: "collected",
+          discoveredOutputs: Object.freeze([Object.freeze({
+            descriptorId: "descriptor:1",
+            discoveredAt: "2026-04-07T12:01:59.000Z",
+            outputRole: "primary",
+            outputIndex: 0,
+            media: Object.freeze({
+              mediaKind: "image",
+              mimeType: "image/png",
+            }),
+            temporaryReference: Object.freeze({
+              kind: "backend-object-handle",
+              backendFamily: "comfyui",
+              objectHandle: "comfy-output:output:generated.png",
+            }),
+          })]),
+          records: Object.freeze([Object.freeze({
+            descriptorId: "descriptor:1",
+            temporaryReference: Object.freeze({
+              kind: "backend-object-handle",
+              backendFamily: "comfyui",
+              objectHandle: "comfy-output:output:generated.png",
+            }),
+            persistence: Object.freeze({
+              status: "not-persisted",
+              reason: "awaiting-managed-asset-persistence",
+            }),
+          })]),
+          summary: Object.freeze({
+            discoveredCount: 1,
+            collectedCount: 1,
+            persistedCount: 0,
+            notPersistedCount: 1,
+            failedCount: 0,
+          }),
+        }),
+      }),
+    });
+
+    expect(persistencePort.calls).toHaveLength(1);
+    expect(result.finalization?.outputs[0]?.assetId).toBe("asset:generated:primary");
+    const telemetry = (result.runRecord.metadata as { executionTelemetry?: { finalizationInternal?: { resultPersistenceDiagnostics?: { persistedCount?: number } } } }).executionTelemetry;
+    expect(telemetry?.finalizationInternal?.resultPersistenceDiagnostics?.persistedCount).toBe(1);
+  });
+
+  it("finalizes safely with degraded hints when result persistence throws", async () => {
+    const queueRepository = new CapturingQueueRepository();
+    const persistencePort = new CapturingResultCollectionPersistencePort();
+    persistencePort.shouldThrow = true;
+    const useCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository,
+      resultCollectionPersistencePort: persistencePort,
+    });
+    const completedRun = createRun(RunLifecycleStates.completed);
+    const result = await useCase.execute({
+      run: completedRun,
+      runRecord: createRunRecord(completedRun),
+      occurredAt: "2026-04-07T12:03:00.000Z",
+      internalDiagnostics: Object.freeze({
+        collectedExecutionResult: Object.freeze({
+          schemaVersion: "1.0.0",
+          collectionId: "collection:run:completed",
+          discoveryId: "discovery:run:completed",
+          executionJobId: "job:1",
+          runId: completedRun.identity.runId,
+          workspaceId: "workspace-alpha",
+          collectedAt: "2026-04-07T12:02:00.000Z",
+          status: "collected",
+          discoveredOutputs: Object.freeze([]),
+          records: Object.freeze([]),
+          summary: Object.freeze({
+            discoveredCount: 0,
+            collectedCount: 0,
+            persistedCount: 0,
+            notPersistedCount: 0,
+            failedCount: 0,
+          }),
+        }),
+      }),
+    });
+
+    expect(result.finalization?.outputAvailability).toBe("degraded");
+    expect(result.finalization?.terminalQuality).toBe("degraded");
+    const telemetry = (result.runRecord.metadata as { executionTelemetry?: { finalizationInternal?: { resultPersistenceDiagnostics?: { reasonCode?: string } } } }).executionTelemetry;
+    expect(telemetry?.finalizationInternal?.resultPersistenceDiagnostics?.reasonCode).toBe("result-persistence-port-failed");
   });
 });

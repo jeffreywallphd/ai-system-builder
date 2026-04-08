@@ -1,9 +1,16 @@
 import type { PlatformRunRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
+  parseImageManipulationCollectedExecutionResult,
+  type ImageManipulationCollectedExecutionResult,
+} from "@application/image-workflows/ports/ImageManipulationOutputDiscoveryContracts";
+import {
+  RunCollectedResultPersistenceStatuses,
   RunFinalizationOutcomeStatuses,
   type AuthoritativeRunFinalizationRecord,
+  type IRunCollectedResultPersistencePort,
   type IRunFinalizationResultRegistrationPort,
   type IRunOrchestrationQueuePersistenceRepository,
+  type RunCollectedResultPersistenceResult,
   type RunFinalizationRegistrationRequest,
   type RunFinalizationRegistrationResult,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
@@ -35,6 +42,7 @@ export interface FinalizeRunExecutionOutcomeResult {
 interface FinalizeRunExecutionOutcomeUseCaseDependencies {
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
+  readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -85,9 +93,11 @@ export class DefaultRunFinalizationResultRegistrationPort implements IRunFinaliz
 
 export class FinalizeRunExecutionOutcomeUseCase {
   private readonly resultRegistrationPort: IRunFinalizationResultRegistrationPort;
+  private readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
 
   public constructor(private readonly dependencies: FinalizeRunExecutionOutcomeUseCaseDependencies) {
     this.resultRegistrationPort = dependencies.resultRegistrationPort ?? new DefaultRunFinalizationResultRegistrationPort();
+    this.resultCollectionPersistencePort = dependencies.resultCollectionPersistencePort;
   }
 
   public async execute(request: FinalizeRunExecutionOutcomeRequest): Promise<FinalizeRunExecutionOutcomeResult> {
@@ -108,13 +118,26 @@ export class FinalizeRunExecutionOutcomeUseCase {
     const runWithReleasedAssignment = this.releaseAssignmentIfActive(request.run, finalizedAt);
     const runWithQueueHistory = this.ensureQueueDequeueTimestamp(runWithReleasedAssignment, finalizedAt);
 
+    const collectedResult = extractCollectedExecutionResult(request.internalDiagnostics);
+    const persistenceOutcome = await this.persistCollectedResultIfAvailable({
+      run: runWithQueueHistory,
+      finalizedAt,
+      senderNodeId: request.senderNodeId,
+      collectedResult,
+      terminalResult: request.lifecycleUpdate?.result,
+    });
+    const normalizedResult = mergeTerminalResultWithPersistence(
+      request.lifecycleUpdate?.result,
+      persistenceOutcome,
+    );
+
     const finalizationResult = await this.resultRegistrationPort.registerFinalizationResult({
       runId: runWithQueueHistory.identity.runId,
       workflowId: runWithQueueHistory.identity.workflowId,
       workspaceId: runWithQueueHistory.identity.workspaceId,
       finalizedAt,
       outcome: resolveFinalizationOutcomeStatus(runWithQueueHistory.state),
-      result: request.lifecycleUpdate?.result,
+      result: normalizedResult,
       safeFailureCode: runWithQueueHistory.execution.outcome === RunExecutionOutcomeKinds.failed
         ? runWithQueueHistory.execution.errorCode
         : undefined,
@@ -130,6 +153,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
       senderNodeId: request.senderNodeId,
       internalDiagnostics: request.internalDiagnostics,
       registrationDiagnostics: finalizationResult.internalDiagnostics,
+      resultPersistenceDiagnostics: persistenceOutcome?.internalDiagnostics,
       finalizedAt,
     });
 
@@ -192,6 +216,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
     readonly senderNodeId?: string;
     readonly internalDiagnostics?: Readonly<Record<string, unknown>>;
     readonly registrationDiagnostics?: Readonly<Record<string, unknown>>;
+    readonly resultPersistenceDiagnostics?: Readonly<Record<string, unknown>>;
     readonly finalizedAt: string;
   }): PlatformRunRecord {
     const metadata = isObject(input.record.metadata)
@@ -206,7 +231,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
       finalization: input.finalization,
     });
 
-    if (input.internalDiagnostics || input.registrationDiagnostics) {
+    if (input.internalDiagnostics || input.registrationDiagnostics || input.resultPersistenceDiagnostics) {
       const executionTelemetry = isObject(metadata.executionTelemetry)
         ? { ...(metadata.executionTelemetry as Record<string, unknown>) }
         : {};
@@ -215,6 +240,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
         senderNodeId: normalizeOptional(input.senderNodeId),
         diagnostics: input.internalDiagnostics,
         registrationDiagnostics: input.registrationDiagnostics,
+        resultPersistenceDiagnostics: input.resultPersistenceDiagnostics,
       });
       metadata.executionTelemetry = Object.freeze(executionTelemetry);
     }
@@ -223,6 +249,43 @@ export class FinalizeRunExecutionOutcomeUseCase {
       ...input.record,
       metadata: Object.freeze(metadata),
     }), input.run);
+  }
+
+  private async persistCollectedResultIfAvailable(input: {
+    readonly run: CanonicalRunRecord;
+    readonly finalizedAt: string;
+    readonly senderNodeId?: string;
+    readonly collectedResult?: ImageManipulationCollectedExecutionResult;
+    readonly terminalResult?: RunLifecycleUpdateRequest["result"];
+  }): Promise<RunCollectedResultPersistenceResult | undefined> {
+    if (!input.collectedResult || !this.resultCollectionPersistencePort) {
+      return undefined;
+    }
+
+    try {
+      return await this.resultCollectionPersistencePort.persistCollectedResult({
+        runId: input.run.identity.runId,
+        workflowId: input.run.identity.workflowId,
+        workspaceId: input.run.identity.workspaceId,
+        occurredAt: input.finalizedAt,
+        actorId: normalizeOptional(input.senderNodeId) ?? "system:run-finalization",
+        collectedResult: input.collectedResult,
+        terminalResult: input.terminalResult,
+        operationKey: `run:result-persistence:${input.run.identity.runId}:${input.finalizedAt}`,
+      });
+    } catch (error) {
+      return Object.freeze({
+        status: RunCollectedResultPersistenceStatuses.failed,
+        outputs: Object.freeze([]),
+        outputAvailabilityHint: "degraded",
+        terminalQualityHint: "degraded",
+        internalDiagnostics: Object.freeze({
+          status: RunCollectedResultPersistenceStatuses.failed,
+          reasonCode: "result-persistence-port-failed",
+          message: error instanceof Error ? error.message : "Result persistence port failed.",
+        }),
+      });
+    }
   }
 }
 
@@ -233,6 +296,106 @@ function normalizeOutputReferences(
     return Object.freeze([]);
   }
   return Object.freeze(value.map((entry) => Object.freeze({ ...entry })));
+}
+
+function extractCollectedExecutionResult(
+  internalDiagnostics?: Readonly<Record<string, unknown>>,
+): ImageManipulationCollectedExecutionResult | undefined {
+  if (!isObject(internalDiagnostics)) {
+    return undefined;
+  }
+
+  const directCandidates: ReadonlyArray<unknown> = Object.freeze([
+    internalDiagnostics.imageManipulationCollectedExecutionResult,
+    internalDiagnostics.collectedExecutionResult,
+    internalDiagnostics.outputCollection,
+    internalDiagnostics.resultCollection,
+  ]);
+  for (const candidate of directCandidates) {
+    const parsed = parseImageManipulationCollectedExecutionResult(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const imageManipulation = isObject(internalDiagnostics.imageManipulation)
+    ? internalDiagnostics.imageManipulation
+    : undefined;
+  if (!imageManipulation) {
+    return undefined;
+  }
+
+  return parseImageManipulationCollectedExecutionResult(imageManipulation.collectedExecutionResult)
+    ?? parseImageManipulationCollectedExecutionResult(imageManipulation.outputCollection)
+    ?? undefined;
+}
+
+function mergeTerminalResultWithPersistence(
+  result: RunLifecycleUpdateRequest["result"] | undefined,
+  persistence: RunCollectedResultPersistenceResult | undefined,
+): RunLifecycleUpdateRequest["result"] | undefined {
+  if (!persistence) {
+    return result;
+  }
+
+  const mergedOutputs = mergeOutputReferences(result?.outputs, persistence.outputs);
+  return Object.freeze({
+    ...(result ?? {}),
+    outputs: mergedOutputs,
+    outputAvailabilityHint: result?.outputAvailabilityHint
+      ?? persistence.outputAvailabilityHint
+      ?? deriveOutputAvailabilityFromPersistence(persistence, mergedOutputs.length),
+    terminalQualityHint: result?.terminalQualityHint
+      ?? persistence.terminalQualityHint
+      ?? deriveTerminalQualityFromPersistence(persistence, mergedOutputs.length),
+  });
+}
+
+function mergeOutputReferences(
+  existing: ReadonlyArray<RunResultOutputReference> | undefined,
+  persisted: ReadonlyArray<RunResultOutputReference>,
+): ReadonlyArray<RunResultOutputReference> {
+  if ((!existing || existing.length === 0) && persisted.length === 0) {
+    return Object.freeze([]);
+  }
+
+  const outputById = new Map<string, RunResultOutputReference>();
+  for (const output of existing ?? []) {
+    outputById.set(output.outputId, Object.freeze({ ...output }));
+  }
+  for (const output of persisted) {
+    outputById.set(output.outputId, Object.freeze({ ...output }));
+  }
+  return Object.freeze([...outputById.values()]);
+}
+
+function deriveOutputAvailabilityFromPersistence(
+  persistence: RunCollectedResultPersistenceResult,
+  outputCount: number,
+): "none" | "partial" | "available" | "degraded" {
+  if (persistence.status === RunCollectedResultPersistenceStatuses.failed) {
+    return outputCount > 0 ? "partial" : "degraded";
+  }
+  if (persistence.status === RunCollectedResultPersistenceStatuses.partiallyPersisted) {
+    return outputCount > 0 ? "partial" : "degraded";
+  }
+  if (persistence.status === RunCollectedResultPersistenceStatuses.persisted) {
+    return outputCount > 0 ? "available" : "none";
+  }
+  return outputCount > 0 ? "partial" : "none";
+}
+
+function deriveTerminalQualityFromPersistence(
+  persistence: RunCollectedResultPersistenceResult,
+  outputCount: number,
+): "standard" | "partial" | "degraded" {
+  if (persistence.status === RunCollectedResultPersistenceStatuses.failed) {
+    return "degraded";
+  }
+  if (persistence.status === RunCollectedResultPersistenceStatuses.partiallyPersisted) {
+    return outputCount > 0 ? "partial" : "degraded";
+  }
+  return outputCount > 0 ? "standard" : "degraded";
 }
 
 function resolveFinalizationOutcomeStatus(

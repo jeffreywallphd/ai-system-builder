@@ -10,6 +10,7 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunFinalizationResultRegistrationPort,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
@@ -206,6 +207,7 @@ interface RequestAuthoritativeRunCancellationUseCaseDependencies {
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
+  readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
   readonly authorization?: IAuthoritativeRunMutationAuthorizationPort;
   readonly cancellationSignalPort?: IRunExecutionCancellationSignalPort;
   readonly transactionManager?: IPlatformTransactionManager;
@@ -231,6 +233,7 @@ export class RequestAuthoritativeRunCancellationUseCase {
     this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
+      resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
     });
   }
 

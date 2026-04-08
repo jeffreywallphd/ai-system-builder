@@ -11,6 +11,7 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunFinalizationResultRegistrationPort,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
@@ -107,6 +108,7 @@ interface IngestRunExecutionUpdateUseCaseDependencies {
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
+  readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
   readonly idGenerator?: {
@@ -142,6 +144,7 @@ export class IngestRunExecutionUpdateUseCase {
     this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
+      resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
     });
   }
 

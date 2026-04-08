@@ -8,6 +8,7 @@ import {
 import type {
   AuthoritativeRunDispatchAttemptResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunFinalizationResultRegistrationPort,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
@@ -52,6 +53,7 @@ interface HandleRunDispatchResultUseCaseDependencies {
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
+  readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
   readonly idGenerator?: {
@@ -211,6 +213,7 @@ export class HandleRunDispatchResultUseCase {
     this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
+      resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
     });
   }
 

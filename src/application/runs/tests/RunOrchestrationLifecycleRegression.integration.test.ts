@@ -13,9 +13,12 @@ import type {
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
   RunQueueEligibilityMarker,
+  type RunCollectedResultPersistenceRequest,
+  type RunCollectedResultPersistenceResult,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { RunNodeClaimConflictReasons } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
@@ -451,6 +454,29 @@ class SequenceIdGenerator {
   }
 }
 
+class CapturingResultCollectionPersistencePort implements IRunCollectedResultPersistencePort {
+  public readonly calls: RunCollectedResultPersistenceRequest[] = [];
+
+  public async persistCollectedResult(
+    request: RunCollectedResultPersistenceRequest,
+  ): Promise<RunCollectedResultPersistenceResult> {
+    this.calls.push(request);
+    return Object.freeze({
+      status: "persisted",
+      outputs: Object.freeze([Object.freeze({
+        outputId: "output:1",
+        kind: "asset",
+        assetId: "asset:generated:from-handoff",
+      })]),
+      outputAvailabilityHint: "available",
+      terminalQualityHint: "standard",
+      internalDiagnostics: Object.freeze({
+        persistedCount: 1,
+      }),
+    });
+  }
+}
+
 function buildCanonicalSubmissionCommand() {
   return Object.freeze({
     actor: Object.freeze({
@@ -655,6 +681,7 @@ describe("Run orchestration lifecycle regression", () => {
         }),
       },
     });
+    const resultCollectionPersistencePort = new CapturingResultCollectionPersistencePort();
 
     const dispatchResult = await dispatch.execute({
       runId: selected.run.runId,
@@ -669,6 +696,7 @@ describe("Run orchestration lifecycle regression", () => {
       runRepository,
       queueRepository,
       orchestrationIntentRepository: intentRepository,
+      resultCollectionPersistencePort,
       idGenerator,
       now: () => new Date("2026-04-07T12:01:00.000Z"),
     });
@@ -709,17 +737,59 @@ describe("Run orchestration lifecycle regression", () => {
         result: Object.freeze({
           summary: "Generated one output.",
           externalResultId: "result:1",
-          outputs: Object.freeze([Object.freeze({
-            outputId: "output:1",
-            kind: "asset",
-            assetId: "asset:1",
-          })]),
+        }),
+        internalDiagnostics: Object.freeze({
+          collectedExecutionResult: Object.freeze({
+            schemaVersion: "1.0.0",
+            collectionId: "collection:run:1",
+            discoveryId: "discovery:run:1",
+            executionJobId: "job:run:1",
+            runId: selected.run.runId,
+            workspaceId: "workspace-alpha",
+            collectedAt: "2026-04-07T12:01:59.000Z",
+            status: "collected",
+            discoveredOutputs: Object.freeze([Object.freeze({
+              descriptorId: "descriptor:1",
+              discoveredAt: "2026-04-07T12:01:59.000Z",
+              outputRole: "primary",
+              outputIndex: 0,
+              media: Object.freeze({
+                mediaKind: "image",
+                mimeType: "image/png",
+              }),
+              temporaryReference: Object.freeze({
+                kind: "backend-object-handle",
+                backendFamily: "comfyui",
+                objectHandle: "comfy-output:output:generated.png",
+              }),
+            })]),
+            records: Object.freeze([Object.freeze({
+              descriptorId: "descriptor:1",
+              temporaryReference: Object.freeze({
+                kind: "backend-object-handle",
+                backendFamily: "comfyui",
+                objectHandle: "comfy-output:output:generated.png",
+              }),
+              persistence: Object.freeze({
+                status: "not-persisted",
+                reason: "awaiting-managed-asset-persistence",
+              }),
+            })]),
+            summary: Object.freeze({
+              discoveredCount: 1,
+              collectedCount: 1,
+              persistedCount: 0,
+              notPersistedCount: 1,
+              failedCount: 0,
+            }),
+          }),
         }),
       }),
     });
 
     expect(completionMutation.status.state).toBe("completed");
-    expect(completionMutation.status.finalization?.outputs[0]?.assetId).toBe("asset:1");
+    expect(completionMutation.status.finalization?.outputs[0]?.assetId).toBe("asset:generated:from-handoff");
+    expect(resultCollectionPersistencePort.calls).toHaveLength(1);
 
     const statusResponse = await queryApi.getRunStatus({
       runId: selected.run.runId,

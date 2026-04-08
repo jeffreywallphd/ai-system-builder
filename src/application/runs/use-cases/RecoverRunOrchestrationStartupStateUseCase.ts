@@ -11,6 +11,7 @@ import {
 } from "@application/common/ports/PlatformTransactionPorts";
 import type {
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunNodePlacementHoldRepository,
   IRunOrchestrationIntentRepository,
   IRunOrchestrationQueuePersistenceRepository,
@@ -80,6 +81,7 @@ interface RecoverRunOrchestrationStartupStateUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly placementHoldRepository?: Pick<IRunNodePlacementHoldRepository, "releaseExpiredNodePlacementHolds">;
+  readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
@@ -130,6 +132,7 @@ export class RecoverRunOrchestrationStartupStateUseCase {
     };
     this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
       queueRepository: dependencies.queueRepository,
+      resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
     });
   }
 

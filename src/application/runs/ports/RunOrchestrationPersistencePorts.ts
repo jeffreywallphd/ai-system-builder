@@ -5,9 +5,14 @@ import type {
   PlatformRunMutationResult,
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { ImageManipulationCollectedExecutionResult } from "@application/image-workflows/ports/ImageManipulationOutputDiscoveryContracts";
 import type { RunExecutionBackendKind } from "@application/runs/ports/RunExecutionDispatchPorts";
 import type { RunLifecycleState } from "@domain/runs/RunDomain";
-import type { RunResultRegistrationInput, RunResultSummary } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import type {
+  RunResultOutputReference,
+  RunResultRegistrationInput,
+  RunResultSummary,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
 export type AuthoritativeRunPersistenceMutationContext = PlatformPersistenceMutationContext;
 
@@ -375,5 +380,38 @@ export interface RunFinalizationRegistrationResult {
 
 export interface IRunFinalizationResultRegistrationPort {
   registerFinalizationResult(request: RunFinalizationRegistrationRequest): Promise<RunFinalizationRegistrationResult>;
+}
+
+export const RunCollectedResultPersistenceStatuses = Object.freeze({
+  persisted: "persisted",
+  partiallyPersisted: "partially-persisted",
+  failed: "failed",
+  skipped: "skipped",
+});
+
+export type RunCollectedResultPersistenceStatus =
+  typeof RunCollectedResultPersistenceStatuses[keyof typeof RunCollectedResultPersistenceStatuses];
+
+export interface RunCollectedResultPersistenceRequest {
+  readonly runId: string;
+  readonly workflowId: string;
+  readonly workspaceId?: string;
+  readonly occurredAt: string;
+  readonly actorId: string;
+  readonly collectedResult: ImageManipulationCollectedExecutionResult;
+  readonly terminalResult?: RunResultRegistrationInput;
+  readonly operationKey: string;
+}
+
+export interface RunCollectedResultPersistenceResult {
+  readonly status: RunCollectedResultPersistenceStatus;
+  readonly outputs: ReadonlyArray<RunResultOutputReference>;
+  readonly outputAvailabilityHint?: RunResultRegistrationInput["outputAvailabilityHint"];
+  readonly terminalQualityHint?: RunResultRegistrationInput["terminalQualityHint"];
+  readonly internalDiagnostics?: Readonly<Record<string, unknown>>;
+}
+
+export interface IRunCollectedResultPersistencePort {
+  persistCollectedResult(request: RunCollectedResultPersistenceRequest): Promise<RunCollectedResultPersistenceResult>;
 }
 
