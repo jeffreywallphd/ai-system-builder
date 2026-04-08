@@ -1,6 +1,7 @@
 # Offline Local-Mode Audit and Operational Event Hooks
 
 Story 19.2.7 adds explicit event hooks for offline transitions and reconnect outcomes so governance and operational tooling can observe desktop-local behavior without reading UI-only state.
+Story 19.3.5 extends this baseline with structured offline/resync observability diagnostics (correlation, counters/metrics, replay/cache failure summaries, and redaction-safe logging).
 
 ## Purpose
 
@@ -20,6 +21,9 @@ Story 19.2.7 adds explicit event hooks for offline transitions and reconnect out
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - runtime operational/audit adapter seam:
   - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
+- runtime offline observability seams:
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`
 
 ## Representative event outcomes in first production scope
 
@@ -29,6 +33,18 @@ Story 19.2.7 adds explicit event hooks for offline transitions and reconnect out
 - `replay-failed`
 - `conflict-detected`
 - `protected-local-execution-registered`
+- `resynchronization-attempt-started`
+- `resynchronization-attempt-completed`
+- `snapshot-refresh-failed`
+
+## Story 19.3.5 observability additions
+
+- every reconnect attempt now carries explicit correlation (`correlationId`, `syncAttemptId`) across replay/cache diagnostics;
+- replay lifecycle emits a bounded attempt start/completion diagnostic pair with counter-friendly summaries;
+- replay-failure/conflict diagnostics include structured reason summaries for blocked/rejected/conflicted paths;
+- cache refresh/invalidation misses now emit explicit `snapshot-refresh-failed` diagnostics instead of silent drops;
+- observability-specific diagnostics are separated from user-facing outcome language by event classification (`user-facing-outcome`, `operational-diagnostic`, `combined`);
+- infrastructure observability adapter emits structured logs + metric counters using sanitized payloads only.
 
 ## Routing model to existing systems
 
@@ -46,6 +62,7 @@ Recorded context is intentionally bounded to:
 - replay target references (`operationId`, `resourceClass`, `resourceId`);
 - normalized outcome (`succeeded`, `failed`, `conflict`);
 - short summary and sanitized details map.
+- optional sanitized diagnostics map for operational troubleshooting.
 
 Sensitive or raw content is intentionally omitted/redacted:
 
@@ -53,6 +70,7 @@ Sensitive or raw content is intentionally omitted/redacted:
 - tokens, credentials, and secret material;
 - internal traces/diagnostics/path-like fields;
 - unbounded arrays/objects/strings.
+- replay payload bodies never appear in offline observability logs/metrics.
 
 ## Non-goals for this story
 
@@ -66,3 +84,4 @@ Sensitive or raw content is intentionally omitted/redacted:
 - `src/application/common/tests/OfflineControlledResynchronizationCoordinator.test.ts`
 - `src/hosts/desktop/tests/DesktopConnectivityStateService.test.ts`
 - `src/infrastructure/api/system-runtime/tests/DesktopOfflineOperationalEventSink.test.ts`
+- `src/infrastructure/api/system-runtime/tests/OfflineOperationalObservability.test.ts`

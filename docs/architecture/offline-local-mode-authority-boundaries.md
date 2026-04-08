@@ -328,6 +328,9 @@ This section documents the implemented Story 19.2.8 baseline for desktop cache p
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - Application offline operational/audit event seam:
   - `src/application/common/OfflineOperationalEventPorts.ts`
+- Infrastructure offline observability seams:
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`
 - Desktop host profile and connectivity runtime:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
@@ -378,7 +381,8 @@ sequenceDiagram
   participant Planner as planOfflineResynchronization(...)
   participant Sink as OfflineOperationalEventSink
 
-  Host->>Coord: synchronizeWorkspace(workspaceId, actor, attemptedAt)
+  Host->>Coord: synchronizeWorkspace(workspaceId, actor, attemptedAt, syncAttemptId?)
+  Coord->>Sink: resynchronization-attempt-started (correlated diagnostic)
   Coord->>QueueSvc: prepareReplayOperations()
   QueueSvc-->>Coord: prepared[] + blocked[] (reason code/message/dependencies)
   Coord->>Auth: fetchResourceRevisions(resourceTargets)
@@ -393,7 +397,8 @@ sequenceDiagram
       Coord->>Sink: conflict-detected or replay-failed
     end
   end
-  Coord-->>Host: outcomes + cleanup classifications + refreshed/invalidated cache keys
+  Coord->>Sink: resynchronization-attempt-completed (summary counters + failure rollup)
+  Coord-->>Host: outcomes + cleanup classifications + refreshed/invalidated cache keys + syncAttemptId
 ```
 
 ### Flow 3: post-sync cache refresh and invalidation cleanup
@@ -413,6 +418,7 @@ sequenceDiagram
     alt refresh payload returned
       Coord->>CacheSvc: cacheSnapshot(..., lastSynchronizedAt=now)
     else no payload (deleted/revoked/not refreshable)
+      Coord->>Sink: snapshot-refresh-failed (diagnostic)
       Coord->>CacheSvc: deleteSnapshot(...)
     end
   end

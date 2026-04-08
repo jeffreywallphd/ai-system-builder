@@ -136,6 +136,7 @@ export interface IOfflineConnectivityStatePort {
 export interface OfflineControlledResynchronizationResult {
   readonly workspaceId: string;
   readonly attemptedAt: string;
+  readonly syncAttemptId: string;
   readonly connectivity: OfflineConnectivitySurfaceStateDto;
   readonly replayPreparedOperationIds: ReadonlyArray<string>;
   readonly blockedOperationIds: ReadonlyArray<string>;
@@ -177,17 +178,37 @@ export class OfflineControlledResynchronizationCoordinator {
   public async synchronizeWorkspace(input: {
     readonly workspaceId: string;
     readonly actorUserIdentityId: string;
+    readonly requestId?: string;
+    readonly syncAttemptId?: string;
     readonly attemptedAt?: string;
   }): Promise<OfflineControlledResynchronizationResult> {
     const workspaceId = normalizeRequired(input.workspaceId, "workspaceId");
     const actorUserIdentityId = normalizeRequired(input.actorUserIdentityId, "actorUserIdentityId");
+    const requestId = normalizeOptional(input.requestId);
     const attemptedAt = normalizeIsoTimestamp(input.attemptedAt ?? this.now().toISOString(), "attemptedAt");
+    const syncAttemptId = normalizeOptional(input.syncAttemptId) ?? makeSyncAttemptId(workspaceId, attemptedAt);
     const connectivity = await this.connectivityPort.getConnectivityState();
 
     if (!connectivity.canResynchronize) {
+      this.publishResynchronizationLifecycleEvent({
+        workspaceId,
+        actorUserIdentityId,
+        requestId,
+        syncAttemptId,
+        attemptedAt,
+        eventType: OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
+        outcome: "failed",
+        summary: "Resynchronization attempt was not started because connectivity is not eligible.",
+        details: Object.freeze({
+          connectivityState: connectivity.state,
+          canResynchronize: connectivity.canResynchronize,
+          canQueueOperations: connectivity.canQueueOperations,
+        }),
+      });
       return Object.freeze({
         workspaceId,
         attemptedAt,
+        syncAttemptId,
         connectivity,
         replayPreparedOperationIds: Object.freeze([]),
         blockedOperationIds: Object.freeze([]),
@@ -205,6 +226,21 @@ export class OfflineControlledResynchronizationCoordinator {
         outcomes: Object.freeze([]),
       });
     }
+
+    this.publishResynchronizationLifecycleEvent({
+      workspaceId,
+      actorUserIdentityId,
+      requestId,
+      syncAttemptId,
+      attemptedAt,
+      eventType: OfflineOperationalEventTypes.resynchronizationAttemptStarted,
+      outcome: "succeeded",
+      summary: "Resynchronization attempt started.",
+      details: Object.freeze({
+        connectivityState: connectivity.state,
+        canResynchronize: connectivity.canResynchronize,
+      }),
+    });
 
     const replayPreparation = await this.pendingOperationService.prepareReplayOperations({
       workspaceId,
@@ -317,6 +353,27 @@ export class OfflineControlledResynchronizationCoordinator {
     const appliedOperationIds: string[] = [];
     const replayedRegistrationIds: string[] = [];
     const appliedRegistrationIds: string[] = [];
+    let cacheFailureCount = 0;
+    const publishReplayOutcomeEvent = (payload: {
+      readonly workspaceId: string;
+      readonly actorUserIdentityId: string;
+      readonly attemptedAt: string;
+      readonly operationId: string;
+      readonly resourceClass: OfflineResourceClass;
+      readonly resourceId: string;
+      readonly eventType: typeof OfflineOperationalEventTypes[keyof typeof OfflineOperationalEventTypes];
+      readonly outcome: "succeeded" | "failed" | "conflict";
+      readonly summary: string;
+      readonly details?: Readonly<Record<string, unknown>>;
+      readonly diagnostics?: Readonly<Record<string, unknown>>;
+      readonly channel?: typeof OfflineOperationalEventChannels[keyof typeof OfflineOperationalEventChannels];
+    }) => {
+      this.publishReplayOutcomeEvent({
+        ...payload,
+        requestId,
+        syncAttemptId,
+      });
+    };
 
     for (const blockedOperation of blockedOperations) {
       const blockedRecord = await this.pendingOperationService.findQueuedOperation(
@@ -384,7 +441,7 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: blockedRecord.operation.targetResourceClass,
         resourceId: blockedRecord.operation.targetResourceId,
       }));
-      this.publishReplayOutcomeEvent({
+      publishReplayOutcomeEvent({
         workspaceId,
         actorUserIdentityId,
         attemptedAt,
@@ -465,7 +522,7 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         }));
-        this.publishReplayOutcomeEvent({
+        publishReplayOutcomeEvent({
           workspaceId,
           actorUserIdentityId,
           attemptedAt,
@@ -519,7 +576,7 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         }));
-        this.publishReplayOutcomeEvent({
+        publishReplayOutcomeEvent({
           workspaceId,
           actorUserIdentityId,
           attemptedAt,
@@ -535,7 +592,7 @@ export class OfflineControlledResynchronizationCoordinator {
           }),
         });
         if (preparedOperation.pendingRunSubmission) {
-          this.publishReplayOutcomeEvent({
+          publishReplayOutcomeEvent({
             workspaceId,
             actorUserIdentityId,
             attemptedAt,
@@ -612,7 +669,7 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: preparedOperation.targetResourceClass,
         resourceId: preparedOperation.targetResourceId,
       }));
-      this.publishReplayOutcomeEvent({
+      publishReplayOutcomeEvent({
         workspaceId,
         actorUserIdentityId,
         attemptedAt,
@@ -675,7 +732,7 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: blockedRecord.registration.resourceClass,
         resourceId: blockedRecord.registration.resourceId,
       }));
-      this.publishReplayOutcomeEvent({
+      publishReplayOutcomeEvent({
         workspaceId,
         actorUserIdentityId,
         attemptedAt,
@@ -730,7 +787,7 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedRegistration.targetResourceClass,
           resourceId: preparedRegistration.targetResourceId,
         }));
-        this.publishReplayOutcomeEvent({
+        publishReplayOutcomeEvent({
           workspaceId,
           actorUserIdentityId,
           attemptedAt,
@@ -780,7 +837,7 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: preparedRegistration.targetResourceClass,
         resourceId: preparedRegistration.targetResourceId,
       }));
-      this.publishReplayOutcomeEvent({
+      publishReplayOutcomeEvent({
         workspaceId,
         actorUserIdentityId,
         attemptedAt,
@@ -821,6 +878,24 @@ export class OfflineControlledResynchronizationCoordinator {
       });
       if (invalidated) {
         invalidatedSnapshotKeys.add(key);
+      } else {
+        cacheFailureCount += 1;
+        publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId: `cache-invalidation:${key}`,
+          resourceClass: target.resourceClass,
+          resourceId: target.resourceId,
+          eventType: OfflineOperationalEventTypes.snapshotRefreshFailed,
+          outcome: "failed",
+          summary: "Offline snapshot invalidation did not remove a stale cache entry.",
+          details: Object.freeze({
+            cacheAction: "invalidate",
+            resourceKey: key,
+            invalidationResult: "not-removed",
+          }),
+        });
       }
     }
 
@@ -834,15 +909,57 @@ export class OfflineControlledResynchronizationCoordinator {
         continue;
       }
 
-      const refreshed = await this.refreshSnapshot({
-        workspaceId,
-        actorUserIdentityId,
-        resourceClass: target.resourceClass,
-        resourceId: target.resourceId,
-      });
+      let refreshed = false;
+      let refreshFailureCategory: string | undefined;
+      try {
+        refreshed = await this.refreshSnapshot({
+          workspaceId,
+          actorUserIdentityId,
+          resourceClass: target.resourceClass,
+          resourceId: target.resourceId,
+        });
+      } catch (error) {
+        refreshFailureCategory = classifyError(error);
+        cacheFailureCount += 1;
+        publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId: `cache-refresh:${key}`,
+          resourceClass: target.resourceClass,
+          resourceId: target.resourceId,
+          eventType: OfflineOperationalEventTypes.snapshotRefreshFailed,
+          outcome: "failed",
+          summary: "Offline snapshot refresh failed during controlled resynchronization.",
+          details: Object.freeze({
+            cacheAction: "refresh",
+            resourceKey: key,
+            failureCategory: refreshFailureCategory,
+          }),
+        });
+      }
       if (refreshed) {
         refreshedSnapshotKeys.add(key);
         continue;
+      }
+      if (!refreshFailureCategory) {
+        cacheFailureCount += 1;
+        publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId: `cache-refresh:${key}`,
+          resourceClass: target.resourceClass,
+          resourceId: target.resourceId,
+          eventType: OfflineOperationalEventTypes.snapshotRefreshFailed,
+          outcome: "failed",
+          summary: "Offline snapshot refresh returned no authoritative cache payload.",
+          details: Object.freeze({
+            cacheAction: "refresh",
+            resourceKey: key,
+            failureCategory: "authoritative-snapshot-unavailable",
+          }),
+        });
       }
 
       const invalidated = await this.snapshotCacheService.deleteSnapshot({
@@ -852,12 +969,65 @@ export class OfflineControlledResynchronizationCoordinator {
       });
       if (invalidated) {
         invalidatedSnapshotKeys.add(key);
+      } else {
+        cacheFailureCount += 1;
+        publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId: `cache-invalidation:${key}`,
+          resourceClass: target.resourceClass,
+          resourceId: target.resourceId,
+          eventType: OfflineOperationalEventTypes.snapshotRefreshFailed,
+          outcome: "failed",
+          summary: "Offline stale snapshot cleanup failed after refresh miss.",
+          details: Object.freeze({
+            cacheAction: "invalidate-after-refresh-miss",
+            resourceKey: key,
+            invalidationResult: "not-removed",
+          }),
+        });
       }
     }
+
+    const replayFailureSummaries = summarizeReplayFailures(outcomes, blockedOperations, blockedRegistrations);
+    const attemptOutcome = replayFailureSummaries.totalFailures > 0
+      ? (replayFailureSummaries.conflictCount > 0 ? "conflict" : "failed")
+      : "succeeded";
+    this.publishResynchronizationLifecycleEvent({
+      workspaceId,
+      actorUserIdentityId,
+      requestId,
+      syncAttemptId,
+      attemptedAt,
+      eventType: OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
+      outcome: attemptOutcome,
+      summary: attemptOutcome === "succeeded"
+        ? "Resynchronization attempt completed successfully."
+        : "Resynchronization attempt completed with unresolved failures or conflicts.",
+      details: Object.freeze({
+        replayPreparedOperationCount: replayPreparedOperationIds.length,
+        blockedOperationCount: blockedOperationIds.length,
+        replayedOperationCount: replayedOperationIds.length,
+        appliedOperationCount: appliedOperationIds.length,
+        replayPreparedRegistrationCount: replayPreparedRegistrationIds.length,
+        blockedRegistrationCount: blockedRegistrationIds.length,
+        replayedRegistrationCount: replayedRegistrationIds.length,
+        appliedRegistrationCount: appliedRegistrationIds.length,
+        refreshedSnapshotCount: refreshedSnapshotKeys.size,
+        invalidatedSnapshotCount: invalidatedSnapshotKeys.size,
+        cacheFailureCount,
+        pendingCleanupRecordCount: pendingOperationCleanupRecords.length,
+      }),
+      diagnostics: Object.freeze({
+        replayFailureSummaries,
+      }),
+    });
 
     return Object.freeze({
       workspaceId,
       attemptedAt,
+      syncAttemptId,
       connectivity,
       replayPreparedOperationIds,
       blockedOperationIds,
@@ -905,6 +1075,8 @@ export class OfflineControlledResynchronizationCoordinator {
   private publishReplayOutcomeEvent(input: {
     readonly workspaceId: string;
     readonly actorUserIdentityId: string;
+    readonly requestId?: string;
+    readonly syncAttemptId?: string;
     readonly attemptedAt: string;
     readonly operationId: string;
     readonly resourceClass: OfflineResourceClass;
@@ -913,20 +1085,56 @@ export class OfflineControlledResynchronizationCoordinator {
     readonly outcome: "succeeded" | "failed" | "conflict";
     readonly summary: string;
     readonly details?: Readonly<Record<string, unknown>>;
+    readonly diagnostics?: Readonly<Record<string, unknown>>;
     readonly channel?: typeof OfflineOperationalEventChannels[keyof typeof OfflineOperationalEventChannels];
   }): void {
     void publishOfflineOperationalEventBestEffort(this.eventSink, Object.freeze({
       channel: input.channel ?? OfflineOperationalEventChannels.operational,
       type: input.eventType,
       occurredAt: input.attemptedAt,
+      requestId: input.requestId,
+      correlationId: input.syncAttemptId ?? input.operationId,
+      syncAttemptId: input.syncAttemptId,
       workspaceId: input.workspaceId,
       actorUserIdentityId: input.actorUserIdentityId,
       operationId: input.operationId,
       resourceClass: input.resourceClass,
       resourceId: input.resourceId,
+      classification: "combined",
       outcome: input.outcome,
       summary: input.summary,
       details: input.details,
+      diagnostics: input.diagnostics,
+    }));
+  }
+
+  private publishResynchronizationLifecycleEvent(input: {
+    readonly workspaceId: string;
+    readonly actorUserIdentityId: string;
+    readonly requestId?: string;
+    readonly syncAttemptId: string;
+    readonly attemptedAt: string;
+    readonly eventType: typeof OfflineOperationalEventTypes[keyof typeof OfflineOperationalEventTypes];
+    readonly outcome: "succeeded" | "failed" | "conflict";
+    readonly summary: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+    readonly diagnostics?: Readonly<Record<string, unknown>>;
+  }): void {
+    void publishOfflineOperationalEventBestEffort(this.eventSink, Object.freeze({
+      channel: OfflineOperationalEventChannels.operational,
+      type: input.eventType,
+      occurredAt: input.attemptedAt,
+      requestId: input.requestId,
+      correlationId: input.syncAttemptId,
+      syncAttemptId: input.syncAttemptId,
+      workspaceId: input.workspaceId,
+      actorUserIdentityId: input.actorUserIdentityId,
+      operationId: input.syncAttemptId,
+      classification: "operational-diagnostic",
+      outcome: input.outcome,
+      summary: input.summary,
+      details: input.details,
+      diagnostics: input.diagnostics,
     }));
   }
 }
@@ -1119,6 +1327,65 @@ function shouldPreserveLocalDraft(resourceClass: OfflineResourceClass): boolean 
 
 function makeResourceKey(resourceClass: OfflineResourceClass, resourceId: string): string {
   return `${resourceClass}::${resourceId}`;
+}
+
+function makeSyncAttemptId(workspaceId: string, attemptedAt: string): string {
+  const safeWorkspace = workspaceId.replace(/[^a-z0-9:_-]+/gi, "-");
+  const safeAttemptedAt = attemptedAt.replace(/[^0-9A-Za-z]+/g, "-");
+  return `offline-sync:${safeWorkspace}:${safeAttemptedAt}`;
+}
+
+function summarizeReplayFailures(
+  outcomes: ReadonlyArray<OfflineReconciliationOutcomeDto>,
+  blockedOperations: ReadonlyArray<OfflineReplayPreparationBlockedOperation>,
+  blockedRegistrations: ReadonlyArray<OfflineReplayPreparationBlockedLocalExecutionRegistration>,
+): Readonly<{
+  totalFailures: number;
+  conflictCount: number;
+  blockedOperationReasonCodes: Readonly<Record<string, number>>;
+  blockedRegistrationReasonCodes: Readonly<Record<string, number>>;
+  conflictClasses: Readonly<Record<string, number>>;
+}> {
+  const blockedOperationReasonCodes = countBy(
+    blockedOperations.map((entry) => entry.reasonCode),
+  );
+  const blockedRegistrationReasonCodes = countBy(
+    blockedRegistrations.map((entry) => entry.reasonCode),
+  );
+  const conflictClasses = countBy(
+    outcomes.flatMap((outcome) => (outcome.conflicts ?? []).map((conflict) => conflict.conflictClass)),
+  );
+  const conflictCount = outcomes.filter((outcome) => outcome.action === OfflineResynchronizationActions.conflictRequiresReview).length;
+  const totalFailures = outcomes.filter((outcome) => outcome.action !== OfflineResynchronizationActions.applyToAuthoritative).length;
+
+  return Object.freeze({
+    totalFailures,
+    conflictCount,
+    blockedOperationReasonCodes,
+    blockedRegistrationReasonCodes,
+    conflictClasses,
+  });
+}
+
+function countBy(values: ReadonlyArray<string | undefined>): Readonly<Record<string, number>> {
+  const counts: Record<string, number> = {};
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+    counts[value] = (counts[value] ?? 0) + 1;
+  }
+  return Object.freeze(counts);
+}
+
+function classifyError(error: unknown): string {
+  if (error instanceof Error && error.name.trim()) {
+    return error.name.trim();
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim().slice(0, 120);
+  }
+  return "unknown-error";
 }
 
 function normalizeRequired(value: string, field: string): string {

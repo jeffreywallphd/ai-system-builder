@@ -24,6 +24,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
    - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
    - include desktop controlled-resynchronization host runtime (`src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`) when reconnect workflow composition changes.
    - include runtime adapter wiring (`src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`) when operational/governance publication paths change.
+   - include structured offline observability adapter seams (`src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`, `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`) when reconnect diagnostics/metrics behavior changes.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
    - keep status derivation in shared presenter seams.
@@ -51,6 +52,8 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - reconnect coordination + cache cleanup:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`
 - shared queue/connectivity/outcome contracts:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -75,6 +78,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - pending-operation persistence keeps actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic reconnect replay.
 - reconnect cleanup semantics classify pending operations (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain behavior for queryable local state transitions.
 - revocation/permission-loss replay rejections should persist non-retryable reason codes so rejected local queue state is explicit and not silently reattempted.
+- reconnect diagnostics should include correlatable attempt/replay/cache markers (`requestId`, `correlationId`, `syncAttemptId`) and sanitized replay-failure summaries for production triage.
 
 ## Deferred unless explicitly scoped
 

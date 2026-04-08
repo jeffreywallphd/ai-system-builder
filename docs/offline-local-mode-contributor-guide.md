@@ -43,6 +43,8 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - runtime event adapter for offline hooks:
   - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservability.ts`
+  - `src/infrastructure/api/system-runtime/OfflineOperationalObservabilityRedaction.ts`
 - shared offline contracts and schema parsers:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -95,6 +97,8 @@ Use this map when deciding where to extend behavior:
    - route reconnect replay through authoritative API ports and capture explicit outcomes for apply/conflict/reject/failure paths.
    - expose blocked replay operations with structured metadata (reason code/message/dependency blockers) rather than id-only reporting.
    - emit structured replay/conflict/recovery/protected-registration outcomes through offline event hooks with sanitized details.
+   - keep sync-attempt correlation and diagnostics explicit (`requestId`, `correlationId`, `syncAttemptId`) so reconnect traces are operable in production.
+   - emit explicit cache failure diagnostics (`snapshot-refresh-failed`) for refresh/invalidation misses instead of silent cleanup skips.
 4. Update desktop profile bindings fourth:
    - keep desktop runtime as `control-plane-client`,
    - enforce allowed resource and execution classes through profile gates.
@@ -126,6 +130,7 @@ Use this map when deciding where to extend behavior:
 - preserve explicit state model (`connected`, `degraded`, `reconnecting`, `disconnected`);
 - preserve explicit deliberate-offline distinction (`offlineModeIntent='deliberate'`);
 - keep transition events best-effort and sanitized;
+- include correlation-safe diagnostics on transition events without exposing transport internals or path-like local content;
 - add/update tests:
   - `DesktopConnectivityStateService.test.ts`
   - `DesktopOfflineOperationalEventSink.test.ts`
@@ -136,6 +141,7 @@ Use this map when deciding where to extend behavior:
 - keep explicit replay-preparation blocked reasons with structured metadata;
 - ensure coordinator cleanup classification remains explicit and queryable;
 - preserve post-sync cache maintenance semantics (refresh or invalidate);
+- keep resync attempt start/completion diagnostics and replay/cache failure summaries aligned to offline observability model;
 - add/update tests:
   - `OfflinePendingOperationPersistence.test.ts`
   - `OfflineControlledResynchronizationCoordinator.test.ts`

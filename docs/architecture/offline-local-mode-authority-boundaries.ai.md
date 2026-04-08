@@ -62,6 +62,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
 - Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
 - Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
+- Infrastructure offline observability now emits sanitized structured logs/metrics with attempt-level correlation (`requestId`, `correlationId`, `syncAttemptId`) and replay/cache failure summaries.
 - Desktop shell now includes a shared offline-aware status surface/presenter seam that consumes canonical offline connectivity/synchronization contracts for user-visible online/offline/reconnecting/unsynced guidance.
 
 ## Desktop cache + resync workflow baseline (Story 19.2.8)
@@ -133,6 +134,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - reconnect cleanup preserves explicit `successful`/`conflicted`/`failed`/`abandoned` classification with remove-vs-retain action.
 - post-sync cache maintenance explicitly refreshes or invalidates entries; stale-unrefreshable cache records are removed.
 - offline operational-event sanitization now redacts path/prompt/credential-like string values in addition to key-based sensitive-field removal.
+- reconnect diagnostics now include explicit `resynchronization-attempt-started` / `resynchronization-attempt-completed` markers and `snapshot-refresh-failed` cache-failure diagnostics.
 
 ## Intentionally deferred behavior (must remain deferred unless explicitly scoped)
 
