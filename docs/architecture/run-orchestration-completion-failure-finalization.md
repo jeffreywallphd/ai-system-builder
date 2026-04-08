@@ -1,4 +1,4 @@
-# Run Orchestration Completion/Failure Finalization and Authoritative Result Registration
+# Run Orchestration Terminal Finalization and Authoritative Result Registration
 
 ## Story alignment
 
@@ -8,7 +8,7 @@
 
 ## Purpose
 
-Finalize terminal `completed` and `failed` runs through an authoritative workflow that durably stores user-facing result metadata, preserves internal diagnostics separately, and releases queue/assignment orchestration state under server control.
+Finalize terminal `completed`, `failed`, and `cancelled` runs through an authoritative workflow that durably stores user-facing result metadata, preserves internal diagnostics separately, and releases queue/assignment orchestration state under server control.
 
 ## Implemented files
 
@@ -28,11 +28,11 @@ Finalize terminal `completed` and `failed` runs through an authoritative workflo
 
 ## Authoritative finalization flow
 
-1. Execution updates or dispatch-result handling transition runs into `completed`/`failed` terminal lifecycle states.
+1. Execution updates, dispatch-result handling, or authoritative cancellation transitions runs into `completed`/`failed`/`cancelled` terminal lifecycle states.
 2. `FinalizeRunExecutionOutcomeUseCase` enforces terminal finalization behavior:
    - releases active assignment state (`assigned -> released`) while preserving assignment history,
    - ensures queue history is explicitly dequeued in canonical run state,
-   - registers user-facing terminal result metadata and links it to the run metadata envelope,
+   - registers user-facing terminal result metadata (including output-availability and terminal-quality hints) and links it to the run metadata envelope,
    - stores internal-only finalization diagnostics under `metadata.executionTelemetry`.
 3. Queue persistence finalizes queue entries for terminal runs and clears active claim tokens/leases.
 4. Updated canonical run + finalization metadata are persisted as authoritative run state.
@@ -61,11 +61,13 @@ Finalization metadata is persisted inside authoritative run metadata at:
 
 This durable record is linked to `runId` and includes:
 
-- terminal outcome (`completed` or `failed`)
+- terminal outcome (`completed`, `failed`, or `cancelled`)
 - finalization timestamp
 - safe summary
 - output references (asset/storage/url/inline descriptors)
 - optional external result id and metrics
+- optional output-availability hint (`none`/`partial`/`available`/`degraded`)
+- optional terminal-quality hint (`standard`/`partial`/`degraded`)
 
 Result metadata therefore remains platform-owned state and no longer depends on scraping backend-local adapter artifacts.
 
@@ -73,11 +75,16 @@ Result metadata therefore remains platform-owned state and no longer depends on 
 
 Queue finalization now updates queue rows to terminal lifecycle state and clears claim lease fields.
 
-Assignment release for terminal completion/failure is represented in canonical run state with explicit release timestamp/reason, preserving assignment lineage while removing active assignment ownership.
+Assignment release for terminal completion/failure/cancellation is represented in canonical run state with explicit release timestamp/reason, preserving assignment lineage while removing active assignment ownership.
+
+## Result persistence handoff seam
+
+Terminal finalization records remain orchestration-owned and intentionally stop at normalized metadata registration. Downstream result persistence/lineage work must integrate through the explicit finalization registration seam (`IRunFinalizationResultRegistrationPort`) rather than embedding persistence logic in transport handlers, cancellation handlers, or adapter-specific execution code.
 
 ## Coverage highlights
 
-- `IngestRunExecutionUpdateUseCase` tests now cover terminal completion finalization and result-linking.
+- `IngestRunExecutionUpdateUseCase` tests now cover terminal completion and cancellation finalization with result-linking and hint projection.
 - `HandleRunDispatchResultUseCase` tests now cover failed terminal finalization with assignment release and queue claim release.
+- `RequestAuthoritativeRunCancellationUseCase` tests cover immediate cancelled-state finalization metadata projection.
 - SQLite adapter tests now verify terminal queue finalization persistence.
 - Transport schema tests now cover terminal result payload parsing and finalization envelope parsing.

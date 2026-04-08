@@ -532,6 +532,8 @@ describe("RequestAuthoritativeRunCancellationUseCase", () => {
       if (entry.expectedState === RunLifecycleStates.cancelled) {
         expect(result.mutation.run.execution.outcome).toBe(RunExecutionOutcomeKinds.cancelled);
         expect(result.mutation.run.cancellation?.acknowledgedAt).toBeDefined();
+        expect(result.mutation.run.finalization?.outcome).toBe("cancelled");
+        expect(result.status.finalization?.outputAvailability).toBe("none");
       }
       if (entry.state === RunLifecycleStates.running || entry.state === RunLifecycleStates.dispatching) {
         expect(result.signalResult?.status).toBe("accepted");

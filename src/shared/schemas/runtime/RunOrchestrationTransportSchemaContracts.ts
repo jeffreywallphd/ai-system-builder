@@ -5,7 +5,9 @@ import {
   RunMutationActions,
   RunOrchestrationTransportContractVersions,
   RunSchedulingPriorityBands,
+  RunResultOutputAvailabilityHints,
   RunResultOutputReferenceKinds,
+  RunResultTerminalQualityHints,
   resolveRunSubmissionSource,
   type RunSubmissionRequest,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
@@ -312,6 +314,17 @@ const RunResultSummarySchema = z.object({
   externalResultId: IdentifierSchema.optional(),
   outputs: z.array(RunResultOutputReferenceSchema),
   metrics: z.record(z.string(), z.unknown()).optional(),
+  outputAvailability: z.enum([
+    RunResultOutputAvailabilityHints.none,
+    RunResultOutputAvailabilityHints.partial,
+    RunResultOutputAvailabilityHints.available,
+    RunResultOutputAvailabilityHints.degraded,
+  ]).optional(),
+  terminalQuality: z.enum([
+    RunResultTerminalQualityHints.standard,
+    RunResultTerminalQualityHints.partial,
+    RunResultTerminalQualityHints.degraded,
+  ]).optional(),
 }).strict();
 
 const RunCancellationSchema = z.object({
@@ -337,7 +350,7 @@ export const RunDetailSchema = RunSummarySchema.extend({
   retry: RunRetrySchema,
   finalization: RunResultSummarySchema.extend({
     finalizedAt: TimestampSchema,
-    outcome: z.enum(["completed", "failed"]),
+    outcome: z.enum(["completed", "failed", "cancelled"]),
   }).strict().optional(),
   statusTimeline: z.array(RunStatusTimelineEntrySchema).optional(),
 }).strict();
@@ -401,7 +414,7 @@ export const RunStatusEnvelopeSchema = z.object({
   }).strict(),
   finalization: RunResultSummarySchema.extend({
     finalizedAt: TimestampSchema,
-    outcome: z.enum(["completed", "failed"]),
+    outcome: z.enum(["completed", "failed", "cancelled"]),
   }).strict().optional(),
   actionAvailability: RunActionAvailabilitySchema.optional(),
   failureSummary: RunFailureSummarySchema.optional(),
@@ -587,6 +600,17 @@ export const RunLifecycleUpdateRequestSchema = z.object({
     externalResultId: IdentifierSchema.optional(),
     outputs: z.array(RunResultOutputReferenceSchema).max(512).optional(),
     metrics: z.record(z.string(), z.unknown()).optional(),
+    outputAvailabilityHint: z.enum([
+      RunResultOutputAvailabilityHints.none,
+      RunResultOutputAvailabilityHints.partial,
+      RunResultOutputAvailabilityHints.available,
+      RunResultOutputAvailabilityHints.degraded,
+    ]).optional(),
+    terminalQualityHint: z.enum([
+      RunResultTerminalQualityHints.standard,
+      RunResultTerminalQualityHints.partial,
+      RunResultTerminalQualityHints.degraded,
+    ]).optional(),
   }).strict().optional(),
   internalDiagnostics: z.record(z.string(), z.unknown()).optional(),
   queue: RunQueueStatusSnapshotSchema.optional(),

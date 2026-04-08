@@ -320,6 +320,8 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       result: {
         summary: "Generated outputs persisted.",
         externalResultId: "result:run-1",
+        outputAvailabilityHint: "degraded",
+        terminalQualityHint: "degraded",
         outputs: [{
           outputId: "output-1",
           kind: "asset",
@@ -334,6 +336,8 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
     expect(parsed.senderNodeId).toBe("node:trusted-1");
     expect(parsed.progress?.percent).toBe(65);
     expect(parsed.result?.outputs?.[0]?.kind).toBe("asset");
+    expect(parsed.result?.outputAvailabilityHint).toBe("degraded");
+    expect(parsed.result?.terminalQualityHint).toBe("degraded");
     expect(parsed.toState).toBeUndefined();
   });
 
@@ -358,8 +362,10 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
       },
       finalization: {
         finalizedAt: "2026-04-07T12:05:00.000Z",
-        outcome: "completed",
+        outcome: "cancelled",
         summary: "Generated 4 outputs.",
+        outputAvailability: "partial",
+        terminalQuality: "partial",
         outputs: [{
           outputId: "output-1",
           kind: "asset",
@@ -369,7 +375,8 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
     });
 
     expect(status.execution?.progress?.percent).toBe(65);
-    expect(status.finalization?.outcome).toBe("completed");
+    expect(status.finalization?.outcome).toBe("cancelled");
+    expect(status.finalization?.terminalQuality).toBe("partial");
   });
 
   it("rejects malformed run payloads", () => {
