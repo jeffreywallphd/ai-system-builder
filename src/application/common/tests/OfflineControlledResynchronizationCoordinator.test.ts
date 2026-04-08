@@ -7,6 +7,7 @@ import {
 } from "../OfflineAuthoritativeSnapshotCache";
 import {
   AuthoritativeReplayExecutionResultKinds,
+  type AuthoritativeReplayExecutionResult,
   type IOfflineAuthoritativeResynchronizationPort,
   type IOfflineConnectivityStatePort,
   OfflineControlledResynchronizationCoordinator,
@@ -108,6 +109,30 @@ class StaticConnectivityPort implements IOfflineConnectivityStatePort {
 class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeResynchronizationPort {
   public readonly replayedOperations: string[] = [];
   public readonly refreshedSnapshots: string[] = [];
+  private readonly revisionByResourceKey: ReadonlyMap<string, { readonly authoritativeRevision: string } & Partial<{
+    readonly resourceExists: boolean;
+    readonly accessRevoked: boolean;
+    readonly permissionAllowsReplay: boolean;
+    readonly requiresAdminIntervention: boolean;
+    readonly submissionStillValid: boolean;
+    readonly revisionComparable: boolean;
+  }>>;
+  private readonly replayResultByOperationId: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+
+  constructor(options?: {
+    readonly revisionsByResourceKey?: ReadonlyMap<string, { readonly authoritativeRevision: string } & Partial<{
+      readonly resourceExists: boolean;
+      readonly accessRevoked: boolean;
+      readonly permissionAllowsReplay: boolean;
+      readonly requiresAdminIntervention: boolean;
+      readonly submissionStillValid: boolean;
+      readonly revisionComparable: boolean;
+    }>>;
+    readonly replayResultsByOperationId?: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+  }) {
+    this.revisionByResourceKey = options?.revisionsByResourceKey ?? new Map();
+    this.replayResultByOperationId = options?.replayResultsByOperationId ?? new Map();
+  }
 
   public async fetchResourceRevisions(input: {
     readonly workspaceId: string;
@@ -117,6 +142,14 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
     }>;
   }) {
     const revisions = input.resources.map((resource) => {
+      const mapped = this.revisionByResourceKey.get(`${resource.resourceClass}::${resource.resourceId}`);
+      if (mapped) {
+        return Object.freeze({
+          resourceClass: resource.resourceClass,
+          resourceId: resource.resourceId,
+          ...mapped,
+        });
+      }
       if (resource.resourceClass === OfflineResourceClasses.runSubmissionIntent) {
         return Object.freeze({
           resourceClass: resource.resourceClass,
@@ -146,6 +179,10 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
     readonly operation: { readonly operationId: string };
   }) {
     this.replayedOperations.push(input.operation.operationId);
+    const configured = this.replayResultByOperationId.get(input.operation.operationId);
+    if (configured) {
+      return configured;
+    }
     return Object.freeze({
       kind: AuthoritativeReplayExecutionResultKinds.applied,
       reason: "Authoritative replay applied.",
@@ -302,6 +339,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(result.replayedOperationIds).toEqual(["operation:apply:1"]);
     expect(result.appliedOperationIds).toEqual(["operation:apply:1"]);
     expect(result.blockedOperationIds).toEqual([]);
+    expect(result.blockedOperations).toEqual([]);
     expect(result.outcomes.map((outcome) => outcome.action)).toEqual([
       "apply-to-authoritative",
       "conflict-requires-review",
@@ -357,7 +395,278 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
 
     expect(result.replayPreparedOperationIds).toEqual([]);
     expect(result.replayedOperationIds).toEqual([]);
+    expect(result.blockedOperations).toEqual([]);
     expect(result.outcomes).toEqual([]);
     expect(authoritativePort.replayedOperations).toEqual([]);
+  });
+
+  it("detects supported conflict classes during resynchronization and preserves local operations", async () => {
+    const pendingOperationService = new OfflinePendingOperationService(
+      new InMemoryOfflinePendingOperationRepository(),
+    );
+    const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
+      new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
+    );
+    const authoritativePort = new FakeAuthoritativeResynchronizationPort({
+      revisionsByResourceKey: new Map([
+        ["workflow-draft::workflow:draft:stale", { authoritativeRevision: "workflow:rev:2" }],
+        [
+          "workflow-draft::workflow:draft:revoked",
+          { authoritativeRevision: "workflow:rev:1", resourceExists: false },
+        ],
+        [
+          "workflow-draft::workflow:draft:permission",
+          {
+            authoritativeRevision: "workflow:rev:1",
+            permissionAllowsReplay: false,
+            requiresAdminIntervention: true,
+          },
+        ],
+        [
+          "run-submission-intent::run:intent:invalid",
+          { authoritativeRevision: "run:rev:1", submissionStillValid: false },
+        ],
+        [
+          "workflow-draft::workflow:draft:format",
+          { authoritativeRevision: "workflow:rev:1", revisionComparable: false },
+        ],
+      ]),
+    });
+    const coordinator = new OfflineControlledResynchronizationCoordinator(
+      pendingOperationService,
+      snapshotCacheService,
+      authoritativePort,
+      new StaticConnectivityPort(createConnectedState()),
+      {
+        now: () => new Date("2026-04-08T12:40:00.000Z"),
+      },
+    );
+
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:stale",
+        targetResourceClass: OfflineResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:stale",
+        intent: OfflineQueuedMutationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "workflow:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:20:00.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:stale",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:stale/promote",
+          idempotencyKey: "idem:operation:stale",
+          payload: Object.freeze({ draftId: "workflow:draft:stale" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:revoked",
+        targetResourceClass: OfflineResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:revoked",
+        intent: OfflineQueuedMutationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "workflow:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:20:01.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:revoked",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:revoked/promote",
+          idempotencyKey: "idem:operation:revoked",
+          payload: Object.freeze({ draftId: "workflow:draft:revoked" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:permission",
+        targetResourceClass: OfflineResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:permission",
+        intent: OfflineQueuedMutationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "workflow:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:20:02.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:permission",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:permission/promote",
+          idempotencyKey: "idem:operation:permission",
+          payload: Object.freeze({ draftId: "workflow:draft:permission" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:invalid-submission",
+        targetResourceClass: OfflineResourceClasses.runSubmissionIntent,
+        targetResourceId: "run:intent:invalid",
+        intent: OfflineQueuedMutationIntents.createOrUpdateAuthoritative,
+        baseAuthoritativeRevision: "run:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:20:03.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:invalid-submission",
+        replayDescriptor: {
+          method: "POST",
+          path: "/v1/runs/intents/run:intent:invalid",
+          idempotencyKey: "idem:operation:invalid-submission",
+          payload: Object.freeze({ runIntentId: "run:intent:invalid" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:version",
+        targetResourceClass: OfflineResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:format",
+        intent: OfflineQueuedMutationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "workflow:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:20:04.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:version",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:format/promote",
+          idempotencyKey: "idem:operation:version",
+          payload: Object.freeze({ draftId: "workflow:draft:format" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+
+    const result = await coordinator.synchronizeWorkspace({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+      attemptedAt: "2026-04-08T12:40:00.000Z",
+    });
+
+    expect(result.replayedOperationIds).toEqual([]);
+    expect(result.outcomes.map((outcome) => outcome.conflicts?.[0]?.conflictClass)).toEqual([
+      "stale-base-edit",
+      "deleted-or-revoked-resource",
+      "permission-changed-during-disconnection",
+      "invalidated-run-submission",
+      "resource-version-mismatch",
+    ]);
+    expect(result.outcomes.map((outcome) => outcome.preserveLocalDraftAsUnsynced)).toEqual([
+      true,
+      true,
+      true,
+      false,
+      true,
+    ]);
+    expect(result.outcomes[2]?.requiresAdminAttention).toBeTrue();
+
+    const stale = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:stale");
+    const revoked = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:revoked");
+    const permission = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:permission");
+    const invalidSubmission = await pendingOperationService.findQueuedOperation(
+      "workspace:alpha",
+      "operation:invalid-submission",
+    );
+    const version = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:version");
+
+    expect(stale?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
+    expect(revoked?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
+    expect(permission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
+    expect(invalidSubmission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
+    expect(version?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
+  });
+
+  it("returns structured blocked replay details and persists terminal blocked states", async () => {
+    const pendingOperationService = new OfflinePendingOperationService(
+      new InMemoryOfflinePendingOperationRepository(),
+    );
+    const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
+      new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
+    );
+    const authoritativePort = new FakeAuthoritativeResynchronizationPort();
+    const coordinator = new OfflineControlledResynchronizationCoordinator(
+      pendingOperationService,
+      snapshotCacheService,
+      authoritativePort,
+      new StaticConnectivityPort(createConnectedState()),
+      {
+        now: () => new Date("2026-04-08T12:45:00.000Z"),
+      },
+    );
+
+    await pendingOperationService.queueOperation({
+      operation: createOfflineQueuedMutationEnvelope({
+        mutationId: "operation:retry-exhausted",
+        targetResourceClass: OfflineResourceClasses.workflowDraft,
+        targetResourceId: "workflow:draft:retry-exhausted",
+        intent: OfflineQueuedMutationIntents.promoteLocalDraft,
+        baseAuthoritativeRevision: "workflow:rev:1",
+        localMutationRevision: 1,
+        queuedAt: "2026-04-08T12:40:00.000Z",
+        userVisibleSyncStatus: OfflineQueuedMutationStatuses.queuedPendingSync,
+        divergenceDisclosureToken: "offline-warning:operation:retry-exhausted",
+        replayDescriptor: {
+          method: "PATCH",
+          path: "/v1/workflows/drafts/workflow:draft:retry-exhausted/promote",
+          idempotencyKey: "idem:operation:retry-exhausted",
+          payload: Object.freeze({ draftId: "workflow:draft:retry-exhausted" }),
+        },
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+      retryability: {
+        retryable: true,
+        retryCount: 3,
+        maxRetryCount: 3,
+        backoffPolicy: "exponential",
+      },
+    });
+
+    const result = await coordinator.synchronizeWorkspace({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+      attemptedAt: "2026-04-08T12:45:00.000Z",
+    });
+
+    expect(result.blockedOperationIds).toEqual(["operation:retry-exhausted"]);
+    expect(result.blockedOperations[0]).toMatchObject({
+      operationId: "operation:retry-exhausted",
+      reasonCode: "retry-exhausted",
+    });
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]).toMatchObject({
+      operationId: "operation:retry-exhausted",
+      action: "reject-not-allowed",
+      preserveLocalDraftAsUnsynced: true,
+    });
+    expect(result.outcomes[0]?.conflicts?.[0]?.conflictClass).toBe("authoritative-state-unavailable");
+
+    const persisted = await pendingOperationService.findQueuedOperation("workspace:alpha", "operation:retry-exhausted");
+    expect(persisted?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
+    expect(persisted?.retryability.retryable).toBeFalse();
+    expect(persisted?.retryability.nonRetryableReasonCode).toBe("retry-exhausted");
   });
 });

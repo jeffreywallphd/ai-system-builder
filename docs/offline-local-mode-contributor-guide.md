@@ -49,6 +49,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
    - keep reconnect decision rules explicit and bounded,
    - preserve visible divergence handling.
    - route reconnect replay through authoritative API ports and capture explicit outcomes for apply/conflict/reject/failure paths.
+   - expose blocked replay operations with structured metadata (reason code/message/dependency blockers) rather than id-only reporting.
 4. Update desktop profile bindings fourth:
    - keep desktop runtime as `control-plane-client`,
    - enforce allowed resource and execution classes through profile gates.

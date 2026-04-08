@@ -14,11 +14,14 @@ import {
 } from "@application/common/OfflineLocalModeResynchronization";
 import {
   type OfflinePendingOperationService,
+  type OfflineReplayPreparationBlockedOperation,
   type PrepareOfflineReplayOperation,
 } from "@application/common/OfflinePendingOperationPersistence";
 import {
+  OfflineAuthorityScopes,
   OfflineQueuedMutationStatuses,
   type OfflineResourceClass,
+  resolveOfflineResourceAuthorityBoundary,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
   type OfflineConnectivitySurfaceStateDto,
@@ -89,6 +92,7 @@ export interface OfflineControlledResynchronizationResult {
   readonly connectivity: OfflineConnectivitySurfaceStateDto;
   readonly replayPreparedOperationIds: ReadonlyArray<string>;
   readonly blockedOperationIds: ReadonlyArray<string>;
+  readonly blockedOperations: ReadonlyArray<OfflineReplayPreparationBlockedOperation>;
   readonly replayedOperationIds: ReadonlyArray<string>;
   readonly appliedOperationIds: ReadonlyArray<string>;
   readonly refreshedSnapshotKeys: ReadonlyArray<string>;
@@ -129,6 +133,7 @@ export class OfflineControlledResynchronizationCoordinator {
         connectivity,
         replayPreparedOperationIds: Object.freeze([]),
         blockedOperationIds: Object.freeze([]),
+        blockedOperations: Object.freeze([]),
         replayedOperationIds: Object.freeze([]),
         appliedOperationIds: Object.freeze([]),
         refreshedSnapshotKeys: Object.freeze([]),
@@ -143,9 +148,10 @@ export class OfflineControlledResynchronizationCoordinator {
     const replayPreparedOperationIds = Object.freeze(
       replayPreparation.prepared.map((operation) => operation.operationId),
     );
-    const blockedOperationIds = Object.freeze(
-      replayPreparation.blocked.map((operation) => operation.operationId),
-    );
+    const blockedOperations = Object.freeze(replayPreparation.blocked.map((operation) => Object.freeze({
+      ...operation,
+    })));
+    const blockedOperationIds = Object.freeze(blockedOperations.map((operation) => operation.operationId));
 
     const cachedSnapshots = await this.snapshotCacheService.listWorkspaceSnapshots(workspaceId);
     const resourceTargets = dedupeResourceTargets([
@@ -212,6 +218,50 @@ export class OfflineControlledResynchronizationCoordinator {
     const outcomes: OfflineReconciliationOutcomeDto[] = [];
     const replayedOperationIds: string[] = [];
     const appliedOperationIds: string[] = [];
+
+    for (const blockedOperation of blockedOperations) {
+      if (blockedOperation.reasonCode === "operation-not-pending") {
+        continue;
+      }
+
+      const blockedRecord = await this.pendingOperationService.findQueuedOperation(
+        workspaceId,
+        blockedOperation.operationId,
+      );
+      if (!blockedRecord) {
+        continue;
+      }
+
+      if (
+        blockedOperation.reasonCode === "retry-exhausted"
+        || blockedOperation.reasonCode === "non-retryable"
+      ) {
+        await this.pendingOperationService.markOperationReplayOutcome({
+          workspaceId,
+          operationId: blockedOperation.operationId,
+          nextStatus: OfflineQueuedMutationStatuses.syncRejected,
+          attemptedAt,
+          incrementRetryCount: false,
+          retryable: false,
+          nonRetryableReasonCode: blockedOperation.reasonCode,
+        });
+      }
+
+      const blockedDecision = deriveDecisionFromBlockedReplayPreparation({
+        blockedOperation,
+        resourceClass: blockedRecord.operation.targetResourceClass,
+      });
+
+      outcomes.push(toOfflineReconciliationOutcomeDto(blockedDecision, {
+        resolvedAt: attemptedAt,
+        conflictCode: blockedDecision.conflictClass,
+        conflictSummary: blockedOperation.message,
+        localMutationRevision: blockedRecord.operation.localMutationRevision,
+      }, {
+        resourceClass: blockedRecord.operation.targetResourceClass,
+        resourceId: blockedRecord.operation.targetResourceId,
+      }));
+    }
 
     for (const preparedOperation of replayPreparation.prepared) {
       const operationId = preparedOperation.operationId;
@@ -315,6 +365,7 @@ export class OfflineControlledResynchronizationCoordinator {
       connectivity,
       replayPreparedOperationIds,
       blockedOperationIds,
+      blockedOperations,
       replayedOperationIds: Object.freeze(replayedOperationIds),
       appliedOperationIds: Object.freeze(appliedOperationIds),
       refreshedSnapshotKeys: Object.freeze([...refreshedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
@@ -408,6 +459,45 @@ function deriveDecisionFromAuthoritativeReplayResult(input: {
     reason: normalizeOptional(input.replayResult.reason)
       ?? "Authoritative replay failed before an apply/reject decision was confirmed.",
   });
+}
+
+function deriveDecisionFromBlockedReplayPreparation(input: {
+  readonly blockedOperation: OfflineReplayPreparationBlockedOperation;
+  readonly resourceClass: OfflineResourceClass;
+}) {
+  const preserveLocalDraftAsUnsynced = shouldPreserveLocalDraft(input.resourceClass);
+
+  if (
+    input.blockedOperation.reasonCode === "retry-exhausted"
+    || input.blockedOperation.reasonCode === "non-retryable"
+  ) {
+    return Object.freeze({
+      mutationId: input.blockedOperation.operationId,
+      action: OfflineResynchronizationActions.rejectNotAllowed,
+      conflictClass: OfflineResynchronizationConflictClasses.authoritativeStateUnavailable,
+      decisionRule: OfflineResynchronizationDecisionRules.rejectReplayAndRequireUserReview,
+      preserveLocalDraftAsUnsynced,
+      requiresUserAttention: true,
+      requiresAdminAttention: false,
+      reason: input.blockedOperation.message,
+    });
+  }
+
+  return Object.freeze({
+    mutationId: input.blockedOperation.operationId,
+    action: OfflineResynchronizationActions.conflictRequiresReview,
+    conflictClass: OfflineResynchronizationConflictClasses.authoritativeStateUnavailable,
+    decisionRule: OfflineResynchronizationDecisionRules.unsafeAutoMergeDeferred,
+    preserveLocalDraftAsUnsynced,
+    requiresUserAttention: true,
+    requiresAdminAttention: false,
+    reason: input.blockedOperation.message,
+  });
+}
+
+function shouldPreserveLocalDraft(resourceClass: OfflineResourceClass): boolean {
+  return resolveOfflineResourceAuthorityBoundary(resourceClass).authoritativeStateScope
+    === OfflineAuthorityScopes.localDraft;
 }
 
 function makeResourceKey(resourceClass: OfflineResourceClass, resourceId: string): string {
