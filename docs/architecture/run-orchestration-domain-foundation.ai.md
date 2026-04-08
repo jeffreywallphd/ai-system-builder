@@ -1,52 +1,56 @@
 # AI Companion: Run Orchestration Domain Foundation
 
 ## Story scope
-Story 16.1.1 defines the canonical run domain model and orchestration boundaries for authoritative run handling.
+Story 16.1.1 defines the generic canonical run domain and lifecycle baseline for authoritative orchestration.
+Story 4.1.1 adds image-manipulation-specific authoritative run domain entities, lifecycle transition rules, and invariants.
 
 ## Implemented files
-- Domain model: `src/domain/runs/RunDomain.ts`
-- Tests: `src/domain/runs/tests/RunDomain.test.ts`
+- Generic run lifecycle: `src/domain/runs/RunDomain.ts`
+- Image run lifecycle and invariants: `src/domain/runs/ImageRunDomain.ts`
+- Generic run tests: `src/domain/runs/tests/RunDomain.test.ts`
+- Image run tests: `src/domain/runs/tests/ImageRunDomain.test.ts`
 - Human doc: `docs/architecture/run-orchestration-domain-foundation.md`
 
-## Canonical run model
-`CanonicalRunRecord` covers:
-- identity (`runId`, `workflowId`, optional `workspaceId`)
-- submission source/timestamps
-- lifecycle state
-- queue state + position semantics
-- assignment state
-- execution state + normalized outcome
-- cancellation state
-- retry budget state
+## Image run canonical model
+`ImageRunRecord` includes:
+- identity and authority: `runId`, `workspaceId`, `ownerUserId`, `createdBy`, `lastModifiedBy`
+- typed composition references: `systemId`, `workflowId`, `workflowTemplateId?`
+- logical asset bindings: input bindings with canonical `asset:*` IDs
+- immutable parameter snapshot
+- lifecycle: status, status timestamps, and status history
+- execution linkage metadata for queue/dispatch/adapter/node correlation
+- failure summary and optional result lineage metadata
 
-## Lifecycle states
-- `submitted`
+## Image lifecycle vocabulary
+- `draft`
+- `requested`
+- `validating`
 - `queued`
-- `assignment-pending`
-- `assigned`
 - `dispatching`
 - `running`
-- `cancelling`
-- `retry-pending`
+- `degraded`
+- `partially-completed`
 - `completed`
 - `failed`
 - `cancelled`
 
-Transition authority is explicit in `RunLifecycleTransitions` and enforced by:
-- `isRunLifecycleTransitionAllowed(...)`
-- `transitionCanonicalRunRecord(...)`
+Transition authority is explicit in `ImageRunLifecycleTransitions` and enforced by:
+- `isImageRunLifecycleTransitionAllowed(...)`
+- `transitionImageRunRecord(...)`
 
-## Important invariants
-- Queue-owned states require queue metadata; dequeued history is explicit.
-- Assignment status is separate from lifecycle and validated for coherence.
-- Terminal lifecycle states require matching execution outcomes.
-- Cancellation metadata only exists for cancelling/cancelled states.
-- Retry budget is explicit and retry-pending requires remaining attempts.
+## Key invariants
+- Ownership/scope is mandatory (`workspaceId`, `ownerUserId`).
+- Composition references must stay system/workflow anchored.
+- Input bindings must use canonical logical asset references (`asset:*`).
+- Status-specific timestamp requirements are enforced.
+- Status history must be chronological and terminate at current status.
+- Dispatch/adapter linkage is only valid where lifecycle position allows it.
+- Failed/degraded/partial states require failure summaries and coherent failure timing.
 
-## Layer boundaries
-- Domain: lifecycle vocabulary + invariants + transition legality.
-- Application: submission/queue/assignment/dispatch orchestration over domain + ports.
-- Infrastructure: queue/persistence/runtime adapter mechanics.
-- UI: read-model/status rendering and command intents.
+## Boundary rules
+- Domain owns lifecycle truth and invariants.
+- Application orchestrates transitions and policy workflow.
+- Infrastructure handles persistence/transport/adapter mechanics.
+- UI renders read models and emits intents only.
 
-Rule: only domain defines lifecycle truth; application/infrastructure/UI consume it.
+Rule: do not move lifecycle legality, ownership invariants, or reference normalization into transport/UI/persistence code.
