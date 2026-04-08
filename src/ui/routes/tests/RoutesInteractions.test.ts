@@ -29,12 +29,14 @@ describe("ui/routes interactions", () => {
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.identityAdmin}>");
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.governanceReview}>");
     expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.governanceReviewThin}>");
+    expect(appRouterSource).toContain("<SurfaceProtectedRoute path={ROUTE_PATHS.deploymentPolicyAdmin}>");
     expect(appRouterSource).toContain("<DesktopAdministrationShellPage />");
     expect(appRouterSource).toContain("<AdminLiteEntryPage />");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.workspaceAdmin");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.identityAdmin");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.governanceReview");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.governanceReviewThin");
+    expect(appRouterSource).toContain("path: ROUTE_PATHS.deploymentPolicyAdmin");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.adminShell");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.adminLiteShell");
     expect(appRouterSource).toContain("path: ROUTE_PATHS.agentStudio, element: <Navigate to={ROUTE_PATHS.build} replace />");

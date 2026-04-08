@@ -76,9 +76,31 @@
   background: rgba(239, 68, 68, 0.08);
 }
 
+.ui-deployment-policy-admin-page__preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.ui-deployment-policy-admin-page__preset-card {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ui-deployment-policy-admin-page__preset-card--requested {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.ui-deployment-policy-admin-page__group-card {
+  border-color: var(--color-border-soft);
+}
+
 @media (max-width: 960px) {
   .ui-security-policy-page__grid,
-  .ui-security-policy-page__property-grid {
+  .ui-security-policy-page__property-grid,
+  .ui-deployment-policy-admin-page__preset-grid {
     grid-template-columns: 1fr;
   }
 }

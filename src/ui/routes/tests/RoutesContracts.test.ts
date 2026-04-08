@@ -49,6 +49,7 @@ describe("ui/routes contract adherence", () => {
     expect(source).toContain('secretsAdmin: "/settings/secrets"');
     expect(source).toContain('governanceReview: "/settings/governance-review"');
     expect(source).toContain('governanceReviewThin: "/settings/governance-review/thin"');
+    expect(source).toContain('deploymentPolicyAdmin: "/settings/deployment-policy"');
     expect(source).toContain('notFound: "*"');
   });
 });
