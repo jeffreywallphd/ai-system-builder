@@ -449,6 +449,22 @@ sequenceDiagram
 - cache maintenance always applies explicit refresh/invalidate behavior after replay planning and replay outcomes.
 - queued replay and registration rows now persist payload/envelope JSON through protected local-value storage when available (Electron `safeStorage`), with explicit per-row protection posture metadata for transparent decode and honest fallback behavior.
 
+### Story 19.3.8 end-to-end regression and production-readiness hardening baseline
+
+Representative cross-layer regression coverage is maintained in:
+
+- `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
+
+This suite keeps one lifecycle-level guard across cache population, queued offline work, reconnect replay, conflict/rejection handling, local execution registration replay, cache refresh/invalidation, restart recovery posture, and desktop status visibility through shared contract parsing and presenter rendering.
+
+The test is expected to preserve these production invariants:
+
+- server authority remains primary for apply/reject decisions;
+- unsynced local conflict/rejection state remains explicit and queryable;
+- no silent competing global truth is introduced by offline cache/drafts;
+- pending operation and local-execution registration durability survives reconnect/restart flows;
+- shared offline contract/schema and desktop status presenter remain interoperable for user-visible unresolved-work guidance.
+
 ### Explicit conflict-detection and decision mapping
 
 - canonical conflict classes stay bounded to:

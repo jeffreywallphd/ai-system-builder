@@ -268,6 +268,7 @@ At minimum, update:
 - `src/application/common/tests/OfflineControlledResynchronizationCoordinator.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflinePendingOperationHost.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineResynchronizationHost.test.ts`
+- `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
 - `src/infrastructure/api/system-runtime/tests/DesktopOfflineOperationalEventSink.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflinePendingOperationRepository.test.ts`
 - `src/application/common/tests/OfflineLocalExecutionRegistrationPersistence.test.ts`
@@ -285,6 +286,21 @@ For Story 19.3.2-style UX work, include interaction-flow coverage for:
 - sync conflict inspection messaging and bounded manual follow-up guidance,
 - replay outcome interpretation (applied/conflict/rejected),
 - explicit unsupported auto-merge disclosure.
+
+## Story 19.3.8 production-hardening regression baseline
+
+Use one representative cross-layer regression to keep production-offline behavior honest across host/application/shared contract/UI seams:
+
+- `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
+
+This regression is expected to cover, in one lifecycle:
+
+- authoritative replay primacy with explicit unsynced local preservation;
+- durable queue and local-execution registration persistence behavior through reconnect;
+- explicit replay conflict/rejection outcomes (no silent merge/no silent global divergence);
+- reconnect cache refresh/invalidation maintenance behavior;
+- restart-time interrupted-resynchronization recovery posture;
+- shared contract + schema parsing and presenter-based unresolved-work visibility.
 
 When architecture behavior changes, update both:
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
