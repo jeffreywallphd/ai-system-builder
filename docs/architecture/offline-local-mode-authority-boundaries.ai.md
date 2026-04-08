@@ -47,6 +47,8 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Dedicated pending-operation persistence and replay-preparation service + SQLite queue store for durable unsynced operation intent.
 - Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
 - Controlled reconnect coordinator revalidates stale cached snapshots, plans replay decisions, executes eligible replay through authoritative APIs in dependency order, updates local queue status, and captures explicit reconciliation outcomes.
+- Coordinator emits structured blocked replay metadata (reason code/message/dependency blockers) so UI/admin surfaces can expose why replay did not proceed.
+- Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
 
 ## Server-authoritative-only baseline
 
