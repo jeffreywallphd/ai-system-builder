@@ -2,12 +2,14 @@
 
 ## What this slice adds
 
-Stories 6.1.1 and 6.1.2 introduce a dedicated domain model for generated image result assets so execution outputs become authoritative platform resources with explicit lifecycle and lineage.
+Stories 6.1.1, 6.1.2, and 6.1.3 introduce a dedicated domain model for generated image result assets so execution outputs become authoritative platform resources with explicit lifecycle, lineage, and protected preview/derivative contracts.
 
 ## Canonical files
 
 - `src/domain/image-assets/GeneratedResultAssetDomain.ts`
 - `src/domain/image-assets/tests/GeneratedResultAssetDomain.test.ts`
+- `src/domain/image-assets/GeneratedResultAssetDerivativeDomain.ts`
+- `src/domain/image-assets/tests/GeneratedResultAssetDerivativeDomain.test.ts`
 - `docs/architecture/generated-result-asset-domain-foundation.md`
 
 ## Modeled contract
@@ -38,6 +40,16 @@ Stories 6.1.1 and 6.1.2 introduce a dedicated domain model for generated image r
 - lineage selected node must match `source.executionNodeId` when both are provided
 - adapter/backend lineage fields are normalized as lowercase logical identifiers
 
+Story 6.1.3 derivative/preview invariants:
+
+- preview and derivative descriptors are mapped to `resultAssetId` (and optional `resultLogicalAssetVersionId`) rather than replacing original result-asset identity
+- `presentationRole` separates `preview` contracts from broader derivative contracts
+- preview role requires explicit logical preview kinds (`thumbnail`, `display-safe`, `history-safe`)
+- derivative availability lifecycle supports deferred/on-demand generation and regeneration (`pending`, `available`, `failed`, `stale`)
+- available/stale descriptors require protected access metadata; pending/failed descriptors cannot expose access handles
+- derivative access descriptors reject filesystem paths and `storage-instance://...` values to prevent raw storage layout leakage
+- stale descriptors require explicit refreshed metadata so regeneration state is queryable without mutating result identity
+
 ## Integration posture
 
 The result model is integrated with existing logical asset semantics, not a disconnected parallel type:
@@ -59,6 +71,12 @@ The lineage shape is designed for later:
 - result history timelines (showing run, workflow template version, system snapshot, and inputs)
 - reuse flows (reapplying parameter snapshots and workflow-template/system context)
 - audit/admin views (explaining selected node and adapter/backend family without exposing backend transport internals)
+
+The preview/derivative shape is designed for later:
+
+- gallery/history panes that need protected, safe-to-render preview handles separate from original-content access flows
+- asynchronous preview generation workers that can materialize, fail, refresh, and regenerate derivatives over time
+- retrieval APIs that authorize against protected resource IDs and return logical preview handles, not storage topology
 
 ## Boundary posture
 
