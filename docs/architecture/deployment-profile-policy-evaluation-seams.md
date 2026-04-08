@@ -64,3 +64,27 @@ The default resolver adapter (`CanonicalDeploymentPolicySnapshotResolver`) is th
 - security consumers use `IDeploymentSecurityPolicyEvaluationPort`.
 
 This keeps dependent features on explicit policy-evaluation seams rather than global config shortcuts.
+
+## Story 20.2.3 first dependent integrations
+
+The first production integrations now consume effective policy decisions at application boundaries:
+
+- Workspace creation sharing defaults:
+  - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+  - when request visibility is omitted, the use case resolves `evaluateAuthorizationPolicy(...)` and maps
+    `defaultWorkspaceVisibility` into workspace ownership visibility.
+- Run submission approval posture:
+  - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+  - the validator resolves `evaluateSchedulingPolicy(...)` and adds policy-driven prerequisite requirements based on:
+    - `runSubmissionApprovalMode`
+    - `highRiskRunRequiresDualApproval` (for high-risk tagged submissions).
+
+## Explicitly deferred policy-family integrations
+
+The following policy families remain intentionally deferred for later stories and are not accidental omissions in this story:
+
+- storage-governance defaulting for storage create/update payload synthesis,
+- security-governance transport and credential-rotation runtime enforcement,
+- audit-governance export/redaction/retention enforcement in audit query and export workflows,
+- admin-controls delegated workspace-admin policy enforcement outside policy-admin mutation workflows,
+- scheduling profile-aware queue/rule overlays beyond run-submission approval prerequisites.

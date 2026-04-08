@@ -24,3 +24,17 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep write-time policy mutation checks centralized in the policy-administration use case layer.
 - Keep preset/profile behavior data-driven from canonical definitions.
 - Do not put profile-specific branching into UI, transport handlers, or backend adapters.
+
+## Story 20.2.3 reference integrations
+
+- `CreateWorkspaceUseCase` consumes `IDeploymentAuthorizationPolicyEvaluationPort` for policy-driven default visibility.
+- `ValidateRunSubmissionUseCase` consumes `IDeploymentSchedulingPolicyEvaluationPort` for approval prerequisite enforcement.
+- Both integrations resolve policy context through explicit resolver seams, keeping policy resolution at application boundaries.
+
+Intentionally deferred families in this story:
+
+- storage-governance runtime default synthesis,
+- security-governance transport/credential enforcement,
+- audit-governance runtime export/redaction/retention enforcement,
+- admin-controls delegated-admin runtime gates,
+- broader scheduling rule overlays.

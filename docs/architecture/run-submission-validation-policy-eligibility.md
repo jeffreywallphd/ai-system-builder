@@ -38,6 +38,8 @@ Validation is split into two explicit stages:
 - target availability + allowed parameter set + required prerequisite checks through `IRunSubmissionTargetResolverPort`
 - storage reference policy checks through existing storage seams (`IStorageInstanceRepository` + `IStoragePolicyEvaluationPort`)
 - security prerequisite checks through existing security seam (`IEncryptionPolicyEvaluationService`)
+- deployment-profile approval posture checks through deployment policy seam (`IDeploymentSchedulingPolicyEvaluationPort`)
+  with application-level context resolution.
 
 ## Standardized denial semantics
 
@@ -69,6 +71,7 @@ Accepted submissions are emitted as `CanonicalRunSubmissionCommand`, which inclu
 - parameter map
 - storage/resource references
 - security prerequisites
+- deployment-policy-derived approval prerequisites
 - submission context metadata
 - normalized `occurredAt`
 

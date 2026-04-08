@@ -28,3 +28,22 @@ Story 20.1.6 adds the application-facing policy evaluation seam that dependent f
 - `src/application/policy-administration/tests/DeploymentPolicyEvaluationServiceContracts.test.ts`
 
 Service-consumption examples demonstrate authorization/storage/scheduling/security usage through dedicated policy evaluation interfaces.
+
+## Story 20.2.3 dependent-feature integration status
+
+Integrated first policy-driven families:
+
+- sharing defaults at workspace-creation boundary:
+  - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+  - `src/application/workspaces/tests/CreateWorkspaceUseCase.test.ts`
+- approval workflow posture in run-submission validation:
+  - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+  - `src/application/runs/tests/ValidateRunSubmissionUseCase.test.ts`
+
+Explicitly deferred policy-family integrations:
+
+- storage-governance defaults for storage provisioning metadata synthesis,
+- security-governance runtime transport/credential enforcement,
+- audit-governance runtime export/redaction/retention enforcement,
+- admin-controls delegated-admin enforcement outside policy-admin mutation flow,
+- broader scheduling-profile queue/rule overlays.
