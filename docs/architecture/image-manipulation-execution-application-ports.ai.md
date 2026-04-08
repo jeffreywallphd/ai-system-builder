@@ -56,3 +56,7 @@
   - `src/application/image-workflows/ports/ImageManipulationOutputDiscoveryContracts.ts`
 - Architecture note:
   - `docs/architecture/image-manipulation-output-discovery-and-collection-contracts.md`
+
+## Story 3.1.5 ComfyUI adapter architecture and boundary rules
+- Focused architecture note for execution-adapter layering and strict authority boundaries:
+  - `docs/architecture/image-manipulation-comfyui-adapter-architecture-and-boundary-rules.md`
