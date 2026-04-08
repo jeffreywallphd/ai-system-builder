@@ -595,6 +595,15 @@ export interface ImageRunLaunchPrecheckState {
   readonly setupAdvisories: ReadonlyArray<ImageRunPrecheckIssue>;
   readonly backendBlockingIssues: ReadonlyArray<ImageRunPrecheckIssue>;
   readonly backendAdvisories: ReadonlyArray<ImageRunPrecheckIssue>;
+  readonly backendOperationalStatus: ImageRunBackendOperationalStatus;
+}
+
+export interface ImageRunBackendOperationalStatus {
+  readonly category: "healthy" | "degraded" | "no-eligible-node" | "outage" | "unknown";
+  readonly summary: string;
+  readonly temporary: boolean;
+  readonly suggestedActions: ReadonlyArray<string>;
+  readonly advancedDetails: ReadonlyArray<string>;
 }
 
 export function buildImageRunLaunchPrecheckState(input: {
@@ -698,13 +707,170 @@ export function buildImageRunLaunchPrecheckState(input: {
     }
   }
 
+  const backendOperationalStatus = deriveBackendOperationalStatus({
+    executionReadiness: input.executionReadiness,
+    executionReadinessError: input.executionReadinessError,
+    executionReadinessErrorCode: input.executionReadinessErrorCode,
+  });
+
   return Object.freeze({
     launchReady: setupBlockingIssues.length < 1 && backendBlockingIssues.length < 1,
     setupBlockingIssues: Object.freeze(setupBlockingIssues),
     setupAdvisories: Object.freeze(setupAdvisories),
     backendBlockingIssues: Object.freeze(backendBlockingIssues),
     backendAdvisories: Object.freeze(backendAdvisories),
+    backendOperationalStatus,
   });
+}
+
+interface RuntimeExecutionReadinessNodeAvailabilitySummary {
+  readonly state?: "available" | "constrained" | "unavailable" | "unknown";
+  readonly candidateNodeCount?: number;
+  readonly eligibleNodeCount?: number;
+  readonly unavailableNodeCount?: number;
+  readonly incompatibleNodeCount?: number;
+  readonly topBlockingReasonCodes?: ReadonlyArray<string>;
+  readonly topTransientAvailabilityReasonCodes?: ReadonlyArray<string>;
+  readonly reasonCode?: string;
+}
+
+function deriveBackendOperationalStatus(input: {
+  readonly executionReadiness?: RuntimeExecutionReadinessResponse;
+  readonly executionReadinessError?: string;
+  readonly executionReadinessErrorCode?: string;
+}): ImageRunBackendOperationalStatus {
+  if (input.executionReadinessError) {
+    const lowerCode = (input.executionReadinessErrorCode ?? "").trim().toLowerCase();
+    const lowerMessage = input.executionReadinessError.toLowerCase();
+    const likelyOutage = lowerCode.includes("timeout")
+      || lowerCode.includes("unavailable")
+      || lowerCode.includes("connect")
+      || lowerMessage.includes("timeout")
+      || lowerMessage.includes("unavailable")
+      || lowerMessage.includes("offline");
+
+    return Object.freeze({
+      category: likelyOutage ? "outage" : "unknown",
+      summary: likelyOutage
+        ? "Execution backend is temporarily unavailable."
+        : "Execution readiness could not be confirmed.",
+      temporary: likelyOutage,
+      suggestedActions: Object.freeze(likelyOutage
+        ? [
+          "Wait a moment, then refresh readiness.",
+          "Retry when backend availability is restored.",
+        ]
+        : [
+          "Refresh readiness to confirm current backend status.",
+          "Contact an operator if readiness remains unavailable.",
+        ]),
+      advancedDetails: Object.freeze([
+        `readinessErrorCode=${input.executionReadinessErrorCode ?? "unknown"}`,
+      ]),
+    });
+  }
+
+  if (!input.executionReadiness) {
+    return Object.freeze({
+      category: "unknown",
+      summary: "Execution readiness has not been checked yet.",
+      temporary: false,
+      suggestedActions: Object.freeze([
+        "Refresh readiness before launching.",
+      ]),
+      advancedDetails: Object.freeze([]),
+    });
+  }
+
+  const nodeAvailability = resolveNodeAvailabilitySummary(input.executionReadiness);
+  const topBlockingCodes = nodeAvailability?.topBlockingReasonCodes ?? [];
+  const topTransientCodes = nodeAvailability?.topTransientAvailabilityReasonCodes ?? [];
+  const hasNoEligibleNode = nodeAvailability?.reasonCode === "execution-node-no-eligible-match"
+    || topBlockingCodes.includes("execution-node-no-eligible-match")
+    || input.executionReadiness.issues.some((issue) => issue.code === "execution-node-no-eligible-match");
+  const isOutage = input.executionReadiness.readiness === "unavailable"
+    || nodeAvailability?.state === "unavailable"
+    || input.executionReadiness.issues.some((issue) => (
+      issue.code.includes("backend-unavailable")
+      || issue.code.includes("execution-node-candidates-unavailable")
+    ));
+
+  if (hasNoEligibleNode) {
+    return Object.freeze({
+      category: "no-eligible-node",
+      summary: "Workflow is valid, but no eligible execution node is currently routable.",
+      temporary: true,
+      suggestedActions: Object.freeze([
+        "Wait for node availability to improve, then retry.",
+        "Adjust workflow/system settings if this remains blocked.",
+      ]),
+      advancedDetails: Object.freeze([
+        `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+        `eligibleNodes=${String(nodeAvailability?.eligibleNodeCount ?? 0)}`,
+        `candidateNodes=${String(nodeAvailability?.candidateNodeCount ?? 0)}`,
+        `blockingCodes=${topBlockingCodes.join(",") || "none"}`,
+      ]),
+    });
+  }
+
+  if (isOutage) {
+    return Object.freeze({
+      category: "outage",
+      summary: "Execution backend is temporarily unavailable.",
+      temporary: true,
+      suggestedActions: Object.freeze([
+        "Wait and refresh readiness.",
+        "Retry launch after backend availability recovers.",
+      ]),
+      advancedDetails: Object.freeze([
+        `backendReadiness=${input.executionReadiness.readiness}`,
+        `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+        `transientCodes=${topTransientCodes.join(",") || "none"}`,
+      ]),
+    });
+  }
+
+  if (input.executionReadiness.readiness === "degraded" || nodeAvailability?.state === "constrained") {
+    return Object.freeze({
+      category: "degraded",
+      summary: input.executionReadiness.message?.trim()
+        || "Backend is available with degraded capacity.",
+      temporary: true,
+      suggestedActions: Object.freeze([
+        "You can continue now, but expect slower or partial execution.",
+        "Refresh readiness if delays increase.",
+      ]),
+      advancedDetails: Object.freeze([
+        `backendReadiness=${input.executionReadiness.readiness}`,
+        `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+        `eligibleNodes=${String(nodeAvailability?.eligibleNodeCount ?? 0)}`,
+        `candidateNodes=${String(nodeAvailability?.candidateNodeCount ?? 0)}`,
+      ]),
+    });
+  }
+
+  return Object.freeze({
+    category: "healthy",
+    summary: "Execution backend and node availability are ready.",
+    temporary: false,
+    suggestedActions: Object.freeze([]),
+    advancedDetails: Object.freeze([
+      `backendReadiness=${input.executionReadiness.readiness}`,
+      `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+    ]),
+  });
+}
+
+function resolveNodeAvailabilitySummary(
+  readiness: RuntimeExecutionReadinessResponse,
+): RuntimeExecutionReadinessNodeAvailabilitySummary | undefined {
+  const candidate = (readiness as RuntimeExecutionReadinessResponse & {
+    readonly nodeAvailability?: RuntimeExecutionReadinessNodeAvailabilitySummary;
+  }).nodeAvailability;
+  if (!candidate || typeof candidate !== "object") {
+    return undefined;
+  }
+  return candidate;
 }
 
 type ImageRunRecoveryKind = "user-fixable" | "retry-later" | "operator-action" | "terminal";
@@ -898,25 +1064,32 @@ export function buildImageRunFailureRecoveryGuidance(input: {
     || input.launchPrecheck.backendBlockingIssues.length > 0
   ) {
     const hasSetupIssues = input.launchPrecheck.setupBlockingIssues.length > 0;
+    const backendStatus = input.launchPrecheck.backendOperationalStatus;
     const summary = hasSetupIssues
       ? input.launchPrecheck.setupBlockingIssues[0]?.message
-      : input.launchPrecheck.backendBlockingIssues[0]?.message;
+      : backendStatus.summary;
     return Object.freeze({
       mode: "launch-blocked",
       kind: hasSetupIssues ? "user-fixable" : "retry-later",
       title: hasSetupIssues
         ? "Fix setup issues before starting"
-        : "Execution environment is not ready",
+        : backendStatus.category === "no-eligible-node"
+          ? "No eligible execution node is available"
+          : backendStatus.category === "outage"
+            ? "Execution backend is temporarily unavailable"
+            : "Execution environment is not ready",
       summary: summary ?? "Resolve blocking issues before launching.",
       recommendedActions: Object.freeze(hasSetupIssues
         ? [
           "Choose required images and complete required settings.",
           "Resolve setup blockers listed in launch precheck.",
         ]
-        : [
-          "Refresh readiness and wait for backend availability.",
-          "Retry launch after operational blockers clear.",
-        ]),
+        : backendStatus.suggestedActions.length > 0
+          ? backendStatus.suggestedActions
+          : [
+            "Refresh readiness and wait for backend availability.",
+            "Retry launch after operational blockers clear.",
+          ]),
       canRetryNow: false,
     });
   }
@@ -3113,9 +3286,7 @@ export function ImageManipulationRuntimeEditorPanel({
                 title="Launch precheck: execution environment"
                 message={isCheckingExecutionReadiness
                   ? "Checking backend and node availability."
-                  : executionReadiness
-                    ? `Backend is ${executionReadiness.readiness}.`
-                    : executionReadinessError ?? "Execution environment readiness has not been confirmed."}
+                  : launchPrecheck.backendOperationalStatus.summary}
                 tone={isCheckingExecutionReadiness
                   ? "neutral"
                   : launchPrecheck.backendBlockingIssues.length > 0
@@ -3125,6 +3296,15 @@ export function ImageManipulationRuntimeEditorPanel({
                       : "success"}
                 loading={isCheckingExecutionReadiness}
               />
+              {!isCheckingExecutionReadiness
+              && launchPrecheck.backendOperationalStatus.category !== "healthy"
+              && launchPrecheck.backendOperationalStatus.category !== "unknown" ? (
+                <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  {launchPrecheck.backendOperationalStatus.temporary
+                    ? "This looks temporary. You can retry when availability improves."
+                    : "This may require operator follow-up if it persists."}
+                </p>
+              ) : null}
               {!isCheckingExecutionReadiness && launchPrecheck.backendBlockingIssues.length > 0 ? (
                 <ul className="ui-text-small ui-text-secondary">
                   {launchPrecheck.backendBlockingIssues.map((issue, index) => (
@@ -3136,6 +3316,13 @@ export function ImageManipulationRuntimeEditorPanel({
                 <ul className="ui-text-small ui-text-secondary">
                   {launchPrecheck.backendAdvisories.map((issue, index) => (
                     <li key={`backend-advisory-${index}`}>{issue.message}</li>
+                  ))}
+                </ul>
+              ) : null}
+              {!isCheckingExecutionReadiness && launchPrecheck.backendOperationalStatus.suggestedActions.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  {launchPrecheck.backendOperationalStatus.suggestedActions.map((action) => (
+                    <li key={`backend-action-${action}`}>{action}</li>
                   ))}
                 </ul>
               ) : null}
@@ -3356,6 +3543,13 @@ export function ImageManipulationRuntimeEditorPanel({
                   {step.userLabel}: {step.status}
                 </p>
               ))}
+              {launchPrecheck.backendOperationalStatus.advancedDetails.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary">
+                  {launchPrecheck.backendOperationalStatus.advancedDetails.map((detail) => (
+                    <li key={detail}>{detail}</li>
+                  ))}
+                </ul>
+              ) : null}
               {(integrityIssues.length > 0 || flowIssues.length > 0) ? (
                 <ul className="ui-text-small ui-text-secondary">
                   {integrityIssues.map((issue, index) => (
