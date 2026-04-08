@@ -17,6 +17,7 @@ import { AuthoritativeNodeTrustAuditSink } from "../AuthoritativeNodeTrustAuditS
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "../AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
+import { AuthoritativeImageAssetAuditSink } from "../AuthoritativeImageAssetAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "../AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeSchedulingGovernanceEventSink } from "../AuthoritativeSchedulingGovernanceEventSink";
 import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "../AuthoritativeDeploymentPolicyGovernanceEventSink";
@@ -251,6 +252,67 @@ describe("Authoritative security audit adapters", () => {
     expect(repository.events[0]?.action).toBe("asset.protected.download.authorized");
     expect(repository.events[1]?.outcome).toBe("rejected");
     expect(repository.events[1]?.action).toBe("asset.protected.download.opened");
+  });
+
+  it("records image-asset creation/finalization and protected original/preview access through authoritative audit", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-08T14:40:00.000Z"),
+      idGenerator: () => `image-audit-${String(repository.events.length + 1)}`,
+    });
+    const sink = new AuthoritativeImageAssetAuditSink(recorder);
+
+    await sink.recordImageAssetEvent({
+      type: "image-asset-creation-initiated",
+      occurredAt: "2026-04-08T14:40:00.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:creator",
+      operationKey: "image-asset:create:1",
+      outcome: "success",
+      asset: Object.freeze({
+        assetId: "image-asset:001",
+        storageInstanceId: "storage:alpha",
+      }),
+      details: Object.freeze({
+        reservationId: "reservation:1",
+      }),
+    });
+    await sink.recordImageAssetEvent({
+      type: "image-asset-upload-finalized",
+      occurredAt: "2026-04-08T14:40:01.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:creator",
+      operationKey: "image-asset:finalize:1",
+      outcome: "rejected",
+      asset: Object.freeze({
+        assetId: "image-asset:001",
+        storageInstanceId: "storage:alpha",
+      }),
+      details: Object.freeze({
+        reasonCode: "checksum-mismatch",
+        objectKey: "workspaces/secret/object-key",
+      }),
+    });
+    await sink.recordImageAssetEvent({
+      type: "image-asset-original-content-accessed",
+      occurredAt: "2026-04-08T14:40:02.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:viewer",
+      correlationId: "corr:image:open:1",
+      outcome: "success",
+      asset: Object.freeze({
+        assetId: "image-asset:001",
+      }),
+    });
+
+    expect(repository.events).toHaveLength(3);
+    expect(repository.events[0]?.category).toBe("administrative");
+    expect(repository.events[0]?.action).toBe("asset.image.creation.initiated");
+    expect(repository.events[1]?.action).toBe("asset.image.upload.finalized");
+    expect(repository.events[1]?.outcome).toBe("rejected");
+    expect(repository.events[2]?.category).toBe("protected-data");
+    expect(repository.events[2]?.action).toBe("asset.protected.image.original.accessed");
   });
 
   it("records secret operation and access-decision events through authoritative secret hooks", async () => {

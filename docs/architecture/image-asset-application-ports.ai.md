@@ -7,6 +7,7 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 ## Canonical files
 
 - `src/application/image-assets/ports/IImageAssetRepository.ts`
+- `src/application/image-assets/ports/ImageAssetAuditPort.ts`
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
 - `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
@@ -24,6 +25,7 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/use-cases/index.ts`
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
+- `src/application/image-assets/tests/ImageAssetAuditPort.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
@@ -36,6 +38,9 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
 - `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
+- `src/infrastructure/audit/AuthoritativeImageAssetAuditSink.ts`
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 - `docs/architecture/image-asset-application-ports.md`
 
 ## Repository port scope
@@ -217,3 +222,22 @@ Preview-safe retrieval now has authoritative request/open contracts and initial 
   - `GET /api/v1/image-assets/:assetId/preview` (request preview contract + availability/access response)
   - `GET /api/v1/image-assets/:assetId/preview/content` (tokenized preview stream open)
 - Preview API responses expose only contract-safe fields (representation/status/media/token/expiry/endpoint) and do not expose raw storage object layout.
+
+## Story 1.3.4 implementation scope
+
+Image-asset lifecycle and protected retrieval flows now emit authoritative audit events through platform audit services instead of ad hoc route logging:
+
+- Added `ImageAssetAuditPort` in application layer:
+  - typed image-asset audit event taxonomy for creation/initiation, upload finalization, original access, preview request, and preview-open actions
+  - best-effort publish helper with centralized sensitive-detail redaction (token/path/object-key/content fields)
+- Added `AuthoritativeImageAssetAuditSink` infrastructure adapter that maps image-asset audit events into canonical authoritative audit recording:
+  - image lifecycle actions map to `asset.image.*` administrative taxonomy
+  - protected original/preview actions map to `asset.protected.image.*` protected-data taxonomy
+  - actor/workspace/image-asset resource context is attached for governance/admin surfaces
+- Wired image-asset use cases with audit sink dependencies in host composition:
+  - `InitiateImageAssetCreationUseCase`
+  - `FinalizeImageAssetUploadUseCase`
+  - `GetImageAssetOriginalContentUseCase`
+  - `RequestImageAssetPreviewContentUseCase`
+  - `OpenImageAssetPreviewContentUseCase`
+- Coverage now includes success/rejected/failed outcomes for core create/finalize/access paths with reason-code details where available.

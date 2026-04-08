@@ -60,6 +60,7 @@ import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/Authorita
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
+import { AuthoritativeImageAssetAuditSink } from "@infrastructure/audit/AuthoritativeImageAssetAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "@infrastructure/audit/AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "@infrastructure/audit/AuthoritativeDeploymentPolicyGovernanceEventSink";
 import {
@@ -1045,6 +1046,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageLogicalAccessResolutionService,
     tokenSecret: resolveImageAssetStorageTokenSecret(env),
   });
+  const imageAssetAuditSink = new AuthoritativeImageAssetAuditSink(authoritativeAuditRecorder);
   const imageAssetManagementBackendApi = new ImageAssetManagementBackendApi({
     initiateImageAssetCreationUseCase: new InitiateImageAssetCreationUseCase({
       imageAssetRepository,
@@ -1053,11 +1055,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       storageInstanceRepository,
       storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+      auditSink: imageAssetAuditSink,
     }),
     finalizeImageAssetUploadUseCase: new FinalizeImageAssetUploadUseCase({
       imageAssetRepository,
       imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
+      auditSink: imageAssetAuditSink,
     }),
     getImageAssetMetadataUseCase: new GetImageAssetMetadataUseCase({
       imageAssetRepository,
@@ -1074,18 +1078,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+      auditSink: imageAssetAuditSink,
     }),
     requestImageAssetPreviewContentUseCase: new RequestImageAssetPreviewContentUseCase({
       imageAssetRepository,
       imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+      auditSink: imageAssetAuditSink,
     }),
     openImageAssetPreviewContentUseCase: new OpenImageAssetPreviewContentUseCase({
       imageAssetRepository,
       imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+      auditSink: imageAssetAuditSink,
     }),
     imageAssetStoragePort: imageAssetStorageAdapter,
     uploadSessionTokenSecret: resolveImageAssetUploadSessionTokenSecret(env),

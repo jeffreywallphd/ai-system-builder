@@ -5,6 +5,7 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 ## Canonical files
 
 - `src/application/image-assets/ports/IImageAssetRepository.ts`
+- `src/application/image-assets/ports/ImageAssetAuditPort.ts`
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
 - `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
@@ -22,6 +23,7 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/use-cases/index.ts`
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
+- `src/application/image-assets/tests/ImageAssetAuditPort.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
@@ -34,6 +36,9 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
 - `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
+- `src/infrastructure/audit/AuthoritativeImageAssetAuditSink.ts`
+- `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/hosts/server/IdentityServerHost.ts`
 
 ## Repository port contract
 
@@ -214,3 +219,22 @@ This story adds the initial protected preview retrieval contracts and server beh
   - `GET /api/v1/image-assets/:assetId/preview`
   - `GET /api/v1/image-assets/:assetId/preview/content`
 - Responses avoid raw storage layout leakage and keep preview retrieval server-authoritative and token-mediated.
+
+## Story 1.3.4: image-asset lifecycle and protected-access audit integration
+
+This story adds authoritative audit capture for image-asset create/upload/access workflows through reusable platform audit services:
+
+- Added `ImageAssetAuditPort` in the image-assets application layer:
+  - typed audit events for create/initiation, upload finalization, original-content access, preview access request, and preview stream open
+  - centralized best-effort publish helper with sensitive detail redaction (token/path/object-key/content fields)
+- Added `AuthoritativeImageAssetAuditSink` infrastructure adapter:
+  - maps image lifecycle actions into canonical `asset.image.*` audit actions
+  - maps protected original/preview retrieval actions into canonical `asset.protected.image.*` actions
+  - records actor identity, workspace scope, image-asset resource identity, operation/correlation context, and action outcome
+- Host composition now wires image-asset use cases to audit sink publication:
+  - `InitiateImageAssetCreationUseCase`
+  - `FinalizeImageAssetUploadUseCase`
+  - `GetImageAssetOriginalContentUseCase`
+  - `RequestImageAssetPreviewContentUseCase`
+  - `OpenImageAssetPreviewContentUseCase`
+- Outcome coverage includes success/rejected/failed status with reason-code context where available, while preserving redaction-safe payload boundaries for governance/admin review surfaces.

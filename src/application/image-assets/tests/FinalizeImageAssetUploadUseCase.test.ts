@@ -30,6 +30,10 @@ import {
   FinalizeImageAssetUploadUseCase,
   ImageAssetUploadFinalizationErrorCodes,
 } from "../use-cases";
+import {
+  type ImageAssetAuditEvent,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly records = new Map<string, ImageAsset>();
@@ -199,6 +203,14 @@ class WorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationRea
   }
 }
 
+class RecordingImageAssetAuditSink implements ImageAssetAuditSink {
+  public readonly events: ImageAssetAuditEvent[] = [];
+
+  public async recordImageAssetEvent(event: ImageAssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function buildImageAsset(input: {
   readonly sizeBytes: number;
   readonly digest: string;
@@ -238,10 +250,12 @@ function buildFixture() {
   const imageAssetRepository = new InMemoryImageAssetRepository();
   const imageAssetStoragePort = new InMemoryImageAssetStoragePort(contentByKey);
   const workspaceAuthorizationReadRepository = new WorkspaceAuthorizationReadRepository();
+  const auditSink = new RecordingImageAssetAuditSink();
   const useCase = new FinalizeImageAssetUploadUseCase({
     imageAssetRepository,
     imageAssetStoragePort,
     workspaceAuthorizationReadRepository,
+    auditSink,
     clock: {
       now: () => new Date("2026-04-08T12:00:00.000Z"),
     },
@@ -264,6 +278,7 @@ function buildFixture() {
     imageAssetRepository,
     imageAssetStoragePort,
     workspaceAuthorizationReadRepository,
+    auditSink,
     reference,
   };
 }
@@ -292,6 +307,8 @@ describe("FinalizeImageAssetUploadUseCase", () => {
     expect(fixture.imageAssetRepository.originalReferences.get("image-asset:001")?.objectKey).toBe(
       fixture.reference.objectKey,
     );
+    expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-upload-finalized");
+    expect(fixture.auditSink.events.at(-1)?.outcome).toBe("success");
   });
 
   it("returns invalid-state when the asset is not pending ingestion", async () => {
@@ -348,5 +365,7 @@ describe("FinalizeImageAssetUploadUseCase", () => {
     expect(fixture.imageAssetStoragePort.deletedReasons).toEqual([
       ImageAssetStorageLifecycleDeleteReasons.ingestFailure,
     ]);
+    expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-upload-finalized");
+    expect(fixture.auditSink.events.at(-1)?.outcome).toBe("rejected");
   });
 });

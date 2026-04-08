@@ -8,6 +8,8 @@ import {
   ImageAssetOriginKinds,
   ImageAssetStatuses,
   createImageAsset,
+  type ImageAssetOriginKind,
+  type ImageAssetStatus,
 } from "@domain/image-assets/ImageAssetDomain";
 import {
   StorageAccessModes,
@@ -35,6 +37,12 @@ import {
 } from "../ports/ImageAssetStoragePort";
 import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
 import {
+  ImageAssetAuditEventTypes,
+  ImageAssetAuditOutcomes,
+  publishImageAssetAuditEventBestEffort,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
+import {
   ImageAssetCreationErrorCodes,
   validateInitiateImageAssetCreationRequest,
   type IInitiateImageAssetCreationUseCase,
@@ -50,6 +58,7 @@ export interface InitiateImageAssetCreationUseCaseDependencies {
   readonly storageInstanceRepository: IStorageInstanceRepository;
   readonly storagePolicyEvaluationPort: IStoragePolicyEvaluationPort;
   readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly auditSink?: ImageAssetAuditSink;
   readonly idGenerator?: {
     nextAssetId(): string;
   };
@@ -95,6 +104,12 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         occurredAt,
       );
       if (!authorization.isAuthorized) {
+        await this.publishCreationAuditEvent({
+          request,
+          occurredAt,
+          outcome: ImageAssetAuditOutcomes.rejected,
+          reasonCode: "workspace-membership-required",
+        });
         return this.failure(
           ImageAssetCreationErrorCodes.accessDenied,
           "Image asset creation requires active workspace membership.",
@@ -106,6 +121,12 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         && request.ownerUserId !== request.actorUserId
         && !authorization.isWorkspaceAdmin
       ) {
+        await this.publishCreationAuditEvent({
+          request,
+          occurredAt,
+          outcome: ImageAssetAuditOutcomes.rejected,
+          reasonCode: "owner-delegation-requires-workspace-admin",
+        });
         return this.failure(
           ImageAssetCreationErrorCodes.accessDenied,
           "Only workspace administrators can create image assets for another owner.",
@@ -118,6 +139,15 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
 
       const createDecision = await this.evaluateCreatePolicy(request, occurredAt);
       if (!createDecision.allowed) {
+        await this.publishCreationAuditEvent({
+          request,
+          occurredAt,
+          outcome: ImageAssetAuditOutcomes.rejected,
+          reasonCode: createDecision.reasonCode,
+          details: Object.freeze({
+            evaluatedAt: createDecision.evaluatedAt,
+          }),
+        });
         return this.failure(
           ImageAssetCreationErrorCodes.accessDenied,
           createDecision.message ?? "Image asset creation denied by authorization policy.",
@@ -136,6 +166,15 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         occurredAt,
       });
       if (!storageResolution.ok) {
+        await this.publishCreationAuditEvent({
+          request,
+          occurredAt,
+          outcome: storageResolution.error.code === ImageAssetCreationErrorCodes.internal
+            ? ImageAssetAuditOutcomes.failed
+            : ImageAssetAuditOutcomes.rejected,
+          reasonCode: storageResolution.error.code,
+          details: storageResolution.error.details,
+        });
         return storageResolution;
       }
 
@@ -182,6 +221,18 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         occurredAt,
       });
 
+      await this.publishCreationAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.success,
+        imageAsset: created.imageAsset,
+        details: Object.freeze({
+          reservationId: reservation.reservationId,
+          uploadArea: reservation.reference.area,
+          storageInstanceId: reservation.reference.storageInstanceId,
+        }),
+      });
+
       return {
         ok: true,
         value: Object.freeze({
@@ -193,6 +244,13 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         }),
       };
     } catch (error) {
+      const occurredAt = request.occurredAt ?? this.clock.now().toISOString();
+      await this.publishCreationAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.failed,
+        reasonCode: "image-asset-creation-failed",
+      });
       if (isDuplicateError(error)) {
         return this.failure(
           ImageAssetCreationErrorCodes.conflict,
@@ -412,6 +470,47 @@ export class InitiateImageAssetCreationUseCase implements IInitiateImageAssetCre
         details,
       }),
     };
+  }
+
+  private async publishCreationAuditEvent(input: {
+    readonly request: InitiateImageAssetCreationRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof ImageAssetAuditOutcomes[keyof typeof ImageAssetAuditOutcomes];
+    readonly imageAsset?: {
+      readonly assetId: string;
+      readonly storageInstanceId: string;
+      readonly ownerUserId?: string;
+      readonly visibility: ResourceVisibility;
+      readonly originKind: ImageAssetOriginKind;
+      readonly lifecycle: { readonly status: ImageAssetStatus };
+      readonly mediaType: string;
+    };
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    const asset = input.imageAsset;
+    await publishImageAssetAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ImageAssetAuditEventTypes.creationInitiated,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: input.request.operationKey,
+      outcome: input.outcome,
+      asset: Object.freeze({
+        assetId: asset?.assetId ?? input.request.assetId ?? "unknown-image-asset",
+        storageInstanceId: asset?.storageInstanceId ?? input.request.storageInstanceId,
+        ownerUserId: asset?.ownerUserId ?? input.request.ownerUserId,
+        visibility: asset?.visibility ?? input.request.visibility,
+        originKind: asset?.originKind ?? input.request.originKind,
+        lifecycleStatus: asset?.lifecycle.status,
+        mediaType: asset?.mediaType ?? input.request.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 
