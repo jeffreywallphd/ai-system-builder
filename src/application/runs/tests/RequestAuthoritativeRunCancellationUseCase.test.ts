@@ -22,6 +22,7 @@ import type {
   RunExecutionCancellationSignalRequest,
   RunExecutionCancellationSignalResult,
 } from "@application/runs/ports/RunExecutionCancellationPorts";
+import type { IAuthoritativeRunMutationAuthorizationPort } from "@application/runs/ports/RunMutationAuthorizationPorts";
 import {
   RunAssignmentStatuses,
   RunExecutionOutcomeKinds,
@@ -37,6 +38,7 @@ import {
 } from "../use-cases/RunCreationPersistenceMapper";
 import {
   RequestAuthoritativeRunCancellationUseCase,
+  RunCancellationUnauthorizedError,
   RunCancellationOutcomes,
 } from "../use-cases/RequestAuthoritativeRunCancellationUseCase";
 
@@ -212,6 +214,32 @@ class StubCancellationSignalPort implements IRunExecutionCancellationSignalPort 
   ): Promise<RunExecutionCancellationSignalResult> {
     this.requests.push(request);
     return this.nextResult;
+  }
+}
+
+class InMemoryRunCancellationAuthorization implements IAuthoritativeRunMutationAuthorizationPort {
+  public readonly deniedRunIds = new Set<string>();
+  public readonly calls: Array<{
+    readonly runId: string;
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId: string;
+  }> = [];
+
+  public async canCancelRun(input: {
+    readonly runId: string;
+    readonly workspaceId?: string;
+    readonly actor: {
+      readonly actorUserIdentityId: string;
+      readonly activeWorkspaceId?: string;
+      readonly authenticatedAt?: string;
+    };
+  }): Promise<boolean> {
+    this.calls.push({
+      runId: input.runId,
+      workspaceId: input.workspaceId,
+      actorUserIdentityId: input.actor.actorUserIdentityId,
+    });
+    return !this.deniedRunIds.has(input.runId);
   }
 }
 
@@ -552,6 +580,130 @@ describe("RequestAuthoritativeRunCancellationUseCase", () => {
     expect(result.signalResult?.status).toBe("not-supported");
     expect(intentRepository.events).toHaveLength(1);
     expect(intentRepository.events[0]?.details?.signal).toBeDefined();
+  });
+
+  it("keeps cancellation explicit and non-terminal when backend cancellation signaling degrades", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const signalPort = new StubCancellationSignalPort();
+    signalPort.nextResult = Object.freeze({
+      status: "failed",
+      safeCode: "transport-timeout",
+      safeMessage: "Cancellation request timed out at backend boundary.",
+    });
+
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:running-signal-degraded",
+      state: RunLifecycleStates.running,
+      withClaim: true,
+    });
+
+    const useCase = new RequestAuthoritativeRunCancellationUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      cancellationSignalPort: signalPort,
+      now: () => new Date("2026-04-07T12:10:00.000Z"),
+    });
+
+    const result = await useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      request: Object.freeze({
+        runId: "run:running-signal-degraded",
+        requestedAt: "2026-04-07T12:10:00.000Z",
+      }),
+    });
+
+    expect(result.outcome).toBe(RunCancellationOutcomes.cancellationRequested);
+    expect(result.mutation.run.state).toBe(RunLifecycleStates.cancelling);
+    expect(result.signalResult?.status).toBe("failed");
+    expect(result.status.state).toBe(RunLifecycleStates.cancelling);
+  });
+
+  it("denies cancellation when run-level authorization rejects the actor", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const authorization = new InMemoryRunCancellationAuthorization();
+
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:denied",
+      state: RunLifecycleStates.queued,
+      withClaim: true,
+    });
+    authorization.deniedRunIds.add("run:denied");
+
+    const useCase = new RequestAuthoritativeRunCancellationUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      authorization,
+      now: () => new Date("2026-04-07T12:10:00.000Z"),
+    });
+
+    await expect(useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      authorization: Object.freeze({
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      }),
+      request: Object.freeze({
+        runId: "run:denied",
+        requestedAt: "2026-04-07T12:10:00.000Z",
+      }),
+    })).rejects.toBeInstanceOf(RunCancellationUnauthorizedError);
+
+    expect(authorization.calls).toHaveLength(1);
+    expect(intentRepository.events).toHaveLength(1);
+    expect(intentRepository.events[0]?.outcome).toBe("rejected");
+    expect(intentRepository.events[0]?.details?.outcome).toBe("denied");
+  });
+
+  it("allows cancellation when run-level authorization allows the actor", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const authorization = new InMemoryRunCancellationAuthorization();
+
+    seedRun({
+      runRepository,
+      queueRepository,
+      runId: "run:allowed",
+      state: RunLifecycleStates.queued,
+      withClaim: true,
+    });
+
+    const useCase = new RequestAuthoritativeRunCancellationUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      authorization,
+      now: () => new Date("2026-04-07T12:10:00.000Z"),
+    });
+
+    const result = await useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      authorization: Object.freeze({
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      }),
+      request: Object.freeze({
+        runId: "run:allowed",
+        requestedAt: "2026-04-07T12:10:00.000Z",
+      }),
+    });
+
+    expect(authorization.calls).toHaveLength(1);
+    expect(result.outcome).toBe(RunCancellationOutcomes.cancelled);
+    expect(result.mutation.run.state).toBe(RunLifecycleStates.cancelled);
   });
 
   it("emits authoritative run cancellation events through centralized recorder when configured", async () => {

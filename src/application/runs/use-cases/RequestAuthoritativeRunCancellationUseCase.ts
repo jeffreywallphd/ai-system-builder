@@ -13,6 +13,10 @@ import type {
   IRunExecutionCancellationSignalPort,
   RunExecutionCancellationSignalResult,
 } from "@application/runs/ports/RunExecutionCancellationPorts";
+import type {
+  AuthoritativeRunMutationAuthorizationActor,
+  IAuthoritativeRunMutationAuthorizationPort,
+} from "@application/runs/ports/RunMutationAuthorizationPorts";
 import { RunExecutionBackendKinds, type RunExecutionBackendKind } from "@application/runs/ports/RunExecutionDispatchPorts";
 import {
   RunMutationActions,
@@ -159,11 +163,19 @@ export class RunCancellationNotFoundError extends Error {
   }
 }
 
+export class RunCancellationUnauthorizedError extends Error {
+  public constructor(runId: string, actorUserIdentityId: string) {
+    super(`Actor '${actorUserIdentityId}' is not authorized to cancel run '${runId}'.`);
+    this.name = "RunCancellationUnauthorizedError";
+  }
+}
+
 export const RunCancellationOutcomes = Object.freeze({
   cancelled: "cancelled",
   cancellationRequested: "cancellation-requested",
   alreadyFinalized: "already-finalized",
   alreadyCancelling: "already-cancelling",
+  denied: "denied",
 });
 
 export type RunCancellationOutcome = typeof RunCancellationOutcomes[keyof typeof RunCancellationOutcomes];
@@ -171,6 +183,7 @@ export type RunCancellationOutcome = typeof RunCancellationOutcomes[keyof typeof
 export interface RequestAuthoritativeRunCancellation {
   readonly workspaceId: string;
   readonly actorUserIdentityId: string;
+  readonly authorization?: AuthoritativeRunMutationAuthorizationActor;
   readonly request: RunCancellationRequest;
   readonly correlationId?: string;
 }
@@ -186,6 +199,7 @@ interface RequestAuthoritativeRunCancellationUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
+  readonly authorization?: IAuthoritativeRunMutationAuthorizationPort;
   readonly cancellationSignalPort?: IRunExecutionCancellationSignalPort;
   readonly transactionManager?: IPlatformTransactionManager;
   readonly now?: () => Date;
@@ -229,9 +243,33 @@ export class RequestAuthoritativeRunCancellationUseCase {
 
       const current = mapPlatformRunRecordToCanonicalRun(persisted);
       const normalizedRequestedBy = normalizeOptional(input.request.requestedByActorId) ?? actorUserIdentityId;
+      const authorizationActor = resolveAuthorizationActor(input.authorization, workspaceId, actorUserIdentityId);
+      const allowed = this.dependencies.authorization
+        ? await this.dependencies.authorization.canCancelRun({
+          runId: current.identity.runId,
+          workspaceId: current.identity.workspaceId,
+          actor: authorizationActor,
+        })
+        : true;
 
       const operationKey = `run:cancel:${runId}:${operationSuffix}`;
       const correlationId = normalizeOptional(input.correlationId);
+
+      if (!allowed) {
+        await this.appendCancellationAuditEvent({
+          run: current,
+          actorId: actorUserIdentityId,
+          requestedAt,
+          outcome: RunCancellationOutcomes.denied,
+          fromState: current.state,
+          toState: current.state,
+          reason,
+          signalResult: undefined,
+          idempotencyKey: input.request.idempotencyKey,
+          correlationId,
+        });
+        throw new RunCancellationUnauthorizedError(runId, actorUserIdentityId);
+      }
 
       if (current.state === RunLifecycleStates.completed
         || current.state === RunLifecycleStates.failed
@@ -526,6 +564,7 @@ export class RequestAuthoritativeRunCancellationUseCase {
       userIdentityId: input.run.submission.submittedByActorId,
       targetRef: `run:${input.run.identity.runId}`,
       outcome: input.outcome === RunCancellationOutcomes.alreadyFinalized
+        || input.outcome === RunCancellationOutcomes.denied
         ? "rejected"
         : "succeeded",
       occurredAt: input.requestedAt,
@@ -562,6 +601,7 @@ export class RequestAuthoritativeRunCancellationUseCase {
         eventType: "run-cancellation-requested",
         action: "run.cancellation.requested",
         outcome: input.outcome === RunCancellationOutcomes.alreadyFinalized
+          || input.outcome === RunCancellationOutcomes.denied
           ? AuditEventOutcomes.denied
           : AuditEventOutcomes.succeeded,
         occurredAt: input.requestedAt,
@@ -614,6 +654,18 @@ export class RequestAuthoritativeRunCancellationUseCase {
 
 function resolveCancellationReasonCode(
   outcome: RunCancellationOutcome,
-): "cancelled" | "cancellation-requested" | "already-finalized" | "already-cancelling" {
+): "cancelled" | "cancellation-requested" | "already-finalized" | "already-cancelling" | "denied" {
   return outcome;
+}
+
+function resolveAuthorizationActor(
+  input: AuthoritativeRunMutationAuthorizationActor | undefined,
+  workspaceId: string,
+  actorUserIdentityId: string,
+): AuthoritativeRunMutationAuthorizationActor {
+  return Object.freeze({
+    actorUserIdentityId,
+    activeWorkspaceId: normalizeOptional(input?.activeWorkspaceId) ?? workspaceId,
+    authenticatedAt: normalizeOptional(input?.authenticatedAt),
+  });
 }

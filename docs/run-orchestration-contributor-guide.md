@@ -113,11 +113,13 @@ Provide an implementation checklist for contributors extending the authoritative
 
 1. Keep cancellation transition logic in `RequestAuthoritativeRunCancellationUseCase`.
 2. Add backend cancellation signaling only through `IRunExecutionCancellationSignalPort` implementations.
+3. Keep cancellation authorization checks in application seams through `IAuthoritativeRunMutationAuthorizationPort` (`src/application/runs/ports/RunMutationAuthorizationPorts.ts`) rather than transport-only checks.
+4. Preserve explicit degraded semantics for in-flight cancellation (`cancelling` + signal outcome metadata) when backend cancellation cannot be guaranteed.
+5. Keep cancellation queue/claim coordination in application use cases; do not release claims directly from route handlers.
    - Authoritative host registration seam: `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
    - Comfy bridge implementation: `src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`
-3. Preserve explicit cancellation outcomes by lifecycle position (immediate terminal, cancellation-requested, or terminal no-op).
-4. Keep cancellation queue/claim coordination in application use cases; do not release claims directly from route handlers.
-5. Keep cancellation telemetry split: canonical run cancellation state for user-safe visibility, audit + metadata for operator diagnostics.
+6. Preserve explicit cancellation outcomes by lifecycle position (immediate terminal, cancellation-requested, or terminal no-op).
+7. Keep cancellation telemetry split: canonical run cancellation state for user-safe visibility, audit + metadata for operator diagnostics.
 
 ## Extending retry and rerun orchestration
 

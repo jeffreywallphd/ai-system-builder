@@ -9,6 +9,8 @@ Story 16.3.1 implements authoritative cancellation behavior for queued and in-fl
 ## Implemented seams
 - Cancellation signaling port:
   - `src/application/runs/ports/RunExecutionCancellationPorts.ts`
+- Cancellation authorization port:
+  - `src/application/runs/ports/RunMutationAuthorizationPorts.ts`
 - Application cancellation orchestration:
   - `src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts`
 - Backend API cancellation entry:
@@ -25,5 +27,11 @@ Story 16.3.1 implements authoritative cancellation behavior for queued and in-fl
 
 ## Guardrails
 - Cancellation signaling is decoupled behind a port and never invoked directly from transport handlers.
+- Cancellation authorization is enforced in the application use case via mutation-authorization ports, not only at API boundaries.
 - Cancellation request/result visibility remains explicit via canonical run cancellation state plus run audit events.
 - Queue claim release and queue finalization are coordinated from the cancellation use case instead of transport/infrastructure shortcuts.
+
+## Degraded cancellation semantics
+- `running` and `dispatching` cancellation remains best-effort; backend signal outcomes can be `not-supported`, `rejected`, or `failed`.
+- Degraded signaling does not fabricate terminal cancellation; lifecycle remains `cancelling` until authoritative execution updates resolve terminal state.
+- Denied cancellation attempts are explicit, auditable rejected outcomes with no lifecycle mutation.

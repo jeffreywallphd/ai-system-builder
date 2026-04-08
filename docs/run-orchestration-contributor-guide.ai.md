@@ -68,9 +68,11 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 ## Cancellation extension guidance
 - Keep cancellation orchestration in `RequestAuthoritativeRunCancellationUseCase`.
 - Add backend cancellation integration only behind `IRunExecutionCancellationSignalPort`.
-  - authoritative registration seam: `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
-  - Comfy cancellation bridge: `src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`
+- Keep cancellation authorization in application seams through `IAuthoritativeRunMutationAuthorizationPort` (`src/application/runs/ports/RunMutationAuthorizationPorts.ts`), not only transport/API checks.
+- authoritative registration seam: `src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`
+- Comfy cancellation bridge: `src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`
 - Keep lifecycle-position-dependent outcomes explicit (terminal cancel, cancelling request, terminal no-op).
+- Keep degraded signaling semantics explicit (`not-supported`/`rejected`/`failed`) while lifecycle remains authoritative (`cancelling`) until execution updates finalize.
 - Keep queue claim release/finalization coordination in application seams, not transport handlers.
 
 ## Retry/rerun extension guidance
