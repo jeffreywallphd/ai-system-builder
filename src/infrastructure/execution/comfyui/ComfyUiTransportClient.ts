@@ -86,6 +86,7 @@ export interface ComfyUiTransportLogger {
 export interface ComfyUiTransportClientOptions {
   readonly baseUrl: string;
   readonly requestTimeoutMs?: number;
+  readonly authToken?: string;
   readonly fetch?: typeof fetch;
   readonly now?: () => Date;
   readonly logger?: ComfyUiTransportLogger;
@@ -146,6 +147,7 @@ export interface ComfyUiBackendProbeResult {
 export class ComfyUiTransportClient {
   private readonly baseUrl: string;
   private readonly requestTimeoutMs: number;
+  private readonly authToken?: string;
   private readonly fetchFn: typeof fetch;
   private readonly now: () => Date;
   private readonly logger?: ComfyUiTransportLogger;
@@ -165,6 +167,7 @@ export class ComfyUiTransportClient {
 
     this.baseUrl = normalizedBaseUrl;
     this.requestTimeoutMs = normalizePositiveInteger(options.requestTimeoutMs, 30_000);
+    this.authToken = options.authToken?.trim() || undefined;
     this.fetchFn = options.fetch ?? globalThis.fetch;
     this.now = options.now ?? (() => new Date());
     this.logger = options.logger;
@@ -529,6 +532,7 @@ export class ComfyUiTransportClient {
     try {
       const response = await this.fetchFn(url, {
         ...input.init,
+        headers: resolveHeadersWithAuthToken(input.init.headers, this.authToken),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -620,6 +624,21 @@ export class ComfyUiTransportClient {
       details: error.diagnostics.details,
     }));
   }
+}
+
+function resolveHeadersWithAuthToken(
+  initHeaders: HeadersInit | undefined,
+  authToken: string | undefined,
+): HeadersInit | undefined {
+  if (!authToken) {
+    return initHeaders;
+  }
+
+  const headers = new Headers(initHeaders);
+  if (!headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${authToken}`);
+  }
+  return headers;
 }
 
 function normalizePromptRequest(input: ComfyWorkflowDto): ComfyWorkflowDto {

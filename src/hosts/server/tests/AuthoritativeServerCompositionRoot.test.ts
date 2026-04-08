@@ -15,6 +15,7 @@ import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "@infrastructure/config/HostServiceRegistration";
 import {
+  AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
   AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
@@ -249,6 +250,60 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedRouteFamilyIds).toContain("run-read");
     expect(observedRouteFamilyIds).toContain("run-mutation");
     expect(observedRouteFamilyIds).toContain("run-execution-update");
+    await runtime.stop();
+  });
+
+  it("composes ComfyUI execution adapter infrastructure through dependencies stage when enabled by environment", async () => {
+    let observedComfyBaseUrl: string | undefined;
+    let observedComfyEnabled: boolean | undefined;
+    let observedComfyHasAuthToken: boolean | undefined;
+
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5310,
+        address: "127.0.0.1:5310",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.dependencies]: (context) => {
+            const composed = context.getArtifact<{
+              readonly config: {
+                readonly enabled: boolean;
+                readonly baseUrl?: string;
+                toSafeSnapshot(): Readonly<Record<string, unknown>>;
+              };
+            }>(AuthoritativeServerComfyUiExecutionAdapterArtifactKey);
+            const snapshot = composed?.config.toSafeSnapshot();
+            observedComfyEnabled = composed?.config.enabled;
+            observedComfyBaseUrl = composed?.config.baseUrl;
+            observedComfyHasAuthToken = snapshot?.hasAuthToken === true;
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-comfyui-composition-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+      environment: {
+        AI_LOOM_COMFYUI_ADAPTER_ENABLED: "true",
+        AI_LOOM_COMFYUI_BASE_URL: "http://127.0.0.1:8188/",
+        AI_LOOM_COMFYUI_AUTH_TOKEN: "super-secret",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedComfyEnabled).toBeTrue();
+    expect(observedComfyBaseUrl).toBe("http://127.0.0.1:8188");
+    expect(observedComfyHasAuthToken).toBeTrue();
     await runtime.stop();
   });
 

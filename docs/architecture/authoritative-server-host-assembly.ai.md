@@ -27,6 +27,12 @@
   - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`
   - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`
   - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
+  - `AI_LOOM_COMFYUI_ADAPTER_ENABLED`
+  - `AI_LOOM_COMFYUI_BASE_URL`
+  - `AI_LOOM_COMFYUI_REQUEST_TIMEOUT_MS`
+  - `AI_LOOM_COMFYUI_CAPABILITY_PROBE_ON_STARTUP`
+  - `AI_LOOM_COMFYUI_REQUIRED_NODE_TYPES`
+  - `AI_LOOM_COMFYUI_AUTH_TOKEN`
 - Script-mode behavior:
   - starts host
   - logs runtime address/phase
@@ -48,6 +54,7 @@
   - `src/infrastructure/transport/http-server/authoritative-route-families/*`
 - Startup behavior:
   - `dependencies` stage composes route registration artifact
+  - `dependencies` stage also composes optional ComfyUI execution adapter infrastructure artifact when Comfy adapter config is enabled
   - `feature-registration` stage asserts authoritative required route-family coverage before transport start
 
 ## Entrypoint consumers

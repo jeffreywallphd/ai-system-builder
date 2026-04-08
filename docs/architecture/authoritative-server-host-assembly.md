@@ -47,6 +47,8 @@ The host validates startup dependency coverage and authoritative service coverag
 
 During authoritative startup, the `dependencies` stage composes an API route registration plan artifact and the `feature-registration` stage validates required route-family coverage before runtime host transport starts.
 
+The same `dependencies` stage now also composes optional ComfyUI execution adapter infrastructure (transport client + run-dispatch adapter + capability probe adapter) as a host startup artifact when Comfy adapter config is enabled.
+
 ## Startup expectations
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
@@ -59,6 +61,12 @@ The entrypoint defaults to a full authoritative startup dependency contract and 
 - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`: optional SQLite bootstrap fallback path.
 - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`: optional SQLite journal mode override for bootstrap/runtime initialization.
 - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`: optional SQLite foreign-key enforcement toggle for bootstrap/runtime initialization.
+- `AI_LOOM_COMFYUI_ADAPTER_ENABLED`: optional Comfy adapter toggle (`true`/`false`).
+- `AI_LOOM_COMFYUI_BASE_URL`: optional Comfy backend base URL for adapter composition.
+- `AI_LOOM_COMFYUI_REQUEST_TIMEOUT_MS`: optional Comfy transport request timeout override.
+- `AI_LOOM_COMFYUI_CAPABILITY_PROBE_ON_STARTUP`: optional capability-probe startup toggle.
+- `AI_LOOM_COMFYUI_REQUIRED_NODE_TYPES`: optional comma-separated required Comfy node types.
+- `AI_LOOM_COMFYUI_AUTH_TOKEN`: optional auth token consumed by Comfy transport requests.
 
 ### Defaults
 

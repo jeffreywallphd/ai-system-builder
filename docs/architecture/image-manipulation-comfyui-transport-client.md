@@ -8,10 +8,13 @@ This note documents Story 3.2.2 for Feature 3 / Epic 3.2:
 ## Canonical implementation seams
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionDispatchAdapter.ts`
+- `src/infrastructure/config/ComfyUiExecutionAdapterConfig.ts`
 - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
 
 ## Transport scope
 
@@ -64,3 +67,44 @@ The concrete transport client now includes backend probe behavior for execution-
 - `ComfyUiImageManipulationCapabilityProbeAdapter` maps transport probe output into
   `IImageManipulationExecutionCapabilityPort` (`ImageManipulationExecutionBackendStatus`).
 - Mapping keeps raw transport details inside infrastructure and emits normalized health/capability metadata suitable for readiness messaging and later run scheduling logic.
+
+## Story 3.2.4 configuration and host composition extension
+
+Adapter dependency and configuration management now has an explicit composition seam so ComfyUI execution wiring is host/infrastructure-owned instead of UI-owned:
+
+1. Canonical configuration contract
+- `ComfyUiExecutionAdapterConfig` (`src/infrastructure/config/ComfyUiExecutionAdapterConfig.ts`) centralizes:
+  - enable/disable behavior,
+  - endpoint validation (`http`/`https`),
+  - timeout defaulting,
+  - capability-probe startup toggle,
+  - required node-type declarations,
+  - optional auth token ingestion.
+- Environment-first resolution uses:
+  - `AI_LOOM_COMFYUI_ADAPTER_ENABLED`
+  - `AI_LOOM_COMFYUI_BASE_URL`
+  - `AI_LOOM_COMFYUI_REQUEST_TIMEOUT_MS`
+  - `AI_LOOM_COMFYUI_CAPABILITY_PROBE_ON_STARTUP`
+  - `AI_LOOM_COMFYUI_REQUIRED_NODE_TYPES`
+  - `AI_LOOM_COMFYUI_AUTH_TOKEN`
+  - plus bounded compatibility fallbacks (`COMFYUI_BASE_URL`, `COMFYUI_TIMEOUT_MS`, `VITE_COMFYUI_BASE_URL`).
+
+2. Concrete infrastructure composition helper
+- `createComfyUiExecutionAdapterInfrastructure(...)` in
+  `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts` creates and returns:
+  - `ComfyUiTransportClient`
+  - `ComfyUiRunExecutionTransportGateway`
+  - `ComfyUiRunExecutionDispatchAdapter`
+  - `ComfyUiImageManipulationCapabilityProbeAdapter`
+- When adapter config is disabled, composition returns `undefined` and host startup continues without Comfy adapter registration.
+
+3. Host bootstrap wiring
+- Authoritative host dependencies stage now composes the ComfyUI execution adapter infrastructure and publishes it as startup artifact:
+  - `AuthoritativeServerComfyUiExecutionAdapterArtifactKey`
+  - file: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
+- This keeps Comfy execution dependency construction inside host composition and out of UI startup paths.
+
+4. Sensitive connection detail handling
+- Adapter auth token is consumed from server environment configuration only.
+- Safe config snapshots expose `hasAuthToken` boolean instead of token value.
+- Transport logging remains bounded to operational metadata and does not include credential payloads.
