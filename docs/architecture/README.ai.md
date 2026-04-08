@@ -235,6 +235,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 7 / Epic 7.1 Story 7.1.2 studio-facing presenter contracts and composed DTO strategy (major-surface view models, centralized selectors/mappers, standardized loading/empty/error/ready/degraded states, and hidden-by-default diagnostics): `docs/architecture/image-manipulation-studio-presenter-contracts.md`
 - Feature 7 / Epic 7.1 Story 7.1.3 user-facing studio UX language posture and primary-vs-advanced terminology rules: `docs/architecture/image-manipulation-studio-ux-language-guidelines.md`
 - Feature 7 / Epic 7.1 Story 7.1.4 full studio architecture and UX-composition posture (Feature 1-6 composition, authoritative guardrails, and seam ownership split across state/presenter/components/API services): `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
+- Feature 7 / Epic 7.4 Story 7.4.4 completion verification and Feature 8 integration guidance (flow baseline, explicit boundaries, verification cross-references, and resilience extension points): `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

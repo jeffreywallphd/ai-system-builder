@@ -299,3 +299,43 @@ Posture preserved:
 - no backend-local filesystem identity is treated as canonical,
 - tests are resilient integration checks for vertical-slice regressions.
 
+## Epic 7.4 Story 7.4.4 implementation update
+
+Story 7.4.4 captures Feature 7 completion verification and defines follow-on Feature 8 integration boundaries so resilience work layers on top of an already coherent studio UX.
+
+Feature 7 completion baseline:
+
+- End-to-end studio flow is now cohesive across image entry, edit selection, settings, readiness/precheck, launch, run monitoring, result review, and continuation/reopen.
+- Authority boundaries remain explicit:
+  - image/workflow/system/run/result truth stays in authoritative APIs and persisted records,
+  - interaction/presenter contracts remain shared and canonical for step gating + surface-state mapping,
+  - components remain presentation/composition shells and do not become local orchestration authorities.
+- Primary UX language remains non-technical and stable (`Choose image` -> `Review results`), with backend IDs/details kept advanced-only.
+- Multi-surface posture remains bounded: desktop is full-authoring; narrow/thin variants are continuity-focused and accessibility-safe, not separate local authoring models.
+
+Cross-reference verification coverage:
+
+- `src/infrastructure/api/studio-shell/tests/ImageManipulationStudioVerticalSlice.integration.test.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputPersistenceFlow.test.ts`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterForm.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowSelectionPresenter.test.ts`
+- `src/ui/services/tests/ImageAssetManagementService.test.ts`
+- `src/ui/services/tests/RuntimeOperationsService.test.ts`
+
+Feature 8 extension posture (validation/error/resilience):
+
+- Validation: extend authoritative readiness/validation contracts and shared presenter mapping; do not add component-local validation authorities.
+- Error handling: extend normalized error categories/retryability hints/safe copy in shared runtime-service seams; keep raw technical/provider detail advanced-only.
+- Operational resilience: add retry/backoff/reconciliation/timeout behavior in orchestration/runtime layers first, then project into interaction/presenter models.
+- Observability: carry correlation/lifecycle diagnostics through authoritative run/status/result pathways and tests; avoid parallel local telemetry truth.
+
+Known limits and intentional non-goals at Feature 7 completion:
+
+- no full mobile authoring parity (thin surfaces stay continuity-focused),
+- no primary-surface exposure of advanced operational diagnostics,
+- no new provider-negotiation model beyond existing readiness/execution adapter posture,
+- no promotion of backend filesystem paths/provider-local IDs to canonical/user-facing identity,
+- no collapse of clean architecture by moving orchestration/persistence truth into renderer-local component state.
+
