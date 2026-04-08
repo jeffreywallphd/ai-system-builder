@@ -278,6 +278,59 @@ describe("ImageWorkflowSystemReadinessValidationService", () => {
 
     expect(assessment.blocking).toBeTrue();
     expect(assessment.issues.some((issue) => issue.code === "required-parameter-not-declared-by-workflow")).toBeTrue();
+    expect(assessment.issues.some((issue) => issue.code === "workflow-required-parameter-not-required-by-system")).toBeTrue();
     expect(assessment.issues.some((issue) => issue.code === "workflow-contract-incompatible")).toBeTrue();
+  });
+
+  it("flags stale/incompatible configured bindings not declared by workflow", () => {
+    const service = new ImageWorkflowSystemReadinessValidationService();
+    const workflow = createWorkflow();
+    const system = createSystem(workflow, {
+      inputAssetSelections: [{
+        inputId: "unknown-input",
+        assetReference: "asset://source-image",
+      }],
+      outputTargetBindings: [{
+        outputId: "unknown-output",
+        targetReference: "dataset-instance://output",
+      }],
+      parameterBaseline: {
+        values: {
+          unknownParameter: 1,
+        },
+        profileReferences: [],
+      },
+    });
+
+    const issues = service.evaluateSystemBindingCompatibility({
+      workflow,
+      system,
+    });
+
+    expect(issues.some((issue) => issue.code === "selected-input-not-declared-by-workflow")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "configured-output-not-declared-by-workflow")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "baseline-parameter-not-declared-by-workflow")).toBeTrue();
+  });
+
+  it("flags when system binding omits required workflow ids", () => {
+    const service = new ImageWorkflowSystemReadinessValidationService();
+    const workflow = createWorkflow();
+    const system = createSystem(workflow, {
+      workflowBinding: {
+        ...createSystem(workflow).workflowBinding,
+        requiredInputIds: [],
+        requiredParameterIds: [],
+        requiredOutputIds: [],
+      },
+    });
+
+    const issues = service.evaluateSystemBindingCompatibility({
+      workflow,
+      system,
+    });
+
+    expect(issues.some((issue) => issue.code === "workflow-required-input-not-required-by-system")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "workflow-required-parameter-not-required-by-system")).toBeTrue();
+    expect(issues.some((issue) => issue.code === "workflow-required-output-not-required-by-system")).toBeTrue();
   });
 });

@@ -59,7 +59,14 @@ export class GetImageSystemDefinitionUseCase {
         correlationId: request.correlationId,
       });
 
-      const readiness = toImageSystemDefinitionReadinessSummary(system, context.occurredAtIso);
+      const workflow = await this.ports.workflowRepository.findWorkflowDefinitionById(
+        system.workflowBinding.workflowId,
+        {
+          workspaceId: context.workspaceId,
+          includeRetired: true,
+        },
+      );
+      const readiness = toImageSystemDefinitionReadinessSummary(system, context.occurredAtIso, workflow);
       return Object.freeze({
         system,
         readiness,

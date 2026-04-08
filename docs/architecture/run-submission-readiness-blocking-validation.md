@@ -45,6 +45,14 @@ Provide one reusable application-layer readiness evaluator for image-run submiss
 - Resolves backend readiness through execution-readiness use case integration.
 - Maps degraded/unavailable adapter state and capability incompatibilities into readiness issues.
 
+6. Story 8.2.2 configuration-hardening coverage
+- Detects stale template/configuration state before queue admission:
+  - workflow operation/template registration mismatches
+  - workflow template-version mismatches against workflow version metadata
+- Detects unsupported saved-system state combinations and workspace-binding mismatches.
+- Reuses hardened workflow/system compatibility checks so missing required slot declarations, stale slot bindings, and unknown baseline parameter ids are blocked before submission.
+- Resolves referenced assets from both explicit submission refs and persisted system input selections, so stale/missing source assets are surfaced even when caller omits manual reference lists.
+
 ## Blocking behavior and queue admission
 
 - `SubmitImageRunUseCase` invokes submission readiness after structural/policy validation and before authoritative creation.
@@ -60,3 +68,4 @@ Provide one reusable application-layer readiness evaluator for image-run submiss
   - `blockingIssues` and `advisoryIssues`
   - structured sections for `policyDenials`, `assetBinding`, `workflowValidity`, `systemValidity`, `backendReadinessDependency`, and `compatibility`
 - Service is transport-agnostic and reusable by submission APIs and studio UX without duplicating controller/UI validation logic.
+- Readiness issues now carry normalized image-manipulation issue classification + retry/recovery guidance so API and presenter layers can render consistent remediation paths.

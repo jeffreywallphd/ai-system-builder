@@ -36,6 +36,23 @@ import {
   type ImageRunSubmissionReadinessPolicyDenial,
   type ImageRunSubmissionReadinessResult,
 } from "./ImageRunSubmissionReadinessContracts";
+import {
+  createInitialSupportedImageWorkflowTemplateRegistry,
+  type InitialSupportedImageWorkflowTemplateRegistry,
+} from "./InitialSupportedImageWorkflowTemplateRegistry";
+import {
+  ImageManipulationFailureDispositions,
+  ImageManipulationFailureSummaryCategories,
+  ImageManipulationIssueKinds,
+  ImageManipulationIssueLayers,
+  createImageManipulationIssueClassification,
+  type ImageManipulationFailureSummaryCategory,
+  type ImageManipulationIssueClassification,
+} from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import {
+  deriveImageManipulationRetryRecoveryContractFromClassification,
+  type ImageManipulationRetryRecoveryContract,
+} from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 import { ImageWorkflowSystemReadinessValidationService } from "./ImageWorkflowSystemReadinessValidationService";
 import type {
   IImageRunReadinessResolver,
@@ -52,6 +69,10 @@ export interface ImageRunSubmissionReadinessValidationServiceDependencies {
   readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
   readonly executionReadinessUseCase?: Pick<GetImageManipulationExecutionReadinessUseCase, "execute">;
   readonly workflowSystemReadinessValidationService?: Pick<ImageWorkflowSystemReadinessValidationService, "evaluateSystemBindingCompatibility">;
+  readonly supportedTemplateRegistry?: Pick<
+    InitialSupportedImageWorkflowTemplateRegistry,
+    "getByOperationKind" | "isOperationSupported"
+  >;
   readonly now?: () => Date;
 }
 
@@ -63,11 +84,14 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
   private readonly now: () => Date;
 
   private readonly workflowSystemReadinessValidationService: Pick<ImageWorkflowSystemReadinessValidationService, "evaluateSystemBindingCompatibility">;
+  private readonly supportedTemplateRegistry: Pick<InitialSupportedImageWorkflowTemplateRegistry, "getByOperationKind" | "isOperationSupported">;
 
   public constructor(private readonly dependencies: ImageRunSubmissionReadinessValidationServiceDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.workflowSystemReadinessValidationService = dependencies.workflowSystemReadinessValidationService
       ?? new ImageWorkflowSystemReadinessValidationService();
+    this.supportedTemplateRegistry = dependencies.supportedTemplateRegistry
+      ?? createInitialSupportedImageWorkflowTemplateRegistry();
   }
 
   public async resolveRunSubmissionReadiness(
@@ -238,6 +262,29 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
       }));
     }
 
+    if (system.workflowBinding.workflowWorkspaceId !== system.ownership.workspaceId) {
+      issues.push(this.blockingIssue({
+        code: "submission-system-workflow-workspace-mismatch",
+        summary:
+          `Image system '${system.systemId}' has workflow binding workspace '${system.workflowBinding.workflowWorkspaceId}' outside system workspace '${system.ownership.workspaceId}'.`,
+        category: ImageRunSubmissionReadinessIssueCategories.systemValidity,
+        path: "system.workflowBinding.workflowWorkspaceId",
+      }));
+    }
+
+    if (
+      system.lifecycleState === ImageSystemLifecycleStates.archived
+      || (system.runtimeStatus === ImageSystemRuntimeStatuses.enabled && system.lifecycleState !== ImageSystemLifecycleStates.ready)
+    ) {
+      issues.push(this.blockingIssue({
+        code: "submission-system-unsupported-state",
+        summary:
+          `Image system '${system.systemId}' is in unsupported lifecycle/runtime state combination '${system.lifecycleState}/${system.runtimeStatus}'.`,
+        category: ImageRunSubmissionReadinessIssueCategories.systemValidity,
+        path: "submission.runtimeTarget.systemId",
+      }));
+    }
+
     for (const readinessIssue of evaluateImageSystemReadiness(system)) {
       issues.push(this.blockingIssue({
         code: readinessIssue.code,
@@ -311,6 +358,50 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
         summary: `Requested translation contract '${input.translationContractVersion}' does not match workflow contract '${workflow.backendTranslation.contractVersion}'.`,
         category: ImageRunSubmissionReadinessIssueCategories.workflowValidity,
         path: "submission.readiness.translationContractVersion",
+      }));
+    }
+
+    if (!this.supportedTemplateRegistry.isOperationSupported(workflow.operationKind)) {
+      issues.push(this.blockingIssue({
+        code: "submission-workflow-operation-unsupported",
+        summary: `Workflow operation '${workflow.operationKind}' is outside the supported image-template set for run submission.`,
+        category: ImageRunSubmissionReadinessIssueCategories.workflowValidity,
+        path: "workflow.operationKind",
+      }));
+      return Object.freeze(issues);
+    }
+
+    const registeredTemplate = this.supportedTemplateRegistry.getByOperationKind(workflow.operationKind);
+    if (!registeredTemplate) {
+      issues.push(this.blockingIssue({
+        code: "submission-workflow-template-unresolved",
+        summary: `No supported template registration could be resolved for operation '${workflow.operationKind}'.`,
+        category: ImageRunSubmissionReadinessIssueCategories.workflowValidity,
+        path: "workflow.backendTranslation.templateId",
+      }));
+      return Object.freeze(issues);
+    }
+
+    if (workflow.backendTranslation.templateId !== registeredTemplate.templateFamilyId) {
+      issues.push(this.blockingIssue({
+        code: "submission-workflow-template-id-mismatch",
+        summary:
+          `Workflow template '${workflow.backendTranslation.templateId}' is stale or incompatible with operation '${workflow.operationKind}' (expected '${registeredTemplate.templateFamilyId}').`,
+        category: ImageRunSubmissionReadinessIssueCategories.workflowValidity,
+        path: "workflow.backendTranslation.templateId",
+      }));
+    }
+
+    if (
+      workflow.backendTranslation.templateVersion
+      && workflow.backendTranslation.templateVersion !== workflow.version.versionTag
+    ) {
+      issues.push(this.blockingIssue({
+        code: "submission-workflow-template-version-mismatch",
+        summary:
+          `Workflow template version '${workflow.backendTranslation.templateVersion}' does not match workflow version '${workflow.version.versionTag}'.`,
+        category: ImageRunSubmissionReadinessIssueCategories.workflowValidity,
+        path: "workflow.backendTranslation.templateVersion",
       }));
     }
 
@@ -502,6 +593,19 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
       const normalized = normalizeOptionalString(assetId);
       if (normalized) {
         referencedAssetIds.add(normalized);
+      }
+    }
+    for (const selection of input.system?.inputAssetSelections ?? []) {
+      const normalizedAssetId = normalizeAssetIdReference(selection.assetReference);
+      if (normalizedAssetId) {
+        referencedAssetIds.add(normalizedAssetId);
+      } else {
+        issues.push(this.blockingIssue({
+          code: "submission-input-asset-reference-malformed",
+          summary: `Input selection '${selection.inputId}' has malformed asset reference '${selection.assetReference}'.`,
+          category: ImageRunSubmissionReadinessIssueCategories.assetBinding,
+          path: `system.inputAssetSelections.${selection.inputId}`,
+        }));
       }
     }
 
@@ -704,7 +808,7 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
     readonly path: string;
     readonly details?: Readonly<Record<string, unknown>>;
   }): ImageRunSubmissionReadinessIssue {
-    return Object.freeze({
+    return this.createReadinessIssue({
       code: input.code,
       summary: input.summary,
       category: input.category,
@@ -722,7 +826,7 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
     readonly path: string;
     readonly details?: Readonly<Record<string, unknown>>;
   }): ImageRunSubmissionReadinessIssue {
-    return Object.freeze({
+    return this.createReadinessIssue({
       code: input.code,
       summary: input.summary,
       category: input.category,
@@ -732,9 +836,125 @@ export class ImageRunSubmissionReadinessValidationService implements Pick<IImage
       details: input.details,
     });
   }
+
+  private createReadinessIssue(input: {
+    readonly code: string;
+    readonly summary: string;
+    readonly category: ImageRunSubmissionReadinessIssue["category"];
+    readonly severity: "error" | "warning";
+    readonly blocking: boolean;
+    readonly path?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): ImageRunSubmissionReadinessIssue {
+    const classification = classifySubmissionReadinessIssue(input);
+    const recovery = deriveImageManipulationRetryRecoveryContractFromClassification({
+      classification,
+      retryable: classification.disposition === ImageManipulationFailureDispositions.retryable,
+    });
+    return Object.freeze({
+      code: input.code,
+      summary: input.summary,
+      category: input.category,
+      severity: input.severity,
+      blocking: input.blocking,
+      path: input.path,
+      details: input.details,
+      classification,
+      recovery,
+    });
+  }
 }
 
 function normalizeOptionalString(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function normalizeAssetIdReference(value: string): string | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  if (!normalized.includes("://")) {
+    return normalized;
+  }
+  if (!normalized.startsWith("asset://")) {
+    return undefined;
+  }
+  const assetId = normalized.slice("asset://".length).trim();
+  return assetId ? assetId : undefined;
+}
+
+function classifySubmissionReadinessIssue(input: {
+  readonly code: string;
+  readonly category: ImageRunSubmissionReadinessIssue["category"];
+  readonly severity: "error" | "warning";
+}): ImageManipulationIssueClassification {
+  const layer = resolveReadinessIssueLayer(input.category);
+  const kind = input.category === ImageRunSubmissionReadinessIssueCategories.backendReadinessDependency
+    ? ImageManipulationIssueKinds.operational
+    : ImageManipulationIssueKinds.validation;
+  const summaryCategory = resolveReadinessSummaryCategory(input);
+  const retryable = kind === ImageManipulationIssueKinds.operational
+    && input.severity === "warning";
+  return createImageManipulationIssueClassification({
+    layer,
+    kind,
+    summaryCategory,
+    disposition: retryable
+      ? ImageManipulationFailureDispositions.retryable
+      : ImageManipulationFailureDispositions.terminal,
+    reason: toReadinessReasonCode(input.code),
+    userFixable: kind === ImageManipulationIssueKinds.validation,
+    degraded: retryable || input.category === ImageRunSubmissionReadinessIssueCategories.backendReadinessDependency,
+  });
+}
+
+function resolveReadinessIssueLayer(
+  category: ImageRunSubmissionReadinessIssue["category"],
+) {
+  if (category === ImageRunSubmissionReadinessIssueCategories.workflowValidity
+    || category === ImageRunSubmissionReadinessIssueCategories.systemValidity
+    || category === ImageRunSubmissionReadinessIssueCategories.compatibility) {
+    return ImageManipulationIssueLayers.workflowConfiguration;
+  }
+  if (category === ImageRunSubmissionReadinessIssueCategories.backendReadinessDependency) {
+    return ImageManipulationIssueLayers.nodeAvailability;
+  }
+  return ImageManipulationIssueLayers.runReadiness;
+}
+
+function resolveReadinessSummaryCategory(input: {
+  readonly code: string;
+  readonly category: ImageRunSubmissionReadinessIssue["category"];
+}): ImageManipulationFailureSummaryCategory {
+  if (input.category === ImageRunSubmissionReadinessIssueCategories.backendReadinessDependency) {
+    if (input.code.includes("timeout")) {
+      return ImageManipulationFailureSummaryCategories.timeout;
+    }
+    if (input.code.includes("connect") || input.code.includes("unavailable")) {
+      return ImageManipulationFailureSummaryCategories.connectivity;
+    }
+    if (input.code.includes("node") || input.code.includes("backend")) {
+      return ImageManipulationFailureSummaryCategories.capacity;
+    }
+    return ImageManipulationFailureSummaryCategories.execution;
+  }
+  if (input.code.includes("translation")) {
+    return ImageManipulationFailureSummaryCategories.translation;
+  }
+  if (input.code.includes("template")) {
+    return ImageManipulationFailureSummaryCategories.translation;
+  }
+  return ImageManipulationFailureSummaryCategories.validation;
+}
+
+function toReadinessReasonCode(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "")
+    || "unknown";
 }

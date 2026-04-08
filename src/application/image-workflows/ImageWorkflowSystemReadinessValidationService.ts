@@ -210,8 +210,26 @@ export class ImageWorkflowSystemReadinessValidationService {
     readonly system: ImageSystemDefinition;
   }): ReadonlyArray<ImageSystemBindingCompatibilityIssue> {
     const workflowInputIds = new Set(input.workflow.inputSlots.map((entry) => entry.inputId));
+    const requiredWorkflowInputIds = new Set(
+      input.workflow.inputSlots
+        .filter((entry) => entry.required)
+        .map((entry) => entry.inputId),
+    );
     const workflowParameterIds = new Set(input.workflow.parameterSpecifications.map((entry) => entry.parameterId));
+    const requiredWorkflowParameterIds = new Set(
+      input.workflow.parameterSpecifications
+        .filter((entry) => entry.required)
+        .map((entry) => entry.parameterId),
+    );
     const workflowOutputIds = new Set(input.workflow.outputExpectations.map((entry) => entry.outputId));
+    const requiredWorkflowOutputIds = new Set(
+      input.workflow.outputExpectations
+        .filter((entry) => entry.required)
+        .map((entry) => entry.outputId),
+    );
+    const systemRequiredInputIds = new Set(input.system.workflowBinding.requiredInputIds);
+    const systemRequiredParameterIds = new Set(input.system.workflowBinding.requiredParameterIds);
+    const systemRequiredOutputIds = new Set(input.system.workflowBinding.requiredOutputIds);
     const issues: ImageSystemBindingCompatibilityIssue[] = [];
 
     for (const requiredInputId of input.system.workflowBinding.requiredInputIds) {
@@ -220,6 +238,18 @@ export class ImageWorkflowSystemReadinessValidationService {
           code: "required-input-not-declared-by-workflow",
           path: `workflowBinding.requiredInputIds.${requiredInputId}`,
           message: `Required input '${requiredInputId}' is not declared by workflow '${input.workflow.workflowId}'.`,
+          severity: "error",
+        }));
+      }
+    }
+
+    for (const requiredWorkflowInputId of requiredWorkflowInputIds) {
+      if (!systemRequiredInputIds.has(requiredWorkflowInputId)) {
+        issues.push(Object.freeze({
+          code: "workflow-required-input-not-required-by-system",
+          path: `workflowBinding.requiredInputIds.${requiredWorkflowInputId}`,
+          message:
+            `Workflow '${input.workflow.workflowId}' requires input '${requiredWorkflowInputId}', but system binding does not declare it as required.`,
           severity: "error",
         }));
       }
@@ -236,12 +266,72 @@ export class ImageWorkflowSystemReadinessValidationService {
       }
     }
 
+    for (const requiredWorkflowParameterId of requiredWorkflowParameterIds) {
+      if (!systemRequiredParameterIds.has(requiredWorkflowParameterId)) {
+        issues.push(Object.freeze({
+          code: "workflow-required-parameter-not-required-by-system",
+          path: `workflowBinding.requiredParameterIds.${requiredWorkflowParameterId}`,
+          message:
+            `Workflow '${input.workflow.workflowId}' requires parameter '${requiredWorkflowParameterId}', but system binding does not declare it as required.`,
+          severity: "error",
+        }));
+      }
+    }
+
     for (const requiredOutputId of input.system.workflowBinding.requiredOutputIds) {
       if (!workflowOutputIds.has(requiredOutputId)) {
         issues.push(Object.freeze({
           code: "required-output-not-declared-by-workflow",
           path: `workflowBinding.requiredOutputIds.${requiredOutputId}`,
           message: `Required output '${requiredOutputId}' is not declared by workflow '${input.workflow.workflowId}'.`,
+          severity: "error",
+        }));
+      }
+    }
+
+    for (const requiredWorkflowOutputId of requiredWorkflowOutputIds) {
+      if (!systemRequiredOutputIds.has(requiredWorkflowOutputId)) {
+        issues.push(Object.freeze({
+          code: "workflow-required-output-not-required-by-system",
+          path: `workflowBinding.requiredOutputIds.${requiredWorkflowOutputId}`,
+          message:
+            `Workflow '${input.workflow.workflowId}' requires output '${requiredWorkflowOutputId}', but system binding does not declare it as required.`,
+          severity: "error",
+        }));
+      }
+    }
+
+    for (const selection of input.system.inputAssetSelections) {
+      if (!workflowInputIds.has(selection.inputId)) {
+        issues.push(Object.freeze({
+          code: "selected-input-not-declared-by-workflow",
+          path: `inputAssetSelections.${selection.inputId}`,
+          message:
+            `Configured input selection '${selection.inputId}' is not declared by workflow '${input.workflow.workflowId}'.`,
+          severity: "error",
+        }));
+      }
+    }
+
+    for (const binding of input.system.outputTargetBindings) {
+      if (!workflowOutputIds.has(binding.outputId)) {
+        issues.push(Object.freeze({
+          code: "configured-output-not-declared-by-workflow",
+          path: `outputTargetBindings.${binding.outputId}`,
+          message:
+            `Configured output target '${binding.outputId}' is not declared by workflow '${input.workflow.workflowId}'.`,
+          severity: "error",
+        }));
+      }
+    }
+
+    for (const parameterId of Object.keys(input.system.parameterBaseline.values)) {
+      if (!workflowParameterIds.has(parameterId)) {
+        issues.push(Object.freeze({
+          code: "baseline-parameter-not-declared-by-workflow",
+          path: `parameterBaseline.values.${parameterId}`,
+          message:
+            `Configured baseline parameter '${parameterId}' is not declared by workflow '${input.workflow.workflowId}'.`,
           severity: "error",
         }));
       }

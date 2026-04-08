@@ -5,6 +5,7 @@ import type { GetImageManipulationExecutionReadinessUseCase } from "@application
 import {
   ImageManipulationExecutionReadinessStates,
 } from "@application/image-workflows/GetImageManipulationExecutionReadinessUseCase";
+import { InitialImageWorkflowTemplateFamilyIds } from "@application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry";
 import { AssetLifecycleStates, type Asset } from "@domain/assets/AssetDomain";
 import {
   createImageWorkflowDefinition,
@@ -286,6 +287,105 @@ describe("ImageRunSubmissionReadinessValidationService", () => {
     expect(result.blockingIssues).toHaveLength(0);
     expect(result.advisoryIssues.some((issue) => issue.code === "backend-degraded")).toBeTrue();
   });
+
+  it("blocks stale workflow template version/template-id mismatches", async () => {
+    const workflow = createWorkflow({
+      backendTranslation: Object.freeze({
+        ...createWorkflow().backendTranslation,
+        templateVersion: "0.9.0",
+        templateId: "image-template:legacy-stale:v0",
+      }),
+    });
+    const system = createSystem(workflow);
+    const service = new ImageRunSubmissionReadinessValidationService({
+      workflowRepository: new InMemoryWorkflowRepository(workflow),
+      systemRepository: new InMemorySystemRepository(system),
+      executionReadinessUseCase: new StubExecutionReadinessUseCase({
+        readiness: ImageManipulationExecutionReadinessStates.ready,
+        readyForExecution: true,
+        issues: Object.freeze([]),
+      }),
+      now: () => new Date("2026-04-08T15:00:00.000Z"),
+    });
+
+    const result = await service.resolveRunSubmissionReadiness({
+      workspaceId: "workspace-alpha",
+      systemId: "system-alpha",
+      workflowId: workflow.workflowId,
+      actorUserIdentityId: "user-owner",
+      inputAssetBindingIds: Object.freeze(["source-image"]),
+      outputBindingIds: Object.freeze(["generated-image"]),
+    });
+
+    expect(result.state).toBe("blocked");
+    expect(result.blockingIssues.some((issue) => issue.code === "submission-workflow-template-id-mismatch")).toBeTrue();
+    expect(result.blockingIssues.some((issue) => issue.code === "submission-workflow-template-version-mismatch")).toBeTrue();
+  });
+
+  it("validates asset references from persisted system input selections", async () => {
+    const workflow = createWorkflow();
+    const system = createSystem(workflow, {
+      inputAssetSelections: [Object.freeze({
+        inputId: "source-image",
+        assetReference: "asset://asset-missing-from-system-selection",
+      })],
+    });
+    const service = new ImageRunSubmissionReadinessValidationService({
+      workflowRepository: new InMemoryWorkflowRepository(workflow),
+      systemRepository: new InMemorySystemRepository(system),
+      assetRepository: new InMemoryAssetRepository([]),
+      executionReadinessUseCase: new StubExecutionReadinessUseCase({
+        readiness: ImageManipulationExecutionReadinessStates.ready,
+        readyForExecution: true,
+        issues: Object.freeze([]),
+      }),
+      now: () => new Date("2026-04-08T15:00:00.000Z"),
+    });
+
+    const result = await service.resolveRunSubmissionReadiness({
+      workspaceId: "workspace-alpha",
+      systemId: "system-alpha",
+      workflowId: workflow.workflowId,
+      actorUserIdentityId: "user-owner",
+      inputAssetBindingIds: Object.freeze(["source-image"]),
+      outputBindingIds: Object.freeze(["generated-image"]),
+    });
+
+    expect(result.state).toBe("blocked");
+    expect(result.blockingIssues.some((issue) => issue.code === "submission-referenced-asset-not-found")).toBeTrue();
+  });
+
+  it("normalizes readiness findings with taxonomy/recovery guidance", async () => {
+    const workflow = createWorkflow();
+    const system = createSystem(workflow);
+    const service = new ImageRunSubmissionReadinessValidationService({
+      workflowRepository: new InMemoryWorkflowRepository(workflow),
+      systemRepository: new InMemorySystemRepository(system),
+      executionReadinessUseCase: new StubExecutionReadinessUseCase({
+        readiness: ImageManipulationExecutionReadinessStates.degraded,
+        readyForExecution: true,
+        issues: Object.freeze([Object.freeze({
+          code: "backend-degraded",
+          severity: "warning",
+          message: "Execution backend is degraded.",
+        })]),
+      }),
+      now: () => new Date("2026-04-08T15:00:00.000Z"),
+    });
+
+    const result = await service.resolveRunSubmissionReadiness({
+      workspaceId: "workspace-alpha",
+      systemId: "system-alpha",
+      workflowId: workflow.workflowId,
+      actorUserIdentityId: "user-owner",
+      inputAssetBindingIds: Object.freeze(["source-image"]),
+      outputBindingIds: Object.freeze(["generated-image"]),
+    });
+    const advisory = result.advisoryIssues.find((issue) => issue.code === "backend-degraded");
+
+    expect(advisory?.classification?.issueCode).toContain("im.node.operational.");
+    expect(advisory?.recovery?.retry.retryEligible).toBeTrue();
+  });
 });
 
 function createWorkflow(overrides?: Partial<ImageWorkflowDefinition>): ImageWorkflowDefinition {
@@ -352,7 +452,7 @@ function createWorkflow(overrides?: Partial<ImageWorkflowDefinition>): ImageWork
     backendTranslation: Object.freeze({
       translatorId: "translator:image",
       contractVersion: "1.0.0",
-      templateId: "template:image",
+      templateId: InitialImageWorkflowTemplateFamilyIds.imageToImageRestyle,
       inputBindings: [Object.freeze({ inputId: "source-image", backendField: "inputs.source" })],
       parameterBindings: [Object.freeze({ parameterId: "strength", backendField: "inputs.strength" })],
       outputBindings: [Object.freeze({ outputId: "generated-image", backendField: "outputs.image" })],

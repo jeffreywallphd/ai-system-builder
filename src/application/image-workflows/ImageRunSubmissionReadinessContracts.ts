@@ -1,3 +1,6 @@
+import type { ImageManipulationRetryRecoveryContract } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
+import type { ImageManipulationIssueClassification } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+
 export const ImageRunSubmissionReadinessStates = Object.freeze({
   ready: "ready",
   advisory: "advisory",
@@ -38,6 +41,8 @@ export interface ImageRunSubmissionReadinessIssue {
   readonly blocking: boolean;
   readonly path?: string;
   readonly details?: Readonly<Record<string, unknown>>;
+  readonly classification?: ImageManipulationIssueClassification;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
 }
 
 export interface ImageRunSubmissionReadinessPolicyDenial {

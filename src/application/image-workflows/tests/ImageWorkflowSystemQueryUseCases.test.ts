@@ -663,6 +663,39 @@ describe("image workflow/system query use cases", () => {
     expect(result.pagination.hasMore).toBeFalse();
   });
 
+  it("marks system detail readiness as incomplete when bound workflow is missing", async () => {
+    const workflowRepository = new InMemoryWorkflowRepository();
+    const systemRepository = new InMemorySystemRepository();
+    const seededWorkflow = createWorkflow({
+      workflowId: "workflow-missing-after-save",
+      ownerUserId: "user-owner",
+      visibility: "team",
+      versionTag: "1.0.0",
+      revision: 1,
+    });
+    const system = createSystem({
+      systemId: "system-stale-binding",
+      ownerUserId: "user-owner",
+      visibility: "team",
+      workflow: seededWorkflow,
+    });
+    await seedSystem(systemRepository, system);
+
+    const useCase = new GetImageSystemDefinitionUseCase(buildPorts({
+      workflowRepository,
+      systemRepository,
+    }));
+    const result = await useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserId: "user-reader",
+      systemId: "system-stale-binding",
+    });
+
+    expect(result.readiness.ready).toBeFalse();
+    expect(result.readiness.classification).toBe("incomplete");
+    expect(result.readiness.issues.some((issue) => issue.code === "bound-workflow-not-found")).toBeTrue();
+  });
+
   it("rejects list requests when list authorization is denied", async () => {
     const useCase = new ListImageSystemDefinitionsUseCase(buildPorts({
       denyListActions: ["image-system.list"],
