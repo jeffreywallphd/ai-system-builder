@@ -29,6 +29,14 @@ export interface RecentStudioImageAsset {
   readonly updatedAt: string;
 }
 
+export interface ImageAssetOriginalContent {
+  readonly assetId: string;
+  readonly fileName: string;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly payloadBase64: string;
+}
+
 export class ImageAssetManagementService {
   private readonly baseUrl: string;
 
@@ -157,11 +165,75 @@ export class ImageAssetManagementService {
     });
   }
 
+  public async getImageAssetOriginalContent(input: {
+    readonly assetId: string;
+    readonly workspaceId: string;
+    readonly sessionToken: string;
+  }): Promise<ImageAssetManagementApiResponse<ImageAssetOriginalContent>> {
+    const route = ImageAssetTransportRoutes.getOriginalContent.replace(":assetId", encodeURIComponent(input.assetId));
+    const response = await fetch(`${this.baseUrl}${route}?workspaceId=${encodeURIComponent(input.workspaceId)}`, {
+      method: "GET",
+      headers: {
+        authorization: `Bearer ${input.sessionToken}`,
+      },
+    });
+    if (!response.ok) {
+      try {
+        return await response.json() as ImageAssetManagementApiResponse<ImageAssetOriginalContent>;
+      } catch {
+        return this.failed("internal", "Image content could not be loaded.");
+      }
+    }
+
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const mimeType = this.normalizeResponseMediaType(response.headers.get("content-type")) ?? "image/png";
+    const fileName = this.parseContentDispositionFileName(response.headers.get("content-disposition"))
+      ?? `image-${input.assetId}.png`;
+    return {
+      ok: true,
+      data: Object.freeze({
+        assetId: input.assetId,
+        fileName,
+        mimeType,
+        sizeBytes: bytes.byteLength,
+        payloadBase64: this.encodeBytesToBase64(bytes),
+      }),
+    };
+  }
+
   private normalizeMediaType(value: string): CreateImageAssetApiRequest["mediaType"] | undefined {
     if (value === "image/png" || value === "image/jpeg" || value === "image/webp") {
       return value;
     }
     return undefined;
+  }
+
+  private normalizeResponseMediaType(value: string | null): CreateImageAssetApiRequest["mediaType"] | undefined {
+    const normalized = value?.split(";")[0]?.trim().toLowerCase();
+    if (!normalized) {
+      return undefined;
+    }
+    return this.normalizeMediaType(normalized);
+  }
+
+  private parseContentDispositionFileName(value: string | null): string | undefined {
+    if (!value) {
+      return undefined;
+    }
+    const quoted = /filename="([^"]+)"/i.exec(value);
+    if (quoted?.[1]) {
+      return quoted[1];
+    }
+    const unquoted = /filename=([^;]+)/i.exec(value);
+    return unquoted?.[1]?.trim();
+  }
+
+  private encodeBytesToBase64(bytes: Uint8Array): string {
+    let binary = "";
+    for (const byte of bytes) {
+      binary += String.fromCharCode(byte);
+    }
+    return btoa(binary);
   }
 
   private async computeSha256Digest(file: File): Promise<string> {
