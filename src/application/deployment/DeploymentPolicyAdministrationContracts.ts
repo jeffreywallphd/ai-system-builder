@@ -11,6 +11,19 @@ import {
   resolveDeploymentPolicySettingDefinition,
   resolveDeploymentProfilePresetPolicyValues,
 } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
+import {
+  DeploymentPolicyAdministrationContractVersions,
+  type DeploymentPolicyAdministrationFamilySnapshot,
+  type DeploymentPolicyAdministrationSnapshot,
+  type DeploymentPolicyAdministrationState,
+  type DeploymentPolicyAdministrationStateValues,
+  type DeploymentPolicyResolvedSetting,
+  type DeploymentPolicyResolutionSource,
+  DeploymentPolicyResolutionSources,
+  createDeploymentPolicyEffectiveSummary,
+  createDeploymentPolicyProfilePresetMetadata,
+  toDeploymentPolicyValueKind,
+} from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
 
 export class DeploymentPolicyAdministrationContractsError extends Error {
   constructor(message: string) {
@@ -29,42 +42,6 @@ export const DeploymentPolicyEvaluationRequestLayers = Object.freeze({
 
 export type DeploymentPolicyEvaluationRequestLayer =
   typeof DeploymentPolicyEvaluationRequestLayers[keyof typeof DeploymentPolicyEvaluationRequestLayers];
-
-export const DeploymentPolicyResolutionSources = Object.freeze({
-  profilePreset: "profile-preset",
-  policyDefault: "policy-default",
-  adminState: "admin-state",
-});
-
-export type DeploymentPolicyResolutionSource =
-  typeof DeploymentPolicyResolutionSources[keyof typeof DeploymentPolicyResolutionSources];
-
-export interface DeploymentPolicyResolvedSetting {
-  readonly familyId: DeploymentPolicyFamilyId;
-  readonly settingKey: DeploymentPolicySettingKey;
-  readonly controlMode: DeploymentPolicyControlMode;
-  readonly value: DeploymentPolicyScalarValue;
-  readonly source: DeploymentPolicyResolutionSource;
-}
-
-export interface DeploymentPolicyAdministrationFamilySnapshot {
-  readonly familyId: DeploymentPolicyFamilyId;
-  readonly settings: Readonly<Record<DeploymentPolicySettingKey, DeploymentPolicyResolvedSetting>>;
-}
-
-export interface DeploymentPolicyAdministrationSnapshot {
-  readonly profileId: DeploymentProfileId;
-  readonly evaluatedAt: string;
-  readonly evaluationLayer: "domain" | "application";
-  readonly families: Readonly<Record<DeploymentPolicyFamilyId, DeploymentPolicyAdministrationFamilySnapshot>>;
-}
-
-export type DeploymentPolicyAdministrationStateValues =
-  Readonly<Record<DeploymentPolicyFamilyId, Readonly<Record<DeploymentPolicySettingKey, DeploymentPolicyScalarValue>>>>;
-
-export interface DeploymentPolicyAdministrationState {
-  readonly values: DeploymentPolicyAdministrationStateValues;
-}
 
 function normalizeTimestamp(value: string | Date | undefined): string {
   const candidate = value instanceof Date ? value.toISOString() : value?.trim() ?? new Date().toISOString();
@@ -167,6 +144,7 @@ export function evaluateDeploymentPolicyAdministrationSnapshot(input: {
         settingKey: setting.settingKey,
         controlMode: setting.controlMode,
         value,
+        valueType: toDeploymentPolicyValueKind(value),
         source,
       });
     }
@@ -177,10 +155,36 @@ export function evaluateDeploymentPolicyAdministrationSnapshot(input: {
     });
   }
 
+  const families = Object.freeze(familySnapshots as Record<DeploymentPolicyFamilyId, DeploymentPolicyAdministrationFamilySnapshot>);
+
   return Object.freeze({
+    contractVersion: DeploymentPolicyAdministrationContractVersions.v1,
     profileId: input.profileId,
     evaluatedAt,
     evaluationLayer,
-    families: Object.freeze(familySnapshots),
+    preset: createDeploymentPolicyProfilePresetMetadata({
+      profileId: input.profileId,
+      presetCatalog: input.presetCatalog,
+    }),
+    families,
+    summary: createDeploymentPolicyEffectiveSummary({
+      families,
+    }),
   });
 }
+
+export type {
+  DeploymentPolicyAdministrationFamilySnapshot,
+  DeploymentPolicyAdministrationSnapshot,
+  DeploymentPolicyAdministrationState,
+  DeploymentPolicyAdministrationStateValues,
+  DeploymentPolicyResolvedSetting,
+  DeploymentPolicyResolutionSource,
+};
+export { DeploymentPolicyResolutionSources };
+
+export type {
+  DeploymentPolicyControlMode,
+  DeploymentPolicyFamilyId,
+  DeploymentPolicySettingKey,
+};
