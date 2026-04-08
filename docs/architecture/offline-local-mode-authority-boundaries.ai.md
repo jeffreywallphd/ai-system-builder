@@ -54,6 +54,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
 - Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
 - Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
+- Desktop shell now includes a shared offline-aware status surface/presenter seam that consumes canonical offline connectivity/synchronization contracts for user-visible online/offline/reconnecting/unsynced guidance.
 
 ## Desktop cache + resync workflow baseline (Story 19.2.8)
 
@@ -75,6 +76,19 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
     - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
     - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
     - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+
+## Desktop UX status surfaces baseline (Story 19.3.1)
+
+- canonical UI seams:
+  - `src/ui/shared/connectivity/DesktopConnectivityService.ts`
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - `src/ui/layout/AppLayout.tsx`
+- required posture:
+  - render explicit offline/reconnecting/connected/unsynced state in shared desktop shell,
+  - display cached-resource and pending-sync summaries,
+  - display explicit policy-limited unsupported actions,
+  - consume shared offline contract DTOs (`OfflineConnectivitySurfaceStateDto`, `OfflineSynchronizationStateSnapshotDto`) instead of ad hoc transport inference.
 
 ## Implemented guarantees now called out explicitly
 
