@@ -21,9 +21,12 @@ Document the implemented end-to-end authoritative orchestration lifecycle across
   - `src/application/runs/ports/RunOrchestrationPersistencePorts.ts`
   - `src/application/runs/ports/RunAssignmentEligibilityPorts.ts`
   - `src/application/runs/ports/RunExecutionDispatchPorts.ts`
+  - `src/application/nodes/ports/ExecutionNodeManagementPorts.ts`
   - `src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts`
   - `src/application/runs/use-cases/SelectAssignmentReadyRunsUseCase.ts`
   - `src/application/runs/use-cases/RunNodeAssignmentEligibilityService.ts`
+  - `src/application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService.ts`
+  - `src/application/nodes/use-cases/ImageRunExecutionNodeSelectionService.ts`
   - `src/application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase.ts`
   - `src/application/runs/use-cases/BuildAssignedRunExecutionCommandUseCase.ts`
   - `src/application/runs/use-cases/DispatchAssignedRunExecutionUseCase.ts`
@@ -47,6 +50,7 @@ sequenceDiagram
     participant QueueRepo as Queue Persistence
     participant RunRepo as Run Persistence
     participant AssignSvc as Assignment Eligibility
+    participant NodeSelect as Image Run Node Selection
     participant ClaimUC as Claim Dispatch Prep
     participant DispatchUC as Dispatch Assigned Run
     participant DispatchPort as Dispatch Router + Adapter
@@ -56,10 +60,11 @@ sequenceDiagram
     Scheduler->>QueueRepo: claimAssignmentReadyRuns(asOf, owner, ttl, limit)
     QueueRepo-->>Scheduler: reservation-claimed queue entries
     Scheduler->>RunRepo: findRunById(runId)
-    Scheduler->>AssignSvc: evaluateNodeEligibility(run, queueEntry, nodeId)
-    alt node ineligible
+    Scheduler->>NodeSelect: selectExecutionNodeForRun(run, requirements)
+    NodeSelect->>AssignSvc: evaluateRunToCandidateNodes(...)
+    alt no eligible node
       Scheduler->>QueueRepo: releaseRunClaim(runId, claimToken)
-    else node eligible
+    else selected node
       Scheduler->>ClaimUC: execute(runId, nodeId, owner, claimToken)
       ClaimUC->>QueueRepo: claimQueuedRunForNodeDispatch(...)
       ClaimUC->>RunRepo: saveRun(state=assigned, queue.dequeuedAt)
@@ -84,14 +89,17 @@ sequenceDiagram
 3. Queue ordering is deterministic and persistence-owned (`eligible_at`, `order_key`, `entered_at`, `run_id`).
 4. Queue persistence remains scheduling-policy neutral; node capability/policy checks are application-layer concerns.
 5. Node-targeted selection uses `IRunNodeAssignmentEligibilityService` and releases claims immediately when eligibility fails.
+6. Node-aware dispatch selection uses `IImageRunExecutionNodeSelectionServicePort` and `IImageRunNodeEligibilityEvaluationServicePort` before assignment claim and dispatch preparation.
 
 ## Initial queued-to-dispatch orchestration pass
 
 1. `ProcessQueuedRunDispatchUseCase` provides the initial image-slice orchestration pass for `queued` runs.
-2. The pass composes `SelectAssignmentReadyRunsUseCase`, `ClaimRunForNodeDispatchPreparationUseCase`, and `DispatchAssignedRunExecutionUseCase`.
+2. The pass composes `SelectAssignmentReadyRunsUseCase`, `ImageRunExecutionNodeSelectionService`, `ClaimRunForNodeDispatchPreparationUseCase`, and `DispatchAssignedRunExecutionUseCase`.
 3. Lifecycle progression remains explicit and durable (`queued` -> `assigned` -> `dispatching` -> `running|failed`) through existing domain-owned transitions.
 4. Dispatch linkage is captured through durable dispatch-attempt ids and backend dispatch receipts for later progress/result synchronization.
-5. Node selection is intentionally simplified to explicit orchestrator input for this pass; richer scheduler/node-assignment policy remains a follow-on seam.
+5. Selection refusal is explicit and structured (`stage=selection` with outcome/reasons/candidate count) when no eligible node can be chosen.
+6. Reservation claims are released immediately on selection refusal so runs remain available for later scheduling attempts.
+7. Assignment remains single-writer and durable through `ClaimRunForNodeDispatchPreparationUseCase`, which records assigned node id and dispatch-attempt metadata before backend invocation.
 
 ## Claim and dispatch model
 
@@ -138,6 +146,7 @@ Do not merge these responsibilities into one adapter or transport endpoint.
 - Canonical lifecycle transition legality is owned by `RunDomain` only.
 - Queue claim lease fields (`claimToken`, `claimedBy`, `claimExpiresAt`) are authoritative for reservation ownership.
 - Node assignment must be single-writer conflict-safe (`already-assigned` and reservation/queue conflicts are first-class outcomes).
+- Node-selection refusal must surface structured reason payloads and must release queue claims before returning.
 - Dispatch-attempt history is durable and linked to run + queue + reservation metadata.
 - Terminal completion/failure must clear active queue claim state and release active assignment ownership.
 - User-safe and internal diagnostics must remain separated in persistence and projection surfaces.

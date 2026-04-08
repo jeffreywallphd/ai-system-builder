@@ -25,6 +25,11 @@ import { DispatchAssignedRunExecutionUseCase } from "@application/runs/use-cases
 import { HandleRunDispatchResultUseCase } from "@application/runs/use-cases/HandleRunDispatchResultUseCase";
 import { ProcessQueuedRunDispatchUseCase } from "@application/runs/use-cases/ProcessQueuedRunDispatchUseCase";
 import { RunLifecycleStates, RunSubmissionSources, type RunLifecycleState } from "@domain/runs/RunDomain";
+import { ImageRunExecutionNodeSelectionOutcomes } from "@application/nodes/ports/ExecutionNodeManagementPorts";
+import type {
+  ImageRunExecutionNodeSelectionDecision,
+  ImageRunExecutionNodeSelectionReason,
+} from "@application/nodes/ports/ExecutionNodeManagementPorts";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   private readonly runs = new Map<string, PlatformRunRecord>();
@@ -324,6 +329,63 @@ class SequenceIdGenerator {
   }
 }
 
+class StubImageRunNodeSelectionService {
+  public decisionByRunId = new Map<string, ImageRunExecutionNodeSelectionDecision>();
+  public selectedNodeId = "node:image-executor:1";
+
+  public async selectExecutionNodeForRun(input: {
+    readonly asOf: string;
+    readonly run: {
+      readonly runId: string;
+      readonly workspaceId: string;
+      readonly systemId?: string;
+      readonly workflowId?: string;
+      readonly operationKind?: string;
+      readonly translationContractVersion?: string;
+    };
+  }): Promise<ImageRunExecutionNodeSelectionDecision> {
+    const existing = this.decisionByRunId.get(input.run.runId);
+    if (existing) {
+      return existing;
+    }
+
+    const reasons: ReadonlyArray<ImageRunExecutionNodeSelectionReason> = Object.freeze([Object.freeze({
+      code: ImageRunExecutionNodeSelectionOutcomes.selected,
+      message: "Test selection succeeded.",
+      details: Object.freeze({
+        selectedNodeId: this.selectedNodeId,
+      }),
+    })]);
+
+    return Object.freeze({
+      asOf: input.asOf,
+      run: Object.freeze({ ...input.run }),
+      strategyId: "test.image-run-selection",
+      outcome: ImageRunExecutionNodeSelectionOutcomes.selected,
+      selectedNodeId: this.selectedNodeId,
+      selectedCandidate: Object.freeze({
+        nodeId: this.selectedNodeId,
+        rank: 1,
+        decision: "eligible",
+        eligible: true,
+        blockingReasonCodes: Object.freeze([]),
+        advisoryReasonCodes: Object.freeze([]),
+        transientAvailabilityReasonCodes: Object.freeze([]),
+      }),
+      reasons,
+      candidates: Object.freeze([Object.freeze({
+        nodeId: this.selectedNodeId,
+        rank: 1,
+        decision: "eligible",
+        eligible: true,
+        blockingReasonCodes: Object.freeze([]),
+        advisoryReasonCodes: Object.freeze([]),
+        transientAvailabilityReasonCodes: Object.freeze([]),
+      })]),
+    });
+  }
+}
+
 function buildSubmissionCommand(occurredAt: string) {
   return Object.freeze({
     actor: Object.freeze({
@@ -411,17 +473,19 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
       queueRepository,
       now: () => new Date("2026-04-08T12:00:07.000Z"),
     });
+    const nodeSelection = new StubImageRunNodeSelectionService();
 
     const useCase = new ProcessQueuedRunDispatchUseCase({
       selectAssignmentReadyRunsUseCase: selectReady,
       claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
       dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: nodeSelection,
+      queueRepository,
       now: () => new Date("2026-04-08T12:00:05.000Z"),
     });
 
     const result = await useCase.execute({
       reservationOwner: "orchestrator:image-default",
-      nodeId: "node:image-executor:1",
       queueId: "queue:default",
       workspaceId: "workspace-alpha",
       limit: 1,
@@ -432,6 +496,7 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
     expect(result.outcomes).toHaveLength(1);
     expect(result.outcomes[0]?.status).toBe("dispatched");
     if (result.outcomes[0]?.status === "dispatched") {
+      expect(result.outcomes[0].nodeId).toBe("node:image-executor:1");
       expect(result.outcomes[0].dispatchAttemptId).toContain("dispatch-attempt:");
       expect(result.outcomes[0].dispatchId).toBe("dispatch:run:1");
       expect(result.outcomes[0].backendRunId).toBe("comfy-job:1");
@@ -443,6 +508,7 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
     expect(queueEntry?.lifecycleState).toBe("running");
     const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
     expect(attempts).toHaveLength(1);
+    expect(attempts[0]?.nodeId).toBe("node:image-executor:1");
     expect(attempts[0]?.dispatchResult?.status).toBe("accepted");
     expect(attempts[0]?.dispatchResult?.dispatchId).toBe("dispatch:run:1");
     expect(attempts[0]?.dispatchResult?.backendRunId).toBe("comfy-job:1");
@@ -497,17 +563,19 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
       queueRepository,
       now: () => new Date("2026-04-08T12:10:07.000Z"),
     });
+    const nodeSelection = new StubImageRunNodeSelectionService();
 
     const useCase = new ProcessQueuedRunDispatchUseCase({
       selectAssignmentReadyRunsUseCase: selectReady,
       claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
       dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: nodeSelection,
+      queueRepository,
       now: () => new Date("2026-04-08T12:10:05.000Z"),
     });
 
     const result = await useCase.execute({
       reservationOwner: "orchestrator:image-default",
-      nodeId: "node:image-executor:1",
       queueId: "queue:default",
       workspaceId: "workspace-alpha",
       limit: 1,
@@ -529,6 +597,122 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
     const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
     expect(attempts).toHaveLength(1);
     expect(attempts[0]?.dispatchResult?.status).toBe("failed-to-start");
+  });
+
+  it("fails cleanly with structured selection reasons and releases claim when no eligible node exists", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const idGenerator = new SequenceIdGenerator();
+
+    const createRun = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+    });
+    const created = await createRun.execute({
+      command: buildSubmissionCommand("2026-04-08T12:20:00.000Z"),
+    });
+
+    const selectReady = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T12:20:05.000Z"),
+    });
+    const claimForDispatch = new ClaimRunForNodeDispatchPreparationUseCase({
+      runRepository,
+      queueRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T12:20:06.000Z"),
+    });
+    const dispatchResultHandler = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T12:20:07.000Z"),
+    });
+    const dispatchAssigned = new DispatchAssignedRunExecutionUseCase({
+      commandBuilder: new BuildAssignedRunExecutionCommandUseCase({
+        runRepository,
+        queueRepository,
+      }),
+      dispatchPort: {
+        dispatch: async () => Object.freeze({
+          dispatchId: "dispatch:run:unreachable",
+          backendKind: "comfyui",
+          backendRunId: "comfy-job:unreachable",
+          acceptedAt: "2026-04-08T12:20:07.000Z",
+        }),
+      },
+      dispatchResultHandler,
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T12:20:07.000Z"),
+    });
+    const nodeSelection = new StubImageRunNodeSelectionService();
+    nodeSelection.decisionByRunId.set(created.run.runId, Object.freeze({
+      asOf: "2026-04-08T12:20:05.000Z",
+      run: Object.freeze({
+        runId: created.run.runId,
+        workspaceId: "workspace-alpha",
+        workflowId: "workflow:image-demo",
+      }),
+      strategyId: "test.image-run-selection",
+      outcome: ImageRunExecutionNodeSelectionOutcomes.noEligibleNode,
+      reasons: Object.freeze([Object.freeze({
+        code: "no-eligible-node",
+        message: "No eligible execution node was found for this run.",
+        details: Object.freeze({
+          topBlockingReasonCodes: Object.freeze(["node-health-not-routable"]),
+        }),
+      })]),
+      candidates: Object.freeze([Object.freeze({
+        nodeId: "node:image-executor:blocked",
+        rank: 1,
+        decision: "unavailable",
+        eligible: false,
+        blockingReasonCodes: Object.freeze(["node-health-not-routable"]),
+        advisoryReasonCodes: Object.freeze([]),
+        transientAvailabilityReasonCodes: Object.freeze(["node-health-not-routable"]),
+      })]),
+    }));
+
+    const useCase = new ProcessQueuedRunDispatchUseCase({
+      selectAssignmentReadyRunsUseCase: selectReady,
+      claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
+      dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: nodeSelection,
+      queueRepository,
+      now: () => new Date("2026-04-08T12:20:05.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:image-default",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+      reservationTtlSeconds: 120,
+    });
+
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]?.status).toBe("failed");
+    if (result.outcomes[0]?.status === "failed") {
+      expect(result.outcomes[0].stage).toBe("selection");
+      expect(result.outcomes[0].selection?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noEligibleNode);
+      expect(result.outcomes[0].selection?.reasons[0]?.code).toBe("no-eligible-node");
+      expect(result.outcomes[0].selection?.candidateCount).toBe(1);
+    }
+
+    const persisted = await runRepository.findRunById(created.run.runId);
+    expect(persisted?.status).toBe("pending");
+    const queueEntry = await queueRepository.getQueueEntryByRunId(created.run.runId);
+    expect(queueEntry?.lifecycleState).toBe("queued");
+    expect(queueEntry?.claimToken).toBeUndefined();
+    expect(queueEntry?.claimedBy).toBeUndefined();
+    const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
+    expect(attempts).toHaveLength(0);
   });
 });
 

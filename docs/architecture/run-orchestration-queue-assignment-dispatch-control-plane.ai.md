@@ -9,10 +9,13 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 ## Canonical seams
 - Queue/claim/finalization persistence: `src/application/runs/ports/RunOrchestrationPersistencePorts.ts`
 - Assignment policy and capability checks: `src/application/runs/ports/RunAssignmentEligibilityPorts.ts`
+- Image-run node eligibility/selection contracts: `src/application/nodes/ports/ExecutionNodeManagementPorts.ts`
 - Dispatch command and backend seam: `src/application/runs/ports/RunExecutionDispatchPorts.ts`
 - Core orchestration use cases:
   - `ProcessQueuedRunDispatchUseCase`
   - `SelectAssignmentReadyRunsUseCase`
+  - `ImageRunNodeEligibilityEvaluationService`
+  - `ImageRunExecutionNodeSelectionService`
   - `ClaimRunForNodeDispatchPreparationUseCase`
   - `BuildAssignedRunExecutionCommandUseCase`
   - `DispatchAssignedRunExecutionUseCase`
@@ -28,10 +31,11 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 
 ## Initial image queue-to-dispatch pass
 - `ProcessQueuedRunDispatchUseCase` is the initial image-slice coordinator for `queued` run dispatch.
-- It composes reservation claim selection, node-claim dispatch preparation, and backend dispatch through existing application seams.
+- It composes reservation claim selection, run-to-node eligibility/selection, node-claim dispatch preparation, and backend dispatch through existing application seams.
 - Lifecycle mutation remains domain-owned (`queued` -> `assigned` -> `dispatching` -> `running|failed`) and durable.
 - Dispatch linkage is captured as durable dispatch-attempt metadata plus backend receipt ids for follow-on progress/result synchronization.
-- Node targeting remains intentionally simple (explicit orchestrator input) so richer scheduling and assignment policy can layer in later without rework.
+- Selection refusal remains explicit and structured (`stage=selection` plus selection outcome/reasons/candidate count) when no eligible node is available.
+- Selection refusal releases reservation claims immediately so runs remain schedulable on later passes.
 
 ## Required invariants
 - Reservation ownership is authoritative (`claimToken`, `claimedBy`, `claimExpiresAt`).
