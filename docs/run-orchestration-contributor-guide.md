@@ -41,6 +41,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 - `docs/architecture/run-orchestration-operational-visibility-projections.md`
 - `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
+- `docs/architecture/image-run-feature-4-final-baseline.md`
 
 ## Required implementation path
 
