@@ -27,6 +27,16 @@ Unsupported or invalid mappings return failed translation results with blocking 
 - missing required input/parameter/output mappings
 - parameter guardrail errors relevant to template translation
 
+## Explicit unsupported combinations (Story 3.4.3)
+
+- Only exact template-operation pairs from the initial supported set are valid.
+- Cross-pairing a supported template id with a different operation kind is explicitly unsupported and must fail with
+  blocking `operation-template-mismatch` diagnostics.
+- Missing required slot/parameter/output mappings are explicitly unsupported and must fail with blocking diagnostics:
+  - `missing-required-slot-binding`
+  - `missing-required-parameter-mapping`
+  - `missing-required-output-expectation`
+
 ## Boundary posture
 
 - Input remains authoritative Feature 2 workflow/system translation data.
@@ -43,3 +53,13 @@ Unsupported or invalid mappings return failed translation results with blocking 
   - backend-unavailable normalization (`transport-unavailable`),
   - malformed submission-response normalization (`invalid-response`).
 - Coverage remains backend-state controlled by using mocked transport responses and does not depend on an external Comfy runtime.
+
+## Story 3.4.3 update
+
+- Added explicit translation-readiness matrix verification in
+  `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.integration.test.ts`.
+- Matrix checks now verify that every supported Feature 2 template has translation coverage and that each case validates:
+  - compatibility readiness metadata,
+  - required slot/parameter/output mapping translation,
+  - expected Comfy prompt node-shape presence,
+  - explicit unsupported-combination failure behavior.
