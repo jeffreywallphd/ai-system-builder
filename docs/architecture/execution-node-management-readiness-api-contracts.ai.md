@@ -18,6 +18,7 @@ Story 5.1.4 defines shared DTO/schema contracts for authoritative execution-node
 
 - Added canonical request/response DTOs for:
   - execution-node list/get management reads,
+  - execution-node availability override control actions (`enable|disable|suppress`),
   - execution-readiness checks,
   - node eligibility checks,
   - backend availability/readiness summaries.

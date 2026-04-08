@@ -23,6 +23,7 @@ export type ExecutionNodeManagementTransportContractVersion =
 export const ExecutionNodeManagementTransportRoutes = Object.freeze({
   listNodes: "/api/v1/execution-nodes",
   getNode: "/api/v1/execution-nodes/:nodeId",
+  setAvailabilityOverride: "/api/v1/execution-nodes/:nodeId/availability",
   checkReadiness: "/api/v1/execution-nodes/readiness",
   checkEligibility: "/api/v1/execution-nodes/eligibility",
   listBackendAvailability: "/api/v1/execution-nodes/backends/availability",
@@ -63,6 +64,15 @@ export const ExecutionNodeCompatibilityFindingKinds = Object.freeze({
 
 export type ExecutionNodeCompatibilityFindingKind =
   typeof ExecutionNodeCompatibilityFindingKinds[keyof typeof ExecutionNodeCompatibilityFindingKinds];
+
+export const ExecutionNodeAvailabilityOverrideActions = Object.freeze({
+  enable: "enable",
+  disable: "disable",
+  suppress: "suppress",
+} as const);
+
+export type ExecutionNodeAvailabilityOverrideAction =
+  typeof ExecutionNodeAvailabilityOverrideActions[keyof typeof ExecutionNodeAvailabilityOverrideActions];
 
 export interface ExecutionNodeBackendReadinessSummaryDto {
   readonly state: ExecutionNodeBackendReadinessState;
@@ -195,6 +205,16 @@ export interface ExecutionNodeGetRequestDto {
   readonly nodeId: string;
 }
 
+export interface ExecutionNodeSetAvailabilityOverrideRequestDto {
+  readonly nodeId: string;
+  readonly action: ExecutionNodeAvailabilityOverrideAction;
+  readonly changedAt?: string;
+  readonly suppressedUntil?: string;
+  readonly expectedRevision?: number;
+  readonly reason?: string;
+  readonly correlationId?: string;
+}
+
 export interface ExecutionNodeReadinessCheckRequestDto {
   readonly workspaceId?: string;
   readonly workflowId?: string;
@@ -233,6 +253,16 @@ export interface ExecutionNodeListResponseDto {
 export interface ExecutionNodeGetResponseDto {
   readonly contractVersion: ExecutionNodeManagementTransportContractVersion;
   readonly node: ExecutionNodeDetailDto;
+  readonly asOf: string;
+}
+
+export interface ExecutionNodeSetAvailabilityOverrideResponseDto {
+  readonly contractVersion: ExecutionNodeManagementTransportContractVersion;
+  readonly node: ExecutionNodeSummaryDto;
+  readonly mutation: {
+    readonly changed: boolean;
+    readonly wasReplay: boolean;
+  };
   readonly asOf: string;
 }
 
@@ -286,6 +316,10 @@ export interface ExecutionNodeManagementApiContract {
   readonly getNode: {
     readonly request: ExecutionNodeGetRequestDto;
     readonly response: SharedApiResponseEnvelope<ExecutionNodeGetResponseDto>;
+  };
+  readonly setAvailabilityOverride: {
+    readonly request: ExecutionNodeSetAvailabilityOverrideRequestDto;
+    readonly response: SharedApiResponseEnvelope<ExecutionNodeSetAvailabilityOverrideResponseDto>;
   };
   readonly checkReadiness: {
     readonly request: ExecutionNodeReadinessCheckRequestDto;

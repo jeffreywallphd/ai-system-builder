@@ -226,6 +226,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 5 / Epic 5.3 Story 5.3.1 run-to-node eligibility evaluation rules and structured eligibility outputs for image runs: `docs/architecture/execution-node-run-to-node-eligibility-evaluation.md`
 - Feature 5 / Epic 5.3 Story 5.3.2 initial deterministic backend-node selection strategy for image runs, with structured no-selection outcomes and policy-extension seams: `docs/architecture/execution-node-initial-selection-strategy.md`
 - Feature 5 / Epic 5.3 Story 5.3.4 authoritative execution-readiness checks that include current node eligibility/availability for specific run requests: `docs/architecture/execution-readiness-node-availability-checks.md`
+- Feature 5 / Epic 5.4 Story 5.4.1 authoritative execution-node management/readiness API endpoints for inventory, availability controls, readiness/eligibility checks, and backend posture reads: `docs/architecture/execution-node-management-readiness-authoritative-apis.md`
 - Feature 4 / Epic 4.2 Story 4.2.5 concrete persistence implementation for image runs and durable status history recording/query seams: `docs/architecture/run-orchestration-image-run-persistence-and-status-history.md`
 - Feature 4 / Epic 4.4 Story 4.4.4 final completion verification and follow-on integration guidance for authoritative image run orchestration: `docs/architecture/image-run-feature-4-final-baseline.md`
 

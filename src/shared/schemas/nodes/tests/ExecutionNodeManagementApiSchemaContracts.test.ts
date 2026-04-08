@@ -17,6 +17,8 @@ import {
   parseExecutionNodeGetResponseDto,
   parseExecutionNodeListRequestDto,
   parseExecutionNodeListResponseDto,
+  parseExecutionNodeSetAvailabilityOverrideRequestDto,
+  parseExecutionNodeSetAvailabilityOverrideResponseDto,
   parseExecutionNodeReadinessCheckResponseDto,
 } from "../ExecutionNodeManagementApiSchemaContracts";
 
@@ -61,6 +63,52 @@ describe("ExecutionNodeManagementApiSchemaContracts", () => {
     });
 
     expect(response.items[0]?.nodeId).toBe("node:execution:1");
+  });
+
+  it("parses availability-override request/response payloads", () => {
+    const request = parseExecutionNodeSetAvailabilityOverrideRequestDto({
+      nodeId: "node:execution:10",
+      action: "suppress",
+      changedAt: "2026-04-08T20:00:00.000Z",
+      suppressedUntil: "2026-04-08T21:00:00.000Z",
+      reason: "maintenance window",
+      expectedRevision: 3,
+      correlationId: "corr:execution-node:10",
+    });
+    expect(request.action).toBe("suppress");
+
+    const response = parseExecutionNodeSetAvailabilityOverrideResponseDto({
+      contractVersion: "execution-node-management-api/v1",
+      node: {
+        nodeId: "node:execution:10",
+        displayName: "Execution Node 10",
+        nodeType: NodeTypes.compute,
+        health: {
+          activationStatus: ExecutionNodeActivationStatuses.active,
+          healthStatus: ExecutionNodeHealthStatuses.ready,
+          stale: false,
+        },
+        operational: {
+          approvalStatus: NodeApprovalStatuses.approved,
+          trustState: NodeTrustStates.trusted,
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+          deploymentTags: ["maintenance"],
+          certificateAssigned: true,
+          availabilityOverrideMode: "suppressed",
+          availabilitySuppressedUntil: "2026-04-08T21:00:00.000Z",
+          availabilityOverrideReason: "maintenance window",
+          availabilityOverrideUpdatedAt: "2026-04-08T20:00:00.000Z",
+        },
+        backendFamilies: ["comfyui"],
+      },
+      mutation: {
+        changed: true,
+        wasReplay: false,
+      },
+      asOf: "2026-04-08T20:00:01.000Z",
+    });
+    expect(response.mutation.changed).toBeTrue();
   });
 
   it("rejects leaked internal fields from get-node response payloads", () => {

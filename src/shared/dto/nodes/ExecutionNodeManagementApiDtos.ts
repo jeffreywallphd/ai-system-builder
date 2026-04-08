@@ -8,6 +8,7 @@ import type {
   ExecutionNodeInternalSummaryDto,
   ExecutionNodeListResponseDto,
   ExecutionNodeReadinessCheckResponseDto,
+  ExecutionNodeSetAvailabilityOverrideResponseDto,
   ExecutionNodeSummaryDto,
 } from "@shared/contracts/nodes/ExecutionNodeManagementApiContracts";
 import {
@@ -64,6 +65,40 @@ export function toExecutionNodeGetResponseFromInternalDto(input: {
   return Object.freeze({
     contractVersion: input.contractVersion,
     node: toExecutionNodeDetailDto(input.node),
+    asOf: input.asOf,
+  });
+}
+
+export function toExecutionNodeSetAvailabilityOverrideResponseDto(input: {
+  readonly contractVersion: ExecutionNodeSetAvailabilityOverrideResponseDto["contractVersion"];
+  readonly node: ExecutionNodeSummaryDto;
+  readonly mutation: ExecutionNodeSetAvailabilityOverrideResponseDto["mutation"];
+  readonly asOf: string;
+}): ExecutionNodeSetAvailabilityOverrideResponseDto {
+  return Object.freeze({
+    contractVersion: input.contractVersion,
+    node: input.node,
+    mutation: Object.freeze({
+      changed: input.mutation.changed,
+      wasReplay: input.mutation.wasReplay,
+    }),
+    asOf: input.asOf,
+  });
+}
+
+export function toExecutionNodeSetAvailabilityOverrideResponseFromInternalDto(input: {
+  readonly contractVersion: ExecutionNodeSetAvailabilityOverrideResponseDto["contractVersion"];
+  readonly node: ExecutionNodeInternalSummaryDto;
+  readonly mutation: ExecutionNodeSetAvailabilityOverrideResponseDto["mutation"];
+  readonly asOf: string;
+}): ExecutionNodeSetAvailabilityOverrideResponseDto {
+  return Object.freeze({
+    contractVersion: input.contractVersion,
+    node: toExecutionNodeSummaryDto(input.node),
+    mutation: Object.freeze({
+      changed: input.mutation.changed,
+      wasReplay: input.mutation.wasReplay,
+    }),
     asOf: input.asOf,
   });
 }

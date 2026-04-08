@@ -77,6 +77,7 @@ import { AuthorizationManagementBackendApi } from "@infrastructure/api/authoriza
 import { AuditLedgerBackendApi } from "@infrastructure/api/audit/AuditLedgerBackendApi";
 import { AuditLedgerObservability } from "@infrastructure/api/audit/AuditLedgerObservability";
 import { NodeTrustBackendApi } from "@infrastructure/api/nodes/NodeTrustBackendApi";
+import { ExecutionNodeManagementBackendApi } from "@infrastructure/api/nodes/ExecutionNodeManagementBackendApi";
 import { CertificateOperationsBackendApi } from "@infrastructure/api/security/CertificateOperationsBackendApi";
 import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMetadataBackendApi";
 import { StorageManagementBackendApi } from "@infrastructure/api/storage/StorageManagementBackendApi";
@@ -235,10 +236,13 @@ import { GetNodeInventoryDetailUseCase } from "@application/nodes/use-cases/GetN
 import { GetNodeEnrollmentDetailUseCase } from "@application/nodes/use-cases/GetNodeEnrollmentDetailUseCase";
 import { ListNodeInventoryUseCase } from "@application/nodes/use-cases/ListNodeInventoryUseCase";
 import { ListTrustedNodeInventoryUseCase } from "@application/nodes/use-cases/ListTrustedNodeInventoryUseCase";
+import { ListExecutionNodesUseCase } from "@application/nodes/use-cases/ListExecutionNodesUseCase";
+import { GetExecutionNodeDetailUseCase } from "@application/nodes/use-cases/GetExecutionNodeDetailUseCase";
 import { RecordNodeHeartbeatUseCase } from "@application/nodes/use-cases/RecordNodeHeartbeatUseCase";
 import { RecordNodeOperationalUpdateUseCase } from "@application/nodes/use-cases/RecordNodeOperationalUpdateUseCase";
 import { RegisterNodeEnrollmentRequestUseCase } from "@application/nodes/use-cases/RegisterNodeEnrollmentRequestUseCase";
 import { RejectNodeEnrollmentUseCase } from "@application/nodes/use-cases/RejectNodeEnrollmentUseCase";
+import { SetExecutionNodeAvailabilityOverrideUseCase } from "@application/nodes/use-cases/SetExecutionNodeAvailabilityOverrideUseCase";
 import { ResolveApprovedNodeCertificateEligibilityUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeCertificateEligibilityUseCase";
 import { ResolveApprovedNodeRuntimeTrustMaterialUseCase } from "@application/nodes/use-cases/ResolveApprovedNodeRuntimeTrustMaterialUseCase";
 import { ResolveNodeMutualTlsTransportIdentityUseCase } from "@application/nodes/use-cases/ResolveNodeMutualTlsTransportIdentityUseCase";
@@ -387,6 +391,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const workspaceRepository = persistentPlatformServices.workspaceRepository;
   const authorizationRepository = persistentPlatformServices.authorizationRepository;
   const nodeTrustRepository = persistentPlatformServices.nodeTrustRepository;
+  const executionNodeRepository = persistentPlatformServices.executionNodeRepository;
   const nodeTrustAuditRecorder = persistentPlatformServices.nodeTrustAuditRecorder;
   const certificateAuthorityRepository = persistentPlatformServices.certificateAuthorityRepository;
   const storageInstanceRepository = persistentPlatformServices.storageInstanceRepository;
@@ -913,6 +918,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       auditSink: nodeTrustAuditSink,
     }),
   });
+  const executionNodeManagementBackendApi = new ExecutionNodeManagementBackendApi({
+    listExecutionNodesUseCase: new ListExecutionNodesUseCase({
+      nodeRepository: executionNodeRepository,
+    }),
+    getExecutionNodeDetailUseCase: new GetExecutionNodeDetailUseCase({
+      nodeRepository: executionNodeRepository,
+    }),
+    setExecutionNodeAvailabilityOverrideUseCase: new SetExecutionNodeAvailabilityOverrideUseCase({
+      nodeRepository: executionNodeRepository,
+    }),
+    eligibilityService: new ImageRunNodeEligibilityEvaluationService({
+      nodeRepository: executionNodeRepository,
+    }),
+    clock: workspaceClock,
+  });
   const managedStorageRootPath = resolveManagedStorageRootPath(path.resolve(options.databasePath), env);
   const localStorageBackendAdapter = new ServerManagedLocalStorageBackendAdapter({
     managedStorageRootPath,
@@ -1135,7 +1155,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
   const imageRunNodeEligibilityEvaluationService = new ImageRunNodeEligibilityEvaluationService({
-    nodeRepository: nodeTrustRepository,
+    nodeRepository: executionNodeRepository,
   });
   const imageRunExecutionNodeSelectionService = new ImageRunExecutionNodeSelectionService({
     eligibilityService: imageRunNodeEligibilityEvaluationService,
@@ -1407,6 +1427,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     authoritativeRunMutationBackendApi,
     authoritativeRunExecutionUpdateBackendApi,
     nodeTrustBackendApi,
+    executionNodeManagementBackendApi,
     authorizationManagementBackendApi,
     workspaceBackendApi,
     workspaceAdministrationBackendApi,

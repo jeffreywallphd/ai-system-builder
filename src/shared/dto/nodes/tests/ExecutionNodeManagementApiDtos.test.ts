@@ -14,6 +14,7 @@ import {
   toExecutionNodeBackendAvailabilityReadResponseFromInternalDto,
   toExecutionNodeGetResponseFromInternalDto,
   toExecutionNodeListResponseFromInternalDto,
+  toExecutionNodeSetAvailabilityOverrideResponseFromInternalDto,
 } from "../ExecutionNodeManagementApiDtos";
 
 describe("ExecutionNodeManagementApiDtos", () => {
@@ -123,5 +124,42 @@ describe("ExecutionNodeManagementApiDtos", () => {
     expect(response.backends[0]?.degradedNodeCount).toBe(1);
     expect((response.backends[0] as unknown as { probePayloadRefIds?: ReadonlyArray<string> }).probePayloadRefIds)
       .toBeUndefined();
+  });
+
+  it("builds immutable availability-override response DTOs from internal summaries", () => {
+    const response = toExecutionNodeSetAvailabilityOverrideResponseFromInternalDto({
+      contractVersion: "execution-node-management-api/v1",
+      node: {
+        nodeId: "node:execution:override",
+        displayName: "Execution Node Override",
+        nodeType: NodeTypes.compute,
+        health: {
+          activationStatus: ExecutionNodeActivationStatuses.active,
+          healthStatus: ExecutionNodeHealthStatuses.ready,
+          stale: false,
+        },
+        operational: {
+          approvalStatus: NodeApprovalStatuses.approved,
+          trustState: NodeTrustStates.trusted,
+          enabledCapabilities: [NodeRoleCapabilities.executor],
+          supportsRemoteScheduling: true,
+          deploymentTags: ["ops"],
+          certificateAssigned: true,
+          availabilityOverrideMode: "disabled",
+          availabilityOverrideUpdatedAt: "2026-04-08T20:25:00.000Z",
+        },
+        backendFamilies: ["comfyui"],
+        endpointRef: "internal://node/override",
+      },
+      mutation: {
+        changed: true,
+        wasReplay: false,
+      },
+      asOf: "2026-04-08T20:25:01.000Z",
+    });
+
+    expect(Object.isFrozen(response)).toBeTrue();
+    expect(response.mutation.changed).toBeTrue();
+    expect((response.node as unknown as { endpointRef?: string }).endpointRef).toBeUndefined();
   });
 });
