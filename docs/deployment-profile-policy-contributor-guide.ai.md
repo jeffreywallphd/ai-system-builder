@@ -12,6 +12,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 
 - Keep taxonomy/preset definitions in `src/domain/deployment/DeploymentProfilePolicyAdministrationDomain.ts`.
 - Keep effective-value resolution and override validation in `src/application/deployment/*` contracts/services.
+- Keep durable policy persistence seams in `src/application/deployment/ports/*` and `src/infrastructure/persistence/deployment/*`.
 - Keep feature-facing decisions in `src/application/policy-administration/*` evaluation interfaces/services.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.
 - Keep docs/tests aligned for `.md` and `.ai.md` surfaces.

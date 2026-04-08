@@ -27,6 +27,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(ids).toContain("platform:v2");
     expect(ids).toContain("platform:v3");
     expect(ids).toContain("platform:v4");
+    expect(ids).toContain("deployment-policy:v1");
     expect(ids).toContain("audit-ledger:v1");
     expect(ids).toContain("certificate-authority:v1");
     expect(ids).toContain("secret-records:v1");
@@ -42,6 +43,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(services.workspaceRepository).toBeDefined();
     expect(services.platformPersistenceRepository).toBeDefined();
     expect(services.auditLedgerRepository).toBeDefined();
+    expect(services.deploymentPolicyRepository).toBeDefined();
 
     expect(() => services.dispose()).not.toThrow();
   });
