@@ -110,6 +110,7 @@ import { SqliteAssetPersistenceAdapter } from "@infrastructure/persistence/asset
 import { SqliteAssetAuditRecorder } from "@infrastructure/persistence/assets/SqliteAssetAuditRecorder";
 import { SqliteAssetUploadSessionPersistenceAdapter } from "@infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
 import { SqliteImageAssetPersistenceAdapter } from "@infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter";
+import { SqliteRunCollectedResultPersistenceAdapter } from "@infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter";
 import {
   createAuthoritativePersistentPlatformServices,
   type AuthoritativePersistentPlatformServices,
@@ -1267,12 +1268,17 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     observability: auditLedgerObservability,
   });
+  const runCollectedResultPersistencePort = new SqliteRunCollectedResultPersistenceAdapter({
+    repository: persistentPlatformServices.generatedResultRepository,
+    now: () => workspaceClock.now(),
+  });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
     requestAuthoritativeRunCancellationUseCase: new RequestAuthoritativeRunCancellationUseCase({
       runRepository: persistentPlatformServices.platformPersistenceRepository,
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
       cancellationSignalPort: options.runExecutionAdapters?.cancellationSignalPort,
+      resultCollectionPersistencePort: runCollectedResultPersistencePort,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
@@ -1306,6 +1312,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       runRepository: persistentPlatformServices.platformPersistenceRepository,
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      resultCollectionPersistencePort: runCollectedResultPersistencePort,
       authoritativeAuditRecorder: authoritativeAuditRecorder,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),
@@ -1317,6 +1324,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     queueRepository: persistentPlatformServices.platformPersistenceRepository,
     placementHoldRepository: persistentPlatformServices.platformPersistenceRepository,
     orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+    resultCollectionPersistencePort: runCollectedResultPersistencePort,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
     now: () => workspaceClock.now(),
   }).execute();

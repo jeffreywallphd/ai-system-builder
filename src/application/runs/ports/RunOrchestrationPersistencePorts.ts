@@ -395,6 +395,17 @@ export type RunCollectedResultPersistenceStatus =
 export interface RunCollectedResultPersistenceRequest {
   readonly runId: string;
   readonly workflowId: string;
+  readonly systemId?: string;
+  readonly workflowTemplateId?: string;
+  readonly workflowTemplateVersionId?: string;
+  readonly workflowTemplateVersionTag?: string;
+  readonly systemSnapshotId?: string;
+  readonly systemVersionTag?: string;
+  readonly parameterSnapshotId?: string;
+  readonly selectedNodeId?: string;
+  readonly executionNodeId?: string;
+  readonly executionAdapterKind?: string;
+  readonly executionBackendFamily?: string;
   readonly workspaceId?: string;
   readonly occurredAt: string;
   readonly actorId: string;

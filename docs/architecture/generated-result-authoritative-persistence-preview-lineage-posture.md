@@ -110,3 +110,34 @@ Failure posture in this story is explicit and safe:
 
 This story intentionally leaves concrete adapter/storage-copy implementation behind the new port seam so Feature 6 follow-ons can add provider-specific materialization without changing run orchestration contracts.
 
+## Story 6.2.2 concrete persistence baseline (implemented)
+
+Generated result persistence is now concretely implemented in authoritative SQLite infrastructure with durable result, preview, and lineage records:
+
+- `src/infrastructure/persistence/generated-results/SqliteGeneratedResultPersistenceMigrations.ts`
+- `src/infrastructure/persistence/generated-results/SqliteGeneratedResultPersistenceAdapter.ts`
+- `src/infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter.ts`
+- `src/application/generated-results/ports/IGeneratedResultPersistenceRepository.ts`
+
+### Persistence structure
+
+- `generated_result_records`: authoritative result asset metadata (run/system/workflow/node linkage, status lifecycle, storage linkage, visibility posture, timestamps, revision/schema metadata).
+- `generated_result_lineage_inputs`: normalized upstream input asset/linkage pointers per result asset.
+- `generated_result_previews`: preview descriptor persistence bound to `result_asset_id` with availability and protected-access metadata.
+- `generated_result_mutation_replays` + `generated_result_preview_mutation_replays`: idempotent mutation replay safety using operation keys.
+
+### Migration impact
+
+- New migration domain id: `generated-results`.
+- New migration table: `generated_result_repository_migrations`.
+- Migration registration is wired through `createAuthoritativePersistenceMigrationHooks` and `createAuthoritativePersistentPlatformServices`, so startup applies generated-result schema alongside existing authoritative domains.
+
+### Runtime wiring impact
+
+- `SqliteRunCollectedResultPersistenceAdapter` now backs `IRunCollectedResultPersistencePort` in server host composition for:
+  - run execution terminal ingestion (`IngestRunExecutionUpdateUseCase`)
+  - run cancellation terminal finalization (`RequestAuthoritativeRunCancellationUseCase`)
+  - startup recovery finalization paths (`RecoverRunOrchestrationStartupStateUseCase`)
+
+This establishes durable, queryable generated-result asset + lineage records as the authoritative source of truth for follow-on history, reuse, preview, and audit experiences.
+
