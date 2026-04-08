@@ -19,6 +19,7 @@ import type {
 import {
   RequestAuthoritativeRunCancellationUseCase,
   RunCancellationNotFoundError,
+  RunCancellationUnauthorizedError,
   RunCancellationValidationError,
 } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
 import {
@@ -141,6 +142,11 @@ export class AuthoritativeRunMutationBackendApi {
       const cancelled = await this.dependencies.requestAuthoritativeRunCancellationUseCase.execute({
         workspaceId,
         actorUserIdentityId,
+        authorization: Object.freeze({
+          actorUserIdentityId,
+          activeWorkspaceId: request.authorization.activeWorkspaceId,
+          authenticatedAt: request.authorization.authenticatedAt,
+        }),
         request: Object.freeze({
           ...request.cancellation,
           runId,
@@ -194,6 +200,7 @@ export class AuthoritativeRunMutationBackendApi {
         operation: "mutation.cancel",
         outcome: "failure",
         severity: error instanceof RunCancellationValidationError || error instanceof RunCancellationNotFoundError
+          || error instanceof RunCancellationUnauthorizedError
           ? "warn"
           : "error",
         runId,
@@ -203,6 +210,8 @@ export class AuthoritativeRunMutationBackendApi {
             ? "invalid-request"
             : error instanceof RunCancellationNotFoundError
               ? "not-found"
+              : error instanceof RunCancellationUnauthorizedError
+                ? "authorization-denied"
               : "internal-error",
         ]),
         details: Object.freeze({
@@ -214,6 +223,9 @@ export class AuthoritativeRunMutationBackendApi {
       }
       if (error instanceof RunCancellationNotFoundError) {
         return this.notFound(error.message);
+      }
+      if (error instanceof RunCancellationUnauthorizedError) {
+        return this.forbidden("Run cancellation is not authorized for this actor.");
       }
 
       return Object.freeze({

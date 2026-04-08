@@ -3,6 +3,7 @@ import { SharedApiErrorCodes } from "@shared/contracts/api/SharedApiContractPrim
 import {
   RequestAuthoritativeRunCancellationUseCase,
   RunCancellationNotFoundError,
+  RunCancellationUnauthorizedError,
   RunCancellationValidationError,
   type RequestAuthoritativeRunCancellationResult,
 } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
@@ -268,6 +269,20 @@ describe("AuthoritativeRunMutationBackendApi", () => {
     });
     expect(notFound.ok).toBeFalse();
     expect(notFound.error?.code).toBe(SharedApiErrorCodes.notFound);
+
+    cancellation.nextError = new RunCancellationUnauthorizedError("run:forbidden", "user:ops");
+    const denied = await api.cancelRun({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:ops",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      cancellation: {
+        runId: "run:forbidden",
+      },
+    });
+    expect(denied.ok).toBeFalse();
+    expect(denied.error?.code).toBe(SharedApiErrorCodes.forbidden);
   });
 
   it("returns canonical retry mutation payload on success", async () => {

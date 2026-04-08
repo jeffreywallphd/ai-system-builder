@@ -16,6 +16,8 @@ Define the production cancellation control flow for authoritative runs, includin
   - `src/domain/runs/RunDomain.ts`
 - Cancellation signaling port (application seam):
   - `src/application/runs/ports/RunExecutionCancellationPorts.ts`
+- Cancellation authorization port (application seam):
+  - `src/application/runs/ports/RunMutationAuthorizationPorts.ts`
 - Authoritative cancellation orchestration use case:
   - `src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts`
 - Backend API permission + mutation orchestration:
@@ -30,7 +32,7 @@ Define the production cancellation control flow for authoritative runs, includin
 1. Authenticated actor calls `POST /api/v1/runtime/runs/:runId/cancel` with workspace context.
 2. Transport layer validates payload shape and actor spoofing constraints.
 3. Backend API evaluates `run.cancel` authorization for `resourceType=authoritative-run`.
-4. Application cancellation use case records cancellation intent and applies canonical lifecycle transitions.
+4. Application cancellation use case re-validates cancellation authorization through mutation-authorization ports before lifecycle mutation.
 5. Queue claim coordination clears active reservation claims where present.
 6. Backend signaling is attempted only through `IRunExecutionCancellationSignalPort` when state/backends can support signaling.
 7. Run mutation response returns canonical run detail/status projections with explicit mutation-change semantics.
@@ -62,6 +64,13 @@ Define the production cancellation control flow for authoritative runs, includin
 - Cancellation signaling must only happen through `IRunExecutionCancellationSignalPort`.
 - Application logic must not call backend-specific clients directly.
 - If signaling is unavailable for the current backend context, response remains explicit (`not-supported`) and lifecycle remains authoritative (`cancelling` when execution is already in-flight).
+
+## Best-effort and degraded cancellation semantics
+
+- Cancellation for `running`/`dispatching` states is best-effort by design; backend signal acceptance is not guaranteed.
+- Use-case responses normalize degraded signal outcomes (`not-supported`, `rejected`, `failed`) without fabricating terminal cancellation.
+- When signaling degrades, lifecycle remains `cancelling` until authoritative execution updates finalize to `cancelled` or another terminal state.
+- Authorization denials are explicit and audited as rejected cancellation intents; no lifecycle mutation is persisted for denied requests.
 
 ## Audit and query visibility
 
