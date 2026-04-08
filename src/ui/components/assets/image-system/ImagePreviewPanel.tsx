@@ -8,6 +8,8 @@ export interface ImagePreviewPanelProps {
   readonly subtitle?: string;
   readonly image?: ImageUiViewModel;
   readonly loading?: boolean;
+  readonly loadingTitle?: string;
+  readonly loadingMessage?: string;
   readonly errorMessage?: string;
   readonly emptyMessage?: string;
   readonly unavailableMessage?: string;
@@ -28,6 +30,8 @@ export function ImagePreviewPanel({
   subtitle,
   image,
   loading = false,
+  loadingTitle = "Loading preview",
+  loadingMessage = "Getting this image ready.",
   errorMessage,
   emptyMessage = "Choose an image to preview.",
   unavailableMessage = "This image is unavailable right now.",
@@ -53,8 +57,9 @@ export function ImagePreviewPanel({
       </header>
       {loading ? (
         <ImageStatusNotice
-          title="Loading preview"
-          message="Getting this image ready."
+          title={loadingTitle}
+          message={loadingMessage}
+          loading
         />
       ) : null}
       {!loading && errorMessage ? (

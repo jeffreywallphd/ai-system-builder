@@ -120,4 +120,28 @@ describe("ImageManipulationRunLifecycleState", () => {
     expect(snapshot.percentComplete).toBe(38);
     expect(snapshot.summary).toContain("3/8 nodes complete");
   });
+
+  it("describes queued progress when node-level counts are not yet available", () => {
+    const queued = buildRunProgressSnapshot({
+      executionId: "run-2",
+      status: "pending",
+      rootAssetId: "asset:root:2",
+      startedAt: "2026-04-08T19:00:00.000Z",
+      updatedAt: "2026-04-08T19:00:10.000Z",
+      progress: {
+        totalNodeCount: 0,
+        completedNodeCount: 0,
+        failedNodeCount: 0,
+        runningNodeCount: 0,
+        updatedAt: "2026-04-08T19:00:10.000Z",
+      },
+      executedVersionMap: {
+        nodeVersionIds: Object.freeze({}),
+      },
+      nestedExecutionLineage: Object.freeze([]),
+    });
+
+    expect(queued.available).toBeFalse();
+    expect(queued.summary).toContain("Queued");
+  });
 });

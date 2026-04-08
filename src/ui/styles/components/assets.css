@@ -182,6 +182,36 @@
   margin: 0;
 }
 
+.ui-image-status-notice--loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.ui-image-status-notice__loading-bar {
+  display: block;
+  width: 42%;
+  height: 0.2rem;
+  border-radius: 999px;
+  margin-bottom: var(--space-2xs);
+  background: linear-gradient(
+    90deg,
+    rgba(72, 127, 255, 0.18) 0%,
+    rgba(72, 127, 255, 0.62) 52%,
+    rgba(72, 127, 255, 0.18) 100%
+  );
+  background-size: 200% 100%;
+  animation: ui-image-status-loading 1.1s linear infinite;
+}
+
+@keyframes ui-image-status-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
 .ui-image-status-notice--warning {
   border-color: rgba(246, 193, 85, 0.45);
 }
