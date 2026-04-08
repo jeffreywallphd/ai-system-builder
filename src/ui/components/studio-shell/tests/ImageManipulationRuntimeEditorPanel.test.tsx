@@ -6,11 +6,14 @@ import ImageManipulationRuntimeEditorPanel, {
   buildImageRunLaunchPrecheckState,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
+  ImageRunFailureRecoveryActionIds,
   resolveNextGalleryPreviewRoleByKey,
+  resolveImageRunFailureRecoveryActionPlan,
   resolveLinkedRunForSelectedOutput,
   resolveCollectionLoadingMessage,
   resolveGalleryLoadingMessage,
   resolvePreviewLoadingMessage,
+  resolveReusableRunOutputForRecovery,
   resolveRunTransitionMessage,
   resolveRunHistorySummary,
   resolveRunOutputRecordId,
@@ -321,6 +324,48 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(guidance?.canRetryNow).toBeTrue();
   });
 
+  it("does not allow retry-now for user-fixable failure codes even when retryable is flagged", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "ready",
+        readyForExecution: true,
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        issues: Object.freeze([]),
+      }),
+    });
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: {
+        state: "failed",
+      },
+      flowIssues: Object.freeze([Object.freeze({
+        stepId: "execution",
+        code: "im.dispatch.validation.invalid-request-data",
+        userMessage: "Fix settings before retrying.",
+        retryable: true,
+      })]),
+      launchPrecheck: precheck,
+    });
+
+    expect(guidance?.kind).toBe("user-fixable");
+    expect(guidance?.canRetryNow).toBeFalse();
+  });
+
   it("blocks launch precheck when setup or backend readiness is unresolved", () => {
     const precheck = buildImageRunLaunchPrecheckState({
       selectedSourceRecordId: undefined,
@@ -339,6 +384,114 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.launchReady).toBeFalse();
     expect(precheck.setupBlockingIssues.length).toBeGreaterThan(0);
     expect(precheck.backendBlockingIssues.length).toBeGreaterThan(0);
+  });
+
+  it("derives safe recovery action plans for blocked launches and retryable failures", () => {
+    const blockedPrecheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: undefined,
+      selectedSourceAssetId: undefined,
+      selectedSourceDatasetInstanceId: undefined,
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+    });
+    const blockedGuidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: {
+        state: "idle",
+      },
+      flowIssues: Object.freeze([]),
+      launchPrecheck: blockedPrecheck,
+    });
+    const blockedPlan = resolveImageRunFailureRecoveryActionPlan({
+      guidance: blockedGuidance,
+      launchPrecheck: blockedPrecheck,
+      latestRecentSystemId: "system:latest:1",
+      runHistory: Object.freeze([]),
+    });
+
+    expect(blockedPlan.actions.map((entry) => entry.actionId)).toContain(ImageRunFailureRecoveryActionIds.reselectSourceImage);
+    expect(blockedPlan.actions.map((entry) => entry.actionId)).toContain(ImageRunFailureRecoveryActionIds.reopenLatestSetup);
+    expect(blockedPlan.actions.map((entry) => entry.actionId)).not.toContain(ImageRunFailureRecoveryActionIds.retryLaunch);
+
+    const retryablePrecheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "ready",
+        readyForExecution: true,
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        issues: Object.freeze([]),
+      }),
+    });
+    const retryableGuidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: {
+        state: "failed",
+      },
+      flowIssues: Object.freeze([Object.freeze({
+        stepId: "persistence",
+        code: "im.result.operational.output-collection-partial-anomaly",
+        userMessage: "Some outputs were saved.",
+        retryable: true,
+      })]),
+      launchPrecheck: retryablePrecheck,
+    });
+    const retryablePlan = resolveImageRunFailureRecoveryActionPlan({
+      guidance: retryableGuidance,
+      launchPrecheck: retryablePrecheck,
+      runHistory: Object.freeze([{
+        runId: "run:completed:1",
+        status: "completed",
+        outputs: {
+          datasetInstance: {
+            persistedRecordIds: ["record:output:1"],
+          },
+          images: [],
+        },
+      }]) as never,
+    });
+
+    expect(retryablePlan.actions.map((entry) => entry.actionId)).toContain(ImageRunFailureRecoveryActionIds.retryLaunch);
+    expect(retryablePlan.actions.map((entry) => entry.actionId)).toContain(ImageRunFailureRecoveryActionIds.reusePriorResult);
+    expect(retryablePlan.reusablePriorRunOutput?.recordId).toBe("record:output:1");
+  });
+
+  it("prefers completed or partial run outputs when selecting reusable recovery context", () => {
+    const reusable = resolveReusableRunOutputForRecovery(Object.freeze([
+      {
+        runId: "run:failed:1",
+        status: "failed",
+        outputs: {
+          images: [{
+            recordId: "record:failed:1",
+          }],
+        },
+      },
+      {
+        runId: "run:completed:1",
+        status: "completed",
+        outputs: {
+          datasetInstance: {
+            persistedRecordIds: ["record:completed:1"],
+          },
+          images: [],
+        },
+      },
+    ]) as never);
+
+    expect(reusable?.runId).toBe("run:completed:1");
+    expect(reusable?.recordId).toBe("record:completed:1");
   });
 
   it("links the selected output to run history using workflow run ids", () => {

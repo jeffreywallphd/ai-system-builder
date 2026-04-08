@@ -709,6 +709,19 @@ export function buildImageRunLaunchPrecheckState(input: {
 
 type ImageRunRecoveryKind = "user-fixable" | "retry-later" | "operator-action" | "terminal";
 
+export const ImageRunFailureRecoveryActionIds = Object.freeze({
+  retryLaunch: "retry-launch",
+  revisitSetup: "revisit-setup",
+  refreshReadiness: "refresh-readiness",
+  waitAndRefresh: "wait-and-refresh",
+  reopenLatestSetup: "reopen-latest-setup",
+  reusePriorResult: "reuse-prior-result",
+  reselectSourceImage: "reselect-source-image",
+} as const);
+
+export type ImageRunFailureRecoveryActionId =
+  typeof ImageRunFailureRecoveryActionIds[keyof typeof ImageRunFailureRecoveryActionIds];
+
 export interface ImageRunFailureRecoveryGuidance {
   readonly mode: "launch-blocked" | "run-failed";
   readonly kind: ImageRunRecoveryKind;
@@ -716,6 +729,19 @@ export interface ImageRunFailureRecoveryGuidance {
   readonly summary: string;
   readonly recommendedActions: ReadonlyArray<string>;
   readonly canRetryNow: boolean;
+}
+
+export interface ImageRunFailureRecoveryActionDescriptor {
+  readonly actionId: ImageRunFailureRecoveryActionId;
+  readonly label: string;
+}
+
+export interface ImageRunFailureRecoveryActionPlan {
+  readonly actions: ReadonlyArray<ImageRunFailureRecoveryActionDescriptor>;
+  readonly reusablePriorRunOutput?: {
+    readonly runId: string;
+    readonly recordId: string;
+  };
 }
 
 function resolveIssueRecoveryKind(
@@ -734,6 +760,37 @@ function resolveIssueRecoveryKind(
     fallbackSummary: issue.userMessage,
   });
   return mapOperationalMessageKindToRunRecoveryKind(guidance.kind);
+}
+
+function resolveIssueRetryPolicy(input: {
+  readonly issue: Pick<ReferenceImageExecutionFlowIssue, "code" | "recoveryKind" | "retryable" | "userMessage">;
+  readonly launchReady: boolean;
+}): {
+  readonly kind: ImageRunRecoveryKind;
+  readonly canRetryNow: boolean;
+} {
+  const kind = resolveIssueRecoveryKind(input.issue);
+  if (kind === "user-fixable" || kind === "operator-action" || kind === "terminal") {
+    return Object.freeze({
+      kind,
+      canRetryNow: false,
+    });
+  }
+
+  const classification = mapImageStudioFailureCodeToClassification({
+    code: input.issue.code,
+    fallbackLayer: ImageStudioFailureMappingLayers.executionDispatch,
+  });
+  const guidance = deriveImageStudioOperationalGuidance({
+    classification,
+    retryable: input.issue.retryable,
+    fallbackSummary: input.issue.userMessage,
+    launchReady: input.launchReady,
+  });
+  return Object.freeze({
+    kind,
+    canRetryNow: guidance.canRetryNow,
+  });
 }
 
 function resolveRuntimeOperationRecovery(input: {
@@ -793,8 +850,13 @@ export function buildImageRunFailureRecoveryGuidance(input: {
 }): ImageRunFailureRecoveryGuidance | undefined {
   if (input.runLifecycle.state === "failed") {
     const firstIssue = input.flowIssues[0];
-    const kind = firstIssue ? resolveIssueRecoveryKind(firstIssue) : "retry-later";
-    const retryable = firstIssue?.retryable ?? kind === "retry-later";
+    const issuePolicy = firstIssue
+      ? resolveIssueRetryPolicy({
+        issue: firstIssue,
+        launchReady: input.launchPrecheck.launchReady,
+      })
+      : undefined;
+    const kind = issuePolicy?.kind ?? "retry-later";
     return Object.freeze({
       mode: "run-failed",
       kind,
@@ -827,7 +889,7 @@ export function buildImageRunFailureRecoveryGuidance(input: {
                 "Contact support if this keeps happening.",
               ],
       ),
-      canRetryNow: retryable && input.launchPrecheck.launchReady,
+      canRetryNow: issuePolicy?.canRetryNow ?? input.launchPrecheck.launchReady,
     });
   }
 
@@ -860,6 +922,88 @@ export function buildImageRunFailureRecoveryGuidance(input: {
   }
 
   return undefined;
+}
+
+export function resolveReusableRunOutputForRecovery(
+  runHistory: ReadonlyArray<ImageRunHistoryRecord>,
+): { readonly runId: string; readonly recordId: string } | undefined {
+  let fallbackRun: { readonly runId: string; readonly recordId: string } | undefined;
+  for (const run of runHistory) {
+    const outputRecordId = resolveRunOutputRecordId(run);
+    if (!outputRecordId) {
+      continue;
+    }
+    if (run.status === "completed" || run.status === "partial") {
+      return Object.freeze({
+        runId: run.runId,
+        recordId: outputRecordId,
+      });
+    }
+    if (!fallbackRun) {
+      fallbackRun = Object.freeze({
+        runId: run.runId,
+        recordId: outputRecordId,
+      });
+    }
+  }
+  return fallbackRun;
+}
+
+export function resolveImageRunFailureRecoveryActionPlan(input: {
+  readonly guidance?: ImageRunFailureRecoveryGuidance;
+  readonly launchPrecheck: ImageRunLaunchPrecheckState;
+  readonly latestRecentSystemId?: string;
+  readonly runHistory: ReadonlyArray<ImageRunHistoryRecord>;
+}): ImageRunFailureRecoveryActionPlan {
+  const guidance = input.guidance;
+  if (!guidance) {
+    return Object.freeze({
+      actions: Object.freeze([]),
+    });
+  }
+
+  const reusablePriorRunOutput = resolveReusableRunOutputForRecovery(input.runHistory);
+  const descriptors: ImageRunFailureRecoveryActionDescriptor[] = [];
+  const pushAction = (actionId: ImageRunFailureRecoveryActionId, label: string) => {
+    if (descriptors.some((entry) => entry.actionId === actionId)) {
+      return;
+    }
+    descriptors.push(Object.freeze({ actionId, label }));
+  };
+
+  if (guidance.canRetryNow) {
+    pushAction(ImageRunFailureRecoveryActionIds.retryLaunch, "Retry launch");
+  }
+
+  if (guidance.kind === "retry-later" && !guidance.canRetryNow) {
+    pushAction(ImageRunFailureRecoveryActionIds.waitAndRefresh, "Wait and refresh");
+  }
+
+  if (guidance.kind !== "terminal") {
+    pushAction(ImageRunFailureRecoveryActionIds.refreshReadiness, "Refresh readiness");
+  }
+
+  const sourceSelectionBlocked = input.launchPrecheck.setupBlockingIssues.some((issue) => (
+    issue.code === "source-image-required" || issue.code === "source-dataset-unlinked"
+  ));
+  if (sourceSelectionBlocked) {
+    pushAction(ImageRunFailureRecoveryActionIds.reselectSourceImage, "Reselect source image");
+  }
+
+  pushAction(ImageRunFailureRecoveryActionIds.revisitSetup, "Revisit setup");
+
+  if (reusablePriorRunOutput) {
+    pushAction(ImageRunFailureRecoveryActionIds.reusePriorResult, "Reuse prior result");
+  }
+
+  if (input.latestRecentSystemId) {
+    pushAction(ImageRunFailureRecoveryActionIds.reopenLatestSetup, "Reopen latest setup");
+  }
+
+  return Object.freeze({
+    actions: Object.freeze(descriptors),
+    reusablePriorRunOutput,
+  });
 }
 
 function mapOperationalMessageKindToRunRecoveryKind(kind: string): ImageRunRecoveryKind {
@@ -1874,6 +2018,12 @@ export function ImageManipulationRuntimeEditorPanel({
     launchPrecheck,
   });
   const latestRecentSystem = recentSystems[0];
+  const failureRecoveryActionPlan = resolveImageRunFailureRecoveryActionPlan({
+    guidance: failureRecoveryGuidance,
+    launchPrecheck,
+    latestRecentSystemId: latestRecentSystem?.systemId,
+    runHistory,
+  });
 
   const chainRecordForReuse = async (input: {
     readonly sourceRecordId: string;
@@ -2378,6 +2528,62 @@ export function ImageManipulationRuntimeEditorPanel({
         retryable: true,
         recoveryKind: "operational",
       })]));
+    }
+  };
+
+  const refreshRecoveryContext = async (): Promise<void> => {
+    setIsRefreshingReview(true);
+    try {
+      await Promise.all([
+        refreshExecutionReadiness(),
+        loadCollections(),
+        loadRunHistory(),
+      ]);
+    } finally {
+      setIsRefreshingReview(false);
+    }
+  };
+
+  const handleFailureRecoveryAction = async (actionId: ImageRunFailureRecoveryActionId): Promise<void> => {
+    if (actionId === ImageRunFailureRecoveryActionIds.retryLaunch) {
+      await startImageCreationRun();
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.revisitSetup) {
+      setSelection((current) => setActivePreviewRole(current, "source"));
+      setStatusMessage("Review setup and settings, then create a new image.");
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.refreshReadiness) {
+      await refreshExecutionReadiness();
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.waitAndRefresh) {
+      setStatusMessage("Waiting for recovery and refreshing authoritative status.");
+      await refreshRecoveryContext();
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.reopenLatestSetup) {
+      if (latestRecentSystem?.systemId) {
+        await reopenRecentSystem(latestRecentSystem.systemId);
+      }
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.reusePriorResult) {
+      const reusableOutput = failureRecoveryActionPlan.reusablePriorRunOutput;
+      if (!reusableOutput) {
+        return;
+      }
+      setSelectedHistoryRunId(reusableOutput.runId);
+      await chainRecordForReuse({
+        sourceRecordId: reusableOutput.recordId,
+        targetDatasetBindingId: "input-image-dataset",
+      });
+      return;
+    }
+    if (actionId === ImageRunFailureRecoveryActionIds.reselectSourceImage) {
+      setSelection((current) => setActivePreviewRole(current, "source"));
+      setStatusMessage("Reselect a source photo to continue.");
     }
   };
 
@@ -3034,40 +3240,47 @@ export function ImageManipulationRuntimeEditorPanel({
                   ))}
                 </ul>
                 <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
-                  {failureRecoveryGuidance.canRetryNow ? (
-                    <button
-                      type="button"
-                      className="ui-button ui-button--secondary ui-button--sm"
-                      disabled={isRunInProgress || context.isBusy}
-                      onClick={() => {
-                        void startImageCreationRun();
-                      }}
-                    >
-                      Retry now
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className="ui-button ui-button--ghost ui-button--sm"
-                    disabled={isRunInProgress}
-                    onClick={() => {
-                      setSelection((current) => setActivePreviewRole(current, "source"));
-                      setStatusMessage("Review setup and settings, then create a new image.");
-                    }}
-                  >
-                    Review setup
-                  </button>
-                  <button
-                    type="button"
-                    className="ui-button ui-button--ghost ui-button--sm"
-                    disabled={isCheckingExecutionReadiness}
-                    onClick={() => {
-                      void refreshExecutionReadiness();
-                    }}
-                  >
-                    {isCheckingExecutionReadiness ? "Checking..." : "Refresh readiness"}
-                  </button>
-                  {latestRecentSystem?.systemId ? (
+                  {failureRecoveryActionPlan.actions.map((action) => {
+                    const className = action.actionId === ImageRunFailureRecoveryActionIds.retryLaunch
+                      ? "ui-button ui-button--secondary ui-button--sm"
+                      : "ui-button ui-button--ghost ui-button--sm";
+                    const disabled = action.actionId === ImageRunFailureRecoveryActionIds.retryLaunch
+                      ? isRunInProgress || context.isBusy || !failureRecoveryGuidance.canRetryNow
+                      : action.actionId === ImageRunFailureRecoveryActionIds.refreshReadiness
+                        ? isCheckingExecutionReadiness
+                        : action.actionId === ImageRunFailureRecoveryActionIds.waitAndRefresh
+                          ? isCheckingExecutionReadiness || isRefreshingReview || isLoadingRunHistory
+                          : action.actionId === ImageRunFailureRecoveryActionIds.reopenLatestSetup
+                            ? Boolean(isReopeningRecentSystemId) || !latestRecentSystem?.systemId
+                            : action.actionId === ImageRunFailureRecoveryActionIds.reusePriorResult
+                              ? isResultQuickActionPending !== undefined || !failureRecoveryActionPlan.reusablePriorRunOutput
+                              : isRunInProgress;
+                    const label = action.actionId === ImageRunFailureRecoveryActionIds.refreshReadiness && isCheckingExecutionReadiness
+                      ? "Checking..."
+                      : action.actionId === ImageRunFailureRecoveryActionIds.waitAndRefresh && isRefreshingReview
+                        ? "Refreshing..."
+                        : action.actionId === ImageRunFailureRecoveryActionIds.reopenLatestSetup
+                          && latestRecentSystem?.systemId
+                          && isReopeningRecentSystemId === latestRecentSystem.systemId
+                          ? "Reopening..."
+                          : action.label;
+                    return (
+                      <button
+                        key={action.actionId}
+                        type="button"
+                        className={className}
+                        disabled={disabled}
+                        onClick={() => {
+                          void handleFailureRecoveryAction(action.actionId);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                  {latestRecentSystem?.systemId && !failureRecoveryActionPlan.actions.some((action) => (
+                    action.actionId === ImageRunFailureRecoveryActionIds.reopenLatestSetup
+                  )) ? (
                     <button
                       type="button"
                       className="ui-button ui-button--ghost ui-button--sm"
@@ -3076,7 +3289,9 @@ export function ImageManipulationRuntimeEditorPanel({
                         void reopenRecentSystem(latestRecentSystem.systemId);
                       }}
                     >
-                      {isReopeningRecentSystemId === latestRecentSystem.systemId ? "Reopening..." : "Reopen latest setup"}
+                      {isReopeningRecentSystemId === latestRecentSystem.systemId
+                        ? "Reopening..."
+                        : "Reopen latest setup"}
                     </button>
                   ) : null}
                 </div>
