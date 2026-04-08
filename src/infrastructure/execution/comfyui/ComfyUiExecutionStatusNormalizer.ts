@@ -12,6 +12,7 @@ import {
   type ImageManipulationExecutionStateSnapshot,
   type ImageManipulationExecutionWarning,
 } from "@application/image-workflows/ports";
+import { ComfyUiExecutionObservability } from "./ComfyUiExecutionObservability";
 
 export interface ComfyUiExecutionStateNormalizationInput {
   readonly executionJobId: string;
@@ -39,6 +40,10 @@ export interface ComfyUiExecutionStateNormalizationInput {
   readonly backendDetails?: Readonly<Record<string, unknown>>;
   readonly startedAt?: string;
   readonly finishedAt?: string;
+}
+
+export interface ComfyUiExecutionStateNormalizationOptions {
+  readonly observability?: ComfyUiExecutionObservability;
 }
 
 const defaultBackendFamily = "adapter.comfyui.image-manipulation";
@@ -83,6 +88,7 @@ const knownStateTokens = new Set<string>([
 
 export function normalizeComfyUiExecutionState(
   input: ComfyUiExecutionStateNormalizationInput,
+  options: ComfyUiExecutionStateNormalizationOptions = {},
 ): ImageManipulationExecutionStateSnapshot {
   const updatedAt = toIsoString(input.progress?.updatedAt)
     ?? toIsoString(input.backendSnapshot?.checkedAt)
@@ -182,7 +188,7 @@ export function normalizeComfyUiExecutionState(
     backendDiagnostics,
   });
 
-  return Object.freeze({
+  const snapshot = Object.freeze({
     executionJobId: input.executionJobId,
     runId: input.runId,
     workspaceId: input.workspaceId,
@@ -220,6 +226,25 @@ export function normalizeComfyUiExecutionState(
     backendDiagnostics,
     normalizedJob,
   });
+  options.observability?.record({
+    event: "progress-normalization.completed",
+    severity: failure ? (failure.retryable ? "warn" : "error") : warnings.length > 0 ? "warn" : "info",
+    runId: input.runId,
+    executionJobId: input.executionJobId,
+    backendExecutionId: normalizeOptional(input.backendExecutionId),
+    workspaceId: input.workspaceId,
+    occurredAt: updatedAt,
+    details: Object.freeze({
+      normalizedState: snapshot.state,
+      backendState: rawBackendState,
+      quality,
+      progressPercent: snapshot.progressPercent,
+      warningCount: warnings.length,
+      failureCode: failure?.code,
+      failureCategory: failure?.category,
+    }),
+  });
+  return snapshot;
 }
 
 function buildProgress(input: {

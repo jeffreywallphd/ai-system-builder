@@ -3,6 +3,11 @@ import {
   ComfyUiTransportClient,
   type ComfyUiTransportLogger,
 } from "./ComfyUiTransportClient";
+import {
+  ComfyUiExecutionObservability,
+  createComfyUiTransportLoggerBridge,
+  type ComfyUiExecutionObservabilityLogger,
+} from "./ComfyUiExecutionObservability";
 import { ComfyUiOutputDiscoveryCollector } from "./ComfyUiOutputDiscoveryCollector";
 import { ComfyUiRunExecutionTransportGateway } from "../runs/ComfyUiRunExecutionTransportGateway";
 import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
@@ -25,6 +30,7 @@ export interface CreateComfyUiExecutionAdapterInfrastructureOptions {
   readonly fetch?: typeof fetch;
   readonly now?: () => Date;
   readonly logger?: ComfyUiTransportLogger;
+  readonly observabilityLogger?: ComfyUiExecutionObservabilityLogger;
 }
 
 export function createComfyUiExecutionAdapterInfrastructure(
@@ -42,18 +48,26 @@ export function createComfyUiExecutionAdapterInfrastructure(
     throw new Error("ComfyUI execution adapter infrastructure requires a configured baseUrl.");
   }
 
+  const observability = input.observabilityLogger
+    ? new ComfyUiExecutionObservability({
+      logger: input.observabilityLogger,
+      now: input.now,
+    })
+    : undefined;
+
   const transportClient = new ComfyUiTransportClient({
     baseUrl,
     requestTimeoutMs: config.requestTimeoutMs,
     authToken: config.authToken,
     fetch: input.fetch,
     now: input.now,
-    logger: input.logger,
+    logger: input.logger ?? (observability ? createComfyUiTransportLoggerBridge(observability) : undefined),
   });
   const runDispatchGateway = new ComfyUiRunExecutionTransportGateway(transportClient);
   const runDispatchAdapter = new ComfyUiRunExecutionDispatchAdapter({
     gateway: runDispatchGateway,
     now: input.now,
+    observability,
   });
   const capabilityProbeAdapter = new ComfyUiImageManipulationCapabilityProbeAdapter({
     transportClient,
@@ -62,11 +76,13 @@ export function createComfyUiExecutionAdapterInfrastructure(
   const outputDiscoveryCollector = new ComfyUiOutputDiscoveryCollector({
     transportClient,
     now: input.now,
+    observability,
   });
   const cancellationAdapter = new ComfyUiExecutionCancellationAdapter({
     transportClient,
     cleanupPort: outputDiscoveryCollector,
     now: input.now,
+    observability,
   });
 
   return Object.freeze({

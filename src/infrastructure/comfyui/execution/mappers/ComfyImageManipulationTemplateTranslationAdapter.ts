@@ -11,6 +11,7 @@ import {
   type ImageManipulationTranslationResult,
 } from "@application/image-workflows/ports";
 import { InitialImageWorkflowTemplateFamilyIds } from "@application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry";
+import { ComfyUiExecutionObservability } from "@infrastructure/execution/comfyui/ComfyUiExecutionObservability";
 
 type TranslationTemplateResolver = (input: {
   readonly request: ImageManipulationTranslationRequest;
@@ -225,15 +226,18 @@ const templateRegistrations: Readonly<Record<string, SupportedTemplateRegistrati
 export interface ComfyImageManipulationTemplateTranslationAdapterOptions {
   readonly now?: () => Date;
   readonly backendFamily?: string;
+  readonly observability?: ComfyUiExecutionObservability;
 }
 
 export class ComfyImageManipulationTemplateTranslationAdapter implements IImageManipulationTemplateTranslationPort {
   private readonly now: () => Date;
   private readonly backendFamily: string;
+  private readonly observability?: ComfyUiExecutionObservability;
 
   public constructor(options: ComfyImageManipulationTemplateTranslationAdapterOptions = {}) {
     this.now = options.now ?? (() => new Date());
     this.backendFamily = options.backendFamily?.trim() || fallbackBackendFamily;
+    this.observability = options.observability;
   }
 
   public async translateToBackendPayload(
@@ -246,7 +250,7 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
     try {
       request = validateImageManipulationTranslationRequest(input);
     } catch (error) {
-      return this.createFailureResult({
+      const failed = this.createFailureResult({
         request: undefined,
         translatedAt,
         diagnostics: Object.freeze([this.createDiagnostic({
@@ -260,7 +264,26 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
           }),
         })]),
       });
+      this.emitTranslationEvent({
+        event: "translation.failed",
+        severity: "error",
+        request: undefined,
+        result: failed,
+      });
+      return failed;
     }
+
+    this.emitTranslationEvent({
+      event: "translation.started",
+      severity: "info",
+      request,
+      details: Object.freeze({
+        templateId: request.templateResolution.templateId,
+        operationKind: request.authoritative.workflow.operationKind,
+        slotBindingCount: request.slotBindings.length,
+        parameterMappingCount: request.parameterMappings.length,
+      }),
+    });
 
     const registration = templateRegistrations[request.templateResolution.templateId];
     if (!registration) {
@@ -271,7 +294,14 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
         message: `ComfyUI translation adapter does not support template '${request.templateResolution.templateId}'.`,
         blocking: true,
       }));
-      return this.createFailureResult({ request, translatedAt, diagnostics: Object.freeze(diagnostics) });
+      const failed = this.createFailureResult({ request, translatedAt, diagnostics: Object.freeze(diagnostics) });
+      this.emitTranslationEvent({
+        event: "translation.failed",
+        severity: "warn",
+        request,
+        result: failed,
+      });
+      return failed;
     }
 
     if (registration.operationKind !== request.authoritative.workflow.operationKind) {
@@ -295,7 +325,14 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
     });
 
     if (hasBlockingDiagnostics(diagnostics)) {
-      return this.createFailureResult({ request, translatedAt, diagnostics: Object.freeze(diagnostics) });
+      const failed = this.createFailureResult({ request, translatedAt, diagnostics: Object.freeze(diagnostics) });
+      this.emitTranslationEvent({
+        event: "translation.failed",
+        severity: "warn",
+        request,
+        result: failed,
+      });
+      return failed;
     }
 
     const backendFamily = this.resolveBackendFamily(request);
@@ -367,6 +404,16 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
       }),
     });
 
+    this.emitTranslationEvent({
+      event: "translation.succeeded",
+      severity: "info",
+      request,
+      result,
+      details: Object.freeze({
+        backendFamily,
+        outputCount: request.outputExpectations.length,
+      }),
+    });
     return result;
   }
 
@@ -505,6 +552,28 @@ export class ComfyImageManipulationTemplateTranslationAdapter implements IImageM
       message: input.message,
       blocking: input.blocking,
       details: input.details,
+    });
+  }
+
+  private emitTranslationEvent(input: {
+    readonly event: string;
+    readonly severity: "info" | "warn" | "error";
+    readonly request: ImageManipulationTranslationRequest | undefined;
+    readonly result?: ImageManipulationTranslationResult;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): void {
+    this.observability?.record({
+      event: input.event,
+      severity: input.severity,
+      runId: input.request?.runId,
+      translationRequestId: input.request?.translationRequestId,
+      correlationId: input.request?.correlationId,
+      workspaceId: input.request?.workspaceId,
+      details: Object.freeze({
+        status: input.result?.status,
+        diagnosticsSummary: input.result?.metadata?.diagnosticsSummary,
+        ...(input.details ?? {}),
+      }),
     });
   }
 }

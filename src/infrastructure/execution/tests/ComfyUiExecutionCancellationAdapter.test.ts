@@ -5,6 +5,29 @@ import {
 } from "@application/image-workflows/ports";
 import { ComfyUiTransportClientError } from "../comfyui/ComfyUiTransportClient";
 import { ComfyUiExecutionCancellationAdapter } from "../comfyui/ComfyUiExecutionCancellationAdapter";
+import {
+  ComfyUiExecutionObservability,
+  type ComfyUiExecutionObservabilityEvent,
+  type ComfyUiExecutionObservabilityLogger,
+} from "../comfyui/ComfyUiExecutionObservability";
+
+class CapturingObservabilityLogger implements ComfyUiExecutionObservabilityLogger {
+  public readonly infoEvents: ComfyUiExecutionObservabilityEvent[] = [];
+  public readonly warnEvents: ComfyUiExecutionObservabilityEvent[] = [];
+  public readonly errorEvents: ComfyUiExecutionObservabilityEvent[] = [];
+
+  public info(event: ComfyUiExecutionObservabilityEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: ComfyUiExecutionObservabilityEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: ComfyUiExecutionObservabilityEvent): void {
+    this.errorEvents.push(event);
+  }
+}
 
 describe("ComfyUiExecutionCancellationAdapter", () => {
   it("normalizes accepted cancellation with explicit adapter-local cleanup details", async () => {
@@ -85,6 +108,11 @@ describe("ComfyUiExecutionCancellationAdapter", () => {
   });
 
   it("preserves failed cancellation status while surfacing degraded cleanup outcomes", async () => {
+    const logger = new CapturingObservabilityLogger();
+    const observability = new ComfyUiExecutionObservability({
+      logger,
+      now: () => new Date("2026-04-08T14:03:00.000Z"),
+    });
     const transportClient = {
       requestPromptCancellation: mock(async () => {
         throw new ComfyUiTransportClientError({
@@ -109,6 +137,7 @@ describe("ComfyUiExecutionCancellationAdapter", () => {
       cleanupPort,
       resolveBackendExecutionId: () => "prompt-cancel-3",
       now: () => new Date("2026-04-08T14:03:00.000Z"),
+      observability,
     });
 
     const result = await adapter.requestExecutionCancellation({
@@ -125,5 +154,7 @@ describe("ComfyUiExecutionCancellationAdapter", () => {
     expect(failure.category).toBe("connectivity");
     expect(cleanup.status).toBe("degraded");
     expect(String(cleanup.message)).toContain("did not complete");
+    expect(logger.infoEvents.some((event) => event.event === "cancellation.requested")).toBeTrue();
+    expect(logger.warnEvents.some((event) => event.event === "cancellation.completed")).toBeTrue();
   });
 });

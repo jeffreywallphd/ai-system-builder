@@ -5,6 +5,29 @@ import {
 } from "@application/image-workflows/ports";
 import { ComfyUiOutputDiscoveryCollector } from "../comfyui/ComfyUiOutputDiscoveryCollector";
 import { ComfyUiTransportClient } from "../comfyui/ComfyUiTransportClient";
+import {
+  ComfyUiExecutionObservability,
+  type ComfyUiExecutionObservabilityEvent,
+  type ComfyUiExecutionObservabilityLogger,
+} from "../comfyui/ComfyUiExecutionObservability";
+
+class CapturingObservabilityLogger implements ComfyUiExecutionObservabilityLogger {
+  public readonly infoEvents: ComfyUiExecutionObservabilityEvent[] = [];
+  public readonly warnEvents: ComfyUiExecutionObservabilityEvent[] = [];
+  public readonly errorEvents: ComfyUiExecutionObservabilityEvent[] = [];
+
+  public info(event: ComfyUiExecutionObservabilityEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: ComfyUiExecutionObservabilityEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: ComfyUiExecutionObservabilityEvent): void {
+    this.errorEvents.push(event);
+  }
+}
 
 describe("ComfyUiOutputDiscoveryCollector", () => {
   it("discovers completed prompt image outputs and collects normalized descriptor records", async () => {
@@ -158,6 +181,11 @@ describe("ComfyUiOutputDiscoveryCollector", () => {
   });
 
   it("releases adapter-tracked temporary output references on explicit cleanup requests", async () => {
+    const logger = new CapturingObservabilityLogger();
+    const observability = new ComfyUiExecutionObservability({
+      logger,
+      now: () => new Date("2026-04-08T13:30:00.000Z"),
+    });
     const fetchFn = mock(async () => new Response(JSON.stringify({
       "prompt-collect-4": Object.freeze({
         status: Object.freeze({
@@ -185,6 +213,7 @@ describe("ComfyUiOutputDiscoveryCollector", () => {
     const collector = new ComfyUiOutputDiscoveryCollector({
       transportClient,
       now: () => new Date("2026-04-08T13:30:00.000Z"),
+      observability,
     });
 
     await collector.discoverAndCollect({
@@ -211,5 +240,8 @@ describe("ComfyUiOutputDiscoveryCollector", () => {
 
     expect(noTracked.status).toBe("none");
     expect(noTracked.releasedReferenceCount).toBe(0);
+    expect(logger.infoEvents.some((event) => event.event === "output-collection.started")).toBeTrue();
+    expect(logger.infoEvents.some((event) => event.event === "output-collection.completed")).toBeTrue();
+    expect(logger.infoEvents.filter((event) => event.event === "output-collection.cleanup").length).toBe(2);
   });
 });

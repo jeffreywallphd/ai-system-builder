@@ -8,6 +8,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionObservability.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionCancellationAdapter.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
@@ -202,3 +203,44 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
 - Cancellation guarantee is best effort via ComfyUI `POST /interrupt` semantics.
 - Cleanup guarantee is limited to adapter-local tracked temporary reference state; it does not guarantee deletion of backend-generated files or runtime-global Comfy queue side effects.
 - Degraded cleanup is explicit and observable in result details so higher layers can choose retry/reconciliation behavior without hidden partial-state assumptions.
+
+## Story 3.3.5 observability, structured logging, and redaction
+
+### Added seam
+
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionObservability.ts`
+- Provides structured adapter execution events + severity routing + centralized redaction.
+
+### Covered flow events
+
+- translation: `translation.started|succeeded|failed`
+- dispatch: `dispatch.started|accepted|failed`
+- transport bridge: `transport.request-succeeded|request-failed`
+- progress normalization: `progress-normalization.completed`
+- output collection: `output-collection.started|completed|failed` + cleanup events
+- cancellation: `cancellation.requested|completed`
+
+### Correlation posture
+
+Where available, logs carry:
+- `runId`
+- `executionJobId`
+- `backendExecutionId`
+- `translationRequestId`
+- `dispatchAttemptId`
+- `correlationId`
+- `workspaceId`
+
+### Redaction posture
+
+- Reuses platform diagnostics redaction utilities and applies adapter-specific sensitive-field filtering.
+- Logs redact or omit prompt text, raw payload blobs, credentials/tokens, path/storage/file internals, and unsafe backend object-handle details.
+- Transport HTTP failure logs now avoid raw response body preview leakage and only emit bounded safe metadata.
+
+### Composition and testing
+
+- Composition accepts optional `observabilityLogger` in:
+  - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+- Focused behavior and redaction coverage:
+  - `src/infrastructure/execution/tests/ComfyUiExecutionObservability.test.ts`
+  - updated cancellation/output-collector tests in `src/infrastructure/execution/tests/*`
