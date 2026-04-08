@@ -488,12 +488,14 @@ describe("HandleRunDispatchResultUseCase", () => {
     expect(result.run.state).toBe("failed");
     expect(result.queueAction).toBe(DispatchOutcomeQueueActions.terminalFinalized);
     expect(result.run.assignment.status).toBe("released");
-    expect(result.run.execution.errorCode).toBe("dispatch-failed-to-start");
-    expect(result.run.execution.errorMessage).toBe("Run failed to start on the selected execution backend.");
+    expect(result.run.execution.errorCode).toBe("dispatch-timeout");
+    expect(result.run.execution.errorMessage).toContain("took too long");
     expect(result.run.finalization?.outcome).toBe("failed");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.internalMessage)
       .toContain("Socket connection timeout");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.details?.recovery)
+      .toBeDefined();
     expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("failed");
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
     expect([...auditRepository.events.values()].length).toBe(3);
@@ -533,9 +535,68 @@ describe("HandleRunDispatchResultUseCase", () => {
     expect(result.run.assignment.status).toBe("unassigned");
     expect(result.run.execution.outcome).toBe("none");
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("failed-to-start");
+    expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.failure?.details?.recovery)
+      .toBeDefined();
     expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("queued");
     expect(queueRepository.queue.get("run-1")?.assignmentNodeId).toBeUndefined();
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
     expect([...auditRepository.events.values()].length).toBe(3);
+  });
+
+  it("does not auto-requeue when retry policy indicates manual retry only", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const auditRepository = new InMemoryAuditRepository();
+    seedAssignedRun(runRepository);
+    seedDispatchAttempt(queueRepository);
+
+    const useCase = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: auditRepository,
+      idGenerator: {
+        nextId: (prefix) => `${prefix}:${auditRepository.events.size + 1}`,
+      },
+    });
+
+    const result = await useCase.execute({
+      command,
+      dispatchStartedAt: "2026-04-07T09:03:00.000Z",
+      outcome: createDispatchFailureOutcome({
+        failedAt: "2026-04-07T09:03:20.000Z",
+        error: Object.freeze({
+          code: "backend-transient",
+          message: "Backend transient failure requiring manual intervention.",
+          retryable: true,
+          failure: Object.freeze({
+            code: "dispatch-execution-failed",
+            summary: "Dispatch failed.",
+            userMessage: "Dispatch failed.",
+            retryable: true,
+            recovery: Object.freeze({
+              retry: Object.freeze({
+                retryEligible: true,
+                retrySafe: true,
+                retryMode: "manual",
+              }),
+              recoveryAction: Object.freeze({
+                kind: "retry-manual",
+                userActionRequired: false,
+                backendRecoveryPending: false,
+                terminalNotRetryable: false,
+                summary: "Manual retry is required.",
+              }),
+              escalation: Object.freeze({
+                category: "operator",
+                required: true,
+              }),
+            }),
+          }),
+        }),
+      }),
+    });
+
+    expect(result.run.state).toBe("failed");
+    expect(result.queueAction).toBe(DispatchOutcomeQueueActions.terminalFinalized);
   });
 });

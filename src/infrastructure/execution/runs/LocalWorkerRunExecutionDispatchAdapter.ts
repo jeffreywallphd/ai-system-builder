@@ -4,6 +4,7 @@ import {
   type IRunExecutionBackendAdapter,
   type RunExecutionDispatchReceipt,
 } from "@application/runs/ports/RunExecutionDispatchPorts";
+import { normalizeRunExecutionDispatchAdapterError } from "./RunExecutionDispatchFailure";
 
 export interface LocalWorkerDispatchPayload {
   readonly runId: string;
@@ -69,15 +70,19 @@ export class LocalWorkerRunExecutionDispatchAdapter implements IRunExecutionBack
       }),
     });
 
-    const dispatched = await this.dependencies.gateway.submitLocalWorkerDispatch(payload);
-    return Object.freeze({
-      dispatchId: `dispatch:${command.dispatchAttemptId}`,
-      backendKind: this.backendKind,
-      acceptedAt: dispatched.acceptedAt?.trim() || this.now().toISOString(),
-      status: "accepted",
-      backendRunId: dispatched.backendRunId,
-      metadata: dispatched.metadata,
-    });
+    try {
+      const dispatched = await this.dependencies.gateway.submitLocalWorkerDispatch(payload);
+      return Object.freeze({
+        dispatchId: `dispatch:${command.dispatchAttemptId}`,
+        backendKind: this.backendKind,
+        acceptedAt: dispatched.acceptedAt?.trim() || this.now().toISOString(),
+        status: "accepted",
+        backendRunId: dispatched.backendRunId,
+        metadata: dispatched.metadata,
+      });
+    } catch (error) {
+      throw normalizeRunExecutionDispatchAdapterError(error);
+    }
   }
 }
 

@@ -973,6 +973,114 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
     expect(completedCanonical.assignment.releaseReason).toBe("execution-completed");
   });
 
+  it("treats stale node freshness as an explicit transient no-selection condition", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const idGenerator = new SequenceIdGenerator();
+    const nodeRepository = new InMemoryExecutionNodeRepository();
+    nodeRepository.records.set("node-stale", createExecutionNode({
+      nodeId: "node-stale",
+      backendFamily: "comfyui",
+      activationStatus: ExecutionNodeActivationStatuses.active,
+      healthStatus: ExecutionNodeHealthStatuses.ready,
+      backendReadinessState: ExecutionNodeBackendReadinessStates.ready,
+    }));
+
+    const createRun = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+    });
+    const created = await createRun.execute({
+      command: buildSubmissionCommand("2026-04-08T13:30:00.000Z"),
+    });
+
+    const selectReady = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:30:05.000Z"),
+    });
+    const claimForDispatch = new ClaimRunForNodeDispatchPreparationUseCase({
+      runRepository,
+      queueRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:30:06.000Z"),
+    });
+    const dispatchResultHandler = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:30:07.000Z"),
+    });
+    let dispatchCalls = 0;
+    const dispatchAssigned = new DispatchAssignedRunExecutionUseCase({
+      commandBuilder: new BuildAssignedRunExecutionCommandUseCase({
+        runRepository,
+        queueRepository,
+      }),
+      dispatchPort: {
+        dispatch: async () => {
+          dispatchCalls += 1;
+          return Object.freeze({
+            dispatchId: "dispatch:run:stale-should-not-dispatch",
+            backendKind: "comfyui",
+            backendRunId: "comfy-job:stale-should-not-dispatch",
+            acceptedAt: "2026-04-08T13:30:07.000Z",
+          });
+        },
+      },
+      dispatchResultHandler,
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:30:07.000Z"),
+    });
+    const selectionService = new CapturingSelectionService(new ImageRunExecutionNodeSelectionService({
+      eligibilityService: new ImageRunNodeEligibilityEvaluationService({
+        nodeRepository,
+      }),
+    }));
+
+    const useCase = new ProcessQueuedRunDispatchUseCase({
+      selectAssignmentReadyRunsUseCase: selectReady,
+      claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
+      dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: selectionService,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:30:05.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:image-default",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+      reservationTtlSeconds: 120,
+      maxNodeLastSeenAgeMs: 60 * 1000,
+    });
+
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]?.status).toBe("failed");
+    if (result.outcomes[0]?.status === "failed") {
+      expect(result.outcomes[0].stage).toBe("selection");
+      expect(result.outcomes[0].selection?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noEligibleNode);
+      expect(result.outcomes[0].selection?.reasons.some((reason) => reason.code === "node-last-seen-stale")).toBeTrue();
+    }
+
+    expect(dispatchCalls).toBe(0);
+    const selectionDecision = selectionService.decisionsByRunId.get(created.run.runId);
+    expect(selectionDecision?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noEligibleNode);
+    expect(selectionDecision?.candidates[0]?.decision).toBe("unavailable");
+
+    const queueEntry = await queueRepository.getQueueEntryByRunId(created.run.runId);
+    expect(queueEntry?.lifecycleState).toBe("queued");
+    expect(queueEntry?.claimToken).toBeUndefined();
+    const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
+    expect(attempts).toHaveLength(0);
+  });
+
   it("rejects incompatible requested nodes before dispatch to prevent hidden single-backend assumptions", async () => {
     const runRepository = new InMemoryRunRepository();
     const queueRepository = new InMemoryQueueRepository();

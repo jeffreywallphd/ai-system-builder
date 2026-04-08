@@ -391,6 +391,94 @@ function seedCancellingRun(runRepository: InMemoryRunRepository): void {
   }));
 }
 
+function seedCompletedRun(runRepository: InMemoryRunRepository): void {
+  const canonical = createCanonicalRunRecord({
+    identity: {
+      runId: "run:1",
+      workflowId: "workflow:demo",
+      workspaceId: "workspace-alpha",
+    },
+    submission: {
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-07T12:00:00.000Z",
+      submittedByActorId: "user:owner",
+    },
+    state: RunLifecycleStates.completed,
+    queue: {
+      queueId: "queue:default",
+      enteredAt: "2026-04-07T11:59:30.000Z",
+      position: null,
+      positionAsOf: "2026-04-07T12:02:00.000Z",
+      dequeuedAt: "2026-04-07T12:00:00.000Z",
+    },
+    assignment: {
+      status: RunAssignmentStatuses.released,
+      assignedNodeId: "node:trusted-1",
+      assignedAt: "2026-04-07T12:00:00.000Z",
+      releasedAt: "2026-04-07T12:02:00.000Z",
+      releaseReason: "execution-completed",
+    },
+    execution: {
+      adapterKind: "local-worker",
+      adapterRunId: "backend-run-1",
+      startedAt: "2026-04-07T12:00:00.000Z",
+      finishedAt: "2026-04-07T12:02:00.000Z",
+      outcome: RunExecutionOutcomeKinds.succeeded,
+    },
+    retry: {
+      attempt: 1,
+      maxAttempts: 2,
+    },
+    updatedAt: "2026-04-07T12:02:00.000Z",
+  });
+
+  const metadata: RunAuthoritativeMetadata = Object.freeze({
+    schemaVersion: 1,
+    canonicalRun: canonical,
+    submissionSnapshot: Object.freeze({
+      actor: Object.freeze({
+        actorUserIdentityId: "user:owner",
+        activeWorkspaceId: "workspace-alpha",
+      }),
+      runtimeTarget: Object.freeze({
+        systemId: "system:demo",
+        versionId: "system:demo:v1",
+        async: true,
+      }),
+      tags: Object.freeze([]),
+      parameters: Object.freeze({}),
+      storageReferences: Object.freeze([]),
+      resourceReferences: Object.freeze([]),
+      policyPrerequisites: Object.freeze([]),
+    }),
+    visibility: Object.freeze({
+      workspaceScope: "workspace",
+      sharingPosture: "workspace-members",
+    }),
+    orchestration: Object.freeze({
+      initialLifecycleState: "queued",
+      initialQueueState: "queued",
+      intent: Object.freeze({
+        kind: "queue-admission-requested",
+        queueId: "queue:default",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    }),
+  });
+
+  runRepository.runs.set("run:1", Object.freeze({
+    runId: "run:1",
+    runKind: "workflow",
+    status: mapLifecycleStateToPlatformRunStatus(canonical.state),
+    workspaceId: "workspace-alpha",
+    userIdentityId: "user:owner",
+    sourceAggregateRef: "workflow:demo",
+    initiatedAt: "2026-04-07T12:00:00.000Z",
+    metadata,
+    revision: 1,
+  }));
+}
+
 describe("IngestRunExecutionUpdateUseCase", () => {
   it("accepts authorized node progress/heartbeat updates and persists canonical state", async () => {
     const runRepository = new InMemoryRunRepository();
@@ -754,5 +842,65 @@ describe("IngestRunExecutionUpdateUseCase", () => {
 
     expect(response.mutation.mutation.changed).toBeFalse();
     expect(response.status.state).toBe("running");
+  });
+
+  it("treats duplicate terminal updates as safe no-op mutations", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedCompletedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+
+    const response = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        toState: "completed",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        occurredAt: "2026-04-07T12:02:10.000Z",
+      }),
+    });
+
+    expect(response.mutation.mutation.changed).toBeFalse();
+    expect(response.status.state).toBe("completed");
+  });
+
+  it("accepts terminal diagnostics updates without regressing canonical lifecycle state", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedCompletedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+
+    const response = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        occurredAt: "2026-04-07T12:02:20.000Z",
+        internalDiagnostics: Object.freeze({
+          streamInterrupted: true,
+          reconciledAt: "2026-04-07T12:02:20.000Z",
+        }),
+      }),
+    });
+
+    expect(response.mutation.mutation.changed).toBeTrue();
+    expect(response.status.state).toBe("completed");
+    expect(runRepository.runs.get("run:1")?.revision).toBe(2);
   });
 });

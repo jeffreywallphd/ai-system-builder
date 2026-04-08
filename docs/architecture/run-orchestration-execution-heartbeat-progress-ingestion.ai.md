@@ -2,6 +2,7 @@
 
 ## Story scope
 Story 16.2.6 adds an authoritative node-ingested execution update pathway so heartbeat/progress signals advance durable run state and status visibility.
+Story 8.2.3 extends this seam to tolerate duplicate terminal updates and preserve late terminal diagnostics without lifecycle regression.
 
 ## Implemented files
 - `src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts`
@@ -27,6 +28,9 @@ Story 16.2.6 adds an authoritative node-ingested execution update pathway so hea
   - progress/heartbeat snapshots only move forward by timestamp,
   - stale or repeated snapshots become no-op lifecycle mutations (`changed=false`),
   - stale lifecycle transitions are ignored to avoid regressing durable run state.
+- Story 8.2.3 terminal-stream hardening:
+  - duplicate late terminal updates now return safe no-op mutations (instead of conflict rejection),
+  - newer internal diagnostics on terminal runs are persisted as metadata-only updates while terminal lifecycle remains unchanged.
 
 ## Safe visibility split
 - User-safe fields:
@@ -51,5 +55,6 @@ Story 16.2.6 adds an authoritative node-ingested execution update pathway so hea
 - Schema/contract tests for lifecycle update progress/heartbeat fields.
 - Use-case tests for accepted update ingestion and stale sender rejection.
 - Use-case tests for stale progress synchronization behavior and repeated-update no-op behavior.
+- Use-case tests for duplicate terminal no-op behavior and terminal diagnostics metadata persistence behavior.
 - Backend API tests for success and shared error mapping.
 - HTTP identity-server tests for node-authenticated execution update endpoint behavior.

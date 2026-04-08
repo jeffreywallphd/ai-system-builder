@@ -27,6 +27,8 @@ interface ProcessQueuedRunDispatchUseCaseDependencies {
   readonly now?: () => Date;
 }
 
+const DefaultNodeLastSeenFreshnessWindowMs = 15 * 60 * 1000;
+
 export interface ProcessQueuedRunDispatchRequest {
   readonly reservationOwner: string;
   readonly nodeId?: string;
@@ -37,6 +39,7 @@ export interface ProcessQueuedRunDispatchRequest {
   readonly workspaceId?: string;
   readonly limit?: number;
   readonly reservationTtlSeconds?: number;
+  readonly maxNodeLastSeenAgeMs?: number;
 }
 
 export interface ProcessQueuedRunDispatchSuccess {
@@ -114,6 +117,7 @@ export class ProcessQueuedRunDispatchUseCase {
     });
 
     const outcomes: ProcessQueuedRunDispatchOutcome[] = [];
+    const maxNodeLastSeenAgeMs = resolveNodeLastSeenAgeMs(input.maxNodeLastSeenAgeMs);
     for (const item of selected.items) {
       const selection = await this.selectExecutionNodeForRun({
         item,
@@ -121,6 +125,7 @@ export class ProcessQueuedRunDispatchUseCase {
         requestedNodeId,
         candidateNodeIds: input.candidateNodeIds,
         selectionQuery: input.selectionQuery,
+        maxNodeLastSeenAgeMs,
       });
       if ("error" in selection) {
         outcomes.push(selection.error);
@@ -181,6 +186,7 @@ export class ProcessQueuedRunDispatchUseCase {
     readonly requestedNodeId?: string;
     readonly candidateNodeIds?: ReadonlyArray<string>;
     readonly selectionQuery?: ExecutionNodeListQuery;
+    readonly maxNodeLastSeenAgeMs?: number;
   }): Promise<
     | { readonly value: { readonly selectedNodeId: string } }
     | { readonly error: ProcessQueuedRunDispatchFailure }
@@ -196,6 +202,7 @@ export class ProcessQueuedRunDispatchUseCase {
         requiredExecutionTarget: "image-manipulation",
         requiredBackendFamilies: Object.freeze(["comfyui"]),
         requiresRemoteScheduling: true,
+        maxLastSeenAgeMs: input.maxNodeLastSeenAgeMs,
       }),
       candidateNodeIds: resolveCandidateNodeIds({
         requestedNodeId: input.requestedNodeId,
@@ -298,4 +305,14 @@ function resolveCandidateNodeIds(input: {
   return Object.freeze(input.candidateNodeIds
     .map((entry) => normalizeOptional(entry))
     .filter((entry): entry is string => Boolean(entry)));
+}
+
+function resolveNodeLastSeenAgeMs(value: number | undefined): number | undefined {
+  if (value === undefined) {
+    return DefaultNodeLastSeenFreshnessWindowMs;
+  }
+  if (!Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+  return Math.floor(value);
 }

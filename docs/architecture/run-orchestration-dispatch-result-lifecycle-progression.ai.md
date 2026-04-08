@@ -2,16 +2,23 @@
 
 ## Story scope
 Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assigned runs progress deterministically into `running` or failed-to-start terminal outcomes with persisted attempt diagnostics.
+Story 8.2.3 extends this seam with resilient dispatch failure normalization, explicit automatic-retry gating, and stale-node dispatch freshness handling.
 
 ## Implemented files
 - `src/application/runs/use-cases/RunDispatchResultStateTransitions.ts`
 - `src/application/runs/use-cases/HandleRunDispatchResultUseCase.ts`
 - `src/application/runs/use-cases/DispatchAssignedRunExecutionUseCase.ts`
+- `src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts`
 - `src/application/runs/use-cases/RunCreationPersistenceMapper.ts`
 - `src/application/runs/ports/RunOrchestrationPersistencePorts.ts`
 - `src/application/runs/tests/RunDispatchResultStateTransitions.test.ts`
 - `src/application/runs/tests/HandleRunDispatchResultUseCase.test.ts`
 - `src/application/runs/tests/DispatchAssignedRunExecutionUseCase.test.ts`
+- `src/application/runs/tests/ProcessQueuedRunDispatchUseCase.integration.test.ts`
+- `src/infrastructure/execution/runs/RunExecutionDispatchFailure.ts`
+- `src/infrastructure/execution/runs/RemoteRunExecutionDispatchAdapter.ts`
+- `src/infrastructure/execution/runs/LocalWorkerRunExecutionDispatchAdapter.ts`
+- `src/infrastructure/execution/tests/RunExecutionDispatchAdapters.contract.test.ts`
 - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts`
 - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceMigrations.ts`
 - `src/infrastructure/persistence/platform/tests/SqlitePlatformPersistenceAdapter.test.ts`
@@ -25,6 +32,10 @@ Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assign
   - `dispatching -> running` on accepted receipts with reservation release,
   - `dispatching -> queued` (via retry-pending progression) for retryable failed-to-start requeue,
   - `dispatching -> failed` on non-requeue failed-to-start outcomes.
+- Story 8.2.3 refinement:
+  - failed-start requeue is now gated by explicit recovery policy (`details.recovery.retry.retryMode=automatic` + retry eligible/safe),
+  - terminal fallback is explicit when recovery policy is manual/non-retryable/absent,
+  - dispatch failure normalization carries durable recovery metadata into attempt results.
 
 ## Attempt metadata persistence
 - Dispatch attempts now store optional `dispatchResult` metadata.
@@ -32,11 +43,13 @@ Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assign
 - Stored result statuses:
   - `accepted`
   - `failed-to-start`
+- `failed-to-start` details may now include Feature 8.1 retry/recovery guidance for durable retry decision traceability.
 
 ## Failure reason posture
 - Canonical run execution failures use user-safe fields (`safeCode`, `safeMessage`).
 - Dispatch-attempt result metadata stores internal-safe diagnostics (`internalCode`, `internalMessage`, optional details, retryable hint).
 - Backend adapter failures are persisted before dispatch errors are rethrown.
+- Remote and local dispatch adapters now normalize timeout/connectivity/capacity failures into explicit retryable dispatch adapter errors before rethrow.
 
 ## Operational visibility
 - Lifecycle transition events are emitted as runs audit records for dispatch-result progression.
@@ -47,6 +60,8 @@ Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assign
 - Dispatch-result use-case tests for authoritative progression and result persistence.
 - Dispatch use-case tests for failure-path persistence behavior.
 - SQLite adapter test coverage for recording and reading dispatch-attempt results.
+- Added dispatch adapter contract coverage for retryable timeout normalization.
+- Added integration coverage for stale-node freshness no-selection outcomes in queued dispatch processing.
 
 ## Story 4.3.5 integration coverage extension
 - Added adapter-backed orchestration integration regression coverage:

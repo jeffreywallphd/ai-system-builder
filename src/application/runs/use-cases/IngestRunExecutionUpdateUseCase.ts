@@ -175,8 +175,24 @@ export class IngestRunExecutionUpdateUseCase {
 
       const current = mapPlatformRunRecordToCanonicalRun(persisted);
       this.assertSenderAuthorized(current.assignment.assignedNodeId, senderNodeId, runId);
-      this.assertRunUpdateable(current.state, runId);
       this.assertBackendConsistency(current.execution, request.update);
+      const diagnosticsChanged = this.hasDiagnosticsChange({
+        record: persisted,
+        request,
+        occurredAt,
+      });
+      if (this.isTerminalState(current.state)) {
+        result = await this.handleTerminalRunUpdate({
+          persisted,
+          runId,
+          senderNodeId,
+          request,
+          occurredAt,
+          operationSuffix,
+          diagnosticsChanged,
+        });
+        return;
+      }
 
       const synchronization = this.synchronizeExecutionUpdate({
         currentState: current.state,
@@ -187,11 +203,6 @@ export class IngestRunExecutionUpdateUseCase {
       const toState = synchronization.toState;
       const nextExecution = synchronization.execution;
       const canonicalChanged = toState !== current.state || !isExecutionStateEqual(current.execution, nextExecution);
-      const diagnosticsChanged = this.hasDiagnosticsChange({
-        record: persisted,
-        request,
-        occurredAt,
-      });
       if (!canonicalChanged && !diagnosticsChanged) {
         result = this.createNoChangeResult(persisted, runId, operationSuffix, occurredAt);
         return;
@@ -320,12 +331,68 @@ export class IngestRunExecutionUpdateUseCase {
     }
   }
 
-  private assertRunUpdateable(state: string, runId: string): void {
-    if (state === RunLifecycleStates.completed || state === RunLifecycleStates.failed || state === RunLifecycleStates.cancelled) {
-      throw new RunExecutionUpdateConflictError(
-        `Run '${runId}' is terminal and cannot accept execution updates.`,
-      );
+  private isTerminalState(state: string): boolean {
+    return state === RunLifecycleStates.completed
+      || state === RunLifecycleStates.failed
+      || state === RunLifecycleStates.cancelled;
+  }
+
+  private async handleTerminalRunUpdate(input: {
+    readonly persisted: PlatformRunRecord;
+    readonly runId: string;
+    readonly senderNodeId: string;
+    readonly request: IngestRunExecutionUpdateRequest;
+    readonly occurredAt: string;
+    readonly operationSuffix: string;
+    readonly diagnosticsChanged: boolean;
+  }): Promise<IngestRunExecutionUpdateResult> {
+    if (!input.diagnosticsChanged) {
+      return this.createNoChangeResult(input.persisted, input.runId, input.operationSuffix, input.occurredAt);
     }
+
+    const recordWithDiagnostics = this.applyInternalDiagnosticsMetadata(
+      input.persisted,
+      input.request,
+      input.occurredAt,
+    );
+    const saved = await this.dependencies.runRepository.saveRun(
+      recordWithDiagnostics,
+      {
+        operationKey: `run:execution-update:${input.runId}:terminal:${input.operationSuffix}`,
+        actorId: input.senderNodeId,
+        occurredAt: input.occurredAt,
+        correlationId: normalizeOptional(input.request.update.actorId),
+        expectedRevision: input.persisted.revision,
+      },
+    );
+
+    await this.appendExecutionUpdateAuditEvent({
+      runId: input.runId,
+      workspaceId: saved.record.workspaceId,
+      userIdentityId: saved.record.userIdentityId,
+      actorId: input.senderNodeId,
+      occurredAt: input.occurredAt,
+      correlationId: normalizeOptional(input.request.update.actorId),
+      fromState: mapPlatformRunRecordToCanonicalRun(input.persisted).state,
+      toState: mapPlatformRunRecordToCanonicalRun(saved.record).state,
+      hadProgress: Boolean(input.request.update.progress),
+      hadHeartbeat: Boolean(input.request.update.heartbeatAt || input.request.update.execution?.heartbeatAt),
+      hadInternalDiagnostics: true,
+      idempotencyKey: input.request.update.idempotencyKey,
+    });
+
+    return Object.freeze({
+      mutation: Object.freeze({
+        action: RunMutationActions.lifecycleUpdate,
+        run: toRunDetailFromPlatformRecord(saved.record),
+        mutation: Object.freeze({
+          changed: true,
+          mutationId: `run:execution-update:${input.runId}:terminal:${input.operationSuffix}`,
+          occurredAt: input.occurredAt,
+        }),
+      }),
+      status: toRunStatusEnvelopeFromPlatformRecord(saved.record),
+    });
   }
 
   private assertBackendConsistency(current: RunExecutionState, update: RunLifecycleUpdateRequest): void {
