@@ -21,6 +21,7 @@ import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/Ima
 import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
+import { ImageAssetManagementService, type RecentStudioImageAsset } from "../../services/ImageAssetManagementService";
 import ComfyImageManipulationPropertyEditor from "../assets/image-system/ComfyImageManipulationPropertyEditor";
 import {
   ReferenceImageExecutionFlowService,
@@ -57,6 +58,7 @@ import {
   ImageManipulationRuntimeDatasetBindingService,
   type ImageManipulationSelectionSnapshot,
 } from "../../runtime/ImageManipulationRuntimeDatasetBindingService";
+import { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -258,6 +260,8 @@ export function ImageManipulationRuntimeEditorPanel({
   const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
     === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
   const studioShell = useMemo(() => new StudioShellService(), []);
+  const imageAssets = useMemo(() => new ImageAssetManagementService(), []);
+  const authSessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
   const uploadAdapter = useMemo(() => createBrowserImageUploadIngestionAdapter({ policy: uploadPolicy }), []);
   const executionFlow = useMemo(() => new ReferenceImageExecutionFlowService(), []);
   const datasetBindingService = useMemo(() => new ImageManipulationRuntimeDatasetBindingService(), []);
@@ -353,6 +357,9 @@ export function ImageManipulationRuntimeEditorPanel({
   const [sourceLoadError, setSourceLoadError] = useState<string | undefined>();
   const [referenceLoadError, setReferenceLoadError] = useState<string | undefined>();
   const [isHydrating, setIsHydrating] = useState(false);
+  const [recentImageAssets, setRecentImageAssets] = useState<ReadonlyArray<RecentStudioImageAsset>>([]);
+  const [isLoadingRecentImageAssets, setIsLoadingRecentImageAssets] = useState(false);
+  const [recentImageAssetsError, setRecentImageAssetsError] = useState<string | undefined>();
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
@@ -477,6 +484,10 @@ export function ImageManipulationRuntimeEditorPanel({
       : outputLoadError;
   const hasCollectionLoadError = Boolean(sourceLoadError || outputLoadError || referenceLoadError);
   const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
+  const session = useMemo(() => authSessionStore.getSession(), [authSessionStore]);
+  const actorUserIdentityId = session?.userIdentityId;
+  const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.initialCapabilityState?.workspaceId;
+  const sessionToken = session?.sessionToken;
 
   const activeGallery = useMemo(() => {
     if (selection.activePreviewRole === "source") {
@@ -559,6 +570,32 @@ export function ImageManipulationRuntimeEditorPanel({
       }
       return response.data.items;
     }).finally(() => setLoading(false));
+  };
+
+  const loadRecentAssets = (): Promise<ReadonlyArray<RecentStudioImageAsset>> => {
+    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+      setRecentImageAssets(Object.freeze([]));
+      setRecentImageAssetsError(undefined);
+      return Promise.resolve(Object.freeze([]));
+    }
+    setIsLoadingRecentImageAssets(true);
+    setRecentImageAssetsError(undefined);
+    return imageAssets.listRecentImageAssets({
+      actorUserIdentityId,
+      workspaceId,
+      sessionToken,
+      limit: 8,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        setRecentImageAssets(Object.freeze([]));
+        setRecentImageAssetsError("We couldn't load your recently used images.");
+        return Object.freeze([]);
+      }
+      setRecentImageAssets(response.data);
+      return response.data;
+    }).finally(() => {
+      setIsLoadingRecentImageAssets(false);
+    });
   };
 
   const loadCollections = (options: LoadCollectionsOptions = {}): Promise<ImageCollections> => {
@@ -650,6 +687,10 @@ export function ImageManipulationRuntimeEditorPanel({
   useEffect(() => {
     void loadCollections({ hydration: true });
   }, [draft?.draftId, roleBindings.sourceBindingId, roleBindings.outputBindingId, roleBindings.referenceBindingId]);
+
+  useEffect(() => {
+    void loadRecentAssets();
+  }, [actorUserIdentityId, workspaceId, sessionToken]);
 
   useEffect(() => {
     if (!draft?.draftId) {
@@ -779,17 +820,47 @@ export function ImageManipulationRuntimeEditorPanel({
               if (!file) {
                 return;
               }
+              if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+                setStatusMessage("Sign in to upload images.");
+                return;
+              }
               setStatusMessage(undefined);
               setIsUploading(true);
               void encodeFileBase64(file)
-                .then((payloadBase64) => studioShell.ingestReferenceImageUpload({
-                  studioId: context.studioId,
-                  draftId: draft.draftId,
-                  fileName: file.name,
-                  mimeType: file.type,
-                  payloadBase64,
-                }))
+                .then(async (payloadBase64) => {
+                  const uploaded = await imageAssets.uploadStudioSourceImage({
+                    file,
+                    actorUserIdentityId,
+                    workspaceId,
+                    sessionToken,
+                  });
+                  if (!uploaded.ok || !uploaded.data) {
+                    setStatusMessage(uploaded.error?.message ?? "We couldn't upload this photo.");
+                    return undefined;
+                  }
+                  const metadata = await imageAssets.getImageAsset({
+                    assetId: uploaded.data.assetId,
+                    workspaceId,
+                    sessionToken,
+                  });
+                  if (!metadata.ok || !metadata.data) {
+                    setStatusMessage(metadata.error?.message ?? "Photo uploaded, but metadata could not be loaded.");
+                    return undefined;
+                  }
+
+                  return studioShell.ingestReferenceImageUpload({
+                    studioId: context.studioId,
+                    draftId: draft.draftId,
+                    fileName: metadata.data.asset.originalFilename,
+                    mimeType: metadata.data.asset.mediaType,
+                    payloadBase64,
+                    sourceImageAssetId: metadata.data.asset.assetId,
+                  });
+                })
                 .then((response) => {
+                  if (!response) {
+                    return undefined;
+                  }
                   if (!response.ok || !response.data) {
                     setStatusMessage("We couldn't upload this photo.");
                     return undefined;
@@ -803,7 +874,10 @@ export function ImageManipulationRuntimeEditorPanel({
                   setStatusMessage("Photo ready.");
                   return response.data.recordId;
                 })
-                .then((preferredSourceRecordId) => loadCollections({ preferredSourceRecordId }))
+                .then((preferredSourceRecordId) => Promise.all([
+                  loadCollections({ preferredSourceRecordId }),
+                  loadRecentAssets(),
+                ]))
                 .finally(() => setIsUploading(false));
             }}
           />
@@ -919,6 +993,37 @@ export function ImageManipulationRuntimeEditorPanel({
                 message={referenceLoadError}
                 tone="danger"
               />
+            ) : null}
+            {sessionToken ? (
+              <section className="ui-stack ui-stack--2xs">
+                <p className="ui-text-small ui-text-secondary">Recently used images</p>
+                {isLoadingRecentImageAssets ? (
+                  <ImageStatusNotice
+                    title="Loading recently used images"
+                    message="Your latest uploaded images will appear here."
+                  />
+                ) : null}
+                {!isLoadingRecentImageAssets && recentImageAssetsError ? (
+                  <ImageStatusNotice
+                    title="Recently used images unavailable"
+                    message={recentImageAssetsError}
+                    tone="warning"
+                  />
+                ) : null}
+                {!isLoadingRecentImageAssets && !recentImageAssetsError && recentImageAssets.length < 1 ? (
+                  <ImageStatusNotice
+                    title="No recent images yet"
+                    message="Upload a photo to start your image library."
+                  />
+                ) : null}
+                {!isLoadingRecentImageAssets && !recentImageAssetsError && recentImageAssets.length > 0 ? (
+                  <ul className="ui-text-small ui-text-secondary">
+                    {recentImageAssets.map((asset) => (
+                      <li key={asset.assetId}>{asset.originalFilename}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
             ) : null}
             <p className="ui-text-small ui-text-secondary">
               These selections stay linked to system-managed image collections.

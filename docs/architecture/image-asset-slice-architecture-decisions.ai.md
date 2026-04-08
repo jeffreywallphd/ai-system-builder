@@ -54,6 +54,12 @@ Story 1.3.5 addition:
 - Regression checks assert authorization enforcement for unauthorized actors and ensure transport responses do not expose raw storage object-key/path internals.
 - Integration assertions now verify that image-asset audit hooks are emitted across successful and rejected protected-content access paths.
 
+Story 1.4.1 addition:
+
+- Image manipulation studio uploads now run authoritative image-asset create, upload-content ingest, and upload-finalization before dataset admission.
+- Studio-shell dataset ingestion now accepts optional logical `sourceImageAssetId` so source/reference records keep canonical image-asset identity instead of path-style references.
+- Studio runtime now surfaces recently used images from authoritative image-asset list/get metadata APIs to support reopen-ready library behavior.
+
 ## Extension guardrails
 
 - Do not introduce path-based local bypasses for upload, preview, or retrieval.
