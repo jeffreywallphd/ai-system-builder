@@ -15,6 +15,7 @@ import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
 import { HostServiceRegistrationError } from "@infrastructure/config/HostServiceRegistration";
 import {
+  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "../AuthoritativeServerCompositionRoot";
@@ -26,6 +27,37 @@ import {
 import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlite/SqlitePersistenceRuntime";
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
+import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
+
+function createDeploymentPolicyBootstrapResolutionStub(
+  profileId = HostDeploymentProfileIds.home,
+): DeploymentPolicyBootstrapResolutionResult {
+  const context = Object.freeze({
+    profileId,
+  });
+  return Object.freeze({
+    scope: Object.freeze({
+      kind: "deployment-policy-scope",
+      scopeId: "platform:default",
+    }),
+    activeProfile: Object.freeze({
+      profileId,
+      source: "default-fallback",
+    }),
+    overrideRecords: Object.freeze([]),
+    evaluationContext: context,
+    evaluationService: {} as never,
+    snapshot: {} as never,
+    validation: Object.freeze({
+      valid: true,
+      issues: Object.freeze([]),
+      evaluatedAt: "2026-04-06T00:00:00.000Z",
+    }),
+    contextResolver: Object.freeze({
+      resolveContext: async () => context,
+    }),
+  });
+}
 
 describe("AuthoritativeServerCompositionRoot", () => {
   it("composes and stops authoritative server runtime with lifecycle transitions", async () => {
@@ -297,6 +329,77 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(started).toBeFalse();
   });
 
+  it("fails compose explicitly when deployment policy bootstrap resolution fails", async () => {
+    let started = false;
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => {
+        started = true;
+        return {
+          port: 5450,
+          address: "127.0.0.1:5450",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        };
+      },
+      bootstrap: {
+        createPersistenceRuntime: () => Object.freeze({
+          configuration: Object.freeze({
+            databasePath: "test.sqlite",
+            pragmas: Object.freeze({
+              journalMode: "WAL",
+              foreignKeys: true,
+            }),
+          }),
+          start: async () => Object.freeze({
+            databasePath: "test.sqlite",
+            migrationIdsApplied: Object.freeze([]),
+          }),
+          getConnection: () => {
+            throw new Error("not used");
+          },
+          dispose: async () => {},
+        }) satisfies SqlitePersistenceRuntime,
+        composePersistentPlatformServices: () => Object.freeze({
+          databasePath: "test.sqlite",
+          identityRepository: {} as never,
+          trustedDeviceRepository: {} as never,
+          workspaceRepository: {} as never,
+          authorizationRepository: {} as never,
+          nodeTrustRepository: {} as never,
+          nodeTrustAuditRecorder: {} as never,
+          certificateAuthorityRepository: {} as never,
+          secretRecordRepository: {} as never,
+          storageInstanceRepository: {} as never,
+          storageManagementAuditRecorder: {} as never,
+          assetRepository: {} as never,
+          assetAuditRecorder: {} as never,
+          assetUploadSessionRepository: {} as never,
+          platformPersistenceRepository: {} as never,
+          auditLedgerRepository: {} as never,
+          deploymentPolicyRepository: {} as never,
+          dispose: () => {},
+        }) satisfies AuthoritativePersistentPlatformServices,
+        resolveDeploymentPolicyBootstrap: async () => {
+          throw new Error("invalid-persisted-state");
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-deployment-policy-bootstrap-failure-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow("invalid-persisted-state");
+    expect(started).toBeFalse();
+  });
+
   it("resolves deployment profile and enabled capabilities through shared startup configuration", async () => {
     let observedProfileId: string | undefined;
     let observedEnvironmentName: string | undefined;
@@ -416,6 +519,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
   it("composes persistent platform services during persistence stage and injects them into runtime host startup", async () => {
     const calls: string[] = [];
     let startedWithServices: AuthoritativePersistentPlatformServices | undefined;
+    let startedWithDeploymentPolicyBootstrap: DeploymentPolicyBootstrapResolutionResult | undefined;
     const persistentServices = Object.freeze({
       databasePath: "test.sqlite",
       identityRepository: {} as never,
@@ -433,6 +537,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
       assetUploadSessionRepository: {} as never,
       platformPersistenceRepository: {} as never,
       auditLedgerRepository: {} as never,
+      deploymentPolicyRepository: {} as never,
       dispose: () => {
         calls.push("persistent-services-dispose");
       },
@@ -444,6 +549,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
       },
       startHost: async (options) => {
         startedWithServices = options.persistentPlatformServices;
+        startedWithDeploymentPolicyBootstrap = options.deploymentPolicyBootstrap;
         return {
           port: 5700,
           address: "127.0.0.1:5700",
@@ -454,7 +560,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
           },
         };
       },
-      bootstrap: {
+        bootstrap: {
         createPersistenceRuntime: () => Object.freeze({
           configuration: Object.freeze({
             databasePath: "test.sqlite",
@@ -476,18 +582,24 @@ describe("AuthoritativeServerCompositionRoot", () => {
           dispose: async () => {
             calls.push("persistence-runtime-dispose");
           },
-        }) satisfies SqlitePersistenceRuntime,
-        composePersistentPlatformServices: () => persistentServices,
-        stageHandlers: {
-          [HostBootstrapStageIds.persistence]: (context) => {
-            const artifact = context.getArtifact<AuthoritativePersistentPlatformServices>(
-              AuthoritativeServerPersistentPlatformServicesArtifactKey,
-            );
-            expect(artifact).toBe(persistentServices);
+          }) satisfies SqlitePersistenceRuntime,
+          composePersistentPlatformServices: () => persistentServices,
+          resolveDeploymentPolicyBootstrap: async () => createDeploymentPolicyBootstrapResolutionStub(),
+          stageHandlers: {
+            [HostBootstrapStageIds.persistence]: (context) => {
+              const artifact = context.getArtifact<AuthoritativePersistentPlatformServices>(
+                AuthoritativeServerPersistentPlatformServicesArtifactKey,
+              );
+              expect(artifact).toBe(persistentServices);
+              const deploymentPolicyBootstrapArtifact =
+                context.getArtifact<DeploymentPolicyBootstrapResolutionResult>(
+                  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+                );
+              expect(deploymentPolicyBootstrapArtifact?.activeProfile.profileId).toBe(HostDeploymentProfileIds.home);
+            },
           },
         },
-      },
-    });
+      });
 
     const boot = createHostBootConfiguration({
       host: AuthoritativeServerHostRuntime,
@@ -498,6 +610,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(startedWithServices).toBe(persistentServices);
+    expect(startedWithDeploymentPolicyBootstrap?.activeProfile.profileId).toBe(HostDeploymentProfileIds.home);
     expect(calls).toEqual(["persistence-start"]);
 
     await runtime.stop();

@@ -15,6 +15,7 @@ import {
   executeHostBootstrapPipeline,
   type HostBootstrapStageId,
   type HostBootstrapReusableStageHandlers,
+  type HostDeploymentProfile,
   type HostSpecificBootstrapStage,
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
@@ -48,6 +49,10 @@ import {
   type AuthoritativePersistentPlatformServices,
 } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
+import {
+  DeploymentPolicyBootstrapResolutionService,
+  type DeploymentPolicyBootstrapResolutionResult,
+} from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -84,6 +89,12 @@ export interface AuthoritativeServerCompositionRootOptions {
     }) => AuthoritativePersistentPlatformServices;
     readonly composeApiRouteRegistrationPlan?: () => AuthoritativeApiRouteRegistrationPlan;
     readonly assertApiRouteRegistrationCoverage?: (plan: AuthoritativeApiRouteRegistrationPlan) => void;
+    readonly resolveDeploymentPolicyBootstrap?: (input: {
+      readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly deploymentProfile: HostDeploymentProfile;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+    }) => Promise<DeploymentPolicyBootstrapResolutionResult>;
   };
 }
 
@@ -93,6 +104,8 @@ export const AuthoritativeServerServiceRegistrationPlanArtifactKey =
 export const AuthoritativeServerPersistenceRuntimeArtifactKey = "artifact:host:server:authoritative:persistence-runtime";
 export const AuthoritativeServerPersistentPlatformServicesArtifactKey =
   "artifact:host:server:authoritative:persistent-platform-services";
+export const AuthoritativeServerDeploymentPolicyBootstrapArtifactKey =
+  "artifact:host:server:authoritative:deployment-policy-bootstrap";
 
 function combineStartupLifecycleHooks(
   primary: HostStartupLifecycleHooks | undefined,
@@ -235,6 +248,21 @@ export function createAuthoritativeServerCompositionRoot(
               AuthoritativeServerPersistentPlatformServicesArtifactKey,
               persistentPlatformServices,
             );
+            const deploymentPolicyBootstrap = await (
+              input.bootstrap?.resolveDeploymentPolicyBootstrap
+              ?? (async (bootstrapInput) => new DeploymentPolicyBootstrapResolutionService({
+                deploymentPolicyRepository: bootstrapInput.persistentPlatformServices.deploymentPolicyRepository,
+              }).execute())
+            )({
+              persistentPlatformServices,
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+              deploymentProfile: context.deploymentProfile,
+              environment: context.environment,
+            });
+            context.setArtifact(
+              AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+              deploymentPolicyBootstrap,
+            );
           },
           [HostBootstrapStageIds.featureRegistration]: async (context) => {
             const plan = context.getArtifact<HostServiceRegistrationPlan>(
@@ -257,12 +285,21 @@ export function createAuthoritativeServerCompositionRoot(
             if (!apiRouteRegistrationPlan) {
               throw new Error("Authoritative server startup requires a composed API route registration plan.");
             }
+            const deploymentPolicyBootstrap = context.getArtifact<DeploymentPolicyBootstrapResolutionResult>(
+              AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+            );
+            if (!deploymentPolicyBootstrap) {
+              throw new Error(
+                "Authoritative server startup requires deployment policy bootstrap resolution before runtime feature registration.",
+              );
+            }
             (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
             (input.bootstrap?.assertApiRouteRegistrationCoverage
               ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
             const composedHost = await startHost({
               ...(context.hostConfiguration as IdentityServerHostOptions),
               deploymentProfile: context.deploymentProfile,
+              deploymentPolicyBootstrap,
               persistentPlatformServices: composedPersistentServices,
               routeRegistrationPlan: apiRouteRegistrationPlan,
             });
