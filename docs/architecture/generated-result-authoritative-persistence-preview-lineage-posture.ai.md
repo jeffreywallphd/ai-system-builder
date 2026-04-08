@@ -145,3 +145,28 @@ Generated-result persistence is now concrete in authoritative SQLite infrastruct
 - application/use-case layers consume typed repository/port contracts
 - persistence DTOs remain isolated from UI/domain presentation models
 
+## Story 8.2.4 resilience hardening baseline (implemented)
+
+Result collection and preview provisioning now handle degraded and partial-failure conditions explicitly, with durable state rather than ambiguous terminal outcomes.
+
+### Collection and preview failure posture
+
+- `SqliteRunCollectedResultPersistenceAdapter` persists per output record with isolated try/catch boundaries so one failing output cannot abort all result persistence.
+- Storage write faults are classified via shared image-manipulation taxonomy/recovery contracts; when possible, a fallback `failed-collection` result record is durably written.
+- Successful result persistence now proactively seeds pending preview descriptors (`availabilityStatus=pending`) so delayed derivative readiness is explicit.
+- Preview write/provisioning failures are normalized via taxonomy/recovery contracts and persisted as failed preview descriptors (`availabilityStatus=failed`, failure code/message) when storage allows.
+- Internal diagnostics now include per-record classification/recovery details plus counters for preview pending/failed/provisioning-unavailable and storage-unavailable conditions.
+
+### Authoritative coherence posture
+
+- Result authority remains in generated-result records even when preview generation/persistence fails.
+- Preview failures no longer collapse result availability into "completed but nothing there"; result lifecycle and derivative lifecycle remain distinct and explicit.
+- Fallback failed-collection records preserve run/workflow/system/input lineage references for audit/recovery integrity.
+- Run terminalization hints degrade explicitly when persistence/preview operations are partial or degraded.
+
+### Recovery and diagnosability posture
+
+- Retryability semantics for operational faults are surfaced through taxonomy-derived recovery contracts in diagnostics.
+- Temporary storage unavailability is tracked distinctly from terminal failure to support explicit retry and recovery paths.
+- Terminal run lifecycle finalization remains non-blocking while preserving durable evidence for follow-on reprocessing or operator investigation.
+

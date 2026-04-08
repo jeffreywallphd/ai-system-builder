@@ -22,9 +22,13 @@ describe("GeneratedResultTransportDtos", () => {
         createdAt: "2026-04-08T15:00:00.000Z",
         updatedAt: "2026-04-08T15:01:00.000Z",
         preview: {
+          state: "preview-available",
           hasPreview: true,
           primaryPreviewKind: "display-safe",
           availabilityStatus: "available",
+        },
+        retrieval: {
+          state: "retrieval-available",
         },
         lineage: {
           resultAssetId: "asset:result:1",
@@ -77,6 +81,7 @@ describe("GeneratedResultTransportDtos", () => {
       contractVersion: "generated-result-transport/v1",
       resultAssetId: "asset:result:1",
       original: {
+        state: "retrieval-available",
         mediaType: "image/png",
         byteSize: 1024,
         protectedResourceId: "protected-resource://result-original-1",

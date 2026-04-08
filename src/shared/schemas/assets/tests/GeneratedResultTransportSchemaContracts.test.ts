@@ -25,9 +25,13 @@ describe("GeneratedResultTransportSchemaContracts", () => {
         createdAt: "2026-04-08T15:00:00.000Z",
         updatedAt: "2026-04-08T15:01:00.000Z",
         preview: {
+          state: "preview-available",
           hasPreview: true,
           primaryPreviewKind: "display-safe",
           availabilityStatus: "available",
+        },
+        retrieval: {
+          state: "retrieval-available",
         },
         lineage: {
           resultAssetId: "asset:result:1",
@@ -70,9 +74,13 @@ describe("GeneratedResultTransportSchemaContracts", () => {
         createdAt: "2026-04-08T15:00:00.000Z",
         updatedAt: "2026-04-08T15:01:00.000Z",
         preview: {
+          state: "preview-available",
           hasPreview: true,
           primaryPreviewKind: "display-safe",
           availabilityStatus: "available",
+        },
+        retrieval: {
+          state: "retrieval-available",
         },
         lineage: {
           resultAssetId: "asset:result:1",
@@ -134,9 +142,13 @@ describe("GeneratedResultTransportSchemaContracts", () => {
         createdAt: "2026-04-08T15:00:00.000Z",
         updatedAt: "2026-04-08T15:01:00.000Z",
         preview: {
+          state: "preview-available",
           hasPreview: true,
           primaryPreviewKind: "display-safe",
           availabilityStatus: "available",
+        },
+        retrieval: {
+          state: "retrieval-available",
         },
         lineage: {
           resultAssetId: "asset:result:1",
@@ -172,6 +184,7 @@ describe("GeneratedResultTransportSchemaContracts", () => {
       contractVersion: "generated-result-transport/v1",
       resultAssetId: "asset:result:1",
       preview: {
+        state: "preview-available",
         available: true,
         selected: {
           derivativeId: "preview:display-safe:1",
@@ -190,6 +203,7 @@ describe("GeneratedResultTransportSchemaContracts", () => {
       contractVersion: "generated-result-transport/v1",
       resultAssetId: "asset:result:1",
       original: {
+        state: "retrieval-available",
         mediaType: "image/webp",
         byteSize: 2048,
         protectedResourceId: "protected-resource://result-original-1",
@@ -207,11 +221,26 @@ describe("GeneratedResultTransportSchemaContracts", () => {
       contractVersion: "generated-result-transport/v1",
       resultAssetId: "asset:result:1",
       preview: {
+        state: "preview-pending",
         available: false,
         alternatives: [],
       },
       backendResponsePayload: {
         raw: true,
+      },
+    })).toThrow(GeneratedResultTransportSchemaValidationError);
+  });
+
+  it("requires reasonCode when original retrieval is unavailable", () => {
+    expect(() => parseRequestGeneratedResultOriginalAccessResponseDto({
+      contractVersion: "generated-result-transport/v1",
+      resultAssetId: "asset:result:1",
+      original: {
+        state: "retrieval-unavailable",
+        mediaType: "image/webp",
+        protectedResourceId: "protected-resource://result-original-1",
+        accessHandle: "preview-access://result/original/handle-1",
+        expiresAt: "2026-04-08T16:00:00.000Z",
       },
     })).toThrow(GeneratedResultTransportSchemaValidationError);
   });

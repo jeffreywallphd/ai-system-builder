@@ -141,3 +141,28 @@ Generated result persistence is now concretely implemented in authoritative SQLi
 
 This establishes durable, queryable generated-result asset + lineage records as the authoritative source of truth for follow-on history, reuse, preview, and audit experiences.
 
+## Story 8.2.4 resilience hardening baseline (implemented)
+
+Result collection and preview provisioning are now hardened so degraded storage or derivative failures produce explicit, durable states instead of ambiguous terminal outcomes.
+
+### Collection + preview failure handling posture
+
+- `SqliteRunCollectedResultPersistenceAdapter` now persists records per output with isolated failure handling, so a single storage write failure does not terminate persistence for other outputs.
+- Storage write failures are normalized through the shared image-manipulation failure taxonomy + retry/recovery contracts, and the adapter attempts a durable fallback `failed-collection` result record.
+- Successful result persistence now seeds a pending preview descriptor (`generated_result_previews`, `availability_status=pending`) so delayed preview generation is explicit and queryable.
+- Preview persistence failures are normalized through taxonomy/recovery contracts and persisted as explicit failed preview descriptors when possible (`availability_status=failed` + failure code/message).
+- Adapter diagnostics now include per-record failure classification/recovery metadata and counters for preview pending/failed/unavailable and temporary storage unavailability.
+
+### Authoritative state coherence guarantees
+
+- Result lifecycle authority remains in result records (`generated_result_records`) even when preview provisioning fails.
+- Preview derivative failure does not silently erase result availability: authoritative result records stay available while derivative state reflects pending/failed conditions.
+- Fallback `failed-collection` records preserve lineage pointers and source linkage posture when operational failures prevent full persistence.
+- Terminal orchestration hints (`outputAvailabilityHint`, `terminalQualityHint`) now degrade explicitly when persistence or preview provisioning is partial/degraded.
+
+### Recovery and diagnosability posture
+
+- Retryability for storage/preview write failures is captured from taxonomy-derived recovery contracts in internal diagnostics.
+- Temporary availability issues are counted separately from terminal failures to support operational triage and delayed-recovery flows.
+- Result persistence remains non-blocking for run terminalization while preserving explicit recovery signals for follow-on reprocessing.
+

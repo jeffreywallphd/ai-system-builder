@@ -13,8 +13,24 @@ import {
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import { AssetVisibilities } from "@domain/assets/AssetDomain";
 import { GeneratedResultAssetStatuses } from "@domain/image-assets/GeneratedResultAssetDomain";
+import {
+  GeneratedResultDerivativeAvailabilityStatuses,
+  GeneratedResultPreviewKinds,
+} from "@domain/image-assets/GeneratedResultAssetDerivativeDomain";
+import {
+  ImageManipulationFailureDispositions,
+  ImageManipulationFailureSummaryCategories,
+  ImageManipulationIssueKinds,
+  ImageManipulationIssueLayers,
+  createImageManipulationIssueClassification,
+  type ImageManipulationIssueClassification,
+} from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import { deriveImageManipulationRetryRecoveryContractFromClassification } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 import { createWorkspaceTenancyMetadata } from "@shared/persistence/PersistenceTenancyMetadataFactory";
-import type { GeneratedResultPersistenceRecord } from "@shared/dto/assets/GeneratedResultPersistenceDtos";
+import type {
+  GeneratedResultPersistenceRecord,
+  GeneratedResultPreviewPersistenceRecord,
+} from "@shared/dto/assets/GeneratedResultPersistenceDtos";
 
 const KnownImageMediaTypes = new Set([
   "image/png",
@@ -40,6 +56,10 @@ function normalizeOptional(value?: string | null): string | undefined {
 
 function toDeterministicSuffix(input: string): string {
   return createHash("sha256").update(input).digest("hex").slice(0, 24);
+}
+
+function toPreviewDerivativeId(resultAssetId: string, previewKind: string): string {
+  return `preview-${toDeterministicSuffix(`${resultAssetId}:${previewKind}`)}`;
 }
 
 function toSafeResultAssetId(input: {
@@ -167,6 +187,108 @@ function resolveLifecycleStatus(
   return GeneratedResultAssetStatuses.pendingCollection;
 }
 
+function classifyOperationalFailure(input: {
+  readonly layer: typeof ImageManipulationIssueLayers[keyof typeof ImageManipulationIssueLayers];
+  readonly reason: string;
+  readonly summaryCategory: typeof ImageManipulationFailureSummaryCategories[keyof typeof ImageManipulationFailureSummaryCategories];
+  readonly retryable: boolean;
+  readonly degraded?: boolean;
+}): {
+  readonly classification: ImageManipulationIssueClassification;
+  readonly recovery: ReturnType<typeof deriveImageManipulationRetryRecoveryContractFromClassification>;
+} {
+  const classification = createImageManipulationIssueClassification({
+    layer: input.layer,
+    kind: ImageManipulationIssueKinds.operational,
+    summaryCategory: input.summaryCategory,
+    disposition: input.retryable
+      ? ImageManipulationFailureDispositions.retryable
+      : ImageManipulationFailureDispositions.terminal,
+    reason: input.reason,
+    degraded: input.degraded ?? input.retryable,
+  });
+  return Object.freeze({
+    classification,
+    recovery: deriveImageManipulationRetryRecoveryContractFromClassification({
+      classification,
+      retryable: input.retryable,
+    }),
+  });
+}
+
+function isLikelyTemporaryStorageError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (!message) {
+    return false;
+  }
+  return message.includes("busy")
+    || message.includes("locked")
+    || message.includes("timeout")
+    || message.includes("tempor")
+    || message.includes("connect")
+    || message.includes("unavail");
+}
+
+function toResultFailureReason(record: ImageManipulationCollectedOutputRecord): string {
+  if (record.persistence.status === ImageManipulationOutputPersistenceStatuses.failed) {
+    const code = normalizeOptional(record.persistence.errorCode);
+    if (code) {
+      return code.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    }
+  }
+  return "result-persistence-failed";
+}
+
+function createPendingPreviewRecord(input: {
+  readonly result: GeneratedResultPersistenceRecord;
+  readonly workspaceId: string;
+  readonly actorId: string;
+  readonly occurredAt: string;
+}): GeneratedResultPreviewPersistenceRecord {
+  return Object.freeze({
+    derivativeId: toPreviewDerivativeId(input.result.resultAssetId, GeneratedResultPreviewKinds.displaySafe),
+    resultAssetId: input.result.resultAssetId,
+    resultLogicalAssetVersionId: input.result.logicalAssetVersionId,
+    previewKind: GeneratedResultPreviewKinds.displaySafe,
+    availabilityStatus: GeneratedResultDerivativeAvailabilityStatuses.pending,
+    isPrimaryPreview: true,
+    protectedResourceId: undefined,
+    accessHandle: undefined,
+    mediaType: input.result.mediaType,
+    width: undefined,
+    height: undefined,
+    byteSize: undefined,
+    generatedAt: undefined,
+    failureCode: undefined,
+    failureMessage: undefined,
+    tenancy: createWorkspaceTenancyMetadata(input.workspaceId),
+    createdAt: input.occurredAt,
+    createdBy: input.actorId,
+    lastModifiedAt: input.occurredAt,
+    lastModifiedBy: input.actorId,
+    revision: 1,
+    schemaVersion: 1,
+  });
+}
+
+function createFailedPreviewRecord(input: {
+  readonly pendingRecord: GeneratedResultPreviewPersistenceRecord;
+  readonly actorId: string;
+  readonly occurredAt: string;
+  readonly failureCode: string;
+  readonly failureMessage: string;
+}): GeneratedResultPreviewPersistenceRecord {
+  return Object.freeze({
+    ...input.pendingRecord,
+    availabilityStatus: GeneratedResultDerivativeAvailabilityStatuses.failed,
+    failureCode: input.failureCode,
+    failureMessage: input.failureMessage,
+    generatedAt: undefined,
+    lastModifiedAt: input.occurredAt,
+    lastModifiedBy: input.actorId,
+  });
+}
+
 export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollectedResultPersistencePort {
   private readonly now: () => Date;
 
@@ -192,10 +314,15 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
       readonly label?: string;
     }> = [];
     const persistedResultAssetIds: string[] = [];
+    const perRecordDiagnostics: Array<Readonly<Record<string, unknown>>> = [];
 
     let persistedCount = 0;
     let pendingCount = 0;
     let failedCount = 0;
+    let previewPendingCount = 0;
+    let previewFailedCount = 0;
+    let previewProvisioningUnavailableCount = 0;
+    let storageUnavailableCount = 0;
 
     for (const record of request.collectedResult.records) {
       const discovered = discoveredByDescriptorId.get(record.descriptorId);
@@ -215,7 +342,7 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         ?? normalizeOptional(request.collectedResult.collectedAt)
         ?? occurredAt;
 
-      const saved = await this.dependencies.repository.saveResult(Object.freeze({
+      const baseRecord: GeneratedResultPersistenceRecord = Object.freeze({
         resultAssetId,
         workspaceId,
         ownerUserId: actorId.startsWith("user:") ? actorId : undefined,
@@ -263,7 +390,7 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
           ? actorId
           : undefined,
         failureCode: record.persistence.status === ImageManipulationOutputPersistenceStatuses.failed
-          ? normalizeOptional(record.persistence.errorCode) ?? "result-persistence-failed"
+          ? toResultFailureReason(record)
           : undefined,
         failureMessage: record.persistence.status === ImageManipulationOutputPersistenceStatuses.failed
           ? normalizeOptional(record.persistence.message) ?? "Result persistence failed."
@@ -277,7 +404,11 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         lastModifiedBy: actorId,
         revision: 1,
         schemaVersion: 1,
-      }), {
+      });
+
+      let saved: Awaited<ReturnType<IGeneratedResultPersistenceRepository["saveResult"]>> | undefined;
+      try {
+        saved = await this.dependencies.repository.saveResult(baseRecord, {
         operationKey: `${request.operationKey}:result:${resultAssetId}`,
         context: Object.freeze({
           actorUserId: actorId,
@@ -285,7 +416,89 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
           correlationId: request.operationKey,
           reason: "run-collected-result-persistence",
         }),
-      });
+        });
+      } catch (error) {
+        const retryable = isLikelyTemporaryStorageError(error);
+        const collectionFailure = classifyOperationalFailure({
+          layer: ImageManipulationIssueLayers.resultCollection,
+          reason: retryable ? "result-storage-temporarily-unavailable" : "result-storage-write-failed",
+          summaryCategory: retryable
+            ? ImageManipulationFailureSummaryCategories.connectivity
+            : ImageManipulationFailureSummaryCategories.output,
+          retryable,
+          degraded: true,
+        });
+        const failureCode = collectionFailure.classification.issueCode;
+        const failureMessage = retryable
+          ? "Result persistence is temporarily unavailable."
+          : "Result persistence failed.";
+
+        if (retryable) {
+          storageUnavailableCount += 1;
+        }
+
+        try {
+          const failedRecord = Object.freeze({
+            ...baseRecord,
+            status: GeneratedResultAssetStatuses.failedCollection,
+            logicalAssetVersionId: undefined,
+            persistedAt: undefined,
+            persistedBy: undefined,
+            previewReadyAt: undefined,
+            previewReadyBy: undefined,
+            failedAt: occurredAt,
+            failedBy: actorId,
+            failureCode,
+            failureMessage,
+            lastModifiedAt: occurredAt,
+            lastModifiedBy: actorId,
+          });
+          saved = await this.dependencies.repository.saveResult(failedRecord, {
+            operationKey: `${request.operationKey}:result:${resultAssetId}:fallback-failed`,
+            context: Object.freeze({
+              actorUserId: actorId,
+              occurredAt,
+              correlationId: request.operationKey,
+              reason: "run-collected-result-persistence-fallback-failure-record",
+              metadata: Object.freeze({
+                originalError: error instanceof Error ? error.message : "Unknown error",
+              }),
+            }),
+          });
+        } catch {
+          failedCount += 1;
+          perRecordDiagnostics.push(Object.freeze({
+            descriptorId: record.descriptorId,
+            resultAssetId,
+            persisted: false,
+            previewProvisioned: false,
+            failure: Object.freeze({
+              code: failureCode,
+              message: failureMessage,
+              classification: collectionFailure.classification,
+              recovery: collectionFailure.recovery,
+              originalError: error instanceof Error ? error.message : "Unknown error",
+              fallbackFailureRecordPersisted: false,
+            }),
+          }));
+          continue;
+        }
+      }
+
+      if (!saved) {
+        failedCount += 1;
+        perRecordDiagnostics.push(Object.freeze({
+          descriptorId: record.descriptorId,
+          resultAssetId,
+          persisted: false,
+          previewProvisioned: false,
+          failure: Object.freeze({
+            code: "im.result.operational.result-storage-write-failed",
+            message: "Result persistence failed before a record was produced.",
+          }),
+        }));
+        continue;
+      }
 
       if (saved.record.status === GeneratedResultAssetStatuses.available || saved.record.status === GeneratedResultAssetStatuses.previewReady) {
         persistedCount += 1;
@@ -296,10 +509,120 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
           assetId: saved.record.resultAssetId,
           label: normalizeOptional(discovered?.outputRole),
         }));
+
+        const pendingPreview = createPendingPreviewRecord({
+          result: saved.record,
+          workspaceId,
+          actorId,
+          occurredAt,
+        });
+        try {
+          await this.dependencies.repository.savePreview(pendingPreview, {
+            operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}`,
+            context: Object.freeze({
+              actorUserId: actorId,
+              occurredAt,
+              correlationId: request.operationKey,
+              reason: "run-collected-result-preview-pending",
+            }),
+          });
+          previewPendingCount += 1;
+          perRecordDiagnostics.push(Object.freeze({
+            descriptorId: record.descriptorId,
+            resultAssetId: saved.record.resultAssetId,
+            persisted: true,
+            previewProvisioned: true,
+            previewStatus: GeneratedResultDerivativeAvailabilityStatuses.pending,
+          }));
+        } catch (error) {
+          const retryable = isLikelyTemporaryStorageError(error);
+          const previewFailure = classifyOperationalFailure({
+            layer: ImageManipulationIssueLayers.previewGeneration,
+            reason: retryable ? "preview-persistence-temporarily-unavailable" : "preview-persistence-failed",
+            summaryCategory: retryable
+              ? ImageManipulationFailureSummaryCategories.connectivity
+              : ImageManipulationFailureSummaryCategories.output,
+            retryable,
+            degraded: true,
+          });
+          const failureCode = previewFailure.classification.issueCode;
+          const failureMessage = retryable
+            ? "Preview provisioning is temporarily unavailable."
+            : "Preview provisioning failed.";
+          try {
+            await this.dependencies.repository.savePreview(createFailedPreviewRecord({
+              pendingRecord: pendingPreview,
+              actorId,
+              occurredAt,
+              failureCode,
+              failureMessage,
+            }), {
+              operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}:failed`,
+              context: Object.freeze({
+                actorUserId: actorId,
+                occurredAt,
+                correlationId: request.operationKey,
+                reason: "run-collected-result-preview-failed",
+                metadata: Object.freeze({
+                  originalError: error instanceof Error ? error.message : "Unknown error",
+                }),
+              }),
+            });
+            previewFailedCount += 1;
+            perRecordDiagnostics.push(Object.freeze({
+              descriptorId: record.descriptorId,
+              resultAssetId: saved.record.resultAssetId,
+              persisted: true,
+              previewProvisioned: false,
+              previewStatus: GeneratedResultDerivativeAvailabilityStatuses.failed,
+              failure: Object.freeze({
+                code: failureCode,
+                message: failureMessage,
+                classification: previewFailure.classification,
+                recovery: previewFailure.recovery,
+                originalError: error instanceof Error ? error.message : "Unknown error",
+              }),
+            }));
+          } catch {
+            previewProvisioningUnavailableCount += 1;
+            perRecordDiagnostics.push(Object.freeze({
+              descriptorId: record.descriptorId,
+              resultAssetId: saved.record.resultAssetId,
+              persisted: true,
+              previewProvisioned: false,
+              previewStatus: "untracked",
+              failure: Object.freeze({
+                code: failureCode,
+                message: failureMessage,
+                classification: previewFailure.classification,
+                recovery: previewFailure.recovery,
+                originalError: error instanceof Error ? error.message : "Unknown error",
+                failedPreviewRecordPersisted: false,
+              }),
+            }));
+          }
+        }
       } else if (saved.record.status === GeneratedResultAssetStatuses.failedCollection) {
         failedCount += 1;
+        perRecordDiagnostics.push(Object.freeze({
+          descriptorId: record.descriptorId,
+          resultAssetId: saved.record.resultAssetId,
+          persisted: false,
+          previewProvisioned: false,
+          failure: Object.freeze({
+            code: saved.record.failureCode,
+            message: saved.record.failureMessage,
+          }),
+        }));
       } else {
         pendingCount += 1;
+        perRecordDiagnostics.push(Object.freeze({
+          descriptorId: record.descriptorId,
+          resultAssetId: saved.record.resultAssetId,
+          persisted: false,
+          previewProvisioned: false,
+          pending: true,
+        }));
       }
     }
 
@@ -322,9 +645,9 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
 
     const terminalQualityHint = status === RunCollectedResultPersistenceStatuses.failed
       ? "degraded"
-      : status === RunCollectedResultPersistenceStatuses.partiallyPersisted
+      : status === RunCollectedResultPersistenceStatuses.partiallyPersisted || previewFailedCount > 0
         ? "partial"
-        : persistedCount > 0
+      : persistedCount > 0
           ? "standard"
           : "degraded";
 
@@ -338,7 +661,12 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         persistedCount,
         pendingCount,
         failedCount,
+        previewPendingCount,
+        previewFailedCount,
+        previewProvisioningUnavailableCount,
+        storageUnavailableCount,
         persistedResultAssetIds: Object.freeze(persistedResultAssetIds),
+        perRecordDiagnostics: Object.freeze(perRecordDiagnostics),
       }),
     });
   }

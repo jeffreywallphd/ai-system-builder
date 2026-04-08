@@ -41,6 +41,26 @@ export const GeneratedResultOriginalAccessPurposes = Object.freeze({
 export type GeneratedResultOriginalAccessPurpose =
   typeof GeneratedResultOriginalAccessPurposes[keyof typeof GeneratedResultOriginalAccessPurposes];
 
+export const GeneratedResultPreviewStates = Object.freeze({
+  pending: "preview-pending",
+  available: "preview-available",
+  failed: "preview-failed",
+  unavailable: "preview-unavailable",
+} as const);
+
+export type GeneratedResultPreviewState =
+  typeof GeneratedResultPreviewStates[keyof typeof GeneratedResultPreviewStates];
+
+export const GeneratedResultRetrievalStates = Object.freeze({
+  available: "retrieval-available",
+  temporarilyUnavailable: "retrieval-temporarily-unavailable",
+  unavailable: "retrieval-unavailable",
+  resultUnavailable: "result-unavailable",
+} as const);
+
+export type GeneratedResultRetrievalState =
+  typeof GeneratedResultRetrievalStates[keyof typeof GeneratedResultRetrievalStates];
+
 export interface GeneratedResultPreviewDescriptorDto {
   readonly derivativeId: string;
   readonly previewKind: GeneratedResultPreviewKind;
@@ -123,9 +143,15 @@ export interface GeneratedResultSummaryDto {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly preview: {
+    readonly state: GeneratedResultPreviewState;
     readonly hasPreview: boolean;
     readonly primaryPreviewKind?: GeneratedResultPreviewKind;
     readonly availabilityStatus?: GeneratedResultDerivativeAvailabilityStatus;
+  };
+  readonly retrieval: {
+    readonly state: GeneratedResultRetrievalState;
+    readonly reasonCode?: string;
+    readonly retryable?: boolean;
   };
   readonly lineage: GeneratedResultLineageSummaryDto;
 }
@@ -232,6 +258,7 @@ export interface RequestGeneratedResultPreviewResponseDto {
   readonly contractVersion: GeneratedResultTransportContractVersion;
   readonly resultAssetId: string;
   readonly preview: {
+    readonly state: GeneratedResultPreviewState;
     readonly available: boolean;
     readonly selected?: GeneratedResultPreviewDescriptorDto;
     readonly alternatives: ReadonlyArray<GeneratedResultPreviewDescriptorDto>;
@@ -252,12 +279,15 @@ export interface RequestGeneratedResultOriginalAccessResponseDto {
   readonly contractVersion: GeneratedResultTransportContractVersion;
   readonly resultAssetId: string;
   readonly original: {
+    readonly state: GeneratedResultRetrievalState;
     readonly mediaType: SupportedImageMediaType;
     readonly byteSize?: number;
     readonly protectedResourceId: string;
     readonly accessHandle: string;
     readonly expiresAt: string;
     readonly suggestedFileName?: string;
+    readonly reasonCode?: string;
+    readonly retryable?: boolean;
   };
 }
 

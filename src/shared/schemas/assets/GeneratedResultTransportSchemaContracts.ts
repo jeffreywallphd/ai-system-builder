@@ -8,6 +8,8 @@ import {
 } from "@domain/image-assets/GeneratedResultAssetDerivativeDomain";
 import {
   GeneratedResultOriginalAccessPurposes,
+  GeneratedResultPreviewStates,
+  GeneratedResultRetrievalStates,
   GeneratedResultTransportContractVersions,
   type GetGeneratedResultLineageDetailRequestDto,
   type GetGeneratedResultLineageDetailResponseDto,
@@ -60,6 +62,18 @@ const PreviewAvailabilityStatusSchema = z.enum([
   GeneratedResultDerivativeAvailabilityStatuses.available,
   GeneratedResultDerivativeAvailabilityStatuses.failed,
   GeneratedResultDerivativeAvailabilityStatuses.stale,
+]);
+const PreviewStateSchema = z.enum([
+  GeneratedResultPreviewStates.pending,
+  GeneratedResultPreviewStates.available,
+  GeneratedResultPreviewStates.failed,
+  GeneratedResultPreviewStates.unavailable,
+]);
+const RetrievalStateSchema = z.enum([
+  GeneratedResultRetrievalStates.available,
+  GeneratedResultRetrievalStates.temporarilyUnavailable,
+  GeneratedResultRetrievalStates.unavailable,
+  GeneratedResultRetrievalStates.resultUnavailable,
 ]);
 const ResultStatusSchema = z.enum([
   GeneratedResultAssetStatuses.pendingCollection,
@@ -272,6 +286,7 @@ const GeneratedResultSummaryDtoSchema = z.object({
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
   preview: z.object({
+    state: PreviewStateSchema,
     hasPreview: z.boolean(),
     primaryPreviewKind: PreviewKindSchema.optional(),
     availabilityStatus: PreviewAvailabilityStatusSchema.optional(),
@@ -283,7 +298,27 @@ const GeneratedResultSummaryDtoSchema = z.object({
         message: "primaryPreviewKind/availabilityStatus can only be present when hasPreview=true.",
       });
     }
+    if (value.state === GeneratedResultPreviewStates.available && !value.hasPreview) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["state"],
+        message: "preview state 'preview-available' requires hasPreview=true.",
+      });
+    }
+    if ((value.state === GeneratedResultPreviewStates.pending || value.state === GeneratedResultPreviewStates.failed)
+      && value.availabilityStatus === GeneratedResultDerivativeAvailabilityStatuses.available) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["availabilityStatus"],
+        message: "pending/failed preview states cannot advertise available derivative status.",
+      });
+    }
   }),
+  retrieval: z.object({
+    state: RetrievalStateSchema,
+    reasonCode: IdentifierSchema.optional(),
+    retryable: z.boolean().optional(),
+  }).strict(),
   lineage: GeneratedResultLineageSummaryDtoSchema,
 }).strict();
 
@@ -500,6 +535,7 @@ export const RequestGeneratedResultPreviewResponseDtoSchema: z.ZodType<RequestGe
   contractVersion: z.literal(GeneratedResultTransportContractVersions.v1),
   resultAssetId: IdentifierSchema,
   preview: z.object({
+    state: PreviewStateSchema,
     available: z.boolean(),
     selected: GeneratedResultPreviewDescriptorDtoSchema.optional(),
     alternatives: z.array(GeneratedResultPreviewDescriptorDtoSchema).max(32),
@@ -509,6 +545,20 @@ export const RequestGeneratedResultPreviewResponseDtoSchema: z.ZodType<RequestGe
         code: z.ZodIssueCode.custom,
         path: ["selected"],
         message: "selected preview can only be present when available=true.",
+      });
+    }
+    if (value.state === GeneratedResultPreviewStates.available && !value.available) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["state"],
+        message: "preview-available requires available=true.",
+      });
+    }
+    if (value.state === GeneratedResultPreviewStates.pending && value.available) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["state"],
+        message: "preview-pending requires available=false.",
       });
     }
   }),
@@ -532,13 +582,30 @@ export const RequestGeneratedResultOriginalAccessResponseDtoSchema: z.ZodType<Re
   contractVersion: z.literal(GeneratedResultTransportContractVersions.v1),
   resultAssetId: IdentifierSchema,
   original: z.object({
+    state: RetrievalStateSchema,
     mediaType: MediaTypeSchema,
     byteSize: z.number().int().min(1).optional(),
     protectedResourceId: ProtectedResourceIdSchema,
     accessHandle: AccessHandleSchema,
     expiresAt: TimestampSchema,
     suggestedFileName: z.string().trim().min(1).max(255).optional(),
-  }).strict(),
+    reasonCode: IdentifierSchema.optional(),
+    retryable: z.boolean().optional(),
+  }).strict().superRefine((value, context) => {
+    if (
+      value.state === GeneratedResultRetrievalStates.temporarilyUnavailable
+      || value.state === GeneratedResultRetrievalStates.unavailable
+      || value.state === GeneratedResultRetrievalStates.resultUnavailable
+    ) {
+      if (!value.reasonCode) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["reasonCode"],
+          message: "Unavailable retrieval states require reasonCode.",
+        });
+      }
+    }
+  }),
 }).strict().superRefine(assertNoForbiddenInternalKeys);
 
 export const GetGeneratedResultLineageSummaryRequestDtoSchema: z.ZodType<GetGeneratedResultLineageSummaryRequestDto> = z.object({
