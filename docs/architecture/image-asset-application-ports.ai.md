@@ -15,6 +15,10 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
+- `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
+- `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
 - `docs/architecture/image-asset-application-ports.md`
 
 ## Repository port scope
@@ -81,3 +85,25 @@ Boundary posture preserved:
 - no direct file writes
 - no UI coupling
 - no filesystem path exposure in request/result contracts
+
+## Story 1.2.2 implementation scope
+
+Concrete image-asset metadata persistence now exists as a SQLite-backed authoritative adapter:
+
+- migration-backed tables for image asset metadata, lifecycle state, lineage upstream links, and mutation replay records
+- domain-to-persistence mapping that keeps persistence rows isolated from application/domain contracts
+- repository operations implemented for:
+  - create metadata record
+  - find by id (with optional deleted inclusion)
+  - workspace-scoped filtered list (owner/origin/status/visibility/media/storage/run/generation filters)
+  - save/update metadata record
+  - lifecycle archive mutation
+  - lifecycle soft-delete mutation
+- mutation replay semantics keyed by `operationKey` for idempotent create/save/archive/delete behavior
+- revision-aware mutation support through `expectedRevision` checks
+
+Schema posture for current and near-future image flows:
+
+- supports uploaded source and generated result assets (`originKind`)
+- stores tenancy/ownership, storage binding references, fingerprint/file metadata, lifecycle timestamps, and lineage references
+- includes nullable preview/result pointer columns (`preview_asset_id`, `preview_media_type`, `latest_object_key`, `latest_object_version_id`) for future preview/result orchestration without requiring schema redesign

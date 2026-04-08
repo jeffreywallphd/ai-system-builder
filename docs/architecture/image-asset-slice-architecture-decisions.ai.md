@@ -11,6 +11,8 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 - `src/shared/contracts/assets/ImageAssetAuthorizationContracts.ts`
 - `src/application/image-assets/ports/IImageAssetRepository.ts`
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `docs/architecture/image-asset-domain-foundation.md`
 - `docs/architecture/image-asset-authorization-contracts.md`
 - `docs/architecture/image-asset-application-ports.md`
@@ -27,8 +29,8 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 
 ## Current implementation posture (April 8, 2026)
 
-- Domain invariants, shared DTO/schema contracts, authorization contracts, and application ports are implemented.
-- This story documents architecture decisions and does not add host/API adapter wiring for image asset endpoints.
+- Domain invariants, shared DTO/schema contracts, authorization contracts, application ports, and concrete SQLite metadata persistence are implemented.
+- Host/API route wiring for the full image-asset ingestion/retrieval surface remains incremental in later stories.
 
 ## Extension guardrails
 

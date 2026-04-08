@@ -13,6 +13,10 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
+- `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
+- `src/infrastructure/persistence/image-assets/tests/SqliteImageAssetPersistenceAdapter.test.ts`
 
 ## Repository port contract
 
@@ -70,3 +74,26 @@ This story adds the authoritative application use case that initializes logical 
 - reserves a managed storage upload location and returns reservation metadata for API/controller flows
 
 No filesystem write or UI logic is performed in this use case. All storage interaction remains logical (`storageInstanceId` + object reference) through authoritative application ports.
+
+## Story 1.2.2: concrete metadata persistence for image assets
+
+This story introduces the authoritative SQLite persistence adapter for image asset metadata:
+
+- migration-backed image-asset persistence tables for metadata, lifecycle state, lineage upstream links, and mutation replay records
+- domain-to-persistence mapper boundaries so SQLite row models do not leak into domain/application contracts
+- concrete `IImageAssetRepository` implementation for:
+  - create metadata record
+  - find by id (including optional include-deleted behavior)
+  - workspace-scoped list with owner/origin/status/visibility/media/storage/run/generation filters
+  - save/update metadata record
+  - lifecycle archive mutation
+  - lifecycle soft-delete mutation
+- idempotent mutation replay support keyed by `operationKey`
+- optimistic revision guard support via `expectedRevision`
+
+Schema posture now supports both uploaded inputs and generated outputs:
+
+- tenancy/ownership and storage binding references are persisted as first-class columns
+- file/fingerprint metadata and lifecycle timestamps are persisted durably
+- lineage references (`upstreamAssetIds`, `sourceRunId`, `generationOperationId`) are persisted for future run/history features
+- preview/result pointer columns are present (`preview_asset_id`, `preview_media_type`, `latest_object_key`, `latest_object_version_id`) to support future preview-safe retrieval and generated-result orchestration without a schema break

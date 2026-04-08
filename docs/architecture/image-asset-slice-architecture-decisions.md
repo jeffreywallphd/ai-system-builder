@@ -12,6 +12,8 @@ This note documents Story 1.1.5 for the image manipulation vertical slice: archi
 - `src/shared/schemas/assets/ImageAssetTransportSchemaContracts.ts`
 - `src/application/image-assets/ports/IImageAssetRepository.ts`
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
+- `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `docs/architecture/image-asset-domain-foundation.md`
 - `docs/architecture/image-asset-authorization-contracts.md`
@@ -84,8 +86,8 @@ Client and host integrations consume typed DTO/schema contracts rather than loca
 
 Current implementation boundary (April 8, 2026):
 
-- domain invariants, shared transport/auth contracts, and application repository/storage ports are implemented
-- this story does not introduce infrastructure adapters or host wiring for these contracts; downstream stories should integrate those through existing host assembly and API layers
+- domain invariants, shared transport/auth contracts, application repository/storage ports, and concrete SQLite image-asset metadata persistence are implemented
+- host wiring for the full image-asset route surface remains incremental in downstream stories through existing host assembly and API layers
 
 ## Decision 6: preview-safe access and generated outputs are first-class
 
