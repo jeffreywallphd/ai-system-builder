@@ -1,14 +1,18 @@
 import { describe, expect, it } from "bun:test";
 import {
+  DeploymentPolicyFamilyScopes,
   DeploymentProfileIds,
   DeploymentProfilePolicyAdministrationDomainError,
   DeploymentPolicyControlModes,
+  createCanonicalDeploymentPolicyConfigurationRegistry,
   createCanonicalDeploymentPolicyFamilyCatalog,
   createCanonicalDeploymentProfilePresetCatalog,
   createDeploymentPolicyFamilyCatalog,
   createDeploymentProfilePresetCatalog,
   normalizeDeploymentProfileId,
   resolveDeploymentProfilePresetPolicyValues,
+  resolveDeploymentPolicySettingDefinition,
+  validateDeploymentPolicySettingValue,
 } from "../DeploymentProfilePolicyAdministrationDomain";
 
 describe("DeploymentProfilePolicyAdministrationDomain", () => {
@@ -115,5 +119,47 @@ describe("DeploymentProfilePolicyAdministrationDomain", () => {
   it("normalizes canonical deployment-profile ids and rejects unsupported values", () => {
     expect(normalizeDeploymentProfileId("deployment-profile:CLASSROOM")).toBe(DeploymentProfileIds.classroom);
     expect(() => normalizeDeploymentProfileId("enterprise")).toThrow(DeploymentProfilePolicyAdministrationDomainError);
+  });
+
+  it("defines first-production policy families with explicit scopes and validation rules", () => {
+    const familyCatalog = createCanonicalDeploymentPolicyFamilyCatalog();
+
+    expect(familyCatalog["approval-governance"]?.scope).toBe(DeploymentPolicyFamilyScopes.runSubmission);
+    expect(familyCatalog["sharing-posture"]?.scope).toBe(DeploymentPolicyFamilyScopes.sharing);
+    expect(familyCatalog["storage-governance"]?.scope).toBe(DeploymentPolicyFamilyScopes.storage);
+    expect(familyCatalog["security-governance"]?.scope).toBe(DeploymentPolicyFamilyScopes.security);
+    expect(familyCatalog["admin-controls"]?.scope).toBe(DeploymentPolicyFamilyScopes.administration);
+    expect(familyCatalog["audit-governance"]?.scope).toBe(DeploymentPolicyFamilyScopes.audit);
+
+    const visibilitySetting = resolveDeploymentPolicySettingDefinition({
+      familyCatalog,
+      familyId: "sharing-posture",
+      settingKey: "defaultWorkspaceVisibility",
+    });
+    const invalidVisibilityIssues = validateDeploymentPolicySettingValue({
+      settingDefinition: visibilitySetting,
+      value: "global",
+    });
+    expect(invalidVisibilityIssues[0]?.code).toBe("disallowed-value");
+
+    const retentionSetting = resolveDeploymentPolicySettingDefinition({
+      familyCatalog,
+      familyId: "storage-governance",
+      settingKey: "retentionDaysDefault",
+    });
+    const invalidRetentionIssues = validateDeploymentPolicySettingValue({
+      settingDefinition: retentionSetting,
+      value: 2,
+    });
+    expect(invalidRetentionIssues[0]?.code).toBe("out-of-range");
+  });
+
+  it("builds a canonical registry with profile-default relationships", () => {
+    const registry = createCanonicalDeploymentPolicyConfigurationRegistry();
+
+    expect(registry.profileDefaults.home?.["sharing-posture"]?.defaultWorkspaceVisibility).toBe("private");
+    expect(registry.profileDefaults.classroom?.["sharing-posture"]?.defaultWorkspaceVisibility).toBe("workspace");
+    expect(registry.profileDefaults.organization?.["storage-governance"]?.defaultStorageTier).toBe("server-managed");
+    expect(registry.profileDefaults.organization?.["approval-governance"]?.highRiskRunRequiresDualApproval).toBe(true);
   });
 });

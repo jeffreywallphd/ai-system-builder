@@ -10,6 +10,7 @@ import {
   isDeploymentPolicyAdminOverrideAllowed,
   resolveDeploymentPolicySettingDefinition,
   resolveDeploymentProfilePresetPolicyValues,
+  validateDeploymentPolicySettingValue,
 } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 import {
   DeploymentPolicyAdministrationContractVersions,
@@ -54,10 +55,6 @@ function normalizeTimestamp(value: string | Date | undefined): string {
   return parsed.toISOString();
 }
 
-function scalarType(value: DeploymentPolicyScalarValue): string {
-  return typeof value;
-}
-
 function assertEvaluationLayer(layer: DeploymentPolicyEvaluationRequestLayer): "domain" | "application" {
   if (
     layer === DeploymentPolicyEvaluationRequestLayers.domain
@@ -89,9 +86,13 @@ export function createDeploymentPolicyAdministrationState(input: {
           `Policy setting '${familyId}.${settingKey}' is '${DeploymentPolicyControlModes.profileFixed}' and cannot be overridden by runtime admin state.`,
         );
       }
-      if (scalarType(settingDefinition.defaultValue) !== scalarType(value)) {
+      const validationIssues = validateDeploymentPolicySettingValue({
+        settingDefinition,
+        value,
+      });
+      if (validationIssues.length > 0) {
         throw new DeploymentPolicyAdministrationContractsError(
-          `Policy setting '${familyId}.${settingKey}' expects '${scalarType(settingDefinition.defaultValue)}' values.`,
+          `Policy setting '${familyId}.${settingKey}' is invalid: ${validationIssues[0]!.message}`,
         );
       }
       familyValues[settingKey] = value;
