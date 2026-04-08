@@ -19,6 +19,10 @@ import {
   type DeploymentPolicyPersistenceMutationResult,
   type DeploymentPolicyPersistenceScope,
 } from "@shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos";
+import type {
+  DeploymentPolicyAdministrationObservabilityEvent,
+  IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
 
 class InMemoryDeploymentPolicyPersistenceRepository implements IDeploymentPolicyPersistenceRepository {
   private activeSelection: DeploymentPolicyActiveProfileSelectionRecord | undefined;
@@ -73,6 +77,17 @@ class InMemoryDeploymentPolicyPersistenceRepository implements IDeploymentPolicy
   }
 }
 
+class RecordingDeploymentPolicyAdministrationObservabilityPort
+  implements IDeploymentPolicyAdministrationObservabilityPort {
+  public readonly events: DeploymentPolicyAdministrationObservabilityEvent[] = [];
+
+  public async recordDeploymentPolicyAdministrationEvent(
+    event: DeploymentPolicyAdministrationObservabilityEvent,
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createScope(): DeploymentPolicyPersistenceScope {
   return createDeploymentPolicyPersistenceScope({
     scopeId: "platform:default",
@@ -117,6 +132,7 @@ function createOverrideRecord(input: {
 describe("DeploymentPolicyBootstrapResolutionService", () => {
   it("resolves persisted active profile and effective snapshot for runtime evaluation seams", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     repository.setActiveSelection(createSelection(DeploymentProfileIds.organization));
     repository.setOverride(createOverrideRecord({
       profileId: DeploymentProfileIds.organization,
@@ -127,6 +143,7 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
 
     const service = new DeploymentPolicyBootstrapResolutionService({
       deploymentPolicyRepository: repository,
+      observabilityPort,
       now: () => new Date("2026-04-06T12:00:00.000Z"),
     });
 
@@ -143,6 +160,10 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
     expect(resolved.snapshot.profileId).toBe(DeploymentProfileIds.organization);
     expect(authorizationPolicy.defaultWorkspaceVisibility.value).toBe("private");
     expect(authorizationPolicy.defaultWorkspaceVisibility.source).toBe("admin-state");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.bootstrap.resolved"
+      && event.outcome === "success"
+    ))).toBeTrue();
   });
 
   it("uses deterministic fallback behavior when persisted profile selection is missing", async () => {
@@ -166,6 +187,7 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
 
   it("fails startup resolution explicitly when persisted state is invalid", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     repository.setActiveSelection(createSelection(DeploymentProfileIds.classroom));
     repository.setOverride(createOverrideRecord({
       profileId: DeploymentProfileIds.classroom,
@@ -176,6 +198,7 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
 
     const service = new DeploymentPolicyBootstrapResolutionService({
       deploymentPolicyRepository: repository,
+      observabilityPort,
       now: () => new Date("2026-04-06T12:00:00.000Z"),
     });
 
@@ -191,5 +214,9 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
       const bootstrapError = error as DeploymentPolicyBootstrapResolutionError;
       expect(bootstrapError.metadata.validationIssues.length).toBeGreaterThan(0);
     }
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.bootstrap.failed"
+      && event.outcome === "failure"
+    ))).toBeTrue();
   });
 });

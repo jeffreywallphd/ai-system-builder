@@ -157,6 +157,7 @@ describe("IdentityHttpServer deployment policy write routes", () => {
         headers: {
           authorization: `Bearer ${token}`,
           "content-type": "application/json",
+          "x-correlation-id": "corr-policy-write-1",
         },
         body: JSON.stringify({
           profileId: "organization",
@@ -170,6 +171,7 @@ describe("IdentityHttpServer deployment policy write routes", () => {
     expect(body.ok).toBe(true);
     expect(body.data.result.snapshot.profileId).toBe("organization");
     expect(backendApi.lastActiveProfileRequest?.workspaceId).toBe("workspace-alpha");
+    expect(backendApi.lastActiveProfileRequest?.correlationId).toBe("corr-policy-write-1");
   });
 
   it("returns invalid request when write payload fails schema validation", async () => {

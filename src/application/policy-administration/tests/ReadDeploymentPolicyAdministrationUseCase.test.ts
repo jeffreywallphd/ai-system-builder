@@ -11,6 +11,10 @@ import {
 import { DeploymentPolicyResolutionSources } from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
 import { ReadDeploymentPolicyAdministrationUseCase } from "../use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { DeploymentPolicyAdministrationPermissionKeys } from "../use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
+import type {
+  DeploymentPolicyAdministrationObservabilityEvent,
+  IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
 
 class InMemoryDeploymentPolicyPersistenceRepository implements IDeploymentPolicyPersistenceRepository {
   public activeProfileSelection: DeploymentPolicyActiveProfileSelectionRecord | undefined;
@@ -72,10 +76,21 @@ class StubPermissionService {
   }
 }
 
+class RecordingDeploymentPolicyAdministrationObservabilityPort implements IDeploymentPolicyAdministrationObservabilityPort {
+  public readonly events: DeploymentPolicyAdministrationObservabilityEvent[] = [];
+
+  public async recordDeploymentPolicyAdministrationEvent(
+    event: DeploymentPolicyAdministrationObservabilityEvent,
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("ReadDeploymentPolicyAdministrationUseCase", () => {
   it("returns active profile, effective snapshot, override provenance, and catalog metadata", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
     const permissionService = new StubPermissionService();
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     repository.activeProfileSelection = Object.freeze({
       scope: Object.freeze({
         kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
@@ -140,6 +155,7 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
     const useCase = new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      observabilityPort,
     });
 
     const response = await useCase.execute({
@@ -160,6 +176,11 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
     expect(response.catalog?.presets.organization?.lineage).toEqual(["home", "classroom", "organization"]);
     expect(response.catalog?.families["approval-governance"]?.settings.approvalEscalationTimeoutMinutes?.valueKind).toBe("number");
     expect(response.effectiveMetadata?.profileId).toBe("organization");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.read.completed"
+      && event.operation === "read"
+      && event.outcome === "success"
+    ))).toBeTrue();
   });
 
   it("falls back to home profile when no persisted active profile exists", async () => {
@@ -192,10 +213,12 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
   it("throws permission error when actor lacks deployment-policy read permission", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
     const permissionService = new StubPermissionService();
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     permissionService.denied.add(DeploymentPolicyAdministrationPermissionKeys.readState);
     const useCase = new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      observabilityPort,
     });
 
     await expect(useCase.execute({
@@ -205,5 +228,9 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
         }),
         actorUserIdentityId: "user:member",
       })).rejects.toThrow("not authorized");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.read.rejected"
+      && event.outcome === "rejected"
+    ))).toBeTrue();
   });
 });

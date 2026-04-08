@@ -1,8 +1,24 @@
 import { describe, expect, it } from "bun:test";
 import { DeploymentPolicyWriteBackendApi } from "../DeploymentPolicyWriteBackendApi";
+import type {
+  DeploymentPolicyAdministrationObservabilityEvent,
+  IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
+
+class RecordingDeploymentPolicyAdministrationObservabilityPort
+  implements IDeploymentPolicyAdministrationObservabilityPort {
+  public readonly events: DeploymentPolicyAdministrationObservabilityEvent[] = [];
+
+  public async recordDeploymentPolicyAdministrationEvent(
+    event: DeploymentPolicyAdministrationObservabilityEvent,
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 describe("DeploymentPolicyWriteBackendApi", () => {
   it("returns canonical response envelope after active profile update", async () => {
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     const useCase = {
       execute: async () => Object.freeze({
         ok: true as const,
@@ -50,6 +66,7 @@ describe("DeploymentPolicyWriteBackendApi", () => {
     };
     const api = new DeploymentPolicyWriteBackendApi({
       updateDeploymentPolicyStateUseCase: useCase as never,
+      observabilityPort,
     });
 
     const response = await api.updateActiveProfile(
@@ -65,6 +82,10 @@ describe("DeploymentPolicyWriteBackendApi", () => {
     expect(response.ok).toBeTrue();
     expect(response.data?.result.scope.scopeId).toBe("workspace-alpha");
     expect(response.data?.result.snapshot.profileId).toBe("organization");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.surface.write.active-profile.completed"
+      && event.outcome === "success"
+    ))).toBeTrue();
   });
 
   it("returns invalid-request when override payload is malformed", async () => {
@@ -98,6 +119,7 @@ describe("DeploymentPolicyWriteBackendApi", () => {
   });
 
   it("maps forbidden write outcomes to forbidden envelopes", async () => {
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     const api = new DeploymentPolicyWriteBackendApi({
       updateDeploymentPolicyStateUseCase: {
         execute: async () => Object.freeze({
@@ -108,6 +130,7 @@ describe("DeploymentPolicyWriteBackendApi", () => {
           }),
         }),
       } as never,
+      observabilityPort,
     });
 
     const response = await api.updateActiveProfile(
@@ -122,6 +145,10 @@ describe("DeploymentPolicyWriteBackendApi", () => {
 
     expect(response.ok).toBeFalse();
     expect(response.error?.code).toBe("forbidden");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.surface.write.active-profile.rejected"
+      && event.outcome === "rejected"
+    ))).toBeTrue();
   });
 
   it("ignores actorUserIdentityId in override provenance from request payload", async () => {

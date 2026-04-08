@@ -2,9 +2,25 @@ import { describe, expect, it } from "bun:test";
 import type { ReadDeploymentPolicyStateResponse } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
 import { ReadDeploymentPolicyAdministrationPermissionError } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { DeploymentPolicyReadBackendApi } from "../DeploymentPolicyReadBackendApi";
+import type {
+  DeploymentPolicyAdministrationObservabilityEvent,
+  IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
+
+class RecordingDeploymentPolicyAdministrationObservabilityPort
+  implements IDeploymentPolicyAdministrationObservabilityPort {
+  public readonly events: DeploymentPolicyAdministrationObservabilityEvent[] = [];
+
+  public async recordDeploymentPolicyAdministrationEvent(
+    event: DeploymentPolicyAdministrationObservabilityEvent,
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 describe("DeploymentPolicyReadBackendApi", () => {
   it("returns canonical policy state payload for valid requests", async () => {
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     const api = new DeploymentPolicyReadBackendApi({
       readDeploymentPolicyStateUseCase: {
         execute: async () => Object.freeze({
@@ -56,6 +72,7 @@ describe("DeploymentPolicyReadBackendApi", () => {
           overrideRecords: Object.freeze([]),
         } satisfies ReadDeploymentPolicyStateResponse),
       } as never,
+      observabilityPort,
     });
 
     const response = await api.readPolicyState({
@@ -66,6 +83,10 @@ describe("DeploymentPolicyReadBackendApi", () => {
     expect(response.ok).toBeTrue();
     expect(response.data?.scope.scopeId).toBe("workspace-alpha");
     expect(response.data?.snapshot.profileId).toBe("home");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.surface.read.completed"
+      && event.outcome === "success"
+    ))).toBeTrue();
   });
 
   it("returns invalid-request envelope for malformed input", async () => {
@@ -88,6 +109,7 @@ describe("DeploymentPolicyReadBackendApi", () => {
   });
 
   it("returns forbidden when read permission checks deny policy state inspection", async () => {
+    const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();
     const api = new DeploymentPolicyReadBackendApi({
       readDeploymentPolicyStateUseCase: {
         execute: async () => {
@@ -96,6 +118,7 @@ describe("DeploymentPolicyReadBackendApi", () => {
           });
         },
       } as never,
+      observabilityPort,
     });
 
     const response = await api.readPolicyState({
@@ -105,5 +128,9 @@ describe("DeploymentPolicyReadBackendApi", () => {
 
     expect(response.ok).toBeFalse();
     expect(response.error?.code).toBe("forbidden");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.surface.read.rejected"
+      && event.outcome === "rejected"
+    ))).toBeTrue();
   });
 });
