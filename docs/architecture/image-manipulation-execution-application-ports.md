@@ -55,3 +55,9 @@ The application execution ports cover six responsibilities:
   - `src/application/image-workflows/ports/ImageManipulationTranslationContracts.ts`
 - Architecture reference note:
   - `docs/architecture/image-manipulation-translation-contracts.md`
+
+## Story 3.1.3 normalized status/error contracts
+- Backend-neutral job-state/progress/completion/failure contracts are defined in:
+  - `src/application/image-workflows/ports/ImageManipulationExecutionStatusContracts.ts`
+- Architecture reference note:
+  - `docs/architecture/image-manipulation-execution-status-contracts.md`

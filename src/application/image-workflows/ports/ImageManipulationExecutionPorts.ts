@@ -1,4 +1,18 @@
 import type { ImageWorkflowBackendTranslationReference } from "@domain/image-workflows/ImageWorkflowDomain";
+import {
+  ImageManipulationBackendJobStates,
+  ImageManipulationBackendTerminalStates,
+  ImageManipulationExecutionFailureCategories,
+  type ImageManipulationBackendDiagnostics,
+  type ImageManipulationBackendJobSnapshot,
+  type ImageManipulationBackendJobState,
+  type ImageManipulationBackendTerminalState,
+  type ImageManipulationExecutionCompletionSummary,
+  type ImageManipulationExecutionFailure,
+  type ImageManipulationExecutionFailureCategory,
+  type ImageManipulationExecutionProgressSnapshot,
+  type ImageManipulationExecutionWarning,
+} from "./ImageManipulationExecutionStatusContracts";
 
 export const ImageManipulationExecutionBackendHealthStates = Object.freeze({
   healthy: "healthy",
@@ -10,26 +24,28 @@ export type ImageManipulationExecutionBackendHealthState =
   typeof ImageManipulationExecutionBackendHealthStates[keyof typeof ImageManipulationExecutionBackendHealthStates];
 
 export const ImageManipulationExecutionStates = Object.freeze({
-  queued: "queued",
-  dispatching: "dispatching",
-  running: "running",
-  completing: "completing",
-  completed: "completed",
-  failed: "failed",
-  cancelled: "cancelled",
+  queued: ImageManipulationBackendJobStates.queued,
+  preparing: ImageManipulationBackendJobStates.preparing,
+  running: ImageManipulationBackendJobStates.running,
+  completed: ImageManipulationBackendJobStates.completed,
+  failed: ImageManipulationBackendJobStates.failed,
+  cancelled: ImageManipulationBackendJobStates.cancelled,
+  // Compatibility aliases for legacy callers that emitted pre-3.1.3 state names.
+  dispatching: ImageManipulationBackendJobStates.preparing,
+  completing: ImageManipulationBackendJobStates.running,
 });
 
 export type ImageManipulationExecutionState =
-  typeof ImageManipulationExecutionStates[keyof typeof ImageManipulationExecutionStates];
+  ImageManipulationBackendJobState;
 
 export const ImageManipulationExecutionTerminalStates = Object.freeze({
-  completed: ImageManipulationExecutionStates.completed,
-  failed: ImageManipulationExecutionStates.failed,
-  cancelled: ImageManipulationExecutionStates.cancelled,
+  completed: ImageManipulationBackendTerminalStates.completed,
+  failed: ImageManipulationBackendTerminalStates.failed,
+  cancelled: ImageManipulationBackendTerminalStates.cancelled,
 });
 
 export type ImageManipulationExecutionTerminalState =
-  typeof ImageManipulationExecutionTerminalStates[keyof typeof ImageManipulationExecutionTerminalStates];
+  ImageManipulationBackendTerminalState;
 
 export const ImageManipulationExecutionProgressEventKinds = Object.freeze({
   queued: "queued",
@@ -56,20 +72,21 @@ export type ImageManipulationExecutionOutputReferenceKind =
   typeof ImageManipulationExecutionOutputReferenceKinds[keyof typeof ImageManipulationExecutionOutputReferenceKinds];
 
 export const ImageManipulationExecutionErrorCategories = Object.freeze({
-  validation: "validation",
-  translation: "translation",
-  dependency: "dependency",
-  capacity: "capacity",
-  timeout: "timeout",
-  cancellation: "cancellation",
-  execution: "execution",
-  output: "output",
-  connectivity: "connectivity",
-  internal: "internal",
+  validation: ImageManipulationExecutionFailureCategories.validation,
+  translation: ImageManipulationExecutionFailureCategories.translation,
+  dependency: ImageManipulationExecutionFailureCategories.dependency,
+  capacity: ImageManipulationExecutionFailureCategories.capacity,
+  timeout: ImageManipulationExecutionFailureCategories.timeout,
+  cancellation: ImageManipulationExecutionFailureCategories.cancellation,
+  execution: ImageManipulationExecutionFailureCategories.execution,
+  output: ImageManipulationExecutionFailureCategories.output,
+  connectivity: ImageManipulationExecutionFailureCategories.connectivity,
+  internal: ImageManipulationExecutionFailureCategories.internal,
+  unknown: ImageManipulationExecutionFailureCategories.unknown,
 });
 
 export type ImageManipulationExecutionErrorCategory =
-  typeof ImageManipulationExecutionErrorCategories[keyof typeof ImageManipulationExecutionErrorCategories];
+  ImageManipulationExecutionFailureCategory;
 
 export const ImageManipulationExecutionCancellationStatuses = Object.freeze({
   accepted: "accepted",
@@ -132,10 +149,16 @@ export interface ImageManipulationExecutionDispatchResult {
 }
 
 export interface ImageManipulationExecutionError {
-  readonly code: string;
+  readonly code: ImageManipulationExecutionFailure["code"];
   readonly category: ImageManipulationExecutionErrorCategory;
   readonly message: string;
+  readonly userMessage?: ImageManipulationExecutionFailure["userMessage"];
   readonly retryable: boolean;
+  readonly summary?: ImageManipulationExecutionFailure["summary"];
+  readonly stageCode?: ImageManipulationExecutionFailure["stageCode"];
+  readonly partialProgressObserved?: ImageManipulationExecutionFailure["partialProgressObserved"];
+  readonly partialOutputCount?: ImageManipulationExecutionFailure["partialOutputCount"];
+  readonly diagnostics?: ImageManipulationExecutionFailure["diagnostics"];
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
@@ -152,8 +175,13 @@ export interface ImageManipulationExecutionStateSnapshot {
   readonly progressPercent?: number;
   readonly stage?: string;
   readonly message?: string;
+  readonly progress?: ImageManipulationExecutionProgressSnapshot;
+  readonly warnings?: ReadonlyArray<ImageManipulationExecutionWarning>;
+  readonly completion?: ImageManipulationExecutionCompletionSummary;
   readonly terminalState?: ImageManipulationExecutionTerminalState;
-  readonly error?: ImageManipulationExecutionError;
+  readonly error?: ImageManipulationExecutionError | ImageManipulationExecutionFailure;
+  readonly backendDiagnostics?: ImageManipulationBackendDiagnostics;
+  readonly normalizedJob?: ImageManipulationBackendJobSnapshot;
 }
 
 export interface ImageManipulationExecutionProgressEvent {
