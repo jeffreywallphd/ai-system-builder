@@ -73,6 +73,28 @@ describe("DeploymentPolicyAdministrationContracts", () => {
     })).toThrow(DeploymentPolicyAdministrationContractsError);
   });
 
+  it("enforces taxonomy validation rules for admin overrides", () => {
+    const familyCatalog = createCanonicalDeploymentPolicyFamilyCatalog();
+
+    expect(() => createDeploymentPolicyAdministrationState({
+      familyCatalog,
+      values: {
+        "sharing-posture": {
+          defaultWorkspaceVisibility: "global",
+        },
+      },
+    })).toThrow(DeploymentPolicyAdministrationContractsError);
+
+    expect(() => createDeploymentPolicyAdministrationState({
+      familyCatalog,
+      values: {
+        "storage-governance": {
+          retentionDaysDefault: 2,
+        },
+      },
+    })).toThrow(DeploymentPolicyAdministrationContractsError);
+  });
+
   it("blocks policy evaluation from UI/transport/infrastructure layers", () => {
     const familyCatalog = createCanonicalDeploymentPolicyFamilyCatalog();
     const presetCatalog = createCanonicalDeploymentProfilePresetCatalog(familyCatalog);

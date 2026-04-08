@@ -1,3 +1,4 @@
+
 export class DeploymentProfilePolicyAdministrationDomainError extends Error {
   constructor(message: string) {
     super(message);
@@ -22,6 +23,49 @@ export const DeploymentPolicyControlModes = Object.freeze({
 export type DeploymentPolicyControlMode =
   typeof DeploymentPolicyControlModes[keyof typeof DeploymentPolicyControlModes];
 
+export const DeploymentPolicyFamilyScopes = Object.freeze({
+  deploymentProfile: "deployment-profile",
+  runSubmission: "run-submission",
+  sharing: "sharing",
+  storage: "storage",
+  security: "security",
+  administration: "administration",
+  audit: "audit",
+});
+
+export type DeploymentPolicyFamilyScope =
+  typeof DeploymentPolicyFamilyScopes[keyof typeof DeploymentPolicyFamilyScopes];
+
+export const DeploymentPolicyValueKinds = Object.freeze({
+  string: "string",
+  number: "number",
+  boolean: "boolean",
+});
+
+export type DeploymentPolicyValueKind =
+  typeof DeploymentPolicyValueKinds[keyof typeof DeploymentPolicyValueKinds];
+
+export interface DeploymentPolicySettingEnumRule {
+  readonly type: "enum";
+  readonly allowedValues: ReadonlyArray<string>;
+}
+
+export interface DeploymentPolicySettingNumberRangeRule {
+  readonly type: "number-range";
+  readonly min: number;
+  readonly max: number;
+  readonly integerOnly?: boolean;
+}
+
+export type DeploymentPolicySettingValidationRule =
+  | DeploymentPolicySettingEnumRule
+  | DeploymentPolicySettingNumberRangeRule;
+
+export interface DeploymentPolicyValueValidationIssue {
+  readonly code: "invalid-type" | "disallowed-value" | "out-of-range" | "non-integer";
+  readonly message: string;
+}
+
 export type DeploymentPolicyScalarValue = string | number | boolean;
 export type DeploymentPolicyFamilyId = string;
 export type DeploymentPolicySettingKey = string;
@@ -31,12 +75,15 @@ export interface DeploymentPolicySettingDefinition {
   readonly description: string;
   readonly controlMode: DeploymentPolicyControlMode;
   readonly defaultValue: DeploymentPolicyScalarValue;
+  readonly valueKind?: DeploymentPolicyValueKind;
+  readonly validationRules?: ReadonlyArray<DeploymentPolicySettingValidationRule>;
 }
 
 export interface DeploymentPolicyFamilyDefinition {
   readonly familyId: DeploymentPolicyFamilyId;
   readonly description: string;
   readonly settings: ReadonlyArray<DeploymentPolicySettingDefinition>;
+  readonly scope?: DeploymentPolicyFamilyScope;
 }
 
 export type DeploymentPolicyFamilyCatalog =
@@ -56,7 +103,24 @@ export interface DeploymentProfilePolicyPreset {
 
 export type DeploymentProfilePresetCatalog = Readonly<Record<DeploymentProfileId, DeploymentProfilePolicyPreset>>;
 
+export interface DeploymentPolicyConfigurationRegistry {
+  readonly familyCatalog: DeploymentPolicyFamilyCatalog;
+  readonly presetCatalog: DeploymentProfilePresetCatalog;
+  readonly profileDefaults: Readonly<Record<DeploymentProfileId, DeploymentProfilePolicyValues>>;
+}
+
+export const DeploymentPolicyFamilyIds = Object.freeze({
+  approvalGovernance: "approval-governance",
+  sharingPosture: "sharing-posture",
+  storageGovernance: "storage-governance",
+  securityGovernance: "security-governance",
+  adminControls: "admin-controls",
+  auditGovernance: "audit-governance",
+});
+
 const CanonicalProfileIds = new Set<DeploymentProfileId>(Object.values(DeploymentProfileIds));
+const CanonicalFamilyScopes = new Set<DeploymentPolicyFamilyScope>(Object.values(DeploymentPolicyFamilyScopes));
+const CanonicalValueKinds = new Set<DeploymentPolicyValueKind>(Object.values(DeploymentPolicyValueKinds));
 const PolicyFamilyIdPattern = /^[a-z][a-z0-9-]{2,126}$/;
 const PolicySettingKeyPattern = /^[a-z][a-zA-Z0-9]{2,126}$/;
 
@@ -73,8 +137,8 @@ function normalizeOptional(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function scalarType(value: DeploymentPolicyScalarValue): string {
-  return typeof value;
+function scalarType(value: DeploymentPolicyScalarValue): DeploymentPolicyValueKind {
+  return typeof value as DeploymentPolicyValueKind;
 }
 
 function assertControlMode(value: DeploymentPolicyControlMode): DeploymentPolicyControlMode {
@@ -96,12 +160,147 @@ function assertProfileId(value: string): DeploymentProfileId {
   return normalized as DeploymentProfileId;
 }
 
+function normalizeValueKind(
+  valueKind: DeploymentPolicyValueKind | undefined,
+  defaultValue: DeploymentPolicyScalarValue,
+  settingKey: string,
+): DeploymentPolicyValueKind {
+  const inferred = scalarType(defaultValue);
+  const normalized = valueKind ?? inferred;
+  if (!CanonicalValueKinds.has(normalized)) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy setting '${settingKey}' has invalid valueKind '${String(normalized)}'.`,
+    );
+  }
+  if (normalized !== inferred) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy setting '${settingKey}' valueKind '${normalized}' does not match default value type '${inferred}'.`,
+    );
+  }
+  return normalized;
+}
+function normalizeValidationRules(
+  input: ReadonlyArray<DeploymentPolicySettingValidationRule> | undefined,
+  valueKind: DeploymentPolicyValueKind,
+  settingKey: string,
+): ReadonlyArray<DeploymentPolicySettingValidationRule> {
+  const normalizedRules: DeploymentPolicySettingValidationRule[] = [];
+  for (const rule of input ?? []) {
+    if (rule.type === "enum") {
+      if (valueKind !== DeploymentPolicyValueKinds.string) {
+        throw new DeploymentProfilePolicyAdministrationDomainError(
+          `Deployment policy setting '${settingKey}' cannot use enum validation for valueKind '${valueKind}'.`,
+        );
+      }
+      const allowed = [
+        ...new Set(
+          rule.allowedValues.map((entry) =>
+            normalizeRequired(entry, `Allowed enum value for setting '${settingKey}'`),
+          ),
+        ),
+      ];
+      if (allowed.length < 1) {
+        throw new DeploymentProfilePolicyAdministrationDomainError(
+          `Deployment policy setting '${settingKey}' enum validation must declare at least one allowed value.`,
+        );
+      }
+      normalizedRules.push(
+        Object.freeze({
+          type: "enum",
+          allowedValues: Object.freeze(allowed),
+        }),
+      );
+      continue;
+    }
+
+    if (valueKind !== DeploymentPolicyValueKinds.number) {
+      throw new DeploymentProfilePolicyAdministrationDomainError(
+        `Deployment policy setting '${settingKey}' cannot use number-range validation for valueKind '${valueKind}'.`,
+      );
+    }
+    if (!Number.isFinite(rule.min) || !Number.isFinite(rule.max)) {
+      throw new DeploymentProfilePolicyAdministrationDomainError(
+        `Deployment policy setting '${settingKey}' number-range validation requires finite min and max values.`,
+      );
+    }
+    if (rule.min > rule.max) {
+      throw new DeploymentProfilePolicyAdministrationDomainError(
+        `Deployment policy setting '${settingKey}' number-range validation requires min <= max.`,
+      );
+    }
+    normalizedRules.push(
+      Object.freeze({
+        type: "number-range",
+        min: rule.min,
+        max: rule.max,
+        integerOnly: rule.integerOnly ?? false,
+      }),
+    );
+  }
+  return Object.freeze(normalizedRules);
+}
+
+function normalizeFamilyScope(scope: DeploymentPolicyFamilyScope | undefined): DeploymentPolicyFamilyScope {
+  const normalized = scope ?? DeploymentPolicyFamilyScopes.deploymentProfile;
+  if (!CanonicalFamilyScopes.has(normalized)) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy family scope '${String(normalized)}' is invalid.`,
+    );
+  }
+  return normalized;
+}
+
 export function normalizeDeploymentProfileId(value: string): DeploymentProfileId {
   const normalized = normalizeRequired(value, "Deployment profile id").toLowerCase();
   if (normalized.startsWith("deployment-profile:")) {
     return normalizeDeploymentProfileId(normalized.slice("deployment-profile:".length));
   }
   return assertProfileId(normalized);
+}
+
+export function validateDeploymentPolicySettingValue(input: {
+  readonly settingDefinition: DeploymentPolicySettingDefinition;
+  readonly value: DeploymentPolicyScalarValue;
+}): ReadonlyArray<DeploymentPolicyValueValidationIssue> {
+  const issues: DeploymentPolicyValueValidationIssue[] = [];
+
+  const actualKind = scalarType(input.value);
+  if (actualKind !== input.settingDefinition.valueKind) {
+    issues.push({
+      code: "invalid-type",
+      message: `Policy setting '${input.settingDefinition.settingKey}' expects '${input.settingDefinition.valueKind}' values.`,
+    });
+    return Object.freeze(issues);
+  }
+
+  for (const rule of input.settingDefinition.validationRules ?? []) {
+    if (rule.type === "enum") {
+      if (!rule.allowedValues.includes(input.value as string)) {
+        issues.push({
+          code: "disallowed-value",
+          message: `Policy setting '${input.settingDefinition.settingKey}' value '${String(input.value)}' is not allowed.`,
+        });
+      }
+      continue;
+    }
+
+    const numericValue = input.value as number;
+    if (rule.integerOnly && !Number.isInteger(numericValue)) {
+      issues.push({
+        code: "non-integer",
+        message: `Policy setting '${input.settingDefinition.settingKey}' requires an integer value.`,
+      });
+      continue;
+    }
+    if (numericValue < rule.min || numericValue > rule.max) {
+      issues.push({
+        code: "out-of-range",
+        message: `Policy setting '${input.settingDefinition.settingKey}' value '${numericValue}' must be between ${rule.min} and ${rule.max}.`,
+      });
+    }
+  }
+
+  return Object.freeze(issues);
 }
 
 function normalizeSettingDefinition(input: DeploymentPolicySettingDefinition): DeploymentPolicySettingDefinition {
@@ -112,12 +311,29 @@ function normalizeSettingDefinition(input: DeploymentPolicySettingDefinition): D
     );
   }
 
-  return Object.freeze({
+  const valueKind = normalizeValueKind(input.valueKind, input.defaultValue, settingKey);
+  const validationRules = normalizeValidationRules(input.validationRules, valueKind, settingKey);
+
+  const normalized: DeploymentPolicySettingDefinition = Object.freeze({
     settingKey,
     description: normalizeRequired(input.description, `Deployment policy setting '${settingKey}' description`),
     controlMode: assertControlMode(input.controlMode),
     defaultValue: input.defaultValue,
+    valueKind,
+    validationRules,
   });
+
+  const defaultIssues = validateDeploymentPolicySettingValue({
+    settingDefinition: normalized,
+    value: normalized.defaultValue,
+  });
+  if (defaultIssues.length > 0) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy setting '${settingKey}' default value is invalid: ${defaultIssues[0]!.message}`,
+    );
+  }
+
+  return normalized;
 }
 
 function normalizeFamilyDefinition(input: DeploymentPolicyFamilyDefinition): DeploymentPolicyFamilyDefinition {
@@ -146,6 +362,7 @@ function normalizeFamilyDefinition(input: DeploymentPolicyFamilyDefinition): Dep
 
   return Object.freeze({
     familyId,
+    scope: normalizeFamilyScope(input.scope),
     description: normalizeRequired(input.description, `Deployment policy family '${familyId}' description`),
     settings: Object.freeze([...bySetting.values()]),
   });
@@ -183,11 +400,17 @@ function normalizeFamilySettingValues(input: {
         `Preset policy family '${input.familyId}' cannot override runtime-admin setting '${settingKey}'.`,
       );
     }
-    if (scalarType(settingDefinition.defaultValue) !== scalarType(rawValue)) {
+
+    const issues = validateDeploymentPolicySettingValue({
+      settingDefinition,
+      value: rawValue,
+    });
+    if (issues.length > 0) {
       throw new DeploymentProfilePolicyAdministrationDomainError(
-        `Policy setting '${input.familyId}.${settingKey}' expects '${scalarType(settingDefinition.defaultValue)}' values.`,
+        `Policy setting '${input.familyId}.${settingKey}' is invalid: ${issues[0]!.message}`,
       );
     }
+
     normalized[settingKey] = rawValue;
   }
 
@@ -351,6 +574,32 @@ export function resolveDeploymentPolicySettingDefinition(input: {
   return setting;
 }
 
+export function createDeploymentPolicyConfigurationRegistry(input: {
+  readonly familyCatalog: DeploymentPolicyFamilyCatalog;
+  readonly presetCatalog: DeploymentProfilePresetCatalog;
+}): DeploymentPolicyConfigurationRegistry {
+  const profileDefaults: Record<DeploymentProfileId, DeploymentProfilePolicyValues> = {
+    [DeploymentProfileIds.home]: resolveDeploymentProfilePresetPolicyValues({
+      profileId: DeploymentProfileIds.home,
+      presetCatalog: input.presetCatalog,
+    }),
+    [DeploymentProfileIds.classroom]: resolveDeploymentProfilePresetPolicyValues({
+      profileId: DeploymentProfileIds.classroom,
+      presetCatalog: input.presetCatalog,
+    }),
+    [DeploymentProfileIds.organization]: resolveDeploymentProfilePresetPolicyValues({
+      profileId: DeploymentProfileIds.organization,
+      presetCatalog: input.presetCatalog,
+    }),
+  };
+
+  return Object.freeze({
+    familyCatalog: input.familyCatalog,
+    presetCatalog: input.presetCatalog,
+    profileDefaults: Object.freeze(profileDefaults),
+  });
+}
+
 export function isDeploymentPolicyAdminOverrideAllowed(controlMode: DeploymentPolicyControlMode): boolean {
   return controlMode === DeploymentPolicyControlModes.profileDefaultAdminOverridable
     || controlMode === DeploymentPolicyControlModes.runtimeAdmin;
@@ -359,7 +608,8 @@ export function isDeploymentPolicyAdminOverrideAllowed(controlMode: DeploymentPo
 export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicyFamilyCatalog {
   return createDeploymentPolicyFamilyCatalog([
     {
-      familyId: "approval-governance",
+      familyId: DeploymentPolicyFamilyIds.approvalGovernance,
+      scope: DeploymentPolicyFamilyScopes.runSubmission,
       description: "Run and workflow approval strictness, escalation posture, and privileged action governance.",
       settings: [
         {
@@ -367,23 +617,37 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Default run-submission approval strategy for the deployment profile.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: "owner-or-admin",
+          valueKind: DeploymentPolicyValueKinds.string,
+          validationRules: [{
+            type: "enum",
+            allowedValues: ["self-or-owner", "owner-or-instructor", "owner-or-admin", "owner-with-manual-review"],
+          }],
         },
         {
           settingKey: "highRiskRunRequiresDualApproval",
           description: "Whether high-risk run classes require dual-approval workflow.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "approvalEscalationTimeoutMinutes",
           description: "Escalation timeout for unresolved approval requests.",
           controlMode: DeploymentPolicyControlModes.runtimeAdmin,
           defaultValue: 120,
+          valueKind: DeploymentPolicyValueKinds.number,
+          validationRules: [{
+            type: "number-range",
+            min: 5,
+            max: 10080,
+            integerOnly: true,
+          }],
         },
       ],
     },
     {
-      familyId: "sharing-posture",
+      familyId: DeploymentPolicyFamilyIds.sharingPosture,
+      scope: DeploymentPolicyFamilyScopes.sharing,
       description: "Default resource visibility and sharing constraints for collaborative surfaces.",
       settings: [
         {
@@ -391,23 +655,31 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Default visibility for newly published workspace resources.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: "workspace",
+          valueKind: DeploymentPolicyValueKinds.string,
+          validationRules: [{
+            type: "enum",
+            allowedValues: ["private", "workspace", "organization"],
+          }],
         },
         {
           settingKey: "publicLinkSharingAllowed",
           description: "Whether public-link sharing is allowed in the deployment profile.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: false,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "crossWorkspaceShareRequiresApproval",
           description: "Whether cross-workspace sharing requires explicit approval.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
       ],
     },
     {
-      familyId: "storage-governance",
+      familyId: DeploymentPolicyFamilyIds.storageGovernance,
+      scope: DeploymentPolicyFamilyScopes.storage,
       description: "Storage defaults, synchronization posture, and retention controls.",
       settings: [
         {
@@ -415,23 +687,37 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Default storage tier for new workspace storage allocations.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: "server-managed",
+          valueKind: DeploymentPolicyValueKinds.string,
+          validationRules: [{
+            type: "enum",
+            allowedValues: ["local-managed", "workspace-managed", "server-managed"],
+          }],
         },
         {
           settingKey: "externalSyncEnabledByDefault",
           description: "Whether external synchronization is enabled by profile default.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: false,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "retentionDaysDefault",
           description: "Default retention period for governed storage surfaces.",
           controlMode: DeploymentPolicyControlModes.runtimeAdmin,
           defaultValue: 90,
+          valueKind: DeploymentPolicyValueKinds.number,
+          validationRules: [{
+            type: "number-range",
+            min: 7,
+            max: 3650,
+            integerOnly: true,
+          }],
         },
       ],
     },
     {
-      familyId: "security-governance",
+      familyId: DeploymentPolicyFamilyIds.securityGovernance,
+      scope: DeploymentPolicyFamilyScopes.security,
       description: "Security baseline controls for transport, encryption, and credential rotation posture.",
       settings: [
         {
@@ -439,23 +725,33 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Whether encryption at rest is mandatory.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "transportTlsRequired",
           description: "Whether TLS is mandatory for non-loopback runtime transport.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "localCredentialRotationDays",
           description: "Credential rotation window used by policy reminders and checks.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: 90,
+          valueKind: DeploymentPolicyValueKinds.number,
+          validationRules: [{
+            type: "number-range",
+            min: 30,
+            max: 365,
+            integerOnly: true,
+          }],
         },
       ],
     },
     {
-      familyId: "admin-controls",
+      familyId: DeploymentPolicyFamilyIds.adminControls,
+      scope: DeploymentPolicyFamilyScopes.administration,
       description: "Administrative delegation and policy-mutation governance controls.",
       settings: [
         {
@@ -463,23 +759,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Whether delegated workspace administrators are allowed.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "policyChangeRequiresTicketReference",
           description: "Whether policy changes require external ticket/change-reference attribution.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "policyDryRunModeEnabledByDefault",
           description: "Whether dry-run mode is enabled by default in policy administration workflows.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
       ],
     },
     {
-      familyId: "audit-governance",
+      familyId: DeploymentPolicyFamilyIds.auditGovernance,
+      scope: DeploymentPolicyFamilyScopes.audit,
       description: "Audit event posture, redaction strictness, and retention administration settings.",
       settings: [
         {
@@ -487,18 +787,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
           description: "Whether governed audit-export endpoints are enabled.",
           controlMode: DeploymentPolicyControlModes.profileDefaultAdminOverridable,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "auditRedactionStrictMode",
           description: "Whether strict redaction posture is enforced in audit read-models.",
           controlMode: DeploymentPolicyControlModes.profileFixed,
           defaultValue: true,
+          valueKind: DeploymentPolicyValueKinds.boolean,
         },
         {
           settingKey: "auditRetentionDays",
           description: "Default retention period for governed audit records.",
           controlMode: DeploymentPolicyControlModes.runtimeAdmin,
           defaultValue: 365,
+          valueKind: DeploymentPolicyValueKinds.number,
+          validationRules: [{
+            type: "number-range",
+            min: 30,
+            max: 3650,
+            integerOnly: true,
+          }],
         },
       ],
     },
@@ -598,5 +907,14 @@ export function createCanonicalDeploymentProfilePresetCatalog(
         },
       },
     ],
+  });
+}
+
+export function createCanonicalDeploymentPolicyConfigurationRegistry(): DeploymentPolicyConfigurationRegistry {
+  const familyCatalog = createCanonicalDeploymentPolicyFamilyCatalog();
+  const presetCatalog = createCanonicalDeploymentProfilePresetCatalog(familyCatalog);
+  return createDeploymentPolicyConfigurationRegistry({
+    familyCatalog,
+    presetCatalog,
   });
 }

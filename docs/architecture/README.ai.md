@@ -142,6 +142,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authorization permission matrix and key catalog reference: `docs/architecture/authorization-permission-catalog.md`
 - Authorization workspace role-definition and baseline role-grant reference: `docs/architecture/authorization-role-reference.md`
 - Feature 20 shared deployment-profile policy contract/read-write/schema baseline: `docs/architecture/deployment-profile-policy-shared-contracts.md`
+- Feature 20 first-production deployment policy taxonomy + canonical configuration registry baseline: `docs/architecture/deployment-profile-policy-taxonomy-registry.md`
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
 - Authorization application-layer policy evaluation ports and adapter-boundary contracts: `docs/architecture/authorization-application-ports.md`
 - Authorization shared payload schema contracts and boundary-validation guidance: `docs/architecture/authorization-schema-validation-contracts.md`

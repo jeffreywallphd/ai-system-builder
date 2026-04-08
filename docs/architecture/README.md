@@ -244,6 +244,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For canonical authorization permission naming, resource/action matrix definitions, and permission lookup usage, read [`authorization-permission-catalog.md`](./authorization-permission-catalog.md).
 - For workspace role definitions, baseline role-to-permission mappings, and deployment profile override seams, read [`authorization-role-reference.md`](./authorization-role-reference.md).
 - For Feature 20 shared deployment-profile policy contract/read-write/schema baselines, read [`deployment-profile-policy-shared-contracts.md`](./deployment-profile-policy-shared-contracts.md).
+- For Feature 20 first-production deployment policy taxonomy, explicit setting validation rules, and canonical configuration registry relationships, read [`deployment-profile-policy-taxonomy-registry.md`](./deployment-profile-policy-taxonomy-registry.md).
 - For reusable protected-resource visibility metadata, explicit sharing targets, and resource-authorization adaptation guidance, read [`authorization-visibility-sharing-contracts.md`](./authorization-visibility-sharing-contracts.md).
 - For authorization application ports, policy evaluator seams, and adapter expectations for context loading/event recording, read [`authorization-application-ports.md`](./authorization-application-ports.md).
 - For shared authorization payload schemas, boundary validation contracts, and schema-vs-domain guidance, read [`authorization-schema-validation-contracts.md`](./authorization-schema-validation-contracts.md).
