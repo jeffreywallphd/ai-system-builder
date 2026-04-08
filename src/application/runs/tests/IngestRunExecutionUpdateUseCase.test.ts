@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type {
   PlatformAuditEventRecord,
   PlatformPersistenceMutationContext,
@@ -171,6 +172,20 @@ class InMemoryQueueRepository implements IRunOrchestrationQueuePersistenceReposi
 
   public async listDispatchAttemptsByRunId(_runId: string): Promise<ReadonlyArray<AuthoritativeRunDispatchAttemptRecord>> {
     return Object.freeze([]);
+  }
+}
+
+class CapturingAuthoritativeRunAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<any> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: input,
+    });
   }
 }
 
@@ -420,10 +435,12 @@ describe("IngestRunExecutionUpdateUseCase", () => {
     const queueRepository = new InMemoryQueueRepository();
     const intentRepository = new InMemoryOrchestrationIntentRepository();
     seedRun(runRepository);
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
     const useCase = new IngestRunExecutionUpdateUseCase({
       runRepository,
       queueRepository,
       orchestrationIntentRepository: intentRepository,
+      authoritativeAuditRecorder,
     });
 
     const result = await useCase.execute({
@@ -460,6 +477,9 @@ describe("IngestRunExecutionUpdateUseCase", () => {
     expect(result.mutation.run.finalization?.summary).toBe("Rendered 4 images.");
     expect(result.mutation.run.finalization?.outputs[0]?.assetId).toBe("asset:generated:1");
     expect(result.status.finalization?.externalResultId).toBe("result:run:1");
+    expect(authoritativeAuditRecorder.events).toHaveLength(1);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.lifecycle.transitioned");
+    expect(authoritativeAuditRecorder.events[0]?.payload?.userSafeDetails?.toState).toBe("completed");
   });
 
   it("finalizes cancelled runs with explicit terminal hints and queue release state", async () => {

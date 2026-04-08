@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import { PlatformAuditEventKinds, type PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
   runInTransactionBoundary,
@@ -30,6 +31,7 @@ import {
   type RunDispatchOutcome,
 } from "./RunDispatchResultStateTransitions";
 import type { CanonicalRunExecutionCommand, RunExecutionDispatchReceipt } from "@application/runs/ports/RunExecutionDispatchPorts";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 
 export interface HandleRunDispatchResultRequest {
   readonly command: CanonicalRunExecutionCommand;
@@ -55,6 +57,7 @@ interface HandleRunDispatchResultUseCaseDependencies {
   readonly idGenerator?: {
     nextId(prefix: string): string;
   };
+  readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
 }
 
 export const DispatchOutcomeQueueActions = Object.freeze({
@@ -274,6 +277,18 @@ export class HandleRunDispatchResultUseCase {
         );
       }
 
+      await this.appendDispatchInitiatedEvent({
+        runId,
+        workspaceId: dispatchingRun.identity.workspaceId,
+        userIdentityId: activePersistedRun.userIdentityId,
+        actorId,
+        occurredAt: dispatchStartedAt,
+        correlationId,
+        dispatchAttemptId,
+        backendKind: request.command.backend.kind,
+        fromState: currentRun.state,
+      });
+
       const activeRun = mapPlatformRunRecordToCanonicalRun(activePersistedRun);
       const requeueAfterFailedStart = shouldRequeueAfterFailedStart({
         run: activeRun,
@@ -438,6 +453,148 @@ export class HandleRunDispatchResultUseCase {
       occurredAt: input.occurredAt,
       correlationId: input.correlationId,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:lifecycle:${input.runId}:${input.dispatchAttemptId}:${input.fromState}->${input.toState}`,
+        eventType: "run-lifecycle-transitioned",
+        action: "run.lifecycle.transitioned",
+        outcome: input.toState === RunLifecycleStates.failed
+          ? AuditEventOutcomes.failed
+          : AuditEventOutcomes.succeeded,
+        occurredAt: input.occurredAt,
+        actor: Object.freeze({
+          actorId: input.actorId,
+          actorKind: input.actorId.startsWith("user:")
+            ? AuditActorKinds.user
+            : AuditActorKinds.service,
+          actorUserIdentityId: input.actorId.startsWith("user:") ? input.actorId : undefined,
+          actorServiceId: input.actorId.startsWith("user:") ? undefined : input.actorId,
+        }),
+        scope: input.workspaceId
+          ? Object.freeze({
+            kind: AuditScopeKinds.workspace,
+            workspaceId: input.workspaceId,
+          })
+          : Object.freeze({
+            kind: AuditScopeKinds.global,
+          }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.runId,
+          resourceRef: input.runId.startsWith("run:") ? input.runId : `run:${input.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            transitionKind: "dispatch-result-handled",
+            fromState: input.fromState,
+            toState: input.toState,
+            dispatchOutcome: input.outcome,
+            dispatchQueueAction: input.queueAction,
+          }),
+          adminOnlyDetails: Object.freeze({
+            dispatchAttemptId: input.dispatchAttemptId,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail dispatch handling.
+    }
+  }
+
+  private async appendDispatchInitiatedEvent(input: {
+    readonly runId: string;
+    readonly workspaceId?: string;
+    readonly userIdentityId?: string;
+    readonly actorId: string;
+    readonly occurredAt: string;
+    readonly correlationId?: string;
+    readonly dispatchAttemptId: string;
+    readonly backendKind: string;
+    readonly fromState: string;
+  }): Promise<void> {
+    const event: PlatformAuditEventRecord = Object.freeze({
+      eventId: this.idGenerator.nextId("audit"),
+      eventKind: PlatformAuditEventKinds.runs,
+      action: "run.dispatch.initiated",
+      actorId: input.actorId,
+      workspaceId: input.workspaceId,
+      userIdentityId: input.userIdentityId,
+      targetRef: `run:${input.runId}`,
+      outcome: "succeeded",
+      occurredAt: input.occurredAt,
+      correlationId: input.correlationId,
+      details: Object.freeze({
+        fromState: input.fromState,
+        toState: RunLifecycleStates.dispatching,
+        dispatchAttemptId: input.dispatchAttemptId,
+        backendKind: input.backendKind,
+      }),
+    });
+
+    await this.dependencies.orchestrationIntentRepository.appendOrchestrationIntent(event, {
+      operationKey: `run:dispatch-initiated:${input.runId}:${input.dispatchAttemptId}`,
+      actorId: input.actorId,
+      occurredAt: input.occurredAt,
+      correlationId: input.correlationId,
+    });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:dispatch-initiated:${input.runId}:${input.dispatchAttemptId}`,
+        eventType: "run-dispatch-initiated",
+        action: "run.dispatch.initiated",
+        outcome: AuditEventOutcomes.succeeded,
+        occurredAt: input.occurredAt,
+        actor: Object.freeze({
+          actorId: input.actorId,
+          actorKind: input.actorId.startsWith("user:")
+            ? AuditActorKinds.user
+            : AuditActorKinds.service,
+          actorUserIdentityId: input.actorId.startsWith("user:") ? input.actorId : undefined,
+          actorServiceId: input.actorId.startsWith("user:") ? undefined : input.actorId,
+        }),
+        scope: input.workspaceId
+          ? Object.freeze({
+            kind: AuditScopeKinds.workspace,
+            workspaceId: input.workspaceId,
+          })
+          : Object.freeze({
+            kind: AuditScopeKinds.global,
+          }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.runId,
+          resourceRef: input.runId.startsWith("run:") ? input.runId : `run:${input.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            fromState: input.fromState,
+            toState: RunLifecycleStates.dispatching,
+            backendKind: input.backendKind,
+          }),
+          adminOnlyDetails: Object.freeze({
+            dispatchAttemptId: input.dispatchAttemptId,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail dispatch handling.
+    }
   }
 }
 

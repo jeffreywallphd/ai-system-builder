@@ -51,6 +51,36 @@ This slice intentionally records structured summary metadata and omits raw poten
 - records runtime target identifiers and queue context needed for governance traceability
 - does not emit raw `parameters`, raw `metadata`, or `idempotencyKey` values in audit details
 
+## Story 4.4.3 lifecycle extension (image run orchestration)
+
+Feature 4.4 extends run audit coverage from submission-only hooks to image run lifecycle mutations executed through authoritative orchestration services.
+
+Additional canonical implementation files:
+
+- `src/application/runs/use-cases/HandleRunDispatchResultUseCase.ts`
+- `src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts`
+- `src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+
+Additional audited actions in this extension:
+
+- `run.dispatch.initiated`
+  - emitted when authoritative dispatch handling records dispatch initiation for a run attempt
+  - captures workspace/run/actor context and dispatch-attempt correlation
+- `run.lifecycle.transitioned`
+  - emitted from dispatch result handling and execution-update ingestion for lifecycle progression
+  - includes terminal completion/failure/cancelled transitions
+- `run.execution-update.ingested`
+  - emitted for non-transitioning progress/heartbeat/internal-diagnostics execution updates
+- `run.cancellation.requested`
+  - emitted for cancellation request outcomes (`cancelled`, `cancellation-requested`, `already-finalized`, `already-cancelling`, `denied`)
+
+Redaction posture for this extension:
+
+- user-safe payloads keep lifecycle states, outcome codes, and minimal transition metadata
+- admin-only payloads carry operational troubleshooting fields (for example dispatch attempt id or idempotency key) and remain recorder-sanitized by the authoritative audit service
+- raw execution payload bodies, raw prompt data, and backend-internal blobs remain excluded from run audit payloads
+
 ## Platform mapping
 
 Run submission audit adapters map application audit event types to stable orchestration actions:
@@ -77,4 +107,6 @@ All mapped events use:
 - `src/infrastructure/api/runs/tests/PlatformRunSubmissionAuditSink.test.ts`
   - application-event to platform-audit mapping and outcome semantics
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/application/runs/tests/HandleRunDispatchResultUseCase.test.ts`
+- `src/application/runs/tests/IngestRunExecutionUpdateUseCase.test.ts`
   - application-event to authoritative canonical run audit mapping

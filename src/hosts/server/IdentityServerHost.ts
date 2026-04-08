@@ -1277,6 +1277,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       runRepository: persistentPlatformServices.platformPersistenceRepository,
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      authoritativeAuditRecorder: authoritativeAuditRecorder,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       now: () => workspaceClock.now(),
     }),

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import type {
   PlatformAuditEventListQuery,
   PlatformAuditEventRecord,
@@ -239,6 +240,20 @@ class InMemoryAuditRepository implements IRunOrchestrationIntentRepository {
   }
 }
 
+class CapturingAuthoritativeRunAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<any> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: input,
+    });
+  }
+}
+
 const command = Object.freeze({
   commandId: "run-execution-command:dispatch-attempt:1",
   dispatchAttemptId: "dispatch-attempt:1",
@@ -405,10 +420,12 @@ describe("HandleRunDispatchResultUseCase", () => {
     seedAssignedRun(runRepository);
     seedDispatchAttempt(queueRepository);
 
+    const authoritativeAuditRecorder = new CapturingAuthoritativeRunAuditRecorder();
     const useCase = new HandleRunDispatchResultUseCase({
       runRepository,
       queueRepository,
       orchestrationIntentRepository: auditRepository,
+      authoritativeAuditRecorder,
       idGenerator: {
         nextId: (prefix) => `${prefix}:${auditRepository.events.size + 1}`,
       },
@@ -434,7 +451,9 @@ describe("HandleRunDispatchResultUseCase", () => {
     expect(queueRepository.attempts.get("dispatch-attempt:1")?.dispatchResult?.status).toBe("accepted");
     expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("running");
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
-    expect([...auditRepository.events.values()].length).toBe(2);
+    expect([...auditRepository.events.values()].length).toBe(3);
+    expect(authoritativeAuditRecorder.events.map((entry) => entry.action)).toContain("run.dispatch.initiated");
+    expect(authoritativeAuditRecorder.events.map((entry) => entry.action)).toContain("run.lifecycle.transitioned");
   });
 
   it("transitions run to failed for dispatch failures and stores user-safe/internal failure reasons", async () => {
@@ -477,7 +496,7 @@ describe("HandleRunDispatchResultUseCase", () => {
       .toContain("Socket connection timeout");
     expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("failed");
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
-    expect([...auditRepository.events.values()].length).toBe(2);
+    expect([...auditRepository.events.values()].length).toBe(3);
   });
 
   it("requeues retryable failed-to-start dispatch outcomes when retry budget remains", async () => {
@@ -517,6 +536,6 @@ describe("HandleRunDispatchResultUseCase", () => {
     expect(queueRepository.queue.get("run-1")?.lifecycleState).toBe("queued");
     expect(queueRepository.queue.get("run-1")?.assignmentNodeId).toBeUndefined();
     expect(queueRepository.queue.get("run-1")?.claimToken).toBeUndefined();
-    expect([...auditRepository.events.values()].length).toBe(2);
+    expect([...auditRepository.events.values()].length).toBe(3);
   });
 });
