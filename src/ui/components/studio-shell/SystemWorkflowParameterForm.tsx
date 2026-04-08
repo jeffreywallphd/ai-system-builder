@@ -4,7 +4,7 @@ import type {
 } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { ImageWorkflowParameterSpecification } from "@domain/image-workflows/ImageWorkflowParameterSpecification";
 import type { WorkflowParameterValidationPresentation } from "./SystemWorkflowParameterFormPresenter";
-import { isWorkflowParameterVisible } from "./SystemWorkflowParameterFormPresenter";
+import { groupWorkflowParameterSections, isWorkflowParameterVisible } from "./SystemWorkflowParameterFormPresenter";
 
 export interface SystemWorkflowParameterFormProps {
   readonly workflow: StudioImageWorkflowDefinitionReadModel;
@@ -116,21 +116,16 @@ export default function SystemWorkflowParameterForm({
   onValueChanged,
   onSaveRequested,
 }: SystemWorkflowParameterFormProps): JSX.Element {
-  const orderedParameters = [...workflow.parameterSpecifications].sort((left, right) => {
-    const leftOrder = left.ui.order ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder = right.ui.order ?? Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-    return left.parameterId.localeCompare(right.parameterId);
-  });
+  const sections = groupWorkflowParameterSections(workflow);
+  const coreSections = sections.filter((section) => !section.advanced);
+  const advancedSections = sections.filter((section) => section.advanced);
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-workflow-parameter-form">
       <div className="ui-stack ui-stack--2xs">
         <strong>Operation settings</strong>
         <span className="ui-text-small ui-text-secondary">
-          Tune your workflow behavior using guided controls.
+          Tune this edit configuration with typed controls, required guidance, and saved defaults from the selected workflow.
         </span>
       </div>
       {validation.globalIssues.length > 0 ? (
@@ -142,43 +137,103 @@ export default function SystemWorkflowParameterForm({
           ))}
         </div>
       ) : null}
-      <div className="ui-form-grid">
-        {orderedParameters.map((specification) => {
-          if (specification.ui.control === "hidden") {
-            return null;
-          }
-          const isVisible = isWorkflowParameterVisible(specification, values);
-          const issues = validation.issuesByParameterId.get(specification.parameterId) ?? [];
-          return (
-            <label key={specification.parameterId} className="ui-field">
-              <span className="ui-field__label">
-                {specification.label}
-                {specification.required ? " *" : ""}
-              </span>
-              {renderParameterControl({
-                specification,
-                value: values[specification.parameterId],
-                disabled: busy || !isVisible,
-                onValueChanged: (value) => onValueChanged(specification.parameterId, value),
-              })}
-              {specification.ui.helpText ? (
-                <span className="ui-text-small ui-text-secondary">{specification.ui.helpText}</span>
-              ) : null}
-              {specification.description ? (
-                <span className="ui-text-small ui-text-secondary">{specification.description}</span>
-              ) : null}
-              {!isVisible ? (
-                <span className="ui-text-small ui-text-secondary">This setting becomes available when related options are set.</span>
-              ) : null}
-              {issues.map((issue, index) => (
-                <span key={`${specification.parameterId}-${issue.code}-${index}`} className="ui-text-small ui-text-danger">
-                  {issue.message}
-                </span>
-              ))}
-            </label>
-          );
-        })}
-      </div>
+      {coreSections.map((section) => (
+        <section key={section.sectionId} className="ui-stack ui-stack--xs">
+          <strong>{section.title}</strong>
+          <div className="ui-form-grid">
+            {section.parameters.map((specification) => {
+              if (specification.ui.control === "hidden") {
+                return null;
+              }
+              const isVisible = isWorkflowParameterVisible(specification, values);
+              const issues = validation.issuesByParameterId.get(specification.parameterId) ?? [];
+              const defaultValue = workflow.parameterDefaults?.[specification.parameterId] ?? specification.defaultValue;
+              return (
+                <label key={specification.parameterId} className="ui-field">
+                  <span className="ui-field__label">
+                    {specification.label}
+                    {specification.required ? " *" : ""}
+                  </span>
+                  {renderParameterControl({
+                    specification,
+                    value: values[specification.parameterId],
+                    disabled: busy || !isVisible,
+                    onValueChanged: (value) => onValueChanged(specification.parameterId, value),
+                  })}
+                  {specification.ui.helpText ? (
+                    <span className="ui-text-small ui-text-secondary">{specification.ui.helpText}</span>
+                  ) : null}
+                  {specification.description ? (
+                    <span className="ui-text-small ui-text-secondary">{specification.description}</span>
+                  ) : null}
+                  {defaultValue !== undefined ? (
+                    <span className="ui-text-small ui-text-secondary">Default: {String(defaultValue)}</span>
+                  ) : null}
+                  {!isVisible ? (
+                    <span className="ui-text-small ui-text-secondary">This setting becomes available when related options are set.</span>
+                  ) : null}
+                  {issues.map((issue, index) => (
+                    <span key={`${specification.parameterId}-${issue.code}-${index}`} className="ui-text-small ui-text-danger">
+                      {issue.message}
+                    </span>
+                  ))}
+                </label>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      {advancedSections.length > 0 ? (
+        <details className="ui-stack ui-stack--xs">
+          <summary className="ui-text-small ui-text-secondary">Advanced options</summary>
+          {advancedSections.map((section) => (
+            <section key={section.sectionId} className="ui-stack ui-stack--xs">
+              <strong>{section.title}</strong>
+              <div className="ui-form-grid">
+                {section.parameters.map((specification) => {
+                  if (specification.ui.control === "hidden") {
+                    return null;
+                  }
+                  const isVisible = isWorkflowParameterVisible(specification, values);
+                  const issues = validation.issuesByParameterId.get(specification.parameterId) ?? [];
+                  const defaultValue = workflow.parameterDefaults?.[specification.parameterId] ?? specification.defaultValue;
+                  return (
+                    <label key={specification.parameterId} className="ui-field">
+                      <span className="ui-field__label">
+                        {specification.label}
+                        {specification.required ? " *" : ""}
+                      </span>
+                      {renderParameterControl({
+                        specification,
+                        value: values[specification.parameterId],
+                        disabled: busy || !isVisible,
+                        onValueChanged: (value) => onValueChanged(specification.parameterId, value),
+                      })}
+                      {specification.ui.helpText ? (
+                        <span className="ui-text-small ui-text-secondary">{specification.ui.helpText}</span>
+                      ) : null}
+                      {specification.description ? (
+                        <span className="ui-text-small ui-text-secondary">{specification.description}</span>
+                      ) : null}
+                      {defaultValue !== undefined ? (
+                        <span className="ui-text-small ui-text-secondary">Default: {String(defaultValue)}</span>
+                      ) : null}
+                      {!isVisible ? (
+                        <span className="ui-text-small ui-text-secondary">This setting becomes available when related options are set.</span>
+                      ) : null}
+                      {issues.map((issue, index) => (
+                        <span key={`${specification.parameterId}-${issue.code}-${index}`} className="ui-text-small ui-text-danger">
+                          {issue.message}
+                        </span>
+                      ))}
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </details>
+      ) : null}
       <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
         <button
           type="button"

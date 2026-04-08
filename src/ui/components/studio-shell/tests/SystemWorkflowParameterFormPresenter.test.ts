@@ -1,7 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { StudioImageWorkflowDefinitionReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import {
+  createWorkflowParameterBaselineValues,
   createWorkflowParameterInitialValues,
+  groupWorkflowParameterSections,
   isWorkflowParameterVisible,
   validateWorkflowParameterValues,
 } from "../SystemWorkflowParameterFormPresenter";
@@ -68,6 +70,27 @@ function createWorkflow(): StudioImageWorkflowDefinitionReadModel {
           operator: "exists",
         }]),
       }),
+    }, {
+      parameterId: "seed",
+      label: "Seed",
+      valueKind: "integer",
+      semanticMeaning: "seed",
+      required: false,
+      defaultValue: 0,
+      sensitivity: "normal",
+      validation: Object.freeze({
+        minimum: 0,
+        maximum: 2147483647,
+        step: 1,
+        options: Object.freeze([]),
+        acceptedAssetKinds: Object.freeze([]),
+      }),
+      ui: Object.freeze({
+        control: "number-input",
+        order: 20,
+        group: "advanced generation",
+        advanced: true,
+      }),
     }]),
     minimumRequirements: Object.freeze({
       inputKinds: Object.freeze(["source-image"]),
@@ -107,5 +130,28 @@ describe("SystemWorkflowParameterFormPresenter", () => {
     expect(validation.hasIssues).toBeTrue();
     expect((validation.issuesByParameterId.get("prompt") ?? []).length).toBeGreaterThan(0);
     expect((validation.issuesByParameterId.get("variationStrength") ?? []).length).toBeGreaterThan(0);
+  });
+
+  it("groups sections for progressive disclosure", () => {
+    const sections = groupWorkflowParameterSections(createWorkflow());
+    expect(sections[0]?.sectionId).toBe("general");
+    expect(sections[0]?.advanced).toBeFalse();
+    expect(sections[1]?.sectionId).toBe("advanced-generation");
+    expect(sections[1]?.advanced).toBeTrue();
+  });
+
+  it("builds a baseline map with only workflow-declared parameter ids", () => {
+    const workflow = createWorkflow();
+    const baseline = createWorkflowParameterBaselineValues({
+      workflow,
+      values: Object.freeze({
+        prompt: "hello world",
+        variationStrength: 0.4,
+        unknownKey: "ignored",
+      } as never),
+    });
+    expect(Object.prototype.hasOwnProperty.call(baseline, "unknownKey")).toBeFalse();
+    expect(baseline.prompt).toBe("hello world");
+    expect(baseline.seed).toBe(0);
   });
 });

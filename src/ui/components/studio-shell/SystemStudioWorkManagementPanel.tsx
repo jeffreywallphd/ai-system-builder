@@ -10,6 +10,7 @@ import { StudioShellService } from "../../services/StudioShellService";
 import SystemWorkflowParameterForm from "./SystemWorkflowParameterForm";
 import {
   coerceWorkflowParameterInputValue,
+  createWorkflowParameterBaselineValues,
   createWorkflowParameterInitialValues,
   validateWorkflowParameterValues,
 } from "./SystemWorkflowParameterFormPresenter";
@@ -86,6 +87,9 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const [workflowLoadError, setWorkflowLoadError] = useState<string>();
   const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(false);
   const [workflowParameterValues, setWorkflowParameterValues] = useState<Readonly<Record<string, unknown>>>(Object.freeze({}));
+  const [workflowParameterValuesByWorkflowId, setWorkflowParameterValuesByWorkflowId] = useState<
+    Readonly<Record<string, Readonly<Record<string, unknown>>>
+  >(defaults.workflowParameterValuesByWorkflowId ?? Object.freeze({}));
   const [workflowParameterStatus, setWorkflowParameterStatus] = useState<string>();
   const [savedSystems, setSavedSystems] = useState<ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>>([]);
   const [selectedSavedSystemId, setSelectedSavedSystemId] = useState(defaults.imageSystemDefinitionId ?? "");
@@ -109,6 +113,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     setDatasetVersionId(defaults.datasetVersionId ?? "");
     setSelectedSavedSystemId(defaults.imageSystemDefinitionId ?? "");
     setRenameDraftTitle(draft?.metadata.title ?? "");
+    setWorkflowParameterValuesByWorkflowId(defaults.workflowParameterValuesByWorkflowId ?? Object.freeze({}));
     setWorkflowParameterStatus(undefined);
   }, [
     defaults.imageSystemDefinitionId,
@@ -194,7 +199,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       }
       setSelectedWorkflowDetail(response.data);
       setWorkflowVersionId(response.data.version.versionTag);
-      const savedValues = defaults.workflowParameterValuesByWorkflowId?.[response.data.workflowId];
+      const savedValues = workflowParameterValuesByWorkflowId[response.data.workflowId];
       setWorkflowParameterValues(createWorkflowParameterInitialValues({
         workflow: response.data,
         existingValues: savedValues,
@@ -208,7 +213,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     return () => {
       disposed = true;
     };
-  }, [defaults.workflowParameterValuesByWorkflowId, draft?.draftId, workflowAssetId, workflowPickerAvailable]);
+  }, [draft?.draftId, workflowAssetId, workflowParameterValuesByWorkflowId, workflowPickerAvailable]);
 
   useEffect(() => {
     const listImageSystemDefinitions = context.operations.listImageSystemDefinitions;
@@ -337,9 +342,13 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               setStatus("Resolve operation setting issues before saving as new.");
               return;
             }
+            const baselineValues = createWorkflowParameterBaselineValues({
+              workflow: selectedWorkflowDetail,
+              values: workflowParameterValues,
+            });
             const nextWorkflowValues = {
-              ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
-              [selectedWorkflowDetail.workflowId]: workflowParameterValues,
+              ...workflowParameterValuesByWorkflowId,
+              [selectedWorkflowDetail.workflowId]: baselineValues,
             };
             void service.modifySystemDefinition({
               studioId: context.studioId,
@@ -374,6 +383,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   return;
                 }
                 setSelectedSavedSystemId(saveResponse.data.systemId);
+                setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
                 setStatus("Saved as new image system.");
                 void context.operations.refresh();
               });
@@ -409,7 +419,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               setSelectedSavedSystemId(reopened.systemId);
 
               const nextWorkflowValues = {
-                ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
+                ...workflowParameterValuesByWorkflowId,
                 [reopened.workflowId]: reopened.parameterBaseline,
               };
               void service.modifySystemDefinition({
@@ -430,6 +440,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   setStatus("Reopened system, but could not fully apply state to this draft.");
                   return;
                 }
+                setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
                 setStatus(`Reopened '${reopened.title}' (${reopened.readinessSummary}).`);
                 void context.operations.refresh();
               });
@@ -454,9 +465,13 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               setStatus("Resolve operation setting issues before updating.");
               return;
             }
+            const baselineValues = createWorkflowParameterBaselineValues({
+              workflow: selectedWorkflowDetail,
+              values: workflowParameterValues,
+            });
             const nextWorkflowValues = {
-              ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
-              [selectedWorkflowDetail.workflowId]: workflowParameterValues,
+              ...workflowParameterValuesByWorkflowId,
+              [selectedWorkflowDetail.workflowId]: baselineValues,
             };
             void service.modifySystemDefinition({
               studioId: context.studioId,
@@ -493,6 +508,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   return;
                 }
                 setSelectedSavedSystemId(updateResponse.data.systemId);
+                setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
                 setStatus("Updated saved image system.");
                 void context.operations.refresh();
               });
@@ -506,7 +522,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       <div className="ui-stack ui-stack--xs" data-testid="system-studio-saved-systems">
         <strong>Saved image systems</strong>
         <label className="ui-field">
-          <span className="ui-field__label">Reopen saved work</span>
+          <span className="ui-field__label">Reopen saved configuration</span>
           <select
             className="ui-select"
             value={selectedSavedSystemId}
@@ -685,22 +701,27 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                 setWorkflowParameterStatus("Some settings still need attention before saving.");
                 return;
               }
-              const currentSavedByWorkflow = defaults.workflowParameterValuesByWorkflowId ?? {};
+              const baselineValues = createWorkflowParameterBaselineValues({
+                workflow: selectedWorkflowDetail,
+                values: workflowParameterValues,
+              });
+              const nextWorkflowValues = {
+                ...workflowParameterValuesByWorkflowId,
+                [selectedWorkflowDetail.workflowId]: baselineValues,
+              };
               void service.modifySystemDefinition({
                 studioId: context.studioId,
                 sessionId,
                 draftId: draft.draftId,
                 runtimeStatePatch: {
-                  imageWorkflowParameterValuesByWorkflowId: {
-                    ...currentSavedByWorkflow,
-                    [selectedWorkflowDetail.workflowId]: workflowParameterValues,
-                  },
+                  imageWorkflowParameterValuesByWorkflowId: nextWorkflowValues,
                 },
               }).then((response) => {
                 if (!response.ok) {
                   setWorkflowParameterStatus("Could not save operation settings.");
                   return;
                 }
+                setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
                 setWorkflowParameterStatus("Operation settings saved.");
                 void context.operations.refresh();
               });

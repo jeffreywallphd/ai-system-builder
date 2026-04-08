@@ -57,6 +57,27 @@ function createWorkflow(): StudioImageWorkflowDefinitionReadModel {
         order: 1,
         helpText: "Keep enabled for targeted edits.",
       }),
+    }, {
+      parameterId: "seed",
+      label: "Seed override",
+      valueKind: "integer",
+      semanticMeaning: "seed",
+      required: false,
+      defaultValue: 0,
+      sensitivity: "normal",
+      validation: Object.freeze({
+        minimum: 0,
+        maximum: 2147483647,
+        step: 1,
+        options: Object.freeze([]),
+        acceptedAssetKinds: Object.freeze([]),
+      }),
+      ui: Object.freeze({
+        control: "number-input",
+        group: "advanced generation",
+        order: 2,
+        advanced: true,
+      }),
     }]),
     minimumRequirements: Object.freeze({
       inputKinds: Object.freeze(["source-image", "mask-image"]),
@@ -93,8 +114,12 @@ describe("SystemWorkflowParameterForm", () => {
     );
 
     expect(html).toContain("Operation settings");
+    expect(html).toContain("Core settings");
     expect(html).toContain("Masked edit direction");
     expect(html).toContain("Protect unmasked areas");
+    expect(html).toContain("Default: Retouch the masked area only.");
+    expect(html).toContain("Advanced options");
+    expect(html).toContain("Seed override");
     expect(html).toContain("Save operation settings");
     expect(html).toContain("Prompt must be at least 5 characters.");
   });

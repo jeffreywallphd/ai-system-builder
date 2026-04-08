@@ -241,3 +241,29 @@ UX-language and advanced-detail posture:
 - Technical metadata (workflow IDs, operation kind, version tags) remains available only under explicit advanced details.
 - Parameter defaults and configuration continue to hydrate from authoritative workflow definition metadata after selection/reopen.
 
+## Epic 7.2 Story 7.2.3: Typed settings editor and saveable configuration UX
+
+Story 7.2.3 hardens the "Adjust settings" phase into a typed, saveable, and reopen-safe configuration experience for image manipulation systems.
+
+Implemented seams:
+
+- `src/ui/components/studio-shell/SystemWorkflowParameterForm.tsx`
+- `src/ui/components/studio-shell/SystemWorkflowParameterFormPresenter.ts`
+- `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterForm.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterFormPresenter.test.ts`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+
+Settings UX behavior:
+
+- Parameter controls are rendered from authoritative workflow parameter specifications (typed value kinds, validation bounds, options, defaults, required flags).
+- Settings are grouped by section metadata (`ui.group`) and advanced groups are progressively disclosed (`ui.advanced`) instead of always-on technical clutter.
+- Required indicators, help text, descriptions, and inline validation feedback are displayed in-place; default values are surfaced to reduce guesswork.
+- Validation and persisted baseline shaping are constrained to declared workflow parameters so unsupported ad hoc keys are not treated as canonical configuration.
+
+Save/reopen behavior:
+
+- Save-as-new, update-existing, and reopen all update one canonical in-panel map of workflow parameter baselines keyed by workflow id.
+- Draft runtime patches and image-system save/update calls reuse that same map, preventing stale draft-content snapshots from becoming a second configuration truth source.
+- Reopen applies authoritative saved system workflow/version/parameter baselines and then synchronizes the active draft through the same authoritative mutation seam (`modifySystemDefinition`).
+
