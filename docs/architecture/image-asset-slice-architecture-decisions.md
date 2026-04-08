@@ -106,6 +106,12 @@ Story 1.3.3 extension:
 - initial preview behavior uses original-as-preview fallback where appropriate, and emits `pending-generation`/`unavailable` statuses for future derivation without API breakage
 - server routing now includes `GET /api/v1/image-assets/:assetId/preview` and `GET /api/v1/image-assets/:assetId/preview/content`
 
+Story 1.3.5 extension:
+
+- identity HTTP integration coverage now exercises production-style create/upload/finalize/get/list/original/preview image-asset flows backed by authoritative metadata persistence and managed storage adapters
+- regression assertions verify authorization enforcement across unauthorized actors and confirm API responses do not leak raw storage object-key/path internals
+- integration assertions verify image-asset audit hooks are emitted for successful and rejected protected-content access paths
+
 ## Decision 6: preview-safe access and generated outputs are first-class
 
 The architecture treats preview and generated outputs as normal protected asset flows:
