@@ -23,6 +23,7 @@ import {
   type ImageAssetRepositoryMutationContext,
   type ImageAssetRepositoryMutationResult,
   type IImageAssetRepository,
+  type ImageAssetStoredObjectReference,
   type ImageAssetStorageAccessHandleClaims,
   type ImageAssetStorageObjectReference,
   type ReserveImageAssetStorageLocationRequest,
@@ -63,6 +64,8 @@ function createTestImageAsset(input?: {
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   private readonly assets = new Map<string, ImageAsset>();
 
+  private readonly originalReferences = new Map<string, ImageAssetStoredObjectReference>();
+
   async findImageAssetById(assetId: string, options?: { readonly includeDeleted?: boolean }): Promise<ImageAsset | undefined> {
     const asset = this.assets.get(assetId.trim());
     if (!asset) {
@@ -100,6 +103,17 @@ class InMemoryImageAssetRepository implements IImageAssetRepository {
       wasReplay: false,
       imageAsset,
     };
+  }
+
+  async setImageAssetOriginalObjectReference(
+    assetId: string,
+    reference: ImageAssetStoredObjectReference,
+  ): Promise<void> {
+    this.originalReferences.set(assetId, reference);
+  }
+
+  async getImageAssetOriginalObjectReference(assetId: string): Promise<ImageAssetStoredObjectReference | undefined> {
+    return this.originalReferences.get(assetId);
   }
 
   async archiveImageAsset(
@@ -254,6 +268,14 @@ describe("image-assets application ports contracts", () => {
       actorUserId: "user-alpha",
     });
     expect(created.imageAsset.assetId).toBe("image-asset-1");
+
+    await repository.setImageAssetOriginalObjectReference("image-asset-1", {
+      storageInstanceId: "storage-alpha",
+      objectKey: "workspaces/workspace-alpha/image-assets/image-asset-1/original/source.png",
+      objectVersionId: "v1",
+    });
+    const originalReference = await repository.getImageAssetOriginalObjectReference("image-asset-1");
+    expect(originalReference?.objectKey).toContain("/original/");
 
     const listed = await repository.listImageAssets({
       workspaceId: "workspace-alpha",

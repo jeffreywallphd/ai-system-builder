@@ -33,7 +33,7 @@
 - `security-*` -> `/api/v1/security/certificates/*`, `/api/v1/security/secrets/*` (authenticated, trusted-session for high-assurance operations)
 - `storage-management` -> `/api/v1/storage/*` (authenticated + workspace policy enforcement)
 - `asset-management` -> `/api/v1/assets/*` (authenticated + workspace/visibility checks)
-- `image-asset-management` -> `/api/v1/image-assets*` (authenticated + workspace-scoped ingestion and metadata access)
+- `image-asset-management` -> `/api/v1/image-assets*` (authenticated + workspace-scoped ingestion, metadata, and protected original-content retrieval; no direct public file-url bypasses)
 - `system-runtime` -> `/api/v1/runtime/*` + `/ws` realtime (authenticated + workspace/topic policy checks)
 
 ## Runtime realtime contracts

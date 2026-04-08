@@ -134,6 +134,7 @@ import {
   type ImageAssetManagementApiResponse,
   type IngestImageAssetUploadContentApiRequest,
   type ListImageAssetMetadataApiRequest,
+  type OpenImageAssetOriginalContentStreamApiRequest,
 } from "../../../api/image-assets/sdk/PublicImageAssetManagementApiContract";
 import {
   RuntimeQueueItemStatuses,
@@ -4046,6 +4047,90 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapImageAssetManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/image-assets/")
+        && path.endsWith("/original")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const assetId = decodePathTail(path, "/api/v1/image-assets/", "/original");
+            if (!assetId || assetId.includes("/")) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const streamRequest: OpenImageAssetOriginalContentStreamApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              assetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.imageAssetManagementBackendApi.openImageAssetOriginalContentStream(streamRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            if (!apiResponse.ok || !apiResponse.data) {
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+              return;
+            }
+
+            const contentDisposition = buildContentDispositionHeader(
+              apiResponse.data.contentDisposition,
+              apiResponse.data.contentDispositionFileName,
+            );
+            response.statusCode = 200;
+            response.setHeader("content-type", apiResponse.data.mimeType);
+            response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+            response.setHeader("content-disposition", contentDisposition);
+            response.setHeader("x-content-type-options", "nosniff");
+            response.setHeader("cache-control", "private, no-store");
+
+            try {
+              for await (const chunk of apiResponse.data.stream) {
+                const encoded = Buffer.from(chunk);
+                if (!response.write(encoded)) {
+                  await once(response, "drain");
+                }
+              }
+              response.end();
+              logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
+                ok: true,
+                data: Object.freeze({
+                  assetId: apiResponse.data.assetId,
+                  workspaceId: apiResponse.data.workspaceId,
+                  mimeType: apiResponse.data.mimeType,
+                  sizeBytes: apiResponse.data.sizeBytes,
+                }),
+              }));
+            } catch (error) {
+              if (!response.headersSent) {
+                const failed = buildImageAssetManagementInternalErrorResponse(
+                  "Image asset original-content stream could not be completed.",
+                );
+                writeJson(response, 500, failed);
+                logResponse(logger, requestId, request, 500, streamRequest, failed);
+                return;
+              }
+              response.destroy(error instanceof Error ? error : undefined);
+            }
           },
         );
         return;
@@ -12294,6 +12379,16 @@ function buildAssetManagementInternalErrorResponse(message: string): AssetManage
     ok: false,
     error: {
       code: AssetManagementApiErrorCodes.internal,
+      message,
+    },
+  });
+}
+
+function buildImageAssetManagementInternalErrorResponse(message: string): ImageAssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ImageAssetManagementApiErrorCodes.internal,
       message,
     },
   });

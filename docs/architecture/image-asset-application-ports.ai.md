@@ -14,6 +14,8 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/FinalizeImageAssetUploadUseCase.ts`
 - `src/application/image-assets/use-cases/GetImageAssetMetadataUseCase.ts`
+- `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/ListImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
@@ -22,6 +24,7 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
+- `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
@@ -171,3 +174,16 @@ Query and response posture:
 - pagination scaffolding (`limit`, `offset`, `returned`, `hasMore`) is returned for UI pickers/browsers
 - responses are based on authoritative metadata repository records; no filesystem scanning or path inspection
 - metadata projections include logical availability flags (`isReadyForUse`, `isPreviewable`, `isDownloadable`) without exposing physical storage structure
+
+## Story 1.3.2 implementation scope
+
+Protected original-content retrieval is now implemented through authoritative application and API boundaries:
+
+- Added `GetImageAssetOriginalContentUseCase` + typed contracts for mediated original-content reads.
+- Authorization and scope checks execute before any storage read access:
+  - active workspace membership required
+  - policy evaluation uses image-asset `download-original` authorization action
+  - denied private reads stay non-leaky (`not-found` style)
+- Retrieval opens content only through `IImageAssetStoragePort.openReadStream` with `purpose=download-original` and logical storage references.
+- Upload finalization now persists authoritative original-object pointers (`latest_object_key`, `latest_object_version_id`) through repository seams so later reads do not rely on path reconstruction shortcuts.
+- HTTP/API transport now streams original bytes through protected server routes with safe content headers and private/no-store cache semantics, without exposing raw filesystem paths or direct storage URLs.

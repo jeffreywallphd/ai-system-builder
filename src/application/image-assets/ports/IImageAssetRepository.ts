@@ -40,6 +40,12 @@ export interface ImageAssetRepositoryMutationResult {
   readonly imageAsset: ImageAsset;
 }
 
+export interface ImageAssetStoredObjectReference {
+  readonly storageInstanceId: string;
+  readonly objectKey: string;
+  readonly objectVersionId?: string;
+}
+
 export interface IImageAssetRepository {
   findImageAssetById(
     assetId: string,
@@ -56,6 +62,11 @@ export interface IImageAssetRepository {
     imageAsset: ImageAsset,
     mutation: ImageAssetRepositoryMutationContext,
   ): Promise<ImageAssetRepositoryMutationResult>;
+  setImageAssetOriginalObjectReference(
+    assetId: string,
+    reference: ImageAssetStoredObjectReference,
+  ): Promise<void>;
+  getImageAssetOriginalObjectReference(assetId: string): Promise<ImageAssetStoredObjectReference | undefined>;
   archiveImageAsset(
     assetId: string,
     mutation: ImageAssetRepositoryMutationContext,

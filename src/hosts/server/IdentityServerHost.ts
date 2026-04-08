@@ -122,6 +122,7 @@ import { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewS
 import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
 import { FinalizeImageAssetUploadUseCase } from "@application/image-assets/use-cases/FinalizeImageAssetUploadUseCase";
 import { GetImageAssetMetadataUseCase } from "@application/image-assets/use-cases/GetImageAssetMetadataUseCase";
+import { GetImageAssetOriginalContentUseCase } from "@application/image-assets/use-cases/GetImageAssetOriginalContentUseCase";
 import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/InitiateImageAssetCreationUseCase";
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
@@ -1063,6 +1064,12 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     listImageAssetMetadataUseCase: new ListImageAssetMetadataUseCase({
       imageAssetRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    getImageAssetOriginalContentUseCase: new GetImageAssetOriginalContentUseCase({
+      imageAssetRepository,
+      imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
     }),

@@ -29,6 +29,7 @@ import type {
   ImageAssetRepositoryListQuery,
   ImageAssetRepositoryMutationContext,
   ImageAssetRepositoryMutationResult,
+  ImageAssetStoredObjectReference,
 } from "../ports/IImageAssetRepository";
 import {
   ImageAssetStorageObjectAreas,
@@ -42,6 +43,8 @@ import {
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly records = new Map<string, ImageAsset>();
+
+  public readonly originalReferences = new Map<string, ImageAssetStoredObjectReference>();
 
   async findImageAssetById(assetId: string): Promise<ImageAsset | undefined> {
     return this.records.get(assetId.trim());
@@ -76,6 +79,17 @@ class InMemoryImageAssetRepository implements IImageAssetRepository {
       wasReplay: false,
       imageAsset,
     };
+  }
+
+  async setImageAssetOriginalObjectReference(
+    assetId: string,
+    reference: ImageAssetStoredObjectReference,
+  ): Promise<void> {
+    this.originalReferences.set(assetId, reference);
+  }
+
+  async getImageAssetOriginalObjectReference(assetId: string): Promise<ImageAssetStoredObjectReference | undefined> {
+    return this.originalReferences.get(assetId);
   }
 
   async archiveImageAsset(

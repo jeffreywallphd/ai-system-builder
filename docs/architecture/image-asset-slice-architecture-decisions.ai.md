@@ -32,8 +32,14 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 ## Current implementation posture (April 8, 2026)
 
 - Domain invariants, shared DTO/schema contracts, authorization contracts, application ports, concrete SQLite metadata persistence, a concrete managed image-binary storage adapter, upload finalization lifecycle orchestration, and policy-enforced metadata read/list use cases are implemented.
-- Authoritative server API wiring now includes image-asset ingestion and metadata endpoints for create, upload-content ingest, upload completion, metadata detail, and metadata listing.
+- Authoritative server API wiring now includes image-asset ingestion/metadata endpoints plus protected original-content retrieval (`GET /api/v1/image-assets/:assetId/original`).
 - Image-asset transport handlers remain thin and delegate to application-layer image use cases through `ImageAssetManagementBackendApi` and host composition.
+
+Story 1.3.2 addition:
+
+- Dedicated original-content retrieval use case (`GetImageAssetOriginalContentUseCase`) now mediates server-side content access.
+- Authorization checks execute before storage stream reads.
+- Finalization now persists authoritative original object references for later managed retrieval without exposing raw filesystem/object-layout details.
 
 ## Extension guardrails
 
@@ -52,6 +58,7 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
+- `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`

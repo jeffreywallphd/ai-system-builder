@@ -202,12 +202,14 @@ Authoritative policy expectations:
   - `POST /api/v1/image-assets`
   - `POST /api/v1/image-assets/:assetId/uploads/:uploadSessionId/content`
   - `POST /api/v1/image-assets/:assetId/uploads/:uploadSessionId/complete`
+- protected content retrieval:
+  - `GET /api/v1/image-assets/:assetId/original`
 
 Authoritative policy expectations:
 
 - bearer session required
 - workspace scope required (`workspaceId`)
-- transport handlers delegate to image application use cases via `ImageAssetManagementBackendApi`; no raw storage path exposure in response DTOs
+- transport handlers delegate to image application use cases via `ImageAssetManagementBackendApi`; no raw storage path exposure in response DTOs and no direct public file URL bypasses for original-image retrieval
 
 ### Runtime control and realtime (`/api/v1/runtime/*`, `/ws`)
 

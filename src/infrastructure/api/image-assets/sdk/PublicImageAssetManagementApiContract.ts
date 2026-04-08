@@ -154,3 +154,21 @@ export interface ListImageAssetMetadataApiResponse {
     readonly hasMore: boolean;
   };
 }
+
+export interface OpenImageAssetOriginalContentStreamApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface OpenImageAssetOriginalContentStreamApiResponse {
+  readonly assetId: string;
+  readonly workspaceId: string;
+  readonly mimeType: ImageAssetDetailDto["mediaType"];
+  readonly sizeBytes: number;
+  readonly contentDisposition: "attachment";
+  readonly contentDispositionFileName: string;
+  readonly stream: AsyncIterable<Uint8Array>;
+}

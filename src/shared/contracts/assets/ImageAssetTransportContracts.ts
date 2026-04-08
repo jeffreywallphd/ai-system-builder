@@ -31,6 +31,7 @@ export const ImageAssetTransportRoutes = Object.freeze({
   completeUpload: "/api/v1/image-assets/:assetId/uploads/:uploadSessionId/complete",
   requestPreview: "/api/v1/image-assets/:assetId/preview",
   requestAccess: "/api/v1/image-assets/:assetId/access",
+  getOriginalContent: "/api/v1/image-assets/:assetId/original",
   listEvents: "/api/v1/image-assets/events",
 } as const);
 
@@ -266,4 +267,11 @@ export function buildImageAssetAccessPath(params: {
 }): string {
   const assetId = encodeURIComponent(normalizeRequired(params.assetId, "assetId"));
   return ImageAssetTransportRoutes.requestAccess.replace(":assetId", assetId);
+}
+
+export function buildImageAssetOriginalContentPath(params: {
+  readonly assetId: string;
+}): string {
+  const assetId = encodeURIComponent(normalizeRequired(params.assetId, "assetId"));
+  return ImageAssetTransportRoutes.getOriginalContent.replace(":assetId", assetId);
 }

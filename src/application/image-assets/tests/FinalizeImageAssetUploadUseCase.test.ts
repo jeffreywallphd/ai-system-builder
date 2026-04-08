@@ -17,6 +17,7 @@ import type {
   ImageAssetRepositoryListQuery,
   ImageAssetRepositoryMutationContext,
   ImageAssetRepositoryMutationResult,
+  ImageAssetStoredObjectReference,
 } from "../ports/IImageAssetRepository";
 import {
   ImageAssetStorageAccessPurposes,
@@ -32,6 +33,8 @@ import {
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly records = new Map<string, ImageAsset>();
+
+  public readonly originalReferences = new Map<string, ImageAssetStoredObjectReference>();
 
   async findImageAssetById(assetId: string): Promise<ImageAsset | undefined> {
     return this.records.get(assetId.trim());
@@ -66,6 +69,17 @@ class InMemoryImageAssetRepository implements IImageAssetRepository {
       wasReplay: false,
       imageAsset,
     };
+  }
+
+  async setImageAssetOriginalObjectReference(
+    assetId: string,
+    reference: ImageAssetStoredObjectReference,
+  ): Promise<void> {
+    this.originalReferences.set(assetId, reference);
+  }
+
+  async getImageAssetOriginalObjectReference(assetId: string): Promise<ImageAssetStoredObjectReference | undefined> {
+    return this.originalReferences.get(assetId);
   }
 
   async archiveImageAsset(): Promise<ImageAssetRepositoryMutationResult | undefined> {
@@ -275,6 +289,9 @@ describe("FinalizeImageAssetUploadUseCase", () => {
     expect(result.value.upload.status).toBe("finalized");
     expect(result.value.upload.observedSizeBytes).toBe(4);
     expect(result.value.imageAsset.sizeBytes).toBe(4);
+    expect(fixture.imageAssetRepository.originalReferences.get("image-asset:001")?.objectKey).toBe(
+      fixture.reference.objectKey,
+    );
   });
 
   it("returns invalid-state when the asset is not pending ingestion", async () => {
