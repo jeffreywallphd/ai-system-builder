@@ -38,6 +38,37 @@ Story 6.1.4 defines shared DTO and schema contracts for authoritative generated-
 - `storage-instance://` internals are kept out of preview/original access handles.
 - Result lifecycle and preview availability metadata are represented as normalized status contracts, not backend-specific adapter state.
 
+## Story 8.2.4 hardening additions (implemented)
+
+Transport contracts now encode explicit preview/retrieval degraded states so API and UI consumers can reliably distinguish delayed derivatives, failed preview generation, and retrieval outages.
+
+### Added state enums
+
+- `GeneratedResultPreviewStates`
+  - `preview-pending`
+  - `preview-available`
+  - `preview-failed`
+  - `preview-unavailable`
+- `GeneratedResultRetrievalStates`
+  - `retrieval-available`
+  - `retrieval-temporarily-unavailable`
+  - `retrieval-unavailable`
+  - `result-unavailable`
+
+### DTO contract changes
+
+- `GeneratedResultSummaryDto.preview.state` is now required.
+- `GeneratedResultSummaryDto.retrieval` is now required with `state` and optional `reasonCode`/`retryable`.
+- `RequestGeneratedResultPreviewResponseDto.preview.state` is required.
+- `RequestGeneratedResultOriginalAccessResponseDto.original.state` is required with optional recovery hints (`reasonCode`, `retryable`).
+
+### Schema-level invariants
+
+- `preview-available` must align with available preview presence.
+- `preview-pending`/`preview-failed` cannot indicate available derivative status.
+- unavailable retrieval states require `reasonCode`.
+- schema parsing keeps strict-shape enforcement and emits `GeneratedResultTransportSchemaValidationError` for diagnosable client/server contract failures.
+
 ## Boundary posture
 - External transport contracts are separated from persistence records (`GeneratedResultPersistenceDtos`).
 - DTO adapters project immutable response envelopes for API-facing payloads.

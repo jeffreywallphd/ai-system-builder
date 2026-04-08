@@ -38,6 +38,37 @@ Story 6.1.4 defines shared DTO and schema contracts for authoritative generated-
 - `storage-instance://` internals are kept out of preview/original access handles.
 - Result lifecycle and preview availability metadata are represented as normalized status contracts, not backend-specific adapter state.
 
+## Story 8.2.4 hardening additions (implemented)
+
+Generated-result transport contracts now expose explicit preview and retrieval availability states for degraded and recovery-aware behavior.
+
+### New explicit state contracts
+
+- `GeneratedResultPreviewStates`:
+  - `preview-pending`
+  - `preview-available`
+  - `preview-failed`
+  - `preview-unavailable`
+- `GeneratedResultRetrievalStates`:
+  - `retrieval-available`
+  - `retrieval-temporarily-unavailable`
+  - `retrieval-unavailable`
+  - `result-unavailable`
+
+### DTO surface updates
+
+- `GeneratedResultSummaryDto.preview` now requires `state` in addition to `hasPreview`.
+- `GeneratedResultSummaryDto` now requires a `retrieval` object with explicit state and optional recovery hints (`reasonCode`, `retryable`).
+- `RequestGeneratedResultPreviewResponseDto.preview` now requires `state`.
+- `RequestGeneratedResultOriginalAccessResponseDto.original` now requires `state`, with optional `reasonCode` and `retryable`.
+
+### Schema hardening invariants
+
+- `preview-available` requires preview availability (`hasPreview=true` or `available=true` as applicable).
+- `preview-pending` and `preview-failed` cannot advertise available derivative status.
+- Retrieval states `retrieval-temporarily-unavailable`, `retrieval-unavailable`, and `result-unavailable` require `reasonCode`.
+- Validation failures continue to throw `GeneratedResultTransportSchemaValidationError` with path-specific issues to improve diagnostics.
+
 ## Boundary posture
 - External transport contracts are separated from persistence records (`GeneratedResultPersistenceDtos`).
 - DTO adapters project immutable response envelopes for API-facing payloads.

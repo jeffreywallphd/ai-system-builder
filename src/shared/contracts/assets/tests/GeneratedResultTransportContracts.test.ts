@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import {
   GeneratedResultOriginalAccessPurposes,
+  GeneratedResultPreviewStates,
+  GeneratedResultRetrievalStates,
   GeneratedResultTransportRoutes,
   buildGeneratedResultByRunRoutePath,
   buildGeneratedResultLineageDetailRoutePath,
@@ -68,5 +70,7 @@ describe("GeneratedResultTransportContracts", () => {
       .toBe("/api/v1/generated-results/:resultAssetId/original-access");
     expect(GeneratedResultOriginalAccessPurposes.downloadOriginal).toBe("download-original");
     expect(GeneratedResultOriginalAccessPurposes.exportOriginal).toBe("export-original");
+    expect(GeneratedResultPreviewStates.pending).toBe("preview-pending");
+    expect(GeneratedResultRetrievalStates.temporarilyUnavailable).toBe("retrieval-temporarily-unavailable");
   });
 });
