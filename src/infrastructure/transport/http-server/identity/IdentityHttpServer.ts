@@ -19,6 +19,7 @@ import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetad
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
 import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
 import type { DeploymentPolicyReadBackendApi } from "../../../api/deployment/DeploymentPolicyReadBackendApi";
+import type { DeploymentPolicyWriteBackendApi } from "../../../api/deployment/DeploymentPolicyWriteBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
 import type { WorkspaceAdministrationBackendApi } from "../../../api/workspaces/WorkspaceAdministrationBackendApi";
 import type { SystemRuntimeBackendApi } from "../../../api/system-runtime/SystemRuntimeBackendApi";
@@ -129,6 +130,7 @@ import {
   SystemRuntimeTransportRoutes,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import { DeploymentPolicyReadTransportRoutes } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
+import { DeploymentPolicyWriteTransportRoutes } from "@shared/contracts/deployment/DeploymentPolicyWriteContracts";
 import {
   RunOrchestrationTransportRoutes,
   resolveRunLifecycleState,
@@ -208,6 +210,10 @@ import {
 } from "@shared/schemas/storage/StorageTransportSchemaContracts";
 import { DeploymentPolicyPersistenceScopeKinds } from "@shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos";
 import { parseReadDeploymentPolicyStateRequest } from "@shared/schemas/deployment/DeploymentPolicyReadSchemaContracts";
+import {
+  parseApplyDeploymentPolicyOverrideOperationsRequest,
+  parseUpdateDeploymentPolicyActiveProfileRequest,
+} from "@shared/schemas/deployment/DeploymentPolicyWriteSchemaContracts";
 import {
   SharedApiQuerySchemaValidationError,
   parseSharedApiListQueryConventions,
@@ -914,6 +920,7 @@ export interface IdentityHttpServerOptions {
   readonly authoritativeRunMutationBackendApi?: AuthoritativeRunMutationBackendApi;
   readonly authoritativeRunExecutionUpdateBackendApi?: AuthoritativeRunExecutionUpdateBackendApi;
   readonly deploymentPolicyReadBackendApi?: DeploymentPolicyReadBackendApi;
+  readonly deploymentPolicyWriteBackendApi?: DeploymentPolicyWriteBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
@@ -4855,6 +4862,114 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               workspaceId: context.workspace.workspaceId,
               actorUserIdentityId: context.actor.userIdentityId,
               query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.deploymentPolicyWriteBackendApi
+        && request.method === "POST"
+        && path === DeploymentPolicyWriteTransportRoutes.updateActiveProfile
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateDeploymentPolicyActiveProfileWriteRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.deploymentPolicyWriteBackendApi.updateActiveProfile(
+              Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                workspaceId: context.workspace.workspaceId,
+              }),
+              parsedRequest.data,
+            );
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.deploymentPolicyWriteBackendApi
+        && request.method === "POST"
+        && path === DeploymentPolicyWriteTransportRoutes.applyOverrides
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateDeploymentPolicyOverrideWriteRequest(parsedBody.value);
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.deploymentPolicyWriteBackendApi.applyOverrideOperations(
+              Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                workspaceId: context.workspace.workspaceId,
+              }),
+              parsedRequest.data,
+            );
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
             }), apiResponse);
           },
         );
@@ -10096,6 +10211,50 @@ function parseAndValidateDeploymentPolicyStateReadRequest(input: {
   }
 }
 
+function parseAndValidateDeploymentPolicyActiveProfileWriteRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseUpdateDeploymentPolicyActiveProfileRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: 400; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseUpdateDeploymentPolicyActiveProfileRequest(payload),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(
+        error instanceof Error ? error.message : "Deployment policy active-profile request is invalid.",
+      ),
+    };
+  }
+}
+
+function parseAndValidateDeploymentPolicyOverrideWriteRequest(payload: unknown):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseApplyDeploymentPolicyOverrideOperationsRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: 400; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseApplyDeploymentPolicyOverrideOperationsRequest(payload),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse(
+        error instanceof Error ? error.message : "Deployment policy override request is invalid.",
+      ),
+    };
+  }
+}
+
 function parseAndValidateAuthoritativeRunListReadRequest(input: {
   readonly workspaceId: string;
   readonly searchParams: URLSearchParams;
@@ -11187,6 +11346,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: Boolean(options.workspaceAdministrationBackendApi),
     [AuthoritativeApiRouteBackendKeys.authorizationManagement]: Boolean(options.authorizationManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: Boolean(options.deploymentPolicyReadBackendApi),
+    [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: Boolean(options.deploymentPolicyWriteBackendApi),
     [AuthoritativeApiRouteBackendKeys.auditLedger]: Boolean(options.auditLedgerBackendApi),
     [AuthoritativeApiRouteBackendKeys.nodeTrust]: Boolean(options.nodeTrustBackendApi),
     [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),

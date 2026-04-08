@@ -26,6 +26,7 @@
 - `workspace-*` -> `/api/v1/workspaces/*` (authenticated + workspace-scoped authorization)
 - `authorization-management` -> `/api/v1/authorization/*` (authenticated policy-evaluated visibility/sharing/reporting)
 - `deployment-policy-read` -> `/api/v1/deployment/policy/state` (authenticated workspace-scoped policy-state inspection; optional catalog/effective/provenance sections)
+- `deployment-policy-write` -> `/api/v1/deployment/policy/active-profile`, `/api/v1/deployment/policy/overrides` (authenticated workspace-scoped policy administration writes with typed payload validation and authoritative permission enforcement)
 - `audit-ledger` -> `/api/v1/audit/events*` (authenticated + workspace-scoped governance audit visibility)
 - `node-trust` -> `/api/v1/nodes/*` (bootstrap enrollment + authenticated review/admin routes)
 - `security-*` -> `/api/v1/security/certificates/*`, `/api/v1/security/secrets/*` (authenticated, trusted-session for high-assurance operations)
