@@ -8,6 +8,10 @@ import type {
   ISchedulingGovernanceEventSink,
   SchedulingGovernanceEvent,
 } from "@application/scheduling/ports/SchedulingGovernanceEventPorts";
+import type {
+  DeploymentPolicyGovernanceEvent,
+  IDeploymentPolicyGovernanceEventSink,
+} from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
 
 interface Disposable {
   dispose(): void;
@@ -101,6 +105,20 @@ export class FanoutSchedulingGovernanceEventSink implements ISchedulingGovernanc
         await sink.recordSchedulingGovernanceEvent(event);
       } catch {
         // Best-effort fan-out keeps scheduling governance hooks non-blocking.
+      }
+    }
+  }
+}
+
+export class FanoutDeploymentPolicyGovernanceEventSink implements IDeploymentPolicyGovernanceEventSink {
+  public constructor(private readonly sinks: ReadonlyArray<IDeploymentPolicyGovernanceEventSink>) {}
+
+  public async recordDeploymentPolicyGovernanceEvent(event: DeploymentPolicyGovernanceEvent): Promise<void> {
+    for (const sink of this.sinks) {
+      try {
+        await sink.recordDeploymentPolicyGovernanceEvent(event);
+      } catch {
+        // Best-effort fan-out keeps policy governance hooks non-blocking.
       }
     }
   }

@@ -53,6 +53,7 @@ import {
   FanoutAssetAuditSink,
   FanoutNodeTrustAuditSink,
   FanoutRunSubmissionAuditSink,
+  FanoutDeploymentPolicyGovernanceEventSink,
 } from "@infrastructure/audit/AuditFanoutPublishers";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
@@ -60,6 +61,7 @@ import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/a
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "@infrastructure/audit/AuthoritativeRunSubmissionAuditSink";
+import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "@infrastructure/audit/AuthoritativeDeploymentPolicyGovernanceEventSink";
 import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
@@ -85,6 +87,7 @@ import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/Aut
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import { DeploymentPolicyReadBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyReadBackendApi";
 import { DeploymentPolicyWriteBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyWriteBackendApi";
+import { PlatformDeploymentPolicyGovernanceEventSink } from "@infrastructure/api/deployment/PlatformDeploymentPolicyGovernanceEventSink";
 import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "@infrastructure/api/deployment/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
 import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
@@ -1081,12 +1084,38 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
     }),
   });
+  const deploymentPolicyGovernanceEventSink = new FanoutDeploymentPolicyGovernanceEventSink([
+    new PlatformDeploymentPolicyGovernanceEventSink(
+      persistentPlatformServices.platformPersistenceRepository,
+      options.logger
+        ? {
+          info: (event) => options.logger?.info(Object.freeze({
+            event: event.event,
+            requestId: "deployment-policy-governance",
+            details: Object.freeze({
+              operation: event.operation,
+              outcome: event.outcome,
+              scopeKind: event.scopeKind,
+              scopeId: event.scopeId,
+              actorUserIdentityId: event.actorUserIdentityId,
+              profileId: event.profileId,
+              policyFamilyIds: event.policyFamilyIds,
+              details: event.details,
+              occurredAt: event.occurredAt,
+            }),
+          })),
+        }
+        : undefined,
+    ),
+    new AuthoritativeDeploymentPolicyGovernanceEventSink(authoritativeAuditRecorder),
+  ]);
   const deploymentPolicyWriteBackendApi = new DeploymentPolicyWriteBackendApi({
     updateDeploymentPolicyStateUseCase: new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
       permissionService: new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
         workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
       }),
+      governanceEventSink: deploymentPolicyGovernanceEventSink,
     }),
   });
   const auditLedgerBackendApi = new AuditLedgerBackendApi({

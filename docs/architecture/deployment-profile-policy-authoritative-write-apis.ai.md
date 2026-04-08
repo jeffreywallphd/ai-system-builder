@@ -52,3 +52,9 @@ Responses include canonical updated policy state from authoritative update flow:
 - `src/infrastructure/api/deployment/tests/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerDeploymentPolicyWriteApi.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
+
+## Related governance hooks
+
+Story 20.2.6 adds policy-governance audit/operational hook integration for these write pathways:
+
+- `docs/architecture/deployment-profile-policy-audit-operational-governance-hooks.md`
