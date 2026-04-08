@@ -146,6 +146,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 20 built-in home/classroom/organization preset definitions + explainable defaults baseline: `docs/architecture/deployment-profile-policy-preset-definitions.md`
 - Feature 20 centralized effective-policy resolver + persisted override validation/provenance baseline: `docs/architecture/deployment-profile-policy-effective-resolution-and-overrides.md`
 - Feature 20 application-facing policy evaluation seam baseline for authorization/storage/scheduling/security consumers: `docs/architecture/deployment-profile-policy-evaluation-seams.md`
+- Feature 20 deployment-profile philosophy, policy-family invariants, preset-vs-override rules, and prohibited branching patterns: `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
+- Feature 20 contributor extension workflow for new policy families and feature evaluation seams: `docs/deployment-profile-policy-contributor-guide.md`
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
 - Authorization application-layer policy evaluation ports and adapter-boundary contracts: `docs/architecture/authorization-application-ports.md`
 - Authorization shared payload schema contracts and boundary-validation guidance: `docs/architecture/authorization-schema-validation-contracts.md`
@@ -303,6 +305,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-composition.md`.
 - Runtime-facing service-to-service secret consumption adapters now expose workspace/user/server credential retrieval through formal retrieval use cases in `src/application/security/services/SecretRuntimeConsumptionAdapters.ts`.
 - Canonical architecture note for this slice: `docs/architecture/secrets-service-consumption-adapters.md`.
+
 
 
 
