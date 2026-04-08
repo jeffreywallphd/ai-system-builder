@@ -54,6 +54,7 @@ Provide an implementation checklist for contributors extending the authoritative
 3. Implement orchestration rules in application use cases and ports:
    - `src/application/runs/use-cases/*`
    - `src/application/runs/ports/*`
+   - Initial queued-to-dispatch image slice seam: `src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts`
 4. Apply persistence, dispatch-adapter, and API transport changes only after application behavior is finalized:
    - `src/infrastructure/persistence/platform/SqlitePlatformPersistenceAdapter.ts`
    - `src/infrastructure/execution/runs/*`
@@ -82,18 +83,19 @@ Provide an implementation checklist for contributors extending the authoritative
 ## Queue integration and reservation/arbitration extension seams
 
 1. Keep queue lease selection in `SelectAssignmentReadyRunsUseCase` and `IRunOrchestrationQueuePersistenceRepository`.
-2. Keep snapshot assembly and policy evaluation in:
+2. Keep the initial simplified queued-to-dispatch orchestration pass in `ProcessQueuedRunDispatchUseCase` (selection -> claim -> dispatch).
+3. Keep snapshot assembly and policy evaluation in:
    - `AssembleAuthoritativeSchedulingInputUseCase`
    - `EvaluateAuthoritativeSchedulingDecisionPipelineUseCase`
-3. Keep assignment materialization and temporary hold lifecycle in `MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`.
-4. Keep assignment finalization conflict handling in `ClaimRunForNodeDispatchPreparationUseCase`.
-5. Keep dispatch outcome reservation settlement in `HandleRunDispatchResultUseCase`.
-6. Preserve explicit outcomes as first-class behavior:
+4. Keep assignment materialization and temporary hold lifecycle in `MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`.
+5. Keep assignment finalization conflict handling in `ClaimRunForNodeDispatchPreparationUseCase`.
+6. Keep dispatch outcome reservation settlement in `HandleRunDispatchResultUseCase`.
+7. Preserve explicit outcomes as first-class behavior:
    - no duplicate assignment (`already-assigned` and reservation conflict semantics)
    - explicit no-placement defer/release behavior (reason-bearing queue settlement)
    - explicit placement-hold acquire/conflict/release lifecycle
    - explicit dispatch outcome settlement (release, requeue, terminal finalization)
-7. Add new capacity/quota/reservation-window policies in scheduling policy and arbitration modules, not in transport handlers or dispatch adapters.
+8. Add new capacity/quota/reservation-window policies in scheduling policy and arbitration modules, not in transport handlers or dispatch adapters.
 
 ## Extending backend dispatch integrations
 

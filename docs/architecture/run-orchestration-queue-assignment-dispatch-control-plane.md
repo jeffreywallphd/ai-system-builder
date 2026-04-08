@@ -21,6 +21,7 @@ Document the implemented end-to-end authoritative orchestration lifecycle across
   - `src/application/runs/ports/RunOrchestrationPersistencePorts.ts`
   - `src/application/runs/ports/RunAssignmentEligibilityPorts.ts`
   - `src/application/runs/ports/RunExecutionDispatchPorts.ts`
+  - `src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts`
   - `src/application/runs/use-cases/SelectAssignmentReadyRunsUseCase.ts`
   - `src/application/runs/use-cases/RunNodeAssignmentEligibilityService.ts`
   - `src/application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase.ts`
@@ -83,6 +84,14 @@ sequenceDiagram
 3. Queue ordering is deterministic and persistence-owned (`eligible_at`, `order_key`, `entered_at`, `run_id`).
 4. Queue persistence remains scheduling-policy neutral; node capability/policy checks are application-layer concerns.
 5. Node-targeted selection uses `IRunNodeAssignmentEligibilityService` and releases claims immediately when eligibility fails.
+
+## Initial queued-to-dispatch orchestration pass
+
+1. `ProcessQueuedRunDispatchUseCase` provides the initial image-slice orchestration pass for `queued` runs.
+2. The pass composes `SelectAssignmentReadyRunsUseCase`, `ClaimRunForNodeDispatchPreparationUseCase`, and `DispatchAssignedRunExecutionUseCase`.
+3. Lifecycle progression remains explicit and durable (`queued` -> `assigned` -> `dispatching` -> `running|failed`) through existing domain-owned transitions.
+4. Dispatch linkage is captured through durable dispatch-attempt ids and backend dispatch receipts for later progress/result synchronization.
+5. Node selection is intentionally simplified to explicit orchestrator input for this pass; richer scheduler/node-assignment policy remains a follow-on seam.
 
 ## Claim and dispatch model
 

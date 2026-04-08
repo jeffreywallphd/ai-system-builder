@@ -11,6 +11,7 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 - Assignment policy and capability checks: `src/application/runs/ports/RunAssignmentEligibilityPorts.ts`
 - Dispatch command and backend seam: `src/application/runs/ports/RunExecutionDispatchPorts.ts`
 - Core orchestration use cases:
+  - `ProcessQueuedRunDispatchUseCase`
   - `SelectAssignmentReadyRunsUseCase`
   - `ClaimRunForNodeDispatchPreparationUseCase`
   - `BuildAssignedRunExecutionCommandUseCase`
@@ -24,6 +25,13 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 - Scheduling policy decides which lease-claimed run/node pair should be attempted.
 - Dispatch orchestration only dispatches an already-assigned run through canonical command + backend adapter seams.
 - Do not collapse scheduling and dispatch into one transport or adapter layer.
+
+## Initial image queue-to-dispatch pass
+- `ProcessQueuedRunDispatchUseCase` is the initial image-slice coordinator for `queued` run dispatch.
+- It composes reservation claim selection, node-claim dispatch preparation, and backend dispatch through existing application seams.
+- Lifecycle mutation remains domain-owned (`queued` -> `assigned` -> `dispatching` -> `running|failed`) and durable.
+- Dispatch linkage is captured as durable dispatch-attempt metadata plus backend receipt ids for follow-on progress/result synchronization.
+- Node targeting remains intentionally simple (explicit orchestrator input) so richer scheduling and assignment policy can layer in later without rework.
 
 ## Required invariants
 - Reservation ownership is authoritative (`claimToken`, `claimedBy`, `claimExpiresAt`).
