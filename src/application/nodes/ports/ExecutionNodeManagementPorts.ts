@@ -2,6 +2,7 @@ import type { PlatformPersistenceMutationContext } from "@application/common/por
 import type {
   ExecutionNodeActivationStatus,
   ExecutionNodeBackendFamilyCapability,
+  ImageExecutionNodeCompatibilityFinding,
   ExecutionNodeHealthStatus,
   ExecutionNodeOperationalAvailabilityMode,
   ExecutionNodeRecord,
@@ -161,6 +162,72 @@ export interface IExecutionNodeEligibilityEvaluationServicePort {
     readonly candidateNodeIds?: ReadonlyArray<string>;
     readonly query?: ExecutionNodeListQuery;
   }): Promise<ReadonlyArray<ExecutionNodeEligibilityEvaluation>>;
+}
+
+export interface ImageRunNodeEligibilityRunContext {
+  readonly runId: string;
+  readonly workspaceId: string;
+  readonly systemId?: string;
+  readonly workflowId?: string;
+  readonly operationKind?: string;
+  readonly translationContractVersion?: string;
+}
+
+export interface ImageRunNodeCompatibilityHints {
+  readonly requiredOperationCapability?: string;
+  readonly requiredInputKinds?: ReadonlyArray<string>;
+  readonly requiredOutputKinds?: ReadonlyArray<string>;
+  readonly translationBackendFamilies?: ReadonlyArray<string>;
+  readonly readinessChecks?: {
+    readonly operationCapability?: boolean;
+    readonly inputKinds?: boolean;
+    readonly outputKinds?: boolean;
+    readonly translationBackendFamily?: boolean;
+  };
+}
+
+export interface ImageRunNodeEligibilityRequirements extends ImageExecutionNodeCompatibilityRequirements {
+  readonly compatibilityHints?: ImageRunNodeCompatibilityHints;
+}
+
+export interface ImageRunNodeEligibilitySummary {
+  readonly blockingReasonCodes: ReadonlyArray<string>;
+  readonly advisoryReasonCodes: ReadonlyArray<string>;
+  readonly transientAvailabilityReasonCodes: ReadonlyArray<string>;
+  readonly findingCount: number;
+}
+
+export interface ImageRunNodeEligibilityResult {
+  readonly run: ImageRunNodeEligibilityRunContext;
+  readonly nodeId: string;
+  readonly decision: ExecutionNodeEligibilityDecisionKind;
+  readonly eligible: boolean;
+  readonly compatible: boolean;
+  readonly routable: boolean;
+  readonly matchedBackendFamily?: string;
+  readonly matchedExecutionTarget?: string;
+  readonly findings: ReadonlyArray<ImageExecutionNodeCompatibilityFinding>;
+  readonly blockingReasons: ReadonlyArray<ImageExecutionNodeCompatibilityFinding>;
+  readonly advisories: ReadonlyArray<ImageExecutionNodeCompatibilityFinding>;
+  readonly transientAvailabilityIssues: ReadonlyArray<ImageExecutionNodeCompatibilityFinding>;
+  readonly normalizedRequirements: ImageExecutionNodeCompatibilityRequirements;
+  readonly summary: ImageRunNodeEligibilitySummary;
+}
+
+export interface IImageRunNodeEligibilityEvaluationServicePort {
+  evaluateRunToNodeEligibility(input: {
+    readonly asOf: string;
+    readonly run: ImageRunNodeEligibilityRunContext;
+    readonly nodeId: string;
+    readonly requirements?: ImageRunNodeEligibilityRequirements;
+  }): Promise<ImageRunNodeEligibilityResult>;
+  evaluateRunToCandidateNodes(input: {
+    readonly asOf: string;
+    readonly run: ImageRunNodeEligibilityRunContext;
+    readonly requirements?: ImageRunNodeEligibilityRequirements;
+    readonly candidateNodeIds?: ReadonlyArray<string>;
+    readonly query?: ExecutionNodeListQuery;
+  }): Promise<ReadonlyArray<ImageRunNodeEligibilityResult>>;
 }
 
 export interface ExecutionNodeAvailabilityChangeResult {
