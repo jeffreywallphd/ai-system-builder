@@ -58,8 +58,8 @@ describe("SystemStudioWorkManagementPanel", () => {
     expect(html).toContain("Saved image systems");
     expect(html).toContain("Select a saved image system");
     expect(html).toContain("Rename this work");
-    expect(html).toContain("Supported workflow operations");
-    expect(html).toContain("Select a supported workflow");
+    expect(html).toContain("Supported edit types");
+    expect(html).toContain("Select a supported edit type");
     expect(html).toContain("Advanced setup changes");
   });
 });

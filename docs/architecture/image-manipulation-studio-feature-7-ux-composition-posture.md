@@ -217,3 +217,27 @@ Architecture and boundary notes:
 - UI does not expose backend-local paths or storage internals; users interact with filenames, timestamps, and actions ("Use as source"/"Use as face reference").
 - Source/reference selection remains compatible with existing dataset-binding and run-request seams, so downstream workflow/readiness/result flows can extend without entry-flow rework.
 
+## Epic 7.2 Story 7.2.2: Supported edit-type and workflow/system selection experience
+
+Story 7.2.2 upgrades the "Choose edit" phase to present supported image manipulations as user-facing edit types while preserving authoritative workflow/system identity and reopening behavior.
+
+Implemented seams:
+
+- `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+- `src/ui/components/studio-shell/SystemWorkflowSelectionPresenter.ts`
+- `src/ui/components/studio-shell/tests/SystemWorkflowSelectionPresenter.test.ts`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+
+Selection-flow behavior:
+
+- Users can start from supported edit types sourced from authoritative workflow-definition APIs.
+- Edit-type options are rendered with user-friendly names/summaries from supported-template metadata; technical workflow jargon is no longer primary copy.
+- Reopening saved systems remains first-class and is no longer constrained to the currently selected edit type filter, so prior work can always be resumed.
+- Selected workflow/system identity continues to propagate through authoritative IDs (`workflowId`, `systemId`, version tags) and runtime-state updates; UI does not redefine template contracts locally.
+
+UX-language and advanced-detail posture:
+
+- Default surface language uses "edit type" terminology and guided summaries.
+- Technical metadata (workflow IDs, operation kind, version tags) remains available only under explicit advanced details.
+- Parameter defaults and configuration continue to hydrate from authoritative workflow definition metadata after selection/reopen.
+
