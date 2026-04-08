@@ -53,6 +53,22 @@ Structured diagnostics currently include:
 
 Blocking diagnostics force a failed translation result.
 
+## Explicitly unsupported combinations (current slice)
+
+The adapter intentionally supports only the exact template-operation pairings in the initial supported set.
+Any template used with a different operation kind is explicitly unsupported and must fail with blocking
+`operation-template-mismatch` diagnostics.
+
+Unsupported pairing examples:
+- `image-template:image-to-image-restyle:v1` with `enhance-upscale` or `mask-guided-edit`
+- `image-template:enhance-upscale:v1` with `image-to-image` or `mask-guided-edit`
+- `image-template:mask-guided-edit:v1` with `image-to-image` or `enhance-upscale`
+
+Missing required mappings are also explicitly unsupported and must fail loudly:
+- missing required slot binding (`missing-required-slot-binding`)
+- missing required parameter mapping (`missing-required-parameter-mapping`)
+- missing required output expectation (`missing-required-output-expectation`)
+
 ## Architectural constraints preserved
 
 - Workflow/system definitions remain the source of truth.
@@ -67,3 +83,14 @@ Blocking diagnostics force a failed translation result.
   - backend unavailable dispatch failure normalization
   - malformed backend response normalization for prompt submission
 - Coverage ensures translation diagnostics remain meaningful and dispatch wiring regressions are caught without relying on uncontrolled external backend state.
+
+## Story 3.4.3 translation-readiness verification update
+
+- Added explicit matrix verification coverage in
+  `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.integration.test.ts`.
+- Matrix coverage now enforces:
+  - one-to-one coverage between the Feature 2 supported template registry and translation verification cases,
+  - compatibility metadata readiness checks per supported operation/template,
+  - required slot/parameter/output mapping presence in translated payloads,
+  - expected Comfy prompt node-shape coverage for each supported template,
+  - explicit failure diagnostics for unsupported template/operation combinations and missing required mappings.
