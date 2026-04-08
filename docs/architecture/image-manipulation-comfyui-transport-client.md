@@ -42,3 +42,25 @@ These operations are intentionally infrastructure-only and do not alter applicat
 - Prompt-state reads use Comfy history first, then queue fallback, so orchestration can read state before completion records are persisted in history.
 - Future progress streaming (WebSocket) can be added in `ComfyUiTransportClient` without changing application-layer dispatch contracts.
 - Additional execution backends should continue to implement infrastructure gateway abstractions and avoid direct transport access from application logic.
+
+## Story 3.2.3 health and capability probe extension
+
+The concrete transport client now includes backend probe behavior for execution-readiness checks:
+
+1. Reachability/Responsiveness probe
+- Uses `GET /queue` as the baseline transport-safe probe to verify backend reachability and JSON responsiveness.
+
+2. Capability probe
+- Uses `GET /object_info` to discover available node types without dispatching a run.
+- Compares discovered node types to required node capabilities for supported image workflow templates.
+
+3. Normalized probe states
+- `ready`: backend reachable and required capabilities present.
+- `degraded`: backend reachable but capability discovery failed.
+- `incompatible`: backend reachable but required capabilities are missing.
+- `unavailable`: backend reachability/responsiveness probe failed.
+
+4. Application-facing capability status mapping
+- `ComfyUiImageManipulationCapabilityProbeAdapter` maps transport probe output into
+  `IImageManipulationExecutionCapabilityPort` (`ImageManipulationExecutionBackendStatus`).
+- Mapping keeps raw transport details inside infrastructure and emits normalized health/capability metadata suitable for readiness messaging and later run scheduling logic.
