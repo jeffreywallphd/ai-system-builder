@@ -10,6 +10,7 @@ Define one backend-neutral application seam for image-run orchestration so use c
 
 - `src/application/image-workflows/ports/ImageRunOrchestrationPorts.ts`
 - `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessValidationService.ts`
 - `src/application/image-workflows/ports/index.ts`
 - `src/application/image-workflows/tests/ImageRunOrchestrationPorts.test.ts`
 - `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`

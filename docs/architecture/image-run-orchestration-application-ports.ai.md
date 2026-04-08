@@ -6,6 +6,7 @@ Story 4.1.3 and Story 4.1.4 define the application-layer repository/orchestratio
 ## Canonical files
 - `src/application/image-workflows/ports/ImageRunOrchestrationPorts.ts`
 - `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessValidationService.ts`
 - `src/application/image-workflows/ports/index.ts`
 - `src/application/image-workflows/tests/ImageRunOrchestrationPorts.test.ts`
 - `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`

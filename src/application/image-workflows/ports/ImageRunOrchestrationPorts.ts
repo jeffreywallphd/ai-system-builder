@@ -146,6 +146,10 @@ export interface IImageRunReadinessResolver {
     readonly workspaceId: string;
     readonly systemId: string;
     readonly workflowId?: string;
+    readonly actorUserIdentityId?: string;
+    readonly actorServiceId?: string;
+    readonly occurredAt?: string;
+    readonly parameters?: Readonly<Record<string, unknown>>;
     readonly operationKind?: string;
     readonly translationContractVersion?: string;
     readonly inputAssetBindingIds?: ReadonlyArray<string>;

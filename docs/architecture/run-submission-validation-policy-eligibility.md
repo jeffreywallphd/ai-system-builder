@@ -16,6 +16,7 @@ Introduce a reusable application-layer validation boundary that blocks invalid, 
 - `src/application/runs/use-cases/RunSubmissionValidationContracts.ts`
 - `src/application/runs/use-cases/RunSubmissionValidationRules.ts`
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessValidationService.ts`
 - `src/application/runs/tests/ValidateRunSubmissionUseCase.test.ts`
 - `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
 - `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`
@@ -88,6 +89,12 @@ Image-manipulation orchestration extends the baseline validator with reusable re
   - workflow/system/adapter compatibility outcomes
 
 This keeps submission-readiness evaluation backend-agnostic while allowing adapter health/capability and future scheduling/node-capability checks to consume the same contract without transport/UI duplication.
+
+Story 4.2.2 adds `ImageRunSubmissionReadinessValidationService` as the canonical application service that evaluates submission readiness and returns blocking/advisory findings for:
+- workflow/system readiness and compatibility posture,
+- required asset-slot completeness plus referenced-asset validity/authorization checks,
+- parameter-set validity against workflow parameter contracts,
+- backend execution-readiness dependencies.
 
 ## Canonical command output
 
