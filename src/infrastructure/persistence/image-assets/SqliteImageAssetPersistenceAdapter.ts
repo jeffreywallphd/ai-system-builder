@@ -138,6 +138,23 @@ export class SqliteImageAssetPersistenceAdapter
       params.push(...generationOperationIds);
     }
 
+    if (query.createdAfter) {
+      clauses.push("created_at >= ?");
+      params.push(query.createdAfter);
+    }
+    if (query.createdBefore) {
+      clauses.push("created_at <= ?");
+      params.push(query.createdBefore);
+    }
+    if (query.updatedAfter) {
+      clauses.push("updated_at >= ?");
+      params.push(query.updatedAfter);
+    }
+    if (query.updatedBefore) {
+      clauses.push("updated_at <= ?");
+      params.push(query.updatedBefore);
+    }
+
     const paging = this.buildPagingClause(query.limit, query.offset);
     const rows = this.getDatabase().prepare(`
       SELECT *

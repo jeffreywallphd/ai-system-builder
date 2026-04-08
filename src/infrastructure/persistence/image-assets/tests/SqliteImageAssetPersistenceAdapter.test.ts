@@ -212,4 +212,49 @@ describe("SqliteImageAssetPersistenceAdapter", () => {
 
     adapter.dispose();
   });
+
+  it("supports created/updated timestamp range filters for metadata listing", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-image-assets-timestamp-filters-"));
+    createdRoots.push(root);
+    const adapter = new SqliteImageAssetPersistenceAdapter(path.join(root, "image-assets.sqlite"));
+
+    const older = createFixtureAsset({
+      assetId: "image-asset:test:older",
+      workspaceId: "workspace-alpha",
+      ownerUserId: "user-alpha",
+      storageInstanceId: "storage-alpha",
+    });
+    const recent = createFixtureAsset({
+      assetId: "image-asset:test:recent",
+      workspaceId: "workspace-alpha",
+      ownerUserId: "user-alpha",
+      storageInstanceId: "storage-alpha",
+    });
+    const recentUpdated = transitionImageAssetStatus(recent, {
+      nextStatus: ImageAssetStatuses.available,
+      actorUserId: "user-alpha",
+      occurredAt: "2026-04-09T12:00:00.000Z",
+    });
+
+    await adapter.createImageAsset(older, {
+      operationKey: "op:image-asset:create:older",
+      actorUserId: "user-alpha",
+      occurredAt: "2026-04-08T12:00:00.000Z",
+    });
+
+    await adapter.createImageAsset(recentUpdated, {
+      operationKey: "op:image-asset:create:recent",
+      actorUserId: "user-alpha",
+      occurredAt: "2026-04-09T12:00:00.000Z",
+    });
+
+    const filtered = await adapter.listImageAssets({
+      workspaceId: "workspace-alpha",
+      updatedAfter: "2026-04-09T00:00:00.000Z",
+      includeDeleted: false,
+    });
+
+    expect(filtered.map((asset) => asset.assetId)).toEqual(["image-asset:test:recent"]);
+    adapter.dispose();
+  });
 });

@@ -16,6 +16,10 @@ export interface ImageAssetRepositoryListQuery {
   readonly storageInstanceIds?: ReadonlyArray<string>;
   readonly sourceRunIds?: ReadonlyArray<string>;
   readonly generationOperationIds?: ReadonlyArray<string>;
+  readonly createdAfter?: string;
+  readonly createdBefore?: string;
+  readonly updatedAfter?: string;
+  readonly updatedBefore?: string;
   readonly includeDeleted?: boolean;
   readonly limit?: number;
   readonly offset?: number;
