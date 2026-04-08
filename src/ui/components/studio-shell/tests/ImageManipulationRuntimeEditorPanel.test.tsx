@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import ImageManipulationRuntimeEditorPanel, {
+  buildImageRunFailureRecoveryGuidance,
   buildImageRunLaunchPrecheckState,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
@@ -74,6 +75,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Settings ready");
     expect(html).toContain("Launch precheck: setup");
     expect(html).toContain("Launch precheck: execution environment");
+    expect(html).toContain("Fix setup issues before starting");
     expect(html).toContain("Refresh precheck");
     expect(html).toContain("Choose a source photo first");
     expect(html).toContain("Run progress");
@@ -204,6 +206,71 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.setupBlockingIssues).toHaveLength(0);
     expect(precheck.backendBlockingIssues).toHaveLength(0);
     expect(precheck.backendAdvisories.length).toBeGreaterThan(0);
+  });
+
+  it("builds user-fixable recovery guidance when launch is blocked by setup issues", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: undefined,
+      selectedSourceAssetId: undefined,
+      selectedSourceDatasetInstanceId: undefined,
+      prompt: "",
+      validationIssues: Object.freeze([]),
+    });
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: {
+        state: "idle",
+      },
+      flowIssues: Object.freeze([]),
+      launchPrecheck: precheck,
+    });
+
+    expect(guidance?.mode).toBe("launch-blocked");
+    expect(guidance?.kind).toBe("user-fixable");
+    expect(guidance?.canRetryNow).toBeFalse();
+  });
+
+  it("builds operational recovery guidance for retryable failed runs", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "ready",
+        readyForExecution: true,
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        issues: Object.freeze([]),
+      }),
+    });
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: {
+        state: "failed",
+      },
+      flowIssues: Object.freeze([Object.freeze({
+        stepId: "persistence",
+        code: "output-materialization-failed",
+        userMessage: "Something went wrong while saving this image.",
+        retryable: true,
+      })]),
+      launchPrecheck: precheck,
+    });
+
+    expect(guidance?.mode).toBe("run-failed");
+    expect(guidance?.kind).toBe("operational");
+    expect(guidance?.canRetryNow).toBeTrue();
   });
 
   it("blocks launch precheck when setup or backend readiness is unresolved", () => {

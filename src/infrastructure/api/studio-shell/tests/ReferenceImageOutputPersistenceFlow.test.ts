@@ -234,6 +234,9 @@ it("fails fast with recoverable diagnostics when runtime context is incomplete",
   expect(persisted.ok).toBeTrue();
   expect(persisted.data?.status).toBe("failed");
   expect(persisted.data?.failureMessages.length).toBeGreaterThan(0);
+  expect(persisted.data?.diagnostics[0]?.stage).toBe("runtime-configuration-resolution-failure");
+  expect(persisted.data?.diagnostics[0]?.retryable).toBeTrue();
+  expect(persisted.data?.diagnostics[0]?.userMessage).toContain("Please");
   expect(persisted.data?.executionOutcome).toBe("recoverable-failure");
   expect(persisted.data?.persistenceBlocked).toBeTrue();
 
@@ -312,6 +315,8 @@ it("blocks persistence when upstream execution status is failed", async () => {
   expect(persisted.data?.status).toBe("failed");
   expect(persisted.data?.persistedRecordIds).toEqual([]);
   expect(persisted.data?.diagnostics[0]?.stage).toBe("model-dependency-availability-failure");
+  expect(persisted.data?.diagnostics[0]?.retryable).toBeTrue();
+  expect(persisted.data?.diagnostics[0]?.userMessage).toBe("Runtime execution failed before outputs were materialized.");
   expect(persisted.data?.executionOutcome).toBe("non-recoverable-failure");
   expect(persisted.data?.persistenceBlocked).toBeTrue();
 });
