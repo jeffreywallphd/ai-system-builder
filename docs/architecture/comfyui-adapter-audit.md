@@ -248,6 +248,15 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - `src/application/system-studio/tests/SystemStudioApplicationService.test.ts` (runtime-capability persistence/reload, provider payload leakage prevention, unsupported-version rejection)
   - `src/ui/pages/tests/SystemStudioPageContracts.test.ts` (bounded runtime-capability editor contract surface)
 
+## Story 3.2.2 update
+- Added a concrete ComfyUI transport client for execution submission/control operations at `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`.
+- Added a concrete run-dispatch gateway binding the existing dispatch adapter seam (`ComfyUiDispatchGateway`) to the transport client at `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`.
+- Added focused coverage for transport normalization and dispatch-gateway integration:
+  - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
+  - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
+- Added architecture note for transport assumptions and extension points:
+  - `docs/architecture/image-manipulation-comfyui-transport-client.md`
+
 ## Story 2.4.9 + 2.4.10 update
 - Runtime-capability execution trace propagation is now explicit in `src/application/system-runtime/SystemRuntimeApplicationService.ts`:
   - persisted runtime-capability binding envelopes are parsed from system execution metadata,

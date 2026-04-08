@@ -147,6 +147,15 @@
   - `src/application/system-studio/tests/SystemStudioApplicationService.test.ts` (runtime-capability persistence/reload, provider payload leakage prevention, unsupported-version rejection)
   - `src/ui/pages/tests/SystemStudioPageContracts.test.ts` (bounded runtime-capability editor contract surface)
 
+## Story 3.2.2 update
+- Added concrete ComfyUI transport execution client at `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts` for prompt submission, state query, and cancellation signaling.
+- Added concrete dispatch gateway adapter at `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts` to bind existing `ComfyUiDispatchGateway` abstraction to transport operations.
+- Added focused tests:
+  - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
+  - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
+- Added dedicated architecture note:
+  - `docs/architecture/image-manipulation-comfyui-transport-client.md`
+
 ## Story 5.1 + 5.2 update
 - Added a concrete image-manipulation execution adapter contract at
   `src/application/system-studio/ComfyImageManipulationExecutionAdapterContract.ts`.
