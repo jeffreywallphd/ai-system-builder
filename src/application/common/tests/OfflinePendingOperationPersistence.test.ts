@@ -225,4 +225,37 @@ describe("OfflinePendingOperationService", () => {
     expect(record.pendingRunSubmission?.submissionId).toBe("submission:1");
     expect(record.pendingRunSubmission?.requestedByActorUserIdentityId).toBe("user:beta");
   });
+
+  it("updates queued operation sync status for explicit replay outcomes", async () => {
+    const repository = new InMemoryOfflinePendingOperationRepository();
+    const service = new OfflinePendingOperationService(repository);
+
+    await service.queueOperation({
+      operation: createQueuedOperation({
+        operationId: "operation:outcome:1",
+        queuedAt: "2026-04-08T10:30:00.000Z",
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:gamma",
+        actorUserIdentityId: "user:gamma",
+      },
+    });
+
+    const conflicted = await service.markOperationReplayOutcome({
+      workspaceId: "workspace:gamma",
+      operationId: "operation:outcome:1",
+      nextStatus: OfflineQueuedMutationStatuses.syncConflict,
+      attemptedAt: "2026-04-08T10:35:00.000Z",
+      incrementRetryCount: true,
+    });
+
+    expect(conflicted.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
+    expect(conflicted.retryability.retryCount).toBe(1);
+    expect(conflicted.retryability.lastAttemptedAt).toBe("2026-04-08T10:35:00.000Z");
+
+    const removed = await service.markOperationAsApplied("workspace:gamma", "operation:outcome:1");
+    expect(removed).toBeTrue();
+    const found = await service.findQueuedOperation("workspace:gamma", "operation:outcome:1");
+    expect(found).toBeUndefined();
+  });
 });

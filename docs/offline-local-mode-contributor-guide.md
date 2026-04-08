@@ -22,11 +22,14 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - application pending-operation persistence/replay-preparation service:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+- application controlled resynchronization coordinator:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - desktop host local-mode binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - desktop persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
@@ -45,6 +48,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
 3. Update application classification/resynchronization behavior third:
    - keep reconnect decision rules explicit and bounded,
    - preserve visible divergence handling.
+   - route reconnect replay through authoritative API ports and capture explicit outcomes for apply/conflict/reject/failure paths.
 4. Update desktop profile bindings fourth:
    - keep desktop runtime as `control-plane-client`,
    - enforce allowed resource and execution classes through profile gates.
@@ -124,7 +128,9 @@ At minimum, update:
 - `src/hosts/desktop/tests/DesktopOfflineSnapshotCacheHost.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflineSnapshotCacheRepository.test.ts`
 - `src/application/common/tests/OfflinePendingOperationPersistence.test.ts`
+- `src/application/common/tests/OfflineControlledResynchronizationCoordinator.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflinePendingOperationHost.test.ts`
+- `src/hosts/desktop/tests/DesktopOfflineResynchronizationHost.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflinePendingOperationRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`

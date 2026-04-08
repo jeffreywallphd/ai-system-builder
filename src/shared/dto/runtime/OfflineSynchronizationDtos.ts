@@ -130,7 +130,12 @@ export function toOfflineReconciliationOutcomeDto(
     readonly conflictCode?: string;
     readonly conflictSummary?: string;
     readonly authoritativeRevision?: string;
+    readonly authoritativeRevisionAfter?: string;
     readonly localMutationRevision?: number;
+  },
+  context?: {
+    readonly resourceClass?: OfflineConflictIndicatorDto["resourceClass"];
+    readonly resourceId?: string;
   },
 ): OfflineReconciliationOutcomeDto {
   const resolvedAt = options?.resolvedAt ?? new Date().toISOString();
@@ -138,8 +143,8 @@ export function toOfflineReconciliationOutcomeDto(
     decision.conflictClass
       ? Object.freeze([Object.freeze({
         operationId: decision.mutationId,
-        resourceClass: "workflow-draft",
-        resourceId: "unknown",
+        resourceClass: context?.resourceClass ?? "workflow-draft",
+        resourceId: context?.resourceId ?? "unknown",
         severity: decision.action === OfflineReconciliationActions.rejectNotAllowed
           ? OfflineConflictSeverities.medium
           : OfflineConflictSeverities.high,
@@ -162,6 +167,7 @@ export function toOfflineReconciliationOutcomeDto(
     decisionRule: decision.decisionRule,
     reason: decision.reason,
     resolvedAt,
+    authoritativeRevisionAfter: options?.authoritativeRevisionAfter,
     conflicts,
   });
 }

@@ -15,8 +15,10 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 1. Shared offline contracts/schemas.
 2. Domain offline boundary catalog and policy model.
 3. Application classification/resynchronization/cache/pending-operation persistence seams.
+   - include controlled reconnect coordinator (`src/application/common/OfflineControlledResynchronizationCoordinator.ts`) and keep replay outcome capture explicit.
 4. Desktop host profile + offline cache/pending-operation runtime gating.
    - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
+   - include desktop controlled-resynchronization host runtime (`src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`) when reconnect workflow composition changes.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
 

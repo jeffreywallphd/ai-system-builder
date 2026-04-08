@@ -1,0 +1,436 @@
+import type {
+  CacheOfflineAuthoritativeSnapshotRequest,
+  OfflineAuthoritativeSnapshotCacheService,
+} from "@application/common/OfflineAuthoritativeSnapshotCache";
+import {
+  type AuthoritativeResourceRevisionSnapshot,
+  type OfflineResynchronizationDecisionRule,
+  type OfflineResynchronizationConflictClass,
+  OfflineResynchronizationActions,
+  OfflineResynchronizationConflictClasses,
+  OfflineResynchronizationDecisionRules,
+  assertResynchronizationPlanPreventsSilentGlobalDivergence,
+  planOfflineResynchronization,
+} from "@application/common/OfflineLocalModeResynchronization";
+import {
+  type OfflinePendingOperationService,
+  type PrepareOfflineReplayOperation,
+} from "@application/common/OfflinePendingOperationPersistence";
+import {
+  OfflineQueuedMutationStatuses,
+  type OfflineResourceClass,
+} from "@domain/platform/OfflineLocalModeBoundaries";
+import {
+  type OfflineConnectivitySurfaceStateDto,
+  type OfflineReconciliationOutcomeDto,
+} from "@shared/contracts/runtime/OfflineSynchronizationContracts";
+import { toOfflineReconciliationOutcomeDto } from "@shared/dto/runtime/OfflineSynchronizationDtos";
+
+export class OfflineControlledResynchronizationCoordinatorError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OfflineControlledResynchronizationCoordinatorError";
+  }
+}
+
+export const AuthoritativeReplayExecutionResultKinds = Object.freeze({
+  applied: "applied",
+  conflict: "conflict",
+  rejected: "rejected",
+  failed: "failed",
+});
+
+export type AuthoritativeReplayExecutionResultKind =
+  typeof AuthoritativeReplayExecutionResultKinds[keyof typeof AuthoritativeReplayExecutionResultKinds];
+
+export interface AuthoritativeReplayExecutionResult {
+  readonly kind: AuthoritativeReplayExecutionResultKind;
+  readonly reason: string;
+  readonly authoritativeRevisionAfter?: string;
+  readonly conflictClass?: OfflineResynchronizationConflictClass;
+  readonly decisionRule?: OfflineResynchronizationDecisionRule;
+  readonly requiresUserAttention?: boolean;
+  readonly requiresAdminAttention?: boolean;
+  readonly preserveLocalDraftAsUnsynced?: boolean;
+  readonly retryable?: boolean;
+  readonly nextEligibleReplayAt?: string;
+}
+
+export interface OfflineAuthoritativeSnapshotFetchResponse
+  extends Omit<CacheOfflineAuthoritativeSnapshotRequest, "cachedByActorUserIdentityId"> {}
+
+export interface IOfflineAuthoritativeResynchronizationPort {
+  fetchResourceRevisions(input: {
+    readonly workspaceId: string;
+    readonly resources: ReadonlyArray<{
+      readonly resourceClass: OfflineResourceClass;
+      readonly resourceId: string;
+    }>;
+  }): Promise<ReadonlyArray<AuthoritativeResourceRevisionSnapshot>>;
+  replayPreparedOperation(input: {
+    readonly workspaceId: string;
+    readonly operation: PrepareOfflineReplayOperation;
+    readonly attemptedAt: string;
+  }): Promise<AuthoritativeReplayExecutionResult>;
+  fetchResourceSnapshotForCache(input: {
+    readonly workspaceId: string;
+    readonly resourceClass: OfflineResourceClass;
+    readonly resourceId: string;
+  }): Promise<OfflineAuthoritativeSnapshotFetchResponse | undefined>;
+}
+
+export interface IOfflineConnectivityStatePort {
+  getConnectivityState(): Promise<OfflineConnectivitySurfaceStateDto>;
+}
+
+export interface OfflineControlledResynchronizationResult {
+  readonly workspaceId: string;
+  readonly attemptedAt: string;
+  readonly connectivity: OfflineConnectivitySurfaceStateDto;
+  readonly replayPreparedOperationIds: ReadonlyArray<string>;
+  readonly blockedOperationIds: ReadonlyArray<string>;
+  readonly replayedOperationIds: ReadonlyArray<string>;
+  readonly appliedOperationIds: ReadonlyArray<string>;
+  readonly refreshedSnapshotKeys: ReadonlyArray<string>;
+  readonly outcomes: ReadonlyArray<OfflineReconciliationOutcomeDto>;
+}
+
+export interface OfflineControlledResynchronizationCoordinatorOptions {
+  readonly now?: () => Date;
+}
+
+export class OfflineControlledResynchronizationCoordinator {
+  private readonly now: () => Date;
+
+  constructor(
+    private readonly pendingOperationService: OfflinePendingOperationService,
+    private readonly snapshotCacheService: OfflineAuthoritativeSnapshotCacheService,
+    private readonly authoritativePort: IOfflineAuthoritativeResynchronizationPort,
+    private readonly connectivityPort: IOfflineConnectivityStatePort,
+    options?: OfflineControlledResynchronizationCoordinatorOptions,
+  ) {
+    this.now = options?.now ?? (() => new Date());
+  }
+
+  public async synchronizeWorkspace(input: {
+    readonly workspaceId: string;
+    readonly actorUserIdentityId: string;
+    readonly attemptedAt?: string;
+  }): Promise<OfflineControlledResynchronizationResult> {
+    const workspaceId = normalizeRequired(input.workspaceId, "workspaceId");
+    const actorUserIdentityId = normalizeRequired(input.actorUserIdentityId, "actorUserIdentityId");
+    const attemptedAt = normalizeIsoTimestamp(input.attemptedAt ?? this.now().toISOString(), "attemptedAt");
+    const connectivity = await this.connectivityPort.getConnectivityState();
+
+    if (!connectivity.canResynchronize) {
+      return Object.freeze({
+        workspaceId,
+        attemptedAt,
+        connectivity,
+        replayPreparedOperationIds: Object.freeze([]),
+        blockedOperationIds: Object.freeze([]),
+        replayedOperationIds: Object.freeze([]),
+        appliedOperationIds: Object.freeze([]),
+        refreshedSnapshotKeys: Object.freeze([]),
+        outcomes: Object.freeze([]),
+      });
+    }
+
+    const replayPreparation = await this.pendingOperationService.prepareReplayOperations({
+      workspaceId,
+      preparedAt: attemptedAt,
+    });
+    const replayPreparedOperationIds = Object.freeze(
+      replayPreparation.prepared.map((operation) => operation.operationId),
+    );
+    const blockedOperationIds = Object.freeze(
+      replayPreparation.blocked.map((operation) => operation.operationId),
+    );
+
+    const cachedSnapshots = await this.snapshotCacheService.listWorkspaceSnapshots(workspaceId);
+    const resourceTargets = dedupeResourceTargets([
+      ...cachedSnapshots.map((record) => ({
+        resourceClass: record.resourceClass,
+        resourceId: record.resourceId,
+      })),
+      ...replayPreparation.prepared.map((operation) => ({
+        resourceClass: operation.targetResourceClass,
+        resourceId: operation.targetResourceId,
+      })),
+    ]);
+    const authoritativeRevisions = await this.authoritativePort.fetchResourceRevisions({
+      workspaceId,
+      resources: resourceTargets,
+    });
+    const revisionByResource = new Map<string, AuthoritativeResourceRevisionSnapshot>();
+    for (const revision of authoritativeRevisions) {
+      revisionByResource.set(makeResourceKey(revision.resourceClass, revision.resourceId), revision);
+    }
+
+    const staleCachedTargets = cachedSnapshots
+      .filter((cached) => {
+        const revision = revisionByResource.get(makeResourceKey(cached.resourceClass, cached.resourceId));
+        if (!revision) {
+          return false;
+        }
+        if (revision.authoritativeRevision !== cached.authoritativeRevision) {
+          return true;
+        }
+        if (
+          revision.authoritativeSnapshotRevision
+          && revision.authoritativeSnapshotRevision !== cached.authoritativeSnapshotRevision
+        ) {
+          return true;
+        }
+        return false;
+      })
+      .map((cached) => ({
+        resourceClass: cached.resourceClass,
+        resourceId: cached.resourceId,
+      }));
+
+    const refreshedSnapshotKeys = new Set<string>();
+    for (const target of staleCachedTargets) {
+      const refreshed = await this.refreshSnapshot({
+        workspaceId,
+        actorUserIdentityId,
+        resourceClass: target.resourceClass,
+        resourceId: target.resourceId,
+      });
+      if (refreshed) {
+        refreshedSnapshotKeys.add(makeResourceKey(target.resourceClass, target.resourceId));
+      }
+    }
+
+    const plannedDecisions = planOfflineResynchronization({
+      queuedMutations: replayPreparation.prepared.map((entry) => entry.operationEnvelope),
+      authoritativeRevisions,
+    });
+    assertResynchronizationPlanPreventsSilentGlobalDivergence(plannedDecisions);
+    const decisionByOperationId = new Map(plannedDecisions.map((decision) => [decision.mutationId, decision]));
+
+    const outcomes: OfflineReconciliationOutcomeDto[] = [];
+    const replayedOperationIds: string[] = [];
+    const appliedOperationIds: string[] = [];
+
+    for (const preparedOperation of replayPreparation.prepared) {
+      const operationId = preparedOperation.operationId;
+      const decision = decisionByOperationId.get(operationId);
+      if (!decision) {
+        throw new OfflineControlledResynchronizationCoordinatorError(
+          `Missing resynchronization decision for prepared operation '${operationId}'.`,
+        );
+      }
+
+      const revisionSnapshot = revisionByResource.get(
+        makeResourceKey(preparedOperation.targetResourceClass, preparedOperation.targetResourceId),
+      );
+      if (decision.action !== OfflineResynchronizationActions.applyToAuthoritative) {
+        await this.pendingOperationService.markOperationReplayOutcome({
+          workspaceId,
+          operationId,
+          nextStatus: decision.action === OfflineResynchronizationActions.conflictRequiresReview
+            ? OfflineQueuedMutationStatuses.syncConflict
+            : OfflineQueuedMutationStatuses.syncRejected,
+          attemptedAt,
+          incrementRetryCount: false,
+        });
+        outcomes.push(toOfflineReconciliationOutcomeDto(decision, {
+          resolvedAt: attemptedAt,
+          conflictCode: decision.conflictClass,
+          conflictSummary: decision.reason,
+          authoritativeRevision: revisionSnapshot?.authoritativeRevision,
+          localMutationRevision: preparedOperation.operationEnvelope.localMutationRevision,
+        }, {
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+        }));
+        continue;
+      }
+
+      replayedOperationIds.push(operationId);
+      const replayResult = await this.authoritativePort.replayPreparedOperation({
+        workspaceId,
+        operation: preparedOperation,
+        attemptedAt,
+      });
+
+      if (replayResult.kind === AuthoritativeReplayExecutionResultKinds.applied) {
+        await this.pendingOperationService.markOperationAsApplied(workspaceId, operationId);
+        appliedOperationIds.push(operationId);
+        const appliedDecision = Object.freeze({
+          ...decision,
+          reason: normalizeOptional(replayResult.reason) ?? decision.reason,
+        });
+        outcomes.push(toOfflineReconciliationOutcomeDto(appliedDecision, {
+          resolvedAt: attemptedAt,
+          authoritativeRevisionAfter: replayResult.authoritativeRevisionAfter,
+        }, {
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+        }));
+
+        const refreshed = await this.refreshSnapshot({
+          workspaceId,
+          actorUserIdentityId,
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+        });
+        if (refreshed) {
+          refreshedSnapshotKeys.add(makeResourceKey(preparedOperation.targetResourceClass, preparedOperation.targetResourceId));
+        }
+        continue;
+      }
+
+      const replayDecision = deriveDecisionFromAuthoritativeReplayResult({
+        operationId,
+        replayResult,
+      });
+      await this.pendingOperationService.markOperationReplayOutcome({
+        workspaceId,
+        operationId,
+        nextStatus: replayDecision.action === OfflineResynchronizationActions.rejectNotAllowed
+          ? OfflineQueuedMutationStatuses.syncRejected
+          : OfflineQueuedMutationStatuses.syncConflict,
+        attemptedAt,
+        incrementRetryCount: true,
+        retryable: replayResult.retryable,
+        nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+      });
+      outcomes.push(toOfflineReconciliationOutcomeDto(replayDecision, {
+        resolvedAt: attemptedAt,
+        conflictCode: replayDecision.conflictClass,
+        conflictSummary: replayDecision.reason,
+        authoritativeRevision: revisionSnapshot?.authoritativeRevision,
+        localMutationRevision: preparedOperation.operationEnvelope.localMutationRevision,
+      }, {
+        resourceClass: preparedOperation.targetResourceClass,
+        resourceId: preparedOperation.targetResourceId,
+      }));
+    }
+
+    return Object.freeze({
+      workspaceId,
+      attemptedAt,
+      connectivity,
+      replayPreparedOperationIds,
+      blockedOperationIds,
+      replayedOperationIds: Object.freeze(replayedOperationIds),
+      appliedOperationIds: Object.freeze(appliedOperationIds),
+      refreshedSnapshotKeys: Object.freeze([...refreshedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
+      outcomes: Object.freeze(outcomes),
+    });
+  }
+
+  private async refreshSnapshot(input: {
+    readonly workspaceId: string;
+    readonly actorUserIdentityId: string;
+    readonly resourceClass: OfflineResourceClass;
+    readonly resourceId: string;
+  }): Promise<boolean> {
+    const snapshot = await this.authoritativePort.fetchResourceSnapshotForCache({
+      workspaceId: input.workspaceId,
+      resourceClass: input.resourceClass,
+      resourceId: input.resourceId,
+    });
+    if (!snapshot) {
+      return false;
+    }
+
+    await this.snapshotCacheService.cacheSnapshot({
+      ...snapshot,
+      workspaceId: input.workspaceId,
+      cachedByActorUserIdentityId: input.actorUserIdentityId,
+      lastSynchronizedAt: this.now().toISOString(),
+    });
+    return true;
+  }
+}
+
+function dedupeResourceTargets(
+  targets: ReadonlyArray<{ readonly resourceClass: OfflineResourceClass; readonly resourceId: string }>,
+): ReadonlyArray<{ readonly resourceClass: OfflineResourceClass; readonly resourceId: string }> {
+  const map = new Map<string, { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }>();
+  for (const target of targets) {
+    const resourceId = normalizeRequired(target.resourceId, "resourceId");
+    map.set(makeResourceKey(target.resourceClass, resourceId), Object.freeze({
+      resourceClass: target.resourceClass,
+      resourceId,
+    }));
+  }
+
+  return Object.freeze([...map.values()]);
+}
+
+function deriveDecisionFromAuthoritativeReplayResult(input: {
+  readonly operationId: string;
+  readonly replayResult: AuthoritativeReplayExecutionResult;
+}) {
+  if (input.replayResult.kind === AuthoritativeReplayExecutionResultKinds.rejected) {
+    return Object.freeze({
+      mutationId: input.operationId,
+      action: OfflineResynchronizationActions.rejectNotAllowed,
+      conflictClass: input.replayResult.conflictClass ?? OfflineResynchronizationConflictClasses.permissionChangedDuringDisconnection,
+      decisionRule: input.replayResult.decisionRule
+        ?? OfflineResynchronizationDecisionRules.rejectReplayAndRequireUserReview,
+      preserveLocalDraftAsUnsynced: input.replayResult.preserveLocalDraftAsUnsynced ?? true,
+      requiresUserAttention: input.replayResult.requiresUserAttention ?? true,
+      requiresAdminAttention: input.replayResult.requiresAdminAttention ?? false,
+      reason: normalizeOptional(input.replayResult.reason)
+        ?? "Authoritative replay was rejected after reconnect validation.",
+    });
+  }
+
+  if (input.replayResult.kind === AuthoritativeReplayExecutionResultKinds.conflict) {
+    return Object.freeze({
+      mutationId: input.operationId,
+      action: OfflineResynchronizationActions.conflictRequiresReview,
+      conflictClass: input.replayResult.conflictClass ?? OfflineResynchronizationConflictClasses.resourceVersionMismatch,
+      decisionRule: input.replayResult.decisionRule
+        ?? OfflineResynchronizationDecisionRules.unsafeAutoMergeDeferred,
+      preserveLocalDraftAsUnsynced: input.replayResult.preserveLocalDraftAsUnsynced ?? true,
+      requiresUserAttention: input.replayResult.requiresUserAttention ?? true,
+      requiresAdminAttention: input.replayResult.requiresAdminAttention ?? false,
+      reason: normalizeOptional(input.replayResult.reason)
+        ?? "Authoritative replay reported a conflict that requires explicit review.",
+    });
+  }
+
+  return Object.freeze({
+    mutationId: input.operationId,
+    action: OfflineResynchronizationActions.conflictRequiresReview,
+    conflictClass: input.replayResult.conflictClass ?? OfflineResynchronizationConflictClasses.authoritativeStateUnavailable,
+    decisionRule: input.replayResult.decisionRule
+      ?? OfflineResynchronizationDecisionRules.unsafeAutoMergeDeferred,
+    preserveLocalDraftAsUnsynced: input.replayResult.preserveLocalDraftAsUnsynced ?? true,
+    requiresUserAttention: input.replayResult.requiresUserAttention ?? true,
+    requiresAdminAttention: input.replayResult.requiresAdminAttention ?? false,
+    reason: normalizeOptional(input.replayResult.reason)
+      ?? "Authoritative replay failed before an apply/reject decision was confirmed.",
+  });
+}
+
+function makeResourceKey(resourceClass: OfflineResourceClass, resourceId: string): string {
+  return `${resourceClass}::${resourceId}`;
+}
+
+function normalizeRequired(value: string, field: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new OfflineControlledResynchronizationCoordinatorError(`${field} is required.`);
+  }
+  return normalized;
+}
+
+function normalizeOptional(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function normalizeIsoTimestamp(value: string, field: string): string {
+  const parsed = new Date(normalizeRequired(value, field));
+  if (Number.isNaN(parsed.getTime())) {
+    throw new OfflineControlledResynchronizationCoordinatorError(`${field} must be a valid ISO timestamp.`);
+  }
+  return parsed.toISOString();
+}
