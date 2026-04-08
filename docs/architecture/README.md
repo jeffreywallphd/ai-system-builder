@@ -247,6 +247,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For Feature 20 first-production deployment policy taxonomy, explicit setting validation rules, and canonical configuration registry relationships, read [`deployment-profile-policy-taxonomy-registry.md`](./deployment-profile-policy-taxonomy-registry.md).
 - For Feature 20 built-in `home`/`classroom`/`organization` preset definitions, explainable rationale metadata, and effective-default baseline expectations, read [`deployment-profile-policy-preset-definitions.md`](./deployment-profile-policy-preset-definitions.md).
 - For Feature 20 centralized effective-policy resolution, persisted override validation, deterministic override precedence, and per-setting provenance behavior, read [`deployment-profile-policy-effective-resolution-and-overrides.md`](./deployment-profile-policy-effective-resolution-and-overrides.md).
+- For Feature 20 application-facing policy evaluation seams used by authorization/storage/scheduling/security consumers, read [`deployment-profile-policy-evaluation-seams.md`](./deployment-profile-policy-evaluation-seams.md).
 - For reusable protected-resource visibility metadata, explicit sharing targets, and resource-authorization adaptation guidance, read [`authorization-visibility-sharing-contracts.md`](./authorization-visibility-sharing-contracts.md).
 - For authorization application ports, policy evaluator seams, and adapter expectations for context loading/event recording, read [`authorization-application-ports.md`](./authorization-application-ports.md).
 - For shared authorization payload schemas, boundary validation contracts, and schema-vs-domain guidance, read [`authorization-schema-validation-contracts.md`](./authorization-schema-validation-contracts.md).
@@ -377,6 +378,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `src/application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `src/application/system-studio/tests/*` and `src/infrastructure/api/studio-shell/tests/*`.
+
 
 
 
