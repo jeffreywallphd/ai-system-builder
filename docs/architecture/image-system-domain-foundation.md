@@ -69,3 +69,10 @@ Story 2.1.3 complements this by adding shared parameter-set validation contracts
 - Domain model is infrastructure-agnostic and does not embed ComfyUI graph JSON.
 - No UI framework, transport, filesystem, or database details are encoded in the entity.
 - The model is designed for later orchestration and lineage features without redesigning the system/workflow contract boundary.
+
+## Related architecture notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`

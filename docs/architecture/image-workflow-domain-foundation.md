@@ -56,3 +56,10 @@ Canonical fields include:
 - No ComfyUI graph JSON is embedded in domain entities.
 - No React, Electron, HTTP, filesystem, or SQLite details are present.
 - Workflow execution adapter details are represented only through typed backend translation references.
+
+## Related architecture notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`

@@ -46,3 +46,10 @@ Story 2.1.1 introduces a dedicated typed image-workflow domain model with lifecy
 - No embedded ComfyUI graph structure in the domain entity.
 - Backend execution details represented through typed translation seams only.
 - Workflow contracts stay authoritative and reusable for later orchestration, policy checks, and storage integration.
+
+## Related notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`
