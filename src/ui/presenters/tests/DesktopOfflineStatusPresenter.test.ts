@@ -7,7 +7,28 @@ describe("DesktopOfflineStatusPresenter", () => {
     const snapshot = createOfflineSynchronizationStateSnapshot({
       workspaceId: "workspace:connected-unsynced",
       cachedResources: Object.freeze([]),
-      drafts: Object.freeze([]),
+      drafts: Object.freeze([{
+        draftId: "draft:1",
+        resourceClass: "workflow-draft",
+        resourceId: "workflow:1",
+        baseAuthoritativeRevision: "rev:1",
+        authoritativeSnapshotRevision: "rev:1",
+        draftRevision: 2,
+        syncStatus: "sync-conflict",
+        queuedMutationId: "op:1",
+        dirty: true,
+        lastEditedAt: "2026-04-07T10:00:30.000Z",
+        lastEditedByActorUserIdentityId: "actor:1",
+        localChanges: Object.freeze([{
+          changeId: "change:1",
+          draftId: "draft:1",
+          resourceId: "workflow:1",
+          kind: "update",
+          changedAt: "2026-04-07T10:00:30.000Z",
+          changedByActorUserIdentityId: "actor:1",
+          summary: "Adjusted workflow step order",
+        }]),
+      }]),
       queue: Object.freeze({
         queueId: "queue:connected-unsynced",
         operations: Object.freeze([{
@@ -30,7 +51,29 @@ describe("DesktopOfflineStatusPresenter", () => {
         }]),
         localExecutionRegistrations: Object.freeze([]),
         pendingRunSubmissions: Object.freeze([]),
-        outcomes: Object.freeze([]),
+        outcomes: Object.freeze([{
+          operationId: "op:1",
+          action: "conflict-requires-review",
+          requiresUserAttention: true,
+          requiresAdminAttention: false,
+          preserveLocalDraftAsUnsynced: true,
+          decisionRule: "preserve-unsynced-draft-and-require-user-review",
+          reason: "Authoritative revision changed during offline edits.",
+          resolvedAt: "2026-04-07T10:01:30.000Z",
+          conflicts: Object.freeze([{
+            operationId: "op:1",
+            resourceClass: "workflow-draft",
+            resourceId: "workflow:1",
+            severity: "high",
+            conflictClass: "stale-base-edit",
+            conflictCode: "authoritative-revision-mismatch",
+            summary: "Base revision no longer matches authoritative state.",
+            authoritativeRevision: "rev:2",
+            localMutationRevision: 2,
+            detectedAt: "2026-04-07T10:01:30.000Z",
+            requiresUserAttention: true,
+          }]),
+        }]),
         updatedAt: "2026-04-07T10:01:00.000Z",
       }),
       connectivity: Object.freeze({
@@ -46,6 +89,10 @@ describe("DesktopOfflineStatusPresenter", () => {
     const model = buildDesktopOfflineStatusSurfaceModel(snapshot);
     expect(model.banner.title).toBe("Connected with unsynced local changes");
     expect(model.synchronization.pendingCount).toBe(1);
+    expect(model.drafts.unsyncedCount).toBe(1);
+    expect(model.conflicts.totalCount).toBe(1);
+    expect(model.replayOutcomes.reviewRequiredCount).toBe(1);
+    expect(model.followUp.limitations.some((entry) => entry.includes("Unsupported auto-merge scenarios"))).toBe(true);
     expect(model.actions.offlineModeToggleLabel).toBe("Go offline");
   });
 
@@ -85,6 +132,7 @@ describe("DesktopOfflineStatusPresenter", () => {
     expect(model.banner.title).toBe("Offline local mode is active");
     expect(model.synchronization.pendingRunSubmissionCount).toBe(1);
     expect(model.policy.unsupportedActions.length).toBe(2);
+    expect(model.followUp.actions.find((entry) => entry.actionKey === "sync-conflicts")?.enabled).toBe(false);
     expect(model.actions.offlineModeToggleLabel).toBe("Return online");
   });
 });

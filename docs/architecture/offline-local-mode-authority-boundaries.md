@@ -183,6 +183,30 @@ Required UX behavior baseline:
 - unsupported actions are listed explicitly when queueing/resynchronization/policy constraints apply;
 - UI state derivation uses shared offline synchronization contracts, not ad hoc transport error inference.
 
+## Desktop offline recovery and sync-resolution interaction flows (Story 19.3.2)
+
+Desktop shell UX now includes explicit interaction flows for unresolved local work after reconnect attempts.
+
+- shared presenter and surface seams remain canonical:
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - `src/ui/layout/AppLayout.tsx`
+- the status surface now includes dedicated panels for:
+  - preserved unsynced drafts (including local-only, queued, conflicted, and rejected states),
+  - sync conflict summaries sourced from queue conflict statuses and reconciliation conflict indicators,
+  - replay outcomes that explain applied vs conflict-preserved vs rejected reconnect decisions,
+  - first production recovery actions for reviewing drafts/conflicts/outcomes.
+- recovery messaging remains explicit about limitations:
+  - unsupported auto-merge scenarios are surfaced as manual review work,
+  - rejected operations are retained for explicit follow-up and are not silently replayed,
+  - pending operations remain local when trusted resynchronization is unavailable.
+
+Required interaction-flow baseline:
+- users can inspect preserved local drafts and conflict records through production shared desktop UI;
+- replay outcomes are understandable from user-visible outcome reason and action labeling;
+- unresolved local work has explicit first-step follow-up actions;
+- UI does not imply unsupported complex merge tooling or silent reconciliation.
+
 ## Offline audit and operational event hooks
 
 Offline and reconnect behavior must remain visible outside desktop-local UI state.

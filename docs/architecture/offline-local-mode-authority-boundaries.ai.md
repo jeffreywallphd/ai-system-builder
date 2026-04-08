@@ -90,6 +90,22 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
   - display explicit policy-limited unsupported actions,
   - consume shared offline contract DTOs (`OfflineConnectivitySurfaceStateDto`, `OfflineSynchronizationStateSnapshotDto`) instead of ad hoc transport inference.
 
+## Desktop UX interaction-flow baseline (Story 19.3.2)
+
+- keep recovery and sync-resolution interaction flow seams in shared presenter/UI:
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - `src/ui/layout/AppLayout.tsx`
+- include explicit user-visible panels for:
+  - preserved unsynced drafts,
+  - sync conflict summaries,
+  - replay outcomes and disposition reasons,
+  - first production recovery/follow-up actions.
+- keep UX honest about bounded automation:
+  - no silent auto-merge claims,
+  - no hidden replay of rejected operations,
+  - no implication that local state becomes authoritative without reconnect outcomes.
+
 ## Implemented guarantees now called out explicitly
 
 - replay starts only when connectivity marks `canResynchronize=true`.
