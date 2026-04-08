@@ -240,3 +240,32 @@ Safety posture preserved:
 - Raw backend/technical detail remains advanced-only.
 - Recovery classification and retryability come from normalized readiness/persistence diagnostics and mapped runtime error codes, not provider-local heuristics.
 
+## Epic 7.4 Story 7.4.1 implementation update
+
+Story 7.4.1 refines responsive layout and accessibility for the runtime editor while keeping mobile/thin behavior intentionally continuity-focused (not full authoring parity).
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/styles/components/assets.css`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+Accessibility behavior:
+
+- editor now exposes an explicit page heading and named region labels for preparation controls vs preview/review regions,
+- image-browser tabs now include full tab semantics (`tabIndex`, `aria-controls`, `tabpanel` linkage),
+- keyboard navigation across image-browser tabs supports arrow keys and `Home`/`End`,
+- run progress exposes `role="progressbar"` with value text for non-visual status.
+
+Responsive behavior:
+
+- key action rows now wrap and stay readable at narrow widths,
+- run-launch panel is sticky on wider layouts so launch/status actions remain discoverable during long-page review,
+- narrow layouts collapse action controls and gallery tabs into touch-friendly full-width/stacked patterns.
+
+Multi-surface posture:
+
+- desktop remains the complete authoring surface,
+- narrow/thin flows prioritize: upload/select, adjust, run/precheck, monitor, review, and continue/reuse outputs,
+- advanced diagnostics remain available but secondary, preserving bounded seams for future thinner clients without local truth forks.
+
