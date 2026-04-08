@@ -18,6 +18,7 @@ import type { CertificateOperationsBackendApi } from "../../../api/security/Cert
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
 import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
+import type { ImageAssetManagementBackendApi } from "../../../api/image-assets/ImageAssetManagementBackendApi";
 import type { DeploymentPolicyReadBackendApi } from "../../../api/deployment/DeploymentPolicyReadBackendApi";
 import type { DeploymentPolicyWriteBackendApi } from "../../../api/deployment/DeploymentPolicyWriteBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
@@ -125,6 +126,15 @@ import {
   type RegisterGeneratedOutputApiRequest,
   type ResolveAssetPreviewApiRequest,
 } from "../../../api/assets/sdk/PublicAssetManagementApiContract";
+import {
+  ImageAssetManagementApiErrorCodes,
+  type CompleteImageAssetUploadApiRequest,
+  type CreateImageAssetApiRequest,
+  type GetImageAssetMetadataApiRequest,
+  type ImageAssetManagementApiResponse,
+  type IngestImageAssetUploadContentApiRequest,
+  type ListImageAssetMetadataApiRequest,
+} from "../../../api/image-assets/sdk/PublicImageAssetManagementApiContract";
 import {
   RuntimeQueueItemStatuses,
   SystemRuntimeTransportRoutes,
@@ -913,6 +923,7 @@ export interface IdentityHttpServerOptions {
   readonly secretMetadataBackendApi?: SecretMetadataBackendApi;
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
+  readonly imageAssetManagementBackendApi?: ImageAssetManagementBackendApi;
   readonly auditLedgerBackendApi?: AuditLedgerBackendApi;
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
@@ -3992,6 +4003,228 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "GET"
+        && path === "/api/v1/image-assets"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateImageAssetListRequest(
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
+              searchParams,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+
+            const apiResponse = await options.imageAssetManagementBackendApi.listImageAssetMetadata(parsedRequest.data);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/image-assets/")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const assetId = decodePathTail(path, "/api/v1/image-assets/");
+            if (!assetId || assetId.includes("/")) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const detailRequest: GetImageAssetMetadataApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              assetId,
+              includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.imageAssetManagementBackendApi.getImageAssetMetadata(detailRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "POST"
+        && path === "/api/v1/image-assets"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = await parseAndValidateImageAssetCreateRequest(
+              request,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.imageAssetManagementBackendApi.createImageAsset(parsedRequest.data);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/image-assets/")
+        && path.endsWith("/content")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const decoded = decodeImageAssetUploadSessionPath(path, "/content");
+            if (!decoded) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const ingestRequest: IngestImageAssetUploadContentApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              assetId: decoded.assetId,
+              uploadSessionId: decoded.uploadSessionId,
+              contentType: typeof request.headers["content-type"] === "string" ? request.headers["content-type"] : undefined,
+              content: toRequestBodyStream(request),
+              expectedSizeBytes: parseOptionalInteger(searchParams.get("expectedSizeBytes")),
+              expectedChecksumSha256: normalizeOptionalString(searchParams.get("expectedChecksumSha256")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+
+            const apiResponse = await options.imageAssetManagementBackendApi.ingestImageAssetUploadContent(ingestRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, {
+              ...ingestRequest,
+              content: "[stream]",
+            }, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/image-assets/")
+        && path.endsWith("/complete")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId, assetId, and uploadSessionId are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const decoded = decodeImageAssetUploadSessionPath(path, "/complete");
+            if (!decoded) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId, assetId, and uploadSessionId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateImageAssetCompleteRequest(
+              request,
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
+              decoded.assetId,
+              decoded.uploadSessionId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const completeRequest: CompleteImageAssetUploadApiRequest = parsedRequest.data;
+            const apiResponse = await options.imageAssetManagementBackendApi.completeImageAssetUpload(completeRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, completeRequest, apiResponse);
           },
         );
         return;
@@ -9972,6 +10205,191 @@ async function parseAndValidateGeneratedOutputRegisterRequest(
   };
 }
 
+async function parseAndValidateImageAssetCreateRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: CreateImageAssetApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildImageAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "image-asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildImageAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+    }) as CreateImageAssetApiRequest,
+  };
+}
+
+async function parseAndValidateImageAssetCompleteRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  uploadSessionId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: CompleteImageAssetUploadApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildImageAssetManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "image-asset-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  const bodyRecord = asRecord(parsedBody.value);
+  if (!bodyRecord) {
+    const body = buildImageAssetManagementInvalidRequestResponse("Request body must be an object.");
+    return { ok: false, statusCode: 400, body };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      ...bodyRecord,
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+      uploadSessionId,
+    }) as CompleteImageAssetUploadApiRequest,
+  };
+}
+
+function parseAndValidateImageAssetListRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: ListImageAssetMetadataApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> } {
+  const originKinds = parseOptionalMultiEnumList(
+    searchParams,
+    "originKind",
+    "originKinds",
+    ["uploaded-source", "generated-result"] as const,
+  );
+  if (!originKinds.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("originKind values are invalid."),
+    };
+  }
+
+  const lifecycleStatuses = parseOptionalMultiEnumList(
+    searchParams,
+    "status",
+    "statuses",
+    ["ingesting", "available", "failed", "archived", "deleted"] as const,
+  );
+  if (!lifecycleStatuses.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("status values are invalid."),
+    };
+  }
+
+  const visibilities = parseOptionalMultiEnumList(
+    searchParams,
+    "visibility",
+    "visibilities",
+    ["private", "workspace", "shared", "published"] as const,
+  );
+  if (!visibilities.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("visibility values are invalid."),
+    };
+  }
+
+  const mediaTypes = parseOptionalMultiEnumList(
+    searchParams,
+    "mediaType",
+    "mediaTypes",
+    ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif", "image/heic", "image/heif"] as const,
+  );
+  if (!mediaTypes.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("mediaType values are invalid."),
+    };
+  }
+
+  const pagination = parseSharedListPaginationFromQuery(searchParams);
+  if (!pagination.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse(pagination.issue.message),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      ownerUserIdentityIds: mergeOptionalStringLists(
+        parseOptionalStringList(searchParams, "ownerUserId", "ownerUserIds"),
+        parseOptionalStringList(searchParams, "ownerUserIdentityId", "ownerUserIdentityIds"),
+      ),
+      originKinds: originKinds.value,
+      lifecycleStatuses: lifecycleStatuses.value,
+      visibilities: visibilities.value,
+      mediaTypes: mediaTypes.value,
+      storageInstanceIds: parseOptionalStringList(searchParams, "storageInstanceId", "storageInstanceIds"),
+      sourceRunIds: parseOptionalStringList(searchParams, "sourceRunId", "sourceRunIds"),
+      generationOperationIds: parseOptionalStringList(searchParams, "generationOperationId", "generationOperationIds"),
+      createdAfter: normalizeOptionalString(searchParams.get("createdAfter")),
+      createdBefore: normalizeOptionalString(searchParams.get("createdBefore")),
+      updatedAfter: normalizeOptionalString(searchParams.get("updatedAfter")),
+      updatedBefore: normalizeOptionalString(searchParams.get("updatedBefore")),
+      includeDeleted: parseOptionalBoolean(searchParams.get("includeDeleted")),
+      limit: pagination.limit,
+      offset: pagination.offset,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+    }),
+  };
+}
+
 function parseAndValidateAssetListRequest(
   actorUserIdentityId: string,
   workspaceId: string,
@@ -11293,6 +11711,29 @@ function mapAssetManagementStatusCode(response: AssetManagementApiResponse<unkno
   }
 }
 
+function mapImageAssetManagementStatusCode(response: ImageAssetManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case ImageAssetManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case ImageAssetManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case ImageAssetManagementApiErrorCodes.forbidden:
+      return 403;
+    case ImageAssetManagementApiErrorCodes.notFound:
+      return 404;
+    case ImageAssetManagementApiErrorCodes.conflict:
+      return 409;
+    case ImageAssetManagementApiErrorCodes.invalidState:
+      return 422;
+    default:
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
+  }
+}
+
 function mapAuditLedgerStatusCode(response: AuditLedgerApiResponse<unknown>): number {
   if (response.ok) {
     return 200;
@@ -11358,6 +11799,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
     [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.assetManagement]: Boolean(options.assetManagementBackendApi),
+    [AuthoritativeApiRouteBackendKeys.imageAssetManagement]: Boolean(options.imageAssetManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.systemRuntime]: Boolean(options.systemRuntimeBackendApi),
     [AuthoritativeApiRouteBackendKeys.runSubmission]: Boolean(options.authoritativeRunSubmissionBackendApi),
     [AuthoritativeApiRouteBackendKeys.runRead]: Boolean(options.authoritativeRunQueryBackendApi),
@@ -11450,6 +11892,36 @@ function parseOptionalMultiEnumList<TValue extends string>(
   return parseOptionalCsvEnumList(searchParams.get(csvFallbackKey), enumeration);
 }
 
+function parseOptionalStringList(
+  searchParams: URLSearchParams,
+  repeatedKey: string,
+  csvFallbackKey: string,
+): ReadonlyArray<string> | undefined {
+  const repeatedValues = searchParams.getAll(repeatedKey)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const csvValues = (searchParams.get(csvFallbackKey) ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+  const merged = [...repeatedValues, ...csvValues];
+  if (merged.length < 1) {
+    return undefined;
+  }
+  return Object.freeze([...new Set(merged)]);
+}
+
+function mergeOptionalStringLists(
+  first: ReadonlyArray<string> | undefined,
+  second: ReadonlyArray<string> | undefined,
+): ReadonlyArray<string> | undefined {
+  const merged = [...(first ?? []), ...(second ?? [])];
+  if (merged.length < 1) {
+    return undefined;
+  }
+  return Object.freeze([...new Set(merged)]);
+}
+
 function normalizeOptionalString(value: string | null): string | undefined {
   if (!value) {
     return undefined;
@@ -11535,6 +12007,32 @@ function decodePathTail(path: string, prefix: string, suffix = ""): string | und
 
   const decoded = decodeURIComponent(tail).trim();
   return decoded ? decoded : undefined;
+}
+
+function decodeImageAssetUploadSessionPath(
+  path: string,
+  suffix: "/content" | "/complete",
+): { readonly assetId: string; readonly uploadSessionId: string } | undefined {
+  if (!path.startsWith("/api/v1/image-assets/") || !path.endsWith(suffix)) {
+    return undefined;
+  }
+
+  const stem = path.slice("/api/v1/image-assets/".length, path.length - suffix.length);
+  const [rawAssetId, rawUploadSessionId] = stem.split("/uploads/");
+  if (!rawAssetId || !rawUploadSessionId) {
+    return undefined;
+  }
+
+  const assetId = decodeURIComponent(rawAssetId).trim();
+  const uploadSessionId = decodeURIComponent(rawUploadSessionId).trim();
+  if (!assetId || !uploadSessionId || assetId.includes("/") || uploadSessionId.includes("/")) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    assetId,
+    uploadSessionId,
+  });
 }
 
 function decodeWorkspaceEntityPath(
@@ -11750,6 +12248,16 @@ function buildAssetManagementInvalidRequestResponse(message: string): AssetManag
     ok: false,
     error: {
       code: AssetManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildImageAssetManagementInvalidRequestResponse(message: string): ImageAssetManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ImageAssetManagementApiErrorCodes.invalidRequest,
       message,
     },
   });

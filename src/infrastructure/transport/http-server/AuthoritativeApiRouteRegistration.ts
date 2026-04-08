@@ -25,6 +25,7 @@ export const AuthoritativeApiRouteBackendKeys = Object.freeze({
   secretMetadata: "secret-metadata",
   storageManagement: "storage-management",
   assetManagement: "asset-management",
+  imageAssetManagement: "image-asset-management",
   deploymentPolicyRead: "deployment-policy-read",
   deploymentPolicyWrite: "deployment-policy-write",
   systemRuntime: "system-runtime",

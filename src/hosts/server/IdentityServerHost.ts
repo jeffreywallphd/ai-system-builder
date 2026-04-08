@@ -81,6 +81,7 @@ import { SecretMetadataBackendApi } from "@infrastructure/api/security/SecretMet
 import { StorageManagementBackendApi } from "@infrastructure/api/storage/StorageManagementBackendApi";
 import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
+import { ImageAssetManagementBackendApi } from "@infrastructure/api/image-assets/ImageAssetManagementBackendApi";
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
@@ -105,6 +106,7 @@ import { SqliteStorageManagementAuditRecorder } from "@infrastructure/persistenc
 import { SqliteAssetPersistenceAdapter } from "@infrastructure/persistence/assets/SqliteAssetPersistenceAdapter";
 import { SqliteAssetAuditRecorder } from "@infrastructure/persistence/assets/SqliteAssetAuditRecorder";
 import { SqliteAssetUploadSessionPersistenceAdapter } from "@infrastructure/persistence/assets/SqliteAssetUploadSessionPersistenceAdapter";
+import { SqliteImageAssetPersistenceAdapter } from "@infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter";
 import {
   createAuthoritativePersistentPlatformServices,
   type AuthoritativePersistentPlatformServices,
@@ -118,6 +120,10 @@ import { AssetDetailService } from "@application/assets/use-cases/AssetDetailSer
 import { AssetDownloadService } from "@application/assets/use-cases/AssetDownloadService";
 import { AssetPreviewService } from "@application/assets/use-cases/AssetPreviewService";
 import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecycleService";
+import { FinalizeImageAssetUploadUseCase } from "@application/image-assets/use-cases/FinalizeImageAssetUploadUseCase";
+import { GetImageAssetMetadataUseCase } from "@application/image-assets/use-cases/GetImageAssetMetadataUseCase";
+import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/InitiateImageAssetCreationUseCase";
+import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
@@ -128,6 +134,7 @@ import {
   ServerManagedLocalStorageObjectAdapter,
 } from "@infrastructure/storage/local";
 import { ServerManagedStorageSynchronizationAdapter } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
+import { ManagedImageAssetStorageAdapter } from "@infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter";
 import { EncryptedAssetDownloadGrantAdapter } from "@infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
 import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
@@ -375,6 +382,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const assetRepository = persistentPlatformServices.assetRepository;
   const assetAuditRecorder = persistentPlatformServices.assetAuditRecorder;
   const assetUploadSessionRepository = persistentPlatformServices.assetUploadSessionRepository;
+  const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(databasePath);
   const env = options.env ?? process.env;
   const hostAddress = options.host ?? "127.0.0.1";
   const secureTransportConfig = resolveHostSecureTransportConfig({
@@ -1030,6 +1038,37 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     previewService: assetPreviewService,
     lifecycleService: assetLifecycleService,
   });
+  const imageAssetStorageAdapter = new ManagedImageAssetStorageAdapter({
+    storageLogicalAccessResolutionService,
+    tokenSecret: resolveImageAssetStorageTokenSecret(env),
+  });
+  const imageAssetManagementBackendApi = new ImageAssetManagementBackendApi({
+    initiateImageAssetCreationUseCase: new InitiateImageAssetCreationUseCase({
+      imageAssetRepository,
+      imageAssetStoragePort: imageAssetStorageAdapter,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      storageInstanceRepository,
+      storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    finalizeImageAssetUploadUseCase: new FinalizeImageAssetUploadUseCase({
+      imageAssetRepository,
+      imageAssetStoragePort: imageAssetStorageAdapter,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+    }),
+    getImageAssetMetadataUseCase: new GetImageAssetMetadataUseCase({
+      imageAssetRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    listImageAssetMetadataUseCase: new ListImageAssetMetadataUseCase({
+      imageAssetRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    imageAssetStoragePort: imageAssetStorageAdapter,
+    uploadSessionTokenSecret: resolveImageAssetUploadSessionTokenSecret(env),
+  });
   const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
     persistentPlatformServices.platformPersistenceRepository,
   );
@@ -1293,6 +1332,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     secretMetadataBackendApi,
     storageManagementBackendApi,
     assetManagementBackendApi,
+    imageAssetManagementBackendApi,
     auditLedgerBackendApi,
     deploymentPolicyReadBackendApi,
     deploymentPolicyWriteBackendApi,
@@ -1353,6 +1393,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     platformSecretConsumers,
       close: () => new Promise<void>((resolve, reject) => {
         server.close((error) => {
+          imageAssetRepository.dispose();
           if (ownsPersistentPlatformServices) {
             persistentPlatformServices.dispose();
           }
@@ -1370,6 +1411,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       }),
     });
   } catch (error) {
+    imageAssetRepository.dispose();
     if (ownsPersistentPlatformServices) {
       persistentPlatformServices.dispose();
     }
@@ -1494,6 +1536,42 @@ function resolveAssetContentEncryptionKey(
 
   return createHash("sha256")
     .update(`asset-content:${randomUUID()}`)
+    .digest("base64");
+}
+
+function resolveImageAssetStorageTokenSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_IMAGE_ASSET_STORAGE_TOKEN_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
+  if (inheritedSecretKey) {
+    return inheritedSecretKey;
+  }
+
+  return createHash("sha256")
+    .update(`image-asset-storage:${randomUUID()}`)
+    .digest("base64");
+}
+
+function resolveImageAssetUploadSessionTokenSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_IMAGE_ASSET_UPLOAD_SESSION_TOKEN_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
+  if (inheritedSecretKey) {
+    return inheritedSecretKey;
+  }
+
+  return createHash("sha256")
+    .update(`image-asset-upload-session:${randomUUID()}`)
     .digest("base64");
 }
 
