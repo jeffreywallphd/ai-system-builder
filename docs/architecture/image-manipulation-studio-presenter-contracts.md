@@ -14,6 +14,10 @@ Define one canonical presenter composition seam that combines image input metada
 
 - `src/ui/shared/images/ImageStudioPresenterContracts.ts`
 - `src/ui/shared/tests/ImageStudioPresenterContracts.test.ts`
+- `src/ui/shared/images/ImageStudioUxCopy.ts`
+- `src/ui/shared/tests/ImageStudioUxCopy.test.ts`
+
+Story 7.1.3 extends this seam with centralized UX copy and language rules so presenter state mapping and user-facing messaging remain consistent.
 
 ## Presenter contract scope
 

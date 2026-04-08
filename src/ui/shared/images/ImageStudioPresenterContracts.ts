@@ -8,6 +8,13 @@ import {
   type ImageStudioRunStatus,
   type ImageStudioRunSummary,
 } from "./ImageStudioInteractionModel";
+import {
+  ImageStudioDefaultCopy,
+  ImageStudioPrimaryActionLabels,
+  ImageStudioSurfaceTitles,
+  getImageStudioStepLabel,
+  mapImageStudioBlockerCodeToUserMessage,
+} from "./ImageStudioUxCopy";
 
 export type ImageStudioSurfaceStateKind = "loading" | "empty" | "error" | "ready" | "degraded";
 
@@ -182,8 +189,8 @@ export function composeImageStudioPresenterViewModel(
   const continuationSurface = composeContinuationSurface(input);
 
   return Object.freeze({
-    title: "Image Studio",
-    subtitle: "Upload or choose an image, apply an edit, and review the result.",
+    title: ImageStudioDefaultCopy.title,
+    subtitle: ImageStudioDefaultCopy.subtitle,
     flow,
     primaryAction,
     input: inputSurface,
@@ -231,7 +238,7 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
 
   if (envelope?.state === "loading") {
     return Object.freeze({
-      state: loadingState("Choose an image", "Loading your recent images and uploads."),
+      state: loadingState(ImageStudioSurfaceTitles.input, "Loading your recent images and uploads."),
       selectedSelectionId,
       options,
     });
@@ -239,7 +246,7 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
 
   if (envelope?.state === "error") {
     return Object.freeze({
-      state: errorState("Choose an image", envelope.errorMessage ?? "Image options could not be loaded."),
+      state: errorState(ImageStudioSurfaceTitles.input, envelope.errorMessage ?? "Image options could not be loaded."),
       selectedSelectionId,
       options,
     });
@@ -247,7 +254,7 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
 
   if (!selectedSelectionId && options.length === 0) {
     return Object.freeze({
-      state: emptyState("Choose an image", "Upload an image or pick one from your library to begin."),
+      state: emptyState(ImageStudioSurfaceTitles.input, "Upload an image or pick one from your library to begin."),
       selectedSelectionId,
       options,
     });
@@ -256,7 +263,7 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
   if (selectedSelectionId && options.length > 0 && !options.some((entry) => entry.selectionId === selectedSelectionId)) {
     return Object.freeze({
       state: degradedState(
-        "Choose an image",
+        ImageStudioSurfaceTitles.input,
         "Your current image is no longer in the loaded list.",
         "Refresh image options or choose another image.",
       ),
@@ -266,7 +273,7 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
   }
 
   return Object.freeze({
-    state: readyState("Choose an image", "Your image is selected and ready."),
+    state: readyState(ImageStudioSurfaceTitles.input, "Your image is selected and ready."),
     selectedSelectionId,
     options,
   });
@@ -282,7 +289,7 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
 
   if (workflowsEnvelope?.state === "loading" || systemsEnvelope?.state === "loading") {
     return Object.freeze({
-      state: loadingState("Choose an edit", "Loading edit options for your image."),
+      state: loadingState(ImageStudioSurfaceTitles.workflow, "Loading edit options for your image."),
       selectedWorkflowId,
       selectedSystemId,
       workflows,
@@ -293,7 +300,7 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
   if (workflowsEnvelope?.state === "error" || systemsEnvelope?.state === "error") {
     return Object.freeze({
       state: errorState(
-        "Choose an edit",
+        ImageStudioSurfaceTitles.workflow,
         workflowsEnvelope?.errorMessage ?? systemsEnvelope?.errorMessage ?? "Edit options are unavailable.",
       ),
       selectedWorkflowId,
@@ -305,7 +312,7 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
 
   if (!selectedWorkflowId || !selectedSystemId) {
     return Object.freeze({
-      state: emptyState("Choose an edit", "Pick an edit style to continue."),
+      state: emptyState(ImageStudioSurfaceTitles.workflow, "Pick an edit style to continue."),
       selectedWorkflowId,
       selectedSystemId,
       workflows,
@@ -316,7 +323,7 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
   if (!workflows.some((entry) => entry.workflowId === selectedWorkflowId)) {
     return Object.freeze({
       state: degradedState(
-        "Choose an edit",
+        ImageStudioSurfaceTitles.workflow,
         "The selected edit is no longer available.",
         "Choose a different edit option.",
       ),
@@ -328,7 +335,7 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
   }
 
   return Object.freeze({
-    state: readyState("Choose an edit", "Your edit settings are selected."),
+    state: readyState(ImageStudioSurfaceTitles.workflow, "Your edit settings are selected."),
     selectedWorkflowId,
     selectedSystemId,
     workflows,
@@ -345,7 +352,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
 
   if (interaction.transient.pendingReadinessRequest) {
     return Object.freeze({
-      state: loadingState("Check readiness", "Verifying that your image edit can run."),
+      state: loadingState(ImageStudioSurfaceTitles.readiness, "Verifying that your image edit can run."),
       assessedAtIso: readiness?.assessedAtIso,
       issues,
     });
@@ -353,7 +360,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
 
   if (!readiness) {
     return Object.freeze({
-      state: emptyState("Check readiness", "Run a readiness check after adjusting your settings."),
+      state: emptyState(ImageStudioSurfaceTitles.readiness, "Run a readiness check after adjusting your settings."),
       issues,
     });
   }
@@ -362,7 +369,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
     const blockingCount = readiness.issues.filter((issue) => issue.severity === "blocking").length;
     return Object.freeze({
       state: degradedState(
-        "Check readiness",
+        ImageStudioSurfaceTitles.readiness,
         blockingCount > 0
           ? "This edit needs attention before it can start."
           : "This edit has recommendations before launch.",
@@ -376,7 +383,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
   if (readiness.issues.length > 0) {
     return Object.freeze({
       state: degradedState(
-        "Check readiness",
+        ImageStudioSurfaceTitles.readiness,
         "Ready to run with recommendations.",
         `${readiness.issues.length} recommendation(s) available.`,
       ),
@@ -386,7 +393,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
   }
 
   return Object.freeze({
-    state: readyState("Check readiness", "Ready to start your edit."),
+    state: readyState(ImageStudioSurfaceTitles.readiness, "Ready to start your edit."),
     assessedAtIso: readiness.assessedAtIso,
     issues,
   });
@@ -399,7 +406,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
 
   if (input.interaction.transient.pendingLaunchRequest) {
     return Object.freeze({
-      state: loadingState("Run progress", "Starting your edit now."),
+      state: loadingState(ImageStudioSurfaceTitles.run, "Starting your edit now."),
       activeRun,
       monitoring: envelope?.data,
       recentRuns,
@@ -409,8 +416,8 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
   if (!activeRun) {
     return Object.freeze({
       state: recentRuns.length > 0
-        ? readyState("Run progress", "No active edit. You can review recent runs.")
-        : emptyState("Run progress", "Start an edit to view live progress."),
+        ? readyState(ImageStudioSurfaceTitles.run, "No active edit. You can review recent runs.")
+        : emptyState(ImageStudioSurfaceTitles.run, "Start an edit to view live progress."),
       activeRun,
       monitoring: envelope?.data,
       recentRuns,
@@ -419,7 +426,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
 
   if (envelope?.state === "loading") {
     return Object.freeze({
-      state: loadingState("Run progress", "Updating live progress."),
+      state: loadingState(ImageStudioSurfaceTitles.run, "Updating live progress."),
       activeRun,
       monitoring: envelope.data,
       recentRuns,
@@ -428,7 +435,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
 
   if (envelope?.state === "error") {
     return Object.freeze({
-      state: degradedState("Run progress", "Live updates are temporarily unavailable.", envelope.errorMessage),
+      state: degradedState(ImageStudioSurfaceTitles.run, "Live updates are temporarily unavailable.", envelope.errorMessage),
       activeRun,
       monitoring: envelope.data,
       recentRuns,
@@ -438,7 +445,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
   if (activeRun.status === "failed" || activeRun.status === "cancelled") {
     return Object.freeze({
       state: degradedState(
-        "Run progress",
+        ImageStudioSurfaceTitles.run,
         activeRun.status === "failed" ? "The last edit did not finish." : "The last edit was cancelled.",
         "Review details and try again.",
       ),
@@ -450,7 +457,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
 
   return Object.freeze({
     state: readyState(
-      "Run progress",
+      ImageStudioSurfaceTitles.run,
       activeRun.status === "completed" ? "Your edit is complete." : "Your edit is running.",
     ),
     activeRun,
@@ -472,7 +479,7 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
 
   if (envelope?.state === "loading") {
     return Object.freeze({
-      state: loadingState("Your results", "Loading generated previews."),
+      state: loadingState(ImageStudioSurfaceTitles.results, "Loading generated previews."),
       selectedResultId,
       cards,
     });
@@ -480,7 +487,7 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
 
   if (envelope?.state === "error") {
     return Object.freeze({
-      state: degradedState("Your results", "Results are available but previews could not be loaded.", envelope.errorMessage),
+      state: degradedState(ImageStudioSurfaceTitles.results, "Results are available but previews could not be loaded.", envelope.errorMessage),
       selectedResultId,
       cards,
     });
@@ -488,14 +495,14 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
 
   if (cards.length === 0) {
     return Object.freeze({
-      state: emptyState("Your results", "Results will appear here after your edit completes."),
+      state: emptyState(ImageStudioSurfaceTitles.results, "Results will appear here after your edit completes."),
       selectedResultId,
       cards,
     });
   }
 
   return Object.freeze({
-    state: readyState("Your results", "Review outputs and reuse any image as your next input."),
+    state: readyState(ImageStudioSurfaceTitles.results, "Review outputs and reuse any image as your next input."),
     selectedResultId,
     cards,
   });
@@ -507,7 +514,7 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
 
   if (envelope?.state === "loading") {
     return Object.freeze({
-      state: loadingState("Continue where you left off", "Looking up your previous session."),
+      state: loadingState(ImageStudioSurfaceTitles.continuation, "Looking up your previous session."),
       continuationSessionId,
     });
   }
@@ -515,7 +522,7 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
   if (envelope?.state === "error") {
     return Object.freeze({
       state: degradedState(
-        "Continue where you left off",
+        ImageStudioSurfaceTitles.continuation,
         "Previous sessions could not be restored right now.",
         envelope.errorMessage,
       ),
@@ -525,7 +532,7 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
 
   if (envelope?.data) {
     return Object.freeze({
-      state: readyState("Continue where you left off", envelope.data.summary),
+      state: readyState(ImageStudioSurfaceTitles.continuation, envelope.data.summary),
       continuationSessionId: envelope.data.continuationSessionId,
       summary: envelope.data.summary,
     });
@@ -533,14 +540,14 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
 
   if (continuationSessionId) {
     return Object.freeze({
-      state: readyState("Continue where you left off", "Session context is available for restore."),
+      state: readyState(ImageStudioSurfaceTitles.continuation, "Session context is available for restore."),
       continuationSessionId,
       summary: "Session context is available for restore.",
     });
   }
 
   return Object.freeze({
-    state: emptyState("Continue where you left off", "No prior session is open."),
+    state: emptyState(ImageStudioSurfaceTitles.continuation, "No prior session is open."),
     continuationSessionId,
   });
 }
@@ -578,7 +585,7 @@ function mapFlow(interaction: ImageStudioInteractionState): ReadonlyArray<ImageS
 
   return Object.freeze(ImageStudioFlowStepSequence.map((stepId, index) => {
     const gate = gateById.get(stepId);
-    const blockers = gate?.blockers.map((code) => mapStepBlocker(code)) ?? [];
+    const blockers = gate?.blockers.map((code) => mapImageStudioBlockerCodeToUserMessage(code)) ?? [];
     const isComplete = interaction.derived.completedStepIds.includes(stepId);
     const status = isComplete
       ? "complete"
@@ -594,7 +601,7 @@ function mapFlow(interaction: ImageStudioInteractionState): ReadonlyArray<ImageS
 
     return Object.freeze({
       stepId,
-      label: toStepLabel(stepId),
+      label: getImageStudioStepLabel(stepId),
       status,
       blockers: Object.freeze(blockers),
     });
@@ -612,55 +619,55 @@ function selectPrimaryAction(
     case ImageStudioFlowStepIds.selectImage:
       return Object.freeze({
         actionId: "pick-image",
-        label: "Choose image",
+        label: ImageStudioPrimaryActionLabels.pickImage,
         disabled: false,
       });
     case ImageStudioFlowStepIds.selectWorkflow:
       return Object.freeze({
         actionId: "pick-edit",
-        label: "Choose edit",
+        label: ImageStudioPrimaryActionLabels.pickEdit,
         disabled: false,
         reason,
       });
     case ImageStudioFlowStepIds.configureParameters:
       return Object.freeze({
         actionId: "adjust-settings",
-        label: "Adjust settings",
+        label: ImageStudioPrimaryActionLabels.adjustSettings,
         disabled: false,
         reason,
       });
     case ImageStudioFlowStepIds.assessReadiness:
       return Object.freeze({
         actionId: "check-readiness",
-        label: "Run readiness check",
+        label: ImageStudioPrimaryActionLabels.checkReadiness,
         disabled: interaction.transient.pendingReadinessRequest,
         reason,
       });
     case ImageStudioFlowStepIds.launchRun:
       return Object.freeze({
         actionId: "start-edit",
-        label: "Start edit",
+        label: ImageStudioPrimaryActionLabels.startEdit,
         disabled: !interaction.derived.canLaunchRun,
         reason,
       });
     case ImageStudioFlowStepIds.monitorRun:
       return Object.freeze({
         actionId: "review-progress",
-        label: "Review progress",
+        label: ImageStudioPrimaryActionLabels.reviewProgress,
         disabled: false,
         reason,
       });
     case ImageStudioFlowStepIds.reviewResults:
       return Object.freeze({
         actionId: "review-results",
-        label: "Review results",
+        label: ImageStudioPrimaryActionLabels.reviewResults,
         disabled: !interaction.derived.canReviewResults,
         reason,
       });
     default:
       return Object.freeze({
         actionId: "pick-image",
-        label: "Choose image",
+        label: ImageStudioPrimaryActionLabels.pickImage,
         disabled: false,
       });
   }
@@ -682,56 +689,6 @@ function mapResultCards(
       reusable: reusableResultId === item.resultId,
     });
   }));
-}
-
-function toStepLabel(stepId: string): string {
-  switch (stepId) {
-    case ImageStudioFlowStepIds.selectImage:
-      return "Choose image";
-    case ImageStudioFlowStepIds.selectWorkflow:
-      return "Choose edit";
-    case ImageStudioFlowStepIds.configureParameters:
-      return "Adjust settings";
-    case ImageStudioFlowStepIds.assessReadiness:
-      return "Check readiness";
-    case ImageStudioFlowStepIds.launchRun:
-      return "Start edit";
-    case ImageStudioFlowStepIds.monitorRun:
-      return "Track progress";
-    case ImageStudioFlowStepIds.reviewResults:
-      return "Review results";
-    default:
-      return "Step";
-  }
-}
-
-function mapStepBlocker(code: string): string {
-  switch (code) {
-    case "input-image-required":
-      return "Choose an image to continue.";
-    case "workflow-and-system-required":
-    case "image-and-workflow-required":
-      return "Choose an image and edit option first.";
-    case "parameters-missing":
-      return "Add settings before continuing.";
-    case "parameter-draft-uncommitted":
-      return "Save your setting changes.";
-    case "readiness-not-assessed":
-      return "Run readiness check.";
-    case "readiness-blocked":
-    case "readiness-not-ready":
-      return "Resolve readiness issues before starting.";
-    case "launch-in-flight":
-      return "Edit launch is in progress.";
-    case "run-not-started":
-      return "Start an edit run first.";
-    case "run-not-completed":
-      return "Wait until the run finishes.";
-    case "results-not-loaded":
-      return "Load generated results.";
-    default:
-      return "Finish this step to continue.";
-  }
 }
 
 function loadingState(title: string, description: string): ImageStudioSurfaceStateViewModel {
@@ -784,7 +741,7 @@ function unreachableSurface(value: never): never {
 export function mapImageStudioStepGateToPresenterBlockers(
   gate: ImageStudioDerivedStepGate,
 ): ReadonlyArray<string> {
-  return Object.freeze(gate.blockers.map((code) => mapStepBlocker(code)));
+  return Object.freeze(gate.blockers.map((code) => mapImageStudioBlockerCodeToUserMessage(code)));
 }
 
 export function createImageStudioPresenterComposeInput(

@@ -8,7 +8,11 @@ Story 7.1.2 adds the shared presenter composition seam for the image manipulatio
 
 - `src/ui/shared/images/ImageStudioPresenterContracts.ts`
 - Tests: `src/ui/shared/tests/ImageStudioPresenterContracts.test.ts`
+- `src/ui/shared/images/ImageStudioUxCopy.ts`
+- Tests: `src/ui/shared/tests/ImageStudioUxCopy.test.ts`
 - Human architecture note: `docs/architecture/image-manipulation-studio-presenter-contracts.md`
+
+Story 7.1.3 adds centralized UX copy and language posture so presenter mapping and UI messaging stay aligned.
 
 ## Contract model
 
