@@ -78,6 +78,10 @@ The preview/derivative shape is designed for later:
 - asynchronous preview generation workers that can materialize, fail, refresh, and regenerate derivatives over time
 - retrieval APIs that authorize against protected resource IDs and return logical preview handles, not storage topology
 
+## Related posture note
+
+- Story 6.1.5 authoritative persistence/preview/lineage posture: `docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md`
+
 ## Boundary posture
 
 - Domain-only implementation.

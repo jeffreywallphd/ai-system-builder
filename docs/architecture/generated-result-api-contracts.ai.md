@@ -14,6 +14,9 @@ Story 6.1.4 defines shared DTO and schema contracts for authoritative generated-
 - `src/shared/schemas/assets/tests/GeneratedResultTransportSchemaContracts.test.ts`
 - `docs/architecture/generated-result-api-contracts.md`
 
+## Related posture note
+- Story 6.1.5 authoritative persistence/preview/lineage posture: `docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md`
+
 ## External API coverage
 - Result list/get:
   - `listResults`
