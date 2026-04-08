@@ -16,6 +16,8 @@ describe("StudioShellService", () => {
     expect(source).toContain("transitionLifecycle(");
     expect(source).toContain("publishVersion(");
     expect(source).toContain("validateDraft(");
+    expect(source).toContain("listImageWorkflowDefinitions(");
+    expect(source).toContain("getImageWorkflowDefinition(");
     expect(source).toContain("getPersistedWorkflow(");
     expect(source).toContain("duplicatePersistedWorkflow(");
     expect(source).toContain("assessWorkflowExecutionReadiness(");

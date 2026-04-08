@@ -21,6 +21,10 @@ import type {
   DataStudioPersistedPipelineReadModel,
   DataStudioPipelineVersionReadModel,
   RunDataStudioPipelineReadModel,
+  StudioImageWorkflowDefinitionListingReadModel,
+  StudioImageWorkflowDefinitionReadModel,
+  ListStudioImageWorkflowDefinitionsRequest,
+  GetStudioImageWorkflowDefinitionRequest,
   AssessDataStudioExecutionReadinessRequest,
   DataStudioExecutionReadinessReadModel,
   WorkflowRunDetailReadModel,
@@ -122,6 +126,20 @@ export class StudioShellService {
   public async validateDraft(studioId: string, draftId: string): Promise<StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>> {
     const raw = await this.requireBridge().validateDraft(JSON.stringify({ studioId, draftId }));
     return JSON.parse(raw) as StudioShellApiResponse<ReadonlyArray<StudioShellValidationIssue>>;
+  }
+
+  public async listImageWorkflowDefinitions(
+    request: ListStudioImageWorkflowDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>> {
+    const raw = await this.requireBridge().listImageWorkflowDefinitions(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>;
+  }
+
+  public async getImageWorkflowDefinition(
+    request: GetStudioImageWorkflowDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>> {
+    const raw = await this.requireBridge().getImageWorkflowDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>;
   }
 
   public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {

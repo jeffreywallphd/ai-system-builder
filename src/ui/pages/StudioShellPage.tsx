@@ -253,6 +253,9 @@ function readPersistedDataStudioPipelineState(): string | undefined {
   return window.localStorage.getItem(DataStudioWizardPersistenceStorageKey) ?? undefined;
 }
 
+const DefaultImageWorkflowWorkspaceId = "workspace:studio-shell";
+const DefaultImageWorkflowActorUserId = "user:studio-shell";
+
 interface StudioShellPageProps {
   readonly studioRegistration?: StudioRegistration;
   readonly extensions?: ReadonlyArray<StudioShellExtensionContribution>;
@@ -1424,6 +1427,16 @@ export default function StudioShellPage({
       getSystemExecutionStatus: async (executionId) => service.getSystemExecutionStatus(executionId),
       getSystemExecutionTrace: async (request) => service.getSystemExecutionTrace(request),
       getSystemExecutionResult: async (executionId) => service.getSystemExecutionResult(executionId),
+      listImageWorkflowDefinitions: async (request) => service.listImageWorkflowDefinitions({
+        workspaceId: DefaultImageWorkflowWorkspaceId,
+        actorUserId: DefaultImageWorkflowActorUserId,
+        ...request,
+      }),
+      getImageWorkflowDefinition: async (request) => service.getImageWorkflowDefinition({
+        workspaceId: DefaultImageWorkflowWorkspaceId,
+        actorUserId: DefaultImageWorkflowActorUserId,
+        ...request,
+      }),
       saveSystemChildComponent: async (request) => {
         const response = await service.addSystemChildComponent(request);
         if (!response.ok) {

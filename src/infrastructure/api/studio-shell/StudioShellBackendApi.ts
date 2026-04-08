@@ -8,6 +8,11 @@ import type { IStudioShellRepository } from "@application/ports/interfaces/IStud
 import { DefaultStudioShellApplicationService } from "@application/studio-shell/DefaultStudioShellApplicationService";
 import { WorkflowStudioApplicationService } from "@application/workflow-studio/WorkflowStudioApplicationService";
 import {
+  createInitialSupportedImageWorkflowTemplateRegistry,
+  type InitialImageWorkflowTemplateFamilyId,
+  type InitialImageWorkflowTemplateDefinition,
+} from "@application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry";
+import {
   buildStudioShellValidationIssues,
   tryReadTaxonomyFromVersionMetadata,
   type StudioShellValidationIssue,
@@ -184,6 +189,53 @@ export interface StudioShellSnapshotReadModel {
     readonly dataStudioPipeline?: DataStudioPipelineVersionSummary;
   }>;
   readonly validationIssues: ReadonlyArray<StudioShellValidationIssue>;
+}
+
+export interface ListStudioImageWorkflowDefinitionsRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly operationKinds?: ReadonlyArray<string>;
+  readonly search?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetStudioImageWorkflowDefinitionRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly workflowId: string;
+}
+
+export interface StudioImageWorkflowDefinitionSummaryReadModel {
+  readonly workflowId: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly operationKind: string;
+  readonly version: {
+    readonly lineageId: string;
+    readonly versionTag: string;
+    readonly revision: number;
+  };
+  readonly updatedAt: string;
+}
+
+export interface StudioImageWorkflowDefinitionReadModel extends StudioImageWorkflowDefinitionSummaryReadModel {
+  readonly rationale: string;
+  readonly minimumRequirements: {
+    readonly inputKinds: ReadonlyArray<string>;
+    readonly outputKinds: ReadonlyArray<string>;
+    readonly requiredParameterIds: ReadonlyArray<string>;
+  };
+}
+
+export interface StudioImageWorkflowDefinitionListingReadModel {
+  readonly items: ReadonlyArray<StudioImageWorkflowDefinitionSummaryReadModel>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
 }
 
 export interface ValidateStudioShellDraftRequest {
@@ -843,6 +895,7 @@ export class StudioShellBackendApi {
   private readonly referenceImageProtectedResourceType: string;
   private readonly referenceImageRunProtectedResourceType: string;
   private readonly workflowRunProtectedResourceType: string;
+  private readonly imageWorkflowTemplateRegistry = createInitialSupportedImageWorkflowTemplateRegistry();
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -1007,6 +1060,75 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError(`Draft '${request.draftId}' is not the active draft for studio '${request.studioId}'.`);
       }
       return snapshot.validationIssues;
+    });
+  }
+
+  public async listImageWorkflowDefinitions(
+    request: ListStudioImageWorkflowDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>> {
+    return this.wrap(async () => {
+      if (typeof request.workspaceId === "string" && request.workspaceId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("workspaceId cannot be empty when provided.");
+      }
+      if (typeof request.actorUserId === "string" && request.actorUserId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("actorUserId cannot be empty when provided.");
+      }
+      const operationKinds = request.operationKinds
+        ?.map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
+      const search = request.search?.trim().toLowerCase();
+      const limit = Math.max(1, Math.min(100, request.limit ?? 50));
+      const offset = Math.max(0, request.offset ?? 0);
+      const updatedAt = this.now().toISOString();
+
+      const filtered = this.imageWorkflowTemplateRegistry
+        .list()
+        .filter((template) => {
+          if (operationKinds && operationKinds.length > 0 && !operationKinds.includes(template.operationKind)) {
+            return false;
+          }
+          if (!search) {
+            return true;
+          }
+          const haystack = `${template.templateFamilyId} ${template.display.title} ${template.display.summary} ${template.operationKind}`
+            .toLowerCase();
+          return haystack.includes(search);
+        });
+      const paged = filtered.slice(offset, offset + limit);
+
+      return Object.freeze({
+        items: Object.freeze(paged.map((template) => this.toImageWorkflowSummaryReadModel(template, updatedAt))),
+        pagination: Object.freeze({
+          limit,
+          offset,
+          returned: paged.length,
+          hasMore: filtered.length > (offset + limit),
+        }),
+      });
+    });
+  }
+
+  public async getImageWorkflowDefinition(
+    request: GetStudioImageWorkflowDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>> {
+    return this.wrap(async () => {
+      if (typeof request.workspaceId === "string" && request.workspaceId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("workspaceId cannot be empty when provided.");
+      }
+      if (typeof request.actorUserId === "string" && request.actorUserId.trim().length === 0) {
+        throw new StudioShellInvalidRequestError("actorUserId cannot be empty when provided.");
+      }
+      const workflowId = request.workflowId.trim();
+      if (!workflowId) {
+        throw new StudioShellInvalidRequestError("workflowId is required.");
+      }
+      const template = this.imageWorkflowTemplateRegistry.getByTemplateFamilyId(
+        workflowId as InitialImageWorkflowTemplateFamilyId,
+      );
+      if (!template) {
+        throw new Error(`not-found:Image workflow '${workflowId}' is not available.`);
+      }
+      return this.toImageWorkflowDefinitionReadModel(template, this.now().toISOString());
     });
   }
 
@@ -3706,6 +3828,49 @@ export class StudioShellBackendApi {
       return fileName.slice(dot + 1).toLowerCase();
     }
     return "png";
+  }
+
+  private toImageWorkflowSummaryReadModel(
+    template: InitialImageWorkflowTemplateDefinition,
+    updatedAt: string,
+  ): StudioImageWorkflowDefinitionSummaryReadModel {
+    const versionTag = template.templateFamilyId.split(":").at(-1) ?? "v1";
+    const lineageId = template.templateFamilyId.replace(/:v\d+$/i, "");
+    return Object.freeze({
+      workflowId: template.templateFamilyId,
+      title: template.display.title,
+      summary: template.display.summary,
+      operationKind: template.operationKind,
+      version: Object.freeze({
+        lineageId,
+        versionTag,
+        revision: 1,
+      }),
+      updatedAt,
+    });
+  }
+
+  private toImageWorkflowDefinitionReadModel(
+    template: InitialImageWorkflowTemplateDefinition,
+    updatedAt: string,
+  ): StudioImageWorkflowDefinitionReadModel {
+    const requiredParameterIds = template.minimumRequirements.parameterSpecifications
+      .filter((entry) => entry.required)
+      .map((entry) => entry.parameterId);
+    const summary = this.toImageWorkflowSummaryReadModel(template, updatedAt);
+    return Object.freeze({
+      ...summary,
+      rationale: template.display.rationale,
+      minimumRequirements: Object.freeze({
+        inputKinds: Object.freeze([...new Set(template.minimumRequirements.inputSlots
+          .filter((entry) => entry.required)
+          .map((entry) => entry.kind))]),
+        outputKinds: Object.freeze([...new Set(template.minimumRequirements.outputExpectations
+          .filter((entry) => entry.required)
+          .map((entry) => entry.kind))]),
+        requiredParameterIds: Object.freeze(requiredParameterIds),
+      }),
+    });
   }
 
   private async synchronizeWorkflowPersistenceFromStudioDraft(

@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type {
+  StudioImageWorkflowDefinitionReadModel,
+  StudioImageWorkflowDefinitionSummaryReadModel,
+} from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
 
@@ -59,6 +63,112 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const [datasetInstanceId, setDatasetInstanceId] = useState(defaults.datasetInstanceId ?? "");
   const [datasetAssetId, setDatasetAssetId] = useState(defaults.datasetAssetId ?? "");
   const [datasetVersionId, setDatasetVersionId] = useState(defaults.datasetVersionId ?? "");
+  const [supportedWorkflows, setSupportedWorkflows] = useState<ReadonlyArray<StudioImageWorkflowDefinitionSummaryReadModel>>([]);
+  const [selectedWorkflowDetail, setSelectedWorkflowDetail] = useState<StudioImageWorkflowDefinitionReadModel>();
+  const [workflowLoadError, setWorkflowLoadError] = useState<string>();
+  const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(false);
+  const workflowPickerAvailable = Boolean(context.operations.listImageWorkflowDefinitions && context.operations.getImageWorkflowDefinition);
+
+  useEffect(() => {
+    setWorkflowBindingId(defaults.workflowBindingId ?? "");
+    setWorkflowAssetId(defaults.workflowAssetId ?? "");
+    setWorkflowVersionId(defaults.workflowVersionId ?? "");
+    setDatasetInstanceId(defaults.datasetInstanceId ?? "");
+    setDatasetAssetId(defaults.datasetAssetId ?? "");
+    setDatasetVersionId(defaults.datasetVersionId ?? "");
+    setRenameDraftTitle(draft?.metadata.title ?? "");
+  }, [
+    defaults.datasetAssetId,
+    defaults.datasetInstanceId,
+    defaults.datasetVersionId,
+    defaults.workflowAssetId,
+    defaults.workflowBindingId,
+    defaults.workflowVersionId,
+    draft?.draftId,
+    draft?.metadata.title,
+  ]);
+
+  useEffect(() => {
+    const listImageWorkflowDefinitions = context.operations.listImageWorkflowDefinitions;
+    if (!draft || !workflowPickerAvailable || !listImageWorkflowDefinitions) {
+      setSupportedWorkflows([]);
+      setSelectedWorkflowDetail(undefined);
+      return;
+    }
+
+    let disposed = false;
+    setIsWorkflowListLoading(true);
+    setWorkflowLoadError(undefined);
+    void listImageWorkflowDefinitions({})
+      .then((response) => {
+        if (disposed) {
+          return;
+        }
+        if (!response?.ok || !response.data) {
+          setWorkflowLoadError("Could not load supported workflows.");
+          setSupportedWorkflows([]);
+          return;
+        }
+        const items = response.data.items;
+        setSupportedWorkflows(items);
+        if (!workflowAssetId.trim()) {
+          const preferredWorkflowId = defaults.workflowAssetId?.trim();
+          const selectedFromList = preferredWorkflowId && items.some((entry) => entry.workflowId === preferredWorkflowId)
+            ? preferredWorkflowId
+            : items[0]?.workflowId;
+          if (selectedFromList) {
+            setWorkflowAssetId(selectedFromList);
+          }
+        }
+      })
+      .catch(() => {
+        if (disposed) {
+          return;
+        }
+        setWorkflowLoadError("Could not load supported workflows.");
+        setSupportedWorkflows([]);
+      })
+      .finally(() => {
+        if (!disposed) {
+          setIsWorkflowListLoading(false);
+        }
+      });
+
+    return () => {
+      disposed = true;
+    };
+  }, [defaults.workflowAssetId, draft?.draftId, workflowPickerAvailable]);
+
+  useEffect(() => {
+    const getImageWorkflowDefinition = context.operations.getImageWorkflowDefinition;
+    if (!draft || !workflowAssetId.trim() || !workflowPickerAvailable || !getImageWorkflowDefinition) {
+      setSelectedWorkflowDetail(undefined);
+      return;
+    }
+
+    let disposed = false;
+    void getImageWorkflowDefinition({
+      workflowId: workflowAssetId.trim(),
+    }).then((response) => {
+      if (disposed) {
+        return;
+      }
+      if (!response?.ok || !response.data) {
+        setSelectedWorkflowDetail(undefined);
+        return;
+      }
+      setSelectedWorkflowDetail(response.data);
+      setWorkflowVersionId(response.data.version.versionTag);
+    }).catch(() => {
+      if (!disposed) {
+        setSelectedWorkflowDetail(undefined);
+      }
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, [draft?.draftId, workflowAssetId, workflowPickerAvailable]);
 
   if (!draft || !sessionId) {
     return <p className="ui-text-small ui-text-secondary">Open a setup draft to save, reopen, copy, or rename.</p>;
@@ -173,6 +283,47 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
         </div>
       </label>
 
+      <div className="ui-stack ui-stack--xs" data-testid="system-studio-workflow-picker">
+        <strong>Supported workflow operations</strong>
+        <label className="ui-field">
+          <span className="ui-field__label">Choose operation</span>
+          <select
+            className="ui-select"
+            value={workflowAssetId}
+            onChange={(event) => setWorkflowAssetId(event.currentTarget.value)}
+            disabled={!workflowPickerAvailable || isWorkflowListLoading}
+          >
+            <option value="">Select a supported workflow</option>
+            {supportedWorkflows.map((workflow) => (
+              <option key={workflow.workflowId} value={workflow.workflowId}>
+                {workflow.title} ({workflow.operationKind})
+              </option>
+            ))}
+          </select>
+        </label>
+        {isWorkflowListLoading ? (
+          <span className="ui-text-small ui-text-secondary">Loading supported workflows...</span>
+        ) : null}
+        {!workflowPickerAvailable ? (
+          <span className="ui-text-small ui-text-secondary">Workflow selection is unavailable in this host.</span>
+        ) : null}
+        {workflowLoadError ? (
+          <span className="ui-text-small ui-text-danger">{workflowLoadError}</span>
+        ) : null}
+        {selectedWorkflowDetail ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+            <strong>{selectedWorkflowDetail.title}</strong>
+            <p className="ui-text-small ui-text-secondary">{selectedWorkflowDetail.summary}</p>
+            <p className="ui-text-small ui-text-secondary">{selectedWorkflowDetail.rationale}</p>
+            <p className="ui-text-small ui-text-secondary">
+              ID: {selectedWorkflowDetail.workflowId}
+              {" | "}
+              Version: {selectedWorkflowDetail.version.versionTag}
+            </p>
+          </div>
+        ) : null}
+      </div>
+
       <details>
         <summary className="ui-text-small ui-text-secondary">Advanced setup changes</summary>
         <div className="ui-stack ui-stack--xs" style={{ marginTop: "0.5rem" }}>
@@ -182,8 +333,8 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               <input className="ui-input" value={workflowBindingId} onChange={(event) => setWorkflowBindingId(event.currentTarget.value)} />
             </label>
             <label className="ui-field">
-              <span className="ui-field__label">Processing workflow</span>
-              <input className="ui-input" value={workflowAssetId} onChange={(event) => setWorkflowAssetId(event.currentTarget.value)} />
+              <span className="ui-field__label">Selected workflow id</span>
+              <input className="ui-input" value={workflowAssetId} readOnly />
             </label>
             <label className="ui-field">
               <span className="ui-field__label">Workflow version</span>

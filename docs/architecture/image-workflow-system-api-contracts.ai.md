@@ -169,3 +169,28 @@ Intended consumers:
 - `docs/architecture/image-system-domain-foundation.md`
 - `docs/architecture/image-workflow-parameter-specification-contracts.md`
 - `docs/architecture/image-workflow-input-output-binding-contracts.md`
+
+## Story 2.4.1 studio picker update
+
+System Studio now uses authoritative workflow list/get seams for workflow selection instead of local-only template assumptions.
+
+Canonical integration seams added for this story:
+
+- backend API methods:
+  - `StudioShellBackendApi.listImageWorkflowDefinitions(...)`
+  - `StudioShellBackendApi.getImageWorkflowDefinition(...)`
+- desktop transport:
+  - IPC handlers in `electron/main/main.ts`:
+    - `ai-loom-desktop-studio-shell:image-workflows:list`
+    - `ai-loom-desktop-studio-shell:image-workflows:get`
+  - preload bridge methods in `electron/preload.ts`
+- UI bridge/service:
+  - `src/ui/services/StudioShellService.ts`
+  - `src/ui/pages/StudioShellPage.tsx` extension operation wiring
+  - `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx` picker/render/apply flow
+
+Behavioral effect:
+
+- users choose supported operations from authoritative workflow DTOs;
+- picker state is anchored to logical workflow ids and stable DTO metadata (title/summary/rationale/version);
+- selection is applied through existing system-definition mutation contracts (`modifySystemDefinition`) for downstream parameter/save flows.

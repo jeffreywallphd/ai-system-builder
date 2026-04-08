@@ -79,6 +79,12 @@ function installBridge(
     validateDraft(requestJson: string) {
       return api.validateDraft(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
     },
+    listImageWorkflowDefinitions(requestJson: string) {
+      return api.listImageWorkflowDefinitions(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
+    getImageWorkflowDefinition(requestJson: string) {
+      return api.getImageWorkflowDefinition(JSON.parse(requestJson)).then((response) => JSON.stringify(response));
+    },
     getPersistedWorkflow(workflowId: string) {
       return api.getPersistedWorkflow(workflowId).then((response) => JSON.stringify(response));
     },
@@ -367,6 +373,30 @@ async function runLifecycleScenario(
 }
 
 describe("StudioShellService integration", () => {
+  it("lists and reads authoritative image workflow definitions through service -> bridge -> backend", async () => {
+    const backendApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    installBridge(backendApi);
+
+    const service = new StudioShellService();
+    const listed = await service.listImageWorkflowDefinitions({
+      workspaceId: "workspace-alpha",
+      actorUserId: "user-author",
+    });
+    expect(listed.ok).toBeTrue();
+    expect((listed.data?.items.length ?? 0) > 0).toBeTrue();
+
+    const workflowId = listed.data?.items[0]?.workflowId;
+    expect(workflowId).toBeDefined();
+    const detail = await service.getImageWorkflowDefinition({
+      workspaceId: "workspace-alpha",
+      actorUserId: "user-author",
+      workflowId: workflowId!,
+    });
+    expect(detail.ok).toBeTrue();
+    expect(detail.data?.workflowId).toBe(workflowId);
+    expect(detail.data?.version.versionTag).toBeDefined();
+  });
+
   it("lists workflow run summaries and loads run detail through the studio-shell bridge", async () => {
     const workflowRunRepository = new InMemoryWorkflowRunSummaryRepository();
     const summary = createWorkflowRunSummaryRecord({
