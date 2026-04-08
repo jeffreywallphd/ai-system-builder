@@ -142,6 +142,7 @@ Do not add new AI capability surfaces that bypass workflow/system contracts via 
 - `docs/architecture/image-system-domain-foundation.md`
 - `docs/architecture/image-workflow-parameter-specification-contracts.md`
 - `docs/architecture/image-workflow-input-output-binding-contracts.md`
+- `docs/architecture/image-workflow-system-api-contracts.md`
 - `docs/architecture/workflow-execution-and-tools.md`
 - `docs/architecture/comfyui-adapter-audit.md`
 - `docs/architecture/domain-and-application-core.md`

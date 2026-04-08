@@ -54,3 +54,4 @@ Use this image slice as the baseline for later AI capabilities:
 - `docs/architecture/image-system-domain-foundation.md`
 - `docs/architecture/image-workflow-parameter-specification-contracts.md`
 - `docs/architecture/image-workflow-input-output-binding-contracts.md`
+- `docs/architecture/image-workflow-system-api-contracts.md`
