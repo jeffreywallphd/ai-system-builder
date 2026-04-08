@@ -395,6 +395,9 @@ describe("StudioShellService integration", () => {
     expect(detail.ok).toBeTrue();
     expect(detail.data?.workflowId).toBe(workflowId);
     expect(detail.data?.version.versionTag).toBeDefined();
+    expect((detail.data?.parameterSpecifications.length ?? 0) > 0).toBeTrue();
+    expect(typeof detail.data?.parameterSpecifications[0]?.ui.control).toBe("string");
+    expect(typeof detail.data?.parameterDefaults).toBe("object");
   });
 
   it("lists workflow run summaries and loads run detail through the studio-shell bridge", async () => {

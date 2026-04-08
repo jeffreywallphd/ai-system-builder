@@ -194,3 +194,27 @@ Behavioral effect:
 - users choose supported operations from authoritative workflow DTOs;
 - picker state is anchored to logical workflow ids and stable DTO metadata (title/summary/rationale/version);
 - selection is applied through existing system-definition mutation contracts (`modifySystemDefinition`) for downstream parameter/save flows.
+
+## Story 2.4.2 typed parameter form update
+
+System Studio now renders workflow parameter settings from authoritative workflow DTO metadata rather than local hardcoded field maps.
+
+Canonical seams for this story:
+
+- backend DTO expansion in `StudioShellBackendApi.getImageWorkflowDefinition(...)`:
+  - `parameterSpecifications` (`ImageWorkflowParameterSpecification[]`)
+  - `parameterDefaults` (`Record<string, unknown>`)
+- template metadata to typed parameter mapping in `StudioShellBackendApi.toImageWorkflowParameterSpecifications(...)`
+- reusable UI/presenter contracts:
+  - `src/ui/components/studio-shell/SystemWorkflowParameterForm.tsx`
+  - `src/ui/components/studio-shell/SystemWorkflowParameterFormPresenter.ts`
+- studio integration in `SystemStudioWorkManagementPanel`:
+  - typed controls rendered from `parameterSpecifications`
+  - default/resume values merged from workflow defaults + serialized runtime state
+  - save path persisted through `modifySystemDefinition(...runtimeStatePatch...)`
+
+Validation integration:
+
+- field validation uses shared contract validation (`validateImageSystemParameterSetContract`) so UI issue semantics align with application/domain rules.
+- feedback is emitted as per-field and global issues with non-technical messaging.
+- visibility rules (when present in parameter metadata) drive conditional disabled states in the form surface.
