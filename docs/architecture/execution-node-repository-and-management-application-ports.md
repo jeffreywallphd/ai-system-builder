@@ -8,6 +8,7 @@
 - Story 5.1.3: Define repository and service ports for node registration, query, and management
 - Story 5.2.1: Implement node registration and activation use cases for image execution backends
 - Story 5.2.2: Implement concrete persistence for execution-node records and status history
+- Story 5.2.3: Implement adapter-backed health/capability refresh services for execution nodes
 
 ## Purpose
 
@@ -20,8 +21,10 @@ Define application-layer port seams so execution nodes are registered, queried, 
 - `src/application/nodes/use-cases/ExecutionNodeManagementUseCaseShared.ts`
 - `src/application/nodes/use-cases/RegisterExecutionNodeUseCase.ts`
 - `src/application/nodes/use-cases/ActivateExecutionNodeUseCase.ts`
+- `src/application/nodes/use-cases/RefreshExecutionNodeBackendStateUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
+- `src/application/nodes/tests/RefreshExecutionNodeBackendStateUseCase.test.ts`
 
 ## Repository port responsibilities
 
@@ -50,6 +53,33 @@ Define application-layer port seams so execution nodes are registered, queried, 
   - applies explicit activation/health availability transitions with mutation context
 - `selectionHints` (`IExecutionNodeSelectionHintsServicePort`)
   - returns ranked routing hints with reason codes for scheduling and dispatch preparation
+
+## Story 5.2.3 refresh behavior
+
+`RefreshExecutionNodeBackendStateUseCase` adds authoritative backend-backed refresh for registered execution nodes by reusing the normalized adapter seam from image execution (`IImageManipulationExecutionCapabilityPort`).
+
+The refresh flow:
+
+- resolves the durable execution-node record from `IExecutionNodeRepository`
+- invokes adapter-backed backend status probing through the capability port
+- normalizes backend status into canonical execution-node health/capability contracts
+- persists refreshed health/capability state through repository update seams
+
+The normalized refresh classification covers:
+
+- `healthy`
+- `degraded`
+- `unavailable`
+- `incompatible`
+- `stale`
+- `unknown`
+
+State handling highlights:
+
+- stale probe observations (`maxStatusAgeMs`) persist as node `health=unknown` and backend readiness `unknown`
+- unavailable probes transition active nodes to activation `unavailable` with `health=unavailable`
+- incompatible probe posture is retained as degraded node health + backend readiness `unknown` with explicit reason metadata
+- capability refresh keeps canonical `image-manipulation` execution target support while preserving non-probed capability arrays
 
 ## Intended consumers
 
