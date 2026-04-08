@@ -11,10 +11,12 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/application/common/OfflineLocalModeResynchronization.ts`
 - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - `src/application/common/OfflinePendingOperationPersistence.ts`
+- `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+- `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
@@ -44,6 +46,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Snapshot records persist logical resource snapshots and offline eligibility markers, not raw filesystem references.
 - Dedicated pending-operation persistence and replay-preparation service + SQLite queue store for durable unsynced operation intent.
 - Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
+- Controlled reconnect coordinator revalidates stale cached snapshots, plans replay decisions, executes eligible replay through authoritative APIs in dependency order, updates local queue status, and captures explicit reconciliation outcomes.
 
 ## Server-authoritative-only baseline
 

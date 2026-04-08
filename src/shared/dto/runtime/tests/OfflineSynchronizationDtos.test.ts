@@ -77,6 +77,10 @@ describe("OfflineSynchronizationDtos", () => {
       conflictCode: "revision-mismatch",
       authoritativeRevision: "workflow:rev:2",
       localMutationRevision: 5,
+      authoritativeRevisionAfter: "workflow:rev:2",
+    }, {
+      resourceClass: "workflow-draft",
+      resourceId: "workflow:draft:2",
     });
 
     expect(outcome.action).toBe("conflict-requires-review");
@@ -84,7 +88,9 @@ describe("OfflineSynchronizationDtos", () => {
     expect(outcome.preserveLocalDraftAsUnsynced).toBeTrue();
     expect(outcome.requiresAdminAttention).toBeFalse();
     expect(outcome.conflicts?.[0]?.conflictClass).toBe("stale-base-edit");
+    expect(outcome.conflicts?.[0]?.resourceId).toBe("workflow:draft:2");
     expect(outcome.conflicts?.[0]?.conflictCode).toBe("revision-mismatch");
+    expect(outcome.authoritativeRevisionAfter).toBe("workflow:rev:2");
     expect(outcome.requiresUserAttention).toBeTrue();
   });
 

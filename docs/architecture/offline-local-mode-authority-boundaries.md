@@ -25,6 +25,8 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - application pending-operation persistence + replay-preparation service and contracts:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+- application controlled resynchronization coordinator:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - desktop host local-mode profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - desktop host connectivity-state monitor and transition service:
@@ -33,6 +35,8 @@ Non-negotiable philosophy:
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - desktop host pending-operation persistence runtime factory:
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+- desktop host controlled resynchronization runtime factory:
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - desktop offline snapshot cache persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - desktop offline pending-operation persistence adapter:
@@ -104,6 +108,7 @@ Queued-operation seams:
 - `createOfflinePendingOperationRecord(...)`
 - `OfflinePendingOperationService.queueOperation(...)`
 - `OfflinePendingOperationService.prepareReplayOperations(...)`
+- `OfflinePendingOperationService.markOperationReplayOutcome(...)`
 
 Required semantics:
 - drafts carry `baseAuthoritativeRevision` and `authoritativeSnapshotRevision`;
@@ -124,10 +129,14 @@ Reconnect decisions are explicit and bounded:
    - `conflict-requires-review`
    - `reject-not-allowed`
 3. require visible intervention for conflict/rejection outcomes.
+4. replay only eligible operations through authoritative API ports in deterministic dependency order.
+5. persist explicit replay outcomes (`sync-conflict`/`sync-rejected`) and remove queue entries only after authoritative apply confirmation.
+6. refresh local authoritative snapshot cache for stale cached resources and successfully replayed targets.
 
 Enforced by:
 - `planOfflineResynchronization(...)`
 - `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`
+- `OfflineControlledResynchronizationCoordinator.synchronizeWorkspace(...)`
 
 ## Desktop connectivity-state boundaries
 

@@ -4,9 +4,14 @@ import {
   type OfflineResourceClass,
   OfflineQueuedMutationStatuses,
   OfflineResourceClasses,
+  createOfflineQueuedMutationEnvelope,
   createOfflinePendingRunSubmissionRecord,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import { toOfflinePendingOperationEnvelopeDto } from "@shared/dto/runtime/OfflineSynchronizationDtos";
+import {
+  OfflinePendingOperationStatuses,
+  transitionOfflinePendingOperationStatus,
+} from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 import { OfflinePendingOperationEnvelopeDtoSchema } from "@shared/schemas/runtime/OfflineSynchronizationSchemaContracts";
 
 export class OfflinePendingOperationPersistenceError extends Error {
@@ -120,6 +125,7 @@ export interface PrepareOfflineReplayOperation {
   readonly operationId: string;
   readonly workspaceId: string;
   readonly actorUserIdentityId: string;
+  readonly operationEnvelope: OfflineQueuedMutationEnvelope;
   readonly targetResourceClass: OfflineResourceClass;
   readonly targetResourceId: string;
   readonly dependencies: ReadonlyArray<OfflinePendingOperationDependency>;
@@ -509,6 +515,85 @@ export class OfflinePendingOperationService {
     );
   }
 
+  public async listQueuedOperations(workspaceId: string): Promise<ReadonlyArray<OfflinePendingOperationRecord>> {
+    return this.repository.listOperationsByWorkspace(normalizeRequired(workspaceId, "workspaceId"));
+  }
+
+  public async markOperationAsApplied(workspaceId: string, operationId: string): Promise<boolean> {
+    return this.removeQueuedOperation(workspaceId, operationId);
+  }
+
+  public async markOperationReplayOutcome(input: {
+    readonly workspaceId: string;
+    readonly operationId: string;
+    readonly nextStatus:
+      | typeof OfflineQueuedMutationStatuses.queuedPendingSync
+      | typeof OfflineQueuedMutationStatuses.syncConflict
+      | typeof OfflineQueuedMutationStatuses.syncRejected;
+    readonly attemptedAt?: string;
+    readonly incrementRetryCount?: boolean;
+    readonly nextEligibleReplayAt?: string;
+    readonly nonRetryableReasonCode?: string;
+    readonly retryable?: boolean;
+  }): Promise<OfflinePendingOperationRecord> {
+    const workspaceId = normalizeRequired(input.workspaceId, "workspaceId");
+    const operationId = normalizeRequired(input.operationId, "operationId");
+    const record = await this.repository.findOperation(workspaceId, operationId);
+    if (!record) {
+      throw new OfflinePendingOperationPersistenceError(
+        `Operation '${operationId}' was not found in workspace '${workspaceId}'.`,
+      );
+    }
+
+    const attemptedAt = normalizeIsoTimestamp(input.attemptedAt ?? new Date().toISOString(), "attemptedAt");
+    const operationDto = toOfflinePendingOperationEnvelopeDto(record.operation, {
+      retryCount: record.retryability.retryCount,
+      lastAttemptedAt: record.retryability.lastAttemptedAt,
+    });
+
+    const transitioned = transitionOfflinePendingOperationStatus({
+      operation: operationDto,
+      nextStatus: input.nextStatus as typeof OfflinePendingOperationStatuses[keyof typeof OfflinePendingOperationStatuses],
+      lastAttemptedAt: attemptedAt,
+      retryCount: input.incrementRetryCount === true
+        ? record.retryability.retryCount + 1
+        : record.retryability.retryCount,
+    });
+
+    const updatedOperation = createOfflineQueuedMutationEnvelope({
+      mutationId: record.operation.mutationId,
+      targetResourceClass: record.operation.targetResourceClass,
+      targetResourceId: record.operation.targetResourceId,
+      intent: record.operation.intent,
+      baseAuthoritativeRevision: record.operation.baseAuthoritativeRevision,
+      localMutationRevision: record.operation.localMutationRevision,
+      queuedAt: record.operation.queuedAt,
+      userVisibleSyncStatus: transitioned.userVisibleSyncStatus,
+      divergenceDisclosureToken: record.operation.divergenceDisclosureToken,
+      replayDescriptor: record.operation.replayDescriptor,
+    });
+
+    const updatedRetryability = Object.freeze({
+      ...record.retryability,
+      retryable: input.retryable ?? record.retryability.retryable,
+      retryCount: transitioned.retryCount,
+      lastAttemptedAt: transitioned.lastAttemptedAt,
+      nextEligibleReplayAt: input.nextEligibleReplayAt ?? record.retryability.nextEligibleReplayAt,
+      nonRetryableReasonCode: input.nonRetryableReasonCode ?? record.retryability.nonRetryableReasonCode,
+    });
+
+    return this.queueOperation({
+      operation: updatedOperation,
+      actorWorkspaceContext: record.actorWorkspaceContext,
+      dependencies: record.dependencies,
+      resourceBaseVersions: record.resourceBaseVersions,
+      retryability: updatedRetryability,
+      pendingRunSubmission: record.pendingRunSubmission,
+      createdAt: record.createdAt,
+      updatedAt: attemptedAt,
+    });
+  }
+
   public async prepareReplayOperations(input: {
     readonly workspaceId: string;
     readonly preparedAt?: string;
@@ -613,6 +698,7 @@ export class OfflinePendingOperationService {
         operationId,
         workspaceId,
         actorUserIdentityId: operation.actorWorkspaceContext.actorUserIdentityId,
+        operationEnvelope: operation.operation,
         targetResourceClass: operation.operation.targetResourceClass,
         targetResourceId: operation.operation.targetResourceId,
         dependencies: operation.dependencies,
