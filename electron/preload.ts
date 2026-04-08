@@ -172,6 +172,15 @@ contextBridge.exposeInMainWorld("aiLoomDesktop", {
     getImageWorkflowDefinition(requestJson: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:image-workflows:get", requestJson) as Promise<string>;
     },
+    listImageSystemDefinitions(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:image-systems:list", requestJson) as Promise<string>;
+    },
+    getImageSystemDefinition(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:image-systems:get", requestJson) as Promise<string>;
+    },
+    saveImageSystemDefinition(requestJson: string) {
+      return ipcRenderer.invoke("ai-loom-desktop-studio-shell:image-systems:save", requestJson) as Promise<string>;
+    },
     getPersistedWorkflow(workflowId: string) {
       return ipcRenderer.invoke("ai-loom-desktop-studio-shell:get-persisted-workflow", workflowId) as Promise<string>;
     },

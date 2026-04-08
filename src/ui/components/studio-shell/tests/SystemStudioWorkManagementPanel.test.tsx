@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SystemStudioWorkManagementPanel } from "../SystemStudioWorkManagementPanel";
 
 describe("SystemStudioWorkManagementPanel", () => {
-  it("renders user-friendly save/open/copy/rename actions with collapsed advanced details", () => {
+  it("renders save-as-new/update/reopen actions and authoritative saved-system picker", () => {
     const html = renderToStaticMarkup(
       <SystemStudioWorkManagementPanel
         context={{
@@ -52,9 +52,11 @@ describe("SystemStudioWorkManagementPanel", () => {
       />,
     );
 
-    expect(html).toContain("Save work");
-    expect(html).toContain("Open saved setup");
-    expect(html).toContain("Make a copy");
+    expect(html).toContain("Save as new");
+    expect(html).toContain("Reopen saved");
+    expect(html).toContain("Update saved");
+    expect(html).toContain("Saved image systems");
+    expect(html).toContain("Select a saved image system");
     expect(html).toContain("Rename this work");
     expect(html).toContain("Supported workflow operations");
     expect(html).toContain("Select a supported workflow");

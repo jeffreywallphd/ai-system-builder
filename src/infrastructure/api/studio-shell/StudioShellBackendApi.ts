@@ -12,6 +12,7 @@ import {
   type InitialImageWorkflowTemplateFamilyId,
   type InitialImageWorkflowTemplateDefinition,
 } from "@application/image-workflows/InitialSupportedImageWorkflowTemplateRegistry";
+import type { IImageSystemDefinitionRepository } from "@application/image-workflows";
 import {
   buildStudioShellValidationIssues,
   tryReadTaxonomyFromVersionMetadata,
@@ -149,6 +150,18 @@ import {
   normalizeImageWorkflowParameterSpecification,
   type ImageWorkflowParameterSpecification,
 } from "@domain/image-workflows/ImageWorkflowParameterSpecification";
+import {
+  createStudioImageSystemDefinitionUseCases,
+  resolveStudioTemplateWorkflowDefinitionById,
+  toSystemIdFromDraft,
+  toSystemUpdateRequest,
+  toSystemUpsertRequest,
+  type GetImageSystemDefinitionRequest,
+  type ImageSystemDefinitionDetailResult,
+  type ListImageSystemDefinitionsRequest,
+  type ListImageSystemDefinitionsResult,
+  type StudioImageSystemDefinitionUseCases,
+} from "./StudioImageSystemDefinitionSupport";
 
 export interface StudioShellApiError {
   readonly code:
@@ -238,6 +251,65 @@ export interface StudioImageWorkflowDefinitionReadModel extends StudioImageWorkf
 
 export interface StudioImageWorkflowDefinitionListingReadModel {
   readonly items: ReadonlyArray<StudioImageWorkflowDefinitionSummaryReadModel>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
+}
+
+export interface SaveStudioImageSystemDefinitionRequest {
+  readonly studioId: string;
+  readonly sessionId: string;
+  readonly draftId: string;
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly existingSystemId?: string;
+  readonly saveAsNew?: boolean;
+  readonly title?: string;
+  readonly summary?: string;
+  readonly tags?: ReadonlyArray<string>;
+}
+
+export interface ListStudioImageSystemDefinitionsRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly workflowIds?: ReadonlyArray<string>;
+  readonly search?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface GetStudioImageSystemDefinitionRequest {
+  readonly workspaceId?: string;
+  readonly actorUserId?: string;
+  readonly systemId: string;
+}
+
+export interface StudioImageSystemDefinitionSummaryReadModel {
+  readonly systemId: string;
+  readonly title: string;
+  readonly summary?: string;
+  readonly lifecycleState: string;
+  readonly runtimeStatus: string;
+  readonly workflowId: string;
+  readonly workflowVersionTag: string;
+  readonly readinessState: string;
+  readonly readinessSummary: string;
+  readonly updatedAt: string;
+}
+
+export interface StudioImageSystemDefinitionReadModel extends StudioImageSystemDefinitionSummaryReadModel {
+  readonly parameterBaseline: Readonly<Record<string, unknown>>;
+  readonly outputTargetBindings: ReadonlyArray<{
+    readonly outputId: string;
+    readonly targetReference: string;
+  }>;
+}
+
+export interface StudioImageSystemDefinitionListingReadModel {
+  readonly items: ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>;
   readonly pagination: {
     readonly limit: number;
     readonly offset: number;
@@ -904,6 +976,10 @@ export class StudioShellBackendApi {
   private readonly referenceImageRunProtectedResourceType: string;
   private readonly workflowRunProtectedResourceType: string;
   private readonly imageWorkflowTemplateRegistry = createInitialSupportedImageWorkflowTemplateRegistry();
+  private readonly createImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["createSystemDefinition"];
+  private readonly updateImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["updateSystemDefinition"];
+  private readonly getImageSystemDefinitionUseCase: StudioImageSystemDefinitionUseCases["getSystemDefinition"];
+  private readonly listImageSystemDefinitionsUseCase: StudioImageSystemDefinitionUseCases["listSystemDefinitions"];
 
   constructor(
     private readonly repository: IStudioShellRepository,
@@ -916,6 +992,7 @@ export class StudioShellBackendApi {
       readonly storageInstanceMetadataRepository?: StorageInstanceMetadataRepository;
       readonly workflowOutputArtifactStorage?: WorkflowOutputArtifactStorage;
       readonly storageLifecycleInfrastructure?: StorageInstanceLifecycleInfrastructure;
+      readonly imageSystemDefinitionRepository?: IImageSystemDefinitionRepository;
       readonly authorizationDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
       readonly referenceImageProtectedResourceType?: string;
       readonly referenceImageRunProtectedResourceType?: string;
@@ -976,6 +1053,13 @@ export class StudioShellBackendApi {
       || "reference-image-run";
     this.workflowRunProtectedResourceType = options?.workflowRunProtectedResourceType?.trim()
       || "workflow-run";
+    const imageSystemUseCases = createStudioImageSystemDefinitionUseCases({
+      systemRepository: options?.imageSystemDefinitionRepository,
+    });
+    this.createImageSystemDefinitionUseCase = imageSystemUseCases.createSystemDefinition;
+    this.updateImageSystemDefinitionUseCase = imageSystemUseCases.updateSystemDefinition;
+    this.getImageSystemDefinitionUseCase = imageSystemUseCases.getSystemDefinition;
+    this.listImageSystemDefinitionsUseCase = imageSystemUseCases.listSystemDefinitions;
     this.workflowStudioService = new WorkflowStudioApplicationService(
       this.service,
       undefined,
@@ -1137,6 +1221,129 @@ export class StudioShellBackendApi {
         throw new Error(`not-found:Image workflow '${workflowId}' is not available.`);
       }
       return this.toImageWorkflowDefinitionReadModel(template, this.now().toISOString());
+    });
+  }
+
+  public async listImageSystemDefinitions(
+    request: ListStudioImageSystemDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>> {
+    return this.wrap(async () => {
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const response = await this.listImageSystemDefinitionsUseCase.execute({
+        workspaceId,
+        actorUserId,
+        workflowIds: request.workflowIds,
+        search: request.search,
+        limit: request.limit,
+        offset: request.offset,
+      } satisfies ListImageSystemDefinitionsRequest);
+      return this.toImageSystemDefinitionListingReadModel(response);
+    });
+  }
+
+  public async getImageSystemDefinition(
+    request: GetStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    return this.wrap(async () => {
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const systemId = request.systemId?.trim();
+      if (!systemId) {
+        throw new StudioShellInvalidRequestError("systemId is required.");
+      }
+      const detail = await this.getImageSystemDefinitionUseCase.execute({
+        workspaceId,
+        actorUserId,
+        systemId,
+      } satisfies GetImageSystemDefinitionRequest);
+      return this.toImageSystemDefinitionReadModel(detail);
+    });
+  }
+
+  public async saveImageSystemDefinition(
+    request: SaveStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    return this.wrap(async () => {
+      const studioId = request.studioId.trim();
+      const draftId = request.draftId.trim();
+      const sessionId = request.sessionId.trim();
+      if (!studioId || !draftId || !sessionId) {
+        throw new StudioShellInvalidRequestError("studioId, sessionId, and draftId are required.");
+      }
+      const snapshot = await this.requireSnapshot(studioId);
+      if (snapshot.draft?.draftId !== draftId) {
+        throw new StudioShellInvalidRequestError(`Draft '${draftId}' is not active in studio '${studioId}'.`);
+      }
+      const draft = snapshot.draft;
+      if (!draft) {
+        throw new StudioShellInvalidRequestError("A draft is required to save an image system definition.");
+      }
+
+      const extracted = this.readStudioImageSystemDraftState(draft.content);
+      if (!extracted.workflowAssetId) {
+        throw new StudioShellInvalidRequestError("Select a workflow operation before saving a system definition.");
+      }
+      const workspaceId = request.workspaceId?.trim() || "workspace:studio-shell";
+      const actorUserId = request.actorUserId?.trim() || "user:studio-shell";
+      const operationKey = `image-system.save:${draftId}:${this.now().toISOString()}`;
+
+      const workflow = resolveStudioTemplateWorkflowDefinitionById(extracted.workflowAssetId, workspaceId);
+      if (!workflow) {
+        throw new StudioShellInvalidRequestError(`Selected workflow '${extracted.workflowAssetId}' is not supported.`);
+      }
+
+      const existingSystemId = request.saveAsNew ? undefined : (request.existingSystemId?.trim() || extracted.imageSystemDefinitionId);
+      const provisionalSystemId = existingSystemId || toSystemIdFromDraft(studioId, draftId, this.now());
+      const createRequest = toSystemUpsertRequest({
+        workspaceId,
+        actorUserId,
+        systemId: provisionalSystemId,
+        title: request.title?.trim() || draft.metadata.title || "Image system",
+        summary: request.summary?.trim() || draft.metadata.summary,
+        tags: request.tags ?? draft.metadata.tags,
+        workflow,
+        workflowParameterValues: extracted.workflowParameterValuesByWorkflowId?.[workflow.workflowId] ?? {},
+        datasetInstanceId: extracted.datasetInstanceId,
+        operationKey,
+        occurredAt: this.now().toISOString(),
+      });
+
+      const saved = existingSystemId
+        ? await this.updateImageSystemDefinitionUseCase.execute(toSystemUpdateRequest({
+          existing: (await this.getImageSystemDefinitionUseCase.execute({
+            workspaceId,
+            actorUserId,
+            systemId: existingSystemId,
+            includeArchived: true,
+          })).system,
+          actorUserId,
+          occurredAt: this.now().toISOString(),
+          operationKey,
+          createRequest,
+        }))
+        : await this.createImageSystemDefinitionUseCase.execute(createRequest);
+
+      const nextContent = this.writeStudioImageSystemDraftState(draft.content, {
+        imageSystemDefinitionId: saved.system.systemId,
+        workflowParameterValuesByWorkflowId: {
+          ...(extracted.workflowParameterValuesByWorkflowId ?? {}),
+          [saved.system.workflowBinding.workflowId]: saved.system.parameterBaseline.values,
+        },
+        workflowAssetId: saved.system.workflowBinding.workflowId,
+        workflowVersionTag: saved.system.workflowBinding.workflowVersionTag,
+      });
+      await this.service.updateAssetDraft({
+        studioId,
+        sessionId,
+        draftId,
+        content: nextContent,
+      });
+      return this.toImageSystemDefinitionReadModel({
+        system: saved.system,
+        readiness: saved.readiness,
+        structure: saved.structure,
+      });
     });
   }
 
@@ -3960,6 +4167,150 @@ export class StudioShellBackendApi {
         },
       });
     });
+  }
+
+  private toImageSystemDefinitionListingReadModel(
+    result: ListImageSystemDefinitionsResult,
+  ): StudioImageSystemDefinitionListingReadModel {
+    return Object.freeze({
+      items: Object.freeze(result.items.map((entry) => Object.freeze({
+        systemId: entry.systemId,
+        title: entry.title,
+        summary: entry.summary,
+        lifecycleState: entry.lifecycleState,
+        runtimeStatus: entry.runtimeStatus,
+        workflowId: entry.workflowBinding.workflowId,
+        workflowVersionTag: entry.workflowBinding.workflowVersionTag,
+        readinessState: entry.readiness.state,
+        readinessSummary: entry.readiness.summary,
+        updatedAt: entry.updatedAt,
+      }))),
+      pagination: Object.freeze({
+        ...result.pagination,
+      }),
+    });
+  }
+
+  private toImageSystemDefinitionReadModel(
+    result: ImageSystemDefinitionDetailResult | {
+      readonly system: ImageSystemDefinitionDetailResult["system"];
+      readonly readiness: ImageSystemDefinitionDetailResult["readiness"];
+    },
+  ): StudioImageSystemDefinitionReadModel {
+    return Object.freeze({
+      systemId: result.system.systemId,
+      title: result.system.display.title,
+      summary: result.system.display.summary,
+      lifecycleState: result.system.lifecycleState,
+      runtimeStatus: result.system.runtimeStatus,
+      workflowId: result.system.workflowBinding.workflowId,
+      workflowVersionTag: result.system.workflowBinding.workflowVersionTag,
+      readinessState: result.readiness.state,
+      readinessSummary: result.readiness.summary,
+      updatedAt: result.system.updatedAt,
+      parameterBaseline: Object.freeze({ ...result.system.parameterBaseline.values }),
+      outputTargetBindings: Object.freeze(result.system.outputTargetBindings.map((entry) => Object.freeze({
+        outputId: entry.outputId,
+        targetReference: entry.targetReference,
+      }))),
+    });
+  }
+
+  private readStudioImageSystemDraftState(content: string): {
+    readonly imageSystemDefinitionId?: string;
+    readonly workflowAssetId?: string;
+    readonly workflowVersionTag?: string;
+    readonly datasetInstanceId?: string;
+    readonly workflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  } {
+    try {
+      const parsed = JSON.parse(content) as {
+        readonly systemSpec?: {
+          readonly serialization?: {
+            readonly runtime?: {
+              readonly workflowBindings?: ReadonlyArray<{
+                readonly workflowAssetId?: string;
+                readonly workflowVersionId?: string;
+              }>;
+              readonly datasetInstances?: ReadonlyArray<{
+                readonly instanceId?: string;
+              }>;
+              readonly state?: {
+                readonly imageWorkflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+                readonly imageSystemDefinitionId?: string;
+              };
+            };
+          };
+        };
+      };
+      const firstWorkflowBinding = parsed.systemSpec?.serialization?.runtime?.workflowBindings?.[0];
+      const firstDatasetInstance = parsed.systemSpec?.serialization?.runtime?.datasetInstances?.[0];
+      return Object.freeze({
+        imageSystemDefinitionId: parsed.systemSpec?.serialization?.runtime?.state?.imageSystemDefinitionId,
+        workflowAssetId: firstWorkflowBinding?.workflowAssetId?.trim(),
+        workflowVersionTag: firstWorkflowBinding?.workflowVersionId?.trim(),
+        datasetInstanceId: firstDatasetInstance?.instanceId?.trim(),
+        workflowParameterValuesByWorkflowId: parsed.systemSpec?.serialization?.runtime?.state?.imageWorkflowParameterValuesByWorkflowId,
+      });
+    } catch {
+      return Object.freeze({});
+    }
+  }
+
+  private writeStudioImageSystemDraftState(
+    content: string,
+    patch: {
+      readonly imageSystemDefinitionId: string;
+      readonly workflowAssetId: string;
+      readonly workflowVersionTag?: string;
+      readonly workflowParameterValuesByWorkflowId: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+    },
+  ): string {
+    const root = content.trim()
+      ? (JSON.parse(content) as Record<string, unknown>)
+      : {};
+    const systemSpec = (
+      root.systemSpec
+      && typeof root.systemSpec === "object"
+      && !Array.isArray(root.systemSpec)
+    )
+      ? { ...(root.systemSpec as Record<string, unknown>) }
+      : {};
+    const serialization = (
+      systemSpec.serialization
+      && typeof systemSpec.serialization === "object"
+      && !Array.isArray(systemSpec.serialization)
+    )
+      ? { ...(systemSpec.serialization as Record<string, unknown>) }
+      : {};
+    const runtime = (
+      serialization.runtime
+      && typeof serialization.runtime === "object"
+      && !Array.isArray(serialization.runtime)
+    )
+      ? { ...(serialization.runtime as Record<string, unknown>) }
+      : {};
+    const state = (
+      runtime.state
+      && typeof runtime.state === "object"
+      && !Array.isArray(runtime.state)
+    )
+      ? { ...(runtime.state as Record<string, unknown>) }
+      : {};
+
+    runtime.workflowBindings = Object.freeze([Object.freeze({
+      bindingId: "component:primary",
+      workflowAssetId: patch.workflowAssetId,
+      workflowVersionId: patch.workflowVersionTag,
+    })]);
+    state.imageSystemDefinitionId = patch.imageSystemDefinitionId;
+    state.imageWorkflowParameterValuesByWorkflowId = patch.workflowParameterValuesByWorkflowId;
+    runtime.state = state;
+    serialization.runtime = runtime;
+    systemSpec.serialization = serialization;
+    root.systemSpec = systemSpec;
+
+    return JSON.stringify(root, null, 2);
   }
 
   private async synchronizeWorkflowPersistenceFromStudioDraft(

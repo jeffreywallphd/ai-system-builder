@@ -218,3 +218,44 @@ Validation integration:
 - field validation uses shared contract validation (`validateImageSystemParameterSetContract`) so UI issue semantics align with application/domain rules.
 - feedback is emitted as per-field and global issues with non-technical messaging.
 - visibility rules (when present in parameter metadata) drive conditional disabled states in the form surface.
+
+## Story 2.4.3 system save, update, and reopen flows
+
+System Studio now persists and reopens image manipulation systems through authoritative image-system APIs instead of local-only draft duplication/open behavior.
+
+Canonical seams for this story:
+
+- backend API surface (`StudioShellBackendApi`):
+  - `listImageSystemDefinitions(...)`
+  - `getImageSystemDefinition(...)`
+  - `saveImageSystemDefinition(...)`
+- backend image-system use-case support:
+  - `src/infrastructure/api/studio-shell/StudioImageSystemDefinitionSupport.ts`
+- desktop/browser transport:
+  - IPC channels in `electron/main/main.ts`
+    - `ai-loom-desktop-studio-shell:image-systems:list`
+    - `ai-loom-desktop-studio-shell:image-systems:get`
+    - `ai-loom-desktop-studio-shell:image-systems:save`
+  - bridge contracts/preload/fallback wiring in:
+    - `electron/shared/DesktopContracts.ts`
+    - `electron/preload.ts`
+    - `src/ui/composition/BrowserStudioShellBridgeFallback.ts`
+- Studio service/page wiring:
+  - `src/ui/services/StudioShellService.ts`
+  - `src/ui/pages/StudioShellPage.tsx`
+  - `src/ui/studio-shell/StudioShellExtensions.ts`
+- System Studio UX flow:
+  - `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+
+Lifecycle behavior now exposed to users:
+
+- `Save as new` creates a new authoritative image-system definition from current draft workflow/parameter state.
+- `Update saved` mutates the selected authoritative image-system definition.
+- `Reopen saved` hydrates workflow selection and parameter baseline from authoritative system detail into active draft state.
+
+Source-of-truth posture for this story:
+
+- saved system identity (`imageSystemDefinitionId`), selected workflow binding, and parameter baseline are synchronized via authoritative API responses and persisted draft runtime state.
+- System Studio avoids keeping a separate conflicting local truth for saved system configuration.
+
+This keeps System Studio ready for later run-submission integration because saved/reopened systems carry workflow version binding, readiness summary, and parameter baseline from authoritative contracts.

@@ -173,6 +173,10 @@ For discovery/reopen experiences specifically:
 - treat list results as authorization-filtered, authoritative summaries for reopen targets
 - do not restore systems/workflows from UI-local snapshots when authoritative definitions are available
 
+Studio lifecycle rule (Story 2.4.3):
+
+- system save, update, and reopen flows must use authoritative image-system create/update/query seams so workflow selection, parameter baselines, and readiness posture come from persisted definitions rather than transient UI state.
+
 Do not add new AI capability surfaces that bypass workflow/system contracts via direct runtime payload editing.
 
 ## Related architecture notes

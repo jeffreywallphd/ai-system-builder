@@ -76,6 +76,10 @@ Discovery/reopen rule:
 
 - read/list workflow/system definitions through authoritative application APIs/use cases, not local studio-only state snapshots.
 
+Studio lifecycle rule (Story 2.4.3):
+
+- Studio save/update/reopen actions for image systems must round-trip through authoritative system APIs so workflow binding, parameter baseline, and readiness metadata are restored from persisted definitions.
+
 ## Related notes
 
 - `docs/architecture/image-workflow-system-definition-layer.md`

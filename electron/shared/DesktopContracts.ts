@@ -145,6 +145,9 @@ export interface DesktopStudioShellBridge {
   validateDraft(requestJson: string): Promise<string>;
   listImageWorkflowDefinitions(requestJson: string): Promise<string>;
   getImageWorkflowDefinition(requestJson: string): Promise<string>;
+  listImageSystemDefinitions(requestJson: string): Promise<string>;
+  getImageSystemDefinition(requestJson: string): Promise<string>;
+  saveImageSystemDefinition(requestJson: string): Promise<string>;
   getPersistedWorkflow(workflowId: string): Promise<string>;
   duplicatePersistedWorkflow(requestJson: string): Promise<string>;
   assessWorkflowExecutionReadiness(requestJson: string): Promise<string>;

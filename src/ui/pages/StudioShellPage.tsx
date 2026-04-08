@@ -1437,6 +1437,21 @@ export default function StudioShellPage({
         actorUserId: DefaultImageWorkflowActorUserId,
         ...request,
       }),
+      listImageSystemDefinitions: async (request) => service.listImageSystemDefinitions({
+        workspaceId: DefaultImageWorkflowWorkspaceId,
+        actorUserId: DefaultImageWorkflowActorUserId,
+        ...request,
+      }),
+      getImageSystemDefinition: async (request) => service.getImageSystemDefinition({
+        workspaceId: DefaultImageWorkflowWorkspaceId,
+        actorUserId: DefaultImageWorkflowActorUserId,
+        ...request,
+      }),
+      saveImageSystemDefinition: async (request) => service.saveImageSystemDefinition({
+        workspaceId: DefaultImageWorkflowWorkspaceId,
+        actorUserId: DefaultImageWorkflowActorUserId,
+        ...request,
+      }),
       saveSystemChildComponent: async (request) => {
         const response = await service.addSystemChildComponent(request);
         if (!response.ok) {
