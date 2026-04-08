@@ -334,3 +334,31 @@ Architecture posture preserved:
 - run linkage for review status/details resolves from authoritative run-history APIs,
 - no backend-local file assumptions are introduced in result review or continuation actions.
 
+## Epic 7.3 Story 7.3.3: Run history, recent work, and continuation flows
+
+Story 7.3.3 upgrades continuity UX so prior image work is discoverable and actionable directly in the runtime editor.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+Recent-work behavior:
+
+- Runtime editor now renders a dedicated `Recent work` panel sourced from authoritative saved-system APIs (`listImageSystemDefinitions`).
+- Each saved system entry shows concise continuation metadata (title, readiness summary, updated timestamp).
+- `Reopen setup` loads authoritative system detail (`getImageSystemDefinition`) and re-applies it to the active draft through authoritative mutation (`modifySystemDefinition`) before refreshing runtime collections/history.
+
+Run-history continuation behavior:
+
+- Runtime editor now renders an explicit `Run history` panel backed by authoritative run-history records (`listReferenceImageRunHistory`).
+- Each run entry includes concise timeline/output/instruction summary and status badge.
+- `Open context` restores run-linked context in-editor (preferred output or source record selection, plus parameter snapshot when available).
+- `Continue from output` reuses authoritative run outputs via dataset-item chaining (`chainReferenceImageDatasetItemToInput`) rather than local file assumptions.
+
+Architecture posture preserved:
+
+- recent-work and run-history views derive from authoritative system/run APIs, not local cache reconstruction,
+- continuation actions mutate or chain through existing studio/runtime API seams,
+- session continuity remains within runtime-safe persisted selection/property state, with no backend path shortcuts.
+

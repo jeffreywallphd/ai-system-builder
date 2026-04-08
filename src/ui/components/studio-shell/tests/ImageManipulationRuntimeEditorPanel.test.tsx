@@ -6,6 +6,9 @@ import ImageManipulationRuntimeEditorPanel, {
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
   resolveLinkedRunForSelectedOutput,
+  resolveRunHistorySummary,
+  resolveRunOutputRecordId,
+  resolveRunParameterSnapshot,
   resolveSelectionConfirmationMessage,
 } from "../ImageManipulationRuntimeEditorPanel";
 
@@ -76,6 +79,8 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Run progress");
     expect(html).toContain("Progress details will appear after execution starts.");
     expect(html).toContain("Result review");
+    expect(html).toContain("Run history");
+    expect(html).toContain("No run history yet");
     expect(html).toContain("Before and after");
     expect(html).toContain("Use result as source");
     expect(html).toContain("Use result as face reference");
@@ -251,5 +256,55 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
 
     expect(linked?.runId).toBe("run:active:1");
     expect(linked?.status).toBe("running");
+  });
+
+  it("resolves authoritative run output record ids for continuation", () => {
+    expect(resolveRunOutputRecordId({
+      outputs: {
+        datasetInstance: {
+          persistedRecordIds: ["record:output:1"],
+        },
+        images: [],
+      },
+    } as never)).toBe("record:output:1");
+
+    expect(resolveRunOutputRecordId({
+      outputs: {
+        images: [{
+          recordId: "record:output:2",
+        }],
+      },
+    } as never)).toBe("record:output:2");
+  });
+
+  it("prefers explicit edit instruction copy when summarizing history entries", () => {
+    expect(resolveRunHistorySummary({
+      inputs: {
+        parameterSummary: {
+          editInstruction: "Keep the pose and brighten the scene.",
+        },
+      },
+    } as never)).toBe("Keep the pose and brighten the scene.");
+  });
+
+  it("restores preset and config snapshots from run parameter summaries", () => {
+    const snapshot = resolveRunParameterSnapshot({
+      fallbackPresetId: "portrait-clean-v1",
+      run: {
+        inputs: {
+          parameterSummary: {
+            presetId: "portrait-clean-v1",
+            imageConfig: {
+              prompts: {
+                positivePrompt: "Cinematic portrait relight",
+              },
+            },
+          },
+        },
+      } as never,
+    });
+
+    expect(snapshot?.presetId).toBe("portrait-clean-v1");
+    expect(snapshot?.config.prompts.positivePrompt).toBe("Cinematic portrait relight");
   });
 });
