@@ -18,6 +18,7 @@ import {
   AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
   AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
+  AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "../AuthoritativeServerCompositionRoot";
 import { AuthoritativeServerApiRouteRegistrationPlanArtifactKey } from "../AuthoritativeServerApiRouteComposition";
@@ -257,6 +258,8 @@ describe("AuthoritativeServerCompositionRoot", () => {
     let observedComfyBaseUrl: string | undefined;
     let observedComfyEnabled: boolean | undefined;
     let observedComfyHasAuthToken: boolean | undefined;
+    let observedRegisteredBackends: ReadonlyArray<string> | undefined;
+    let observedHasCancellationSignalPort = false;
 
     const root = createAuthoritativeServerCompositionRoot({
       hostOptions: {
@@ -283,6 +286,12 @@ describe("AuthoritativeServerCompositionRoot", () => {
             observedComfyEnabled = composed?.config.enabled;
             observedComfyBaseUrl = composed?.config.baseUrl;
             observedComfyHasAuthToken = snapshot?.hasAuthToken === true;
+            const registration = context.getArtifact<{
+              readonly registeredBackendKinds: ReadonlyArray<string>;
+              readonly cancellationSignalPort?: unknown;
+            }>(AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey);
+            observedRegisteredBackends = registration?.registeredBackendKinds;
+            observedHasCancellationSignalPort = !!registration?.cancellationSignalPort;
           },
         },
       },
@@ -304,7 +313,77 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedComfyEnabled).toBeTrue();
     expect(observedComfyBaseUrl).toBe("http://127.0.0.1:8188");
     expect(observedComfyHasAuthToken).toBeTrue();
+    expect(observedRegisteredBackends).toEqual(["comfyui"]);
+    expect(observedHasCancellationSignalPort).toBeTrue();
     await runtime.stop();
+  });
+
+  it("passes composed run-execution adapter registration into runtime host startup options", async () => {
+    let observedRunExecutionRegistration: {
+      readonly registeredBackendKinds: ReadonlyArray<string>;
+      readonly cancellationSignalPort?: unknown;
+    } | undefined;
+
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async (options) => {
+        observedRunExecutionRegistration = options.runExecutionAdapters;
+        return {
+          port: 5311,
+          address: "127.0.0.1:5311",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        };
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-run-execution-registration-pass-through-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+      environment: {
+        AI_LOOM_COMFYUI_ADAPTER_ENABLED: "true",
+        AI_LOOM_COMFYUI_BASE_URL: "http://127.0.0.1:8188/",
+      },
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedRunExecutionRegistration?.registeredBackendKinds).toEqual(["comfyui"]);
+    expect(observedRunExecutionRegistration?.cancellationSignalPort).toBeDefined();
+    await runtime.stop();
+  });
+
+  it("surfaces ComfyUI adapter configuration failures during startup dependencies composition", async () => {
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5312,
+        address: "127.0.0.1:5312",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-comfyui-config-failure-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+      environment: {
+        AI_LOOM_COMFYUI_ADAPTER_ENABLED: "true",
+      },
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow(
+      "ComfyUI execution adapter infrastructure requires a configured baseUrl.",
+    );
   });
 
   it("fails compose when authoritative service coverage assertions fail", async () => {

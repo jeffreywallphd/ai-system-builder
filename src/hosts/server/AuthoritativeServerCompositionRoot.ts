@@ -58,6 +58,10 @@ import {
   createComfyUiExecutionAdapterInfrastructure,
   type ComfyUiExecutionAdapterInfrastructure,
 } from "@infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition";
+import {
+  createAuthoritativeRunExecutionAdapterRegistration,
+  type AuthoritativeRunExecutionAdapterRegistration,
+} from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -99,6 +103,12 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly environment: Readonly<Record<string, string | undefined>>;
       readonly deploymentProfile: HostDeploymentProfile;
     }) => ComfyUiExecutionAdapterInfrastructure | undefined;
+    readonly composeRunExecutionAdapterRegistration?: (input: {
+      readonly hostConfiguration: IdentityServerHostOptions;
+      readonly environment: Readonly<Record<string, string | undefined>>;
+      readonly deploymentProfile: HostDeploymentProfile;
+      readonly comfyUiExecutionAdapter?: ComfyUiExecutionAdapterInfrastructure;
+    }) => AuthoritativeRunExecutionAdapterRegistration | undefined;
     readonly resolveDeploymentPolicyBootstrap?: (input: {
       readonly persistentPlatformServices: AuthoritativePersistentPlatformServices;
       readonly hostConfiguration: IdentityServerHostOptions;
@@ -116,6 +126,8 @@ export const AuthoritativeServerPersistentPlatformServicesArtifactKey =
   "artifact:host:server:authoritative:persistent-platform-services";
 export const AuthoritativeServerComfyUiExecutionAdapterArtifactKey =
   "artifact:host:server:authoritative:comfyui-execution-adapter";
+export const AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey =
+  "artifact:host:server:authoritative:run-execution-adapter-registration";
 export const AuthoritativeServerDeploymentPolicyBootstrapArtifactKey =
   "artifact:host:server:authoritative:deployment-policy-bootstrap";
 
@@ -245,6 +257,23 @@ export function createAuthoritativeServerCompositionRoot(
                 comfyUiExecutionAdapter,
               );
             }
+            const runExecutionAdapterRegistration = (
+              input.bootstrap?.composeRunExecutionAdapterRegistration
+              ?? ((registrationInput) => createAuthoritativeRunExecutionAdapterRegistration({
+                comfyUiExecutionAdapter: registrationInput.comfyUiExecutionAdapter,
+              }))
+            )({
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+              environment: context.environment,
+              deploymentProfile: context.deploymentProfile,
+              comfyUiExecutionAdapter,
+            });
+            if (runExecutionAdapterRegistration) {
+              context.setArtifact(
+                AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+                runExecutionAdapterRegistration,
+              );
+            }
           },
           [HostBootstrapStageIds.persistence]: async (context) => {
             persistenceRuntime = (
@@ -333,12 +362,16 @@ export function createAuthoritativeServerCompositionRoot(
             (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
             (input.bootstrap?.assertApiRouteRegistrationCoverage
               ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
+            const runExecutionAdapterRegistration = context.getArtifact<AuthoritativeRunExecutionAdapterRegistration>(
+              AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+            );
             const composedHost = await startHost({
               ...(context.hostConfiguration as IdentityServerHostOptions),
               deploymentProfile: context.deploymentProfile,
               deploymentPolicyBootstrap,
               persistentPlatformServices: composedPersistentServices,
               routeRegistrationPlan: apiRouteRegistrationPlan,
+              runExecutionAdapters: runExecutionAdapterRegistration,
             });
             context.setArtifact(StartedHostArtifactKey, composedHost);
           },

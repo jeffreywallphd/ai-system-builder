@@ -47,7 +47,11 @@ The host validates startup dependency coverage and authoritative service coverag
 
 During authoritative startup, the `dependencies` stage composes an API route registration plan artifact and the `feature-registration` stage validates required route-family coverage before runtime host transport starts.
 
-The same `dependencies` stage now also composes optional ComfyUI execution adapter infrastructure (transport client + run-dispatch adapter + capability probe adapter) as a host startup artifact when Comfy adapter config is enabled.
+The same `dependencies` stage now also composes optional ComfyUI execution adapter infrastructure (transport client + run-dispatch adapter + cancellation adapter + capability probe adapter + output discovery collector) as a host startup artifact when Comfy adapter config is enabled.
+
+The dependencies stage additionally composes authoritative run-execution adapter registration (`src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`) so higher layers can resolve:
+- a run-dispatch port with registered backend adapters
+- a run-cancellation signal port backed by the Comfy cancellation adapter bridge (`src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`)
 
 ## Startup expectations
 
@@ -86,6 +90,8 @@ During host composition:
 - the bootstrap `persistence` stage initializes the shared SQLite persistence runtime (`src/infrastructure/persistence/sqlite/SqlitePersistenceRuntime.ts`)
 - the bootstrap `persistence` stage composes authoritative persistent platform services (repository adapters, audit sinks, and platform run/audit persistence adapter) and stores them as startup artifacts
 - the bootstrap `feature-registration` stage injects startup-composed persistent platform services into `startIdentityServerHost(...)`
+- the bootstrap `feature-registration` stage injects startup-composed run execution adapter registration into `startIdentityServerHost(...)` through `IdentityServerHostOptions.runExecutionAdapters`
+- run cancellation orchestration resolves backend cancellation signaling from host-composed adapter registration rather than constructing backend adapters inside API/UI code
 - startup failure cleanup disposes persistence runtime resources
 - startup failure cleanup also disposes composed persistent platform services
 - normal host shutdown also disposes composed persistent platform services and persistence runtime resources after host transport shutdown

@@ -255,6 +255,7 @@ import {
   type IdentityHttpServerLogger,
 } from "@infrastructure/transport/http-server/identity/IdentityHttpServer";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
+import type { AuthoritativeRunExecutionAdapterRegistration } from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
 import type { IdentitySessionLifecyclePolicies } from "@application/identity/services/IdentitySessionLifecycleService";
 import type { AuthProvider, CredentialPolicy } from "@domain/identity/IdentityDomain";
 import type {
@@ -285,6 +286,7 @@ export interface IdentityServerHostOptions {
   readonly providerAccountPolicies?: IdentityProviderAccountPolicyConfig;
   readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
+  readonly runExecutionAdapters?: AuthoritativeRunExecutionAdapterRegistration;
 }
 
 export interface IdentityServerHost {
@@ -1220,6 +1222,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       runRepository: persistentPlatformServices.platformPersistenceRepository,
       queueRepository: persistentPlatformServices.platformPersistenceRepository,
       orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      cancellationSignalPort: options.runExecutionAdapters?.cancellationSignalPort,
       transactionManager: persistentPlatformServices.platformPersistenceRepository,
       authoritativeAuditRecorder: authoritativeAuditRecorder,
       now: () => workspaceClock.now(),
