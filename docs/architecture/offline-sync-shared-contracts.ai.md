@@ -19,6 +19,7 @@ Story 19.1.6 adds explicit offline local-execution metadata and reconnect regist
 - Use `OfflineDraftStateDto.syncStatus` and transition helpers to keep local draft progression explicit.
 - Use `OfflinePendingOperationEnvelopeDto` for queued operations.
   - include `replayDescriptor` so operation intent is durable and replayable against authoritative APIs.
+  - keep persisted envelope payload canonicalized and validated against shared contract shapes before durable write.
 - Use `OfflineSyncQueueStateDto.pendingRunSubmissions` for explicit pending run-submission records.
 - Use `OfflineSyncQueueStateDto.localExecutionRegistrations` for explicit local-execution registration queue entries.
 - Use `OfflineLocalExecutionRecordDto` for local execution metadata that remains local activity until registration.
@@ -30,6 +31,7 @@ Story 19.1.6 adds explicit offline local-execution metadata and reconnect regist
   - include `decisionRule`, `requiresAdminAttention`, and `preserveLocalDraftAsUnsynced` on outcomes
 - Use `OfflineConnectivitySurfaceStateDto` for connectivity-aware UI state.
 - Use parser helpers in `OfflineSynchronizationSchemaContracts` before persisting or serving payloads.
+- Use canonical pending-operation persistence/replay-preparation services to attach actor/workspace context, dependencies, base versions, and retryability metadata around these queue envelopes.
 
 ## Compatibility posture
 

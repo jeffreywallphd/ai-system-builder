@@ -20,12 +20,16 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflineLocalModeResynchronization.ts`
 - application authoritative snapshot cache service:
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+- application pending-operation persistence/replay-preparation service:
+  - `src/application/common/OfflinePendingOperationPersistence.ts`
 - desktop host local-mode binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
 - desktop persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - shared offline contracts and schema parsers:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -79,6 +83,9 @@ Required:
 - include `divergenceDisclosureToken`;
 - preserve no-preclaim rule: queued operations cannot be pre-marked globally applied;
 - keep operation status transitions explicit (`queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
+- persist pending operation records with explicit `actorWorkspaceContext`, dependency references, resource base-version metadata, and retryability metadata.
+- preserve canonical replay payload serialization + digest so reconnect replay intent is durable across desktop restart.
+- replay-preparation output must be deterministic and dependency-aware, and must clearly separate replay-eligible unsynced records from blocked/non-eligible records.
 
 ## Extending reconnect conflict handling
 
@@ -116,6 +123,9 @@ At minimum, update:
 - `src/hosts/desktop/tests/DesktopConnectivityStateService.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineSnapshotCacheHost.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflineSnapshotCacheRepository.test.ts`
+- `src/application/common/tests/OfflinePendingOperationPersistence.test.ts`
+- `src/hosts/desktop/tests/DesktopOfflinePendingOperationHost.test.ts`
+- `src/infrastructure/desktop/tests/DesktopOfflinePendingOperationRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`
 - `src/shared/schemas/runtime/tests/OfflineSynchronizationSchemaContracts.test.ts`

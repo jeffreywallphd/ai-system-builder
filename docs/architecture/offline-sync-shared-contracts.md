@@ -17,6 +17,7 @@ Story 19.1.6 extends it with explicit offline local-execution metadata and recon
 - Use `OfflineSynchronizationStateSnapshotDto` as the top-level state shape for workspace offline/resync views.
 - Use `OfflineDraftStateDto.syncStatus` transitions to model local draft lifecycle explicitly (`local-only`, `queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
 - Use `OfflinePendingOperationEnvelopeDto` for queue entries persisted while disconnected, including the required structured `replayDescriptor` for reconnect replay.
+- Keep persisted operation payloads canonicalized and replay-validated against these shared contract shapes before writing to local durable stores.
 - Use `OfflineSyncQueueStateDto.pendingRunSubmissions` for pending run submissions that are locally durable but not yet authoritative.
 - Use `OfflineSyncQueueStateDto.localExecutionRegistrations` for queued registration of local offline executions.
 - Use `OfflineLocalExecutionRecordDto` to persist local execution metadata (actor/time/digests/output summaries/mode context).
@@ -28,6 +29,7 @@ Story 19.1.6 extends it with explicit offline local-execution metadata and recon
   - `OfflineReconciliationOutcomeDto` now carries `decisionRule`, `requiresAdminAttention`, and `preserveLocalDraftAsUnsynced`.
 - Use `OfflineConnectivitySurfaceStateDto` for connectivity-aware status rendering in UI surfaces.
 - Validate incoming/outgoing payloads with `parseOfflineSynchronizationStateSnapshotDto(...)` (and related parser helpers) before persistence or transport.
+- Use canonical persistence/replay-preparation seams (for example `OfflinePendingOperationService`) to carry actor/workspace context, dependency references, resource base versions, and retryability metadata alongside contract-backed queue envelopes.
 
 ## Migration notes
 

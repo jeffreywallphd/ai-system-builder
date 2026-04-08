@@ -23,14 +23,20 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineResourceClassificationPolicy.ts`
 - application authoritative snapshot cache service and contracts:
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+- application pending-operation persistence + replay-preparation service and contracts:
+  - `src/application/common/OfflinePendingOperationPersistence.ts`
 - desktop host local-mode profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - desktop host connectivity-state monitor and transition service:
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - desktop host cache runtime factory:
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+- desktop host pending-operation persistence runtime factory:
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
 - desktop offline snapshot cache persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+- desktop offline pending-operation persistence adapter:
+  - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - shared contract package for runtime DTO/schema/state:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -95,6 +101,9 @@ Local draft seams:
 Queued-operation seams:
 - `createOfflineQueuedMutationEnvelope(...)`
 - `createOfflinePendingRunSubmissionRecord(...)`
+- `createOfflinePendingOperationRecord(...)`
+- `OfflinePendingOperationService.queueOperation(...)`
+- `OfflinePendingOperationService.prepareReplayOperations(...)`
 
 Required semantics:
 - drafts carry `baseAuthoritativeRevision` and `authoritativeSnapshotRevision`;
@@ -103,6 +112,8 @@ Required semantics:
 - queued operations require `divergenceDisclosureToken`;
 - queued operations cannot be pre-marked `sync-applied`;
 - local edits reset sync state to `local-only` and clear queued linkage.
+- persisted pending-operation records include actor/workspace context, operation dependency graph, base-version metadata, retryability metadata, and canonical replay payload digest so reconnect replay is deterministic and auditable.
+- replay preparation filters to replay-eligible unsynced operations and produces deterministic dependency-aware replay ordering.
 
 ## Sync and reconciliation boundaries
 
