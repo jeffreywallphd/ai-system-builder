@@ -103,3 +103,4 @@ Infrastructure and host layers:
 - `docs/architecture/run-submission-validation-policy-eligibility.md`
 - `docs/architecture/run-authoritative-creation-persistence-workflow.md`
 - `docs/architecture/run-orchestration-queue-assignment-dispatch-control-plane.md`
+- `docs/architecture/image-run-feature-4-final-baseline.md`

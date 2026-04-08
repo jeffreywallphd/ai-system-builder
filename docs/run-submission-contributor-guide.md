@@ -14,6 +14,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 - `docs/architecture/run-authoritative-read-api.md`
 - `docs/architecture/run-submission-lifecycle-audit-hooks.md`
 - `docs/architecture/run-submission-pipeline-extension-guardrails.md`
+- `docs/architecture/image-run-feature-4-final-baseline.md`
 
 ## Required implementation path
 

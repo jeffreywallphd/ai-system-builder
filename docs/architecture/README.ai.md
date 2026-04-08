@@ -218,6 +218,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 4 / Epic 4.1 Story 4.1.3 image-run repository and orchestration service ports for authoritative persistence, readiness, queueing, dispatch handoff, update ingestion, cancellation, and output notifications: `docs/architecture/image-run-orchestration-application-ports.md`
 - Feature 4 / Epic 4.1 Story 4.1.5 authoritative run-orchestration posture for image manipulation (authoritative submission/validation, lifecycle normalization, execution handoff, and strict no direct studio-to-backend execution): `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 - Feature 4 / Epic 4.2 Story 4.2.5 concrete persistence implementation for image runs and durable status history recording/query seams: `docs/architecture/run-orchestration-image-run-persistence-and-status-history.md`
+- Feature 4 / Epic 4.4 Story 4.4.4 final completion verification and follow-on integration guidance for authoritative image run orchestration: `docs/architecture/image-run-feature-4-final-baseline.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

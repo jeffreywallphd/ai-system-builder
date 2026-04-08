@@ -5,6 +5,7 @@ Quick extension workflow for contributors adding new run-submission backends/pol
 
 ## Human doc
 - `docs/run-submission-contributor-guide.md`
+- `docs/architecture/image-run-feature-4-final-baseline.md`
 
 ## Required workflow
 - Update shared run transport contracts/schemas first.
