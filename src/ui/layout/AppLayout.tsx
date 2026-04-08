@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Link,
   Outlet,
@@ -23,6 +23,9 @@ import {
   SurfaceSkipLink,
   useSurfaceRouteFocus,
 } from "../shared/accessibility";
+import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
+import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
+import type { OfflineSynchronizationStateSnapshotDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -33,7 +36,7 @@ const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   healthChecks: Object.freeze([]),
   isRefreshingHealth: false,
   appState: "starting",
-  appStateDetail: "Checking runtime statusâ€¦",
+  appStateDetail: "Checking runtime status…",
   canRestartRuntime: false,
   isRestartingRuntime: false,
 });
@@ -62,6 +65,7 @@ export interface AppLayoutProps {
 
 export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Element {
   const { runtimeConsoleStore, workflowStore } = useUiDependencies();
+  const desktopConnectivityService = useMemo(() => new DesktopConnectivityService(), []);
   const location = useLocation();
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
@@ -69,6 +73,10 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
   const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [routeAnnouncement, setRouteAnnouncement] = useState<string | undefined>(undefined);
+  const [offlineSnapshot, setOfflineSnapshot] = useState<OfflineSynchronizationStateSnapshotDto | undefined>(undefined);
+  const [offlineStatusError, setOfflineStatusError] = useState<string | undefined>(undefined);
+  const [isOfflineStatusLoading, setOfflineStatusLoading] = useState<boolean>(false);
+  const [isOfflineModeTogglePending, setOfflineModeTogglePending] = useState<boolean>(false);
   const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
   const mainContentRef = useRef<HTMLElement>(null);
@@ -80,6 +88,46 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
   useEffect(() => {
     return runtimeConsoleStore.subscribe(setRuntimeConsoleState);
   }, [runtimeConsoleStore]);
+
+  const refreshOfflineStatus = useCallback(async () => {
+    setOfflineStatusLoading(true);
+    try {
+      const next = await desktopConnectivityService.getSynchronizationStateSnapshot();
+      setOfflineSnapshot(next);
+      setOfflineStatusError(undefined);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to refresh offline/local mode status.";
+      setOfflineStatusError(message);
+    } finally {
+      setOfflineStatusLoading(false);
+    }
+  }, [desktopConnectivityService]);
+
+  const toggleOfflineMode = useCallback(async (active: boolean) => {
+    setOfflineModeTogglePending(true);
+    try {
+      await desktopConnectivityService.setOfflineMode({
+        active,
+        detail: active ? "desktop-shell-toggle" : "desktop-shell-resume",
+      });
+      await refreshOfflineStatus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to update offline mode.";
+      setOfflineStatusError(message);
+    } finally {
+      setOfflineModeTogglePending(false);
+    }
+  }, [desktopConnectivityService, refreshOfflineStatus]);
+
+  useEffect(() => {
+    void refreshOfflineStatus();
+    const interval = window.setInterval(() => {
+      void refreshOfflineStatus();
+    }, 15_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [refreshOfflineStatus]);
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const { currentWorkflow, isDirty } = workflowStore.getState();
@@ -242,6 +290,18 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
             isWideWorkspace ? " ui-app__main-inner--wide" : ""
           }`}
         >
+          <DesktopOfflineStatusSurface
+            snapshot={offlineSnapshot}
+            isLoading={isOfflineStatusLoading}
+            isTogglingOfflineMode={isOfflineModeTogglePending}
+            errorMessage={offlineStatusError}
+            onRefresh={() => {
+              void refreshOfflineStatus();
+            }}
+            onToggleOfflineMode={(active) => {
+              void toggleOfflineMode(active);
+            }}
+          />
           <GuidedOnboardingFlowSurface pathname={location.pathname} />
           <ContextNavigationBar model={contextNavigation} />
           <Outlet />
@@ -278,4 +338,5 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
     </div>
   );
 }
+
 

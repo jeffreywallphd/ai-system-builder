@@ -160,6 +160,29 @@ Connectivity transition publication is explicit:
 - `offline-entered` and `offline-exited` events emit from the host connectivity service when local-mode state changes;
 - transition events are best-effort and do not alter connectivity decision semantics.
 
+## Desktop offline-aware UX status surfaces (Story 19.3.1)
+
+Desktop shell UX now consumes canonical offline contract state through shared presenter/UI seams rather than route-level transport heuristics.
+
+- desktop bridge/UI service seam:
+  - `src/ui/shared/connectivity/DesktopConnectivityService.ts`
+  - consumes `OfflineConnectivitySurfaceStateDto` and resolves `OfflineSynchronizationStateSnapshotDto` (bridge payload when available, canonical structured fallback otherwise).
+- shared presenter seam:
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - derives banner state, reconnecting/offline/unsynced messaging, cache summaries, pending-sync summaries, and policy-limited guidance from shared offline contracts.
+- shared desktop shell surface seam:
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - renders status banner, cached-resource summary, pending-operation summary, and explicit unsupported-action guidance.
+- shell composition seam:
+  - `src/ui/layout/AppLayout.tsx`
+  - renders the offline status surface in the shared desktop frame and keeps host/sync mechanics outside the UI.
+
+Required UX behavior baseline:
+- users can distinguish `connected`, `offline`, `reconnecting`, and `connected-with-unsynced` states;
+- pending synchronization and cached resource state are always visible in one shared panel;
+- unsupported actions are listed explicitly when queueing/resynchronization/policy constraints apply;
+- UI state derivation uses shared offline synchronization contracts, not ad hoc transport error inference.
+
 ## Offline audit and operational event hooks
 
 Offline and reconnect behavior must remain visible outside desktop-local UI state.

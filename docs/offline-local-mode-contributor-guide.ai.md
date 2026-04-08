@@ -25,6 +25,8 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
    - include runtime adapter wiring (`src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`) when operational/governance publication paths change.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
+   - keep status derivation in shared presenter seams.
+   - keep host/application sync mechanics outside UI components.
 
 ## Desktop cache + reconnect extension map
 
@@ -46,6 +48,11 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
   - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+- desktop shared UI status seams:
+  - `src/ui/shared/connectivity/DesktopConnectivityService.ts`
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - `src/ui/layout/AppLayout.tsx`
 
 ## Invariants to preserve
 
@@ -78,4 +85,5 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 
 - update relevant offline tests across domain/application/host/shared contract modules;
 - include desktop connectivity-state transition coverage in host tests when connectivity semantics change;
+- include shared desktop offline-status service/presenter/surface coverage when offline UX behavior changes;
 - keep `.md` and `.ai.md` offline docs paired and updated together.

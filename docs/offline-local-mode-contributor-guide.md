@@ -42,6 +42,11 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
   - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+- desktop shared UI status seams:
+  - `src/ui/shared/connectivity/DesktopConnectivityService.ts`
+  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
+  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
+  - `src/ui/layout/AppLayout.tsx`
 
 ## Desktop cache and reconnect workflow entry points
 
@@ -86,6 +91,8 @@ Use this map when deciding where to extend behavior:
    - enforce allowed resource and execution classes through profile gates.
    - emit explicit offline-entered/offline-exited events from host-owned connectivity transitions.
 5. Update adapters/UI surfaces last to consume new canonical contracts; do not invent ad hoc offline object shapes.
+   - Keep offline/local-mode display logic in shared presenter/component seams.
+   - Keep host/application synchronization mechanics out of UI components.
 
 ## Workflow-specific extension checklists
 
@@ -215,6 +222,9 @@ At minimum, update:
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`
 - `src/shared/schemas/runtime/tests/OfflineSynchronizationSchemaContracts.test.ts`
+- `src/ui/shared/connectivity/tests/DesktopConnectivityService.test.ts`
+- `src/ui/presenters/tests/DesktopOfflineStatusPresenter.test.ts`
+- `src/ui/shared/tests/DesktopOfflineStatusSurface.test.tsx`
 
 When architecture behavior changes, update both:
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
