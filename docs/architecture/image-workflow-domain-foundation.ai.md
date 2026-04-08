@@ -7,7 +7,9 @@ Story 2.1.1 introduces a dedicated typed image-workflow domain model with lifecy
 ## Canonical files
 
 - `src/domain/image-workflows/ImageWorkflowDomain.ts`
+- `src/domain/image-workflows/ImageWorkflowParameterSpecification.ts`
 - `src/domain/image-workflows/tests/ImageWorkflowDomain.test.ts`
+- `src/domain/image-workflows/tests/ImageWorkflowParameterSpecification.test.ts`
 - `docs/architecture/image-workflow-domain-foundation.md`
 
 ## Modeled contract
@@ -20,7 +22,7 @@ Story 2.1.1 introduces a dedicated typed image-workflow domain model with lifecy
 - version lineage and semantic version tags
 - lifecycle state and activation status
 - typed input slots + input binding rules
-- typed parameter specifications
+- typed parameter specifications (semantic meaning + validation metadata + UI hints)
 - typed output expectations + output binding rules
 - backend translation references (translator/template/mappings)
 - audit timestamps and actor metadata
@@ -36,7 +38,7 @@ Story 2.1.1 introduces a dedicated typed image-workflow domain model with lifecy
 - binding ids and referenced ids must be unique/resolved
 - backend translation mappings must reference declared inputs/parameters/outputs
 - logical references reject raw filesystem paths
-- parameter defaults are type/range/enum validated
+- parameter defaults and runtime values are type/constraint validated through dedicated parameter-spec value objects
 
 ## Boundary posture
 

@@ -52,11 +52,20 @@ function createValidWorkflow() {
     parameterSpecifications: [{
       parameterId: "variationStrength",
       label: "Variation strength",
-      kind: "number",
+      valueKind: "float",
+      semanticMeaning: "variation-strength",
       required: true,
-      minimum: 0,
-      maximum: 1,
       defaultValue: 0.5,
+      sensitivity: "normal",
+      validation: {
+        minimum: 0,
+        maximum: 1,
+        step: 0.05,
+      },
+      ui: {
+        control: "slider",
+        unitLabel: "%",
+      },
     }],
     outputExpectations: [{
       outputId: "images",
@@ -135,10 +144,17 @@ describe("ImageWorkflowDomain", () => {
       parameterSpecifications: [{
         parameterId: "mode",
         label: "Mode",
-        kind: "enum",
+        valueKind: "select",
+        semanticMeaning: "custom",
         required: true,
-        allowedValues: ["a", "b"],
         defaultValue: "c",
+        sensitivity: "normal",
+        validation: {
+          options: [{ value: "a", label: "A" }, { value: "b", label: "B" }],
+        },
+        ui: {
+          control: "select",
+        },
       }],
       backendTranslation: {
         ...createValidWorkflow().backendTranslation,
@@ -159,6 +175,77 @@ describe("ImageWorkflowDomain", () => {
       }],
       createdBy: "user-1",
     })).toThrow("filesystem path");
+  });
+
+  it("supports typed form parameters for boolean/select/reference and visibility hints", () => {
+    const workflow = createImageWorkflowDefinition({
+      ...createValidWorkflow(),
+      workflowId: "wf:image:typed-parameters",
+      parameterSpecifications: [
+        {
+          parameterId: "preserveIdentity",
+          label: "Preserve identity",
+          valueKind: "boolean",
+          semanticMeaning: "custom",
+          required: false,
+          defaultValue: true,
+          sensitivity: "normal",
+          validation: {},
+          ui: {
+            control: "switch",
+          },
+        },
+        {
+          parameterId: "qualityPreset",
+          label: "Quality preset",
+          valueKind: "select",
+          semanticMeaning: "custom",
+          required: true,
+          defaultValue: "balanced",
+          sensitivity: "normal",
+          validation: {
+            options: [
+              { value: "fast", label: "Fast" },
+              { value: "balanced", label: "Balanced" },
+              { value: "quality", label: "Quality" },
+            ],
+          },
+          ui: {
+            control: "select",
+          },
+        },
+        {
+          parameterId: "styleReference",
+          label: "Style reference",
+          valueKind: "reference-asset-reference",
+          semanticMeaning: "style-reference",
+          required: false,
+          sensitivity: "sensitive",
+          validation: {
+            acceptedAssetKinds: ["image-asset"],
+          },
+          visibility: {
+            mode: "all",
+            rules: [{ parameterId: "qualityPreset", operator: "equals", value: "quality" }],
+          },
+          ui: {
+            control: "reference-slot",
+          },
+        },
+      ],
+      backendTranslation: {
+        ...createValidWorkflow().backendTranslation,
+        parameterBindings: [
+          { parameterId: "preserveIdentity", backendField: "params.preserve_identity" },
+          { parameterId: "qualityPreset", backendField: "params.quality_preset" },
+          { parameterId: "styleReference", backendField: "params.style_reference" },
+        ],
+      },
+      createdBy: "user-1",
+    });
+
+    expect(workflow.parameterSpecifications).toHaveLength(3);
+    expect(workflow.parameterSpecifications[2]?.ui.control).toBe("reference-slot");
   });
 
   it("enforces lifecycle transitions and publication completeness", () => {

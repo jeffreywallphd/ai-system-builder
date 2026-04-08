@@ -15,6 +15,7 @@ Story 2.1.2 introduces a dedicated typed image-system domain model that binds im
 - Workflow definitions remain reusable contract resources (typed inputs, parameters, outputs, translation seams, lifecycle/versioning).
 - System definitions are reusable/runnable saved configurations that pin a workflow version and store selected assets, output targets, and parameter baseline state.
 - This avoids mixing workflow authoring concerns with per-system state continuity and keeps orchestration seams clean.
+- Story 2.1.3 adds shared parameter-set contracts so system parameter values can be validated against workflow parameter specifications with typed issue codes.
 
 ## Modeled contract
 
