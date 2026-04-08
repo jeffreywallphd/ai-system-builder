@@ -8,6 +8,7 @@ Story 16.1.3 adds the application-layer run submission validator that blocks inv
 - `src/application/runs/use-cases/RunSubmissionValidationContracts.ts`
 - `src/application/runs/use-cases/RunSubmissionValidationRules.ts`
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessValidationService.ts`
 - `src/application/runs/tests/ValidateRunSubmissionUseCase.test.ts`
 - `docs/architecture/run-submission-validation-policy-eligibility.md`
 - `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
@@ -42,6 +43,7 @@ Each rejection includes typed `validationIssues` with stable `kind/path/code/mes
 - Separates blocking/advisory issues and keeps machine-readable `code` separate from user-facing `summary`.
 - Supports structured findings for policy denials, asset-binding completeness, workflow/system validity, backend-readiness dependencies, and compatibility checks.
 - Keeps contracts backend-agnostic while allowing adapter health/capability findings to participate in queue-admission decisions and future scheduling/node-capability integration.
+- Story 4.2.2 introduces `ImageRunSubmissionReadinessValidationService` as the canonical reusable evaluator for blocking/advisory submission readiness before authoritative queue admission.
 
 ## Tests
 `ValidateRunSubmissionUseCase.test.ts` verifies:

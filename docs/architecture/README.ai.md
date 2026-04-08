@@ -207,6 +207,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 16 / Epic 16.3 Story 16.3.4 authoritative realtime orchestration event publication for submission/queue/assignment/progress/cancel/retry/completion/failure transitions: `docs/architecture/run-orchestration-realtime-event-publication.md`
 - Feature 16 / Epic 16.1 Story 16.1.7 run submission governance audit hooks for denied/accepted submission events and initial lifecycle transition emission: `docs/architecture/run-submission-lifecycle-audit-hooks.md`
 - Feature 16 / Epic 16.1 Story 16.1.8 end-to-end authoritative run-submission pipeline guardrails, extension points, and prohibited shortcuts: `docs/architecture/run-submission-pipeline-extension-guardrails.md`
+- Feature 4 / Epic 4.2 Story 4.2.2 reusable run-submission readiness and blocking validation service before queue admission: `docs/architecture/run-submission-readiness-blocking-validation.md`
 - Feature 16 / Epic 16.1 Story 16.1.8 contributor workflow and extension checklist for run-submission changes: `docs/run-submission-contributor-guide.md`
 - Feature 17 / Epic 17.2 Story 17.2.8 contributor workflow for scheduler policy, queue reservations/arbitration, dispatch, execution-update, and finalization extensions: `docs/run-orchestration-contributor-guide.md`
 - Feature 1 image-asset ingestion completion baseline, readiness verification, explicit limits, and Feature 2 prerequisites: `docs/architecture/image-asset-feature-1-final-baseline.md`

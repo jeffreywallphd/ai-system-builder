@@ -202,6 +202,7 @@ import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorizat
 import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
 import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
+import { ImageRunSubmissionReadinessValidationService } from "@application/image-workflows/ImageRunSubmissionReadinessValidationService";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
@@ -1131,9 +1132,22 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     auditSink: authoritativeRunSubmissionAuditSink,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
+  const getImageManipulationExecutionReadinessUseCase = new GetImageManipulationExecutionReadinessUseCase({
+    capabilityPort: options.runExecutionAdapters?.capabilityProbePort,
+    now: () => workspaceClock.now(),
+  });
+  const imageRunSubmissionReadinessValidationService = new ImageRunSubmissionReadinessValidationService({
+    workflowRepository: persistentPlatformServices.imageWorkflowSystemRepository,
+    systemRepository: persistentPlatformServices.imageWorkflowSystemRepository,
+    assetRepository,
+    authorizationDecisionEvaluator,
+    executionReadinessUseCase: getImageManipulationExecutionReadinessUseCase,
+    now: () => workspaceClock.now(),
+  });
   const submitImageRunUseCase = new SubmitImageRunUseCase({
     validateRunSubmissionUseCase,
     createAuthoritativeRunUseCase,
+    imageRunReadinessResolver: imageRunSubmissionReadinessValidationService,
     now: () => workspaceClock.now(),
   });
   const runOrchestrationObservability = new RunOrchestrationObservability({
@@ -1159,10 +1173,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
       persistentPlatformServices.platformPersistenceRepository,
     ),
-    getImageManipulationExecutionReadinessUseCase: new GetImageManipulationExecutionReadinessUseCase({
-      capabilityPort: options.runExecutionAdapters?.capabilityProbePort,
-      now: () => workspaceClock.now(),
-    }),
+    getImageManipulationExecutionReadinessUseCase,
     runRepository: persistentPlatformServices.platformPersistenceRepository,
     auditEventRepository: persistentPlatformServices.platformPersistenceRepository,
     authorizationDecisionEvaluator,
