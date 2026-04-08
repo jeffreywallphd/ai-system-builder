@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { PlatformAuditEventKinds, type PlatformAuditEventRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import {
+  PlatformAuditEventKinds,
+  type PlatformAuditEventRecord,
+  type PlatformRunRecord,
+} from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import {
   runInTransactionBoundary,
   type IPlatformTransactionManager,
@@ -21,8 +25,11 @@ import {
 import {
   RunExecutionOutcomeKinds,
   RunLifecycleStates,
+  isRunLifecycleTransitionAllowed,
   transitionCanonicalRunRecord,
+  type RunExecutionProgressState,
   type RunExecutionState,
+  type RunLifecycleState,
 } from "@domain/runs/RunDomain";
 import {
   mapPlatformRunRecordToCanonicalRun,
@@ -105,6 +112,11 @@ interface IngestRunExecutionUpdateUseCaseDependencies {
   };
 }
 
+interface ExecutionUpdateSynchronizationResult {
+  readonly toState: RunLifecycleState;
+  readonly execution: RunExecutionState;
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -160,20 +172,30 @@ export class IngestRunExecutionUpdateUseCase {
       this.assertRunUpdateable(current.state, runId);
       this.assertBackendConsistency(current.execution, request.update);
 
-      const toState = request.update.toState ?? current.state;
-      const nextExecution = this.buildExecutionState({
+      const synchronization = this.synchronizeExecutionUpdate({
+        currentState: current.state,
         current: current.execution,
         update: request.update,
-        toState,
         occurredAt,
       });
+      const toState = synchronization.toState;
+      const nextExecution = synchronization.execution;
+      const canonicalChanged = toState !== current.state || !isExecutionStateEqual(current.execution, nextExecution);
+      const diagnosticsChanged = this.hasDiagnosticsChange({
+        record: persisted,
+        request,
+        occurredAt,
+      });
+      if (!canonicalChanged && !diagnosticsChanged) {
+        result = this.createNoChangeResult(persisted, runId, operationSuffix, occurredAt);
+        return;
+      }
 
-      let next = transitionCanonicalRunRecord(current, {
+      const next = transitionCanonicalRunRecord(current, {
         toState,
         occurredAt,
         execution: nextExecution,
       });
-      next = this.applyProgress(next, request.update.progress);
 
       const persistedCanonical = updatePlatformRunRecordCanonicalState(persisted, next);
       let persistedWithDiagnostics = this.applyInternalDiagnosticsMetadata(
@@ -238,6 +260,41 @@ export class IngestRunExecutionUpdateUseCase {
     return result;
   }
 
+  private synchronizeExecutionUpdate(input: {
+    readonly currentState: RunLifecycleState;
+    readonly current: RunExecutionState;
+    readonly update: RunLifecycleUpdateRequest;
+    readonly occurredAt: string;
+  }): ExecutionUpdateSynchronizationResult {
+    const requestedState = input.update.toState ?? input.currentState;
+    const toState = this.resolveTargetState({
+      currentState: input.currentState,
+      requestedState,
+    });
+    return Object.freeze({
+      toState,
+      execution: this.buildExecutionState({
+        current: input.current,
+        update: input.update,
+        toState,
+        occurredAt: input.occurredAt,
+      }),
+    });
+  }
+
+  private resolveTargetState(input: {
+    readonly currentState: RunLifecycleState;
+    readonly requestedState: RunLifecycleState;
+  }): RunLifecycleState {
+    if (input.requestedState === input.currentState) {
+      return input.currentState;
+    }
+    if (isRunLifecycleTransitionAllowed(input.currentState, input.requestedState)) {
+      return input.requestedState;
+    }
+    return input.currentState;
+  }
+
   private assertSenderAuthorized(assignedNodeId: string | undefined, senderNodeId: string, runId: string): void {
     const expected = normalizeOptional(assignedNodeId);
     if (!expected) {
@@ -281,9 +338,18 @@ export class IngestRunExecutionUpdateUseCase {
   private buildExecutionState(input: {
     readonly current: RunExecutionState;
     readonly update: RunLifecycleUpdateRequest;
-    readonly toState: string;
+    readonly toState: RunLifecycleState;
     readonly occurredAt: string;
   }): RunExecutionState {
+    const heartbeatAt = resolveHeartbeatAt(input.current.heartbeatAt, [
+      input.update.heartbeatAt,
+      input.update.execution?.heartbeatAt,
+    ]);
+    const progress = resolveProgressState(input.current.progress, [
+      input.update.progress,
+      input.update.execution?.progress,
+    ]);
+
     const merged: RunExecutionState = Object.freeze({
       ...input.current,
       ...input.update.execution,
@@ -293,24 +359,8 @@ export class IngestRunExecutionUpdateUseCase {
       adapterRunId: normalizeOptional(input.update.execution?.adapterRunId)
         ?? normalizeOptional(input.update.senderBackendRunId)
         ?? input.current.adapterRunId,
-      heartbeatAt: normalizeOptional(input.update.heartbeatAt)
-        ?? normalizeOptional(input.update.execution?.heartbeatAt)
-        ?? input.current.heartbeatAt,
-      progress: input.update.progress
-        ? Object.freeze({
-          updatedAt: input.update.progress.updatedAt,
-          percent: input.update.progress.percent,
-          stage: input.update.progress.stage,
-          message: input.update.progress.message,
-        })
-        : input.update.execution?.progress
-          ? Object.freeze({
-            updatedAt: input.update.execution.progress.updatedAt,
-            percent: input.update.execution.progress.percent,
-            stage: input.update.execution.progress.stage,
-            message: input.update.execution.progress.message,
-          })
-        : input.current.progress,
+      heartbeatAt,
+      progress,
       outcome: input.update.execution?.outcome ?? input.current.outcome,
     });
 
@@ -344,29 +394,6 @@ export class IngestRunExecutionUpdateUseCase {
     return merged;
   }
 
-  private applyProgress(
-    run: ReturnType<typeof mapPlatformRunRecordToCanonicalRun>,
-    progress: RunLifecycleUpdateRequest["progress"] | undefined,
-  ): ReturnType<typeof mapPlatformRunRecordToCanonicalRun> {
-    if (!progress) {
-      return run;
-    }
-
-    return transitionCanonicalRunRecord(run, {
-      toState: run.state,
-      occurredAt: run.updatedAt,
-      execution: Object.freeze({
-        ...run.execution,
-        progress: Object.freeze({
-          updatedAt: progress.updatedAt,
-          percent: progress.percent,
-          stage: progress.stage,
-          message: progress.message,
-        }),
-      }),
-    });
-  }
-
   private applyInternalDiagnosticsMetadata(
     record: ReturnType<typeof updatePlatformRunRecordCanonicalState>,
     request: IngestRunExecutionUpdateRequest,
@@ -378,6 +405,13 @@ export class IngestRunExecutionUpdateUseCase {
 
     const metadata = asRecord(record.metadata) ?? {};
     const executionTelemetry = asRecord(metadata.executionTelemetry) ?? {};
+    const lastInternalUpdate = asRecord(executionTelemetry.lastInternalUpdate);
+    const lastUpdatedAt = normalizeOptional(
+      typeof lastInternalUpdate?.updatedAt === "string" ? lastInternalUpdate.updatedAt : undefined,
+    );
+    if (lastUpdatedAt && Date.parse(occurredAt) <= Date.parse(lastUpdatedAt)) {
+      return record;
+    }
     const nextMetadata = Object.freeze({
       ...metadata,
       executionTelemetry: Object.freeze({
@@ -395,6 +429,46 @@ export class IngestRunExecutionUpdateUseCase {
     return Object.freeze({
       ...record,
       metadata: nextMetadata,
+    });
+  }
+
+  private hasDiagnosticsChange(input: {
+    readonly record: PlatformRunRecord;
+    readonly request: IngestRunExecutionUpdateRequest;
+    readonly occurredAt: string;
+  }): boolean {
+    if (!input.request.update.internalDiagnostics) {
+      return false;
+    }
+    const metadata = asRecord(input.record.metadata);
+    const executionTelemetry = asRecord(metadata?.executionTelemetry);
+    const lastInternalUpdate = asRecord(executionTelemetry?.lastInternalUpdate);
+    const lastUpdatedAt = normalizeOptional(
+      typeof lastInternalUpdate?.updatedAt === "string" ? lastInternalUpdate.updatedAt : undefined,
+    );
+    if (!lastUpdatedAt) {
+      return true;
+    }
+    return Date.parse(input.occurredAt) > Date.parse(lastUpdatedAt);
+  }
+
+  private createNoChangeResult(
+    persisted: PlatformRunRecord,
+    runId: string,
+    operationSuffix: string,
+    occurredAt: string,
+  ): IngestRunExecutionUpdateResult {
+    return Object.freeze({
+      mutation: Object.freeze({
+        action: RunMutationActions.lifecycleUpdate,
+        run: toRunDetailFromPlatformRecord(persisted),
+        mutation: Object.freeze({
+          changed: false,
+          mutationId: `run:execution-update:${runId}:${operationSuffix}`,
+          occurredAt,
+        }),
+      }),
+      status: toRunStatusEnvelopeFromPlatformRecord(persisted),
     });
   }
 
@@ -473,4 +547,46 @@ function resolveTerminalOutcome(
 
 function maxIso(left: string, right: string): string {
   return Date.parse(left) >= Date.parse(right) ? left : right;
+}
+
+function resolveHeartbeatAt(
+  currentHeartbeatAt: string | undefined,
+  candidates: ReadonlyArray<string | undefined>,
+): string | undefined {
+  let selected = currentHeartbeatAt;
+  for (const value of candidates) {
+    const normalized = normalizeOptional(value);
+    if (!normalized) {
+      continue;
+    }
+    if (!selected || Date.parse(normalized) > Date.parse(selected)) {
+      selected = normalized;
+    }
+  }
+  return selected;
+}
+
+function resolveProgressState(
+  current: RunExecutionProgressState | undefined,
+  candidates: ReadonlyArray<RunLifecycleUpdateRequest["progress"] | undefined>,
+): RunExecutionProgressState | undefined {
+  let selected = current;
+  for (const value of candidates) {
+    if (!value) {
+      continue;
+    }
+    if (!selected || Date.parse(value.updatedAt) > Date.parse(selected.updatedAt)) {
+      selected = Object.freeze({
+        updatedAt: value.updatedAt,
+        percent: value.percent,
+        stage: value.stage,
+        message: value.message,
+      });
+    }
+  }
+  return selected;
+}
+
+function isExecutionStateEqual(left: RunExecutionState, right: RunExecutionState): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
 }
