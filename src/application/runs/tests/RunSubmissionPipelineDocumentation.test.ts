@@ -62,6 +62,7 @@ describe("run submission pipeline documentation", () => {
       "src/domain/runs/RunDomain.ts",
       "src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts",
       "src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts",
+      "src/application/runs/use-cases/SubmitImageRunUseCase.ts",
       "src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts",
       "src/application/runs/use-cases/CreateAuthoritativeRunUseCase.ts",
       "src/application/runs/use-cases/RunCreationPersistenceMapper.ts",

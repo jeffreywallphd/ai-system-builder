@@ -43,38 +43,19 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
       },
     });
     const backend = new AuthoritativeRunSubmissionBackendApi({
-      validateRunSubmissionUseCase: {
+      submitImageRunUseCase: {
         execute: async () => Object.freeze({
           ok: true as const,
-          command: Object.freeze({
-            actor: Object.freeze({
-              actorUserIdentityId: "user:1",
-              activeWorkspaceId: "workspace-alpha",
+          response: Object.freeze({
+            run: createRunDetail("run:1"),
+            mutation: Object.freeze({
+              changed: true,
+              mutationId: "audit:1",
+              occurredAt: "2026-04-07T12:00:00.000Z",
             }),
-            workspaceId: "workspace-alpha",
-            source: "api",
-            runtimeTarget: Object.freeze({
-              systemId: "system-demo",
-              versionId: "version-1",
-              async: true,
-            }),
-            tags: Object.freeze([]),
-            parameters: Object.freeze({}),
-            storageReferences: Object.freeze([]),
-            resourceReferences: Object.freeze([]),
-            policyPrerequisites: Object.freeze([]),
-            submissionContext: Object.freeze({
-              submittedByActorId: "user:1",
-            }),
-            occurredAt: "2026-04-07T12:00:00.000Z",
           }),
-        }),
-      } as any,
-      createAuthoritativeRunUseCase: {
-        execute: async () => Object.freeze({
-          run: createRunDetail("run:1"),
-          persistedRunRevision: 1,
-          orchestrationIntentEventId: "audit:1",
+          readiness: createReadySubmissionReadiness(),
+          warnings: Object.freeze([]),
         }),
       } as any,
       realtimePublisher,
@@ -105,7 +86,7 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
 
   it("maps policy-ineligible validation denials to stable forbidden semantics with validation details", async () => {
     const backend = new AuthoritativeRunSubmissionBackendApi({
-      validateRunSubmissionUseCase: {
+      submitImageRunUseCase: {
         execute: async () => Object.freeze({
           ok: false as const,
           error: Object.freeze({
@@ -119,11 +100,6 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
             })]),
           }),
         }),
-      } as any,
-      createAuthoritativeRunUseCase: {
-        execute: async () => {
-          throw new Error("should not execute");
-        },
       } as any,
     });
 
@@ -147,34 +123,7 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
 
   it("maps run-creation conflicts to shared conflict error responses", async () => {
     const backend = new AuthoritativeRunSubmissionBackendApi({
-      validateRunSubmissionUseCase: {
-        execute: async () => Object.freeze({
-          ok: true as const,
-          command: Object.freeze({
-            actor: Object.freeze({
-              actorUserIdentityId: "user:1",
-              activeWorkspaceId: "workspace-alpha",
-            }),
-            workspaceId: "workspace-alpha",
-            source: "api",
-            runtimeTarget: Object.freeze({
-              systemId: "system-demo",
-              versionId: "version-1",
-              async: true,
-            }),
-            tags: Object.freeze([]),
-            parameters: Object.freeze({}),
-            storageReferences: Object.freeze([]),
-            resourceReferences: Object.freeze([]),
-            policyPrerequisites: Object.freeze([]),
-            submissionContext: Object.freeze({
-              submittedByActorId: "user:1",
-            }),
-            occurredAt: "2026-04-07T12:00:00.000Z",
-          }),
-        }),
-      } as any,
-      createAuthoritativeRunUseCase: {
+      submitImageRunUseCase: {
         execute: async () => {
           throw new Error("Platform run 'run:1' already exists.");
         },
@@ -201,7 +150,7 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
     const logger = new CapturingRunObservabilityLogger();
     const observability = new RunOrchestrationObservability({ logger });
     const backend = new AuthoritativeRunSubmissionBackendApi({
-      validateRunSubmissionUseCase: {
+      submitImageRunUseCase: {
         execute: async () => Object.freeze({
           ok: false as const,
           error: Object.freeze({
@@ -210,11 +159,6 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
             validationIssues: Object.freeze([]),
           }),
         }),
-      } as any,
-      createAuthoritativeRunUseCase: {
-        execute: async () => {
-          throw new Error("should not execute");
-        },
       } as any,
       observability,
     });
@@ -327,6 +271,42 @@ function createRunDetail(runId: string): RunDetail {
     retry: Object.freeze({
       attempt: 1,
       maxAttempts: 1,
+    }),
+  });
+}
+
+function createReadySubmissionReadiness() {
+  return Object.freeze({
+    checkedAt: "2026-04-07T12:00:00.000Z",
+    state: "ready" as const,
+    readyForQueueing: true,
+    summary: "Run submission is ready for queue admission.",
+    issues: Object.freeze([]),
+    blockingIssues: Object.freeze([]),
+    advisoryIssues: Object.freeze([]),
+    policyDenials: Object.freeze([]),
+    assetBinding: Object.freeze({
+      complete: true,
+      missingInputBindingIds: Object.freeze([]),
+      missingOutputBindingIds: Object.freeze([]),
+      unresolvedAssetReferences: Object.freeze([]),
+    }),
+    workflowValidity: Object.freeze({
+      valid: true,
+      issues: Object.freeze([]),
+    }),
+    systemValidity: Object.freeze({
+      valid: true,
+      issues: Object.freeze([]),
+    }),
+    backendReadinessDependency: Object.freeze({
+      adapterHealth: "healthy" as const,
+      ready: true,
+      issues: Object.freeze([]),
+    }),
+    compatibility: Object.freeze({
+      compatible: true,
+      issues: Object.freeze([]),
     }),
   });
 }

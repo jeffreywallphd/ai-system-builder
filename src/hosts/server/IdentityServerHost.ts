@@ -182,6 +182,7 @@ import { TrustMaterialKinds } from "@domain/security/CertificateAuthorityDomain"
 import { AuthorizationPolicyDecisionEvaluator } from "@application/authorization/use-cases/AuthorizationPolicyDecisionEvaluator";
 import { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
 import { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
+import { SubmitImageRunUseCase } from "@application/runs/use-cases/SubmitImageRunUseCase";
 import { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
@@ -1130,12 +1131,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     auditSink: authoritativeRunSubmissionAuditSink,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
+  const submitImageRunUseCase = new SubmitImageRunUseCase({
+    validateRunSubmissionUseCase,
+    createAuthoritativeRunUseCase,
+    now: () => workspaceClock.now(),
+  });
   const runOrchestrationObservability = new RunOrchestrationObservability({
     logger: createRunOrchestrationOperationalLogger(options.logger),
   });
   const authoritativeRunSubmissionBackendApi = new AuthoritativeRunSubmissionBackendApi({
-    validateRunSubmissionUseCase,
-    createAuthoritativeRunUseCase,
+    submitImageRunUseCase,
     observability: runOrchestrationObservability,
   });
   const authoritativeRunQueryBackendApi = new AuthoritativeRunQueryBackendApi({

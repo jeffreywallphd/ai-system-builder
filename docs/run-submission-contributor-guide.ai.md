@@ -8,13 +8,14 @@ Quick extension workflow for contributors adding new run-submission backends/pol
 
 ## Required workflow
 - Update shared run transport contracts/schemas first.
-- Extend validation and canonical command behavior in run application use cases.
+- Extend validation and canonical command behavior in run application use cases (`ValidateRunSubmissionUseCase`, `SubmitImageRunUseCase`).
 - Keep authoritative creation/persistence in `CreateAuthoritativeRunUseCase` + mapper + persistence ports.
 - Wire infrastructure adapters and route-family composition only after inner-layer behavior is correct.
 
 ## Extension seams
 - Backend availability/eligibility: `IRunSubmissionTargetResolverPort` and infrastructure resolver adapters.
 - Policy additions: `ValidateRunSubmissionUseCase` and policy/evaluator ports.
+- Submission orchestration for image runs: `SubmitImageRunUseCase` (validation + readiness + authoritative creation response shaping).
 - Run kind mapping changes: `RunCreationPersistenceMapper`.
 - Dispatch/scheduling follow-up: application orchestration services over ports after authoritative acceptance.
 
