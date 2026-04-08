@@ -1,6 +1,6 @@
 # Image Run API and Event Contracts
 
-This note documents Story 4.1.2 (Feature 4 / Epic 4.1): shared DTO and schema contracts for authoritative image-run APIs and run event flows.
+This note documents Story 4.1.2 and Story 4.1.4 (Feature 4 / Epic 4.1): shared DTO/schema contracts for authoritative image-run APIs, run event flows, and run-submission readiness semantics.
 
 ## Purpose
 
@@ -25,6 +25,10 @@ Define one stable, transport-safe contract surface for image run submission, lif
   - cancel request/response with idempotency support.
 - Execution readiness:
   - backend readiness summary with capability flags and normalized readiness issues.
+- Submission readiness:
+  - queue-admission readiness summary with blocking/advisory issue split,
+  - policy denial, asset-binding completeness, workflow/system validity, backend readiness dependency, and compatibility finding sections,
+  - machine-readable issue code + user-facing summary separation.
 - Failure/result summaries:
   - normalized failure category/code/retryability/user-safe messaging,
   - result summary with logical output references only (asset ids/metadata).

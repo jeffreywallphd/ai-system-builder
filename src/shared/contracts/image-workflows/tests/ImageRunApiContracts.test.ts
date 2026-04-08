@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildImageRunEventCursor,
+  ImageRunSubmissionReadinessIssueCategories,
+  ImageRunSubmissionReadinessIssueSeverities,
+  ImageRunSubmissionReadinessStates,
   parseImageRunEventCursor,
   toListImageRunEventsQueryParams,
   toListImageRunsQueryParams,
@@ -49,6 +52,12 @@ describe("ImageRunApiContracts", () => {
     expect(cursor).toBe("image-run-event:7");
     expect(parseImageRunEventCursor(cursor)).toBe(7);
     expect(parseImageRunEventCursor("image-run-event:not-a-number")).toBeUndefined();
+  });
+
+  it("exposes canonical submission-readiness taxonomy constants", () => {
+    expect(ImageRunSubmissionReadinessStates.blocked).toBe("blocked");
+    expect(ImageRunSubmissionReadinessIssueCategories.policyDenial).toBe("policy-denial");
+    expect(ImageRunSubmissionReadinessIssueSeverities.warning).toBe("warning");
   });
 });
 

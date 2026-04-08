@@ -88,6 +88,38 @@ export const ImageRunReadinessStates = Object.freeze({
 
 export type ImageRunReadinessState = typeof ImageRunReadinessStates[keyof typeof ImageRunReadinessStates];
 
+export const ImageRunSubmissionReadinessStates = Object.freeze({
+  ready: "ready",
+  advisory: "advisory",
+  blocked: "blocked",
+} as const);
+
+export type ImageRunSubmissionReadinessState =
+  typeof ImageRunSubmissionReadinessStates[keyof typeof ImageRunSubmissionReadinessStates];
+
+export const ImageRunSubmissionReadinessIssueCategories = Object.freeze({
+  blocking: "blocking",
+  advisory: "advisory",
+  policyDenial: "policy-denial",
+  assetBinding: "asset-binding",
+  systemValidity: "system-validity",
+  workflowValidity: "workflow-validity",
+  backendReadinessDependency: "backend-readiness-dependency",
+  compatibility: "compatibility",
+} as const);
+
+export type ImageRunSubmissionReadinessIssueCategory =
+  typeof ImageRunSubmissionReadinessIssueCategories[keyof typeof ImageRunSubmissionReadinessIssueCategories];
+
+export const ImageRunSubmissionReadinessIssueSeverities = Object.freeze({
+  error: "error",
+  warning: "warning",
+  info: "info",
+} as const);
+
+export type ImageRunSubmissionReadinessIssueSeverity =
+  typeof ImageRunSubmissionReadinessIssueSeverities[keyof typeof ImageRunSubmissionReadinessIssueSeverities];
+
 export interface ImageRunSubmissionInputAssetReference {
   readonly bindingId: string;
   readonly assetId: string;
@@ -132,6 +164,7 @@ export interface ImageRunDetailDto extends ImageRunSummaryDto {
     readonly acknowledgedAt?: string;
   };
   readonly readiness?: ImageRunExecutionReadinessSummaryDto;
+  readonly submissionReadiness?: ImageRunSubmissionReadinessSummaryDto;
 }
 
 export interface ImageRunProgressSnapshotDto {
@@ -281,6 +314,60 @@ export interface ImageRunExecutionReadinessSummaryDto {
     readonly supportedTranslationContractVersions: ReadonlyArray<string>;
   };
   readonly issues: ReadonlyArray<ImageRunExecutionReadinessIssueDto>;
+}
+
+export interface ImageRunSubmissionReadinessIssueDto {
+  readonly code: string;
+  readonly summary: string;
+  readonly category: ImageRunSubmissionReadinessIssueCategory;
+  readonly severity: ImageRunSubmissionReadinessIssueSeverity;
+  readonly blocking: boolean;
+  readonly path?: string;
+}
+
+export interface ImageRunSubmissionReadinessPolicyDenialDto {
+  readonly policyId: string;
+  readonly code: string;
+  readonly summary: string;
+}
+
+export interface ImageRunSubmissionAssetBindingCompletenessDto {
+  readonly complete: boolean;
+  readonly missingInputBindingIds: ReadonlyArray<string>;
+  readonly missingOutputBindingIds: ReadonlyArray<string>;
+  readonly unresolvedAssetReferences: ReadonlyArray<string>;
+}
+
+export interface ImageRunSubmissionDefinitionValidityDto {
+  readonly valid: boolean;
+  readonly issues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+}
+
+export interface ImageRunSubmissionBackendReadinessDependencyDto {
+  readonly adapterHealth: "healthy" | "degraded" | "unavailable" | "unknown";
+  readonly ready: boolean;
+  readonly issues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+}
+
+export interface ImageRunSubmissionCompatibilityDto {
+  readonly compatible: boolean;
+  readonly issues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+}
+
+export interface ImageRunSubmissionReadinessSummaryDto {
+  readonly checkedAt: string;
+  readonly state: ImageRunSubmissionReadinessState;
+  readonly readyForQueueing: boolean;
+  readonly summary: string;
+  readonly issues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+  readonly blockingIssues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+  readonly advisoryIssues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
+  readonly policyDenials: ReadonlyArray<ImageRunSubmissionReadinessPolicyDenialDto>;
+  readonly assetBinding: ImageRunSubmissionAssetBindingCompletenessDto;
+  readonly workflowValidity: ImageRunSubmissionDefinitionValidityDto;
+  readonly systemValidity: ImageRunSubmissionDefinitionValidityDto;
+  readonly backendReadinessDependency: ImageRunSubmissionBackendReadinessDependencyDto;
+  readonly compatibility: ImageRunSubmissionCompatibilityDto;
 }
 
 export interface GetImageRunExecutionReadinessRequestDto {

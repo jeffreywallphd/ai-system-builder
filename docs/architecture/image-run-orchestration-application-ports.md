@@ -1,16 +1,18 @@
 # Image Run Orchestration Application Ports
 
-This note documents Story 4.1.3 (Feature 4 / Epic 4.1): application-layer ports for authoritative image-run persistence and orchestration.
+This note documents Story 4.1.3 and Story 4.1.4 (Feature 4 / Epic 4.1): application-layer ports and readiness contracts for authoritative image-run persistence and orchestration.
 
 ## Purpose
 
-Define one backend-neutral application seam for image-run orchestration so use cases can persist run metadata, resolve readiness, enqueue work, dispatch execution, ingest normalized updates, request cancellation, and hand off outputs without coupling to queue infrastructure or execution adapter internals.
+Define one backend-neutral application seam for image-run orchestration so use cases can persist run metadata, resolve execution + submission readiness, enqueue work, dispatch execution, ingest normalized updates, request cancellation, and hand off outputs without coupling to queue infrastructure or execution adapter internals.
 
 ## Canonical implementation seam
 
 - `src/application/image-workflows/ports/ImageRunOrchestrationPorts.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
 - `src/application/image-workflows/ports/index.ts`
 - `src/application/image-workflows/tests/ImageRunOrchestrationPorts.test.ts`
+- `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`
 
 ## Port coverage
 
@@ -26,23 +28,31 @@ Define one backend-neutral application seam for image-run orchestration so use c
 - `IImageRunReadinessResolver`
 - Resolve execution readiness in orchestration terms before queue admission/dispatch.
 
-4. Queue orchestration
+4. Submission-readiness contracts
+- `ImageRunSubmissionReadinessContracts.ts`
+- Provides reusable run-submission readiness result models with:
+  - stable machine-readable issue codes and user-facing summaries,
+  - blocking vs advisory outcome separation,
+  - policy-denial, asset-binding completeness, workflow/system validity, backend-readiness dependency, and compatibility findings,
+  - one canonical `readyForQueueing` decision surface for use cases, APIs, and UI.
+
+5. Queue orchestration
 - `IImageRunQueueOrchestrationPort`
 - Enqueue runs and expose scheduler-friendly reservation/claim/release seams without queue backend leakage.
 
-5. Execution handoff
+6. Execution handoff
 - `IImageRunExecutionHandoffPort`
 - Dispatch run-scoped execution handoff requests to an execution adapter through normalized contracts.
 
-6. Execution update ingestion
+7. Execution update ingestion
 - `IImageRunExecutionUpdatePort`
 - Poll/subscribe to normalized execution updates in run-centric envelopes.
 
-7. Cancellation orchestration
+8. Cancellation orchestration
 - `IImageRunCancellationOrchestrationPort`
 - Request run cancellation with normalized status outcomes.
 
-8. Output handoff notification
+9. Output handoff notification
 - `IImageRunOutputHandoffNotificationPort`
 - Publish run output-availability notifications for downstream persistence/lineage workflows.
 
@@ -52,6 +62,7 @@ Define one backend-neutral application seam for image-run orchestration so use c
 - Persistence ports are phrased in AI Loom run/orchestration terms (`ImageRunRecord`, queue entry, execution update envelope), not storage schema terms.
 - Orchestration ports are transport-agnostic and policy-aware so scheduling/node-assignment logic can evolve without redefining use-case dependencies.
 - Output handoff is an explicit application seam; result persistence and lineage adapters remain replaceable infrastructure implementations.
+- Submission-readiness contracts stay backend-agnostic while still carrying adapter-health/capability dependency findings so later scheduling/node-capability gates can consume the same result shape.
 
 ## Scheduling and node-assignment extension posture
 

@@ -7,6 +7,7 @@ import type {
   ImageManipulationExecutionStateSnapshot,
 } from "@application/image-workflows/ports/ImageManipulationExecutionPorts";
 import type { ImageManipulationExecutionReadinessSummary } from "@application/image-workflows/GetImageManipulationExecutionReadinessUseCase";
+import type { ImageRunSubmissionReadinessResult } from "@application/image-workflows/ImageRunSubmissionReadinessContracts";
 import type { ImageRunRecord, ImageRunStatus } from "@domain/runs/ImageRunDomain";
 
 export interface ImageRunListQuery {
@@ -141,6 +142,16 @@ export interface IImageRunReadinessResolver {
     readonly operationKind?: string;
     readonly translationContractVersion?: string;
   }): Promise<ImageManipulationExecutionReadinessSummary>;
+  resolveRunSubmissionReadiness?(input: {
+    readonly workspaceId: string;
+    readonly systemId: string;
+    readonly workflowId?: string;
+    readonly operationKind?: string;
+    readonly translationContractVersion?: string;
+    readonly inputAssetBindingIds?: ReadonlyArray<string>;
+    readonly outputBindingIds?: ReadonlyArray<string>;
+    readonly referencedAssetIds?: ReadonlyArray<string>;
+  }): Promise<ImageRunSubmissionReadinessResult>;
 }
 
 export interface IImageRunQueueOrchestrationPort {
