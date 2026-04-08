@@ -135,6 +135,7 @@ Protected-resource composition pattern is canonical:
 - Creator metadata attribution is deterministic on initialization records (`createdBy` / `lastModifiedBy` and assignment/join timestamps from one clock instant).
 - Creation flow has bounded extension hooks for:
   - authorization gating (pre-write actor validation seam),
+  - deployment-policy sharing posture default visibility resolution when `visibility` is omitted,
   - best-effort audit event emission (post-commit seam for future durable audit integration).
 - New tests cover:
   - successful workspace initialization with owner membership/role bootstrap,

@@ -36,6 +36,20 @@ import {
   type RunSubmissionAuditSink,
   type RunSubmissionAuditEvent,
 } from "./RunSubmissionAudit";
+import type { DeploymentPolicyEvaluationContext } from "@application/policy-administration/DeploymentPolicyEvaluationContracts";
+import type { IDeploymentSchedulingPolicyEvaluationPort } from "@application/policy-administration/DeploymentPolicyEvaluationPorts";
+
+const DeploymentApprovalPolicyPrerequisiteIds = Object.freeze({
+  ownerOrInstructor: "deployment-approval:owner-or-instructor",
+  ownerOrAdmin: "deployment-approval:owner-or-admin",
+  ownerWithManualReview: "deployment-approval:owner-with-manual-review",
+  highRiskDualApproval: "deployment-approval:high-risk-dual-approval",
+});
+
+const HighRiskRunTags = Object.freeze([
+  "risk:high",
+  "risk:critical",
+]);
 
 export interface ValidateRunSubmissionUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
@@ -44,6 +58,15 @@ export interface ValidateRunSubmissionUseCaseDependencies {
   readonly storageInstanceRepository?: IStorageInstanceRepository;
   readonly storagePolicyEvaluationPort?: IStoragePolicyEvaluationPort;
   readonly encryptionPolicyEvaluationService?: IEncryptionPolicyEvaluationService;
+  readonly deploymentSchedulingPolicyEvaluationPort?: IDeploymentSchedulingPolicyEvaluationPort;
+  readonly deploymentPolicyContextResolver?: {
+    resolveContext(input: {
+      readonly workspaceId: string;
+      readonly actorUserIdentityId?: string;
+      readonly actorServiceId?: string;
+      readonly occurredAt: string;
+    }): Promise<DeploymentPolicyEvaluationContext | undefined>;
+  };
   readonly auditSink?: RunSubmissionAuditSink;
   readonly clock?: {
     now(): Date;
@@ -91,6 +114,7 @@ export class ValidateRunSubmissionUseCase {
 
   private async evaluatePolicyEligibility(command: CanonicalRunSubmissionCommand): Promise<ReadonlyArray<RunSubmissionValidationIssue>> {
     const issues: RunSubmissionValidationIssue[] = [];
+    const occurredAt = command.occurredAt;
 
     const workspace = await this.dependencies.workspaceRepository.findWorkspaceById(command.workspaceId);
     if (!workspace) {
@@ -160,6 +184,12 @@ export class ValidateRunSubmissionUseCase {
     }
 
     const requiredPrerequisites = new Set(targetResolution.requiredPolicyPrerequisiteIds ?? []);
+
+    const deploymentApprovalPrerequisites = await this.resolveDeploymentApprovalPrerequisites(command, occurredAt);
+    for (const prerequisiteId of deploymentApprovalPrerequisites) {
+      requiredPrerequisites.add(prerequisiteId);
+    }
+
     if (requiredPrerequisites.size > 0) {
       const provided = new Set(command.policyPrerequisites.map((entry) => entry.id).filter((entry): entry is string => Boolean(entry)));
       for (const prerequisiteId of requiredPrerequisites) {
@@ -233,6 +263,49 @@ export class ValidateRunSubmissionUseCase {
     issues.push(...securityIssues);
 
     return Object.freeze(issues);
+  }
+
+  private async resolveDeploymentApprovalPrerequisites(
+    command: CanonicalRunSubmissionCommand,
+    occurredAt: string,
+  ): Promise<ReadonlyArray<string>> {
+    if (
+      !this.dependencies.deploymentSchedulingPolicyEvaluationPort
+      || !this.dependencies.deploymentPolicyContextResolver
+    ) {
+      return Object.freeze([]);
+    }
+
+    const context = await this.dependencies.deploymentPolicyContextResolver.resolveContext({
+      workspaceId: command.workspaceId,
+      actorUserIdentityId: command.actor.actorUserIdentityId,
+      actorServiceId: command.actor.actorServiceId,
+      occurredAt,
+    });
+    if (!context) {
+      return Object.freeze([]);
+    }
+
+    const schedulingPolicy = await this.dependencies.deploymentSchedulingPolicyEvaluationPort.evaluateSchedulingPolicy(context);
+    const prerequisites = new Set<string>();
+    const approvalMode = schedulingPolicy.runSubmissionApprovalMode.value;
+
+    if (approvalMode === "owner-or-instructor") {
+      prerequisites.add(DeploymentApprovalPolicyPrerequisiteIds.ownerOrInstructor);
+    } else if (approvalMode === "owner-or-admin") {
+      prerequisites.add(DeploymentApprovalPolicyPrerequisiteIds.ownerOrAdmin);
+    } else if (approvalMode === "owner-with-manual-review") {
+      prerequisites.add(DeploymentApprovalPolicyPrerequisiteIds.ownerWithManualReview);
+    }
+
+    if (
+      schedulingPolicy.highRiskRunRequiresDualApproval.value
+      && command.tags.some((tag) => HighRiskRunTags.includes(tag.toLowerCase()))
+    ) {
+      prerequisites.add(DeploymentApprovalPolicyPrerequisiteIds.highRiskDualApproval);
+    }
+
+    return Object.freeze([...prerequisites]);
   }
 
   private async validateResourceReference(

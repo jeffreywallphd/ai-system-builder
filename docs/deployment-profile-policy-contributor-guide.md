@@ -94,6 +94,31 @@ Provide a practical implementation workflow for extending deployment-profile pol
 
 Request policy decisions through `IDeployment*PolicyEvaluationPort` interfaces.
 
+## First dependent-feature integrations (Story 20.2.3)
+
+Use these files as reference patterns for application-boundary integration:
+
+- sharing defaults in workspace creation:
+  - `src/application/workspaces/use-cases/CreateWorkspaceUseCase.ts`
+  - consumes `IDeploymentAuthorizationPolicyEvaluationPort` through a context resolver seam.
+- approval posture in run-submission validation:
+  - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+  - consumes `IDeploymentSchedulingPolicyEvaluationPort` through a context resolver seam.
+
+Integration rule:
+
+- resolve effective policy in use-case/application services,
+- map policy decisions into feature-specific behavior,
+- avoid profile branching in UI, route handlers, or persistence adapters.
+
+Current intentional deferrals:
+
+- storage-governance default payload synthesis,
+- security-governance transport/credential runtime controls,
+- audit-governance query/export runtime controls,
+- admin-controls delegation gates in workspace/member administration,
+- scheduling queue-policy overlays beyond run-submission approval prerequisites.
+
 ## Effective-resolution invariants checklist
 
 - Preset inheritance order is deterministic.

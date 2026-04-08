@@ -52,6 +52,11 @@ import {
   type RunSubmissionAuditEvent,
   type RunSubmissionAuditSink,
 } from "../use-cases/RunSubmissionAudit";
+import { DeploymentPolicyEvaluationService } from "@application/policy-administration/DeploymentPolicyEvaluationService";
+import { CanonicalDeploymentPolicySnapshotResolver } from "@application/policy-administration/CanonicalDeploymentPolicySnapshotResolver";
+import type { IDeploymentSchedulingPolicyEvaluationPort } from "@application/policy-administration/DeploymentPolicyEvaluationPorts";
+import { DeploymentProfileIds } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
+import type { DeploymentPolicyEvaluationContext } from "@application/policy-administration/DeploymentPolicyEvaluationContracts";
 
 class InMemoryWorkspaceRepository implements IWorkspaceRepository {
   public readonly workspaces = new Map<string, Workspace>();
@@ -261,6 +266,16 @@ class InMemoryRunSubmissionAuditSink implements RunSubmissionAuditSink {
   }
 }
 
+class FixedRunSubmissionDeploymentPolicyContextResolver {
+  public constructor(private readonly profileId: typeof DeploymentProfileIds[keyof typeof DeploymentProfileIds]) {}
+
+  public async resolveContext(): Promise<DeploymentPolicyEvaluationContext> {
+    return Object.freeze({
+      profileId: this.profileId,
+    });
+  }
+}
+
 function createWorkspaceRecord(workspaceId: string, status = WorkspaceStatuses.active): Workspace {
   return createWorkspace({
     id: workspaceId,
@@ -466,6 +481,111 @@ describe("ValidateRunSubmissionUseCase", () => {
     }
     expect(result.error.code).toBe(RunSubmissionValidationErrorCodes.notFound);
     expect(result.error.validationIssues.some((issue) => issue.code === "target-system-not-found")).toBeTrue();
+  });
+
+  it("enforces deployment scheduling approval prerequisites from effective policy", async () => {
+    const workspaceRepository = new InMemoryWorkspaceRepository();
+    await workspaceRepository.saveWorkspace(createWorkspaceRecord("workspace-alpha"));
+
+    const storageRepository = new InMemoryStorageInstanceRepository();
+    await storageRepository.createStorageInstance(createStorageRecord("storage-alpha", "workspace-alpha"), {
+      operationKey: "seed",
+      actorUserIdentityId: "user:owner",
+    });
+
+    const deploymentSchedulingPolicyEvaluationPort: IDeploymentSchedulingPolicyEvaluationPort =
+      new DeploymentPolicyEvaluationService(new CanonicalDeploymentPolicySnapshotResolver());
+    const useCase = new ValidateRunSubmissionUseCase({
+      workspaceRepository,
+      authorizationDecisionEvaluator: new StubAuthorizationDecisionEvaluator(),
+      targetResolver: new StubTargetResolver(),
+      storageInstanceRepository: storageRepository,
+      storagePolicyEvaluationPort: new StubStoragePolicyPort(),
+      encryptionPolicyEvaluationService: new StubEncryptionPolicyEvaluationService(),
+      deploymentSchedulingPolicyEvaluationPort,
+      deploymentPolicyContextResolver: new FixedRunSubmissionDeploymentPolicyContextResolver(
+        DeploymentProfileIds.organization,
+      ),
+    });
+
+    const denied = await useCase.execute(createBaseRequest());
+
+    expect(denied.ok).toBeFalse();
+    if (denied.ok) {
+      return;
+    }
+    expect(denied.error.code).toBe(RunSubmissionValidationErrorCodes.policyIneligible);
+    expect(denied.error.validationIssues.some((issue) => issue.code === "missing-policy-prerequisite")).toBeTrue();
+
+    const approvedRequest = createBaseRequest();
+    const allowed = await useCase.execute({
+      ...approvedRequest,
+      submission: {
+        ...approvedRequest.submission,
+        policyPrerequisites: Object.freeze([
+          ...approvedRequest.submission.policyPrerequisites,
+          Object.freeze({
+            id: "deployment-approval:owner-or-admin",
+            kind: RunSubmissionSecurityPrerequisiteKinds.custom,
+            expected: true,
+          }),
+        ]),
+      },
+    });
+
+    expect(allowed.ok).toBeTrue();
+  });
+
+  it("enforces high-risk dual approval prerequisite when deployment policy requires it", async () => {
+    const workspaceRepository = new InMemoryWorkspaceRepository();
+    await workspaceRepository.saveWorkspace(createWorkspaceRecord("workspace-alpha"));
+
+    const storageRepository = new InMemoryStorageInstanceRepository();
+    await storageRepository.createStorageInstance(createStorageRecord("storage-alpha", "workspace-alpha"), {
+      operationKey: "seed",
+      actorUserIdentityId: "user:owner",
+    });
+
+    const deploymentSchedulingPolicyEvaluationPort: IDeploymentSchedulingPolicyEvaluationPort =
+      new DeploymentPolicyEvaluationService(new CanonicalDeploymentPolicySnapshotResolver());
+    const useCase = new ValidateRunSubmissionUseCase({
+      workspaceRepository,
+      authorizationDecisionEvaluator: new StubAuthorizationDecisionEvaluator(),
+      targetResolver: new StubTargetResolver(),
+      storageInstanceRepository: storageRepository,
+      storagePolicyEvaluationPort: new StubStoragePolicyPort(),
+      encryptionPolicyEvaluationService: new StubEncryptionPolicyEvaluationService(),
+      deploymentSchedulingPolicyEvaluationPort,
+      deploymentPolicyContextResolver: new FixedRunSubmissionDeploymentPolicyContextResolver(
+        DeploymentProfileIds.classroom,
+      ),
+    });
+
+    const highRiskRequest = createBaseRequest();
+    const denied = await useCase.execute({
+      ...highRiskRequest,
+      submission: {
+        ...highRiskRequest.submission,
+        tags: Object.freeze(["queue:default", "risk:high"]),
+        policyPrerequisites: Object.freeze([
+          ...highRiskRequest.submission.policyPrerequisites,
+          Object.freeze({
+            id: "deployment-approval:owner-or-instructor",
+            kind: RunSubmissionSecurityPrerequisiteKinds.custom,
+            expected: true,
+          }),
+        ]),
+      },
+    });
+
+    expect(denied.ok).toBeFalse();
+    if (denied.ok) {
+      return;
+    }
+    expect(denied.error.validationIssues.some((issue) => (
+      issue.code === "missing-policy-prerequisite"
+      && String(issue.message).includes("deployment-approval:high-risk-dual-approval")
+    ))).toBeTrue();
   });
 
   it("accepts eligible submissions and returns a canonical command", async () => {

@@ -19,6 +19,7 @@ Story 16.1.3 adds the application-layer run submission validator that blocks inv
   - authorization decisions (`IAuthorizationPolicyDecisionEvaluator`)
   - storage policy and lookup (`IStorageInstanceRepository`, `IStoragePolicyEvaluationPort`)
   - security prerequisite evaluation (`IEncryptionPolicyEvaluationService`)
+  - deployment scheduling approval posture (`IDeploymentSchedulingPolicyEvaluationPort`)
   - run-target availability/policy contract (`IRunSubmissionTargetResolverPort`)
 
 ## Denial semantics
