@@ -6,9 +6,10 @@ import type {
   PlatformRunRecord,
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { IAuthoritativeRunPersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type { IAuthoritativeRunQueryAuthorizationPort } from "@application/runs/ports/RunQueryAuthorizationPorts";
 import { RunLifecycleStates, RunSubmissionSources, createCanonicalRunRecord } from "@domain/runs/RunDomain";
 import { mapLifecycleStateToPlatformRunStatus, type RunAuthoritativeMetadata } from "../use-cases/RunCreationPersistenceMapper";
-import { ListAuthoritativeRunsUseCase } from "../use-cases/ListAuthoritativeRunsUseCase";
+import { ListAuthoritativeRunsUseCase, RunCompletionStates } from "../use-cases/ListAuthoritativeRunsUseCase";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   public readonly runs = new Map<string, PlatformRunRecord>();
@@ -51,6 +52,8 @@ class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
 function createRun(input: {
   readonly runId: string;
   readonly workspaceId: string;
+  readonly ownerUserIdentityId?: string;
+  readonly systemId?: string;
   readonly workflowId: string;
   readonly state: typeof RunLifecycleStates[keyof typeof RunLifecycleStates];
   readonly source: typeof RunSubmissionSources[keyof typeof RunSubmissionSources];
@@ -86,12 +89,12 @@ function createRun(input: {
     canonicalRun,
     submissionSnapshot: Object.freeze({
       actor: Object.freeze({
-        actorUserIdentityId: "user-owner",
+        actorUserIdentityId: input.ownerUserIdentityId ?? "user-owner",
         activeWorkspaceId: input.workspaceId,
       }),
       runtimeTarget: Object.freeze({
-        systemId: "system:demo",
-        versionId: "system:demo:v1",
+        systemId: input.systemId ?? "system:demo",
+        versionId: `${input.systemId ?? "system:demo"}:v1`,
         async: true,
       }),
       tags: Object.freeze([]),
@@ -119,12 +122,40 @@ function createRun(input: {
     runKind: "workflow",
     status: mapLifecycleStateToPlatformRunStatus(input.state),
     workspaceId: input.workspaceId,
-    userIdentityId: "user-owner",
+    userIdentityId: input.ownerUserIdentityId ?? "user-owner",
     sourceAggregateRef: `workflow:${input.workflowId}`,
     initiatedAt: input.submittedAt,
     metadata,
     revision: 1,
   });
+}
+
+class InMemoryRunQueryAuthorization implements IAuthoritativeRunQueryAuthorizationPort {
+  public readonly deniedRunIds = new Set<string>();
+  public readonly deniedWorkspaceIds = new Set<string>();
+
+  public async canReadWorkspaceRuns(input: {
+    readonly workspaceId: string;
+    readonly actor: {
+      readonly actorUserIdentityId: string;
+      readonly activeWorkspaceId?: string;
+      readonly authenticatedAt?: string;
+    };
+  }): Promise<boolean> {
+    return !this.deniedWorkspaceIds.has(input.workspaceId);
+  }
+
+  public async canReadRun(input: {
+    readonly runId: string;
+    readonly workspaceId?: string;
+    readonly actor: {
+      readonly actorUserIdentityId: string;
+      readonly activeWorkspaceId?: string;
+      readonly authenticatedAt?: string;
+    };
+  }): Promise<boolean> {
+    return !this.deniedRunIds.has(input.runId);
+  }
 }
 
 describe("ListAuthoritativeRunsUseCase", () => {
@@ -133,6 +164,8 @@ describe("ListAuthoritativeRunsUseCase", () => {
     await repository.createRun(createRun({
       runId: "run:alpha",
       workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:alpha",
+      systemId: "system:alpha",
       workflowId: "workflow:alpha",
       state: RunLifecycleStates.running,
       source: RunSubmissionSources.api,
@@ -142,6 +175,8 @@ describe("ListAuthoritativeRunsUseCase", () => {
     await repository.createRun(createRun({
       runId: "run:beta",
       workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:beta",
+      systemId: "system:beta",
       workflowId: "workflow:beta",
       state: RunLifecycleStates.submitted,
       source: RunSubmissionSources.uiManual,
@@ -151,6 +186,8 @@ describe("ListAuthoritativeRunsUseCase", () => {
     await repository.createRun(createRun({
       runId: "run:gamma",
       workspaceId: "workspace-beta",
+      ownerUserIdentityId: "user:gamma",
+      systemId: "system:gamma",
       workflowId: "workflow:gamma",
       state: RunLifecycleStates.running,
       source: RunSubmissionSources.api,
@@ -173,6 +210,103 @@ describe("ListAuthoritativeRunsUseCase", () => {
     expect(result.totalCount).toBe(1);
     expect(result.items).toHaveLength(1);
     expect(result.items[0]?.runId).toBe("run:alpha");
+    expect(result.items[0]?.systemId).toBe("system:alpha");
+    expect(result.items[0]?.ownerUserIdentityId).toBe("user:alpha");
+    expect(result.items[0]?.historyHints.normalizedStatus).toBe("active");
+  });
+
+  it("supports owner/system/time and completion-state filters", async () => {
+    const repository = new InMemoryRunRepository();
+    await repository.createRun(createRun({
+      runId: "run:terminal:success",
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:owner-a",
+      systemId: "system:image",
+      workflowId: "workflow:image",
+      state: RunLifecycleStates.completed,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-01T08:00:00.000Z",
+      updatedAt: "2026-04-01T08:10:00.000Z",
+    }), { operationKey: "seed:terminal:success", actorId: "system:test" });
+    await repository.createRun(createRun({
+      runId: "run:terminal:failed",
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:owner-a",
+      systemId: "system:image",
+      workflowId: "workflow:image",
+      state: RunLifecycleStates.failed,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-02T08:00:00.000Z",
+      updatedAt: "2026-04-02T08:10:00.000Z",
+    }), { operationKey: "seed:terminal:failed", actorId: "system:test" });
+    await repository.createRun(createRun({
+      runId: "run:active",
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:owner-b",
+      systemId: "system:other",
+      workflowId: "workflow:other",
+      state: RunLifecycleStates.running,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-03T08:00:00.000Z",
+      updatedAt: "2026-04-03T08:10:00.000Z",
+    }), { operationKey: "seed:active", actorId: "system:test" });
+
+    const useCase = new ListAuthoritativeRunsUseCase(repository);
+    const result = await useCase.execute({
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityIds: ["user:owner-a"],
+      systemIds: ["system:image"],
+      completionStates: [RunCompletionStates.failed],
+      submittedAfter: "2026-04-02T00:00:00.000Z",
+      submittedBefore: "2026-04-02T23:59:59.999Z",
+      updatedAfter: "2026-04-02T00:00:00.000Z",
+      updatedBefore: "2026-04-02T23:59:59.999Z",
+    });
+
+    expect(result.totalCount).toBe(1);
+    expect(result.items[0]?.runId).toBe("run:terminal:failed");
+    expect(result.items[0]?.historyHints.hasFailure).toBeTrue();
+  });
+
+  it("enforces run-read authorization consistently when an authorizer is configured", async () => {
+    const repository = new InMemoryRunRepository();
+    await repository.createRun(createRun({
+      runId: "run:allowed",
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:owner-a",
+      systemId: "system:image",
+      workflowId: "workflow:image",
+      state: RunLifecycleStates.running,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-04T08:00:00.000Z",
+      updatedAt: "2026-04-04T08:10:00.000Z",
+    }), { operationKey: "seed:allowed", actorId: "system:test" });
+    await repository.createRun(createRun({
+      runId: "run:denied",
+      workspaceId: "workspace-alpha",
+      ownerUserIdentityId: "user:owner-a",
+      systemId: "system:image",
+      workflowId: "workflow:image",
+      state: RunLifecycleStates.running,
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-04T09:00:00.000Z",
+      updatedAt: "2026-04-04T09:10:00.000Z",
+    }), { operationKey: "seed:denied", actorId: "system:test" });
+
+    const authorization = new InMemoryRunQueryAuthorization();
+    authorization.deniedRunIds.add("run:denied");
+
+    const useCase = new ListAuthoritativeRunsUseCase(repository, { authorization });
+    const result = await useCase.execute({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user:viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+
+    expect(result.totalCount).toBe(1);
+    expect(result.items[0]?.runId).toBe("run:allowed");
   });
 });
 
