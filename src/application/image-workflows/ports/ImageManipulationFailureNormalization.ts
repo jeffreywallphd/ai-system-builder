@@ -1,4 +1,12 @@
 import {
+  ImageManipulationFailureDispositions,
+  ImageManipulationFailureSummaryCategories,
+  ImageManipulationIssueKinds,
+  ImageManipulationIssueLayers,
+  createImageManipulationIssueClassification,
+  type ImageManipulationIssueClassification,
+} from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import {
   ImageManipulationExecutionFailureCategories,
   type ImageManipulationExecutionFailure,
   type ImageManipulationExecutionFailureCategory,
@@ -105,6 +113,12 @@ export function normalizeImageManipulationExecutionFailure(
   const retryable = resolveRetryable(category, code);
   const summary = resolveSummary(category, code, partialOutputCount);
   const userMessage = resolveUserMessage(category, code, retryable, partialOutputCount);
+  const classification = resolveFailureClassification({
+    category,
+    code,
+    retryable,
+    stageCode: normalizeOptional(input.stageCode) ?? resolveStageCode(input.source, category, input.state),
+  });
   const diagnostics = buildDiagnostics(input);
 
   return Object.freeze({
@@ -117,6 +131,7 @@ export function normalizeImageManipulationExecutionFailure(
     stageCode: normalizeOptional(input.stageCode) ?? resolveStageCode(input.source, category, input.state),
     partialProgressObserved: Boolean(input.partialProgressObserved),
     partialOutputCount,
+    classification,
     diagnostics,
   });
 }
@@ -245,6 +260,60 @@ function resolveRetryable(
     return true;
   }
   return false;
+}
+
+function resolveFailureClassification(input: {
+  readonly category: ImageManipulationExecutionFailureCategory;
+  readonly code: string;
+  readonly retryable: boolean;
+  readonly stageCode: string;
+}): ImageManipulationIssueClassification {
+  const layer = resolveFailureLayer(input.category, input.stageCode);
+  const reason = input.code;
+  const kind = input.category === ImageManipulationFailureSummaryCategories.validation
+    || input.category === ImageManipulationFailureSummaryCategories.translation
+    ? ImageManipulationIssueKinds.validation
+    : ImageManipulationIssueKinds.operational;
+  const degraded = input.retryable
+    || input.category === ImageManipulationFailureSummaryCategories.connectivity
+    || input.category === ImageManipulationFailureSummaryCategories.capacity
+    || input.category === ImageManipulationFailureSummaryCategories.timeout
+    || input.category === ImageManipulationFailureSummaryCategories.output;
+  const userFixable = kind === ImageManipulationIssueKinds.validation;
+  return createImageManipulationIssueClassification({
+    layer,
+    kind,
+    summaryCategory: input.category,
+    disposition: input.retryable
+      ? ImageManipulationFailureDispositions.retryable
+      : ImageManipulationFailureDispositions.terminal,
+    reason,
+    userFixable,
+    degraded,
+  });
+}
+
+function resolveFailureLayer(
+  category: ImageManipulationExecutionFailureCategory,
+  stageCode: string,
+) {
+  if (stageCode === "output-collection") {
+    return ImageManipulationIssueLayers.resultCollection;
+  }
+  if (stageCode === "dispatch") {
+    return ImageManipulationIssueLayers.executionDispatch;
+  }
+  if (category === ImageManipulationFailureSummaryCategories.connectivity
+    || category === ImageManipulationFailureSummaryCategories.capacity
+    || category === ImageManipulationFailureSummaryCategories.timeout
+    || category === ImageManipulationFailureSummaryCategories.dependency) {
+    return ImageManipulationIssueLayers.nodeAvailability;
+  }
+  if (category === ImageManipulationFailureSummaryCategories.validation
+    || category === ImageManipulationFailureSummaryCategories.translation) {
+    return ImageManipulationIssueLayers.runReadiness;
+  }
+  return ImageManipulationIssueLayers.executionDispatch;
 }
 
 function resolveSummary(

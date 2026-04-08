@@ -50,3 +50,13 @@
   - output anomalies (`output-collection-failed`, `output-collection-partial-anomaly`)
 - `ComfyUiExecutionStatusNormalizer` now uses that shared helper so progress-polling failure normalization stays consistent with dispatch/output collection semantics.
 - User-safe summaries/messages are preserved separately from developer diagnostics; diagnostics are sanitized to avoid local path/token leakage.
+
+## Story 8.1.1 taxonomy foundation integration
+- Shared taxonomy foundation:
+  - `src/shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy.ts`
+- Execution failure categories now align with shared summary-category constants reused by run/API contracts.
+- Normalized execution failures may include a `classification` envelope with:
+  - canonical issue code (`im.<layer>.<kind>.<reason>`),
+  - layer + kind + disposition,
+  - user-fixable/degraded markers and `resolutionActor`.
+- Purpose: keep retryability/terminal/degraded semantics coherent across application services, APIs, presenters, and diagnostics without backend-specific branching.

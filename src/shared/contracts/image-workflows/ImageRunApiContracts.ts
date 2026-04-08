@@ -1,5 +1,9 @@
 import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
 import type { RunLifecycleState, RunSubmissionSource } from "@domain/runs/RunDomain";
+import {
+  ImageManipulationFailureSummaryCategories,
+  type ImageManipulationFailureSummaryCategory,
+} from "./ImageManipulationValidationFailureTaxonomy";
 
 export class ImageRunApiContractError extends Error {
   constructor(message: string) {
@@ -42,20 +46,20 @@ export type ImageRunFailureVisibility =
   typeof ImageRunFailureVisibilities[keyof typeof ImageRunFailureVisibilities];
 
 export const ImageRunFailureCategories = Object.freeze({
-  validation: "validation",
-  translation: "translation",
-  dependency: "dependency",
-  capacity: "capacity",
-  timeout: "timeout",
-  cancellation: "cancellation",
-  execution: "execution",
-  output: "output",
-  connectivity: "connectivity",
-  internal: "internal",
-  unknown: "unknown",
+  validation: ImageManipulationFailureSummaryCategories.validation,
+  translation: ImageManipulationFailureSummaryCategories.translation,
+  dependency: ImageManipulationFailureSummaryCategories.dependency,
+  capacity: ImageManipulationFailureSummaryCategories.capacity,
+  timeout: ImageManipulationFailureSummaryCategories.timeout,
+  cancellation: ImageManipulationFailureSummaryCategories.cancellation,
+  execution: ImageManipulationFailureSummaryCategories.execution,
+  output: ImageManipulationFailureSummaryCategories.output,
+  connectivity: ImageManipulationFailureSummaryCategories.connectivity,
+  internal: ImageManipulationFailureSummaryCategories.internal,
+  unknown: ImageManipulationFailureSummaryCategories.unknown,
 } as const);
 
-export type ImageRunFailureCategory = typeof ImageRunFailureCategories[keyof typeof ImageRunFailureCategories];
+export type ImageRunFailureCategory = ImageManipulationFailureSummaryCategory;
 
 export const ImageRunEventCategories = Object.freeze({
   lifecycle: "lifecycle",

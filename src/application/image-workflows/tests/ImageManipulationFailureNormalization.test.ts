@@ -21,6 +21,10 @@ describe("image manipulation failure normalization", () => {
     expect(failure.category).toBe("dependency");
     expect(failure.code).toBe("execution-missing-model-dependency");
     expect(failure.retryable).toBeFalse();
+    expect(failure.classification?.layer).toBe("node-availability");
+    expect(failure.classification?.kind).toBe("operational");
+    expect(failure.classification?.disposition).toBe("terminal");
+    expect(failure.classification?.resolutionActor).toBe("operator");
   });
 
   it("classifies graph binding mismatches as translation failures", () => {
@@ -35,6 +39,10 @@ describe("image manipulation failure normalization", () => {
     expect(failure.category).toBe("translation");
     expect(failure.code).toBe("dispatch-translation-mismatch");
     expect(failure.userMessage).toContain("could not be prepared");
+    expect(failure.classification?.layer).toBe("execution-dispatch");
+    expect(failure.classification?.kind).toBe("validation");
+    expect(failure.classification?.userFixable).toBeTrue();
+    expect(failure.classification?.issueCode).toBe("im.dispatch.validation.dispatch-translation-mismatch");
   });
 
   it("classifies output collection anomalies as output failures with partial output context", () => {
@@ -51,6 +59,9 @@ describe("image manipulation failure normalization", () => {
     expect(failure.code).toBe("output-collection-partial-anomaly");
     expect(failure.retryable).toBeTrue();
     expect(failure.partialOutputCount).toBe(2);
+    expect(failure.classification?.layer).toBe("result-collection");
+    expect(failure.classification?.disposition).toBe("retryable");
+    expect(failure.classification?.degraded).toBeTrue();
   });
 
   it("redacts local filesystem and token details from diagnostics", () => {
