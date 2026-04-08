@@ -29,6 +29,8 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- application desktop startup recovery and interrupted-resync inspection/recovery service:
+  - `src/application/common/OfflineDesktopStartupRecovery.ts`
 - application offline audit/operational event hook contracts:
   - `src/application/common/OfflineOperationalEventPorts.ts`
 - desktop host local-mode profile binding:
@@ -51,6 +53,8 @@ Non-negotiable philosophy:
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - desktop offline local-execution registration persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+- desktop offline interrupted-resynchronization recovery marker persistence adapter:
+  - `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
 - desktop offline protected-value adapter:
   - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - shared contract package for runtime DTO/schema/state:
@@ -289,6 +293,13 @@ Story 19.3.3 registration/linkage baseline:
 - reconnect replay of local-execution registrations is explicit and status-bound (`queued-pending-registration`, `registration-conflict`, `registration-rejected`, `registration-applied`);
 - authoritative linkage is emitted as `protected-local-execution-registered` audit/operational outcomes, without claiming disconnected server orchestration;
 - conflict/rejection linkage outcomes are retained explicitly in local queue state and reconciliation outcomes; no silent backdating.
+
+Story 19.3.6 startup-recovery baseline:
+- startup recovery inspects queue retryability metadata, interrupted-resync markers, preserved draft resources, and snapshot expiry metadata before any retry decision;
+- interrupted resynchronization attempts are durably persisted as started/completed marker records so abrupt desktop termination does not erase recovery context;
+- startup recovery distinguishes retryable operations/registrations from manual-follow-up cases and keeps unresolved entries explicit;
+- optional startup auto-retry only runs when reconnect is allowed (`canResynchronize=true`) and retryable queue work exists;
+- unresolved state is retained and queryable for user/admin follow-up; no silent destructive cleanup.
 
 ## Server-authoritative-only examples
 

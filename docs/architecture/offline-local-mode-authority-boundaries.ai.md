@@ -13,6 +13,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/application/common/OfflinePendingOperationPersistence.ts`
 - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- `src/application/common/OfflineDesktopStartupRecovery.ts`
 - `src/application/common/OfflineOperationalEventPorts.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `src/hosts/desktop/DesktopConnectivityStateService.ts`
@@ -24,6 +25,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+- `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -64,6 +66,8 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
 - Infrastructure offline observability now emits sanitized structured logs/metrics with attempt-level correlation (`requestId`, `correlationId`, `syncAttemptId`) and replay/cache failure summaries.
 - Desktop shell now includes a shared offline-aware status surface/presenter seam that consumes canonical offline connectivity/synchronization contracts for user-visible online/offline/reconnecting/unsynced guidance.
+- Desktop startup recovery now inspects interrupted-resync markers, queue retryability metadata, preserved draft resources, and snapshot expiry metadata so restart-time state remains explicit and durable.
+- Desktop host runtime now records resynchronization attempt started/completed markers and can perform bounded startup auto-retry of interrupted attempts when reconnect preconditions are satisfied.
 
 ## Desktop cache + resync workflow baseline (Story 19.2.8)
 
@@ -126,6 +130,18 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
   - registration outcomes map to explicit statuses (`queued-pending-registration`, `registration-conflict`, `registration-rejected`, `registration-applied`),
   - success emits `protected-local-execution-registered` without implying disconnected authoritative orchestration,
   - conflict/rejection remains queryable in local queue + reconciliation outcomes (no silent backdating).
+
+## Desktop startup recovery baseline (Story 19.3.6)
+
+- canonical seams:
+  - `src/application/common/OfflineDesktopStartupRecovery.ts`
+  - `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- restart behavior:
+  - startup inspection classifies retryable vs manual-follow-up queue state explicitly,
+  - interrupted resync attempts remain durable across desktop restarts,
+  - optional startup auto-retry is bounded to reconnect-eligible and retryable cases,
+  - unresolved state remains queryable (no silent destructive cleanup).
 
 ## Implemented guarantees now called out explicitly
 
