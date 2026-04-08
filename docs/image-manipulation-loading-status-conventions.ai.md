@@ -16,6 +16,8 @@ Use this as the implementation contract for operational UX feedback in the image
 ## Messaging rules
 - Loading copy must identify the active surface (source/output/reference dataset, preview role, or run phase).
 - Transitional run states must be explicit between execution completion and result availability.
+- If execution completed but no preview is selectable yet, show an explicit `preview pending` notice.
+- If execution completed but preview/result retrieval is partially unavailable, show explicit `partially available` messaging plus a refresh path.
 - Fallback progress copy must acknowledge uncertainty honestly when node counts are unavailable.
 - Operational precheck messaging must keep setup-vs-backend causes separate:
   - setup blockers = user configuration/image selection actions,
@@ -33,10 +35,12 @@ Use this as the implementation contract for operational UX feedback in the image
 
 ## UI pattern rules
 - Loading notices should expose `aria-busy` and clear status text.
+- Rehydrated runtime sessions should expose explicit restored/reconciling states (not silent background state swaps).
 - Keep warnings visible when backend is degraded or constrained.
 - Do not hide advisory uncertainty under success framing.
 - Keep primary copy non-technical; place codes/counts/reason details in optional advanced details.
 - Avoid UI-local outage guessing: use readiness issues, readiness state, and node-availability reason codes from authoritative contracts.
+- If loading settles with unresolved surface errors, show a refresh-needed/recovery-needed state with a direct recovery action.
 
 ## Definition of done for this convention
 - Users can tell what the system is doing now.

@@ -16,12 +16,16 @@ This note defines UX conventions for operational feedback in the image manipulat
   - Collection refresh messages identify which of source/result/reference datasets are currently loading.
 - Transitional run messaging:
   - After execution completes, the UI explicitly shows retrieval, persistence, and refresh transitions before final completion.
+  - If execution completes but no result preview is selectable yet, the UI shows an explicit `Preview pending` state instead of a silent empty review panel.
+  - If execution is complete but preview retrieval is partially unavailable, the UI shows an explicit `Results partially available` state and directs users to refresh.
   - Run progress fallback copy distinguishes queued and early-running states when node-level progress is not yet available.
 - Loading-state presentation polish:
   - Status notices support a loading variant (`aria-busy`) with a lightweight animated loading bar.
   - High-frequency operational waits (hydration, readiness checks, run history/image-library loading, review refresh) use loading notices instead of static status blocks.
+  - Restored runtime sessions surface explicit rehydration/reconciliation messaging so reopened work does not appear stale or frozen.
 - Manual refresh clarity:
   - Refresh actions communicate that authoritative run history and output selections are being updated.
+  - When any surface (collections, run history, readiness, recent assets/systems, image library) is partially unavailable after loading settles, the editor shows a `Refresh recommended` state with a direct recovery action.
 - Operational readiness and outage messaging:
   - Launch precheck explicitly separates setup blockers (image/configuration issues) from execution-environment blockers (backend/node operational issues).
   - Backend/node availability copy distinguishes:
