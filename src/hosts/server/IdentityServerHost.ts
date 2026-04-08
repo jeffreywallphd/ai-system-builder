@@ -248,12 +248,14 @@ import type {
   EvaluateTransportConnectionPolicyRequest,
   ResolveTransportSecurityPolicyRequest,
 } from "@application/security/ports/TransportSecurityPorts";
+import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
   readonly port?: number;
   readonly host?: string;
   readonly deploymentProfile?: HostDeploymentProfile;
+  readonly deploymentPolicyBootstrap?: DeploymentPolicyBootstrapResolutionResult;
   readonly cors?: {
     readonly enabled?: boolean;
     readonly allowedOrigins?: ReadonlyArray<string>;
@@ -635,6 +637,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       transactionManager: workspaceRepository,
       idGenerator: workspaceIdGenerator,
       clock: workspaceClock,
+      deploymentAuthorizationPolicyPort: options.deploymentPolicyBootstrap?.evaluationService,
+      deploymentPolicyContextResolver: options.deploymentPolicyBootstrap?.contextResolver,
     }),
     updateWorkspaceUseCase: new UpdateWorkspaceUseCase({
       workspaceRepository,
@@ -1039,6 +1043,8 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageInstanceRepository,
     storagePolicyEvaluationPort: workspaceAwareStoragePolicyEvaluationAdapter,
     encryptionPolicyEvaluationService: assetEncryptionPolicyEvaluationService,
+    deploymentSchedulingPolicyEvaluationPort: options.deploymentPolicyBootstrap?.evaluationService,
+    deploymentPolicyContextResolver: options.deploymentPolicyBootstrap?.contextResolver,
     auditSink: authoritativeRunSubmissionAuditSink,
     clock: workspaceClock,
   });
