@@ -118,6 +118,15 @@ Story 1.4.1 extension:
 - studio runtime ingestion now accepts an optional logical `sourceImageAssetId` so admitted source/reference records preserve canonical asset references instead of local/path-style identifiers
 - studio UI now surfaces recently used image assets from authoritative list/get metadata contracts to support reopen-ready image library behavior
 
+Story 1.4.3 extension:
+
+- image manipulation runtime now groups recent image assets into continuity windows (today / earlier this week / older) so users can rediscover reusable inputs quickly
+- recent image entries now provide authoritative reuse actions (`Use as source` and `Use as face reference`) that:
+  - resolve metadata via image-asset APIs
+  - fetch protected original content via image-asset original-content routes
+  - re-ingest into runtime datasets through existing studio ingestion APIs with logical `sourceImageAssetId` lineage
+- reopen continuity remains driven by persisted runtime logical state (dataset-binding ids, selected record ids, property state) without introducing local filesystem/path truth sources
+
 ## Decision 6: preview-safe access and generated outputs are first-class
 
 The architecture treats preview and generated outputs as normal protected asset flows:

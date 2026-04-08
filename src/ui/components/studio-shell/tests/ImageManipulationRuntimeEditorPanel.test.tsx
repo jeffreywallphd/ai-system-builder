@@ -1,7 +1,9 @@
-﻿import { describe, expect, it } from "bun:test";
+import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
-import ImageManipulationRuntimeEditorPanel from "../ImageManipulationRuntimeEditorPanel";
+import ImageManipulationRuntimeEditorPanel, {
+  groupRecentImageAssetsByContinuityWindow,
+} from "../ImageManipulationRuntimeEditorPanel";
 
 describe("ImageManipulationRuntimeEditorPanel", () => {
   it("renders a bounded fallback message when no image manipulation draft is active", () => {
@@ -70,5 +72,41 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Face reference (0)");
     expect(html).toContain("disabled=\"\"");
   });
-});
 
+  it("groups recent assets into continuity windows for rediscovery", () => {
+    const grouped = groupRecentImageAssetsByContinuityWindow([
+      {
+        assetId: "asset:image:today",
+        originalFilename: "today.png",
+        mediaType: "image/png",
+        sizeBytes: 100,
+        lifecycleStatus: "available",
+        createdAt: "2026-04-08T12:00:00.000Z",
+        updatedAt: "2026-04-08T12:00:00.000Z",
+      },
+      {
+        assetId: "asset:image:week",
+        originalFilename: "week.png",
+        mediaType: "image/png",
+        sizeBytes: 100,
+        lifecycleStatus: "available",
+        createdAt: "2026-04-06T12:00:00.000Z",
+        updatedAt: "2026-04-06T12:00:00.000Z",
+      },
+      {
+        assetId: "asset:image:older",
+        originalFilename: "older.png",
+        mediaType: "image/png",
+        sizeBytes: 100,
+        lifecycleStatus: "available",
+        createdAt: "2026-03-20T12:00:00.000Z",
+        updatedAt: "2026-03-20T12:00:00.000Z",
+      },
+    ], new Date("2026-04-08T15:00:00.000Z"));
+
+    expect(grouped.map((entry) => entry.key)).toEqual(["today", "week", "older"]);
+    expect(grouped[0]?.assets[0]?.assetId).toBe("asset:image:today");
+    expect(grouped[1]?.assets[0]?.assetId).toBe("asset:image:week");
+    expect(grouped[2]?.assets[0]?.assetId).toBe("asset:image:older");
+  });
+});

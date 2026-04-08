@@ -197,6 +197,63 @@ interface LoadCollectionsOptions {
   readonly hydration?: boolean;
 }
 
+type RecentImageAssetContinuityGroupKey = "today" | "week" | "older";
+
+interface RecentImageAssetContinuityGroup {
+  readonly key: RecentImageAssetContinuityGroupKey;
+  readonly label: string;
+  readonly assets: ReadonlyArray<RecentStudioImageAsset>;
+}
+
+function startOfDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function groupRecentImageAssetsByContinuityWindow(
+  assets: ReadonlyArray<RecentStudioImageAsset>,
+  now: Date = new Date(),
+): ReadonlyArray<RecentImageAssetContinuityGroup> {
+  const todayStart = startOfDay(now).getTime();
+  const sevenDaysAgo = todayStart - (6 * 24 * 60 * 60 * 1000);
+  const grouped = new Map<RecentImageAssetContinuityGroupKey, RecentStudioImageAsset[]>();
+  grouped.set("today", []);
+  grouped.set("week", []);
+  grouped.set("older", []);
+
+  for (const asset of assets) {
+    const updatedAt = new Date(asset.updatedAt).getTime();
+    if (Number.isNaN(updatedAt)) {
+      grouped.get("older")?.push(asset);
+      continue;
+    }
+    if (updatedAt >= todayStart) {
+      grouped.get("today")?.push(asset);
+      continue;
+    }
+    if (updatedAt >= sevenDaysAgo) {
+      grouped.get("week")?.push(asset);
+      continue;
+    }
+    grouped.get("older")?.push(asset);
+  }
+
+  return Object.freeze(([
+    { key: "today" as const, label: "Today" },
+    { key: "week" as const, label: "Earlier this week" },
+    { key: "older" as const, label: "Older" },
+  ]).flatMap((group) => {
+    const bucket = grouped.get(group.key) ?? [];
+    if (bucket.length < 1) {
+      return [];
+    }
+    return [Object.freeze({
+      key: group.key,
+      label: group.label,
+      assets: Object.freeze(bucket),
+    })];
+  }));
+}
+
 function getCollectionLoadErrorMessage(datasetBindingId: ReferenceImageDatasetBindingId): string {
   if (datasetBindingId === "input-image-dataset") {
     return "We couldn't load your source photos right now.";
@@ -360,12 +417,17 @@ export function ImageManipulationRuntimeEditorPanel({
   const [recentImageAssets, setRecentImageAssets] = useState<ReadonlyArray<RecentStudioImageAsset>>([]);
   const [isLoadingRecentImageAssets, setIsLoadingRecentImageAssets] = useState(false);
   const [recentImageAssetsError, setRecentImageAssetsError] = useState<string | undefined>();
+  const [isReusingRecentImageAssetId, setIsReusingRecentImageAssetId] = useState<string | undefined>();
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
   const [integrityIssues, setIntegrityIssues] = useState<ReadonlyArray<CrossStudioIntegrityIssue>>([]);
   const [flowSteps, setFlowSteps] = useState<ReadonlyArray<ReferenceImageExecutionFlowStep>>([]);
   const [flowIssues, setFlowIssues] = useState<ReadonlyArray<ReferenceImageExecutionFlowIssue>>([]);
+  const recentImageAssetGroups = useMemo(
+    () => groupRecentImageAssetsByContinuityWindow(recentImageAssets),
+    [recentImageAssets],
+  );
 
   useEffect(() => {
     setSelection(datasetBindingService.createSelectionStateFromHydration({
@@ -596,6 +658,82 @@ export function ImageManipulationRuntimeEditorPanel({
     }).finally(() => {
       setIsLoadingRecentImageAssets(false);
     });
+  };
+
+  const reuseRecentImageAsset = async (input: {
+    readonly asset: RecentStudioImageAsset;
+    readonly targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">;
+  }): Promise<void> => {
+    if (!draft?.draftId || !workspaceId || !sessionToken) {
+      setStatusMessage("Sign in to reuse recent images.");
+      return;
+    }
+    setIsReusingRecentImageAssetId(input.asset.assetId);
+    setStatusMessage(undefined);
+    try {
+      const [metadata, original] = await Promise.all([
+        imageAssets.getImageAsset({
+          assetId: input.asset.assetId,
+          workspaceId,
+          sessionToken,
+        }),
+        imageAssets.getImageAssetOriginalContent({
+          assetId: input.asset.assetId,
+          workspaceId,
+          sessionToken,
+        }),
+      ]);
+      if (!metadata.ok || !metadata.data) {
+        setStatusMessage(metadata.error?.message ?? "We couldn't load this image metadata.");
+        return;
+      }
+      if (!original.ok || !original.data) {
+        setStatusMessage(original.error?.message ?? "We couldn't load this image content.");
+        return;
+      }
+
+      const ingested = await studioShell.ingestReferenceImageUpload({
+        studioId: context.studioId,
+        draftId: draft.draftId,
+        fileName: metadata.data.asset.originalFilename,
+        mimeType: metadata.data.asset.mediaType ?? original.data.mimeType,
+        payloadBase64: original.data.payloadBase64,
+        sourceImageAssetId: metadata.data.asset.assetId,
+        targetDatasetBindingId: input.targetDatasetBindingId,
+      });
+      if (!ingested.ok || !ingested.data) {
+        setStatusMessage(ingested.error?.message ?? "We couldn't reuse this image.");
+        return;
+      }
+
+      if (input.targetDatasetBindingId === "input-image-dataset") {
+        setDatasetInstanceId(ingested.data.datasetInstanceId);
+        setSelection((current) => setRoleSelection(current, {
+          role: "source",
+          recordId: ingested.data.recordId,
+          syncPreviewRole: true,
+        }));
+      } else {
+        setSelection((current) => setRoleSelection(current, {
+          role: "reference",
+          recordId: ingested.data.recordId,
+          syncPreviewRole: true,
+        }));
+      }
+      setStatusMessage(input.targetDatasetBindingId === "input-image-dataset"
+        ? "Recent image ready as your source photo."
+        : "Recent image ready as your face reference photo.");
+      await loadCollections({
+        preferredSourceRecordId: input.targetDatasetBindingId === "input-image-dataset"
+          ? ingested.data.recordId
+          : undefined,
+        preferredReferenceRecordId: input.targetDatasetBindingId === "reference-image-dataset"
+          ? ingested.data.recordId
+          : undefined,
+      });
+    } finally {
+      setIsReusingRecentImageAssetId(undefined);
+    }
   };
 
   const loadCollections = (options: LoadCollectionsOptions = {}): Promise<ImageCollections> => {
@@ -1016,12 +1154,54 @@ export function ImageManipulationRuntimeEditorPanel({
                     message="Upload a photo to start your image library."
                   />
                 ) : null}
-                {!isLoadingRecentImageAssets && !recentImageAssetsError && recentImageAssets.length > 0 ? (
-                  <ul className="ui-text-small ui-text-secondary">
-                    {recentImageAssets.map((asset) => (
-                      <li key={asset.assetId}>{asset.originalFilename}</li>
+                {!isLoadingRecentImageAssets && !recentImageAssetsError && recentImageAssetGroups.length > 0 ? (
+                  <div className="ui-stack ui-stack--xs">
+                    {recentImageAssetGroups.map((group) => (
+                      <section key={group.key} className="ui-stack ui-stack--2xs">
+                        <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>{group.label}</p>
+                        <ul className="ui-text-small ui-text-secondary ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+                          {group.assets.map((asset) => (
+                            <li key={asset.assetId}>
+                              <div className="ui-stack ui-stack--2xs">
+                                <span>{asset.originalFilename}</span>
+                                <span className="ui-text-secondary">{toFriendlyTimestamp(asset.updatedAt) ?? "Recently updated"}</span>
+                                <div className="ui-row ui-row--xs">
+                                  <button
+                                    type="button"
+                                    className="ui-button ui-button--ghost ui-button--sm"
+                                    disabled={Boolean(isReusingRecentImageAssetId)}
+                                    onClick={() => {
+                                      void reuseRecentImageAsset({
+                                        asset,
+                                        targetDatasetBindingId: "input-image-dataset",
+                                      });
+                                    }}
+                                  >
+                                    {isReusingRecentImageAssetId === asset.assetId ? "Preparing..." : "Use as source"}
+                                  </button>
+                                  {roleBindings.referenceBindingId ? (
+                                    <button
+                                      type="button"
+                                      className="ui-button ui-button--ghost ui-button--sm"
+                                      disabled={Boolean(isReusingRecentImageAssetId)}
+                                      onClick={() => {
+                                        void reuseRecentImageAsset({
+                                          asset,
+                                          targetDatasetBindingId: "reference-image-dataset",
+                                        });
+                                      }}
+                                    >
+                                      {isReusingRecentImageAssetId === asset.assetId ? "Preparing..." : "Use as face reference"}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
                     ))}
-                  </ul>
+                  </div>
                 ) : null}
               </section>
             ) : null}

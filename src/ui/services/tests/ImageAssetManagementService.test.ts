@@ -90,4 +90,31 @@ describe("ImageAssetManagementService", () => {
     expect(listed.data?.[0]?.originalFilename).toBe("portrait.png");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("loads original image content for authoritative recent-asset reuse", async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    const fetchMock = mock(async () => ({
+      ok: true,
+      headers: new Headers({
+        "content-type": "image/png",
+        "content-disposition": "attachment; filename=\"reused.png\"",
+      }),
+      arrayBuffer: async () => bytes.buffer,
+    }) as Response);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const service = new ImageAssetManagementService("http://identity.local");
+    const loaded = await service.getImageAssetOriginalContent({
+      assetId: "asset:image:uploaded-2",
+      workspaceId: "workspace-1",
+      sessionToken: "token-1",
+    });
+
+    expect(loaded.ok).toBeTrue();
+    expect(loaded.data?.assetId).toBe("asset:image:uploaded-2");
+    expect(loaded.data?.fileName).toBe("reused.png");
+    expect(loaded.data?.mimeType).toBe("image/png");
+    expect(loaded.data?.payloadBase64).toBe("AQIDBA==");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 });
