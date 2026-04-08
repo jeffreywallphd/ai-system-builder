@@ -3,7 +3,12 @@ import type { AssetDraftDependencyReference, AssetMetadataPatch } from "@domain/
 import { TaxonomySemanticRoles, type TaxonomyBehaviorKind, type TaxonomySemanticRole } from "@domain/taxonomy/CompositionTaxonomy";
 import type {
   GetStudioImageWorkflowDefinitionRequest,
+  GetStudioImageSystemDefinitionRequest,
+  ListStudioImageSystemDefinitionsRequest,
   ListStudioImageWorkflowDefinitionsRequest,
+  SaveStudioImageSystemDefinitionRequest,
+  StudioImageSystemDefinitionListingReadModel,
+  StudioImageSystemDefinitionReadModel,
   StudioImageWorkflowDefinitionListingReadModel,
   StudioImageWorkflowDefinitionReadModel,
   StudioShellApiResponse,
@@ -57,6 +62,9 @@ export interface StudioShellExtensionOperations {
   getSystemExecutionResult?(executionId: string): Promise<SystemRuntimeApiResponse<RuntimeExecutionResultReadModel>>;
   listImageWorkflowDefinitions?(request?: ListStudioImageWorkflowDefinitionsRequest): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionListingReadModel>>;
   getImageWorkflowDefinition?(request: GetStudioImageWorkflowDefinitionRequest): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>>;
+  listImageSystemDefinitions?(request?: ListStudioImageSystemDefinitionsRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>>;
+  getImageSystemDefinition?(request: GetStudioImageSystemDefinitionRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>>;
+  saveImageSystemDefinition?(request: SaveStudioImageSystemDefinitionRequest): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>>;
   saveSystemChildComponent?(request: AddSystemChildComponentRequest): Promise<boolean>;
   removeSystemChildComponent?(request: RemoveSystemChildComponentRequest): Promise<boolean>;
   reorderSystemChildComponent?(request: ReorderSystemChildComponentRequest): Promise<boolean>;

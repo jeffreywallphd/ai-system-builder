@@ -87,6 +87,7 @@ import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-run
 import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
 import { SqliteExecutionAuditRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
 import { SqliteImageRunHistoryRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
+import { SqliteImageWorkflowSystemPersistenceAdapter } from "../../src/infrastructure/persistence/image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
 import { LocalStorageInstanceProvisioner } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
 import { LocalSystemOutputArtifactStorage } from "../../src/infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
 import { LocalStorageInstanceLifecycleInfrastructure } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
@@ -805,6 +806,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
     path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
   );
+  const imageWorkflowSystemPersistence = new SqliteImageWorkflowSystemPersistenceAdapter(
+    path.join(storagePaths.assetsDirectory, "image-workflow-system.sqlite"),
+  );
   const studioShellBackendApi = new StudioShellBackendApi(
     studioShellRepository,
     workflowPersistenceRepository,
@@ -821,6 +825,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       storageLifecycleInfrastructure: new LocalStorageInstanceLifecycleInfrastructure(
         path.join(storagePaths.storageDirectory, "storage"),
       ),
+      imageSystemDefinitionRepository: imageWorkflowSystemPersistence,
     },
   );
   const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
@@ -999,6 +1004,18 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.handle("ai-loom-desktop-studio-shell:image-workflows:get", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getImageWorkflowDefinition"]>[0];
     return JSON.stringify(await studioShellBackendApi.getImageWorkflowDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listImageSystemDefinitions"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listImageSystemDefinitions(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:get", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getImageSystemDefinition"]>[0];
+    return JSON.stringify(await studioShellBackendApi.getImageSystemDefinition(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:save", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["saveImageSystemDefinition"]>[0];
+    return JSON.stringify(await studioShellBackendApi.saveImageSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
     return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));

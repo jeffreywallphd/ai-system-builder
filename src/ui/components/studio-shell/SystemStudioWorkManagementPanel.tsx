@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type {
+  StudioImageSystemDefinitionReadModel,
+  StudioImageSystemDefinitionSummaryReadModel,
   StudioImageWorkflowDefinitionReadModel,
   StudioImageWorkflowDefinitionSummaryReadModel,
 } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
@@ -13,6 +15,7 @@ import {
 } from "./SystemWorkflowParameterFormPresenter";
 
 function readDefaultReferenceValues(content: string): {
+  readonly imageSystemDefinitionId?: string;
   readonly workflowBindingId?: string;
   readonly workflowAssetId?: string;
   readonly workflowVersionId?: string;
@@ -37,6 +40,7 @@ function readDefaultReferenceValues(content: string): {
               readonly datasetVersionId?: string;
             }>;
             readonly state?: {
+              readonly imageSystemDefinitionId?: string;
               readonly imageWorkflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
             };
           };
@@ -46,6 +50,7 @@ function readDefaultReferenceValues(content: string): {
     const firstWorkflowBinding = parsed.systemSpec?.serialization?.runtime?.workflowBindings?.[0];
     const firstDatasetBinding = parsed.systemSpec?.serialization?.runtime?.datasetInstances?.[0];
     return Object.freeze({
+      imageSystemDefinitionId: parsed.systemSpec?.serialization?.runtime?.state?.imageSystemDefinitionId,
       workflowBindingId: firstWorkflowBinding?.bindingId,
       workflowAssetId: firstWorkflowBinding?.workflowAssetId,
       workflowVersionId: firstWorkflowBinding?.workflowVersionId,
@@ -66,8 +71,6 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const defaults = useMemo(() => (draft ? readDefaultReferenceValues(draft.content) : Object.freeze({})), [draft?.content]);
   const [status, setStatus] = useState<string>();
   const [renameDraftTitle, setRenameDraftTitle] = useState(draft?.metadata.title ?? "");
-  const [openDraftId, setOpenDraftId] = useState("");
-  const [copyTitle, setCopyTitle] = useState("");
   const [workflowBindingId, setWorkflowBindingId] = useState(defaults.workflowBindingId ?? "");
   const [workflowAssetId, setWorkflowAssetId] = useState(defaults.workflowAssetId ?? "");
   const [workflowVersionId, setWorkflowVersionId] = useState(defaults.workflowVersionId ?? "");
@@ -80,7 +83,18 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(false);
   const [workflowParameterValues, setWorkflowParameterValues] = useState<Readonly<Record<string, unknown>>>(Object.freeze({}));
   const [workflowParameterStatus, setWorkflowParameterStatus] = useState<string>();
+  const [savedSystems, setSavedSystems] = useState<ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>>([]);
+  const [selectedSavedSystemId, setSelectedSavedSystemId] = useState(defaults.imageSystemDefinitionId ?? "");
+  const [selectedSavedSystemDetail, setSelectedSavedSystemDetail] = useState<StudioImageSystemDefinitionReadModel>();
+  const [systemLoadError, setSystemLoadError] = useState<string>();
+  const [isSystemListLoading, setIsSystemListLoading] = useState(false);
+  const [isSystemDetailLoading, setIsSystemDetailLoading] = useState(false);
   const workflowPickerAvailable = Boolean(context.operations.listImageWorkflowDefinitions && context.operations.getImageWorkflowDefinition);
+  const imageSystemOperationsAvailable = Boolean(
+    context.operations.listImageSystemDefinitions
+    && context.operations.getImageSystemDefinition
+    && context.operations.saveImageSystemDefinition,
+  );
 
   useEffect(() => {
     setWorkflowBindingId(defaults.workflowBindingId ?? "");
@@ -89,9 +103,11 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     setDatasetInstanceId(defaults.datasetInstanceId ?? "");
     setDatasetAssetId(defaults.datasetAssetId ?? "");
     setDatasetVersionId(defaults.datasetVersionId ?? "");
+    setSelectedSavedSystemId(defaults.imageSystemDefinitionId ?? "");
     setRenameDraftTitle(draft?.metadata.title ?? "");
     setWorkflowParameterStatus(undefined);
   }, [
+    defaults.imageSystemDefinitionId,
     defaults.datasetAssetId,
     defaults.datasetInstanceId,
     defaults.datasetVersionId,
@@ -190,8 +206,98 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     };
   }, [defaults.workflowParameterValuesByWorkflowId, draft?.draftId, workflowAssetId, workflowPickerAvailable]);
 
+  useEffect(() => {
+    const listImageSystemDefinitions = context.operations.listImageSystemDefinitions;
+    if (!draft || !imageSystemOperationsAvailable || !listImageSystemDefinitions) {
+      setSavedSystems([]);
+      setSelectedSavedSystemDetail(undefined);
+      return;
+    }
+
+    let disposed = false;
+    setIsSystemListLoading(true);
+    setSystemLoadError(undefined);
+    void listImageSystemDefinitions({
+      workflowIds: workflowAssetId.trim() ? [workflowAssetId.trim()] : undefined,
+      limit: 50,
+    }).then((response) => {
+      if (disposed) {
+        return;
+      }
+      if (!response?.ok || !response.data) {
+        setSystemLoadError("Could not load saved image systems.");
+        setSavedSystems([]);
+        return;
+      }
+      setSavedSystems(response.data.items);
+      if (!selectedSavedSystemId.trim()) {
+        const preferredSystemId = defaults.imageSystemDefinitionId?.trim();
+        const selectedFromList = preferredSystemId && response.data.items.some((entry) => entry.systemId === preferredSystemId)
+          ? preferredSystemId
+          : response.data.items[0]?.systemId;
+        if (selectedFromList) {
+          setSelectedSavedSystemId(selectedFromList);
+        }
+      }
+    }).catch(() => {
+      if (!disposed) {
+        setSystemLoadError("Could not load saved image systems.");
+        setSavedSystems([]);
+      }
+    }).finally(() => {
+      if (!disposed) {
+        setIsSystemListLoading(false);
+      }
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, [
+    defaults.imageSystemDefinitionId,
+    draft?.draftId,
+    imageSystemOperationsAvailable,
+    selectedSavedSystemId,
+    workflowAssetId,
+  ]);
+
+  useEffect(() => {
+    const getImageSystemDefinition = context.operations.getImageSystemDefinition;
+    if (!draft || !selectedSavedSystemId.trim() || !imageSystemOperationsAvailable || !getImageSystemDefinition) {
+      setSelectedSavedSystemDetail(undefined);
+      return;
+    }
+
+    let disposed = false;
+    setIsSystemDetailLoading(true);
+    void getImageSystemDefinition({
+      systemId: selectedSavedSystemId.trim(),
+    }).then((response) => {
+      if (disposed) {
+        return;
+      }
+      if (!response?.ok || !response.data) {
+        setSelectedSavedSystemDetail(undefined);
+        return;
+      }
+      setSelectedSavedSystemDetail(response.data);
+    }).catch(() => {
+      if (!disposed) {
+        setSelectedSavedSystemDetail(undefined);
+      }
+    }).finally(() => {
+      if (!disposed) {
+        setIsSystemDetailLoading(false);
+      }
+    });
+
+    return () => {
+      disposed = true;
+    };
+  }, [draft?.draftId, imageSystemOperationsAvailable, selectedSavedSystemId]);
+
   if (!draft || !sessionId) {
-    return <p className="ui-text-small ui-text-secondary">Open a setup draft to save, reopen, copy, or rename.</p>;
+    return <p className="ui-text-small ui-text-secondary">Open a setup draft to save, reopen, update, or rename.</p>;
   }
 
   const workflowParameterValidation = selectedWorkflowDetail
@@ -203,74 +309,226 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-studio-work-management-panel">
-      <p className="ui-text-small ui-text-secondary">Save your work, reopen a saved setup as an editable copy, make copies, and rename from one place.</p>
+      <p className="ui-text-small ui-text-secondary">Save reusable image systems, update existing definitions, reopen saved systems, and rename from one place.</p>
       <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
         <button
           type="button"
           className="ui-button ui-button--primary"
           onClick={() => {
-            void service.saveSystemDefinition({
+            if (!selectedWorkflowDetail) {
+              setStatus("Choose a supported workflow operation before saving.");
+              return;
+            }
+            if (workflowParameterValidation?.hasIssues) {
+              setStatus("Resolve operation setting issues before saving as new.");
+              return;
+            }
+            const nextWorkflowValues = {
+              ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
+              [selectedWorkflowDetail.workflowId]: workflowParameterValues,
+            };
+            void service.modifySystemDefinition({
               studioId: context.studioId,
               sessionId,
               draftId: draft.draftId,
-            }).then((response) => {
-              if (!response.ok) {
-                setStatus("Could not save right now. Please try again.");
+              workflowBindings: [{
+                bindingId: workflowBindingId.trim() || "component:primary",
+                workflowAssetId: selectedWorkflowDetail.workflowId,
+                workflowVersionId: workflowVersionId.trim() || selectedWorkflowDetail.version.versionTag,
+              }],
+              runtimeStatePatch: {
+                imageWorkflowParameterValuesByWorkflowId: nextWorkflowValues,
+              },
+            }).then((modifyResponse) => {
+              if (!modifyResponse.ok) {
+                setStatus("Could not prepare this draft for save.");
                 return;
               }
-              setStatus("Saved.");
-              void context.operations.refresh();
+              if (!context.operations.saveImageSystemDefinition) {
+                setStatus("Image system save is unavailable in this host.");
+                return;
+              }
+              void context.operations.saveImageSystemDefinition({
+                studioId: context.studioId,
+                sessionId,
+                draftId: draft.draftId,
+                saveAsNew: true,
+                title: renameDraftTitle.trim() || draft.metadata.title,
+              }).then((saveResponse) => {
+                if (!saveResponse.ok || !saveResponse.data) {
+                  setStatus("Could not save as a new image system.");
+                  return;
+                }
+                setSelectedSavedSystemId(saveResponse.data.systemId);
+                setStatus("Saved as new image system.");
+                void context.operations.refresh();
+              });
             });
           }}
         >
-          Save work
+          Save as new
         </button>
         <button
           type="button"
           className="ui-button"
           onClick={() => {
-            if (!openDraftId.trim()) {
-              setStatus("Choose a saved setup first.");
+            if (!selectedSavedSystemId.trim()) {
+              setStatus("Choose a saved image system first.");
               return;
             }
-            void service.duplicateSystemDefinition({
-              studioId: context.studioId,
-              sessionId,
-              sourceDraftId: openDraftId.trim(),
-              title: copyTitle.trim() || undefined,
+            if (!context.operations.getImageSystemDefinition) {
+              setStatus("Image system reopen is unavailable in this host.");
+              return;
+            }
+            setStatus("Reopening saved image system...");
+            void context.operations.getImageSystemDefinition({
+              systemId: selectedSavedSystemId.trim(),
             }).then((response) => {
-              if (!response.ok) {
-                setStatus("Could not open that setup. Please try again.");
+              if (!response.ok || !response.data) {
+                setStatus("Could not reopen that image system.");
                 return;
               }
-              setStatus("Opened as a safe editable copy.");
-              void context.operations.refresh();
+              const reopened = response.data;
+              setWorkflowAssetId(reopened.workflowId);
+              setWorkflowVersionId(reopened.workflowVersionTag);
+              setWorkflowParameterValues(reopened.parameterBaseline);
+              setSelectedSavedSystemId(reopened.systemId);
+
+              const nextWorkflowValues = {
+                ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
+                [reopened.workflowId]: reopened.parameterBaseline,
+              };
+              void service.modifySystemDefinition({
+                studioId: context.studioId,
+                sessionId,
+                draftId: draft.draftId,
+                workflowBindings: [{
+                  bindingId: workflowBindingId.trim() || "component:primary",
+                  workflowAssetId: reopened.workflowId,
+                  workflowVersionId: reopened.workflowVersionTag,
+                }],
+                runtimeStatePatch: {
+                  imageSystemDefinitionId: reopened.systemId,
+                  imageWorkflowParameterValuesByWorkflowId: nextWorkflowValues,
+                },
+              }).then((modifyResponse) => {
+                if (!modifyResponse.ok) {
+                  setStatus("Reopened system, but could not fully apply state to this draft.");
+                  return;
+                }
+                setStatus(`Reopened '${reopened.title}' (${reopened.readinessSummary}).`);
+                void context.operations.refresh();
+              });
             });
           }}
         >
-          Open saved setup
+          Reopen saved
         </button>
         <button
           type="button"
           className="ui-button"
           onClick={() => {
-            void service.duplicateSystemDefinition({
+            if (!selectedSavedSystemId.trim()) {
+              setStatus("Choose a saved image system to update.");
+              return;
+            }
+            if (!selectedWorkflowDetail) {
+              setStatus("Choose a supported workflow operation before updating.");
+              return;
+            }
+            if (workflowParameterValidation?.hasIssues) {
+              setStatus("Resolve operation setting issues before updating.");
+              return;
+            }
+            const nextWorkflowValues = {
+              ...(defaults.workflowParameterValuesByWorkflowId ?? {}),
+              [selectedWorkflowDetail.workflowId]: workflowParameterValues,
+            };
+            void service.modifySystemDefinition({
               studioId: context.studioId,
               sessionId,
-              sourceDraftId: draft.draftId,
-              title: copyTitle.trim() || `${draft.metadata.title} copy`,
-            }).then((response) => {
-              if (!response.ok) {
-                setStatus("Could not make a copy. Please try again.");
+              draftId: draft.draftId,
+              workflowBindings: [{
+                bindingId: workflowBindingId.trim() || "component:primary",
+                workflowAssetId: selectedWorkflowDetail.workflowId,
+                workflowVersionId: workflowVersionId.trim() || selectedWorkflowDetail.version.versionTag,
+              }],
+              runtimeStatePatch: {
+                imageSystemDefinitionId: selectedSavedSystemId.trim(),
+                imageWorkflowParameterValuesByWorkflowId: nextWorkflowValues,
+              },
+            }).then((modifyResponse) => {
+              if (!modifyResponse.ok) {
+                setStatus("Could not prepare this draft for update.");
                 return;
               }
-              setStatus("Copy created.");
-              void context.operations.refresh();
+              if (!context.operations.saveImageSystemDefinition) {
+                setStatus("Image system update is unavailable in this host.");
+                return;
+              }
+              void context.operations.saveImageSystemDefinition({
+                studioId: context.studioId,
+                sessionId,
+                draftId: draft.draftId,
+                existingSystemId: selectedSavedSystemId.trim(),
+                saveAsNew: false,
+                title: renameDraftTitle.trim() || draft.metadata.title,
+              }).then((updateResponse) => {
+                if (!updateResponse.ok || !updateResponse.data) {
+                  setStatus("Could not update that image system.");
+                  return;
+                }
+                setSelectedSavedSystemId(updateResponse.data.systemId);
+                setStatus("Updated saved image system.");
+                void context.operations.refresh();
+              });
             });
           }}
         >
-          Make a copy
+          Update saved
         </button>
+      </div>
+
+      <div className="ui-stack ui-stack--xs" data-testid="system-studio-saved-systems">
+        <strong>Saved image systems</strong>
+        <label className="ui-field">
+          <span className="ui-field__label">Choose saved system</span>
+          <select
+            className="ui-select"
+            value={selectedSavedSystemId}
+            onChange={(event) => setSelectedSavedSystemId(event.currentTarget.value)}
+            disabled={!imageSystemOperationsAvailable || isSystemListLoading}
+          >
+            <option value="">Select a saved image system</option>
+            {savedSystems.map((system) => (
+              <option key={system.systemId} value={system.systemId}>
+                {system.title} ({system.readinessState})
+              </option>
+            ))}
+          </select>
+        </label>
+        {isSystemListLoading ? (
+          <span className="ui-text-small ui-text-secondary">Loading saved image systems...</span>
+        ) : null}
+        {systemLoadError ? (
+          <span className="ui-text-small ui-text-danger">{systemLoadError}</span>
+        ) : null}
+        {isSystemDetailLoading ? (
+          <span className="ui-text-small ui-text-secondary">Loading selected system details...</span>
+        ) : null}
+        {selectedSavedSystemDetail ? (
+          <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
+            <strong>{selectedSavedSystemDetail.title}</strong>
+            <p className="ui-text-small ui-text-secondary">
+              Workflow: {selectedSavedSystemDetail.workflowId}
+              {" | "}
+              Version: {selectedSavedSystemDetail.workflowVersionTag}
+            </p>
+            <p className="ui-text-small ui-text-secondary">
+              Readiness: {selectedSavedSystemDetail.readinessSummary}
+            </p>
+          </div>
+        ) : null}
       </div>
 
       <label className="ui-field">
@@ -466,12 +724,8 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
             Apply setup changes
           </button>
           <label className="ui-field">
-            <span className="ui-field__label">Open this saved draft id</span>
-            <input className="ui-input" value={openDraftId} onChange={(event) => setOpenDraftId(event.currentTarget.value)} placeholder="draft-123" />
-          </label>
-          <label className="ui-field">
-            <span className="ui-field__label">Copy name (optional)</span>
-            <input className="ui-input" value={copyTitle} onChange={(event) => setCopyTitle(event.currentTarget.value)} placeholder="My image setup copy" />
+            <span className="ui-field__label">Linked image system id</span>
+            <input className="ui-input" value={defaults.imageSystemDefinitionId ?? ""} readOnly />
           </label>
           <p className="ui-text-small ui-text-secondary">Current draft id: {draft.draftId}</p>
         </div>

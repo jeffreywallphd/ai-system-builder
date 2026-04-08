@@ -25,6 +25,11 @@ import type {
   StudioImageWorkflowDefinitionReadModel,
   ListStudioImageWorkflowDefinitionsRequest,
   GetStudioImageWorkflowDefinitionRequest,
+  GetStudioImageSystemDefinitionRequest,
+  ListStudioImageSystemDefinitionsRequest,
+  SaveStudioImageSystemDefinitionRequest,
+  StudioImageSystemDefinitionListingReadModel,
+  StudioImageSystemDefinitionReadModel,
   AssessDataStudioExecutionReadinessRequest,
   DataStudioExecutionReadinessReadModel,
   WorkflowRunDetailReadModel,
@@ -140,6 +145,27 @@ export class StudioShellService {
   ): Promise<StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>> {
     const raw = await this.requireBridge().getImageWorkflowDefinition(JSON.stringify(request));
     return JSON.parse(raw) as StudioShellApiResponse<StudioImageWorkflowDefinitionReadModel>;
+  }
+
+  public async listImageSystemDefinitions(
+    request: ListStudioImageSystemDefinitionsRequest = {},
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>> {
+    const raw = await this.requireBridge().listImageSystemDefinitions(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionListingReadModel>;
+  }
+
+  public async getImageSystemDefinition(
+    request: GetStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    const raw = await this.requireBridge().getImageSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionReadModel>;
+  }
+
+  public async saveImageSystemDefinition(
+    request: SaveStudioImageSystemDefinitionRequest,
+  ): Promise<StudioShellApiResponse<StudioImageSystemDefinitionReadModel>> {
+    const raw = await this.requireBridge().saveImageSystemDefinition(JSON.stringify(request));
+    return JSON.parse(raw) as StudioShellApiResponse<StudioImageSystemDefinitionReadModel>;
   }
 
   public async getPersistedWorkflow(workflowId: string): Promise<StudioShellApiResponse<PersistedWorkflowReadModel>> {
