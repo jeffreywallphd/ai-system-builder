@@ -229,6 +229,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 5 / Epic 5.4 Story 5.4.1 authoritative execution-node management/readiness API endpoints for inventory, availability controls, readiness/eligibility checks, and backend posture reads: `docs/architecture/execution-node-management-readiness-authoritative-apis.md`
 - Feature 4 / Epic 4.2 Story 4.2.5 concrete persistence implementation for image runs and durable status history recording/query seams: `docs/architecture/run-orchestration-image-run-persistence-and-status-history.md`
 - Feature 4 / Epic 4.4 Story 4.4.4 final completion verification and follow-on integration guidance for authoritative image run orchestration: `docs/architecture/image-run-feature-4-final-baseline.md`
+- Feature 6 / Epic 6.1 Story 6.1.5 authoritative result-persistence, preview-safe retrieval, and lineage boundary posture for image manipulation: `docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md`
+- Feature 6 generated-result domain and API contract foundations used by Story 6.1.5: `docs/architecture/generated-result-asset-domain-foundation.md`, `docs/architecture/generated-result-api-contracts.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

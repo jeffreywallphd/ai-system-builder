@@ -83,6 +83,10 @@ This enables later history/reuse/audit surfaces to explain provenance directly f
 
 This keeps generated results as first-class authoritative assets rather than backend-local files or UI-only artifacts.
 
+## Related posture note
+
+- Story 6.1.5 authoritative persistence/preview/lineage posture: `docs/architecture/generated-result-authoritative-persistence-preview-lineage-posture.md`
+
 ## Story 6.1.3: preview and derivative contracts
 
 Generated-result preview and derivative representations are modeled separately from original result storage identity in `GeneratedResultAssetDerivativeDomain`:
