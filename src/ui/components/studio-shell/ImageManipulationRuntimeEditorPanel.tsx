@@ -73,6 +73,7 @@ import type {
   RuntimeSdkExecutionResultResponse,
   RuntimeSdkExecutionStatusResponse,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type { StudioImageSystemDefinitionSummaryReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -339,6 +340,61 @@ function resolveHistoryRunBadgeTone(
   return "neutral";
 }
 
+export function resolveRunOutputRecordId(run: ImageRunHistoryRecord): string | undefined {
+  const datasetRecordId = run.outputs.datasetInstance?.persistedRecordIds[0]?.trim();
+  if (datasetRecordId) {
+    return datasetRecordId;
+  }
+  const imageRecordId = run.outputs.images[0]?.recordId?.trim();
+  if (imageRecordId) {
+    return imageRecordId;
+  }
+  return undefined;
+}
+
+function resolveRunSourceRecordId(run: ImageRunHistoryRecord): string | undefined {
+  return run.inputs.images[0]?.recordId?.trim() || undefined;
+}
+
+function resolveRunOutputCount(run: ImageRunHistoryRecord): number {
+  return run.outputs.datasetInstance?.persistedRecordIds.length ?? run.outputs.images.length;
+}
+
+export function resolveRunHistorySummary(run: ImageRunHistoryRecord): string {
+  const promptSummary = run.inputs.parameterSummary["editInstruction"];
+  if (typeof promptSummary === "string" && promptSummary.trim().length > 0) {
+    return promptSummary.trim();
+  }
+  const positivePrompt = (run.inputs.parameterSummary["imageConfig"] as { readonly prompts?: { readonly positivePrompt?: string } } | undefined)
+    ?.prompts?.positivePrompt;
+  if (typeof positivePrompt === "string" && positivePrompt.trim().length > 0) {
+    return positivePrompt.trim();
+  }
+  return "No saved instruction summary.";
+}
+
+export function resolveRunParameterSnapshot(input: {
+  readonly run: ImageRunHistoryRecord;
+  readonly fallbackPresetId: string;
+}): { readonly presetId: string; readonly config: ComfyImageManipulationConfig } | undefined {
+  const summary = input.run.inputs.parameterSummary as Readonly<Record<string, unknown>>;
+  const configuredPresetId = summary["presetId"];
+  const presetId = typeof configuredPresetId === "string" && configuredPresetId.trim().length > 0
+    ? configuredPresetId.trim()
+    : input.fallbackPresetId;
+  const candidateConfig = "imageConfig" in summary
+    ? summary["imageConfig"]
+    : summary;
+  try {
+    return Object.freeze({
+      presetId,
+      config: resolveComfyImageManipulationConfig(candidateConfig, { presetId }),
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 export function resolveLinkedRunForSelectedOutput(input: {
   readonly selectedOutputItem?: OutputGalleryItem;
   readonly runHistory: ReadonlyArray<ImageRunHistoryRecord>;
@@ -575,6 +631,7 @@ export function ImageManipulationRuntimeEditorPanel({
   restoredSession,
 }: ImageManipulationRuntimeEditorPanelProps): JSX.Element {
   const draft = context.snapshot?.draft;
+  const sessionId = context.snapshot?.activeSessionId;
   const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
     === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
   const studioShell = useMemo(() => new StudioShellService(), []);
@@ -680,6 +737,10 @@ export function ImageManipulationRuntimeEditorPanel({
   const [isLoadingRecentImageAssets, setIsLoadingRecentImageAssets] = useState(false);
   const [recentImageAssetsError, setRecentImageAssetsError] = useState<string | undefined>();
   const [isReusingRecentImageAssetId, setIsReusingRecentImageAssetId] = useState<string | undefined>();
+  const [recentSystems, setRecentSystems] = useState<ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>>([]);
+  const [isLoadingRecentSystems, setIsLoadingRecentSystems] = useState(false);
+  const [recentSystemsError, setRecentSystemsError] = useState<string | undefined>();
+  const [isReopeningRecentSystemId, setIsReopeningRecentSystemId] = useState<string | undefined>();
   const [uploadProgressStage, setUploadProgressStage] = useState<UploadProgressStage>("idle");
   const [imageLibrarySearch, setImageLibrarySearch] = useState("");
   const [appliedImageLibrarySearch, setAppliedImageLibrarySearch] = useState("");
@@ -697,6 +758,8 @@ export function ImageManipulationRuntimeEditorPanel({
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const [isLoadingRunHistory, setIsLoadingRunHistory] = useState(false);
   const [runHistoryError, setRunHistoryError] = useState<string | undefined>();
+  const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | undefined>();
+  const [isContinuingFromRunId, setIsContinuingFromRunId] = useState<string | undefined>();
   const [isResultQuickActionPending, setIsResultQuickActionPending] = useState<"source" | "reference" | undefined>();
   const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
@@ -968,6 +1031,31 @@ export function ImageManipulationRuntimeEditorPanel({
     });
   };
 
+  const loadRecentSystems = (): Promise<ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>> => {
+    if (!sessionToken) {
+      setRecentSystems(Object.freeze([]));
+      setRecentSystemsError(undefined);
+      return Promise.resolve(Object.freeze([]));
+    }
+    setIsLoadingRecentSystems(true);
+    setRecentSystemsError(undefined);
+    return studioShell.listImageSystemDefinitions({
+      workflowIds: runtimeWorkflowAssetId ? [runtimeWorkflowAssetId] : undefined,
+      limit: 8,
+      offset: 0,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        setRecentSystems(Object.freeze([]));
+        setRecentSystemsError(response.error?.message ?? "We couldn't load your recent systems.");
+        return Object.freeze([]);
+      }
+      setRecentSystems(response.data.items);
+      return response.data.items;
+    }).finally(() => {
+      setIsLoadingRecentSystems(false);
+    });
+  };
+
   const loadImageLibrary = (options?: {
     readonly append?: boolean;
     readonly search?: string;
@@ -1228,6 +1316,10 @@ export function ImageManipulationRuntimeEditorPanel({
   }, [actorUserIdentityId, workspaceId, sessionToken]);
 
   useEffect(() => {
+    void loadRecentSystems();
+  }, [sessionToken, runtimeWorkflowAssetId]);
+
+  useEffect(() => {
     void loadImageLibrary({
       search: appliedImageLibrarySearch,
       offset: 0,
@@ -1237,6 +1329,15 @@ export function ImageManipulationRuntimeEditorPanel({
   useEffect(() => {
     void refreshExecutionReadiness();
   }, [runtimeWorkflowAssetId, sessionToken]);
+
+  useEffect(() => {
+    if (!selectedHistoryRunId) {
+      return;
+    }
+    if (!runHistory.some((entry) => entry.runId === selectedHistoryRunId)) {
+      setSelectedHistoryRunId(undefined);
+    }
+  }, [runHistory, selectedHistoryRunId]);
 
   useEffect(() => {
     if (activeRunId) {
@@ -1431,28 +1532,29 @@ export function ImageManipulationRuntimeEditorPanel({
         : "ui-badge ui-badge--neutral";
   const quickActionDisabled = !selectedOutputItem || isResultQuickActionPending !== undefined;
 
-  const chainOutputForReuse = async (
-    targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">,
-  ): Promise<void> => {
-    if (!selectedOutputItem || !draft?.draftId) {
+  const chainRecordForReuse = async (input: {
+    readonly sourceRecordId: string;
+    readonly targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">;
+  }): Promise<void> => {
+    if (!draft?.draftId) {
       return;
     }
     setStatusMessage(undefined);
-    setIsResultQuickActionPending(targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
+    setIsResultQuickActionPending(input.targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
     try {
       const chained = await studioShell.chainReferenceImageDatasetItemToInput({
         studioId: context.studioId,
         draftId: draft.draftId,
         sourceDatasetBindingId: "output-image-dataset",
-        sourceRecordId: selectedOutputItem.image.recordId,
-        targetDatasetBindingId,
+        sourceRecordId: input.sourceRecordId,
+        targetDatasetBindingId: input.targetDatasetBindingId,
       });
       if (!chained.ok || !chained.data) {
         setStatusMessage(chained.error?.message ?? "Couldn't reuse this result.");
         return;
       }
 
-      if (targetDatasetBindingId === "input-image-dataset") {
+      if (input.targetDatasetBindingId === "input-image-dataset") {
         setDatasetInstanceId(chained.data.target.datasetInstanceId);
         setSelection((current) => setRoleSelection(current, {
           role: "source",
@@ -1468,19 +1570,143 @@ export function ImageManipulationRuntimeEditorPanel({
       }
 
       await loadCollections({
-        preferredSourceRecordId: targetDatasetBindingId === "input-image-dataset"
+        preferredSourceRecordId: input.targetDatasetBindingId === "input-image-dataset"
           ? chained.data.target.recordId
           : undefined,
-        preferredReferenceRecordId: targetDatasetBindingId === "reference-image-dataset"
+        preferredReferenceRecordId: input.targetDatasetBindingId === "reference-image-dataset"
           ? chained.data.target.recordId
           : undefined,
       });
 
-      setStatusMessage(targetDatasetBindingId === "input-image-dataset"
+      setStatusMessage(input.targetDatasetBindingId === "input-image-dataset"
         ? "Result prepared as your next source photo."
         : "Result prepared as your face reference photo.");
     } finally {
       setIsResultQuickActionPending(undefined);
+    }
+  };
+
+  const chainOutputForReuse = async (
+    targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">,
+  ): Promise<void> => {
+    if (!selectedOutputItem || !draft?.draftId) {
+      return;
+    }
+    await chainRecordForReuse({
+      sourceRecordId: selectedOutputItem.image.recordId,
+      targetDatasetBindingId,
+    });
+  };
+
+  const continueFromRunHistory = async (run: ImageRunHistoryRecord): Promise<void> => {
+    const runId = run.runId;
+    setSelectedHistoryRunId(runId);
+    setIsContinuingFromRunId(runId);
+    try {
+      const snapshot = resolveRunParameterSnapshot({
+        run,
+        fallbackPresetId: presetId,
+      });
+      if (snapshot) {
+        setPresetId(snapshot.presetId);
+        setConfig(snapshot.config);
+      }
+
+      const outputRecordId = resolveRunOutputRecordId(run);
+      if (outputRecordId) {
+        await loadCollections({
+          preferredOutputRecordId: outputRecordId,
+        });
+        setSelection((current) => setRoleSelection(current, {
+          role: "output",
+          recordId: outputRecordId,
+          syncPreviewRole: true,
+        }));
+        setStatusMessage(`Loaded run ${runId} output for review and continuation.`);
+        return;
+      }
+
+      const sourceRecordId = resolveRunSourceRecordId(run);
+      if (sourceRecordId) {
+        await loadCollections({
+          preferredSourceRecordId: sourceRecordId,
+        });
+        setSelection((current) => setRoleSelection(current, {
+          role: "source",
+          recordId: sourceRecordId,
+          syncPreviewRole: true,
+        }));
+        setStatusMessage(`Loaded run ${runId} context. Add changes, then create a new image.`);
+        return;
+      }
+
+      setStatusMessage(`Run ${runId} has no reusable records yet, but settings were restored.`);
+    } finally {
+      setIsContinuingFromRunId(undefined);
+    }
+  };
+
+  const reopenRecentSystem = async (systemId: string): Promise<void> => {
+    if (!draft?.draftId || !sessionId) {
+      setStatusMessage("Open a draft session before reopening saved systems.");
+      return;
+    }
+    setIsReopeningRecentSystemId(systemId);
+    try {
+      const response = await studioShell.getImageSystemDefinition({ systemId });
+      if (!response.ok || !response.data) {
+        setStatusMessage(response.error?.message ?? "Couldn't reopen this saved system.");
+        return;
+      }
+      const reopened = response.data;
+      const summaryRecord = reopened.parameterBaseline as Readonly<Record<string, unknown>>;
+      const configuredPresetId = summaryRecord["presetId"];
+      const resolvedPresetId = typeof configuredPresetId === "string" && configuredPresetId.trim().length > 0
+        ? configuredPresetId.trim()
+        : presetId;
+      const resolvedConfigInput = "imageConfig" in summaryRecord
+        ? summaryRecord["imageConfig"]
+        : summaryRecord;
+      const resolvedConfig = resolveComfyImageManipulationConfig(resolvedConfigInput, {
+        presetId: resolvedPresetId,
+      });
+
+      const workflowBindingId = hydratedRuntime?.resolvedWorkflowTemplate.bindingId
+        ?? ImageManipulationSystemTemplate.compositionBindings.workflowTemplateBindingId;
+
+      const modifyResponse = await studioShell.modifySystemDefinition({
+        studioId: context.studioId,
+        sessionId,
+        draftId: draft.draftId,
+        workflowBindings: [Object.freeze({
+          bindingId: workflowBindingId,
+          workflowAssetId: reopened.workflowId,
+          workflowVersionId: reopened.workflowVersionTag,
+        })],
+        runtimeStatePatch: Object.freeze({
+          imageSystemDefinitionId: reopened.systemId,
+          imageWorkflowParameterValuesByWorkflowId: Object.freeze({
+            [reopened.workflowId]: reopened.parameterBaseline,
+          }),
+        }),
+      });
+      if (!modifyResponse.ok) {
+        setStatusMessage("Saved system loaded, but draft synchronization failed.");
+        return;
+      }
+
+      setPresetId(resolvedPresetId);
+      setConfig(resolvedConfig);
+      await Promise.all([
+        loadCollections({ hydration: true }),
+        loadRunHistory(),
+      ]);
+      setStatusMessage(`Reopened '${reopened.title}'.`);
+      void context.operations.refresh();
+    } catch (error) {
+      setStatusMessage(error instanceof Error ? error.message : "Couldn't reopen this saved system.");
+    } finally {
+      setIsReopeningRecentSystemId(undefined);
     }
   };
 
@@ -1792,6 +2018,56 @@ export function ImageManipulationRuntimeEditorPanel({
                       </section>
                     ))}
                   </div>
+                ) : null}
+              </section>
+            ) : null}
+            {sessionToken ? (
+              <section className="ui-stack ui-stack--2xs" data-testid="image-recent-work-panel">
+                <p className="ui-text-small ui-text-secondary">Recent work</p>
+                {isLoadingRecentSystems ? (
+                  <ImageStatusNotice
+                    title="Loading recent systems"
+                    message="Saved setups will appear here for quick continuation."
+                  />
+                ) : null}
+                {!isLoadingRecentSystems && recentSystemsError ? (
+                  <ImageStatusNotice
+                    title="Recent systems unavailable"
+                    message={recentSystemsError}
+                    tone="warning"
+                  />
+                ) : null}
+                {!isLoadingRecentSystems && !recentSystemsError && recentSystems.length < 1 ? (
+                  <ImageStatusNotice
+                    title="No saved systems yet"
+                    message="Save this setup to reopen it later from recent work."
+                  />
+                ) : null}
+                {!isLoadingRecentSystems && !recentSystemsError && recentSystems.length > 0 ? (
+                  <ul className="ui-text-small ui-text-secondary ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+                    {recentSystems.map((system) => (
+                      <li key={system.systemId}>
+                        <div className="ui-stack ui-stack--2xs">
+                          <span>{system.title}</span>
+                          <span className="ui-text-secondary">
+                            {system.readinessSummary} - {toFriendlyTimestamp(system.updatedAt) ?? system.updatedAt}
+                          </span>
+                          <div className="ui-row ui-row--xs">
+                            <button
+                              type="button"
+                              className="ui-button ui-button--ghost ui-button--sm"
+                              disabled={Boolean(isReopeningRecentSystemId)}
+                              onClick={() => {
+                                void reopenRecentSystem(system.systemId);
+                              }}
+                            >
+                              {isReopeningRecentSystemId === system.systemId ? "Reopening..." : "Reopen setup"}
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
                 ) : null}
               </section>
             ) : null}
@@ -2483,6 +2759,89 @@ export function ImageManipulationRuntimeEditorPanel({
                 </details>
               </div>
             )}
+            <section className="ui-stack ui-stack--2xs" data-testid="image-run-history-panel">
+              <div className="ui-image-surface__header">
+                <h4 className="ui-image-surface__title">Run history</h4>
+                <span className="ui-text-small ui-text-secondary">{runHistory.length} runs</span>
+              </div>
+              {isLoadingRunHistory ? (
+                <ImageStatusNotice
+                  title="Loading run history"
+                  message="Fetching authoritative run records for this setup."
+                />
+              ) : null}
+              {!isLoadingRunHistory && runHistory.length < 1 ? (
+                <ImageStatusNotice
+                  title="No run history yet"
+                  message="Create an image to build continuation history."
+                />
+              ) : null}
+              {!isLoadingRunHistory && runHistory.length > 0 ? (
+                <ul className="ui-text-small ui-text-secondary ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+                  {runHistory.map((run) => {
+                    const outputRecordId = resolveRunOutputRecordId(run);
+                    const canUseRunOutput = Boolean(outputRecordId);
+                    const runStatusTone = resolveHistoryRunBadgeTone(run.status);
+                    const runBadgeClassName = runStatusTone === "success"
+                      ? "ui-badge ui-badge--success"
+                      : runStatusTone === "warning"
+                        ? "ui-badge ui-badge--warning"
+                        : runStatusTone === "danger"
+                          ? "ui-badge ui-badge--danger"
+                          : "ui-badge ui-badge--neutral";
+                    return (
+                      <li key={run.runId}>
+                        <div className="ui-stack ui-stack--2xs">
+                          <div className="ui-row ui-row--xs ui-row--middle">
+                            <strong>{run.runId}</strong>
+                            <span className={runBadgeClassName}>{run.status}</span>
+                          </div>
+                          <span className="ui-text-secondary">
+                            {toFriendlyTimestamp(run.timestamps.updatedAt) ?? run.timestamps.updatedAt}
+                            {" - "}
+                            {resolveRunOutputCount(run)} output{resolveRunOutputCount(run) === 1 ? "" : "s"}
+                          </span>
+                          <span className="ui-text-secondary">{resolveRunHistorySummary(run)}</span>
+                          <div className="ui-row ui-row--xs">
+                            <button
+                              type="button"
+                              className={`ui-button ui-button--sm ${selectedHistoryRunId === run.runId ? "ui-button--primary" : "ui-button--ghost"}`}
+                              disabled={Boolean(isContinuingFromRunId)}
+                              onClick={() => {
+                                void continueFromRunHistory(run);
+                              }}
+                            >
+                              {isContinuingFromRunId === run.runId
+                                ? "Loading..."
+                                : selectedHistoryRunId === run.runId
+                                  ? "Loaded"
+                                  : "Open context"}
+                            </button>
+                            <button
+                              type="button"
+                              className="ui-button ui-button--ghost ui-button--sm"
+                              disabled={!canUseRunOutput || Boolean(isContinuingFromRunId)}
+                              onClick={() => {
+                                if (!outputRecordId) {
+                                  return;
+                                }
+                                setSelectedHistoryRunId(run.runId);
+                                void chainRecordForReuse({
+                                  sourceRecordId: outputRecordId,
+                                  targetDatasetBindingId: "input-image-dataset",
+                                });
+                              }}
+                            >
+                              Continue from output
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+            </section>
             {runHistoryError ? (
               <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>{runHistoryError}</p>
             ) : null}

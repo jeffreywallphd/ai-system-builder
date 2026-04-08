@@ -178,3 +178,31 @@ Architecture posture preserved:
 - run linkage for review badges/details resolves from authoritative run history records (`listReferenceImageRunHistory`),
 - no backend-local filesystem assumptions are introduced in result review or reuse actions.
 
+## Epic 7.3 Story 7.3.3 implementation update
+
+Story 7.3.3 adds continuity-focused recent-work and run-history continuation behavior so users can resume prior image work without restarting setup.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+Recent-work continuity behavior:
+
+- Runtime editor now renders a `Recent work` panel driven by authoritative saved-system listing (`listImageSystemDefinitions`).
+- Entries expose compact summaries (title/readiness/updated timestamp) and a `Reopen setup` action.
+- Reopen now loads authoritative system detail (`getImageSystemDefinition`) and applies it back to the active draft via authoritative modification (`modifySystemDefinition`) before refreshing runtime collections/history.
+
+Run-history continuity behavior:
+
+- Runtime editor now renders a dedicated `Run history` list from authoritative run-history records (`listReferenceImageRunHistory`).
+- Each entry shows status, timestamp, output count, and summarized instruction context.
+- `Open context` restores prior run context in-panel (selection focus + parameter snapshot when available).
+- `Continue from output` chains run output back into input through authoritative dataset chaining (`chainReferenceImageDatasetItemToInput`), preserving lineage posture.
+
+Architecture posture preserved:
+
+- no local-only run/system cache assumptions are used for recent-work or run-history panels,
+- continuation/reopen actions remain API-authoritative and draft-safe,
+- backend filesystem/path shortcuts remain prohibited.
+
