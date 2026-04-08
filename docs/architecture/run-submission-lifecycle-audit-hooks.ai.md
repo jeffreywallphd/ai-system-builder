@@ -41,3 +41,22 @@ Story 18.1.7 extends this slice by faning these events into the canonical author
 - `src/application/runs/tests/AuthoritativeRunCreationUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/PlatformRunSubmissionAuditSink.test.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/application/runs/tests/HandleRunDispatchResultUseCase.test.ts`
+- `src/application/runs/tests/IngestRunExecutionUpdateUseCase.test.ts`
+
+## Story 4.4.3 lifecycle extension
+- Extends audit integration to image run lifecycle actions beyond initial submission hooks.
+- Additional implementation seams:
+  - `src/application/runs/use-cases/HandleRunDispatchResultUseCase.ts`
+  - `src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts`
+  - `src/application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase.ts`
+  - `src/hosts/server/IdentityServerHost.ts`
+- Additional audited actions:
+  - `run.dispatch.initiated`
+  - `run.lifecycle.transitioned` (including terminal completion/failure/cancelled updates)
+  - `run.execution-update.ingested`
+  - `run.cancellation.requested`
+- Redaction posture:
+  - user-safe lifecycle summaries only in shared payload
+  - bounded operational fields in admin-only payloads under centralized authoritative recorder sanitization
+  - no raw prompt/runtime payload bodies or backend internal blobs

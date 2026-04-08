@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import {
   PlatformAuditEventKinds,
   type PlatformAuditEventRecord,
@@ -31,6 +32,7 @@ import {
   type RunExecutionState,
   type RunLifecycleState,
 } from "@domain/runs/RunDomain";
+import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
 import {
   mapPlatformRunRecordToCanonicalRun,
   toRunDetailFromPlatformRecord,
@@ -110,6 +112,7 @@ interface IngestRunExecutionUpdateUseCaseDependencies {
   readonly idGenerator?: {
     nextId(prefix: string): string;
   };
+  readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
 }
 
 interface ExecutionUpdateSynchronizationResult {
@@ -236,6 +239,7 @@ export class IngestRunExecutionUpdateUseCase {
         userIdentityId: saved.record.userIdentityId,
         actorId: senderNodeId,
         occurredAt,
+        correlationId: normalizeOptional(request.update.actorId),
         fromState: current.state,
         toState,
         hadProgress: Boolean(request.update.progress),
@@ -488,6 +492,7 @@ export class IngestRunExecutionUpdateUseCase {
     readonly hadHeartbeat: boolean;
     readonly hadInternalDiagnostics: boolean;
     readonly idempotencyKey?: string;
+    readonly correlationId?: string;
   }): Promise<void> {
     const event: PlatformAuditEventRecord = Object.freeze({
       eventId: this.idGenerator.nextId("audit"),
@@ -514,6 +519,67 @@ export class IngestRunExecutionUpdateUseCase {
       actorId: input.actorId,
       occurredAt: input.occurredAt,
     });
+
+    if (!this.dependencies.authoritativeAuditRecorder) {
+      return;
+    }
+
+    const lifecycleChanged = input.fromState !== input.toState;
+    const action = lifecycleChanged ? "run.lifecycle.transitioned" : "run.execution-update.ingested";
+    const eventType = lifecycleChanged ? "run-lifecycle-transitioned" : "run-execution-update-ingested";
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:execution-update:${input.runId}:${input.occurredAt}`,
+        eventType,
+        action,
+        outcome: input.toState === RunLifecycleStates.failed
+          ? AuditEventOutcomes.failed
+          : AuditEventOutcomes.succeeded,
+        occurredAt: input.occurredAt,
+        actor: Object.freeze({
+          actorId: input.actorId,
+          actorKind: input.actorId.startsWith("user:")
+            ? AuditActorKinds.user
+            : AuditActorKinds.service,
+          actorUserIdentityId: input.actorId.startsWith("user:") ? input.actorId : undefined,
+          actorServiceId: input.actorId.startsWith("user:") ? undefined : input.actorId,
+        }),
+        scope: input.workspaceId
+          ? Object.freeze({
+            kind: AuditScopeKinds.workspace,
+            workspaceId: input.workspaceId,
+          })
+          : Object.freeze({
+            kind: AuditScopeKinds.global,
+          }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.runId,
+          resourceRef: input.runId.startsWith("run:") ? input.runId : `run:${input.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.workspaceId,
+        }),
+        correlationId: input.correlationId,
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            fromState: input.fromState,
+            toState: input.toState,
+            hadProgress: input.hadProgress,
+            hadHeartbeat: input.hadHeartbeat,
+            hadInternalDiagnostics: input.hadInternalDiagnostics,
+            isTerminalState: input.toState === RunLifecycleStates.completed
+              || input.toState === RunLifecycleStates.failed
+              || input.toState === RunLifecycleStates.cancelled,
+          }),
+          adminOnlyDetails: Object.freeze({
+            idempotencyKey: input.idempotencyKey,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail execution update ingestion.
+    }
   }
 }
 
