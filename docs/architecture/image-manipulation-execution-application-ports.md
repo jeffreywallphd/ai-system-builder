@@ -49,3 +49,9 @@ The application execution ports cover six responsibilities:
 ## Notes for future orchestration
 - The dispatch request shape includes translation metadata and run/workspace identity so future run orchestration can prepare once and dispatch to any backend adapter.
 - Progress/state/output contracts are normalized to support consistent run projections regardless of runtime provider.
+
+## Story 3.1.2 translation bridge
+- Translation request/response contracts that bridge Feature 2 authoritative workflow/system definitions into backend-executable internal payloads are defined in:
+  - `src/application/image-workflows/ports/ImageManipulationTranslationContracts.ts`
+- Architecture reference note:
+  - `docs/architecture/image-manipulation-translation-contracts.md`

@@ -38,3 +38,9 @@
 - Run orchestration use cases (dispatch, observe, cancel, finalize).
 - Image workflow/system services that need backend execution as a port.
 - Infrastructure adapters implementing ComfyUI or future execution providers.
+
+## Story 3.1.2 translation bridge
+- Feature 2 authoritative workflow/system definitions are translated through:
+  - `src/application/image-workflows/ports/ImageManipulationTranslationContracts.ts`
+- Translation contract architecture note:
+  - `docs/architecture/image-manipulation-translation-contracts.md`
