@@ -2,6 +2,12 @@ import {
   OfflineConnectivityStates,
   type OfflineConnectivitySurfaceStateDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
+import {
+  OfflineOperationalEventChannels,
+  OfflineOperationalEventTypes,
+  type IOfflineOperationalEventSink,
+  publishOfflineOperationalEventBestEffort,
+} from "@application/common/OfflineOperationalEventPorts";
 
 export const DesktopConnectivityReasonCodes = Object.freeze({
   online: "online",
@@ -54,6 +60,11 @@ export interface DesktopConnectivityProbePort {
 export interface DesktopConnectivityStateServiceOptions {
   readonly now?: () => Date;
   readonly initialState?: OfflineConnectivitySurfaceStateDto;
+  readonly eventSink?: IOfflineOperationalEventSink;
+  readonly eventContext?: {
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  };
 }
 
 export interface DesktopConnectivityMonitorOptions {
@@ -75,6 +86,9 @@ const DEFAULT_MONITOR_INTERVAL_MS = 4_000;
 
 export class DesktopConnectivityStateService {
   private readonly now: () => Date;
+  private readonly eventSink: IOfflineOperationalEventSink | undefined;
+  private readonly eventWorkspaceId: string | undefined;
+  private readonly eventActorUserIdentityId: string | undefined;
   private readonly listeners = new Set<DesktopConnectivityListener>();
   private readonly evaluateFromPreviousState: (
     previous: DesktopConnectivityStateSnapshot,
@@ -89,6 +103,9 @@ export class DesktopConnectivityStateService {
 
   public constructor(options?: DesktopConnectivityStateServiceOptions) {
     this.now = options?.now ?? (() => new Date());
+    this.eventSink = options?.eventSink;
+    this.eventWorkspaceId = normalizeOptional(options?.eventContext?.workspaceId);
+    this.eventActorUserIdentityId = normalizeOptional(options?.eventContext?.actorUserIdentityId);
     this.state = options?.initialState
       ? this.toSnapshot(options.initialState)
       : this.toSnapshot(Object.freeze({
@@ -320,11 +337,46 @@ export class DesktopConnectivityStateService {
       return this.state;
     }
 
+    const previous = this.state;
     this.state = next;
+    this.publishConnectivityTransitionEvents(previous, next);
     for (const listener of this.listeners) {
       listener(next);
     }
     return next;
+  }
+
+  private publishConnectivityTransitionEvents(
+    previous: DesktopConnectivityStateSnapshot,
+    next: DesktopConnectivityStateSnapshot,
+  ): void {
+    const wasOffline = previous.localModeActive;
+    const isOffline = next.localModeActive;
+    if (wasOffline === isOffline) {
+      return;
+    }
+
+    const eventType = isOffline
+      ? OfflineOperationalEventTypes.offlineEntered
+      : OfflineOperationalEventTypes.offlineExited;
+    const summary = isOffline
+      ? "Desktop host entered offline local mode."
+      : "Desktop host exited offline local mode.";
+    void publishOfflineOperationalEventBestEffort(this.eventSink, Object.freeze({
+      channel: OfflineOperationalEventChannels.operational,
+      type: eventType,
+      occurredAt: next.lastChangedAt,
+      workspaceId: this.eventWorkspaceId,
+      actorUserIdentityId: this.eventActorUserIdentityId,
+      summary,
+      details: Object.freeze({
+        previousState: previous.state,
+        nextState: next.state,
+        reasonCode: next.reasonCode,
+        offlineModeIntent: next.offlineModeIntent,
+        canResynchronize: next.canResynchronize,
+      }),
+    }));
   }
 
   private toSnapshot(state: OfflineConnectivitySurfaceStateDto): DesktopConnectivityStateSnapshot {

@@ -12,11 +12,13 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - `src/application/common/OfflinePendingOperationPersistence.ts`
 - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- `src/application/common/OfflineOperationalEventPorts.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
 - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
@@ -51,6 +53,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Coordinator emits structured blocked replay metadata (reason code/message/dependency blockers) so UI/admin surfaces can expose why replay did not proceed.
 - Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
 - Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
+- Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
 
 ## Server-authoritative-only baseline
 

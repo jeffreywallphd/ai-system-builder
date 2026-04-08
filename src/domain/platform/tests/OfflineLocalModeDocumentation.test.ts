@@ -23,6 +23,18 @@ const syncContractsDocPath = path.join(
   "architecture",
   "offline-sync-shared-contracts.md",
 );
+const auditOperationalHooksDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "offline-local-mode-audit-operational-hooks.md",
+);
+const auditOperationalHooksAiDocPath = path.join(
+  repoRoot,
+  "docs",
+  "architecture",
+  "offline-local-mode-audit-operational-hooks.ai.md",
+);
 const contributorDocPath = path.join(repoRoot, "docs", "offline-local-mode-contributor-guide.md");
 const contributorAiDocPath = path.join(repoRoot, "docs", "offline-local-mode-contributor-guide.ai.md");
 const architectureReadmePath = path.join(repoRoot, "docs", "architecture", "README.md");
@@ -32,6 +44,8 @@ describe("offline local-mode documentation guidance", () => {
   it("keeps architecture and contributor offline docs checked in with AI companion docs", () => {
     expect(existsSync(architectureDocPath)).toBeTrue();
     expect(existsSync(architectureAiDocPath)).toBeTrue();
+    expect(existsSync(auditOperationalHooksDocPath)).toBeTrue();
+    expect(existsSync(auditOperationalHooksAiDocPath)).toBeTrue();
     expect(existsSync(contributorDocPath)).toBeTrue();
     expect(existsSync(contributorAiDocPath)).toBeTrue();
   });
@@ -70,15 +84,19 @@ describe("offline local-mode documentation guidance", () => {
 
     expect(architectureReadme).toContain("offline-local-mode-authority-boundaries.md");
     expect(architectureReadme).toContain("offline-sync-shared-contracts.md");
+    expect(architectureReadme).toContain("offline-local-mode-audit-operational-hooks.md");
     expect(architectureReadme).toContain("offline-local-mode-contributor-guide.md");
 
     expect(architectureReadmeAi).toContain("docs/architecture/offline-local-mode-authority-boundaries.md");
     expect(architectureReadmeAi).toContain("docs/architecture/offline-sync-shared-contracts.md");
+    expect(architectureReadmeAi).toContain("docs/architecture/offline-local-mode-audit-operational-hooks.md");
     expect(architectureReadmeAi).toContain("docs/offline-local-mode-contributor-guide.md");
   });
 
   it("keeps AI companion docs aligned to canonical offline docs", () => {
     const aiDoc = readFileSync(architectureAiDocPath, "utf8");
+    const hooksDoc = readFileSync(auditOperationalHooksDocPath, "utf8");
+    const hooksAiDoc = readFileSync(auditOperationalHooksAiDocPath, "utf8");
     const contributorAiDoc = readFileSync(contributorAiDocPath, "utf8");
     const syncDoc = readFileSync(syncContractsDocPath, "utf8");
 
@@ -87,6 +105,13 @@ describe("offline local-mode documentation guidance", () => {
 
     expect(contributorAiDoc).toContain("docs/offline-local-mode-contributor-guide.md");
     expect(contributorAiDoc).toContain("control-plane-client");
+
+    expect(hooksDoc).toContain("offline-entered");
+    expect(hooksDoc).toContain("replay-succeeded");
+    expect(hooksDoc).toContain("protected-local-execution-registered");
+    expect(hooksDoc).toContain("DesktopConnectivityStateService.ts");
+    expect(hooksAiDoc).toContain("docs/architecture/offline-local-mode-audit-operational-hooks.md");
+    expect(hooksAiDoc).toContain("OfflineOperationalEventPorts.ts");
 
     expect(syncDoc).toContain("OfflinePendingOperationEnvelopeDto");
     expect(syncDoc).toContain("OfflineConflictIndicatorDto");

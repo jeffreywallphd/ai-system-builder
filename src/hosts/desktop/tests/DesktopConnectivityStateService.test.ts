@@ -3,6 +3,20 @@ import {
   DesktopConnectivityReasonCodes,
   DesktopConnectivityStateService,
 } from "../DesktopConnectivityStateService";
+import {
+  OfflineOperationalEventTypes,
+  type IOfflineOperationalEventSink,
+} from "@application/common/OfflineOperationalEventPorts";
+
+class RecordingOfflineOperationalSink implements IOfflineOperationalEventSink {
+  public readonly events: Array<Parameters<IOfflineOperationalEventSink["recordOfflineOperationalEvent"]>[0]> = [];
+
+  public async recordOfflineOperationalEvent(
+    event: Parameters<IOfflineOperationalEventSink["recordOfflineOperationalEvent"]>[0],
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
 
 describe("DesktopConnectivityStateService", () => {
   it("transitions to connected when transport/session/trust prerequisites are satisfied", () => {
@@ -75,8 +89,14 @@ describe("DesktopConnectivityStateService", () => {
   });
 
   it("distinguishes deliberate offline mode from transport failures", () => {
+    const sink = new RecordingOfflineOperationalSink();
     const service = new DesktopConnectivityStateService({
       now: () => new Date("2026-04-07T12:00:00.000Z"),
+      eventSink: sink,
+      eventContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
     });
 
     service.observe({
@@ -111,5 +131,13 @@ describe("DesktopConnectivityStateService", () => {
       observedAt: "2026-04-07T12:00:04.000Z",
     });
     expect(recovered.state).toBe("connected");
+    expect(sink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.offlineEntered,
+      OfflineOperationalEventTypes.offlineExited,
+    ]);
+    expect(sink.events[0]).toMatchObject({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+    });
   });
 });
