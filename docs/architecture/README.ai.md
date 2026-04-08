@@ -209,6 +209,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 16 / Epic 16.1 Story 16.1.8 end-to-end authoritative run-submission pipeline guardrails, extension points, and prohibited shortcuts: `docs/architecture/run-submission-pipeline-extension-guardrails.md`
 - Feature 16 / Epic 16.1 Story 16.1.8 contributor workflow and extension checklist for run-submission changes: `docs/run-submission-contributor-guide.md`
 - Feature 17 / Epic 17.2 Story 17.2.8 contributor workflow for scheduler policy, queue reservations/arbitration, dispatch, execution-update, and finalization extensions: `docs/run-orchestration-contributor-guide.md`
+- Feature 1 image-asset ingestion completion baseline, readiness verification, explicit limits, and Feature 2 prerequisites: `docs/architecture/image-asset-feature-1-final-baseline.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

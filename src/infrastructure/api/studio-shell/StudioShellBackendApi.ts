@@ -1321,7 +1321,11 @@ export class StudioShellBackendApi {
         throw new StudioShellInvalidRequestError("Uploaded file name is required.");
       }
       const sourceImageAssetId = request.sourceImageAssetId?.trim() || undefined;
-      if (sourceImageAssetId && !sourceImageAssetId.startsWith("asset:")) {
+      if (
+        sourceImageAssetId
+        && !sourceImageAssetId.startsWith("asset:")
+        && !sourceImageAssetId.startsWith("image-asset:")
+      ) {
         throw new StudioShellInvalidRequestError("sourceImageAssetId must be a logical asset identifier.");
       }
       const payload = this.decodeBase64Payload(request.payloadBase64);
@@ -1352,7 +1356,7 @@ export class StudioShellBackendApi {
         provenance: {
           sourceType: "upload",
           sourceReference: sourceImageAssetId
-            ? `image-asset:${sourceImageAssetId}`
+            ? sourceImageAssetId
             : `upload:${datasetBindingId}:${draft.draftId}:${fileName}`,
           sourceSystemId: runtimeSystemId,
           ingestedBy: "studio-shell-ui",
