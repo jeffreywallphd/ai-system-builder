@@ -50,3 +50,9 @@
   - `src/application/image-workflows/ports/ImageManipulationExecutionStatusContracts.ts`
 - Architecture note:
   - `docs/architecture/image-manipulation-execution-status-contracts.md`
+
+## Story 3.1.4 output discovery and collection contracts
+- Canonical output-discovery and collected-result contracts are defined in:
+  - `src/application/image-workflows/ports/ImageManipulationOutputDiscoveryContracts.ts`
+- Architecture note:
+  - `docs/architecture/image-manipulation-output-discovery-and-collection-contracts.md`
