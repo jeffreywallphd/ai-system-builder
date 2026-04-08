@@ -11,6 +11,12 @@ import {
 import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
 import {
+  ImageAssetAuditEventTypes,
+  ImageAssetAuditOutcomes,
+  publishImageAssetAuditEventBestEffort,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
+import {
   ImageAssetStorageAccessPurposes,
   ImageAssetStorageErrorCodes,
   ImageAssetStorageLifecycleDeleteReasons,
@@ -30,6 +36,7 @@ export interface FinalizeImageAssetUploadUseCaseDependencies {
   readonly imageAssetRepository: IImageAssetRepository;
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
+  readonly auditSink?: ImageAssetAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -72,6 +79,12 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.accessDenied,
         "Image asset upload finalization requires active workspace membership.",
@@ -82,6 +95,12 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       includeDeleted: true,
     });
     if (!existing || existing.workspaceId !== request.workspaceId) {
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: ImageAssetUploadFinalizationErrorCodes.notFound,
+      });
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.notFound,
         "Image asset was not found for the workspace.",
@@ -89,6 +108,13 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
     }
 
     if (existing.storageInstanceId !== request.storageReference.storageInstanceId) {
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        imageAsset: existing,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "storage-instance-mismatch",
+      });
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.invalidRequest,
         "storageReference.storageInstanceId does not match image asset storageInstanceId.",
@@ -96,6 +122,13 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
     }
 
     if (existing.lifecycle.status !== ImageAssetStatuses.ingesting) {
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        imageAsset: existing,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: ImageAssetUploadFinalizationErrorCodes.invalidState,
+      });
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.invalidState,
         `Image asset '${existing.assetId}' is '${existing.lifecycle.status}' and cannot be finalized from upload pending state.`,
@@ -137,6 +170,17 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
           objectVersionId: request.storageReference.objectVersionId,
         },
       );
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        imageAsset: saved.imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          storageInstanceId: request.storageReference.storageInstanceId,
+          finalizedSizeBytes: observed.sizeBytes,
+          fingerprintAlgorithm: saved.imageAsset.fingerprint.algorithm,
+        }),
+      });
 
       return {
         ok: true,
@@ -154,8 +198,18 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
     } catch (error) {
       const failureReason = mapFailureReason(error);
       const cleanup = await this.failWithCleanup(existing, request, occurredAt, failureReason);
-
       const code = mapFailureCode(error);
+      await this.publishFinalizationAuditEvent({
+        request,
+        occurredAt,
+        imageAsset: existing,
+        outcome: code === ImageAssetUploadFinalizationErrorCodes.internal
+          ? ImageAssetAuditOutcomes.failed
+          : ImageAssetAuditOutcomes.rejected,
+        reasonCode: failureReason,
+        details: cleanup,
+      });
+
       return this.failure(
         code,
         error instanceof Error ? error.message : "Image asset upload finalization failed.",
@@ -372,6 +426,38 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
         details,
       }),
     };
+  }
+
+  private async publishFinalizationAuditEvent(input: {
+    readonly request: FinalizeImageAssetUploadRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof ImageAssetAuditOutcomes[keyof typeof ImageAssetAuditOutcomes];
+    readonly imageAsset?: ImageAsset;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishImageAssetAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ImageAssetAuditEventTypes.uploadFinalized,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: input.request.operationKey,
+      outcome: input.outcome,
+      asset: Object.freeze({
+        assetId: input.request.assetId,
+        storageInstanceId: input.imageAsset?.storageInstanceId ?? input.request.storageReference.storageInstanceId,
+        ownerUserId: input.imageAsset?.ownerUserId,
+        visibility: input.imageAsset?.visibility,
+        originKind: input.imageAsset?.originKind,
+        lifecycleStatus: input.imageAsset?.lifecycle.status,
+        mediaType: input.imageAsset?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

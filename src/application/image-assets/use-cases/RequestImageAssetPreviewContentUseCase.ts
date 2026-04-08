@@ -13,6 +13,12 @@ import {
 } from "@shared/contracts/assets/ImageAssetAuthorizationContracts";
 import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
 import {
+  ImageAssetAuditEventTypes,
+  ImageAssetAuditOutcomes,
+  publishImageAssetAuditEventBestEffort,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
+import {
   ImageAssetStorageAccessPurposes,
   ImageAssetStorageObjectAreas,
   isImageAssetStorageError,
@@ -36,6 +42,7 @@ export interface RequestImageAssetPreviewContentUseCaseDependencies {
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly auditSink?: ImageAssetAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -72,6 +79,12 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.accessDenied,
         "Image asset preview access requires active workspace membership.",
@@ -90,6 +103,13 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
 
     const allowed = await this.canRequestPreview(imageAsset, request.actorUserId, occurredAt, authorization.isWorkspaceAdmin);
     if (!allowed) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
@@ -97,6 +117,16 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
     }
 
     if (imageAsset.lifecycle.status === ImageAssetStatuses.ingesting || imageAsset.lifecycle.status === ImageAssetStatuses.failed) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          availabilityStatus: ImageAssetPreviewAvailabilityStatuses.pendingGeneration,
+          resolvedFrom: "derived-preview",
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -112,6 +142,16 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
 
     const preferredMediaTypes = request.preferredMediaTypes ?? [];
     if (preferredMediaTypes.length > 0 && !preferredMediaTypes.includes(imageAsset.mediaType)) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          availabilityStatus: ImageAssetPreviewAvailabilityStatuses.pendingGeneration,
+          resolvedFrom: "derived-preview",
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -127,6 +167,16 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
 
     const reference = await this.dependencies.imageAssetRepository.getImageAssetOriginalObjectReference(imageAsset.assetId);
     if (!reference) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          availabilityStatus: ImageAssetPreviewAvailabilityStatuses.unavailable,
+          resolvedFrom: "original-fallback",
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -163,6 +213,18 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
         expiresInSeconds,
         occurredAt,
       });
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          availabilityStatus: ImageAssetPreviewAvailabilityStatuses.available,
+          resolvedFrom: "original-fallback",
+          expiresAt: access.expiresAt,
+          requestedExpirySeconds: expiresInSeconds,
+        }),
+      });
 
       return {
         ok: true,
@@ -181,11 +243,25 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       };
     } catch (error) {
       if (isImageAssetStorageError(error)) {
+        await this.publishPreviewRequestAuditEvent({
+          request,
+          occurredAt,
+          imageAsset,
+          outcome: ImageAssetAuditOutcomes.rejected,
+          reasonCode: "preview-content-unavailable",
+        });
         return this.failure(
           ImageAssetPreviewContentReadErrorCodes.contentUnavailable,
           "Image asset preview is not currently available.",
         );
       }
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.failed,
+        reasonCode: "preview-request-failed",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset preview request failed.",
@@ -283,6 +359,39 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
         details,
       }),
     };
+  }
+
+  private async publishPreviewRequestAuditEvent(input: {
+    readonly request: RequestImageAssetPreviewContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof ImageAssetAuditOutcomes[keyof typeof ImageAssetAuditOutcomes];
+    readonly imageAsset?: ImageAsset;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishImageAssetAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ImageAssetAuditEventTypes.previewAccessRequested,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      asset: Object.freeze({
+        assetId: input.request.assetId,
+        storageInstanceId: input.imageAsset?.storageInstanceId,
+        ownerUserId: input.imageAsset?.ownerUserId,
+        visibility: input.imageAsset?.visibility,
+        originKind: input.imageAsset?.originKind,
+        lifecycleStatus: input.imageAsset?.lifecycle.status,
+        mediaType: input.imageAsset?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        representation: input.request.representation ?? "gallery",
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

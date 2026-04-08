@@ -13,6 +13,12 @@ import {
 } from "@shared/contracts/assets/ImageAssetAuthorizationContracts";
 import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
 import {
+  ImageAssetAuditEventTypes,
+  ImageAssetAuditOutcomes,
+  publishImageAssetAuditEventBestEffort,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
+import {
   ImageAssetStorageAccessPurposes,
   isImageAssetStorageError,
   type IImageAssetStoragePort,
@@ -31,6 +37,7 @@ export interface OpenImageAssetPreviewContentUseCaseDependencies {
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly auditSink?: ImageAssetAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -67,6 +74,12 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.accessDenied,
         "Image asset preview retrieval requires active workspace membership.",
@@ -92,6 +105,13 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
 
     const allowed = await this.canRequestPreview(imageAsset, request.actorUserId, occurredAt, authorization.isWorkspaceAdmin);
     if (!allowed) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
@@ -106,6 +126,13 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       occurredAt,
     });
     if (!claims || claims.purpose !== ImageAssetStorageAccessPurposes.inlinePreview) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "preview-token-invalid",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset preview was not found.",
@@ -119,6 +146,16 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
         actorUserId: request.actorUserId,
         purpose: ImageAssetStorageAccessPurposes.inlinePreview,
         reference: claims.reference,
+      });
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          responseSizeBytes: opened.sizeBytes,
+          storageInstanceId: claims.reference.storageInstanceId,
+        }),
       });
 
       return {
@@ -135,11 +172,25 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       };
     } catch (error) {
       if (isImageAssetStorageError(error)) {
+        await this.publishPreviewOpenAuditEvent({
+          request,
+          occurredAt,
+          imageAsset,
+          outcome: ImageAssetAuditOutcomes.rejected,
+          reasonCode: "preview-content-unavailable",
+        });
         return this.failure(
           ImageAssetPreviewContentReadErrorCodes.contentUnavailable,
           "Image asset preview is not currently available.",
         );
       }
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.failed,
+        reasonCode: "preview-open-failed",
+      });
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset preview retrieval failed.",
@@ -237,5 +288,37 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
         details,
       }),
     };
+  }
+
+  private async publishPreviewOpenAuditEvent(input: {
+    readonly request: OpenImageAssetPreviewContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof ImageAssetAuditOutcomes[keyof typeof ImageAssetAuditOutcomes];
+    readonly imageAsset?: ImageAsset;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishImageAssetAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ImageAssetAuditEventTypes.previewContentOpened,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      asset: Object.freeze({
+        assetId: input.request.assetId,
+        storageInstanceId: input.imageAsset?.storageInstanceId,
+        ownerUserId: input.imageAsset?.ownerUserId,
+        visibility: input.imageAsset?.visibility,
+        originKind: input.imageAsset?.originKind,
+        lifecycleStatus: input.imageAsset?.lifecycle.status,
+        mediaType: input.imageAsset?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }

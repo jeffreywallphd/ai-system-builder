@@ -28,6 +28,10 @@ import {
   OpenImageAssetPreviewContentUseCase,
   RequestImageAssetPreviewContentUseCase,
 } from "../use-cases";
+import {
+  type ImageAssetAuditEvent,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly assets = new Map<string, ImageAsset>();
@@ -182,6 +186,14 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   }
 }
 
+class RecordingImageAssetAuditSink implements ImageAssetAuditSink {
+  public readonly events: ImageAssetAuditEvent[] = [];
+
+  public async recordImageAssetEvent(event: ImageAssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createAvailableAsset(): ImageAsset {
   return createImageAsset({
     assetId: "image-asset:001",
@@ -212,6 +224,7 @@ describe("Image asset preview use cases", () => {
   it("issues preview access contracts using original-content fallback", async () => {
     const repository = new InMemoryImageAssetRepository();
     const storagePort = new InMemoryImageAssetStoragePort();
+    const auditSink = new RecordingImageAssetAuditSink();
     repository.assets.set("image-asset:001", createAvailableAsset());
     repository.originalReferences.set("image-asset:001", Object.freeze({
       storageInstanceId: "storage-alpha",
@@ -222,6 +235,7 @@ describe("Image asset preview use cases", () => {
       imageAssetRepository: repository,
       imageAssetStoragePort: storagePort,
       workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -239,6 +253,8 @@ describe("Image asset preview use cases", () => {
     expect(outcome.value.status).toBe("available");
     expect(outcome.value.resolvedFrom).toBe("original-fallback");
     expect(outcome.value.access?.previewToken).toBe("preview-token");
+    expect(auditSink.events.at(-1)?.type).toBe("image-asset-preview-access-requested");
+    expect(auditSink.events.at(-1)?.outcome).toBe("success");
   });
 
   it("returns pending-generation when preferred preview format is unavailable", async () => {
@@ -275,12 +291,14 @@ describe("Image asset preview use cases", () => {
   it("opens preview content streams through preview access handles", async () => {
     const repository = new InMemoryImageAssetRepository();
     const storagePort = new InMemoryImageAssetStoragePort();
+    const auditSink = new RecordingImageAssetAuditSink();
     repository.assets.set("image-asset:001", createAvailableAsset());
 
     const useCase = new OpenImageAssetPreviewContentUseCase({
       imageAssetRepository: repository,
       imageAssetStoragePort: storagePort,
       workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -301,6 +319,8 @@ describe("Image asset preview use cases", () => {
       chunks.push(...chunk);
     }
     expect(Buffer.from(chunks).toString("utf8")).toBe("hello");
+    expect(auditSink.events.at(-1)?.type).toBe("image-asset-preview-content-opened");
+    expect(auditSink.events.at(-1)?.outcome).toBe("success");
   });
 
   it("blocks preview stream open before storage access for inactive workspace membership", async () => {

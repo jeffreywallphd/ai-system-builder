@@ -13,6 +13,12 @@ import {
 } from "@shared/contracts/assets/ImageAssetAuthorizationContracts";
 import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
 import {
+  ImageAssetAuditEventTypes,
+  ImageAssetAuditOutcomes,
+  publishImageAssetAuditEventBestEffort,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
+import {
   ImageAssetStorageAccessPurposes,
   ImageAssetStorageErrorCodes,
   ImageAssetStorageObjectAreas,
@@ -33,6 +39,7 @@ export interface GetImageAssetOriginalContentUseCaseDependencies {
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly auditSink?: ImageAssetAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -69,6 +76,12 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
       occurredAt,
     );
     if (!authorization.isAuthorized) {
+      await this.publishOriginalContentAuditEvent({
+        request,
+        occurredAt,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         ImageAssetOriginalContentReadErrorCodes.accessDenied,
         "Image asset original-content retrieval requires active workspace membership.",
@@ -94,6 +107,13 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
 
     const allowed = await this.canReadOriginalContent(imageAsset, request.actorUserId, occurredAt, authorization.isWorkspaceAdmin);
     if (!allowed) {
+      await this.publishOriginalContentAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         ImageAssetOriginalContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
@@ -102,6 +122,13 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
 
     const reference = await this.dependencies.imageAssetRepository.getImageAssetOriginalObjectReference(imageAsset.assetId);
     if (!reference) {
+      await this.publishOriginalContentAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.rejected,
+        reasonCode: "original-reference-missing",
+      });
       return this.failure(
         ImageAssetOriginalContentReadErrorCodes.contentUnavailable,
         "Image asset original content is not currently available.",
@@ -128,6 +155,15 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
           area: ImageAssetStorageObjectAreas.original,
         },
       });
+      await this.publishOriginalContentAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.success,
+        details: Object.freeze({
+          responseSizeBytes: opened.sizeBytes,
+        }),
+      });
 
       return {
         ok: true,
@@ -144,18 +180,39 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
     } catch (error) {
       if (isImageAssetStorageError(error)) {
         if (error.code === ImageAssetStorageErrorCodes.notFound) {
+          await this.publishOriginalContentAuditEvent({
+            request,
+            occurredAt,
+            imageAsset,
+            outcome: ImageAssetAuditOutcomes.rejected,
+            reasonCode: "storage-content-not-found",
+          });
           return this.failure(
             ImageAssetOriginalContentReadErrorCodes.contentUnavailable,
             "Image asset original content is not currently available.",
           );
         }
         if (error.code === ImageAssetStorageErrorCodes.accessDenied) {
+          await this.publishOriginalContentAuditEvent({
+            request,
+            occurredAt,
+            imageAsset,
+            outcome: ImageAssetAuditOutcomes.rejected,
+            reasonCode: "storage-access-denied",
+          });
           return this.failure(
             ImageAssetOriginalContentReadErrorCodes.accessDenied,
             "Image asset original-content retrieval was denied by storage access policy.",
           );
         }
       }
+      await this.publishOriginalContentAuditEvent({
+        request,
+        occurredAt,
+        imageAsset,
+        outcome: ImageAssetAuditOutcomes.failed,
+        reasonCode: "original-content-open-failed",
+      });
       return this.failure(
         ImageAssetOriginalContentReadErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset original-content retrieval failed.",
@@ -253,5 +310,37 @@ export class GetImageAssetOriginalContentUseCase implements IGetImageAssetOrigin
         details,
       }),
     };
+  }
+
+  private async publishOriginalContentAuditEvent(input: {
+    readonly request: GetImageAssetOriginalContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof ImageAssetAuditOutcomes[keyof typeof ImageAssetAuditOutcomes];
+    readonly imageAsset?: ImageAsset;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishImageAssetAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ImageAssetAuditEventTypes.originalContentAccessed,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      asset: Object.freeze({
+        assetId: input.request.assetId,
+        storageInstanceId: input.imageAsset?.storageInstanceId,
+        ownerUserId: input.imageAsset?.ownerUserId,
+        visibility: input.imageAsset?.visibility,
+        originKind: input.imageAsset?.originKind,
+        lifecycleStatus: input.imageAsset?.lifecycle.status,
+        mediaType: input.imageAsset?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }

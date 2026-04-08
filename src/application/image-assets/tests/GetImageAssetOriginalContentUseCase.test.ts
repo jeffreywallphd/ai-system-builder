@@ -28,6 +28,10 @@ import {
   GetImageAssetOriginalContentUseCase,
   ImageAssetOriginalContentReadErrorCodes,
 } from "../use-cases";
+import {
+  type ImageAssetAuditEvent,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly assets = new Map<string, ImageAsset>();
@@ -169,6 +173,14 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   }
 }
 
+class RecordingImageAssetAuditSink implements ImageAssetAuditSink {
+  public readonly events: ImageAssetAuditEvent[] = [];
+
+  public async recordImageAssetEvent(event: ImageAssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createAvailableAsset(): ImageAsset {
   return createImageAsset({
     assetId: "image-asset:001",
@@ -199,6 +211,7 @@ describe("GetImageAssetOriginalContentUseCase", () => {
   it("retrieves original image content through the storage abstraction for authorized callers", async () => {
     const repository = new InMemoryImageAssetRepository();
     const storagePort = new InMemoryImageAssetStoragePort();
+    const auditSink = new RecordingImageAssetAuditSink();
     repository.assets.set("image-asset:001", createAvailableAsset());
     repository.originalReferences.set("image-asset:001", Object.freeze({
       storageInstanceId: "storage-alpha",
@@ -210,6 +223,7 @@ describe("GetImageAssetOriginalContentUseCase", () => {
       imageAssetRepository: repository,
       imageAssetStoragePort: storagePort,
       workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -230,11 +244,14 @@ describe("GetImageAssetOriginalContentUseCase", () => {
       chunks.push(...chunk);
     }
     expect(Buffer.from(chunks).toString("utf8")).toBe("hello");
+    expect(auditSink.events.at(-1)?.type).toBe("image-asset-original-content-accessed");
+    expect(auditSink.events.at(-1)?.outcome).toBe("success");
   });
 
   it("blocks retrieval before storage access for callers without active workspace membership", async () => {
     const repository = new InMemoryImageAssetRepository();
     const storagePort = new InMemoryImageAssetStoragePort();
+    const auditSink = new RecordingImageAssetAuditSink();
     repository.assets.set("image-asset:001", createAvailableAsset());
     repository.originalReferences.set("image-asset:001", Object.freeze({
       storageInstanceId: "storage-alpha",
@@ -247,6 +264,7 @@ describe("GetImageAssetOriginalContentUseCase", () => {
       workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository({
         isActive: false,
       }),
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -261,6 +279,8 @@ describe("GetImageAssetOriginalContentUseCase", () => {
     }
     expect(outcome.error.code).toBe(ImageAssetOriginalContentReadErrorCodes.accessDenied);
     expect(storagePort.openReadCallCount).toBe(0);
+    expect(auditSink.events.at(-1)?.type).toBe("image-asset-original-content-accessed");
+    expect(auditSink.events.at(-1)?.outcome).toBe("rejected");
   });
 
   it("returns content-unavailable when no persisted original-object reference is present", async () => {

@@ -40,6 +40,10 @@ import {
   ImageAssetCreationErrorCodes,
   InitiateImageAssetCreationUseCase,
 } from "../use-cases";
+import {
+  type ImageAssetAuditEvent,
+  type ImageAssetAuditSink,
+} from "../ports/ImageAssetAuditPort";
 
 class InMemoryImageAssetRepository implements IImageAssetRepository {
   public readonly records = new Map<string, ImageAsset>();
@@ -279,6 +283,14 @@ class AuthorizationPolicyDecisionEvaluator implements IAuthorizationPolicyDecisi
   }
 }
 
+class RecordingImageAssetAuditSink implements ImageAssetAuditSink {
+  public readonly events: ImageAssetAuditEvent[] = [];
+
+  public async recordImageAssetEvent(event: ImageAssetAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createStorage(input: {
   readonly id: string;
   readonly workspaceId?: string;
@@ -319,6 +331,7 @@ function buildFixture() {
   const storageInstanceRepository = new StorageInstanceRepository();
   const storagePolicyEvaluationPort = new StoragePolicyEvaluationPort();
   const authorizationPolicyDecisionEvaluator = new AuthorizationPolicyDecisionEvaluator();
+  const auditSink = new RecordingImageAssetAuditSink();
 
   const useCase = new InitiateImageAssetCreationUseCase({
     imageAssetRepository,
@@ -327,6 +340,7 @@ function buildFixture() {
     storageInstanceRepository,
     storagePolicyEvaluationPort,
     authorizationPolicyDecisionEvaluator,
+    auditSink,
     idGenerator: {
       nextAssetId: () => "image-asset:auto-1",
     },
@@ -343,6 +357,7 @@ function buildFixture() {
     storageInstanceRepository,
     storagePolicyEvaluationPort,
     authorizationPolicyDecisionEvaluator,
+    auditSink,
   };
 }
 
@@ -384,6 +399,8 @@ describe("InitiateImageAssetCreationUseCase", () => {
     expect(result.value.upload.status).toBe("upload-pending");
     expect(result.value.upload.reservation.reference.area).toBe("original");
     expect(fixture.imageAssetRepository.records.get("image-asset:001")?.assetId).toBe("image-asset:001");
+    expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-creation-initiated");
+    expect(fixture.auditSink.events.at(-1)?.outcome).toBe("success");
   });
 
   it("auto-selects an eligible storage instance when storageInstanceId is omitted", async () => {
@@ -478,6 +495,8 @@ describe("InitiateImageAssetCreationUseCase", () => {
         code: ImageAssetCreationErrorCodes.accessDenied,
       }),
     });
+    expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-creation-initiated");
+    expect(fixture.auditSink.events.at(-1)?.outcome).toBe("rejected");
   });
 
   it("rejects owner delegation for non-admin actors", async () => {
