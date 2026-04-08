@@ -166,6 +166,7 @@ Do not merge these responsibilities into one adapter or transport endpoint.
 - Queue and assignment-ready selection:
   - `src/application/runs/tests/SelectAssignmentReadyRunsUseCase.test.ts`
   - `src/application/runs/tests/RunNodeAssignmentEligibilityService.test.ts`
+  - `src/application/runs/tests/ProcessQueuedRunDispatchUseCase.integration.test.ts`
 - Node claim and dispatch preparation:
   - `src/application/runs/tests/ClaimRunForNodeDispatchPreparationUseCase.test.ts`
 - Command build and dispatch:

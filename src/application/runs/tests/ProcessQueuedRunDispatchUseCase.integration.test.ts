@@ -23,13 +23,34 @@ import { ClaimRunForNodeDispatchPreparationUseCase } from "@application/runs/use
 import { BuildAssignedRunExecutionCommandUseCase } from "@application/runs/use-cases/BuildAssignedRunExecutionCommandUseCase";
 import { DispatchAssignedRunExecutionUseCase } from "@application/runs/use-cases/DispatchAssignedRunExecutionUseCase";
 import { HandleRunDispatchResultUseCase } from "@application/runs/use-cases/HandleRunDispatchResultUseCase";
+import { IngestRunExecutionUpdateUseCase } from "@application/runs/use-cases/IngestRunExecutionUpdateUseCase";
 import { ProcessQueuedRunDispatchUseCase } from "@application/runs/use-cases/ProcessQueuedRunDispatchUseCase";
 import { RunLifecycleStates, RunSubmissionSources, type RunLifecycleState } from "@domain/runs/RunDomain";
+import {
+  createExecutionNodeRecord,
+  ExecutionNodeActivationStatuses,
+  ExecutionNodeBackendReadinessStates,
+  ExecutionNodeHealthStatuses,
+  ExecutionNodeTargetKinds,
+  type ExecutionNodeRecord,
+} from "@domain/nodes/ExecutionNodeDomain";
+import {
+  NodeApprovalStatuses,
+  NodeRoleCapabilities,
+  NodeTrustStates,
+  NodeTypes,
+  createNodeCapabilityProfile,
+} from "@domain/nodes/NodeTrustDomain";
 import { ImageRunExecutionNodeSelectionOutcomes } from "@application/nodes/ports/ExecutionNodeManagementPorts";
 import type {
+  ExecutionNodeListQuery,
+  IImageRunExecutionNodeSelectionServicePort,
   ImageRunExecutionNodeSelectionDecision,
   ImageRunExecutionNodeSelectionReason,
 } from "@application/nodes/ports/ExecutionNodeManagementPorts";
+import { ImageRunNodeEligibilityEvaluationService } from "@application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService";
+import { ImageRunExecutionNodeSelectionService } from "@application/nodes/use-cases/ImageRunExecutionNodeSelectionService";
+import { mapPlatformRunRecordToCanonicalRun } from "@application/runs/use-cases/RunCreationPersistenceMapper";
 
 class InMemoryRunRepository implements IAuthoritativeRunPersistenceRepository {
   private readonly runs = new Map<string, PlatformRunRecord>();
@@ -386,6 +407,88 @@ class StubImageRunNodeSelectionService {
   }
 }
 
+class InMemoryExecutionNodeRepository {
+  public readonly records = new Map<string, ExecutionNodeRecord>();
+
+  public async findExecutionNodeById(nodeId: string): Promise<ExecutionNodeRecord | undefined> {
+    return this.records.get(nodeId);
+  }
+
+  public async listExecutionNodes(query: ExecutionNodeListQuery): Promise<ReadonlyArray<ExecutionNodeRecord>> {
+    const nodeIds = query.nodeIds && query.nodeIds.length > 0
+      ? new Set(query.nodeIds)
+      : undefined;
+    const records = [...this.records.values()]
+      .filter((record) => !nodeIds || nodeIds.has(record.nodeId));
+    return Object.freeze(records);
+  }
+}
+
+class CapturingSelectionService implements Pick<IImageRunExecutionNodeSelectionServicePort, "selectExecutionNodeForRun"> {
+  public readonly decisionsByRunId = new Map<string, ImageRunExecutionNodeSelectionDecision>();
+
+  public constructor(
+    private readonly delegate: Pick<IImageRunExecutionNodeSelectionServicePort, "selectExecutionNodeForRun">,
+  ) {}
+
+  public async selectExecutionNodeForRun(input: Parameters<IImageRunExecutionNodeSelectionServicePort["selectExecutionNodeForRun"]>[0]) {
+    const decision = await this.delegate.selectExecutionNodeForRun(input);
+    this.decisionsByRunId.set(input.run.runId, decision);
+    return decision;
+  }
+}
+
+function createExecutionNode(input: {
+  readonly nodeId: string;
+  readonly backendFamily?: string;
+  readonly activationStatus?: ExecutionNodeRecord["activationStatus"];
+  readonly healthStatus?: ExecutionNodeRecord["healthStatus"];
+  readonly backendReadinessState?: "ready" | "degraded" | "unavailable" | "unknown";
+}): ExecutionNodeRecord {
+  return createExecutionNodeRecord({
+    nodeId: input.nodeId,
+    displayName: `Execution node ${input.nodeId}`,
+    nodeType: NodeTypes.compute,
+    capabilityProfile: createNodeCapabilityProfile({
+      enabledCapabilities: [
+        NodeRoleCapabilities.executor,
+        NodeRoleCapabilities.storageAccess,
+      ],
+      supportsRemoteScheduling: true,
+      maxConcurrentWorkloads: 4,
+    }),
+    backendFamilyCapabilities: [Object.freeze({
+      backendFamily: input.backendFamily ?? "comfyui",
+      supportedExecutionTargets: [ExecutionNodeTargetKinds.imageManipulation],
+      supportedOperationKinds: ["image-to-image"],
+      supportedInputKinds: ["source-image"],
+      supportedOutputKinds: ["generated-image"],
+      supportedTranslationContractVersions: ["1.0.0"],
+      executionReadiness: Object.freeze({
+        state: input.backendReadinessState ?? ExecutionNodeBackendReadinessStates.ready,
+        checkedAt: "2026-04-08T13:00:00.000Z",
+      }),
+    })],
+    approvalStatus: NodeApprovalStatuses.approved,
+    trustState: NodeTrustStates.trusted,
+    activationStatus: input.activationStatus ?? ExecutionNodeActivationStatuses.active,
+    healthStatus: input.healthStatus ?? ExecutionNodeHealthStatuses.ready,
+    availabilityOverride: Object.freeze({
+      mode: "enabled",
+      updatedAt: "2026-04-08T13:00:00.000Z",
+    }),
+    deploymentTags: ["region-east"],
+    endpoint: Object.freeze({
+      endpointRef: `node://${input.nodeId}`,
+    }),
+    certificateRef: `cert:${input.nodeId}`,
+    lastSeenAt: "2026-04-08T13:00:00.000Z",
+    metadata: {},
+    createdAt: "2026-04-08T13:00:00.000Z",
+    updatedAt: "2026-04-08T13:00:00.000Z",
+  });
+}
+
 function buildSubmissionCommand(occurredAt: string) {
   return Object.freeze({
     actor: Object.freeze({
@@ -711,6 +814,273 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
     expect(queueEntry?.lifecycleState).toBe("queued");
     expect(queueEntry?.claimToken).toBeUndefined();
     expect(queueEntry?.claimedBy).toBeUndefined();
+    const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
+    expect(attempts).toHaveLength(0);
+  });
+
+  it("falls back to a degraded eligible node, excludes unavailable/incompatible nodes, and preserves assignment lineage", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const idGenerator = new SequenceIdGenerator();
+    const nodeRepository = new InMemoryExecutionNodeRepository();
+    nodeRepository.records.set("node-unavailable", createExecutionNode({
+      nodeId: "node-unavailable",
+      activationStatus: ExecutionNodeActivationStatuses.unavailable,
+      healthStatus: ExecutionNodeHealthStatuses.unavailable,
+      backendReadinessState: ExecutionNodeBackendReadinessStates.unavailable,
+    }));
+    nodeRepository.records.set("node-incompatible", createExecutionNode({
+      nodeId: "node-incompatible",
+      backendFamily: "custom-runtime",
+    }));
+    nodeRepository.records.set("node-degraded", createExecutionNode({
+      nodeId: "node-degraded",
+      activationStatus: ExecutionNodeActivationStatuses.degraded,
+      healthStatus: ExecutionNodeHealthStatuses.degraded,
+      backendReadinessState: ExecutionNodeBackendReadinessStates.degraded,
+    }));
+
+    const createRun = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+    });
+    const created = await createRun.execute({
+      command: buildSubmissionCommand("2026-04-08T13:00:00.000Z"),
+    });
+
+    const selectReady = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:00:05.000Z"),
+    });
+    const claimForDispatch = new ClaimRunForNodeDispatchPreparationUseCase({
+      runRepository,
+      queueRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:00:06.000Z"),
+    });
+    const dispatchResultHandler = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:00:07.000Z"),
+    });
+    const dispatchAssigned = new DispatchAssignedRunExecutionUseCase({
+      commandBuilder: new BuildAssignedRunExecutionCommandUseCase({
+        runRepository,
+        queueRepository,
+      }),
+      dispatchPort: {
+        dispatch: async () => Object.freeze({
+          dispatchId: "dispatch:run:degraded-fallback",
+          backendKind: "comfyui",
+          backendRunId: "comfy-job:degraded-fallback",
+          acceptedAt: "2026-04-08T13:00:07.000Z",
+        }),
+      },
+      dispatchResultHandler,
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:00:07.000Z"),
+    });
+    const selectionService = new CapturingSelectionService(new ImageRunExecutionNodeSelectionService({
+      eligibilityService: new ImageRunNodeEligibilityEvaluationService({
+        nodeRepository,
+      }),
+    }));
+
+    const useCase = new ProcessQueuedRunDispatchUseCase({
+      selectAssignmentReadyRunsUseCase: selectReady,
+      claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
+      dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: selectionService,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:00:05.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:image-default",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+      reservationTtlSeconds: 120,
+    });
+
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]?.status).toBe("dispatched");
+    if (result.outcomes[0]?.status === "dispatched") {
+      expect(result.outcomes[0].nodeId).toBe("node-degraded");
+    }
+
+    const selectionDecision = selectionService.decisionsByRunId.get(created.run.runId);
+    expect(selectionDecision?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.selected);
+    expect(selectionDecision?.selectedNodeId).toBe("node-degraded");
+    expect(selectionDecision?.candidates.map((candidate) => candidate.nodeId)).toEqual([
+      "node-degraded",
+      "node-unavailable",
+      "node-incompatible",
+    ]);
+    const candidateByNodeId = new Map(selectionDecision?.candidates.map((candidate) => [candidate.nodeId, candidate]));
+    expect(candidateByNodeId.get("node-degraded")?.decision).toBe("eligible");
+    expect(candidateByNodeId.get("node-unavailable")?.decision).toBe("unavailable");
+    expect(candidateByNodeId.get("node-incompatible")?.decision).toBe("incompatible");
+
+    const runningRecord = await runRepository.findRunById(created.run.runId);
+    expect(runningRecord).toBeDefined();
+    const runningCanonical = mapPlatformRunRecordToCanonicalRun(runningRecord!);
+    expect(runningCanonical.state).toBe("running");
+    expect(runningCanonical.assignment.status).toBe("assigned");
+    expect(runningCanonical.assignment.assignedNodeId).toBe("node-degraded");
+
+    const ingest = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:01:00.000Z"),
+    });
+    await ingest.execute({
+      runId: created.run.runId,
+      senderNodeId: "node-degraded",
+      update: Object.freeze({
+        runId: created.run.runId,
+        senderNodeId: "node-degraded",
+        senderBackendKind: "comfyui",
+        senderBackendRunId: "comfy-job:degraded-fallback",
+        occurredAt: "2026-04-08T13:01:00.000Z",
+        toState: "completed",
+        execution: Object.freeze({
+          outcome: "succeeded",
+          finishedAt: "2026-04-08T13:01:00.000Z",
+        }),
+        result: Object.freeze({
+          summary: "Generated one image from degraded fallback node.",
+          outputs: Object.freeze([]),
+        }),
+      }),
+    });
+
+    const completedRecord = await runRepository.findRunById(created.run.runId);
+    expect(completedRecord).toBeDefined();
+    const completedCanonical = mapPlatformRunRecordToCanonicalRun(completedRecord!);
+    expect(completedCanonical.state).toBe("completed");
+    expect(completedCanonical.assignment.status).toBe("released");
+    expect(completedCanonical.assignment.assignedNodeId).toBe("node-degraded");
+    expect(completedCanonical.assignment.releaseReason).toBe("execution-completed");
+  });
+
+  it("rejects incompatible requested nodes before dispatch to prevent hidden single-backend assumptions", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const idGenerator = new SequenceIdGenerator();
+    const nodeRepository = new InMemoryExecutionNodeRepository();
+    nodeRepository.records.set("node-incompatible", createExecutionNode({
+      nodeId: "node-incompatible",
+      backendFamily: "custom-runtime",
+    }));
+    nodeRepository.records.set("node-compatible", createExecutionNode({
+      nodeId: "node-compatible",
+      backendFamily: "comfyui",
+    }));
+
+    const createRun = new CreateAuthoritativeRunUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+    });
+    const created = await createRun.execute({
+      command: buildSubmissionCommand("2026-04-08T13:10:00.000Z"),
+    });
+
+    const selectReady = new SelectAssignmentReadyRunsUseCase({
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:10:05.000Z"),
+    });
+    const claimForDispatch = new ClaimRunForNodeDispatchPreparationUseCase({
+      runRepository,
+      queueRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:10:06.000Z"),
+    });
+    const dispatchResultHandler = new HandleRunDispatchResultUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      idGenerator,
+      now: () => new Date("2026-04-08T13:10:07.000Z"),
+    });
+    let dispatchCalls = 0;
+    const dispatchAssigned = new DispatchAssignedRunExecutionUseCase({
+      commandBuilder: new BuildAssignedRunExecutionCommandUseCase({
+        runRepository,
+        queueRepository,
+      }),
+      dispatchPort: {
+        dispatch: async () => {
+          dispatchCalls += 1;
+          return Object.freeze({
+            dispatchId: "dispatch:run:should-not-happen",
+            backendKind: "comfyui",
+            backendRunId: "comfy-job:should-not-happen",
+            acceptedAt: "2026-04-08T13:10:07.000Z",
+          });
+        },
+      },
+      dispatchResultHandler,
+      runRepository,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:10:07.000Z"),
+    });
+    const selectionService = new CapturingSelectionService(new ImageRunExecutionNodeSelectionService({
+      eligibilityService: new ImageRunNodeEligibilityEvaluationService({
+        nodeRepository,
+      }),
+    }));
+
+    const useCase = new ProcessQueuedRunDispatchUseCase({
+      selectAssignmentReadyRunsUseCase: selectReady,
+      claimRunForNodeDispatchPreparationUseCase: claimForDispatch,
+      dispatchAssignedRunExecutionUseCase: dispatchAssigned,
+      runNodeSelectionService: selectionService,
+      queueRepository,
+      now: () => new Date("2026-04-08T13:10:05.000Z"),
+    });
+
+    const result = await useCase.execute({
+      reservationOwner: "orchestrator:image-default",
+      nodeId: "node-incompatible",
+      queueId: "queue:default",
+      workspaceId: "workspace-alpha",
+      limit: 1,
+      reservationTtlSeconds: 120,
+    });
+
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]?.status).toBe("failed");
+    if (result.outcomes[0]?.status === "failed") {
+      expect(result.outcomes[0].stage).toBe("selection");
+      expect(result.outcomes[0].selection?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noEligibleNode);
+      expect(result.outcomes[0].selection?.candidateCount).toBe(1);
+    }
+
+    expect(dispatchCalls).toBe(0);
+    const selectionDecision = selectionService.decisionsByRunId.get(created.run.runId);
+    expect(selectionDecision?.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noEligibleNode);
+    expect(selectionDecision?.candidates[0]?.nodeId).toBe("node-incompatible");
+    expect(selectionDecision?.candidates[0]?.decision).toBe("incompatible");
+
+    const persisted = await runRepository.findRunById(created.run.runId);
+    expect(persisted?.status).toBe("pending");
+    const queueEntry = await queueRepository.getQueueEntryByRunId(created.run.runId);
+    expect(queueEntry?.lifecycleState).toBe("queued");
+    expect(queueEntry?.claimToken).toBeUndefined();
     const attempts = await queueRepository.listDispatchAttemptsByRunId(created.run.runId);
     expect(attempts).toHaveLength(0);
   });
