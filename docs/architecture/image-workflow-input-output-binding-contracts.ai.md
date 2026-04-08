@@ -39,3 +39,10 @@ Story 2.1.4 introduces a typed binding-contract layer so image workflows declare
 - Contracts are path-free and protected-asset aligned.
 - Contracts are reusable across domain, application, and future execution adapters.
 - No ComfyUI JSON or UI-only payloads are embedded in the contract layer.
+
+## Related notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`

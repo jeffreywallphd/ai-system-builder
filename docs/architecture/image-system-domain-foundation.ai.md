@@ -65,3 +65,10 @@ Story 2.1.2 introduces a dedicated typed image-system domain model that binds im
 - Domain-first modeling with no UI-only or transport-only assumptions.
 - No embedded backend graph JSON or adapter-specific payloads.
 - Ready for later run orchestration and lineage expansion without contract redesign.
+
+## Related notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`

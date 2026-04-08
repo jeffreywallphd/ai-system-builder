@@ -44,3 +44,10 @@ Story 2.1.3 introduces a dedicated parameter-specification value object and shar
 - No ComfyUI JSON or desktop-only widget assumptions in domain/shared contracts.
 - UI hints are present but optional and surface-agnostic.
 - Contract design preserves extension seams for future advanced image workflows.
+
+## Related notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`

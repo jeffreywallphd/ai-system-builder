@@ -71,3 +71,10 @@ This provides a typed validation seam for system configuration and runtime submi
 - Semantic parameter meaning is separated from UI rendering hints.
 - UI schema hints are portable across desktop and future thin-client surfaces.
 - Contracts are extensible for additional parameter kinds/controls in later workflow stories.
+
+## Related architecture notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-input-output-binding-contracts.md`

@@ -58,3 +58,10 @@ The contract layer enforces:
 - Contracts are reusable across studio authoring, runtime preflight, and adapter translation layers.
 - Contracts use logical asset ids and slot semantics, preserving the protected asset model.
 - Contracts remain backend-agnostic and do not embed ComfyUI JSON or storage-path assumptions.
+
+## Related architecture notes
+
+- `docs/architecture/image-workflow-system-definition-layer.md`
+- `docs/architecture/image-workflow-domain-foundation.md`
+- `docs/architecture/image-system-domain-foundation.md`
+- `docs/architecture/image-workflow-parameter-specification-contracts.md`
