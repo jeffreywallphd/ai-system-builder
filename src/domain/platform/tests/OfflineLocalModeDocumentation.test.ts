@@ -60,22 +60,34 @@ describe("offline local-mode documentation guidance", () => {
     expect(doc).toContain("## Conflict categories and decision rules");
     expect(doc).toContain("## Server-authoritative-only examples");
     expect(doc).toContain("## Prohibited shortcuts");
+    expect(doc).toContain("## Desktop cache and controlled resynchronization workflow map (Epic 19.2)");
+    expect(doc).toContain("### Flow 1: cache population and offline transition");
+    expect(doc).toContain("### Flow 2: reconnect replay, conflict handling, and explicit outcomes");
+    expect(doc).toContain("### Flow 3: post-sync cache refresh and invalidation cleanup");
+    expect(doc).toContain("## Intentionally deferred behavior (explicitly not implemented)");
     expect(doc).toContain("client code must not treat offline local state as silently authoritative global truth");
     expect(doc).toContain("src/domain/platform/OfflineLocalModeBoundaries.ts");
     expect(doc).toContain("src/application/common/OfflineLocalModeResynchronization.ts");
+    expect(doc).toContain("src/application/common/OfflineControlledResynchronizationCoordinator.ts");
+    expect(doc).toContain("src/hosts/desktop/DesktopConnectivityStateService.ts");
+    expect(doc).toContain("src/shared/contracts/runtime/OfflineSynchronizationContracts.ts");
   });
 
   it("documents contributor extension sequence and required offline module touchpoints", () => {
     const contributorDoc = readFileSync(contributorDocPath, "utf8");
 
     expect(contributorDoc).toContain("## Required extension sequence");
+    expect(contributorDoc).toContain("## Desktop cache and reconnect workflow entry points");
+    expect(contributorDoc).toContain("## Workflow-specific extension checklists");
     expect(contributorDoc).toContain("## Adding a new offline resource class");
     expect(contributorDoc).toContain("## Extending reconnect conflict handling");
     expect(contributorDoc).toContain("## What must remain server-authoritative");
     expect(contributorDoc).toContain("## Prohibited patterns");
+    expect(contributorDoc).toContain("## Intentionally deferred behavior guardrails");
     expect(contributorDoc).toContain("src/domain/platform/OfflineLocalModeBoundaries.ts");
     expect(contributorDoc).toContain("src/shared/contracts/runtime/OfflineSynchronizationContracts.ts");
     expect(contributorDoc).toContain("src/hosts/desktop/DesktopOfflineLocalModeProfile.ts");
+    expect(contributorDoc).toContain("OfflineControlledResynchronizationCoordinator.synchronizeWorkspace(...)");
   });
 
   it("keeps architecture index docs discoverable for offline architecture and contributor guidance", () => {
@@ -102,9 +114,11 @@ describe("offline local-mode documentation guidance", () => {
 
     expect(aiDoc).toContain("docs/offline-local-mode-contributor-guide.md");
     expect(aiDoc).toContain("offline local state as silently authoritative global truth");
+    expect(aiDoc).toContain("Desktop cache + resync workflow baseline (Story 19.2.8)");
 
     expect(contributorAiDoc).toContain("docs/offline-local-mode-contributor-guide.md");
     expect(contributorAiDoc).toContain("control-plane-client");
+    expect(contributorAiDoc).toContain("## Desktop cache + reconnect extension map");
 
     expect(hooksDoc).toContain("offline-entered");
     expect(hooksDoc).toContain("replay-succeeded");

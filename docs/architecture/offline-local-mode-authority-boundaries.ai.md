@@ -55,6 +55,42 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
 - Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
 
+## Desktop cache + resync workflow baseline (Story 19.2.8)
+
+- canonical workflow source of truth: `docs/architecture/offline-local-mode-authority-boundaries.md`
+- new flow sections in the human doc cover:
+  - cache population + offline transition sequence
+  - reconnect replay + conflict handling sequence
+  - post-sync cache refresh/invalidation cleanup sequence
+- workflow map cross-links host/application/infrastructure/shared seams:
+  - reconnect coordinator: `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - pending-operation replay prep: `src/application/common/OfflinePendingOperationPersistence.ts`
+  - snapshot cache policy + storage: `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+  - connectivity transitions: `src/hosts/desktop/DesktopConnectivityStateService.ts`
+  - desktop runtime composition: `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+  - sqlite durability adapters:
+    - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+    - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+  - shared queue/connectivity/outcome contracts:
+    - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
+    - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
+    - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+
+## Implemented guarantees now called out explicitly
+
+- replay starts only when connectivity marks `canResynchronize=true`.
+- blocked replay operations keep structured reasons/dependency blockers.
+- reconnect cleanup preserves explicit `successful`/`conflicted`/`failed`/`abandoned` classification with remove-vs-retain action.
+- post-sync cache maintenance explicitly refreshes or invalidates entries; stale-unrefreshable cache records are removed.
+
+## Intentionally deferred behavior (must remain deferred unless explicitly scoped)
+
+- no silent auto-merge expansion beyond baseline authoritative revision match.
+- no multi-desktop queue merge protocol.
+- no secret plaintext offline cache path.
+- no automatic promotion of local cache/draft state to authoritative truth.
+- no coupling of best-effort event publication failures to reconciliation control flow.
+
 ## Server-authoritative-only baseline
 
 Must remain server-authoritative:
