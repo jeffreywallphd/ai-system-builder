@@ -21,6 +21,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
+- `docs/architecture/deployment-profile-policy-evolution-seams-and-neutrality-safeguards.md`
 
 ## Required implementation path
 
@@ -156,7 +157,8 @@ Current limits that should remain explicit in feature work:
 
 - policy-governance events publish safe summaries and avoid raw override value payloads,
 - mutation scope kind is currently `deployment-policy-scope`,
-- default startup scope is `platform:default` unless host composition config intentionally changes it.
+- default startup scope is `platform:default` unless host composition config intentionally changes it,
+- default profile fallbacks should remain explicit seams (`fallbackProfileId` / `defaultProfileId`), not hidden `home` literals in read/write/update workflows.
 
 ## Effective-resolution invariants checklist
 

@@ -22,6 +22,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep admin permission-boundary posture aligned with `docs/architecture/deployment-profile-policy-admin-permission-boundaries.md`.
 - Keep admin observability/redaction/failure-handling posture aligned with `docs/architecture/deployment-profile-policy-admin-observability-redaction-and-failure-handling.md`.
 - Keep explainability and impact summaries aligned with `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`.
+- Keep profile-evolution neutrality safeguards aligned with `docs/architecture/deployment-profile-policy-evolution-seams-and-neutrality-safeguards.md`.
 - Keep admin inspection/update read-model/service/page seams in `src/ui/shared/admin/DeploymentPolicyAdministrationReadModel.ts`, `src/ui/services/DeploymentPolicyAdministrationReadService.ts`, `src/ui/services/DeploymentPolicyAdministrationWriteService.ts`, and `src/ui/pages/DeploymentPolicyAdministrationPage.tsx`.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.
 - Keep docs/tests aligned for `.md` and `.ai.md` surfaces.
@@ -31,6 +32,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Use `IDeployment*PolicyEvaluationPort` interfaces for feature policy decisions.
 - Keep write-time policy mutation checks centralized in the policy-administration use case layer.
 - Keep startup policy resolution in `DeploymentPolicyBootstrapResolutionService.ts`; avoid route-level fallback policy branching.
+- Keep default-profile fallback behavior explicit via dependency seams; avoid hidden `home` literals in read/write orchestration.
 - Keep preset/profile behavior data-driven from canonical definitions.
 - Do not put profile-specific branching into UI, transport handlers, or backend adapters.
 
