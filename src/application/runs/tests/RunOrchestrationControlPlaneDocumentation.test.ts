@@ -110,6 +110,7 @@ describe("run orchestration control-plane documentation", () => {
       "src/application/runs/ports/RunAssignmentEligibilityPorts.ts",
       "src/application/runs/ports/RunExecutionDispatchPorts.ts",
       "src/application/runs/ports/RunExecutionCancellationPorts.ts",
+      "src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts",
       "src/application/runs/use-cases/SelectAssignmentReadyRunsUseCase.ts",
       "src/application/runs/use-cases/ClaimRunForNodeDispatchPreparationUseCase.ts",
       "src/application/runs/use-cases/DispatchAssignedRunExecutionUseCase.ts",

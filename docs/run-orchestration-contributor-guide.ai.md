@@ -34,6 +34,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Update shared scheduling policy contracts/schemas first (`SchedulingPolicyEvaluationContracts` + `SchedulingPolicyEvaluationSchemaContracts`).
 - Keep lifecycle legality in `src/domain/runs/RunDomain.ts`.
 - Add scheduler/assignment/dispatch/update behavior in `src/application/runs/use-cases/*` and ports.
+- Keep the initial image queue-to-dispatch seam in `src/application/runs/use-cases/ProcessQueuedRunDispatchUseCase.ts`.
 - Add persistence/adapter/transport wiring only after application behavior is correct.
 - Keep operational logging/metrics hooks in dedicated run observability seams (`RunOrchestrationObservability*`) rather than mixing log shaping into run-domain transitions.
 - Keep host route-family/backend registration composition aligned.
@@ -53,6 +54,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 
 ## Queue/reservation/arbitration integration map
 - Queue leasing remains in `SelectAssignmentReadyRunsUseCase` + `IRunOrchestrationQueuePersistenceRepository`.
+- Initial simplified queue-to-dispatch orchestration remains in `ProcessQueuedRunDispatchUseCase` (selection -> claim -> dispatch).
 - Scheduling snapshot assembly and policy evaluation remain in `AssembleAuthoritativeSchedulingInputUseCase` + `EvaluateAuthoritativeSchedulingDecisionPipelineUseCase`.
 - Assignment materialization and temporary hold lifecycle remain in `MaterializeAuthoritativeSchedulingAssignmentGatewayUseCase`.
 - Node-claim finalization conflict semantics remain in `ClaimRunForNodeDispatchPreparationUseCase`.
