@@ -103,6 +103,17 @@ export interface DeploymentProfilePolicyPreset {
 
 export type DeploymentProfilePresetCatalog = Readonly<Record<DeploymentProfileId, DeploymentProfilePolicyPreset>>;
 
+export interface DeploymentProfilePresetDefinition {
+  readonly profileId: DeploymentProfileId;
+  readonly parentProfileId?: DeploymentProfileId;
+  readonly scope: string;
+  readonly rationale: string;
+  readonly policyOverrides: DeploymentProfilePolicyValues;
+}
+
+export type DeploymentProfilePresetDefinitionCatalog =
+  Readonly<Record<DeploymentProfileId, DeploymentProfilePresetDefinition>>;
+
 export interface DeploymentPolicyConfigurationRegistry {
   readonly familyCatalog: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog: DeploymentProfilePresetCatalog;
@@ -817,96 +828,127 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
 export function createCanonicalDeploymentProfilePresetCatalog(
   familyCatalog: DeploymentPolicyFamilyCatalog = createCanonicalDeploymentPolicyFamilyCatalog(),
 ): DeploymentProfilePresetCatalog {
+  const presetDefinitions = createCanonicalDeploymentProfilePresetDefinitions();
+
   return createDeploymentProfilePresetCatalog({
     familyCatalog,
-    presets: [
-      {
-        profileId: DeploymentProfileIds.home,
-        policyOverrides: {
-          "approval-governance": {
-            runSubmissionApprovalMode: "self-or-owner",
-            highRiskRunRequiresDualApproval: false,
-          },
-          "sharing-posture": {
-            defaultWorkspaceVisibility: "private",
-            publicLinkSharingAllowed: true,
-            crossWorkspaceShareRequiresApproval: false,
-          },
-          "storage-governance": {
-            defaultStorageTier: "local-managed",
-            externalSyncEnabledByDefault: true,
-          },
-          "security-governance": {
-            localCredentialRotationDays: 180,
-          },
-          "admin-controls": {
-            allowDelegatedWorkspaceAdmins: false,
-            policyChangeRequiresTicketReference: false,
-            policyDryRunModeEnabledByDefault: false,
-          },
-          "audit-governance": {
-            auditExportEnabled: false,
-            auditRedactionStrictMode: false,
-          },
-        },
-      },
-      {
-        profileId: DeploymentProfileIds.classroom,
-        parentProfileId: DeploymentProfileIds.home,
-        policyOverrides: {
-          "approval-governance": {
-            runSubmissionApprovalMode: "owner-or-instructor",
-            highRiskRunRequiresDualApproval: true,
-          },
-          "sharing-posture": {
-            defaultWorkspaceVisibility: "workspace",
-            publicLinkSharingAllowed: false,
-            crossWorkspaceShareRequiresApproval: true,
-          },
-          "storage-governance": {
-            defaultStorageTier: "workspace-managed",
-            externalSyncEnabledByDefault: false,
-          },
-          "security-governance": {
-            localCredentialRotationDays: 120,
-          },
-          "admin-controls": {
-            allowDelegatedWorkspaceAdmins: true,
-            policyChangeRequiresTicketReference: true,
-            policyDryRunModeEnabledByDefault: true,
-          },
-          "audit-governance": {
-            auditExportEnabled: true,
-            auditRedactionStrictMode: true,
-          },
-        },
-      },
-      {
-        profileId: DeploymentProfileIds.organization,
-        parentProfileId: DeploymentProfileIds.classroom,
-        policyOverrides: {
-          "approval-governance": {
-            runSubmissionApprovalMode: "owner-or-admin",
-          },
-          "storage-governance": {
-            defaultStorageTier: "server-managed",
-            externalSyncEnabledByDefault: false,
-          },
-          "security-governance": {
-            localCredentialRotationDays: 90,
-          },
-          "admin-controls": {
-            allowDelegatedWorkspaceAdmins: true,
-            policyChangeRequiresTicketReference: true,
-            policyDryRunModeEnabledByDefault: true,
-          },
-          "audit-governance": {
-            auditExportEnabled: true,
-            auditRedactionStrictMode: true,
-          },
-        },
-      },
-    ],
+    presets: Object.values(presetDefinitions).map((preset) => ({
+      profileId: preset.profileId,
+      parentProfileId: preset.parentProfileId,
+      policyOverrides: preset.policyOverrides,
+    })),
+  });
+}
+
+export function createCanonicalDeploymentProfilePresetDefinitions(): DeploymentProfilePresetDefinitionCatalog {
+  return Object.freeze({
+    [DeploymentProfileIds.home]: Object.freeze({
+      profileId: DeploymentProfileIds.home,
+      scope: "Personal and family-managed deployments with lightweight governance overhead.",
+      rationale:
+        "Optimize for low-friction usage while preserving baseline safety controls and clear policy defaults.",
+      policyOverrides: Object.freeze({
+        "approval-governance": Object.freeze({
+          runSubmissionApprovalMode: "self-or-owner",
+          highRiskRunRequiresDualApproval: false,
+        }),
+        "sharing-posture": Object.freeze({
+          defaultWorkspaceVisibility: "private",
+          publicLinkSharingAllowed: true,
+          crossWorkspaceShareRequiresApproval: false,
+        }),
+        "storage-governance": Object.freeze({
+          defaultStorageTier: "local-managed",
+          externalSyncEnabledByDefault: true,
+        }),
+        "security-governance": Object.freeze({
+          encryptionAtRestRequired: true,
+          transportTlsRequired: true,
+          localCredentialRotationDays: 180,
+        }),
+        "admin-controls": Object.freeze({
+          allowDelegatedWorkspaceAdmins: false,
+          policyChangeRequiresTicketReference: false,
+          policyDryRunModeEnabledByDefault: false,
+        }),
+        "audit-governance": Object.freeze({
+          auditExportEnabled: false,
+          auditRedactionStrictMode: false,
+        }),
+      }),
+    }),
+    [DeploymentProfileIds.classroom]: Object.freeze({
+      profileId: DeploymentProfileIds.classroom,
+      parentProfileId: DeploymentProfileIds.home,
+      scope: "Instructor-governed collaborative deployments with bounded classroom sharing and review controls.",
+      rationale:
+        "Tighten collaboration and approval posture versus home environments while retaining instructor-operable defaults.",
+      policyOverrides: Object.freeze({
+        "approval-governance": Object.freeze({
+          runSubmissionApprovalMode: "owner-or-instructor",
+          highRiskRunRequiresDualApproval: true,
+        }),
+        "sharing-posture": Object.freeze({
+          defaultWorkspaceVisibility: "workspace",
+          publicLinkSharingAllowed: false,
+          crossWorkspaceShareRequiresApproval: true,
+        }),
+        "storage-governance": Object.freeze({
+          defaultStorageTier: "workspace-managed",
+          externalSyncEnabledByDefault: false,
+        }),
+        "security-governance": Object.freeze({
+          encryptionAtRestRequired: true,
+          transportTlsRequired: true,
+          localCredentialRotationDays: 120,
+        }),
+        "admin-controls": Object.freeze({
+          allowDelegatedWorkspaceAdmins: true,
+          policyChangeRequiresTicketReference: true,
+          policyDryRunModeEnabledByDefault: true,
+        }),
+        "audit-governance": Object.freeze({
+          auditExportEnabled: true,
+          auditRedactionStrictMode: true,
+        }),
+      }),
+    }),
+    [DeploymentProfileIds.organization]: Object.freeze({
+      profileId: DeploymentProfileIds.organization,
+      parentProfileId: DeploymentProfileIds.classroom,
+      scope: "Organization-wide governed deployments with stricter approval, storage, and credential posture.",
+      rationale:
+        "Apply enterprise-grade governance defaults while preserving centralized administration and auditable control.",
+      policyOverrides: Object.freeze({
+        "approval-governance": Object.freeze({
+          runSubmissionApprovalMode: "owner-or-admin",
+          highRiskRunRequiresDualApproval: true,
+        }),
+        "sharing-posture": Object.freeze({
+          defaultWorkspaceVisibility: "workspace",
+          publicLinkSharingAllowed: false,
+          crossWorkspaceShareRequiresApproval: true,
+        }),
+        "storage-governance": Object.freeze({
+          defaultStorageTier: "server-managed",
+          externalSyncEnabledByDefault: false,
+        }),
+        "security-governance": Object.freeze({
+          encryptionAtRestRequired: true,
+          transportTlsRequired: true,
+          localCredentialRotationDays: 90,
+        }),
+        "admin-controls": Object.freeze({
+          allowDelegatedWorkspaceAdmins: true,
+          policyChangeRequiresTicketReference: true,
+          policyDryRunModeEnabledByDefault: true,
+        }),
+        "audit-governance": Object.freeze({
+          auditExportEnabled: true,
+          auditRedactionStrictMode: true,
+        }),
+      }),
+    }),
   });
 }
 
