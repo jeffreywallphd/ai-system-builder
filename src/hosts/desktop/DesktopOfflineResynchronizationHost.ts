@@ -1,5 +1,6 @@
 import type { DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
 import { OfflineControlledResynchronizationCoordinator } from "@application/common/OfflineControlledResynchronizationCoordinator";
+import type { IOfflineOperationalEventSink } from "@application/common/OfflineOperationalEventPorts";
 import type {
   IOfflineAuthoritativeResynchronizationPort,
   IOfflineConnectivityStatePort,
@@ -21,6 +22,11 @@ export interface DesktopOfflineResynchronizationHostOptions {
   readonly pendingOperationMaxEntries?: number;
   readonly snapshotCacheMaxEntries?: number;
   readonly supportsProtectedAtRestStorage?: boolean;
+  readonly eventSink?: IOfflineOperationalEventSink;
+  readonly eventContext?: {
+    readonly workspaceId?: string;
+    readonly actorUserIdentityId?: string;
+  };
   readonly now?: () => Date;
 }
 
@@ -55,6 +61,8 @@ export function createDesktopOfflineResynchronizationHostRuntime(
   const connectivityStatePort = options.connectivityStatePort
     ?? new DesktopConnectivityStatePortAdapter(new DesktopConnectivityStateService({
       now: options.now,
+      eventSink: options.eventSink,
+      eventContext: options.eventContext,
     }));
 
   const coordinator = new OfflineControlledResynchronizationCoordinator(
@@ -64,6 +72,7 @@ export function createDesktopOfflineResynchronizationHostRuntime(
     connectivityStatePort,
     {
       now: options.now,
+      eventSink: options.eventSink,
     },
   );
 

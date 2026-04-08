@@ -27,6 +27,8 @@ Non-negotiable philosophy:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- application offline audit/operational event hook contracts:
+  - `src/application/common/OfflineOperationalEventPorts.ts`
 - desktop host local-mode profile binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - desktop host connectivity-state monitor and transition service:
@@ -37,6 +39,8 @@ Non-negotiable philosophy:
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
 - desktop host controlled resynchronization runtime factory:
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- runtime adapter for offline hook publication into existing audit/operational streams:
+  - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - desktop offline snapshot cache persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - desktop offline pending-operation persistence adapter:
@@ -151,6 +155,28 @@ Desktop host connectivity state is explicitly modeled and exposed through one ho
 - transitions are explicit across `connected`, `degraded`, `reconnecting`, and `disconnected`;
 - deliberate offline mode is distinguished from transient transport failures through structured reason metadata;
 - UI/shared layers consume one structured connectivity payload via the desktop host bridge rather than inferring status from ad hoc errors.
+
+Connectivity transition publication is explicit:
+- `offline-entered` and `offline-exited` events emit from the host connectivity service when local-mode state changes;
+- transition events are best-effort and do not alter connectivity decision semantics.
+
+## Offline audit and operational event hooks
+
+Offline and reconnect behavior must remain visible outside desktop-local UI state.
+
+First-scope representative events:
+- `offline-entered`
+- `offline-exited`
+- `replay-succeeded`
+- `replay-failed`
+- `conflict-detected`
+- `protected-local-execution-registered`
+
+Boundary posture:
+- emissions occur from application/host seams (`OfflineControlledResynchronizationCoordinator`, `DesktopConnectivityStateService`);
+- payloads include bounded actor/workspace/resource context and sanitized summaries/details;
+- replay payload bodies/tokens/secrets/internal diagnostics are excluded from hook payloads;
+- hook publication is best-effort and cannot mutate reconciliation decisions.
 
 ## Conflict categories and decision rules
 

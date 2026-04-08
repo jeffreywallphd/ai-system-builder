@@ -35,6 +35,10 @@ import {
   type OfflineConnectivitySurfaceStateDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
+import {
+  OfflineOperationalEventTypes,
+  type IOfflineOperationalEventSink,
+} from "../OfflineOperationalEventPorts";
 
 class InMemoryOfflinePendingOperationRepository implements IOfflinePendingOperationRepository {
   private readonly records = new Map<string, OfflinePendingOperationRecord>();
@@ -230,6 +234,16 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
   }
 }
 
+class RecordingOfflineOperationalSink implements IOfflineOperationalEventSink {
+  public readonly events: Array<Parameters<IOfflineOperationalEventSink["recordOfflineOperationalEvent"]>[0]> = [];
+
+  public async recordOfflineOperationalEvent(
+    event: Parameters<IOfflineOperationalEventSink["recordOfflineOperationalEvent"]>[0],
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createPolicy(
   overrides?: Partial<OfflineResourcePolicyEvaluationInput>,
 ): OfflineResourcePolicyEvaluationInput {
@@ -265,6 +279,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
     );
     const authoritativePort = new FakeAuthoritativeResynchronizationPort();
+    const eventSink = new RecordingOfflineOperationalSink();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
       snapshotCacheService,
@@ -272,6 +287,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       new StaticConnectivityPort(createConnectedState()),
       {
         now: () => new Date("2026-04-08T12:30:00.000Z"),
+        eventSink,
       },
     );
 
@@ -392,6 +408,11 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     ]);
     expect(authoritativePort.refreshedSnapshots).toContain("run-submission-intent::run:intent:1");
     expect(authoritativePort.refreshedSnapshots).toContain("workflow-definition::workflow:def:1");
+    expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.replaySucceeded,
+      OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
+      OfflineOperationalEventTypes.conflictDetected,
+    ]);
   });
 
   it("skips replay when connectivity cannot resynchronize", async () => {
@@ -654,6 +675,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
     );
     const authoritativePort = new FakeAuthoritativeResynchronizationPort();
+    const eventSink = new RecordingOfflineOperationalSink();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
       snapshotCacheService,
@@ -661,6 +683,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       new StaticConnectivityPort(createConnectedState()),
       {
         now: () => new Date("2026-04-08T12:45:00.000Z"),
+        eventSink,
       },
     );
 
@@ -725,6 +748,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(persisted?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(persisted?.retryability.retryable).toBeFalse();
     expect(persisted?.retryability.nonRetryableReasonCode).toBe("retry-exhausted");
+    expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.replayFailed,
+    ]);
   });
 
   it("invalidates stale cached snapshots when authoritative refresh is unavailable", async () => {

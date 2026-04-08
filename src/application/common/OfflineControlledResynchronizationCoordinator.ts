@@ -28,6 +28,12 @@ import {
   type OfflineReconciliationOutcomeDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 import { toOfflineReconciliationOutcomeDto } from "@shared/dto/runtime/OfflineSynchronizationDtos";
+import {
+  OfflineOperationalEventChannels,
+  OfflineOperationalEventTypes,
+  type IOfflineOperationalEventSink,
+  publishOfflineOperationalEventBestEffort,
+} from "@application/common/OfflineOperationalEventPorts";
 
 export class OfflineControlledResynchronizationCoordinatorError extends Error {
   constructor(message: string) {
@@ -133,10 +139,12 @@ export interface OfflineControlledResynchronizationResult {
 
 export interface OfflineControlledResynchronizationCoordinatorOptions {
   readonly now?: () => Date;
+  readonly eventSink?: IOfflineOperationalEventSink;
 }
 
 export class OfflineControlledResynchronizationCoordinator {
   private readonly now: () => Date;
+  private readonly eventSink: IOfflineOperationalEventSink | undefined;
 
   constructor(
     private readonly pendingOperationService: OfflinePendingOperationService,
@@ -146,6 +154,7 @@ export class OfflineControlledResynchronizationCoordinator {
     options?: OfflineControlledResynchronizationCoordinatorOptions,
   ) {
     this.now = options?.now ?? (() => new Date());
+    this.eventSink = options?.eventSink;
   }
 
   public async synchronizeWorkspace(input: {
@@ -338,6 +347,27 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: blockedRecord.operation.targetResourceClass,
         resourceId: blockedRecord.operation.targetResourceId,
       }));
+      this.publishReplayOutcomeEvent({
+        workspaceId,
+        actorUserIdentityId,
+        attemptedAt,
+        operationId: blockedOperation.operationId,
+        resourceClass: blockedRecord.operation.targetResourceClass,
+        resourceId: blockedRecord.operation.targetResourceId,
+        eventType: blockedDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? OfflineOperationalEventTypes.conflictDetected
+          : OfflineOperationalEventTypes.replayFailed,
+        outcome: blockedDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? "conflict"
+          : "failed",
+        summary: blockedOperation.message,
+        details: Object.freeze({
+          decisionRule: blockedDecision.decisionRule,
+          conflictClass: blockedDecision.conflictClass,
+          blockedReasonCode: blockedOperation.reasonCode,
+          blockingDependencyOperationIds: blockedOperation.blockingDependencyOperationIds,
+        }),
+      });
     }
 
     for (const preparedOperation of replayPreparation.prepared) {
@@ -392,6 +422,25 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         }));
+        this.publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId,
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+          eventType: decision.action === OfflineResynchronizationActions.conflictRequiresReview
+            ? OfflineOperationalEventTypes.conflictDetected
+            : OfflineOperationalEventTypes.replayFailed,
+          outcome: decision.action === OfflineResynchronizationActions.conflictRequiresReview
+            ? "conflict"
+            : "failed",
+          summary: decision.reason,
+          details: Object.freeze({
+            decisionRule: decision.decisionRule,
+            conflictClass: decision.conflictClass,
+          }),
+        });
         continue;
       }
 
@@ -427,6 +476,40 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         }));
+        this.publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId,
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+          eventType: OfflineOperationalEventTypes.replaySucceeded,
+          outcome: "succeeded",
+          summary: normalizeOptional(replayResult.reason) ?? decision.reason,
+          details: Object.freeze({
+            decisionRule: decision.decisionRule,
+            authoritativeRevisionAfter: replayResult.authoritativeRevisionAfter,
+          }),
+        });
+        if (preparedOperation.pendingRunSubmission) {
+          this.publishReplayOutcomeEvent({
+            workspaceId,
+            actorUserIdentityId,
+            attemptedAt,
+            operationId,
+            resourceClass: preparedOperation.targetResourceClass,
+            resourceId: preparedOperation.targetResourceId,
+            eventType: OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
+            outcome: "succeeded",
+            summary: "Protected local execution metadata registered through authoritative replay.",
+            details: Object.freeze({
+              registrationKind: "pending-run-submission",
+              submissionId: preparedOperation.pendingRunSubmission.submissionId,
+              workflowDefinitionId: preparedOperation.pendingRunSubmission.workflowDefinitionId,
+            }),
+            channel: OfflineOperationalEventChannels.audit,
+          });
+        }
         queueRefreshTarget({
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
@@ -482,6 +565,28 @@ export class OfflineControlledResynchronizationCoordinator {
         resourceClass: preparedOperation.targetResourceClass,
         resourceId: preparedOperation.targetResourceId,
       }));
+      this.publishReplayOutcomeEvent({
+        workspaceId,
+        actorUserIdentityId,
+        attemptedAt,
+        operationId,
+        resourceClass: preparedOperation.targetResourceClass,
+        resourceId: preparedOperation.targetResourceId,
+        eventType: replayDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? OfflineOperationalEventTypes.conflictDetected
+          : OfflineOperationalEventTypes.replayFailed,
+        outcome: replayDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? "conflict"
+          : "failed",
+        summary: replayDecision.reason,
+        details: Object.freeze({
+          decisionRule: replayDecision.decisionRule,
+          conflictClass: replayDecision.conflictClass,
+          replayResultKind: replayResult.kind,
+          retryable: replayResult.retryable,
+          nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+        }),
+      });
     }
 
     for (const key of [...invalidateTargets.keys()].sort((left, right) => left.localeCompare(right))) {
@@ -571,6 +676,34 @@ export class OfflineControlledResynchronizationCoordinator {
       lastSynchronizedAt: this.now().toISOString(),
     });
     return true;
+  }
+
+  private publishReplayOutcomeEvent(input: {
+    readonly workspaceId: string;
+    readonly actorUserIdentityId: string;
+    readonly attemptedAt: string;
+    readonly operationId: string;
+    readonly resourceClass: OfflineResourceClass;
+    readonly resourceId: string;
+    readonly eventType: typeof OfflineOperationalEventTypes[keyof typeof OfflineOperationalEventTypes];
+    readonly outcome: "succeeded" | "failed" | "conflict";
+    readonly summary: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+    readonly channel?: typeof OfflineOperationalEventChannels[keyof typeof OfflineOperationalEventChannels];
+  }): void {
+    void publishOfflineOperationalEventBestEffort(this.eventSink, Object.freeze({
+      channel: input.channel ?? OfflineOperationalEventChannels.operational,
+      type: input.eventType,
+      occurredAt: input.attemptedAt,
+      workspaceId: input.workspaceId,
+      actorUserIdentityId: input.actorUserIdentityId,
+      operationId: input.operationId,
+      resourceClass: input.resourceClass,
+      resourceId: input.resourceId,
+      outcome: input.outcome,
+      summary: input.summary,
+      details: input.details,
+    }));
   }
 }
 

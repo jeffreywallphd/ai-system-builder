@@ -8,6 +8,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
 
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
 - `docs/architecture/offline-sync-shared-contracts.md`
+- `docs/architecture/offline-local-mode-audit-operational-hooks.md`
 - `docs/architecture/host-runtime-composition-boundaries.md`
 - `docs/architecture/desktop-host-assembly.md`
 
@@ -24,6 +25,8 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflinePendingOperationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- application offline audit/operational event hooks:
+  - `src/application/common/OfflineOperationalEventPorts.ts`
 - desktop host local-mode binding:
   - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
@@ -33,6 +36,8 @@ Provide a durable implementation workflow for extending offline/local-mode behav
 - desktop persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+- runtime event adapter for offline hooks:
+  - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - shared offline contracts and schema parsers:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -50,9 +55,11 @@ Provide a durable implementation workflow for extending offline/local-mode behav
    - preserve visible divergence handling.
    - route reconnect replay through authoritative API ports and capture explicit outcomes for apply/conflict/reject/failure paths.
    - expose blocked replay operations with structured metadata (reason code/message/dependency blockers) rather than id-only reporting.
+   - emit structured replay/conflict/recovery/protected-registration outcomes through offline event hooks with sanitized details.
 4. Update desktop profile bindings fourth:
    - keep desktop runtime as `control-plane-client`,
    - enforce allowed resource and execution classes through profile gates.
+   - emit explicit offline-entered/offline-exited events from host-owned connectivity transitions.
 5. Update adapters/UI surfaces last to consume new canonical contracts; do not invent ad hoc offline object shapes.
 
 ## Adding a new offline resource class
@@ -133,6 +140,7 @@ At minimum, update:
 - `src/application/common/tests/OfflineResourceClassificationPolicy.test.ts`
 - `src/application/common/tests/OfflineLocalModeResynchronization.test.ts`
 - `src/application/common/tests/OfflineAuthoritativeSnapshotCache.test.ts`
+- `src/application/common/tests/OfflineOperationalEventPorts.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineLocalModeProfile.test.ts`
 - `src/hosts/desktop/tests/DesktopConnectivityStateService.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineSnapshotCacheHost.test.ts`
@@ -141,6 +149,7 @@ At minimum, update:
 - `src/application/common/tests/OfflineControlledResynchronizationCoordinator.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflinePendingOperationHost.test.ts`
 - `src/hosts/desktop/tests/DesktopOfflineResynchronizationHost.test.ts`
+- `src/infrastructure/api/system-runtime/tests/DesktopOfflineOperationalEventSink.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflinePendingOperationRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`

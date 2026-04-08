@@ -5,6 +5,7 @@
 - `docs/offline-local-mode-contributor-guide.md`
 - `docs/architecture/offline-local-mode-authority-boundaries.md`
 - `docs/architecture/offline-sync-shared-contracts.md`
+- `docs/architecture/offline-local-mode-audit-operational-hooks.md`
 
 ## Purpose
 
@@ -17,9 +18,11 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 3. Application classification/resynchronization/cache/pending-operation persistence seams.
    - include controlled reconnect coordinator (`src/application/common/OfflineControlledResynchronizationCoordinator.ts`) and keep replay outcome capture explicit.
    - include structured blocked replay metadata (reason code/message/dependency blockers) in coordinator results so UI/admin surfaces can explain non-replayed operations.
+   - include offline event hook contracts (`src/application/common/OfflineOperationalEventPorts.ts`) and emit sanitized reconnect outcome events.
 4. Desktop host profile + offline cache/pending-operation runtime gating.
    - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
    - include desktop controlled-resynchronization host runtime (`src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`) when reconnect workflow composition changes.
+   - include runtime adapter wiring (`src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`) when operational/governance publication paths change.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
 

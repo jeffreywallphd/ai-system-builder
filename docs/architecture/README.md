@@ -183,6 +183,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For the executable desktop host assembly, startup entrypoint, and desktop-specific composition/lifecycle boundaries, read [`desktop-host-assembly.md`](./desktop-host-assembly.md).
 - For canonical offline local-mode authority boundaries, offline-capable resource classes, queued mutation invariants, reconnect conflict categories, and prohibited shortcuts, read [`offline-local-mode-authority-boundaries.md`](./offline-local-mode-authority-boundaries.md).
 - For shared offline synchronization contracts, DTO/schema usage, and state-transition semantics, read [`offline-sync-shared-contracts.md`](./offline-sync-shared-contracts.md).
+- For offline transition/reconnect audit + operational event hook boundaries and sanitized publication posture, read [`offline-local-mode-audit-operational-hooks.md`](./offline-local-mode-audit-operational-hooks.md).
 - For contributor implementation workflow when extending offline resource eligibility, draft/queue semantics, and reconnect policy, read [`../offline-local-mode-contributor-guide.md`](../offline-local-mode-contributor-guide.md).
 - For the executable hybrid host assembly, capability-composition rules, and authoritative delegation mode, read [`hybrid-host-assembly.md`](./hybrid-host-assembly.md).
 - For the executable web host assembly, thin-client delivery composition boundaries, and startup entrypoint expectations, read [`web-host-assembly.md`](./web-host-assembly.md).

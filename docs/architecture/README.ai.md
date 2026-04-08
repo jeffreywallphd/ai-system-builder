@@ -120,6 +120,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Desktop executable host assembly baseline (dedicated startup entrypoint + desktop runtime lifecycle expectations): `docs/architecture/desktop-host-assembly.md`
 - Offline local-mode authority boundary baseline for offline-capable resource classes, explicit local-vs-authoritative state ownership, queued mutation disclosure invariants, reconnect conflict categories, and prohibited shortcuts: `docs/architecture/offline-local-mode-authority-boundaries.md`
 - Shared offline synchronization contract/DTO/schema baseline and transition semantics: `docs/architecture/offline-sync-shared-contracts.md`
+- Offline transition/reconnect audit + operational hook baseline for structured outcome visibility and sanitized payload publication: `docs/architecture/offline-local-mode-audit-operational-hooks.md`
 - Contributor workflow for offline/local-mode extensions (resource classification, local draft/queue semantics, reconnect policy, and guardrails): `docs/offline-local-mode-contributor-guide.md`
 - Hybrid executable host assembly baseline (hybrid capability composition rules + authoritative delegation mode): `docs/architecture/hybrid-host-assembly.md`
 - Web executable host assembly baseline (thin-client delivery composition boundaries + startup entrypoint expectations): `docs/architecture/web-host-assembly.md`
