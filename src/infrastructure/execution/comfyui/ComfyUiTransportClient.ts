@@ -28,6 +28,7 @@ export type ComfyUiTransportCancellationStatus =
 export type ComfyUiTransportOperation =
   | "submit-prompt"
   | "query-prompt-state"
+  | "query-prompt-history"
   | "request-cancellation"
   | "probe-reachability"
   | "probe-capabilities";
@@ -112,6 +113,12 @@ export interface ComfyUiPromptCancellationResult {
   readonly status: ComfyUiTransportCancellationStatus;
   readonly acknowledgedAt: string;
   readonly state?: ComfyUiTransportPromptState;
+}
+
+export interface ComfyUiPromptHistorySnapshot {
+  readonly promptId: string;
+  readonly checkedAt: string;
+  readonly historyEntry?: ComfyHistoryPromptEntryDto;
 }
 
 export const ComfyUiBackendProbeStates = Object.freeze({
@@ -297,6 +304,37 @@ export class ComfyUiTransportClient {
     } catch (error) {
       if (error instanceof ComfyUiTransportClientError) {
         this.logFailure("query-prompt-state", startedAt, error);
+      }
+      throw error;
+    }
+  }
+
+  public async queryPromptHistory(input: {
+    readonly promptId: string;
+  }): Promise<ComfyUiPromptHistorySnapshot> {
+    const promptId = normalizePromptId(input.promptId);
+    const startedAt = Date.now();
+    try {
+      const history = await this.requestJson<ComfyHistoryResponseDto>({
+        operation: "query-prompt-history",
+        path: `/history/${encodeURIComponent(promptId)}`,
+        init: Object.freeze({
+          method: "GET",
+        }),
+      });
+      const historyEntry = history[promptId];
+      this.logSuccess("query-prompt-history", startedAt, promptId, undefined, {
+        hasHistoryEntry: Boolean(historyEntry),
+        hasOutputs: Boolean(historyEntry?.outputs && Object.keys(historyEntry.outputs).length > 0),
+      });
+      return Object.freeze({
+        promptId,
+        checkedAt: this.now().toISOString(),
+        historyEntry,
+      });
+    } catch (error) {
+      if (error instanceof ComfyUiTransportClientError) {
+        this.logFailure("query-prompt-history", startedAt, error);
       }
       throw error;
     }

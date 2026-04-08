@@ -117,6 +117,41 @@ describe("ComfyUiTransportClient", () => {
     expect(snapshot.queuePosition).toBe(0);
   });
 
+  it("queries prompt history records for output discovery", async () => {
+    const fetchFn = mock(async () => new Response(JSON.stringify({
+      "prompt-history-1": Object.freeze({
+        status: Object.freeze({
+          completed: true,
+          status_str: "success",
+        }),
+        outputs: Object.freeze({
+          "9": Object.freeze({
+            images: Object.freeze([
+              Object.freeze({
+                filename: "result.png",
+                subfolder: "run",
+                type: "output",
+              }),
+            ]),
+          }),
+        }),
+      }),
+    })));
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+      now: () => new Date("2026-04-08T10:01:30.000Z"),
+    });
+
+    const snapshot = await client.queryPromptHistory({
+      promptId: "prompt-history-1",
+    });
+
+    expect(snapshot.promptId).toBe("prompt-history-1");
+    expect(snapshot.checkedAt).toBe("2026-04-08T10:01:30.000Z");
+    expect(snapshot.historyEntry?.outputs?.["9"]?.images?.[0]?.filename).toBe("result.png");
+  });
+
   it("returns already-terminal cancellation when prompt is completed", async () => {
     const fetchFn = mock(async () => new Response(JSON.stringify({
       "prompt-3": Object.freeze({
