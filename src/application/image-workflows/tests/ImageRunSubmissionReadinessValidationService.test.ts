@@ -119,6 +119,17 @@ class StubExecutionReadinessUseCase implements Pick<GetImageManipulationExecutio
       readonly supportedOperationKinds: ReadonlyArray<string>;
       readonly supportedTranslationContractVersions: ReadonlyArray<string>;
     };
+    readonly nodeAvailability: {
+      readonly state: "available" | "constrained" | "unavailable" | "unknown";
+      readonly checkedAt: string;
+      readonly candidateNodeCount: number;
+      readonly eligibleNodeCount: number;
+      readonly unavailableNodeCount: number;
+      readonly incompatibleNodeCount: number;
+      readonly topBlockingReasonCodes: ReadonlyArray<string>;
+      readonly topTransientAvailabilityReasonCodes: ReadonlyArray<string>;
+      readonly reasonCode?: string;
+    };
     readonly issues: ReadonlyArray<{
       readonly code: string;
       readonly severity: "error" | "warning";
@@ -138,6 +149,16 @@ class StubExecutionReadinessUseCase implements Pick<GetImageManipulationExecutio
         supportsOutputDiscovery: true,
         supportedOperationKinds: Object.freeze(["image-to-image"]),
         supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+      }),
+      nodeAvailability: Object.freeze({
+        state: "available" as const,
+        checkedAt: "2026-04-08T15:00:00.000Z",
+        candidateNodeCount: 1,
+        eligibleNodeCount: 1,
+        unavailableNodeCount: 0,
+        incompatibleNodeCount: 0,
+        topBlockingReasonCodes: Object.freeze([]),
+        topTransientAvailabilityReasonCodes: Object.freeze([]),
       }),
       issues: this.readiness.issues,
     });

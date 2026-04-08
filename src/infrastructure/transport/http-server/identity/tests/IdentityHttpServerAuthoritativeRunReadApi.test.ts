@@ -164,6 +164,17 @@ class StubAuthoritativeRunQueryBackendApi {
           supportedOperationKinds: ["image-to-image"],
           supportedTranslationContractVersions: ["1.0.0"],
         },
+        nodeAvailability: {
+          state: "constrained",
+          checkedAt: "2026-04-08T12:10:00.000Z",
+          candidateNodeCount: 2,
+          eligibleNodeCount: 0,
+          unavailableNodeCount: 1,
+          incompatibleNodeCount: 1,
+          topBlockingReasonCodes: ["node-backend-family-unsupported"],
+          topTransientAvailabilityReasonCodes: ["node-health-not-routable"],
+          reasonCode: "execution-node-no-eligible-match",
+        },
         issues: [{
           code: "translation-contract-version-unsupported",
           severity: "error",

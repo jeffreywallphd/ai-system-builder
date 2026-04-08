@@ -203,6 +203,8 @@ import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization
 import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
 import { ListAuthorizationEffectiveAccessUseCase } from "@application/authorization/use-cases/ListAuthorizationEffectiveAccessUseCase";
 import { ImageRunSubmissionReadinessValidationService } from "@application/image-workflows/ImageRunSubmissionReadinessValidationService";
+import { ImageRunNodeEligibilityEvaluationService } from "@application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService";
+import { ImageRunExecutionNodeSelectionService } from "@application/nodes/use-cases/ImageRunExecutionNodeSelectionService";
 import {
   IssueWorkspaceInvitationUseCase,
   type WorkspaceInvitationIssuanceClock,
@@ -1132,8 +1134,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     auditSink: authoritativeRunSubmissionAuditSink,
     transactionManager: persistentPlatformServices.platformPersistenceRepository,
   });
+  const imageRunNodeEligibilityEvaluationService = new ImageRunNodeEligibilityEvaluationService({
+    nodeRepository: nodeTrustRepository,
+  });
+  const imageRunExecutionNodeSelectionService = new ImageRunExecutionNodeSelectionService({
+    eligibilityService: imageRunNodeEligibilityEvaluationService,
+  });
   const getImageManipulationExecutionReadinessUseCase = new GetImageManipulationExecutionReadinessUseCase({
     capabilityPort: options.runExecutionAdapters?.capabilityProbePort,
+    nodeSelectionService: imageRunExecutionNodeSelectionService,
     now: () => workspaceClock.now(),
   });
   const imageRunSubmissionReadinessValidationService = new ImageRunSubmissionReadinessValidationService({
