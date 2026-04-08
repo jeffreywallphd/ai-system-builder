@@ -61,6 +61,10 @@ describe("ImageAssetManagementObservability", () => {
     expect(serialized).not.toContain("img-upload-v1.payload.signature");
     expect(serialized).not.toContain("workspaces/workspace-a/image-assets/image-asset-123/original/image.png");
     expect(serialized).not.toContain("unsafe-bytes");
+    expect(event.slice).toBe("image-manipulation");
+    expect(event.correlation.workspaceId).toBe("workspace-a");
+    expect(event.correlation.assetId).toBe("image-asset:123");
+    expect(event.resilience?.[0]?.category).toBe("validation");
   });
 
   it("maps internal API failures to error severity", async () => {
@@ -93,5 +97,8 @@ describe("ImageAssetManagementObservability", () => {
     expect(logger.errorEvents[0]?.outcome).toBe("failure");
     expect(logger.errorEvents[0]?.severity).toBe("error");
     expect(logger.errorEvents[0]?.requestId).toBe("image-asset:upload:finalize:image-asset:123:op-1");
+    expect(logger.errorEvents[0]?.slice).toBe("image-manipulation");
+    expect(logger.errorEvents[0]?.correlation.operationKey).toBe("image-asset:upload:finalize:image-asset:123:op-1");
+    expect(logger.errorEvents[0]?.resilience?.[0]?.category).toBe("operational");
   });
 });

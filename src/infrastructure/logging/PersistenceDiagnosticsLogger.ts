@@ -1,15 +1,22 @@
 import { sanitizePersistenceDiagnostics } from "./PersistenceRedaction";
+import type {
+  ImageManipulationSliceCorrelation,
+  ImageManipulationSliceResilienceDiagnostic,
+} from "./ImageManipulationSliceDiagnostics";
 
 export type PersistenceDiagnosticsLogLevel = "info" | "warn" | "error";
 
 export interface PersistenceDiagnosticsLogEvent {
   readonly type: "persistence-diagnostic";
+  readonly slice?: "image-manipulation";
   readonly level: PersistenceDiagnosticsLogLevel;
   readonly repository: string;
   readonly operation: string;
   readonly code: string;
   readonly retryable: boolean;
   readonly occurredAt: string;
+  readonly correlation?: Readonly<ImageManipulationSliceCorrelation>;
+  readonly resilience?: ReadonlyArray<ImageManipulationSliceResilienceDiagnostic>;
   readonly details?: Readonly<Record<string, unknown>>;
 }
 

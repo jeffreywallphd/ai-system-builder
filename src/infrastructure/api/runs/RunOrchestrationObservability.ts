@@ -1,8 +1,16 @@
 import {
   sanitizeRunOrchestrationObservabilityEvent,
 } from "./RunOrchestrationObservabilityRedaction";
+import {
+  createImageManipulationSliceCorrelation,
+  deriveImageManipulationResilienceDiagnostics,
+  IMAGE_MANIPULATION_SLICE_NAME,
+  type ImageManipulationSliceCorrelation,
+  type ImageManipulationSliceResilienceDiagnostic,
+} from "@infrastructure/logging/ImageManipulationSliceDiagnostics";
 
 export interface RunOrchestrationObservabilityLogEvent {
+  readonly slice: typeof IMAGE_MANIPULATION_SLICE_NAME;
   readonly event: string;
   readonly operation:
     | "submission"
@@ -29,6 +37,8 @@ export interface RunOrchestrationObservabilityLogEvent {
   readonly markers?: ReadonlyArray<string>;
   readonly counters?: Readonly<Record<string, number>>;
   readonly details?: Readonly<Record<string, unknown>>;
+  readonly correlation: Readonly<ImageManipulationSliceCorrelation>;
+  readonly resilience?: ReadonlyArray<ImageManipulationSliceResilienceDiagnostic>;
 }
 
 export interface RunOrchestrationMetricsEvent {
@@ -62,13 +72,36 @@ export class RunOrchestrationObservability {
     this.metricsSink = options.metricsSink;
   }
 
-  public async record(input: Omit<RunOrchestrationObservabilityLogEvent, "occurredAt"> & {
+  public async record(input: Omit<RunOrchestrationObservabilityLogEvent, "occurredAt" | "slice" | "correlation"> & {
     readonly occurredAt?: string;
   }): Promise<void> {
     const occurredAt = input.occurredAt?.trim() || new Date().toISOString();
+    const correlation = createImageManipulationSliceCorrelation({
+      requestId: input.requestId,
+      correlationId: input.correlationId,
+      workspaceId: input.workspaceId,
+      runId: input.runId,
+      nodeId: input.nodeId,
+    });
+    const resilience = input.resilience
+      ?? (input.outcome === "failure" || input.severity !== "info"
+        ? deriveImageManipulationResilienceDiagnostics({
+          details: input.details,
+          defaultCode: `run-orchestration-${input.operation}-${input.outcome}`,
+          defaultSummary: input.outcome === "failure"
+            ? "Run orchestration operation failed."
+            : "Run orchestration operation completed with degraded or warning posture.",
+          defaultCategory: input.outcome === "failure" ? "operational" : "degraded",
+          defaultRetryable: input.severity === "warn",
+          defaultDegraded: input.outcome !== "success",
+        })
+        : undefined);
     const event = sanitizeRunOrchestrationObservabilityEvent(Object.freeze({
+      slice: IMAGE_MANIPULATION_SLICE_NAME,
       ...input,
       occurredAt,
+      correlation,
+      resilience,
     })) as RunOrchestrationObservabilityLogEvent;
 
     if (event.severity === "error") {

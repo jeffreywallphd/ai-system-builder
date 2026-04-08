@@ -7,12 +7,17 @@ import type {
   GeneratedResultPersistenceRecord,
   GeneratedResultPreviewPersistenceRecord,
 } from "@shared/dto/assets/GeneratedResultPersistenceDtos";
+import type {
+  IPersistenceDiagnosticsLogger,
+  PersistenceDiagnosticsLogEvent,
+} from "@infrastructure/logging/PersistenceDiagnosticsLogger";
 import { SqliteRunCollectedResultPersistenceAdapter } from "../SqliteRunCollectedResultPersistenceAdapter";
 
 class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRepository {
   public readonly records = new Map<string, GeneratedResultPersistenceRecord>();
   public readonly previews = new Map<string, GeneratedResultPreviewPersistenceRecord>();
   public readonly throwOnResultAssetIds = new Set<string>();
+  public readonly throwOnResultErrorMessages = new Map<string, string>();
   public readonly throwOnPreviewDerivativeIds = new Set<string>();
   public throwOnAnyPreviewSave = false;
   public remainingPreviewSaveFailures = 0;
@@ -49,7 +54,9 @@ class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRe
     _mutation: GeneratedResultPersistenceMutationEnvelope,
   ): Promise<GeneratedResultPersistenceMutationResult<GeneratedResultPersistenceRecord>> {
     if (this.throwOnResultAssetIds.has(record.resultAssetId)) {
-      throw new Error(`Temporary storage unavailable for ${record.resultAssetId}`);
+      const message = this.throwOnResultErrorMessages.get(record.resultAssetId)
+        ?? `Temporary storage unavailable for ${record.resultAssetId}`;
+      throw new Error(message);
     }
     const changed = JSON.stringify(this.records.get(record.resultAssetId)) !== JSON.stringify(record);
     this.records.set(record.resultAssetId, record);
@@ -83,6 +90,24 @@ class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRe
 
   public async getLineageByResultId(_resultAssetId: string): Promise<GeneratedResultLineageRecord | undefined> {
     return undefined;
+  }
+}
+
+class CapturingPersistenceDiagnosticsLogger implements IPersistenceDiagnosticsLogger {
+  public readonly infoEvents: PersistenceDiagnosticsLogEvent[] = [];
+  public readonly warnEvents: PersistenceDiagnosticsLogEvent[] = [];
+  public readonly errorEvents: PersistenceDiagnosticsLogEvent[] = [];
+
+  public info(event: PersistenceDiagnosticsLogEvent): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: PersistenceDiagnosticsLogEvent): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: PersistenceDiagnosticsLogEvent): void {
+    this.errorEvents.push(event);
   }
 }
 
@@ -215,8 +240,13 @@ describe("SqliteRunCollectedResultPersistenceAdapter", () => {
 
   it("continues collection when a persisted output cannot be written and records failure state", async () => {
     const repository = new InMemoryGeneratedResultRepository();
+    const diagnosticsLogger = new CapturingPersistenceDiagnosticsLogger();
     repository.throwOnResultAssetIds.add("gr-result-authoritative-2");
-    const adapter = new SqliteRunCollectedResultPersistenceAdapter({ repository });
+    repository.throwOnResultErrorMessages.set(
+      "gr-result-authoritative-2",
+      "Temporary storage unavailable for C:\\private\\workspace\\unsafe.db token=abc123",
+    );
+    const adapter = new SqliteRunCollectedResultPersistenceAdapter({ repository, diagnosticsLogger });
 
     const result = await adapter.persistCollectedResult({
       runId: "run:beta:001",
@@ -333,12 +363,26 @@ describe("SqliteRunCollectedResultPersistenceAdapter", () => {
       failedCount: 1,
       storageUnavailableCount: 1,
     });
+    expect(diagnosticsLogger.warnEvents.length).toBeGreaterThan(0);
+    const saveFailureEvent = diagnosticsLogger.warnEvents.find((entry) =>
+      entry.operation === "persist-collected-result.save-result",
+    );
+    expect(saveFailureEvent).toBeDefined();
+    expect(saveFailureEvent?.slice).toBe("image-manipulation");
+    expect(saveFailureEvent?.correlation?.runId).toBe("run:beta:001");
+    expect(saveFailureEvent?.correlation?.resultAssetId).toBe("gr-result-authoritative-2");
+    expect(saveFailureEvent?.resilience?.[0]?.scope).toBe("result-collection");
+    expect(saveFailureEvent?.resilience?.[0]?.retryable).toBeTrue();
+    const serialized = JSON.stringify(saveFailureEvent);
+    expect(serialized).not.toContain("C:\\\\private\\\\workspace\\\\unsafe.db");
+    expect(serialized).not.toContain("abc123");
   });
 
   it("records preview-failed state when preview provisioning cannot persist", async () => {
     const repository = new InMemoryGeneratedResultRepository();
+    const diagnosticsLogger = new CapturingPersistenceDiagnosticsLogger();
     repository.remainingPreviewSaveFailures = 1;
-    const adapter = new SqliteRunCollectedResultPersistenceAdapter({ repository });
+    const adapter = new SqliteRunCollectedResultPersistenceAdapter({ repository, diagnosticsLogger });
 
     const result = await adapter.persistCollectedResult({
       runId: "run:gamma:001",
@@ -414,5 +458,14 @@ describe("SqliteRunCollectedResultPersistenceAdapter", () => {
     });
     expect([...repository.previews.values()]).toHaveLength(1);
     expect([...repository.previews.values()][0]?.availabilityStatus).toBe("failed");
+    const previewFailureEvent = diagnosticsLogger.warnEvents.find((entry) =>
+      entry.operation === "persist-collected-result.save-preview",
+    );
+    expect(previewFailureEvent).toBeDefined();
+    expect(previewFailureEvent?.slice).toBe("image-manipulation");
+    expect(previewFailureEvent?.correlation?.runId).toBe("run:gamma:001");
+    expect(previewFailureEvent?.correlation?.resultAssetId).toBe("gr-result-authoritative-1");
+    expect(previewFailureEvent?.correlation?.previewDerivativeId).toBeDefined();
+    expect(previewFailureEvent?.resilience?.[0]?.scope).toBe("preview-generation");
   });
 });

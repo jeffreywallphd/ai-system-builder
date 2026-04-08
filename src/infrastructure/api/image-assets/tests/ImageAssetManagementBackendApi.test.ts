@@ -823,6 +823,10 @@ describe("ImageAssetManagementBackendApi", () => {
     expect(event.trace.assetId).toBe("image-asset:001");
     expect(event.trace.workspaceId).toBe("workspace-alpha");
     expect(event.trace.correlationId).toBe("corr-preview-1");
+    expect(event.slice).toBe("image-manipulation");
+    expect(event.correlation.correlationId).toBe("corr-preview-1");
+    expect(event.correlation.assetId).toBe("image-asset:001");
+    expect(event.resilience?.[0]?.category).toBe("validation");
 
     const serialized = JSON.stringify(event);
     expect(serialized).not.toContain("preview-token-secret");

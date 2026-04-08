@@ -1,10 +1,18 @@
 import { sanitizePersistenceDiagnostics } from "@infrastructure/logging/PersistenceRedaction";
+import {
+  createImageManipulationSliceCorrelation,
+  deriveImageManipulationResilienceDiagnostics,
+  IMAGE_MANIPULATION_SLICE_NAME,
+  type ImageManipulationSliceCorrelation,
+  type ImageManipulationSliceResilienceDiagnostic,
+} from "@infrastructure/logging/ImageManipulationSliceDiagnostics";
 import type {
   ComfyUiTransportLogEvent,
   ComfyUiTransportLogger,
 } from "./ComfyUiTransportClient";
 
 export interface ComfyUiExecutionObservabilityEvent {
+  readonly slice: typeof IMAGE_MANIPULATION_SLICE_NAME;
   readonly scope: "comfyui-execution-adapter";
   readonly event: string;
   readonly severity: "info" | "warn" | "error";
@@ -17,6 +25,8 @@ export interface ComfyUiExecutionObservabilityEvent {
   readonly correlationId?: string;
   readonly workspaceId?: string;
   readonly details?: Readonly<Record<string, unknown>>;
+  readonly correlation: Readonly<ImageManipulationSliceCorrelation>;
+  readonly resilience?: ReadonlyArray<ImageManipulationSliceResilienceDiagnostic>;
 }
 
 export interface ComfyUiExecutionObservabilityLogger {
@@ -39,10 +49,37 @@ export class ComfyUiExecutionObservability {
     this.now = options.now ?? (() => new Date());
   }
 
-  public record(event: Omit<ComfyUiExecutionObservabilityEvent, "scope" | "occurredAt"> & {
+  public record(event: Omit<ComfyUiExecutionObservabilityEvent, "scope" | "occurredAt" | "slice" | "correlation"> & {
     readonly occurredAt?: string;
   }): void {
+    const correlation = createImageManipulationSliceCorrelation({
+      correlationId: normalizeText(event.correlationId),
+      workspaceId: normalizeText(event.workspaceId),
+      runId: normalizeText(event.runId),
+      nodeId: normalizeText(event.dispatchAttemptId),
+      executionJobId: normalizeText(event.executionJobId),
+      backendExecutionId: normalizeText(event.backendExecutionId),
+      requestId: normalizeText(event.translationRequestId)
+        ?? normalizeText(event.dispatchAttemptId)
+        ?? normalizeText(event.executionJobId)
+        ?? normalizeText(event.backendExecutionId)
+        ?? normalizeText(event.runId),
+    });
+    const resilience = event.resilience
+      ?? (event.severity === "warn" || event.severity === "error"
+        ? deriveImageManipulationResilienceDiagnostics({
+          details: event.details,
+          defaultCode: `comfyui-${event.event}`,
+          defaultSummary: event.severity === "error"
+            ? "ComfyUI execution adapter reported an operational failure."
+            : "ComfyUI execution adapter reported a degraded or warning condition.",
+          defaultCategory: event.severity === "error" ? "operational" : "degraded",
+          defaultRetryable: event.severity === "warn",
+          defaultDegraded: event.severity !== "info",
+        })
+        : undefined);
     const safeEvent = sanitizeComfyUiExecutionObservabilityEvent({
+      slice: IMAGE_MANIPULATION_SLICE_NAME,
       scope: "comfyui-execution-adapter",
       event: normalizeText(event.event) ?? "comfyui.adapter.event",
       severity: event.severity,
@@ -55,6 +92,8 @@ export class ComfyUiExecutionObservability {
       correlationId: normalizeText(event.correlationId),
       workspaceId: normalizeText(event.workspaceId),
       details: event.details,
+      correlation,
+      resilience,
     });
 
     if (safeEvent.severity === "error") {
