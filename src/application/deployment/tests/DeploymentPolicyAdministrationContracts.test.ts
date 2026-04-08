@@ -7,6 +7,9 @@ import {
   evaluateDeploymentPolicyAdministrationSnapshot,
 } from "../DeploymentPolicyAdministrationContracts";
 import {
+  DeploymentPolicyAdministrationContractVersions,
+} from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
+import {
   DeploymentProfileIds,
   createCanonicalDeploymentPolicyFamilyCatalog,
   createCanonicalDeploymentProfilePresetCatalog,
@@ -35,6 +38,9 @@ describe("DeploymentPolicyAdministrationContracts", () => {
       evaluatedAt: "2026-04-07T16:00:00.000Z",
     });
 
+    expect(snapshot.contractVersion).toBe(DeploymentPolicyAdministrationContractVersions.v1);
+    expect(snapshot.preset.profileId).toBe(DeploymentProfileIds.classroom);
+    expect(snapshot.summary.familyCount).toBe(Object.keys(snapshot.families).length);
     expect(snapshot.families["approval-governance"]?.settings.runSubmissionApprovalMode?.value).toBe(
       "owner-with-manual-review",
     );

@@ -243,6 +243,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - For authorization domain contracts covering RBAC, visibility, sharing, actor/resource policy context, and policy-decision models, read [`authorization-foundation.md`](./authorization-foundation.md).
 - For canonical authorization permission naming, resource/action matrix definitions, and permission lookup usage, read [`authorization-permission-catalog.md`](./authorization-permission-catalog.md).
 - For workspace role definitions, baseline role-to-permission mappings, and deployment profile override seams, read [`authorization-role-reference.md`](./authorization-role-reference.md).
+- For Feature 20 shared deployment-profile policy contract/read-write/schema baselines, read [`deployment-profile-policy-shared-contracts.md`](./deployment-profile-policy-shared-contracts.md).
 - For reusable protected-resource visibility metadata, explicit sharing targets, and resource-authorization adaptation guidance, read [`authorization-visibility-sharing-contracts.md`](./authorization-visibility-sharing-contracts.md).
 - For authorization application ports, policy evaluator seams, and adapter expectations for context loading/event recording, read [`authorization-application-ports.md`](./authorization-application-ports.md).
 - For shared authorization payload schemas, boundary validation contracts, and schema-vs-domain guidance, read [`authorization-schema-validation-contracts.md`](./authorization-schema-validation-contracts.md).
@@ -373,6 +374,7 @@ The runtime is not a single path. The system currently supports multiple executi
 - Regression coverage now protects these guarantees through contract-focused suites in:
   - `src/application/system-studio/tests/ImageManipulationRunnableTemplateContract.regression.test.ts`,
   - existing completeness/readiness/smoke/failure-path suites under `src/application/system-studio/tests/*` and `src/infrastructure/api/studio-shell/tests/*`.
+
 
 
 
