@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  InitialImageWorkflowOperationCapabilities,
+  InitialImageWorkflowTemplateBackendFamilies,
   InitialImageWorkflowTemplateFamilyIds,
   InitialSupportedImageWorkflowTemplateSet,
   InitialSupportedImageWorkflowTemplateRegistry,
@@ -64,6 +66,58 @@ describe("InitialSupportedImageWorkflowTemplateRegistry", () => {
       expect(template.translation.translationKey.includes("}")).toBeFalse();
       expect(template.translation.translationKey.includes("raw-graph")).toBeFalse();
     }
+  });
+
+  it("provides structured compatibility metadata for capability and backend-family readiness checks", () => {
+    const registry = createInitialSupportedImageWorkflowTemplateRegistry();
+    const restyle = registry.getByOperationKind("image-to-image");
+    const masked = registry.getByOperationKind("mask-guided-edit");
+
+    expect(restyle?.compatibility.requiredOperationCapability).toBe(
+      InitialImageWorkflowOperationCapabilities.imageToImage,
+    );
+    expect(restyle?.compatibility.requiredInputKinds).toEqual(["source-image"]);
+    expect(restyle?.compatibility.requiredOutputKinds).toEqual(["generated-image"]);
+    expect(restyle?.compatibility.translationBackendFamilies).toEqual([
+      InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation,
+    ]);
+    expect(restyle?.compatibility.readinessChecks.translationBackendFamily).toBeTrue();
+
+    expect(masked?.compatibility.requiredInputKinds.sort()).toEqual(["mask-image", "source-image"]);
+  });
+
+  it("resolves and evaluates compatibility readiness for later validation/node/translation consumers", () => {
+    const registry = createInitialSupportedImageWorkflowTemplateRegistry();
+    const compatibility = registry.resolveCompatibilityMetadataForOperationKind("enhance-upscale");
+
+    expect(compatibility?.requiredOperationCapability).toBe(
+      InitialImageWorkflowOperationCapabilities.enhanceUpscale,
+    );
+    expect(compatibility?.translationBackendFamilies).toEqual([
+      InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation,
+    ]);
+
+    const ready = registry.evaluateCompatibilityReadinessForOperationKind({
+      operationKind: "enhance-upscale",
+      availableOperationCapabilities: [InitialImageWorkflowOperationCapabilities.enhanceUpscale],
+      availableInputKinds: ["source-image"],
+      availableOutputKinds: ["generated-image"],
+      availableTranslationBackendFamilies: [InitialImageWorkflowTemplateBackendFamilies.comfyUiImageManipulation],
+    });
+    expect(ready.compatible).toBeTrue();
+    expect(ready.issues).toEqual([]);
+
+    const missing = registry.evaluateCompatibilityReadinessForOperationKind({
+      operationKind: "enhance-upscale",
+      availableOperationCapabilities: [],
+      availableInputKinds: [],
+      availableOutputKinds: ["generated-image"],
+      availableTranslationBackendFamilies: [],
+    });
+    expect(missing.compatible).toBeFalse();
+    expect(missing.issues.some((issue) => issue.code === "required-operation-capability-missing")).toBeTrue();
+    expect(missing.issues.some((issue) => issue.code === "required-input-kind-missing")).toBeTrue();
+    expect(missing.issues.some((issue) => issue.code === "required-translation-backend-family-missing")).toBeTrue();
   });
 
   it("provides centralized defaults, guidance, and reusable presets for supported templates", () => {
@@ -137,6 +191,26 @@ describe("InitialSupportedImageWorkflowTemplateRegistry", () => {
         ...InitialSupportedImageWorkflowTemplateSet[2]!,
       },
     ])).toThrow("references unknown id");
+  });
+
+  it("rejects template registration when compatibility metadata drifts from required contract requirements", () => {
+    const invalidTemplate = {
+      ...InitialSupportedImageWorkflowTemplateSet[2]!,
+      compatibility: {
+        ...InitialSupportedImageWorkflowTemplateSet[2]!.compatibility,
+        requiredInputKinds: ["source-image"],
+      },
+    } as const;
+
+    expect(() => new InitialSupportedImageWorkflowTemplateRegistry([
+      {
+        ...InitialSupportedImageWorkflowTemplateSet[0]!,
+      },
+      {
+        ...InitialSupportedImageWorkflowTemplateSet[1]!,
+      },
+      invalidTemplate,
+    ])).toThrow("compatibility.requiredInputKinds must include 'mask-image'");
   });
 
   it("rejects template registration when defaults and presets violate parameter requirements", () => {

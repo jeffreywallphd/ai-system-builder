@@ -3,6 +3,7 @@
 This note documents Story 2.3.1 for Feature 2 / Epic 2.3: the initial production-ready workflow set for the image manipulation vertical slice.
 Story 2.3.2 extends this set with translation-ready template metadata for adapter consumption.
 Story 2.3.3 adds template-scoped defaults and reusable parameter presets so supported workflows are immediately usable without low-level tuning.
+Story 2.3.4 extends the set with explicit compatibility/capability metadata and readiness evaluation seams for later scheduling, node capability checks, and translation backend selection.
 
 ## Purpose
 
@@ -19,6 +20,7 @@ Lock down a concrete, typed, user-facing workflow set so downstream translation 
 Story 2.3.2 metadata seam:
 
 - `InitialImageWorkflowTemplateDefinition.display` for user-facing labels and rationale.
+- `InitialImageWorkflowTemplateDefinition.compatibility` for operation capability requirements, required input/output kinds, backend family identifiers, and readiness-check toggles.
 - `InitialImageWorkflowTemplateDefinition.translation` for internal translation keys, capability hints, and mapping descriptors.
 - `InitialImageWorkflowTemplateDefinition.configuration` for defaults, parameter guidance (recommended ranges + guardrails), and reusable preset profiles.
 
@@ -92,6 +94,17 @@ For Story 2.3.3 it also enforces configuration readiness by validating:
 - presets reference known parameters and can be resolved from defaults + preset overrides,
 - parameter guidance exists for each supported parameter and carries user-facing helper text,
 - recommended ranges and guardrails are structurally valid for later studio and system-binding flows.
+
+For Story 2.3.4 it also enforces and exposes compatibility readiness by validating:
+
+- required operation capability metadata is present,
+- required input/output kinds include all required typed contract kinds,
+- translation/backend family identifiers remain aligned with adapter-family metadata.
+
+Registry consumption seams for downstream consumers:
+
+- `resolveCompatibilityMetadataForOperationKind(...)` resolves canonical capability metadata by operation.
+- `evaluateCompatibilityReadinessForOperationKind(...)` performs deterministic readiness checks against available operation capabilities, input/output kinds, and backend family availability.
 
 ## Defaults and presets UX role
 

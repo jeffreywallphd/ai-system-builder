@@ -5,6 +5,7 @@
 Story 2.3.1 defines the initial supported workflow template set for authoritative image-workflow definition authoring.
 Story 2.3.2 adds translation-ready internal metadata for those template families so later adapter execution can map typed definitions into backend requests without treating backend graphs as product truth.
 Story 2.3.3 adds template-level defaults and reusable presets so supported templates are immediately usable by non-technical users.
+Story 2.3.4 adds explicit compatibility/capability metadata and readiness evaluation seams so later scheduling/node-capability checks and backend translation selection can validate template runability in a given environment.
 
 ## Canonical files
 
@@ -18,6 +19,7 @@ Story 2.3.3 adds template-level defaults and reusable presets so supported templ
 Story 2.3.2 metadata shape lives in:
 
 - `InitialImageWorkflowTemplateDefinition.display` (user-facing text)
+- `InitialImageWorkflowTemplateDefinition.compatibility` (required operation capability, required input/output kinds, translation backend family identifiers, readiness-check switches)
 - `InitialImageWorkflowTemplateDefinition.translation` (internal translation metadata)
 - `InitialImageWorkflowTemplateDefinition.configuration` (default values, parameter guidance, reusable preset profiles)
 
@@ -57,6 +59,15 @@ For Story 2.3.3 it additionally validates:
 - defaults/presets match parameter value kinds and known parameter ids,
 - every supported parameter has user-facing guidance with recommended ranges and guardrails,
 - preset ids are unique and resolvable for later system baseline cloning.
+
+For Story 2.3.4 it additionally validates and exposes:
+
+- explicit template-level required operation capability ids,
+- required input/output kinds mirrored from typed minimum requirements,
+- translation/backend family identifiers aligned to adapter-family metadata,
+- reusable readiness evaluation API:
+- `resolveCompatibilityMetadataForOperationKind(...)`
+- `evaluateCompatibilityReadinessForOperationKind(...)`
 
 ## Translation metadata consumption guidance
 

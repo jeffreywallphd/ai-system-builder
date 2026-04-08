@@ -18,6 +18,7 @@ Story 2.2.6 extends the baseline with reusable readiness validation services so 
 Story 2.3.1 extends the baseline with an explicit initial supported workflow template set so authoring and downstream translation targets remain bounded and deterministic.
 Story 2.3.2 extends the baseline with internal translation-ready metadata for supported templates and consistency checks that keep translation descriptors aligned with typed requirements.
 Story 2.3.3 extends the baseline with template-level defaults, parameter guidance, and reusable presets so image workflows are usable without exposing backend tuning jargon.
+Story 2.3.4 extends the baseline with explicit compatibility/capability metadata on supported templates plus readiness-evaluation seams for node capability and backend translation eligibility checks.
 
 ## Canonical implementation seams
 
@@ -51,6 +52,7 @@ Initial supported workflow template families for this slice:
 Template metadata split for translation-ready templates:
 
 - `display`: user-facing text surfaced by Studio and API projections.
+- `compatibility`: operation capability requirements, required input/output kinds, translation backend family identifiers, and readiness-check toggles.
 - `translation`: internal adapter metadata (translation key, capability hints, input/parameter/output mapping descriptors).
 - `configuration`: default parameter values, recommended ranges, guardrails, and reusable preset profiles for form initialization and future system baseline cloning.
 
@@ -123,6 +125,11 @@ ComfyUI adapter consumption rule for Story 2.3.2:
 
 - use translation metadata keys to resolve adapter-internal graph templates;
 - keep raw ComfyUI graph JSON/prompt/history payloads out of workflow/system definition contracts and user-facing APIs.
+
+Template compatibility consumption rule for Story 2.3.4:
+
+- consume `resolveCompatibilityMetadataForOperationKind(...)` and `evaluateCompatibilityReadinessForOperationKind(...)` from `InitialSupportedImageWorkflowTemplateRegistry` for deterministic capability/backend-family readiness checks;
+- keep these checks in application/service layers and do not re-implement them as UI-only heuristics.
 
 ## Versioning and evolution seams
 
