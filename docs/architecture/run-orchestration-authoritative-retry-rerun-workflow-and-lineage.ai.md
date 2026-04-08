@@ -25,8 +25,10 @@ Story 16.3.2 implements authoritative retry/rerun behavior for eligible failed/c
 - Retry resubmission reuses canonical submission pipeline (`ValidateRunSubmissionUseCase` + `CreateAuthoritativeRunUseCase`).
 - Source runs remain immutable; retries create new run records.
 - Retried runs carry explicit lineage (`retry.previousRunId`, incremented attempt, optional reason) plus orchestration metadata lineage.
+- Retry does not redispatch source runs in place; all retry behavior is new-run creation only.
 
 ## Guardrails
 - Transport/backend handlers must not persist retried runs directly.
 - Retry success must include explicit linkage to source run.
 - Ineligible retries must return explicit failure semantics.
+- Duplicate retry intent handling remains in canonical submission idempotency semantics, not source-run mutation paths.

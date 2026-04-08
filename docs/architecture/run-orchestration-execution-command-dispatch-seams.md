@@ -57,6 +57,25 @@ Canonical commands include a normalized backend kind:
 
 Application orchestration depends only on canonical command/receipt contracts. It does not depend on any backend payload DTO shape.
 
+## Dispatch safety guards
+
+`DispatchAssignedRunExecutionUseCase` now enforces an authoritative pre-dispatch guard before calling backend adapters:
+
+- verifies the run still exists and is still in lifecycle state `assigned`
+- verifies the referenced dispatch attempt exists and matches the command-assigned node
+- rejects dispatch attempts that already have a recorded dispatch result
+- atomically transitions the run to `dispatching` with optimistic concurrency (`expectedRevision`) before backend dispatch
+
+This prevents duplicate backend execution in the supported orchestration path by making dispatch eligibility authoritative and conflict-detectable rather than best-effort.
+
+Guard failures are explicit (`RunDispatchGuardError`) and include deterministic codes:
+
+- `run-not-found`
+- `dispatch-attempt-not-found`
+- `dispatch-attempt-node-mismatch`
+- `dispatch-attempt-already-finalized`
+- `duplicate-dispatch-detected`
+
 ## Infrastructure adapter isolation
 
 Backend payload translation is isolated in infrastructure adapters:

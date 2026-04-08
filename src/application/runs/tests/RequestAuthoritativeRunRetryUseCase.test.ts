@@ -413,6 +413,110 @@ describe("RequestAuthoritativeRunRetryUseCase", () => {
     expect(create.calls).toHaveLength(0);
   });
 
+  it("fails retry requests when the source run is already retry-pending", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const intentRepository = new InMemoryIntentRepository();
+    const validate = new StubValidateRunSubmissionUseCase();
+    const create = new StubCreateAuthoritativeRunUseCase();
+
+    const canonicalRun = createCanonicalRunRecord({
+      identity: {
+        runId: "run:retry-pending",
+        workflowId: "workflow:demo",
+        workspaceId: "workspace-alpha",
+      },
+      submission: {
+        source: RunSubmissionSources.api,
+        submittedAt: "2026-04-07T12:00:00.000Z",
+        submittedByActorId: "user:owner",
+      },
+      state: RunLifecycleStates.retryPending,
+      queue: {
+        queueId: "queue:default",
+        enteredAt: "2026-04-07T12:00:00.000Z",
+        position: null,
+        positionAsOf: "2026-04-07T12:04:00.000Z",
+        dequeuedAt: "2026-04-07T12:03:00.000Z",
+      },
+      assignment: {
+        status: "unassigned",
+      },
+      execution: {
+        outcome: RunExecutionOutcomeKinds.none,
+      },
+      retry: {
+        attempt: 1,
+        maxAttempts: 3,
+        queuedAt: "2026-04-07T12:03:00.000Z",
+      },
+      updatedAt: "2026-04-07T12:04:00.000Z",
+    });
+
+    const metadata: RunAuthoritativeMetadata = Object.freeze({
+      schemaVersion: 1,
+      canonicalRun,
+      submissionSnapshot: Object.freeze({
+        actor: Object.freeze({
+          actorUserIdentityId: "user:owner",
+          activeWorkspaceId: "workspace-alpha",
+        }),
+        runtimeTarget: Object.freeze({
+          systemId: "system:demo",
+          versionId: "version:demo",
+          async: true,
+        }),
+        tags: Object.freeze(["quality:high"]),
+        parameters: Object.freeze({ seed: 42 }),
+        metadata: Object.freeze({ mode: "baseline" }),
+        storageReferences: Object.freeze([]),
+        resourceReferences: Object.freeze([]),
+        policyPrerequisites: Object.freeze([]),
+      }),
+      visibility: Object.freeze({
+        workspaceScope: "workspace",
+        sharingPosture: "workspace-members",
+      }),
+      orchestration: Object.freeze({
+        initialLifecycleState: RunLifecycleStates.queued,
+        initialQueueState: "queued",
+        intent: Object.freeze({
+          kind: "queue-admission-requested",
+          queueId: "queue:default",
+          recordedAt: "2026-04-07T12:00:00.000Z",
+        }),
+      }),
+    });
+
+    runRepository.runs.set("run:retry-pending", Object.freeze({
+      runId: "run:retry-pending",
+      runKind: "workflow",
+      status: mapLifecycleStateToPlatformRunStatus(RunLifecycleStates.retryPending),
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user:owner",
+      sourceAggregateRef: "workflow:demo",
+      initiatedAt: "2026-04-07T12:00:00.000Z",
+      metadata,
+      revision: 1,
+    }));
+
+    const useCase = new RequestAuthoritativeRunRetryUseCase({
+      runRepository,
+      orchestrationIntentRepository: intentRepository,
+      validateRunSubmissionUseCase: validate as unknown as ValidateRunSubmissionUseCase,
+      createAuthoritativeRunUseCase: create as unknown as CreateAuthoritativeRunUseCase,
+    });
+
+    await expect(useCase.execute({
+      workspaceId: "workspace-alpha",
+      actorUserIdentityId: "user:ops",
+      request: Object.freeze({
+        runId: "run:retry-pending",
+      }),
+    })).rejects.toBeInstanceOf(RunRetryIneligibleError);
+    expect(validate.calls).toHaveLength(0);
+    expect(create.calls).toHaveLength(0);
+  });
+
   it("fails retry when authoritative submission snapshot metadata is unavailable", async () => {
     const runRepository = new InMemoryRunRepository();
     const intentRepository = new InMemoryIntentRepository();

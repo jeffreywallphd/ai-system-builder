@@ -643,6 +643,8 @@ describe("Run orchestration lifecycle regression", () => {
     const dispatch = new DispatchAssignedRunExecutionUseCase({
       commandBuilder,
       dispatchResultHandler,
+      runRepository,
+      queueRepository,
       now: () => new Date("2026-04-07T12:00:40.000Z"),
       dispatchPort: {
         dispatch: async () => Object.freeze({
