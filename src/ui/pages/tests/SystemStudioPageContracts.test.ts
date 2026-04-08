@@ -32,7 +32,7 @@ describe("SystemStudioPage contracts", () => {
     expect(registrationSource).not.toContain("system-studio-advanced-setup");
     expect(registrationSource).not.toContain("system-studio-composition-capabilities");
     expect(registrationSource).not.toContain("system-studio-metadata-summary");
-    expect(workManagementPanelSource).toContain("Supported workflow operations");
+    expect(workManagementPanelSource).toContain("Supported edit types");
     expect(workManagementPanelSource).toContain("listImageWorkflowDefinitions");
     expect(workManagementPanelSource).toContain("getImageWorkflowDefinition");
   });

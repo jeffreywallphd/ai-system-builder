@@ -100,3 +100,23 @@ Implementation posture:
 - authoritative IDs (`workflowId`, `systemId`, versions) remain the persisted/runtime truth,
 - technical metadata is kept in advanced details instead of primary UX copy.
 
+## Epic 7.2 Story 7.2.3 implementation update
+
+Story 7.2.3 upgrades "Adjust settings" and saved-configuration actions so users edit typed workflow parameters with clearer defaults/validation and can save/reopen without local truth drift.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/SystemWorkflowParameterForm.tsx`
+- `src/ui/components/studio-shell/SystemWorkflowParameterFormPresenter.ts`
+- `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterForm.test.tsx`
+- `src/ui/components/studio-shell/tests/SystemWorkflowParameterFormPresenter.test.ts`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+
+Implementation posture:
+
+- typed controls are grouped into user-facing sections with progressive disclosure for advanced sections (`ui.group`, `ui.advanced` metadata),
+- required indicators, default-value hints, help text, and validation feedback are rendered from authoritative workflow parameter contracts,
+- validation and saved baselines are normalized to declared parameter specs (unknown ad hoc keys are excluded),
+- save-as-new, update-existing, and reopen flows now reuse one in-panel workflow-parameter map synchronized through authoritative APIs to avoid draft-content/studio-state divergence.
+

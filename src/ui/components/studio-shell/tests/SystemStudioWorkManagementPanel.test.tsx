@@ -57,6 +57,7 @@ describe("SystemStudioWorkManagementPanel", () => {
     expect(html).toContain("Update saved");
     expect(html).toContain("Saved image systems");
     expect(html).toContain("Select a saved image system");
+    expect(html).toContain("Reopen saved configuration");
     expect(html).toContain("Rename this work");
     expect(html).toContain("Supported edit types");
     expect(html).toContain("Select a supported edit type");

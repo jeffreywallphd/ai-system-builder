@@ -18,6 +18,13 @@ export interface WorkflowParameterValidationPresentation {
   readonly hasIssues: boolean;
 }
 
+export interface WorkflowParameterSectionPresentation {
+  readonly sectionId: string;
+  readonly title: string;
+  readonly advanced: boolean;
+  readonly parameters: ReadonlyArray<ImageWorkflowParameterSpecification>;
+}
+
 function evaluateVisibilityRule(
   rule: ImageWorkflowParameterVisibilityRule,
   values: Readonly<Record<string, unknown>>,
@@ -77,6 +84,61 @@ export function createWorkflowParameterInitialValues(input: {
   return Object.freeze(nextValues);
 }
 
+function resolveSpecificationOrder(specification: ImageWorkflowParameterSpecification): number {
+  return specification.ui.order ?? Number.MAX_SAFE_INTEGER;
+}
+
+function resolveSectionId(specification: ImageWorkflowParameterSpecification): string {
+  const normalized = specification.ui.group?.trim().toLowerCase();
+  if (!normalized) {
+    return "general";
+  }
+  return normalized.replace(/\s+/g, "-");
+}
+
+function toSectionTitle(sectionId: string): string {
+  if (sectionId === "general") {
+    return "Core settings";
+  }
+  return sectionId
+    .split("-")
+    .filter((entry) => entry.length > 0)
+    .map((entry) => `${entry.charAt(0).toUpperCase()}${entry.slice(1)}`)
+    .join(" ");
+}
+
+export function groupWorkflowParameterSections(workflow: StudioImageWorkflowDefinitionReadModel): ReadonlyArray<WorkflowParameterSectionPresentation> {
+  const ordered = [...workflow.parameterSpecifications].sort((left, right) => {
+    const orderDelta = resolveSpecificationOrder(left) - resolveSpecificationOrder(right);
+    if (orderDelta !== 0) {
+      return orderDelta;
+    }
+    return left.parameterId.localeCompare(right.parameterId);
+  });
+
+  const sectionOrder: string[] = [];
+  const parametersBySection = new Map<string, Array<ImageWorkflowParameterSpecification>>();
+  const sectionAdvanced = new Map<string, boolean>();
+
+  for (const specification of ordered) {
+    const sectionId = resolveSectionId(specification);
+    if (!parametersBySection.has(sectionId)) {
+      sectionOrder.push(sectionId);
+      parametersBySection.set(sectionId, []);
+      sectionAdvanced.set(sectionId, false);
+    }
+    parametersBySection.get(sectionId)?.push(specification);
+    sectionAdvanced.set(sectionId, (sectionAdvanced.get(sectionId) ?? false) || specification.ui.advanced === true);
+  }
+
+  return Object.freeze(sectionOrder.map((sectionId) => Object.freeze({
+    sectionId,
+    title: toSectionTitle(sectionId),
+    advanced: sectionAdvanced.get(sectionId) === true,
+    parameters: Object.freeze(parametersBySection.get(sectionId) ?? []),
+  })));
+}
+
 export function coerceWorkflowParameterInputValue(
   specification: ImageWorkflowParameterSpecification,
   rawValue: string | boolean,
@@ -102,11 +164,42 @@ export function coerceWorkflowParameterInputValue(
   return rawValue;
 }
 
+function createValidatedValueMap(input: {
+  readonly workflow: StudioImageWorkflowDefinitionReadModel;
+  readonly values: Readonly<Record<string, unknown>>;
+}): Readonly<Record<string, unknown>> {
+  const nextValues: Record<string, unknown> = {};
+  for (const specification of input.workflow.parameterSpecifications) {
+    const existingValue = input.values[specification.parameterId];
+    if (existingValue !== undefined) {
+      nextValues[specification.parameterId] = existingValue;
+      continue;
+    }
+    const workflowDefaultValue = input.workflow.parameterDefaults?.[specification.parameterId];
+    if (workflowDefaultValue !== undefined) {
+      nextValues[specification.parameterId] = workflowDefaultValue;
+      continue;
+    }
+    if (specification.defaultValue !== undefined) {
+      nextValues[specification.parameterId] = specification.defaultValue;
+    }
+  }
+  return Object.freeze(nextValues);
+}
+
+export function createWorkflowParameterBaselineValues(input: {
+  readonly workflow: StudioImageWorkflowDefinitionReadModel;
+  readonly values: Readonly<Record<string, unknown>>;
+}): Readonly<Record<string, unknown>> {
+  return createValidatedValueMap(input);
+}
+
 export function validateWorkflowParameterValues(input: {
   readonly workflow: StudioImageWorkflowDefinitionReadModel;
   readonly values: Readonly<Record<string, unknown>>;
 }): WorkflowParameterValidationPresentation {
-  const valueEntries = Object.entries(input.values).map(([parameterId, value]) => Object.freeze({
+  const validatedValues = createValidatedValueMap(input);
+  const valueEntries = Object.entries(validatedValues).map(([parameterId, value]) => Object.freeze({
     parameterId,
     value,
     source: ImageSystemParameterValueSources.baseline,
