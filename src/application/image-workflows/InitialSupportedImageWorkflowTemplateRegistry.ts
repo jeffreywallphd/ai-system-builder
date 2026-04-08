@@ -18,6 +18,15 @@ export const InitialImageWorkflowTemplateFamilyIds = Object.freeze({
 export type InitialImageWorkflowTemplateFamilyId =
   typeof InitialImageWorkflowTemplateFamilyIds[keyof typeof InitialImageWorkflowTemplateFamilyIds];
 
+export const InitialImageWorkflowTemplatePresetScopes = Object.freeze({
+  platformDefault: "platform-default",
+  workspaceShared: "workspace-shared",
+  userPrivate: "user-private",
+});
+
+export type InitialImageWorkflowTemplatePresetScope =
+  typeof InitialImageWorkflowTemplatePresetScopes[keyof typeof InitialImageWorkflowTemplatePresetScopes];
+
 export interface InitialImageWorkflowTemplateInputRequirement {
   readonly inputId: string;
   readonly kind: ImageWorkflowInputSlotKind;
@@ -82,16 +91,71 @@ export interface InitialImageWorkflowTemplateTranslationMetadata {
   readonly outputMappings: ReadonlyArray<InitialImageWorkflowTemplateOutputTranslationMapping>;
 }
 
+export interface InitialImageWorkflowTemplateParameterValueRecommendedRange {
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly step?: number;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly suggestedValues?: ReadonlyArray<string | number | boolean>;
+}
+
+export interface InitialImageWorkflowTemplateParameterValueGuardrails {
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly minLength?: number;
+  readonly maxLength?: number;
+  readonly allowEmpty?: boolean;
+  readonly allowedValues?: ReadonlyArray<string | number | boolean>;
+}
+
+export interface InitialImageWorkflowTemplateParameterGuidance {
+  readonly parameterId: string;
+  readonly label: string;
+  readonly helperText: string;
+  readonly recommendedRange?: InitialImageWorkflowTemplateParameterValueRecommendedRange;
+  readonly guardrails?: InitialImageWorkflowTemplateParameterValueGuardrails;
+}
+
+export interface InitialImageWorkflowTemplateDefaultParameterValues {
+  readonly title: string;
+  readonly summary: string;
+  readonly parameterValues: Readonly<Record<string, unknown>>;
+}
+
+export interface InitialImageWorkflowTemplatePresetDefinition {
+  readonly presetId: string;
+  readonly scope: InitialImageWorkflowTemplatePresetScope;
+  readonly title: string;
+  readonly summary: string;
+  readonly parameterValues: Readonly<Record<string, unknown>>;
+}
+
+export interface InitialImageWorkflowTemplateConfigurationMetadata {
+  readonly defaults: InitialImageWorkflowTemplateDefaultParameterValues;
+  readonly presets: ReadonlyArray<InitialImageWorkflowTemplatePresetDefinition>;
+  readonly parameterGuidance: ReadonlyArray<InitialImageWorkflowTemplateParameterGuidance>;
+}
+
 export interface InitialImageWorkflowTemplateDefinition {
   readonly templateFamilyId: InitialImageWorkflowTemplateFamilyId;
   readonly operationKind: ImageWorkflowOperationKind;
   readonly display: InitialImageWorkflowTemplateDisplayMetadata;
   readonly translation: InitialImageWorkflowTemplateTranslationMetadata;
+  readonly configuration: InitialImageWorkflowTemplateConfigurationMetadata;
   readonly minimumRequirements: {
     readonly inputSlots: ReadonlyArray<InitialImageWorkflowTemplateInputRequirement>;
     readonly parameterSpecifications: ReadonlyArray<InitialImageWorkflowTemplateParameterRequirement>;
     readonly outputExpectations: ReadonlyArray<InitialImageWorkflowTemplateOutputRequirement>;
   };
+}
+
+export interface ResolvedImageWorkflowTemplateParameterValues {
+  readonly templateFamilyId: InitialImageWorkflowTemplateFamilyId;
+  readonly operationKind: ImageWorkflowOperationKind;
+  readonly source: "defaults" | "preset";
+  readonly presetId?: string;
+  readonly parameterValues: Readonly<Record<string, unknown>>;
 }
 
 function freezeTemplate(
@@ -113,6 +177,35 @@ function freezeTemplate(
         template.translation.parameterMappings.map((mapping) => Object.freeze({ ...mapping })),
       ),
       outputMappings: Object.freeze(template.translation.outputMappings.map((mapping) => Object.freeze({ ...mapping }))),
+    }),
+    configuration: Object.freeze({
+      defaults: Object.freeze({
+        ...template.configuration.defaults,
+        parameterValues: Object.freeze({ ...template.configuration.defaults.parameterValues }),
+      }),
+      presets: Object.freeze(template.configuration.presets.map((preset) => Object.freeze({
+        ...preset,
+        parameterValues: Object.freeze({ ...preset.parameterValues }),
+      }))),
+      parameterGuidance: Object.freeze(template.configuration.parameterGuidance.map((entry) => Object.freeze({
+        ...entry,
+        recommendedRange: entry.recommendedRange
+          ? Object.freeze({
+            ...entry.recommendedRange,
+            suggestedValues: entry.recommendedRange.suggestedValues
+              ? Object.freeze([...entry.recommendedRange.suggestedValues])
+              : undefined,
+          })
+          : undefined,
+        guardrails: entry.guardrails
+          ? Object.freeze({
+            ...entry.guardrails,
+            allowedValues: entry.guardrails.allowedValues
+              ? Object.freeze([...entry.guardrails.allowedValues])
+              : undefined,
+          })
+          : undefined,
+      }))),
     }),
     minimumRequirements: Object.freeze({
       inputSlots: Object.freeze(template.minimumRequirements.inputSlots.map((slot) => Object.freeze({ ...slot }))),
@@ -163,6 +256,63 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
         outputId: "generatedImage",
         translationKey: "outputs.generated-image",
         required: true,
+      }],
+    },
+    configuration: {
+      defaults: {
+        title: "Balanced restyle",
+        summary: "Good starting point for guided edits that preserve the original image composition.",
+        parameterValues: {
+          prompt: "Restyle this image while preserving its composition and core subject details.",
+          variationStrength: 0.45,
+        },
+      },
+      presets: [{
+        presetId: "subtle-cleanup",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Subtle Cleanup",
+        summary: "Small quality improvements and cleanup while keeping the original style mostly intact.",
+        parameterValues: {
+          prompt: "Clean up small artifacts, improve clarity, and keep the original style.",
+          variationStrength: 0.25,
+        },
+      }, {
+        presetId: "bold-restyle",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Bold Restyle",
+        summary: "Stronger visual changes for exploratory variations.",
+        parameterValues: {
+          prompt: "Create a stronger visual restyle with noticeable artistic changes.",
+          variationStrength: 0.7,
+        },
+      }],
+      parameterGuidance: [{
+        parameterId: "prompt",
+        label: "Edit Direction",
+        helperText: "Describe what should change, and keep instructions focused on visible image outcomes.",
+        recommendedRange: {
+          minLength: 20,
+          maxLength: 260,
+        },
+        guardrails: {
+          minLength: 5,
+          maxLength: 800,
+          allowEmpty: false,
+        },
+      }, {
+        parameterId: "variationStrength",
+        label: "Variation Strength",
+        helperText: "Lower values keep the source image closer to original; higher values allow stronger restyling.",
+        recommendedRange: {
+          minimum: 0.25,
+          maximum: 0.65,
+          step: 0.05,
+          suggestedValues: [0.25, 0.45, 0.65],
+        },
+        guardrails: {
+          minimum: 0,
+          maximum: 1,
+        },
       }],
     },
     minimumRequirements: {
@@ -225,6 +375,55 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
         outputId: "enhancedImage",
         translationKey: "outputs.enhanced-image",
         required: true,
+      }],
+    },
+    configuration: {
+      defaults: {
+        title: "Standard 2x",
+        summary: "Balanced default for most web and screen uses.",
+        parameterValues: {
+          scaleFactor: 2,
+        },
+      },
+      presets: [{
+        presetId: "web-sharp-2x",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Web Sharp 2x",
+        summary: "Reliable enhancement for online display where artifact control matters.",
+        parameterValues: {
+          scaleFactor: 2,
+        },
+      }, {
+        presetId: "print-detail-3x",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Print Detail 3x",
+        summary: "Higher detail target for print-ready derivatives.",
+        parameterValues: {
+          scaleFactor: 3,
+        },
+      }, {
+        presetId: "max-detail-4x",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Max Detail 4x",
+        summary: "Strong upscale for cases where larger dimensions are required.",
+        parameterValues: {
+          scaleFactor: 4,
+        },
+      }],
+      parameterGuidance: [{
+        parameterId: "scaleFactor",
+        label: "Upscale Factor",
+        helperText: "Higher factors increase output size and may increase runtime cost.",
+        recommendedRange: {
+          minimum: 2,
+          maximum: 3,
+          step: 1,
+          suggestedValues: [2, 3, 4],
+        },
+        guardrails: {
+          minimum: 1,
+          maximum: 4,
+        },
       }],
     },
     minimumRequirements: {
@@ -290,6 +489,59 @@ export const InitialSupportedImageWorkflowTemplateSet: ReadonlyArray<InitialImag
         outputId: "editedImage",
         translationKey: "outputs.edited-image",
         required: true,
+      }],
+    },
+    configuration: {
+      defaults: {
+        title: "Precise Retouch",
+        summary: "Conservative edits limited to masked regions.",
+        parameterValues: {
+          prompt: "Edit only the masked area and keep the surrounding image consistent.",
+          preserveUnmaskedAreas: true,
+        },
+      },
+      presets: [{
+        presetId: "precise-retouch",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Precise Retouch",
+        summary: "Small, controlled fixes while preserving untouched areas.",
+        parameterValues: {
+          prompt: "Retouch the masked area only and preserve surrounding details.",
+          preserveUnmaskedAreas: true,
+        },
+      }, {
+        presetId: "creative-replace",
+        scope: InitialImageWorkflowTemplatePresetScopes.platformDefault,
+        title: "Creative Replace",
+        summary: "More assertive masked-region replacement with creative variation.",
+        parameterValues: {
+          prompt: "Replace the masked area with a creative but coherent new visual concept.",
+          preserveUnmaskedAreas: false,
+        },
+      }],
+      parameterGuidance: [{
+        parameterId: "prompt",
+        label: "Masked Edit Direction",
+        helperText: "Describe only what should change inside the masked area.",
+        recommendedRange: {
+          minLength: 15,
+          maxLength: 220,
+        },
+        guardrails: {
+          minLength: 5,
+          maxLength: 800,
+          allowEmpty: false,
+        },
+      }, {
+        parameterId: "preserveUnmaskedAreas",
+        label: "Protect Unmasked Areas",
+        helperText: "Keep this enabled for targeted edits; disable for more global blending behavior.",
+        recommendedRange: {
+          suggestedValues: [true],
+        },
+        guardrails: {
+          allowedValues: [true, false],
+        },
       }],
     },
     minimumRequirements: {
@@ -371,6 +623,63 @@ export class InitialSupportedImageWorkflowTemplateRegistry {
   public isOperationSupported(operationKind: ImageWorkflowOperationKind): boolean {
     return this.templatesByOperation.has(operationKind);
   }
+
+  public listPresetsForOperationKind(operationKind: ImageWorkflowOperationKind): ReadonlyArray<InitialImageWorkflowTemplatePresetDefinition> {
+    const template = this.templatesByOperation.get(operationKind);
+    if (!template) {
+      return Object.freeze([]);
+    }
+    return template.configuration.presets;
+  }
+
+  public resolveDefaultParameterValuesForOperationKind(
+    operationKind: ImageWorkflowOperationKind,
+  ): ResolvedImageWorkflowTemplateParameterValues | undefined {
+    const template = this.templatesByOperation.get(operationKind);
+    if (!template) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      templateFamilyId: template.templateFamilyId,
+      operationKind: template.operationKind,
+      source: "defaults",
+      parameterValues: template.configuration.defaults.parameterValues,
+    });
+  }
+
+  public resolveParameterValuesForOperationKind(input: {
+    readonly operationKind: ImageWorkflowOperationKind;
+    readonly presetId?: string;
+  }): ResolvedImageWorkflowTemplateParameterValues | undefined {
+    const template = this.templatesByOperation.get(input.operationKind);
+    if (!template) {
+      return undefined;
+    }
+
+    const presetId = input.presetId?.trim();
+    if (!presetId) {
+      return this.resolveDefaultParameterValuesForOperationKind(input.operationKind);
+    }
+
+    const preset = template.configuration.presets.find((entry) => entry.presetId === presetId);
+    if (!preset) {
+      throw new Error(
+        `Template '${template.templateFamilyId}' does not contain preset '${presetId}'.`,
+      );
+    }
+
+    return Object.freeze({
+      templateFamilyId: template.templateFamilyId,
+      operationKind: template.operationKind,
+      source: "preset",
+      presetId: preset.presetId,
+      parameterValues: Object.freeze({
+        ...template.configuration.defaults.parameterValues,
+        ...preset.parameterValues,
+      }),
+    });
+  }
 }
 
 export function createInitialSupportedImageWorkflowTemplateRegistry(): InitialSupportedImageWorkflowTemplateRegistry {
@@ -435,6 +744,8 @@ function assertTemplateDefinitionIsTranslationReady(template: InitialImageWorkfl
       );
     }
   }
+
+  assertTemplateConfigurationIsValid(template);
 }
 
 function assertRequiredString(value: string, field: string): void {
@@ -510,6 +821,266 @@ function assertTranslationMappingsMatchRequirements<TMapping extends Record<stri
     if (required && !mappedIds.has(requiredId)) {
       throw new Error(
         `Template '${input.template.templateFamilyId}' missing required ${input.label} mapping '${requiredId}'.`,
+      );
+    }
+  }
+}
+
+function assertTemplateConfigurationIsValid(template: InitialImageWorkflowTemplateDefinition): void {
+  assertRequiredString(template.configuration.defaults.title, "configuration.defaults.title");
+  assertRequiredString(template.configuration.defaults.summary, "configuration.defaults.summary");
+
+  const parametersById = new Map(template.minimumRequirements.parameterSpecifications.map((parameter) => [
+    parameter.parameterId,
+    parameter,
+  ]));
+
+  const requiredParameterIds = new Set(
+    template.minimumRequirements.parameterSpecifications
+      .filter((parameter) => parameter.required)
+      .map((parameter) => parameter.parameterId),
+  );
+
+  const guidanceById = new Map(template.configuration.parameterGuidance.map((entry) => [entry.parameterId, entry]));
+  for (const parameter of template.minimumRequirements.parameterSpecifications) {
+    const guidance = guidanceById.get(parameter.parameterId);
+    if (!guidance) {
+      throw new Error(
+        `Template '${template.templateFamilyId}' is missing guidance for parameter '${parameter.parameterId}'.`,
+      );
+    }
+    assertRequiredString(guidance.label, `configuration.parameterGuidance '${parameter.parameterId}' label`);
+    assertRequiredString(guidance.helperText, `configuration.parameterGuidance '${parameter.parameterId}' helperText`);
+    assertRangeMetadataIsValid(template, parameter.parameterId, guidance.recommendedRange, "recommendedRange");
+    assertRangeMetadataIsValid(template, parameter.parameterId, guidance.guardrails, "guardrails");
+  }
+
+  const defaults = template.configuration.defaults.parameterValues;
+  assertParameterValueMapIsValid({
+    template,
+    values: defaults,
+    valuesLabel: "configuration.defaults.parameterValues",
+    parametersById,
+    requiredParameterIds,
+  });
+
+  const seenPresetIds = new Set<string>();
+  for (const preset of template.configuration.presets) {
+    assertRequiredString(preset.presetId, "configuration.presets.presetId");
+    if (seenPresetIds.has(preset.presetId)) {
+      throw new Error(`Template '${template.templateFamilyId}' has duplicate preset id '${preset.presetId}'.`);
+    }
+    seenPresetIds.add(preset.presetId);
+    if (!Object.values(InitialImageWorkflowTemplatePresetScopes).includes(preset.scope)) {
+      throw new Error(`Template '${template.templateFamilyId}' preset '${preset.presetId}' scope is invalid.`);
+    }
+    assertRequiredString(preset.title, `configuration.presets '${preset.presetId}' title`);
+    assertRequiredString(preset.summary, `configuration.presets '${preset.presetId}' summary`);
+
+    assertParameterValueMapIsValid({
+      template,
+      values: preset.parameterValues,
+      valuesLabel: `configuration.presets '${preset.presetId}' parameterValues`,
+      parametersById,
+      requiredParameterIds,
+      allowMissingRequired: true,
+    });
+
+    const mergedValues = {
+      ...defaults,
+      ...preset.parameterValues,
+    };
+
+    for (const [parameterId, value] of Object.entries(mergedValues)) {
+      const guidance = guidanceById.get(parameterId);
+      const parameterRequirement = parametersById.get(parameterId);
+      if (!guidance || !parameterRequirement) {
+        continue;
+      }
+      assertValueCompliesWithGuardrails({
+        template,
+        parameterId,
+        parameterRequirement,
+        guardrails: guidance.guardrails,
+        value,
+        valuesLabel: `preset '${preset.presetId}'`,
+      });
+    }
+  }
+}
+
+function assertParameterValueMapIsValid(input: {
+  readonly template: InitialImageWorkflowTemplateDefinition;
+  readonly values: Readonly<Record<string, unknown>>;
+  readonly valuesLabel: string;
+  readonly parametersById: ReadonlyMap<string, InitialImageWorkflowTemplateParameterRequirement>;
+  readonly requiredParameterIds: ReadonlySet<string>;
+  readonly allowMissingRequired?: boolean;
+}): void {
+  const providedIds = Object.keys(input.values);
+  for (const parameterId of providedIds) {
+    const parameterRequirement = input.parametersById.get(parameterId);
+    if (!parameterRequirement) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} references unknown parameter '${parameterId}'.`,
+      );
+    }
+
+    assertParameterValueType(parameterRequirement, input.values[parameterId], input.template.templateFamilyId, input.valuesLabel);
+  }
+
+  if (input.allowMissingRequired) {
+    return;
+  }
+
+  for (const requiredParameterId of input.requiredParameterIds) {
+    if (!providedIds.includes(requiredParameterId)) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} must include required parameter '${requiredParameterId}'.`,
+      );
+    }
+  }
+}
+
+function assertRangeMetadataIsValid(
+  template: InitialImageWorkflowTemplateDefinition,
+  parameterId: string,
+  range: InitialImageWorkflowTemplateParameterValueRecommendedRange | InitialImageWorkflowTemplateParameterValueGuardrails | undefined,
+  field: string,
+): void {
+  if (!range) {
+    return;
+  }
+
+  if (typeof range.minimum === "number" && typeof range.maximum === "number" && range.minimum > range.maximum) {
+    throw new Error(
+      `Template '${template.templateFamilyId}' ${field} minimum cannot exceed maximum for parameter '${parameterId}'.`,
+    );
+  }
+  if ("step" in range && typeof range.step === "number" && range.step <= 0) {
+    throw new Error(
+      `Template '${template.templateFamilyId}' ${field} step must be greater than zero for parameter '${parameterId}'.`,
+    );
+  }
+  if (typeof range.minLength === "number" && range.minLength < 0) {
+    throw new Error(
+      `Template '${template.templateFamilyId}' ${field} minLength must be non-negative for parameter '${parameterId}'.`,
+    );
+  }
+  if (typeof range.maxLength === "number" && range.maxLength < 0) {
+    throw new Error(
+      `Template '${template.templateFamilyId}' ${field} maxLength must be non-negative for parameter '${parameterId}'.`,
+    );
+  }
+  if (
+    typeof range.minLength === "number"
+    && typeof range.maxLength === "number"
+    && range.minLength > range.maxLength
+  ) {
+    throw new Error(
+      `Template '${template.templateFamilyId}' ${field} minLength cannot exceed maxLength for parameter '${parameterId}'.`,
+    );
+  }
+}
+
+function assertParameterValueType(
+  parameter: InitialImageWorkflowTemplateParameterRequirement,
+  value: unknown,
+  templateFamilyId: string,
+  valuesLabel: string,
+): void {
+  const valueKind = parameter.valueKind;
+
+  if (valueKind === "text") {
+    if (typeof value !== "string") {
+      throw new Error(`Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be text.`);
+    }
+    return;
+  }
+
+  if (valueKind === "integer") {
+    if (!Number.isInteger(value)) {
+      throw new Error(`Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be an integer.`);
+    }
+    return;
+  }
+
+  if (valueKind === "float") {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error(`Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be a number.`);
+    }
+    return;
+  }
+
+  if (valueKind === "boolean") {
+    if (typeof value !== "boolean") {
+      throw new Error(`Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be boolean.`);
+    }
+    return;
+  }
+
+  if (valueKind === "select") {
+    if (typeof value !== "string") {
+      throw new Error(`Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be a select value.`);
+    }
+    return;
+  }
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(
+      `Template '${templateFamilyId}' ${valuesLabel} parameter '${parameter.parameterId}' must be a non-empty logical reference string.`,
+    );
+  }
+}
+
+function assertValueCompliesWithGuardrails(input: {
+  readonly template: InitialImageWorkflowTemplateDefinition;
+  readonly parameterId: string;
+  readonly parameterRequirement: InitialImageWorkflowTemplateParameterRequirement;
+  readonly guardrails: InitialImageWorkflowTemplateParameterValueGuardrails | undefined;
+  readonly value: unknown;
+  readonly valuesLabel: string;
+}): void {
+  if (!input.guardrails) {
+    return;
+  }
+
+  const { guardrails, parameterRequirement, value } = input;
+  if (parameterRequirement.valueKind === "text" && typeof value === "string") {
+    if (guardrails.allowEmpty === false && value.trim().length === 0) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' cannot be empty.`,
+      );
+    }
+    if (typeof guardrails.minLength === "number" && value.length < guardrails.minLength) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' is below minLength guardrail.`,
+      );
+    }
+    if (typeof guardrails.maxLength === "number" && value.length > guardrails.maxLength) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' exceeds maxLength guardrail.`,
+      );
+    }
+  }
+
+  if ((parameterRequirement.valueKind === "integer" || parameterRequirement.valueKind === "float") && typeof value === "number") {
+    if (typeof guardrails.minimum === "number" && value < guardrails.minimum) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' is below minimum guardrail.`,
+      );
+    }
+    if (typeof guardrails.maximum === "number" && value > guardrails.maximum) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' exceeds maximum guardrail.`,
+      );
+    }
+  }
+
+  if (guardrails.allowedValues && guardrails.allowedValues.length > 0) {
+    if (!guardrails.allowedValues.includes(value as string | number | boolean)) {
+      throw new Error(
+        `Template '${input.template.templateFamilyId}' ${input.valuesLabel} parameter '${input.parameterId}' violates allowedValues guardrail.`,
       );
     }
   }

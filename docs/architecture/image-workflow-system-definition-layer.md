@@ -17,6 +17,7 @@ Story 2.2.5 extends this baseline with authoritative query/list use cases so wor
 Story 2.2.6 extends the baseline with reusable readiness validation services so draft/incomplete/valid/runnable posture is evaluated consistently before later run-submission orchestration consumes definitions.
 Story 2.3.1 extends the baseline with an explicit initial supported workflow template set so authoring and downstream translation targets remain bounded and deterministic.
 Story 2.3.2 extends the baseline with internal translation-ready metadata for supported templates and consistency checks that keep translation descriptors aligned with typed requirements.
+Story 2.3.3 extends the baseline with template-level defaults, parameter guidance, and reusable presets so image workflows are usable without exposing backend tuning jargon.
 
 ## Canonical implementation seams
 
@@ -51,6 +52,7 @@ Template metadata split for translation-ready templates:
 
 - `display`: user-facing text surfaced by Studio and API projections.
 - `translation`: internal adapter metadata (translation key, capability hints, input/parameter/output mapping descriptors).
+- `configuration`: default parameter values, recommended ranges, guardrails, and reusable preset profiles for form initialization and future system baseline cloning.
 
 ## Layered model and responsibilities
 

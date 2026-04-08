@@ -4,6 +4,7 @@
 
 Story 2.3.1 defines the initial supported workflow template set for authoritative image-workflow definition authoring.
 Story 2.3.2 adds translation-ready internal metadata for those template families so later adapter execution can map typed definitions into backend requests without treating backend graphs as product truth.
+Story 2.3.3 adds template-level defaults and reusable presets so supported templates are immediately usable by non-technical users.
 
 ## Canonical files
 
@@ -18,6 +19,7 @@ Story 2.3.2 metadata shape lives in:
 
 - `InitialImageWorkflowTemplateDefinition.display` (user-facing text)
 - `InitialImageWorkflowTemplateDefinition.translation` (internal translation metadata)
+- `InitialImageWorkflowTemplateDefinition.configuration` (default values, parameter guidance, reusable preset profiles)
 
 ## Initial supported operation set
 
@@ -49,6 +51,13 @@ For Story 2.3.2 it also ensures each template stays translation-ready by validat
 
 This keeps authoring metadata and execution-translation metadata aligned without exposing runtime graph payloads.
 
+For Story 2.3.3 it additionally validates:
+
+- required parameters have default values,
+- defaults/presets match parameter value kinds and known parameter ids,
+- every supported parameter has user-facing guidance with recommended ranges and guardrails,
+- preset ids are unique and resolvable for later system baseline cloning.
+
 ## Translation metadata consumption guidance
 
 Later ComfyUI adapter work should consume only the `translation` metadata plus typed workflow definitions:
@@ -57,6 +66,12 @@ Later ComfyUI adapter work should consume only the `translation` metadata plus t
 2. Use `translation.translationKey`, `translation.operationTypeKey`, and mapping descriptors to build adapter-bound request payloads.
 3. Resolve concrete backend graph JSON strictly inside the adapter layer from internal adapter templates keyed by those identifiers.
 4. Keep UI/API contracts on `display` + typed workflow/system models; never project adapter graph structure into user-facing contracts.
+
+Preset/default consumption guidance:
+
+1. Use `configuration.defaults` for initial parameter rendering.
+2. Use `configuration.presets` as selectable profile starting points.
+3. Use registry resolution helpers to merge defaults + preset overrides before writing system baselines.
 
 ## Authoring enforcement
 
