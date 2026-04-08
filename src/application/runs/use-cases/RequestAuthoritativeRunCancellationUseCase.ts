@@ -8,7 +8,12 @@ import {
   runInTransactionBoundary,
   type IPlatformTransactionManager,
 } from "@application/common/ports/PlatformTransactionPorts";
-import type { IAuthoritativeRunPersistenceRepository, IRunOrchestrationIntentRepository, IRunOrchestrationQueuePersistenceRepository } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type {
+  IAuthoritativeRunPersistenceRepository,
+  IRunFinalizationResultRegistrationPort,
+  IRunOrchestrationIntentRepository,
+  IRunOrchestrationQueuePersistenceRepository,
+} from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import type {
   IRunExecutionCancellationSignalPort,
   RunExecutionCancellationSignalResult,
@@ -42,6 +47,7 @@ import {
   toRunStatusEnvelopeFromPlatformRecord,
   updatePlatformRunRecordCanonicalState,
 } from "./RunCreationPersistenceMapper";
+import { FinalizeRunExecutionOutcomeUseCase } from "./FinalizeRunExecutionOutcomeUseCase";
 
 function normalizeRequired(value: string | undefined, label: string): string {
   const normalized = value?.trim();
@@ -199,6 +205,7 @@ interface RequestAuthoritativeRunCancellationUseCaseDependencies {
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly orchestrationIntentRepository: IRunOrchestrationIntentRepository;
+  readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
   readonly authorization?: IAuthoritativeRunMutationAuthorizationPort;
   readonly cancellationSignalPort?: IRunExecutionCancellationSignalPort;
   readonly transactionManager?: IPlatformTransactionManager;
@@ -214,12 +221,17 @@ export class RequestAuthoritativeRunCancellationUseCase {
   private readonly idGenerator: {
     nextId(prefix: string): string;
   };
+  private readonly finalizationUseCase: FinalizeRunExecutionOutcomeUseCase;
 
   public constructor(private readonly dependencies: RequestAuthoritativeRunCancellationUseCaseDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.idGenerator = dependencies.idGenerator ?? {
       nextId: (prefix) => `${prefix}:${randomUUID()}`,
     };
+    this.finalizationUseCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository: dependencies.queueRepository,
+      resultRegistrationPort: dependencies.resultRegistrationPort,
+    });
   }
 
   public async execute(
@@ -401,22 +413,24 @@ export class RequestAuthoritativeRunCancellationUseCase {
         });
       }
 
-      if (next.state === RunLifecycleStates.cancelled) {
-        await this.dependencies.queueRepository.finalizeRunQueueEntry({
-          runId,
-          finalizedAt: requestedAt,
-          lifecycleState: RunLifecycleStates.cancelled,
-        });
-      }
-
       const recordWithCanonical = updatePlatformRunRecordCanonicalState(persisted, next);
-      const recordWithMetadata = this.applyCancellationMetadata(recordWithCanonical, {
+      let recordWithMetadata = this.applyCancellationMetadata(recordWithCanonical, {
         requestedAt,
         requestedByActorId: normalizedRequestedBy,
         reason,
         state: next.state,
         signalResult,
       });
+      if (next.state === RunLifecycleStates.cancelled) {
+        const finalization = await this.finalizationUseCase.execute({
+          run: next,
+          runRecord: recordWithMetadata,
+          occurredAt: requestedAt,
+          senderNodeId: next.assignment.assignedNodeId,
+          internalDiagnostics: signalResult?.metadata,
+        });
+        recordWithMetadata = finalization.runRecord;
+      }
 
       const saved = await this.dependencies.runRepository.saveRun(recordWithMetadata, {
         operationKey,

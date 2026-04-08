@@ -346,6 +346,7 @@ export interface IRunOrchestrationQueuePersistenceRepository {
 export const RunFinalizationOutcomeStatuses = Object.freeze({
   completed: "completed",
   failed: "failed",
+  cancelled: "cancelled",
 });
 
 export type RunFinalizationOutcomeStatus =

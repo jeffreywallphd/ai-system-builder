@@ -14,6 +14,8 @@ import {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { CanonicalRunSubmissionCommand } from "./RunSubmissionValidationContracts";
 import {
+  RunResultOutputAvailabilityHints,
+  RunResultTerminalQualityHints,
   toRunDetail,
   toRunStatusEnvelope,
   type RunDetail,
@@ -61,7 +63,7 @@ export interface RunAuthoritativeMetadata {
 
 export interface RunAuthoritativeFinalizationSnapshot extends RunResultSummary {
   readonly finalizedAt: string;
-  readonly outcome: "completed" | "failed";
+  readonly outcome: "completed" | "failed" | "cancelled";
 }
 
 function normalizeOptional(value?: string): string | undefined {
@@ -246,7 +248,7 @@ function toFinalizationSnapshot(value: unknown): RunAuthoritativeFinalizationSna
   }
 
   const finalizedAt = typeof value.finalizedAt === "string" ? value.finalizedAt.trim() : "";
-  const outcome = value.outcome === "completed" || value.outcome === "failed"
+  const outcome = value.outcome === "completed" || value.outcome === "failed" || value.outcome === "cancelled"
     ? value.outcome
     : undefined;
   const outputs = Array.isArray(value.outputs) ? value.outputs : [];
@@ -261,6 +263,14 @@ function toFinalizationSnapshot(value: unknown): RunAuthoritativeFinalizationSna
     externalResultId: typeof value.externalResultId === "string" ? value.externalResultId : undefined,
     outputs: Object.freeze(outputs.map((entry) => Object.freeze({ ...(entry as Record<string, unknown>) }))),
     metrics: isObject(value.metrics) ? Object.freeze({ ...value.metrics }) : undefined,
+    outputAvailability: Object.values(RunResultOutputAvailabilityHints)
+      .includes(value.outputAvailability as typeof RunResultOutputAvailabilityHints[keyof typeof RunResultOutputAvailabilityHints])
+      ? value.outputAvailability as typeof RunResultOutputAvailabilityHints[keyof typeof RunResultOutputAvailabilityHints]
+      : undefined,
+    terminalQuality: Object.values(RunResultTerminalQualityHints)
+      .includes(value.terminalQuality as typeof RunResultTerminalQualityHints[keyof typeof RunResultTerminalQualityHints])
+      ? value.terminalQuality as typeof RunResultTerminalQualityHints[keyof typeof RunResultTerminalQualityHints]
+      : undefined,
   }) as RunAuthoritativeFinalizationSnapshot;
 }
 

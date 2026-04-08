@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  RunResultOutputAvailabilityHints,
+  RunResultTerminalQualityHints,
   RunOrchestrationTransportContractVersions,
   RunOrchestrationTransportRoutes,
   resolveRunLifecycleState,
@@ -31,6 +33,13 @@ describe("RunOrchestrationTransportContracts", () => {
       .toBe("/api/v1/runtime/scheduling/admin/deferred/re-evaluate");
     expect(RunOrchestrationTransportRoutes.retryRun).toBe("/api/v1/runtime/runs/:runId/retry");
     expect(RunOrchestrationTransportRoutes.updateLifecycle).toBe("/api/v1/runtime/runs/:runId/lifecycle");
+  });
+
+  it("exposes canonical finalization hint catalogs", () => {
+    expect(RunResultOutputAvailabilityHints.available).toBe("available");
+    expect(RunResultOutputAvailabilityHints.degraded).toBe("degraded");
+    expect(RunResultTerminalQualityHints.standard).toBe("standard");
+    expect(RunResultTerminalQualityHints.partial).toBe("partial");
   });
 
   it("projects canonical run records to summary detail and status envelopes", () => {

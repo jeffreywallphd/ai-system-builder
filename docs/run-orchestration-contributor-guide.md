@@ -109,7 +109,8 @@ Provide an implementation checklist for contributors extending the authoritative
 1. Keep node lifecycle/progress updates inside `IngestRunExecutionUpdateUseCase`.
 2. Preserve sender-node and backend identity consistency checks.
 3. Keep internal diagnostics in metadata telemetry, not run read projections.
-4. Keep completion/failure finalization in `FinalizeRunExecutionOutcomeUseCase`, including queue finalization and assignment release.
+4. Keep completion/failure/cancellation finalization in `FinalizeRunExecutionOutcomeUseCase`, including queue finalization and assignment release.
+5. Preserve explicit terminal summary hints (`outputAvailability`, `terminalQuality`) in finalization metadata so downstream result-persistence seams can reason over partial/degraded outcomes without reclassifying backend payloads.
 
 ## Extending cancellation orchestration
 
@@ -146,7 +147,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Scheduling policy selects candidate work; dispatch adapters execute backend translation only.
 - Scheduling policy decisions should remain explainable (reason-bearing) and source-traceable.
 - Transport handlers authenticate/validate/map requests but do not own orchestration decisions.
-- Completion/failure terminal handling must preserve user-safe outputs and internal diagnostics separation.
+- Completion/failure/cancellation terminal handling must preserve user-safe outputs and internal diagnostics separation.
 - Observability/redaction concerns must stay in dedicated infrastructure seams, not in domain transition logic.
 
 ## Prohibited patterns
@@ -168,7 +169,7 @@ Provide an implementation checklist for contributors extending the authoritative
 3. Does queue claim/lease behavior remain conflict-safe and TTL-backed?
 4. Does dispatch remain command-driven with adapter translation isolated in infrastructure?
 5. Are dispatch outcomes and execution updates still progressing lifecycle through authoritative use cases?
-6. Are terminal completion/failure paths still finalizing queue + assignment state and preserving diagnostics split?
+6. Are terminal completion/failure/cancellation paths still finalizing queue + assignment state and preserving diagnostics split?
 7. Are `.md` and `.ai.md` docs updated together for orchestration changes?
 8. Are relevant tests updated across application, infrastructure, transport, and persistence seams?
 9. Does regression coverage still pass for integrated lifecycle hardening in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`?

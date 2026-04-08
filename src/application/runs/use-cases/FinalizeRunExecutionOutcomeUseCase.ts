@@ -51,8 +51,16 @@ export class DefaultRunFinalizationResultRegistrationPort implements IRunFinaliz
     request: RunFinalizationRegistrationRequest,
   ): Promise<RunFinalizationRegistrationResult> {
     const summary = request.result?.summary?.trim()
-      || (request.outcome === "failed" ? request.safeFailureMessage ?? "Run failed during execution." : "Run completed.");
+      || (request.outcome === RunFinalizationOutcomeStatuses.failed
+        ? request.safeFailureMessage ?? "Run failed during execution."
+        : request.outcome === RunFinalizationOutcomeStatuses.cancelled
+          ? "Run cancelled."
+          : "Run completed.");
     const outputReferences = normalizeOutputReferences(request.result?.outputs);
+    const outputAvailability = request.result?.outputAvailabilityHint
+      ?? resolveOutputAvailabilityHint(request.outcome, outputReferences);
+    const terminalQuality = request.result?.terminalQualityHint
+      ?? resolveTerminalQualityHint(request.outcome, outputReferences);
 
     return Object.freeze({
       summary: Object.freeze({
@@ -62,8 +70,10 @@ export class DefaultRunFinalizationResultRegistrationPort implements IRunFinaliz
         outputs: outputReferences,
         metrics: request.result?.metrics,
         externalResultId: normalizeOptional(request.result?.externalResultId),
+        outputAvailability,
+        terminalQuality,
       }),
-      internalDiagnostics: request.outcome === "failed"
+      internalDiagnostics: request.outcome === RunFinalizationOutcomeStatuses.failed
         ? Object.freeze({
           safeFailureCode: request.safeFailureCode,
           safeFailureMessage: request.safeFailureMessage,
@@ -81,7 +91,11 @@ export class FinalizeRunExecutionOutcomeUseCase {
   }
 
   public async execute(request: FinalizeRunExecutionOutcomeRequest): Promise<FinalizeRunExecutionOutcomeResult> {
-    if (request.run.state !== RunLifecycleStates.completed && request.run.state !== RunLifecycleStates.failed) {
+    if (
+      request.run.state !== RunLifecycleStates.completed
+      && request.run.state !== RunLifecycleStates.failed
+      && request.run.state !== RunLifecycleStates.cancelled
+    ) {
       return Object.freeze({
         run: request.run,
         runRecord: request.runRecord,
@@ -99,9 +113,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
       workflowId: runWithQueueHistory.identity.workflowId,
       workspaceId: runWithQueueHistory.identity.workspaceId,
       finalizedAt,
-      outcome: runWithQueueHistory.state === RunLifecycleStates.completed
-        ? RunFinalizationOutcomeStatuses.completed
-        : RunFinalizationOutcomeStatuses.failed,
+      outcome: resolveFinalizationOutcomeStatus(runWithQueueHistory.state),
       result: request.lifecycleUpdate?.result,
       safeFailureCode: runWithQueueHistory.execution.outcome === RunExecutionOutcomeKinds.failed
         ? runWithQueueHistory.execution.errorCode
@@ -150,7 +162,9 @@ export class FinalizeRunExecutionOutcomeUseCase {
         releasedAt,
         releaseReason: run.state === RunLifecycleStates.completed
           ? "execution-completed"
-          : "execution-failed",
+          : run.state === RunLifecycleStates.failed
+            ? "execution-failed"
+            : "execution-cancelled",
       }),
     });
   }
@@ -219,4 +233,42 @@ function normalizeOutputReferences(
     return Object.freeze([]);
   }
   return Object.freeze(value.map((entry) => Object.freeze({ ...entry })));
+}
+
+function resolveFinalizationOutcomeStatus(
+  state: CanonicalRunRecord["state"],
+): typeof RunFinalizationOutcomeStatuses[keyof typeof RunFinalizationOutcomeStatuses] {
+  if (state === RunLifecycleStates.completed) {
+    return RunFinalizationOutcomeStatuses.completed;
+  }
+  if (state === RunLifecycleStates.cancelled) {
+    return RunFinalizationOutcomeStatuses.cancelled;
+  }
+  return RunFinalizationOutcomeStatuses.failed;
+}
+
+function resolveOutputAvailabilityHint(
+  outcome: RunFinalizationRegistrationRequest["outcome"],
+  outputs: ReadonlyArray<RunResultOutputReference>,
+): "none" | "partial" | "available" | "degraded" {
+  if (outputs.length === 0) {
+    return "none";
+  }
+  if (outcome === RunFinalizationOutcomeStatuses.completed) {
+    return "available";
+  }
+  if (outcome === RunFinalizationOutcomeStatuses.failed) {
+    return "partial";
+  }
+  return "partial";
+}
+
+function resolveTerminalQualityHint(
+  outcome: RunFinalizationRegistrationRequest["outcome"],
+  outputs: ReadonlyArray<RunResultOutputReference>,
+): "standard" | "partial" | "degraded" {
+  if (outcome === RunFinalizationOutcomeStatuses.completed) {
+    return "standard";
+  }
+  return outputs.length > 0 ? "partial" : "standard";
 }

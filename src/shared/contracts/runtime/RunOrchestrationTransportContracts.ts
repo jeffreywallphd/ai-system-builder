@@ -246,7 +246,7 @@ export interface RunDetail extends RunSummary {
   readonly retry: RunRetryState;
   readonly finalization?: RunResultSummary & {
     readonly finalizedAt: string;
-    readonly outcome: "completed" | "failed";
+    readonly outcome: "completed" | "failed" | "cancelled";
   };
   readonly statusTimeline?: ReadonlyArray<RunStatusTimelineEntry>;
 }
@@ -325,6 +325,25 @@ export const RunResultOutputReferenceKinds = Object.freeze({
 export type RunResultOutputReferenceKind =
   typeof RunResultOutputReferenceKinds[keyof typeof RunResultOutputReferenceKinds];
 
+export const RunResultOutputAvailabilityHints = Object.freeze({
+  none: "none",
+  partial: "partial",
+  available: "available",
+  degraded: "degraded",
+} as const);
+
+export type RunResultOutputAvailabilityHint =
+  typeof RunResultOutputAvailabilityHints[keyof typeof RunResultOutputAvailabilityHints];
+
+export const RunResultTerminalQualityHints = Object.freeze({
+  standard: "standard",
+  partial: "partial",
+  degraded: "degraded",
+} as const);
+
+export type RunResultTerminalQualityHint =
+  typeof RunResultTerminalQualityHints[keyof typeof RunResultTerminalQualityHints];
+
 export interface RunResultOutputReference {
   readonly outputId: string;
   readonly kind: RunResultOutputReferenceKind;
@@ -342,6 +361,8 @@ export interface RunResultRegistrationInput {
   readonly externalResultId?: string;
   readonly outputs?: ReadonlyArray<RunResultOutputReference>;
   readonly metrics?: Readonly<Record<string, unknown>>;
+  readonly outputAvailabilityHint?: RunResultOutputAvailabilityHint;
+  readonly terminalQualityHint?: RunResultTerminalQualityHint;
 }
 
 export interface RunResultSummary {
@@ -349,6 +370,8 @@ export interface RunResultSummary {
   readonly externalResultId?: string;
   readonly outputs: ReadonlyArray<RunResultOutputReference>;
   readonly metrics?: Readonly<Record<string, unknown>>;
+  readonly outputAvailability?: RunResultOutputAvailabilityHint;
+  readonly terminalQuality?: RunResultTerminalQualityHint;
 }
 
 export interface RunQueueStatusReadRequest {

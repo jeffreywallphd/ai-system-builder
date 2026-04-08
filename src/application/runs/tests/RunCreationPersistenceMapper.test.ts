@@ -85,8 +85,10 @@ describe("RunCreationPersistenceMapper", () => {
           }),
           finalization: Object.freeze({
             finalizedAt: "2026-04-07T15:10:00.000Z",
-            outcome: "completed",
+            outcome: "cancelled",
             summary: "Rendered 2 outputs.",
+            outputAvailability: "partial",
+            terminalQuality: "partial",
             outputs: Object.freeze([Object.freeze({
               outputId: "output-1",
               kind: "asset",
@@ -98,7 +100,8 @@ describe("RunCreationPersistenceMapper", () => {
     });
 
     const detail = toRunDetailFromPlatformRecord(withFinalization);
-    expect(detail.finalization?.outcome).toBe("completed");
+    expect(detail.finalization?.outcome).toBe("cancelled");
+    expect(detail.finalization?.outputAvailability).toBe("partial");
     expect(detail.finalization?.outputs[0]?.assetId).toBe("asset:generated:1");
     expect(extractRunFinalizationSnapshot(withFinalization.metadata)?.summary).toBe("Rendered 2 outputs.");
   });

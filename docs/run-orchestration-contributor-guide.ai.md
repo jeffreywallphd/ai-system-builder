@@ -1,7 +1,7 @@
 # AI Companion: Run Orchestration Contributor Guide
 
 ## Purpose
-Quick workflow for extending queue selection, node assignment, dispatch, progress ingestion, and completion/failure finalization without breaking authoritative control-plane boundaries.
+Quick workflow for extending queue selection, node assignment, dispatch, progress ingestion, and terminal finalization without breaking authoritative control-plane boundaries.
 
 ## Human doc
 - `docs/run-orchestration-contributor-guide.md`
@@ -66,6 +66,10 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Build canonical command first.
 - Add backend mapping only through `IRunExecutionBackendAdapter` + router registration.
 - Route all outcomes through authoritative dispatch-result handling.
+
+## Progress/finalization guidance
+- Keep completion/failure/cancellation finalization in `FinalizeRunExecutionOutcomeUseCase`.
+- Preserve explicit terminal summary hints (`outputAvailability`, `terminalQuality`) so future result-persistence/lineage work can classify partial/degraded outcomes through typed metadata instead of backend-specific payload inspection.
 
 ## Cancellation extension guidance
 - Keep cancellation orchestration in `RequestAuthoritativeRunCancellationUseCase`.

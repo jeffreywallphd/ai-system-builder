@@ -260,6 +260,96 @@ function seedRun(runRepository: InMemoryRunRepository): void {
   }));
 }
 
+function seedCancellingRun(runRepository: InMemoryRunRepository): void {
+  const canonical = createCanonicalRunRecord({
+    identity: {
+      runId: "run:1",
+      workflowId: "workflow:demo",
+      workspaceId: "workspace-alpha",
+    },
+    submission: {
+      source: RunSubmissionSources.api,
+      submittedAt: "2026-04-07T12:00:00.000Z",
+      submittedByActorId: "user:owner",
+    },
+    state: RunLifecycleStates.cancelling,
+    queue: {
+      queueId: "queue:default",
+      enteredAt: "2026-04-07T11:59:30.000Z",
+      position: null,
+      positionAsOf: "2026-04-07T12:01:45.000Z",
+      dequeuedAt: "2026-04-07T12:00:00.000Z",
+    },
+    assignment: {
+      status: RunAssignmentStatuses.assigned,
+      assignedNodeId: "node:trusted-1",
+      assignedAt: "2026-04-07T12:00:00.000Z",
+    },
+    execution: {
+      adapterKind: "local-worker",
+      adapterRunId: "backend-run-1",
+      startedAt: "2026-04-07T12:00:00.000Z",
+      heartbeatAt: "2026-04-07T12:01:45.000Z",
+      outcome: RunExecutionOutcomeKinds.none,
+    },
+    cancellation: {
+      requestedAt: "2026-04-07T12:01:40.000Z",
+      requestedByActorId: "user:owner",
+    },
+    retry: {
+      attempt: 1,
+      maxAttempts: 2,
+    },
+    updatedAt: "2026-04-07T12:01:45.000Z",
+  });
+
+  const metadata: RunAuthoritativeMetadata = Object.freeze({
+    schemaVersion: 1,
+    canonicalRun: canonical,
+    submissionSnapshot: Object.freeze({
+      actor: Object.freeze({
+        actorUserIdentityId: "user:owner",
+        activeWorkspaceId: "workspace-alpha",
+      }),
+      runtimeTarget: Object.freeze({
+        systemId: "system:demo",
+        versionId: "system:demo:v1",
+        async: true,
+      }),
+      tags: Object.freeze([]),
+      parameters: Object.freeze({}),
+      storageReferences: Object.freeze([]),
+      resourceReferences: Object.freeze([]),
+      policyPrerequisites: Object.freeze([]),
+    }),
+    visibility: Object.freeze({
+      workspaceScope: "workspace",
+      sharingPosture: "workspace-members",
+    }),
+    orchestration: Object.freeze({
+      initialLifecycleState: "queued",
+      initialQueueState: "queued",
+      intent: Object.freeze({
+        kind: "queue-admission-requested",
+        queueId: "queue:default",
+        recordedAt: "2026-04-07T12:00:00.000Z",
+      }),
+    }),
+  });
+
+  runRepository.runs.set("run:1", Object.freeze({
+    runId: "run:1",
+    runKind: "workflow",
+    status: mapLifecycleStateToPlatformRunStatus(canonical.state),
+    workspaceId: "workspace-alpha",
+    userIdentityId: "user:owner",
+    sourceAggregateRef: "workflow:demo",
+    initiatedAt: "2026-04-07T12:00:00.000Z",
+    metadata,
+    revision: 1,
+  }));
+}
+
 describe("IngestRunExecutionUpdateUseCase", () => {
   it("accepts authorized node progress/heartbeat updates and persists canonical state", async () => {
     const runRepository = new InMemoryRunRepository();
@@ -370,6 +460,51 @@ describe("IngestRunExecutionUpdateUseCase", () => {
     expect(result.mutation.run.finalization?.summary).toBe("Rendered 4 images.");
     expect(result.mutation.run.finalization?.outputs[0]?.assetId).toBe("asset:generated:1");
     expect(result.status.finalization?.externalResultId).toBe("result:run:1");
+  });
+
+  it("finalizes cancelled runs with explicit terminal hints and queue release state", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    seedCancellingRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+    });
+
+    const cancelled = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        occurredAt: "2026-04-07T12:01:50.000Z",
+        toState: "cancelled",
+        execution: Object.freeze({
+          outcome: "cancelled",
+          finishedAt: "2026-04-07T12:01:50.000Z",
+        }),
+        result: Object.freeze({
+          summary: "Cancellation acknowledged after collecting one output.",
+          outputAvailabilityHint: "partial",
+          terminalQualityHint: "degraded",
+          outputs: Object.freeze([Object.freeze({
+            outputId: "output-1",
+            kind: "asset",
+            assetId: "asset:generated:partial",
+          })]),
+        }),
+      }),
+    });
+
+    expect(cancelled.mutation.run.state).toBe("cancelled");
+    expect(cancelled.mutation.run.assignment.status).toBe("released");
+    expect(cancelled.mutation.run.finalization?.outcome).toBe("cancelled");
+    expect(cancelled.mutation.run.finalization?.outputAvailability).toBe("partial");
+    expect(cancelled.mutation.run.finalization?.terminalQuality).toBe("degraded");
   });
 
   it("ignores stale progress snapshots and preserves authoritative progress", async () => {

@@ -203,7 +203,11 @@ export class IngestRunExecutionUpdateUseCase {
         request,
         occurredAt,
       );
-      if (toState === RunLifecycleStates.completed || toState === RunLifecycleStates.failed) {
+      if (
+        toState === RunLifecycleStates.completed
+        || toState === RunLifecycleStates.failed
+        || toState === RunLifecycleStates.cancelled
+      ) {
         const finalized = await this.finalizationUseCase.execute({
           run: next,
           runRecord: persistedWithDiagnostics,
