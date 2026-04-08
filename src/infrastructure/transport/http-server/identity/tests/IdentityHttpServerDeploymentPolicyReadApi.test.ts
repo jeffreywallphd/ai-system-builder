@@ -149,6 +149,7 @@ describe("IdentityHttpServer deployment policy read routes", () => {
         method: "GET",
         headers: {
           authorization: `Bearer ${token}`,
+          "x-correlation-id": "corr-policy-read-1",
         },
       },
     );
@@ -158,6 +159,7 @@ describe("IdentityHttpServer deployment policy read routes", () => {
     expect(body.ok).toBe(true);
     expect(body.data.activeProfile.profileId).toBe("organization");
     expect(deploymentPolicyReadBackendApi.lastRequest?.workspaceId).toBe("workspace-alpha");
+    expect(deploymentPolicyReadBackendApi.lastRequest?.correlationId).toBe("corr-policy-read-1");
   });
 
   it("returns invalid request when deployment policy read query is malformed", async () => {

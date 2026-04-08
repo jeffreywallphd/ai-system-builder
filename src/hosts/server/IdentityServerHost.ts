@@ -87,6 +87,7 @@ import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/Aut
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import { DeploymentPolicyReadBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyReadBackendApi";
 import { DeploymentPolicyWriteBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyWriteBackendApi";
+import { PlatformDeploymentPolicyAdministrationObservabilityPort } from "@infrastructure/api/deployment/PlatformDeploymentPolicyAdministrationObservabilityPort";
 import { PlatformDeploymentPolicyGovernanceEventSink } from "@infrastructure/api/deployment/PlatformDeploymentPolicyGovernanceEventSink";
 import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "@infrastructure/api/deployment/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
 import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
@@ -1088,11 +1089,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const deploymentPolicyPermissionService = new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
     workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
   });
+  const deploymentPolicyAdministrationObservabilityPort = new PlatformDeploymentPolicyAdministrationObservabilityPort({
+    logger: createDeploymentPolicyAdministrationOperationalLogger(options.logger),
+  });
   const deploymentPolicyReadBackendApi = new DeploymentPolicyReadBackendApi({
     readDeploymentPolicyStateUseCase: new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
       permissionService: deploymentPolicyPermissionService,
+      observabilityPort: deploymentPolicyAdministrationObservabilityPort,
     }),
+    observabilityPort: deploymentPolicyAdministrationObservabilityPort,
   });
   const deploymentPolicyGovernanceEventSink = new FanoutDeploymentPolicyGovernanceEventSink([
     new PlatformDeploymentPolicyGovernanceEventSink(
@@ -1124,7 +1130,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
       permissionService: deploymentPolicyPermissionService,
       governanceEventSink: deploymentPolicyGovernanceEventSink,
+      observabilityPort: deploymentPolicyAdministrationObservabilityPort,
     }),
+    observabilityPort: deploymentPolicyAdministrationObservabilityPort,
   });
   const auditLedgerBackendApi = new AuditLedgerBackendApi({
     auditLedgerQueryService: new AuditLedgerQueryService({
@@ -1587,6 +1595,55 @@ function createRunOrchestrationOperationalLogger(logger: IdentityHttpServerLogge
           ?? resolveOptionalString(event.workspaceId),
         details: Object.freeze({
           orchestration: event,
+        }),
+      });
+    },
+  });
+}
+
+function createDeploymentPolicyAdministrationOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Readonly<Record<string, unknown>>): void;
+  warn(event: Readonly<Record<string, unknown>>): void;
+  error(event: Readonly<Record<string, unknown>>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Readonly<Record<string, unknown>>) => {
+      logger.info({
+        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          deploymentPolicyAdministration: event,
+        }),
+      });
+    },
+    warn: (event: Readonly<Record<string, unknown>>) => {
+      logger.warn({
+        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          deploymentPolicyAdministration: event,
+        }),
+      });
+    },
+    error: (event: Readonly<Record<string, unknown>>) => {
+      logger.error({
+        event: resolveOptionalString(event.event) ?? "deployment-policy-admin.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          deploymentPolicyAdministration: event,
         }),
       });
     },

@@ -17,6 +17,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-admin-ui-read-models.md`
 - `docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md`
 - `docs/architecture/deployment-profile-policy-admin-permission-boundaries.md`
+- `docs/architecture/deployment-profile-policy-admin-observability-redaction-and-failure-handling.md`
 - `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
@@ -95,8 +96,10 @@ Provide a practical implementation workflow for extending deployment-profile pol
 4. Keep write APIs (`DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`, `DeploymentPolicyWriteBackendApi.ts`) authoritative for mutation validation and persistence.
 5. Keep audit/operational governance hook publication in policy-administration workflows:
    - `DeploymentPolicyGovernanceEventPorts.ts`
+   - `DeploymentPolicyAdministrationObservabilityPorts.ts`
    - `PlatformDeploymentPolicyGovernanceEventSink.ts`
    - `AuthoritativeDeploymentPolicyGovernanceEventSink.ts`
+   - `PlatformDeploymentPolicyAdministrationObservabilityPort.ts`
 6. Keep shared read/write contracts and schema validation in `src/shared/contracts/deployment/*` and `src/shared/schemas/deployment/*`.
 
 ## Adding a new policy family

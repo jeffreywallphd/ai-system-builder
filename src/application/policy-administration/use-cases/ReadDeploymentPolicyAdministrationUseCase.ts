@@ -24,10 +24,17 @@ import {
   DeploymentPolicyAdministrationPermissionKeys,
   type IDeploymentPolicyAdministrationPermissionService,
 } from "./DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
+import {
+  DeploymentPolicyAdministrationObservabilityOperations,
+  DeploymentPolicyAdministrationObservabilityOutcomes,
+  publishDeploymentPolicyAdministrationObservabilityBestEffort,
+  type IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
 
 export interface ReadDeploymentPolicyAdministrationUseCaseDependencies {
   readonly deploymentPolicyRepository: IDeploymentPolicyPersistenceRepository;
   readonly permissionService: IDeploymentPolicyAdministrationPermissionService;
+  readonly observabilityPort?: IDeploymentPolicyAdministrationObservabilityPort;
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: DeploymentProfilePresetCatalog;
   readonly presetDefinitions?: DeploymentProfilePresetDefinitionCatalog;
@@ -67,77 +74,154 @@ export class ReadDeploymentPolicyAdministrationUseCase {
       kind: input.scope.kind,
       scopeId: input.scope.scopeId.trim().toLowerCase(),
     });
-    const readPermission = await this.dependencies.permissionService.evaluatePermission({
-      actorUserIdentityId: input.actorUserIdentityId,
-      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.readState,
-      scope,
-      asOf: input.evaluatedAt,
-    });
-    if (!readPermission.allowed) {
-      throw new ReadDeploymentPolicyAdministrationPermissionError({
-        reasonCode: readPermission.reasonCode,
-        reason: readPermission.reason,
+    const occurredAt = input.evaluatedAt ?? new Date().toISOString();
+    try {
+      const readPermission = await this.dependencies.permissionService.evaluatePermission({
+        actorUserIdentityId: input.actorUserIdentityId,
+        requiredPermission: DeploymentPolicyAdministrationPermissionKeys.readState,
+        scope,
+        asOf: input.evaluatedAt,
       });
+      if (!readPermission.allowed) {
+        await this.publishReadObservability({
+          event: "deployment-policy-admin.read.rejected",
+          occurredAt,
+          outcome: DeploymentPolicyAdministrationObservabilityOutcomes.rejected,
+          severity: "warn",
+          scope,
+          actorUserIdentityId: input.actorUserIdentityId,
+          details: Object.freeze({
+            reasonCode: readPermission.reasonCode,
+            reason: readPermission.reason,
+          }),
+        });
+        throw new ReadDeploymentPolicyAdministrationPermissionError({
+          reasonCode: readPermission.reasonCode,
+          reason: readPermission.reason,
+        });
+      }
+
+      const canSelectActiveProfile = await this.isAllowed({
+        actorUserIdentityId: input.actorUserIdentityId,
+        requiredPermission: DeploymentPolicyAdministrationPermissionKeys.selectActiveProfile,
+        scope,
+        asOf: input.evaluatedAt,
+      });
+      const canManageOverrides = await this.isAllowed({
+        actorUserIdentityId: input.actorUserIdentityId,
+        requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageOverrides,
+        scope,
+        asOf: input.evaluatedAt,
+      });
+      const canManageRuntimeAdminOverrides = await this.isAllowed({
+        actorUserIdentityId: input.actorUserIdentityId,
+        requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides,
+        scope,
+        asOf: input.evaluatedAt,
+      });
+
+      const activeSelection = await this.dependencies.deploymentPolicyRepository.getActiveProfileSelection(scope);
+      const activeProfileId = activeSelection?.profileId ?? DeploymentProfileIds.home;
+      const resolvedProfileId = input.profileId ?? activeProfileId;
+
+      const overrideRecords = await this.dependencies.deploymentPolicyRepository.listOverrideRecords({
+        scope,
+        profileId: resolvedProfileId,
+      });
+
+      const resolved = resolveDeploymentPolicyAdministrationSnapshotWithOverrides({
+        profileId: resolvedProfileId,
+        familyCatalog: this.familyCatalog,
+        presetCatalog: this.presetCatalog,
+        overrideRecords: overrideRecords.map((record) => this.toOverrideRecord(record)),
+        evaluationLayer: DeploymentPolicyEvaluationRequestLayers.application,
+        evaluatedAt: input.evaluatedAt,
+      });
+
+      const includeCatalog = input.includeCatalog ?? true;
+      const includeOverrideRecords = input.includeOverrideRecords ?? true;
+      const includeEffectiveMetadata = input.includeEffectiveMetadata ?? true;
+      const response = Object.freeze({
+        scope,
+        authorization: Object.freeze({
+          canReadState: true,
+          canSelectActiveProfile,
+          canManageOverrides,
+          canManageRuntimeAdminOverrides,
+        }),
+        activeProfile: this.toActiveProfileReadModel(activeSelection),
+        snapshot: resolved.snapshot,
+        validation: resolved.validation,
+        overrideRecords: includeOverrideRecords ? overrideRecords : undefined,
+        effectiveMetadata: includeEffectiveMetadata
+          ? await this.dependencies.deploymentPolicyRepository.getEffectivePolicyMetadata(scope)
+          : undefined,
+        catalog: includeCatalog ? this.buildCatalog() : undefined,
+      });
+      await this.publishReadObservability({
+        event: "deployment-policy-admin.read.completed",
+        occurredAt,
+        outcome: DeploymentPolicyAdministrationObservabilityOutcomes.success,
+        severity: resolved.validation.valid ? "info" : "warn",
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        profileId: resolvedProfileId,
+        details: Object.freeze({
+          includeCatalog,
+          includeOverrideRecords,
+          includeEffectiveMetadata,
+          activeProfileSource: response.activeProfile.source,
+        }),
+        counters: Object.freeze({
+          overrideRecordCount: overrideRecords.length,
+          validationIssueCount: resolved.validation.issues.length,
+          familyCount: resolved.snapshot.summary.familyCount,
+          settingCount: resolved.snapshot.summary.settingCount,
+        }),
+      });
+      return response;
+    } catch (error) {
+      if (error instanceof ReadDeploymentPolicyAdministrationPermissionError) {
+        throw error;
+      }
+      await this.publishReadObservability({
+        event: "deployment-policy-admin.read.failed",
+        occurredAt,
+        outcome: DeploymentPolicyAdministrationObservabilityOutcomes.failure,
+        severity: "error",
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        details: Object.freeze({
+          message: error instanceof Error ? error.message : "Unknown read failure.",
+        }),
+      });
+      throw error;
     }
+  }
 
-    const canSelectActiveProfile = await this.isAllowed({
+  private async publishReadObservability(input: {
+    readonly event: string;
+    readonly occurredAt: string;
+    readonly outcome: "success" | "rejected" | "failure";
+    readonly severity: "info" | "warn" | "error";
+    readonly scope: ReadDeploymentPolicyStateRequest["scope"];
+    readonly actorUserIdentityId: string;
+    readonly profileId?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+    readonly counters?: Readonly<Record<string, number>>;
+  }): Promise<void> {
+    await publishDeploymentPolicyAdministrationObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+      event: input.event,
+      operation: DeploymentPolicyAdministrationObservabilityOperations.read,
+      outcome: input.outcome,
+      severity: input.severity,
+      occurredAt: input.occurredAt,
+      scope: input.scope,
       actorUserIdentityId: input.actorUserIdentityId,
-      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.selectActiveProfile,
-      scope,
-      asOf: input.evaluatedAt,
-    });
-    const canManageOverrides = await this.isAllowed({
-      actorUserIdentityId: input.actorUserIdentityId,
-      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageOverrides,
-      scope,
-      asOf: input.evaluatedAt,
-    });
-    const canManageRuntimeAdminOverrides = await this.isAllowed({
-      actorUserIdentityId: input.actorUserIdentityId,
-      requiredPermission: DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides,
-      scope,
-      asOf: input.evaluatedAt,
-    });
-
-    const activeSelection = await this.dependencies.deploymentPolicyRepository.getActiveProfileSelection(scope);
-    const activeProfileId = activeSelection?.profileId ?? DeploymentProfileIds.home;
-    const resolvedProfileId = input.profileId ?? activeProfileId;
-
-    const overrideRecords = await this.dependencies.deploymentPolicyRepository.listOverrideRecords({
-      scope,
-      profileId: resolvedProfileId,
-    });
-
-    const resolved = resolveDeploymentPolicyAdministrationSnapshotWithOverrides({
-      profileId: resolvedProfileId,
-      familyCatalog: this.familyCatalog,
-      presetCatalog: this.presetCatalog,
-      overrideRecords: overrideRecords.map((record) => this.toOverrideRecord(record)),
-      evaluationLayer: DeploymentPolicyEvaluationRequestLayers.application,
-      evaluatedAt: input.evaluatedAt,
-    });
-
-    const includeCatalog = input.includeCatalog ?? true;
-    const includeOverrideRecords = input.includeOverrideRecords ?? true;
-    const includeEffectiveMetadata = input.includeEffectiveMetadata ?? true;
-
-    return Object.freeze({
-      scope,
-      authorization: Object.freeze({
-        canReadState: true,
-        canSelectActiveProfile,
-        canManageOverrides,
-        canManageRuntimeAdminOverrides,
-      }),
-      activeProfile: this.toActiveProfileReadModel(activeSelection),
-      snapshot: resolved.snapshot,
-      validation: resolved.validation,
-      overrideRecords: includeOverrideRecords ? overrideRecords : undefined,
-      effectiveMetadata: includeEffectiveMetadata
-        ? await this.dependencies.deploymentPolicyRepository.getEffectivePolicyMetadata(scope)
-        : undefined,
-      catalog: includeCatalog ? this.buildCatalog() : undefined,
-    });
+      profileId: input.profileId,
+      details: input.details,
+      counters: input.counters,
+    }));
   }
 
   private async isAllowed(input: {

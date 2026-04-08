@@ -4855,7 +4855,10 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               return;
             }
 
-            const apiResponse = await options.deploymentPolicyReadBackendApi.readPolicyState(parsedRequest.data);
+            const apiResponse = await options.deploymentPolicyReadBackendApi.readPolicyState(Object.freeze({
+              ...parsedRequest.data,
+              correlationId: resolveRequestCorrelationId(request, requestId),
+            }));
             const statusCode = mapRunSubmissionStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, Object.freeze({
@@ -4908,6 +4911,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               Object.freeze({
                 actorUserIdentityId: context.actor.userIdentityId,
                 workspaceId: context.workspace.workspaceId,
+                correlationId: resolveRequestCorrelationId(request, requestId),
               }),
               parsedRequest.data,
             );
@@ -4962,6 +4966,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               Object.freeze({
                 actorUserIdentityId: context.actor.userIdentityId,
                 workspaceId: context.workspace.workspaceId,
+                correlationId: resolveRequestCorrelationId(request, requestId),
               }),
               parsedRequest.data,
             );

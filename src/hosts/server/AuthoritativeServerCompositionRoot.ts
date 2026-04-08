@@ -53,6 +53,7 @@ import {
   DeploymentPolicyBootstrapResolutionService,
   type DeploymentPolicyBootstrapResolutionResult,
 } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
+import { PlatformDeploymentPolicyAdministrationObservabilityPort } from "@infrastructure/api/deployment/PlatformDeploymentPolicyAdministrationObservabilityPort";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -252,6 +253,15 @@ export function createAuthoritativeServerCompositionRoot(
               input.bootstrap?.resolveDeploymentPolicyBootstrap
               ?? (async (bootstrapInput) => new DeploymentPolicyBootstrapResolutionService({
                 deploymentPolicyRepository: bootstrapInput.persistentPlatformServices.deploymentPolicyRepository,
+                observabilityPort: new PlatformDeploymentPolicyAdministrationObservabilityPort({
+                  logger: bootstrapInput.hostConfiguration.logger
+                    ? {
+                      info: (event) => bootstrapInput.hostConfiguration.logger?.info(event),
+                      warn: (event) => bootstrapInput.hostConfiguration.logger?.warn(event),
+                      error: (event) => bootstrapInput.hostConfiguration.logger?.error(event),
+                    }
+                    : undefined,
+                }),
               }).execute())
             )({
               persistentPlatformServices,

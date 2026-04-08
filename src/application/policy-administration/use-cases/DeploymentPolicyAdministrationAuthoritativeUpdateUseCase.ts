@@ -42,6 +42,13 @@ import {
   publishDeploymentPolicyGovernanceEventBestEffort,
   type IDeploymentPolicyGovernanceEventSink,
 } from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
+import {
+  DeploymentPolicyAdministrationObservabilityOperations,
+  DeploymentPolicyAdministrationObservabilityOutcomes,
+  publishDeploymentPolicyAdministrationObservabilityBestEffort,
+  type DeploymentPolicyAdministrationObservabilityEvent,
+  type IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
 
 export const DeploymentPolicyAdministrationPermissionKeys = Object.freeze({
   readState: "deployment-policy.state.read",
@@ -110,6 +117,7 @@ export interface DeploymentPolicyAdministrationIdGenerator {
 
 export const DeploymentPolicyAdministrationIdNamespaces = Object.freeze({
   mutation: "deployment-policy-admin-mutation",
+  observabilityCorrelation: "deployment-policy-admin-correlation",
 } as const);
 
 class DefaultDeploymentPolicyAdministrationIdGenerator implements DeploymentPolicyAdministrationIdGenerator {
@@ -170,6 +178,7 @@ export interface DeploymentPolicyAdministrationAuthoritativeUpdateUseCaseDepende
   readonly deploymentPolicyRepository: IDeploymentPolicyPersistenceRepository;
   readonly permissionService: IDeploymentPolicyAdministrationPermissionService;
   readonly governanceEventSink?: IDeploymentPolicyGovernanceEventSink;
+  readonly observabilityPort?: IDeploymentPolicyAdministrationObservabilityPort;
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: ReturnType<typeof createCanonicalDeploymentPolicyConfigurationRegistry>["presetCatalog"];
   readonly clock?: DeploymentPolicyAdministrationClock;
@@ -296,11 +305,35 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
     input: ApplyDeploymentPolicyAdministrationUpdatesInput,
   ): Promise<DeploymentPolicyAdministrationUpdateOutcome<ApplyDeploymentPolicyAdministrationUpdatesResult>> {
     const scope = normalizeScope(input.scope);
+    const correlationId = normalizeOptionalString(input.correlationId)
+      ?? this.idGenerator.nextId(DeploymentPolicyAdministrationIdNamespaces.observabilityCorrelation);
+    const operationKey = this.idGenerator.nextId(DeploymentPolicyAdministrationIdNamespaces.mutation);
+    await this.publishWriteObservability({
+      event: "deployment-policy-admin.write.attempted",
+      outcome: DeploymentPolicyAdministrationObservabilityOutcomes.success,
+      severity: "info",
+      scope,
+      actorUserIdentityId: input.actorUserIdentityId,
+      correlationId,
+      operationKey,
+      details: Object.freeze({
+        dryRun: Boolean(input.dryRun),
+        requestedOperationKinds: Object.freeze(input.operations.map((operation) => operation.kind)),
+      }),
+      counters: Object.freeze({
+        operationCount: input.operations.length,
+      }),
+    });
+
     if (scope.kind !== DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope) {
-      return toFailure(
-        DeploymentPolicyAdministrationUpdateErrorCodes.invalidRequest,
-        `Unsupported deployment-policy scope kind '${scope.kind}'.`,
-        {
+      return this.toFailureWithObservability({
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        correlationId,
+        operationKey,
+        code: DeploymentPolicyAdministrationUpdateErrorCodes.invalidRequest,
+        message: `Unsupported deployment-policy scope kind '${scope.kind}'.`,
+        options: {
           validation: createDeploymentPolicyValidationOutcome({
             issues: [toValidationIssue({
               code: DeploymentPolicyValidationIssueCodes.invalidUpdateOperation,
@@ -309,18 +342,47 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
             })],
             evaluatedAt: this.clock.now().toISOString(),
           }),
+          details: Object.freeze({
+            phase: "request-scope-validation",
+          }),
         },
-      );
+      });
     }
 
     if (input.operations.length < 1) {
-      return toFailure(
-        DeploymentPolicyAdministrationUpdateErrorCodes.invalidRequest,
-        "At least one deployment-policy administration operation is required.",
-      );
+      return this.toFailureWithObservability({
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        correlationId,
+        operationKey,
+        code: DeploymentPolicyAdministrationUpdateErrorCodes.invalidRequest,
+        message: "At least one deployment-policy administration operation is required.",
+        options: {
+          details: Object.freeze({
+            phase: "request-shape-validation",
+          }),
+        },
+      });
     }
 
-    const loaded = await this.loadScopeState(scope, input.operations);
+    let loaded: LoadedScopeState;
+    try {
+      loaded = await this.loadScopeState(scope, input.operations);
+    } catch (error) {
+      return this.toFailureWithObservability({
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        correlationId,
+        operationKey,
+        code: DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
+        message: `Failed to load deployment-policy scope state: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
+        options: Object.freeze({
+          details: Object.freeze({
+            phase: "load-scope-state",
+          }),
+        }),
+      });
+    }
     let workingOverridesByProfile = { ...loaded.overridesByProfile };
     let currentActiveProfileSelection = loaded.activeProfileSelection;
 
@@ -341,17 +403,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
         });
 
         if (!permission.allowed) {
-          return toFailure(
-            DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
-            "Actor is not authorized to change the active deployment profile.",
-            {
+          return this.toFailureWithObservability({
+            scope,
+            actorUserIdentityId: input.actorUserIdentityId,
+            correlationId,
+            operationKey,
+            code: DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
+            message: "Actor is not authorized to change the active deployment profile.",
+            options: {
               permission: {
                 required: DeploymentPolicyAdministrationPermissionKeys.selectActiveProfile,
                 reasonCode: permission.reasonCode,
                 reason: permission.reason,
               },
+              details: Object.freeze({
+                phase: "active-profile-permission-check",
+              }),
             },
-          );
+          });
         }
 
         const nowIso = input.occurredAt ?? this.clock.now().toISOString();
@@ -379,17 +448,26 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
                 occurredAt: input.occurredAt,
                 reason: input.reason,
                 ticketReference: input.ticketReference,
-                correlationId: input.correlationId,
+                correlationId,
                 metadata: input.metadata,
                 expectedRevision: input.expectedRevision,
               }),
             });
             currentActiveProfileSelection = activeProfileSelectionMutation.record;
           } catch (error) {
-            return toFailure(
-              DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
-              `Failed to persist active profile selection: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
-            );
+            return this.toFailureWithObservability({
+              scope,
+              actorUserIdentityId: input.actorUserIdentityId,
+              correlationId,
+              operationKey,
+              code: DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
+              message: `Failed to persist active profile selection: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
+              options: {
+                details: Object.freeze({
+                  phase: "persist-active-profile-selection",
+                }),
+              },
+            });
           }
 
           await this.publishGovernanceEventPair({
@@ -407,7 +485,7 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
               changed: activeProfileSelectionMutation.changed,
               wasReplay: activeProfileSelectionMutation.wasReplay,
             }),
-            correlationId: input.correlationId,
+            correlationId,
           });
         } else {
           currentActiveProfileSelection = nextRecord;
@@ -425,17 +503,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
       });
 
       if (!overridePermission.allowed) {
-        return toFailure(
-          DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
-          "Actor is not authorized to update deployment policy overrides.",
-          {
+        return this.toFailureWithObservability({
+          scope,
+          actorUserIdentityId: input.actorUserIdentityId,
+          correlationId,
+          operationKey,
+          code: DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
+          message: "Actor is not authorized to update deployment policy overrides.",
+          options: {
             permission: {
               required: DeploymentPolicyAdministrationPermissionKeys.manageOverrides,
               reasonCode: overridePermission.reasonCode,
               reason: overridePermission.reason,
             },
+            details: Object.freeze({
+              phase: "override-permission-check",
+            }),
           },
-        );
+        });
       }
 
       const commandValidation = this.validateUpdateCommandShape(command);
@@ -465,17 +550,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
           asOf: input.occurredAt,
         });
         if (!runtimePermission.allowed) {
-          return toFailure(
-            DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
-            "Actor is not authorized to mutate runtime-admin deployment policy settings.",
-            {
+          return this.toFailureWithObservability({
+            scope,
+            actorUserIdentityId: input.actorUserIdentityId,
+            correlationId,
+            operationKey,
+            code: DeploymentPolicyAdministrationUpdateErrorCodes.forbidden,
+            message: "Actor is not authorized to mutate runtime-admin deployment policy settings.",
+            options: {
               permission: {
                 required: DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides,
                 reasonCode: runtimePermission.reasonCode,
                 reason: runtimePermission.reason,
               },
+              details: Object.freeze({
+                phase: "runtime-admin-permission-check",
+              }),
             },
-          );
+          });
         }
       }
 
@@ -490,7 +582,7 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
             occurredAt: command.submittedAt ?? input.occurredAt,
             reason: input.reason,
             ticketReference: input.ticketReference,
-            correlationId: input.correlationId,
+            correlationId,
             metadata: input.metadata,
             expectedRevision: command.expectedRevision,
           });
@@ -569,10 +661,22 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
               recordRevision: result.record.revision,
             }));
           } catch (error) {
-            return toFailure(
-              DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
-              `Failed to persist deployment-policy override operation '${item.operation.operation}' for '${item.operation.familyId}.${item.operation.settingKey}': ${error instanceof Error ? error.message : "Unknown persistence error."}`,
-            );
+            return this.toFailureWithObservability({
+              scope,
+              actorUserIdentityId: input.actorUserIdentityId,
+              correlationId,
+              operationKey,
+              code: DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
+              message: `Failed to persist deployment-policy override operation '${item.operation.operation}' for '${item.operation.familyId}.${item.operation.settingKey}': ${error instanceof Error ? error.message : "Unknown persistence error."}`,
+              options: {
+                details: Object.freeze({
+                  phase: "persist-override-operation",
+                  operation: item.operation.operation,
+                  familyId: item.operation.familyId,
+                  settingKey: item.operation.settingKey,
+                }),
+              },
+            });
           }
         }
       } else {
@@ -657,13 +761,21 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
     });
 
     if (!validation.valid) {
-      return toFailure(
-        DeploymentPolicyAdministrationUpdateErrorCodes.validationFailed,
-        "Deployment-policy mutation request failed validation.",
-        {
+      return this.toFailureWithObservability({
+        scope,
+        actorUserIdentityId: input.actorUserIdentityId,
+        correlationId,
+        operationKey,
+        code: DeploymentPolicyAdministrationUpdateErrorCodes.validationFailed,
+        message: "Deployment-policy mutation request failed validation.",
+        options: {
           validation,
+          details: Object.freeze({
+            phase: "mutation-validation",
+            issueCodes: Object.freeze([...new Set(validation.issues.map((issue) => issue.code))]),
+          }),
         },
-      );
+      });
     }
 
     const snapshotProfileId = this.resolveSnapshotProfileId({
@@ -707,15 +819,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
             occurredAt: input.occurredAt,
             reason: input.reason,
             ticketReference: input.ticketReference,
-            correlationId: input.correlationId,
+            correlationId,
             metadata: input.metadata,
           }),
         });
       } catch (error) {
-        return toFailure(
-          DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
-          `Failed to persist effective deployment-policy metadata: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
-        );
+        return this.toFailureWithObservability({
+          scope,
+          actorUserIdentityId: input.actorUserIdentityId,
+          correlationId,
+          operationKey,
+          code: DeploymentPolicyAdministrationUpdateErrorCodes.persistenceConflict,
+          message: `Failed to persist effective deployment-policy metadata: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
+          options: {
+            details: Object.freeze({
+              phase: "persist-effective-metadata",
+            }),
+          },
+        });
       }
     }
 
@@ -733,9 +854,29 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
           mutationCount: overrideSafeSummaries.length,
           mutations: Object.freeze(overrideSafeSummaries),
         }),
-        correlationId: input.correlationId,
+        correlationId,
       });
     }
+
+    await this.publishWriteObservability({
+      event: "deployment-policy-admin.write.completed",
+      outcome: DeploymentPolicyAdministrationObservabilityOutcomes.success,
+      severity: "info",
+      scope,
+      actorUserIdentityId: input.actorUserIdentityId,
+      profileId: snapshotProfileId,
+      correlationId,
+      operationKey,
+      details: Object.freeze({
+        dryRun: Boolean(input.dryRun),
+        activeProfileChanged: Boolean(activeProfileSelectionMutation?.changed),
+      }),
+      counters: Object.freeze({
+        operationCount: input.operations.length,
+        overrideMutationCount: overrideMutations.length,
+        validationIssueCount: validation.issues.length,
+      }),
+    });
 
     return {
       ok: true,
@@ -749,6 +890,52 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
         snapshot: resolved.snapshot,
       }),
     };
+  }
+
+  private async toFailureWithObservability<TValue>(input: {
+    readonly scope: DeploymentPolicyPersistenceScope;
+    readonly actorUserIdentityId: string;
+    readonly correlationId?: string;
+    readonly operationKey?: string;
+    readonly code: DeploymentPolicyAdministrationUpdateErrorCode;
+    readonly message: string;
+    readonly options?: {
+      readonly validation?: DeploymentPolicyValidationOutcome;
+      readonly permission?: {
+        readonly required: DeploymentPolicyAdministrationPermissionKey;
+        readonly reasonCode?: string;
+        readonly reason?: string;
+      };
+      readonly details?: Readonly<Record<string, unknown>>;
+    };
+  }): Promise<DeploymentPolicyAdministrationUpdateOutcome<TValue>> {
+    await this.publishWriteObservability({
+      event: input.code === DeploymentPolicyAdministrationUpdateErrorCodes.validationFailed
+        ? "deployment-policy-admin.write.validation-failed"
+        : "deployment-policy-admin.write.failed",
+      outcome: input.code === DeploymentPolicyAdministrationUpdateErrorCodes.forbidden
+        ? DeploymentPolicyAdministrationObservabilityOutcomes.rejected
+        : DeploymentPolicyAdministrationObservabilityOutcomes.failure,
+      severity: input.code === DeploymentPolicyAdministrationUpdateErrorCodes.forbidden
+        || input.code === DeploymentPolicyAdministrationUpdateErrorCodes.validationFailed
+        ? "warn"
+        : "error",
+      scope: input.scope,
+      actorUserIdentityId: input.actorUserIdentityId,
+      correlationId: input.correlationId,
+      operationKey: input.operationKey,
+      details: Object.freeze({
+        code: input.code,
+        permissionRequired: input.options?.permission?.required,
+        reasonCode: input.options?.permission?.reasonCode,
+        ...input.options?.details,
+      }),
+      counters: Object.freeze({
+        validationIssueCount: input.options?.validation?.issues.length ?? 0,
+      }),
+    });
+
+    return toFailure(input.code, input.message, input.options);
   }
 
   private async loadScopeState(
@@ -1092,6 +1279,34 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
       correlationId: input.correlationId,
       details: input.details,
     });
+  }
+
+  private async publishWriteObservability(input: {
+    readonly event: string;
+    readonly outcome: DeploymentPolicyAdministrationObservabilityEvent["outcome"];
+    readonly severity: DeploymentPolicyAdministrationObservabilityEvent["severity"];
+    readonly scope: DeploymentPolicyPersistenceScope;
+    readonly actorUserIdentityId: string;
+    readonly profileId?: string;
+    readonly correlationId?: string;
+    readonly operationKey?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+    readonly counters?: Readonly<Record<string, number>>;
+  }): Promise<void> {
+    await publishDeploymentPolicyAdministrationObservabilityBestEffort(this.dependencies.observabilityPort, Object.freeze({
+      event: input.event,
+      operation: DeploymentPolicyAdministrationObservabilityOperations.write,
+      outcome: input.outcome,
+      severity: input.severity,
+      occurredAt: this.clock.now().toISOString(),
+      scope: input.scope,
+      actorUserIdentityId: input.actorUserIdentityId,
+      profileId: input.profileId,
+      correlationId: input.correlationId,
+      operationKey: input.operationKey,
+      details: input.details,
+      counters: input.counters,
+    }));
   }
 
   private toOverrideSafeSummary(input: {

@@ -38,6 +38,10 @@ import type {
   DeploymentPolicyGovernanceEvent,
   IDeploymentPolicyGovernanceEventSink,
 } from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
+import type {
+  DeploymentPolicyAdministrationObservabilityEvent,
+  IDeploymentPolicyAdministrationObservabilityPort,
+} from "@application/policy-administration/ports/DeploymentPolicyAdministrationObservabilityPorts";
 
 class InMemoryDeploymentPolicyRepository implements IDeploymentPolicyPersistenceRepository {
   public activeByScope = new Map<string, DeploymentPolicyActiveProfileSelectionRecord>();
@@ -203,6 +207,17 @@ class CapturingDeploymentPolicyGovernanceEventSink implements IDeploymentPolicyG
   }
 }
 
+class CapturingDeploymentPolicyAdministrationObservabilityPort
+  implements IDeploymentPolicyAdministrationObservabilityPort {
+  public readonly events: DeploymentPolicyAdministrationObservabilityEvent[] = [];
+
+  public async recordDeploymentPolicyAdministrationEvent(
+    event: DeploymentPolicyAdministrationObservabilityEvent,
+  ): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createScope(scopeId: string): DeploymentPolicyPersistenceScope {
   return createDeploymentPolicyPersistenceScope({
     kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
@@ -286,10 +301,12 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
   it("rejects invalid override values and does not persist changes", async () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();
+    const observabilityPort = new CapturingDeploymentPolicyAdministrationObservabilityPort();
 
     const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      observabilityPort,
     });
 
     const result = await useCase.execute({
@@ -317,6 +334,11 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     }
     expect(repository.upsertOverrideCalls).toBe(0);
     expect(repository.saveMetadataCalls).toBe(0);
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.write.validation-failed"
+      && event.operation === "write"
+      && event.outcome === "failure"
+    ))).toBeTrue();
   });
 
   it("rejects remove operations when override is missing", async () => {
@@ -356,11 +378,13 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();
     const governanceEventSink = new CapturingDeploymentPolicyGovernanceEventSink();
+    const observabilityPort = new CapturingDeploymentPolicyAdministrationObservabilityPort();
 
     const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
       governanceEventSink,
+      observabilityPort,
     });
 
     const result = await useCase.execute({
@@ -424,6 +448,14 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     expect(mutationDetails?.[0]?.before).toEqual({ existed: false });
     expect(mutationDetails?.[0]?.after).toEqual({ existed: true, valueType: "string", revision: 1 });
     expect(JSON.stringify(overrideEvent?.details)).not.toContain("\"private\"");
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.write.attempted"
+      && event.outcome === "success"
+    ))).toBeTrue();
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.write.completed"
+      && event.outcome === "success"
+    ))).toBeTrue();
   });
 
   it("supports dry-run validation without mutating persistence", async () => {
@@ -471,11 +503,13 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
   it("enforces runtime-admin permission for runtime-admin setting mutations", async () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();
+    const observabilityPort = new CapturingDeploymentPolicyAdministrationObservabilityPort();
     permissionService.denied.add(DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides);
 
     const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      observabilityPort,
     });
 
     const result = await useCase.execute({
@@ -502,5 +536,9 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
       expect(result.error.permission?.required).toBe(DeploymentPolicyAdministrationPermissionKeys.manageRuntimeAdminOverrides);
     }
     expect(repository.upsertOverrideCalls).toBe(0);
+    expect(observabilityPort.events.some((event) => (
+      event.event === "deployment-policy-admin.write.failed"
+      && event.outcome === "rejected"
+    ))).toBeTrue();
   });
 });
