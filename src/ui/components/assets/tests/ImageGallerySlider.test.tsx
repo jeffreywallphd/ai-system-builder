@@ -29,6 +29,7 @@ describe("ImageGallerySlider", () => {
       title: "Results",
       items: [],
       loading: true,
+      loadingMessage: "Loading created images from the output dataset.",
     }));
     const emptyHtml = renderToStaticMarkup(React.createElement(ImageGallerySlider, {
       title: "Results",
@@ -41,6 +42,7 @@ describe("ImageGallerySlider", () => {
     }));
 
     expect(loadingHtml).toContain("Results is loading");
+    expect(loadingHtml).toContain("output dataset");
     expect(emptyHtml).toContain("No images in results");
     expect(errorHtml).toContain("Gallery unavailable");
   });

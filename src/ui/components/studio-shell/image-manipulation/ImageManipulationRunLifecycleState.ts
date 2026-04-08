@@ -74,7 +74,7 @@ export function mapRuntimeStatusToRunLifecycleState(
   if (status === "pending") {
     return Object.freeze({
       state: "queued",
-      message: "Your run is queued for execution.",
+      message: "Queued. Waiting for an available execution node.",
     });
   }
   if (status === "running") {
@@ -82,7 +82,7 @@ export function mapRuntimeStatusToRunLifecycleState(
       if (progress.completedNodeCount < 1) {
         return Object.freeze({
           state: "preparing",
-          message: "Preparing execution resources.",
+          message: `Preparing execution graph (0/${progress.totalNodeCount} nodes complete).`,
         });
       }
       return Object.freeze({
@@ -92,7 +92,7 @@ export function mapRuntimeStatusToRunLifecycleState(
     }
     return Object.freeze({
       state: "running",
-      message: "Creating your image.",
+      message: "Execution started. Waiting for first progress updates.",
     });
   }
   if (status === "succeeded") {
@@ -115,7 +115,7 @@ export function mapRuntimeStatusToRunLifecycleState(
   }
   return Object.freeze({
     state: "running",
-    message: "Creating your image.",
+    message: "Execution started. Waiting for first progress updates.",
   });
 }
 
@@ -155,6 +155,11 @@ export function buildRunProgressSnapshot(
 ): ImageManipulationRunProgressSnapshot {
   const progress = status?.progress;
   if (!progress || progress.totalNodeCount < 1) {
+    const summary = status?.status === "pending"
+      ? "Queued. Progress details will appear when execution begins."
+      : status?.status === "running"
+        ? "Execution started. Progress details will appear after the first node reports."
+        : "Progress details will appear after execution starts.";
     return Object.freeze({
       available: false,
       completedNodeCount: 0,
@@ -162,7 +167,7 @@ export function buildRunProgressSnapshot(
       runningNodeCount: 0,
       failedNodeCount: 0,
       percentComplete: 0,
-      summary: "Progress details will appear after execution starts.",
+      summary,
     });
   }
 

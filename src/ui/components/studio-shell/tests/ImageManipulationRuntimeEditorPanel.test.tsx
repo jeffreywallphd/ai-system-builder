@@ -8,6 +8,10 @@ import ImageManipulationRuntimeEditorPanel, {
   groupRecentImageAssetsByContinuityWindow,
   resolveNextGalleryPreviewRoleByKey,
   resolveLinkedRunForSelectedOutput,
+  resolveCollectionLoadingMessage,
+  resolveGalleryLoadingMessage,
+  resolvePreviewLoadingMessage,
+  resolveRunTransitionMessage,
   resolveRunHistorySummary,
   resolveRunOutputRecordId,
   resolveRunParameterSnapshot,
@@ -122,6 +126,21 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       activeRole: "source",
       key: "Enter",
     })).toBeUndefined();
+  });
+
+  it("builds contextual loading and transition messages for operational feedback", () => {
+    expect(resolveCollectionLoadingMessage({
+      source: true,
+      output: false,
+      reference: true,
+    })).toContain("source photos and face reference photos");
+    expect(resolvePreviewLoadingMessage("output")).toContain("result record");
+    expect(resolveGalleryLoadingMessage("source")).toContain("input image dataset");
+    expect(resolveRunTransitionMessage({
+      isFetchingRunResult: true,
+      isPersistingRunResult: false,
+      isRefreshingAfterRun: false,
+    })).toContain("Retrieving");
   });
 
   it("groups recent assets into continuity windows for rediscovery", () => {

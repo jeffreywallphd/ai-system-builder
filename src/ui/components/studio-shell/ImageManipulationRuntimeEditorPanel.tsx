@@ -353,6 +353,68 @@ function resolveRunStatusMessage(runLifecycle: ImageManipulationRunLifecycleSnap
   return runLifecycle.message ?? fallbackStatusMessage ?? "Adjust your settings, then create a new image.";
 }
 
+interface ImageCollectionLoadingDescriptor {
+  readonly source: boolean;
+  readonly output: boolean;
+  readonly reference: boolean;
+}
+
+export function resolveCollectionLoadingMessage(descriptor: ImageCollectionLoadingDescriptor): string | undefined {
+  const loadingLabels = [
+    descriptor.source ? "source photos" : undefined,
+    descriptor.output ? "created images" : undefined,
+    descriptor.reference ? "face reference photos" : undefined,
+  ].filter((value): value is string => Boolean(value));
+
+  if (loadingLabels.length < 1) {
+    return undefined;
+  }
+  if (loadingLabels.length === 1) {
+    return `Loading ${loadingLabels[0]} from authoritative datasets.`;
+  }
+  if (loadingLabels.length === 2) {
+    return `Loading ${loadingLabels[0]} and ${loadingLabels[1]} from authoritative datasets.`;
+  }
+  return "Loading source photos, created images, and face reference photos from authoritative datasets.";
+}
+
+export function resolvePreviewLoadingMessage(role: ImageManipulationSelectionRole): string {
+  if (role === "source") {
+    return "Loading source preview from the selected dataset record.";
+  }
+  if (role === "reference") {
+    return "Loading face reference preview from the selected dataset record.";
+  }
+  return "Loading created image preview from the selected result record.";
+}
+
+export function resolveGalleryLoadingMessage(role: ImageManipulationSelectionRole): string {
+  if (role === "source") {
+    return "Loading source photos from the input image dataset.";
+  }
+  if (role === "reference") {
+    return "Loading face reference photos from the reference dataset.";
+  }
+  return "Loading created images from the output dataset.";
+}
+
+export function resolveRunTransitionMessage(input: {
+  readonly isFetchingRunResult: boolean;
+  readonly isPersistingRunResult: boolean;
+  readonly isRefreshingAfterRun: boolean;
+}): string | undefined {
+  if (input.isFetchingRunResult) {
+    return "Execution finished. Retrieving authoritative run outputs.";
+  }
+  if (input.isPersistingRunResult) {
+    return "Persisting run outputs and lineage into studio datasets.";
+  }
+  if (input.isRefreshingAfterRun) {
+    return "Refreshing result gallery and run history with the latest records.";
+  }
+  return undefined;
+}
+
 function resolveHistoryRunBadgeTone(
   status: ImageRunHistoryRecord["status"] | undefined,
 ): "neutral" | "success" | "warning" | "danger" {
@@ -962,9 +1024,13 @@ export function ImageManipulationRuntimeEditorPanel({
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const [isLoadingRunHistory, setIsLoadingRunHistory] = useState(false);
   const [runHistoryError, setRunHistoryError] = useState<string | undefined>();
+  const [isRefreshingReview, setIsRefreshingReview] = useState(false);
   const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | undefined>();
   const [isContinuingFromRunId, setIsContinuingFromRunId] = useState<string | undefined>();
   const [isResultQuickActionPending, setIsResultQuickActionPending] = useState<"source" | "reference" | undefined>();
+  const [isFetchingRunResult, setIsFetchingRunResult] = useState(false);
+  const [isPersistingRunResult, setIsPersistingRunResult] = useState(false);
+  const [isRefreshingAfterRun, setIsRefreshingAfterRun] = useState(false);
   const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
   const [executionReadinessErrorCode, setExecutionReadinessErrorCode] = useState<string | undefined>();
@@ -1124,6 +1190,18 @@ export function ImageManipulationRuntimeEditorPanel({
       ? referenceLoadError
       : outputLoadError;
   const hasCollectionLoadError = Boolean(sourceLoadError || outputLoadError || referenceLoadError);
+  const collectionLoadingMessage = resolveCollectionLoadingMessage({
+    source: isLoadingSources,
+    output: isLoadingOutputs,
+    reference: isLoadingReferences,
+  });
+  const previewLoadingMessage = resolvePreviewLoadingMessage(selection.activePreviewRole);
+  const galleryLoadingMessage = resolveGalleryLoadingMessage(selection.activePreviewRole);
+  const runTransitionMessage = resolveRunTransitionMessage({
+    isFetchingRunResult,
+    isPersistingRunResult,
+    isRefreshingAfterRun,
+  });
   const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
   const runProgress = useMemo(() => buildRunProgressSnapshot(activeRunStatus), [activeRunStatus]);
   const selectionConfirmationMessage = useMemo(() => resolveSelectionConfirmationMessage({
@@ -1951,6 +2029,9 @@ export function ImageManipulationRuntimeEditorPanel({
     setRunLifecycle(Object.freeze({ state: "validating", message: "Checking your setup." }));
     setActiveRunId(undefined);
     setActiveRunStatus(undefined);
+    setIsFetchingRunResult(false);
+    setIsPersistingRunResult(false);
+    setIsRefreshingAfterRun(false);
     setIntegrityIssues([]);
     setFlowSteps([]);
     setFlowIssues([]);
@@ -2078,6 +2159,9 @@ export function ImageManipulationRuntimeEditorPanel({
         return;
       }
       if (monitored.status === "cancelled") {
+        setIsFetchingRunResult(false);
+        setIsPersistingRunResult(false);
+        setIsRefreshingAfterRun(false);
         setRunLifecycle(Object.freeze({
           state: "cancelled",
           message: "This run was cancelled.",
@@ -2085,11 +2169,17 @@ export function ImageManipulationRuntimeEditorPanel({
         return;
       }
 
+      setIsFetchingRunResult(true);
+      setRunLifecycle(Object.freeze({
+        state: "preparing",
+        message: "Execution finished. Retrieving authoritative outputs.",
+      }));
       const resultResponse = await runtimeOperations.getRunResult({
         executionId: runId,
         diagnosticsLimit: 50,
         nodeResultLimit: 20,
       });
+      setIsFetchingRunResult(false);
       if (!resultResponse.ok || !resultResponse.data) {
         const recovery = resolveRuntimeOperationRecovery({
           code: resultResponse.error?.code,
@@ -2118,6 +2208,11 @@ export function ImageManipulationRuntimeEditorPanel({
           userLabel: "Saving",
         }),
       ]));
+      setIsPersistingRunResult(true);
+      setRunLifecycle(Object.freeze({
+        state: "preparing",
+        message: "Retrieved outputs. Persisting results into studio datasets.",
+      }));
 
       const persistenceResponse = await studioShell.persistReferenceImageOutputs(
         createReferenceImageOutputPersistenceRequest({
@@ -2139,6 +2234,7 @@ export function ImageManipulationRuntimeEditorPanel({
           runtimeResult: mapRuntimeSdkResultToPersistenceResult(resultResponse.data),
         }),
       );
+      setIsPersistingRunResult(false);
 
       if (!persistenceResponse.ok || !persistenceResponse.data) {
         const recovery = resolveRuntimeOperationRecovery({
@@ -2208,10 +2304,16 @@ export function ImageManipulationRuntimeEditorPanel({
           userLabel: "Refreshing",
         }),
       ]));
+      setIsRefreshingAfterRun(true);
+      setRunLifecycle(Object.freeze({
+        state: "preparing",
+        message: "Saved results. Refreshing previews and run history.",
+      }));
       await Promise.all([
         loadCollections({ preferLatestOutput: true }),
         loadRunHistory(),
       ]);
+      setIsRefreshingAfterRun(false);
       setSelection((current) => setActivePreviewRole(current, "output"));
       setFlowSteps((current) => Object.freeze(current.map((step) => (
         step.stepId === "refresh"
@@ -2223,6 +2325,9 @@ export function ImageManipulationRuntimeEditorPanel({
         message: "Done. Your result is ready.",
       }));
     } catch {
+      setIsFetchingRunResult(false);
+      setIsPersistingRunResult(false);
+      setIsRefreshingAfterRun(false);
       setRunLifecycle(Object.freeze({
         state: "failed",
         message: "This run could not be completed right now.",
@@ -2245,8 +2350,16 @@ export function ImageManipulationRuntimeEditorPanel({
       </header>
       {isHydrating ? (
         <ImageStatusNotice
-          title="Loading editor"
-          message="Getting your photos and settings ready."
+          title="Restoring editor session"
+          message="Loading saved settings, selections, and linked image collections."
+          loading
+        />
+      ) : null}
+      {!isHydrating && collectionLoadingMessage ? (
+        <ImageStatusNotice
+          title="Refreshing image collections"
+          message={collectionLoadingMessage}
+          loading
         />
       ) : null}
       {hasCollectionLoadError ? (
@@ -2357,6 +2470,7 @@ export function ImageManipulationRuntimeEditorPanel({
               message={uploadProgressStage === "uploading"
                 ? "Uploading your photo to your image library."
                 : "Finalizing metadata and linking the photo to this editing session."}
+              loading
             />
           ) : null}
           <ComfyImageManipulationPropertyEditor
@@ -2404,6 +2518,7 @@ export function ImageManipulationRuntimeEditorPanel({
               <ImageStatusNotice
                 title="Loading source photos"
                 message="Your uploaded photos will appear here."
+                loading
               />
             ) : null}
             {!isLoadingSources && sourceItems.length < 1 ? (
@@ -2488,6 +2603,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   <ImageStatusNotice
                     title="Loading recently used images"
                     message="Your latest uploaded images will appear here."
+                    loading
                   />
                 ) : null}
                 {!isLoadingRecentImageAssets && recentImageAssetsError ? (
@@ -2561,6 +2677,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   <ImageStatusNotice
                     title="Loading recent systems"
                     message="Saved setups will appear here for quick continuation."
+                    loading
                   />
                 ) : null}
                 {!isLoadingRecentSystems && recentSystemsError ? (
@@ -2644,6 +2761,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   <ImageStatusNotice
                     title="Loading image library"
                     message="Fetching your uploaded image assets."
+                    loading
                   />
                 ) : null}
                 {!isLoadingImageLibrary && imageLibraryError ? (
@@ -2758,8 +2876,9 @@ export function ImageManipulationRuntimeEditorPanel({
                   : launchPrecheck.backendBlockingIssues.length > 0
                     ? "warning"
                     : launchPrecheck.backendAdvisories.length > 0
-                      ? "warning"
+                    ? "warning"
                       : "success"}
+                loading={isCheckingExecutionReadiness}
               />
               {!isCheckingExecutionReadiness && launchPrecheck.backendBlockingIssues.length > 0 ? (
                 <ul className="ui-text-small ui-text-secondary">
@@ -2843,6 +2962,13 @@ export function ImageManipulationRuntimeEditorPanel({
               message={runStatusMessage}
               tone={resolveRunStatusTone(runLifecycle.state)}
             />
+            {runTransitionMessage ? (
+              <ImageStatusNotice
+                title="Run transition"
+                message={runTransitionMessage}
+                loading
+              />
+            ) : null}
             {(runLifecycle.state === "degraded" || launchPrecheck.backendAdvisories.length > 0) ? (
               <ImageStatusNotice
                 title="Execution warnings"
@@ -2992,6 +3118,8 @@ export function ImageManipulationRuntimeEditorPanel({
             subtitle={previewContextLabels[selection.activePreviewRole]}
             image={selectedPreviewViewModel}
             loading={previewLoading}
+            loadingTitle="Loading image preview"
+            loadingMessage={previewLoadingMessage}
             errorMessage={previewErrorMessage}
             emptyMessage="Select a source, result, or face reference image to preview it here."
             unavailableMessage="This image is currently unavailable."
@@ -3095,15 +3223,18 @@ export function ImageManipulationRuntimeEditorPanel({
                   <button
                     type="button"
                     className="ui-button ui-button--ghost ui-button--sm"
-                    disabled={isLoadingOutputs || isLoadingRunHistory}
+                    disabled={isLoadingOutputs || isLoadingRunHistory || isRefreshingReview}
                     onClick={() => {
+                      setIsRefreshingReview(true);
                       void Promise.all([
                         loadCollections(),
                         loadRunHistory(),
-                      ]);
+                      ]).finally(() => {
+                        setIsRefreshingReview(false);
+                      });
                     }}
                   >
-                    Refresh review
+                    {isRefreshingReview ? "Refreshing review..." : "Refresh review"}
                   </button>
                 </div>
                 <details>
@@ -3129,6 +3260,14 @@ export function ImageManipulationRuntimeEditorPanel({
                 <ImageStatusNotice
                   title="Loading run history"
                   message="Fetching authoritative run records for this setup."
+                  loading
+                />
+              ) : null}
+              {isRefreshingReview && !isLoadingRunHistory ? (
+                <ImageStatusNotice
+                  title="Refreshing review context"
+                  message="Updating result selection and run history from authoritative records."
+                  loading
                 />
               ) : null}
               {!isLoadingRunHistory && runHistory.length < 1 ? (
@@ -3292,6 +3431,7 @@ export function ImageManipulationRuntimeEditorPanel({
                 items={activeGallery.items}
                 selectedImageId={activeGallery.selectedId}
                 loading={activeGallery.loading}
+                loadingMessage={galleryLoadingMessage}
                 errorMessage={activeGallery.errorMessage}
                 emptyMessage={activeGallery.emptyMessage}
                 onImageSelected={(imageId) => {
