@@ -10,10 +10,13 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/application/common/OfflineResourceClassificationPolicy.ts`
 - `src/application/common/OfflineLocalModeResynchronization.ts`
 - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+- `src/application/common/OfflinePendingOperationPersistence.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+- `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+- `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
@@ -39,6 +42,8 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Explicit desktop connectivity-state transitions (`connected`, `degraded`, `reconnecting`, `disconnected`) derived from transport/session/trust/offline-intent probes.
 - Dedicated desktop authoritative snapshot cache service + SQLite persistence with bounded retention and metadata integrity digest checks.
 - Snapshot records persist logical resource snapshots and offline eligibility markers, not raw filesystem references.
+- Dedicated pending-operation persistence and replay-preparation service + SQLite queue store for durable unsynced operation intent.
+- Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
 
 ## Server-authoritative-only baseline
 

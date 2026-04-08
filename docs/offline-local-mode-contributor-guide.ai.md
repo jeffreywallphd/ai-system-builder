@@ -14,8 +14,8 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 
 1. Shared offline contracts/schemas.
 2. Domain offline boundary catalog and policy model.
-3. Application classification/resynchronization/cache seams.
-4. Desktop host profile + offline cache runtime gating.
+3. Application classification/resynchronization/cache/pending-operation persistence seams.
+4. Desktop host profile + offline cache/pending-operation runtime gating.
    - include desktop connectivity-state host service (`src/hosts/desktop/DesktopConnectivityStateService.ts`) and keep connectivity heuristics out of page code.
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
@@ -28,6 +28,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - desktop host remains control-plane-client and non-authoritative.
 - authoritative snapshot cache stores logical payload + sync metadata, not filesystem references.
 - snapshot cache writes respect eligibility and protected-storage requirements.
+- pending-operation persistence keeps actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic reconnect replay.
 
 ## Prohibited patterns
 
