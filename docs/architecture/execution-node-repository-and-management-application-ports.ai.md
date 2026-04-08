@@ -4,6 +4,7 @@
 
 Story 5.1.3 introduces application-layer repository and service ports for execution-node registration, query, health/capability refresh, eligibility evaluation, availability management, and scheduling selection hints.
 Story 5.2.1 adds authoritative application use cases for registering and activating execution nodes for image backend hosting.
+Story 5.2.2 adds concrete SQLite persistence + status-history recording for execution-node records.
 
 ## Implemented files
 
@@ -45,3 +46,10 @@ These ports are intended for authoritative run orchestration, scheduling, node-a
 - Adds shared use-case error/outcome and mutation-context helpers in `ExecutionNodeManagementUseCaseShared.ts`.
 - Adds optional authorization extension seam (`ExecutionNodeManagementAuthorizationHook`) to keep policy controls extensible.
 - Adds behavior tests covering valid registration, invalid/duplicate submissions, activation success, and activation-policy/posture rejection paths.
+
+## Story 5.2.2 persistence note
+
+- Concrete adapter: `src/infrastructure/persistence/nodes/SqliteExecutionNodeRepository.ts`
+- Migration schema: `src/infrastructure/persistence/nodes/SqliteExecutionNodePersistenceMigrations.ts`
+- Mapper isolation boundary: `src/infrastructure/persistence/nodes/ExecutionNodePersistenceMapper.ts`
+- Operational history table: `execution_node_status_history`

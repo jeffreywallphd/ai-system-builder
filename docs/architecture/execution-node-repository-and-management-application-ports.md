@@ -7,6 +7,7 @@
 - Epic 5.2: Node Registration, Persistence, Health, and Capability Management
 - Story 5.1.3: Define repository and service ports for node registration, query, and management
 - Story 5.2.1: Implement node registration and activation use cases for image execution backends
+- Story 5.2.2: Implement concrete persistence for execution-node records and status history
 
 ## Purpose
 
@@ -84,3 +85,13 @@ These ports are designed for:
   - both use cases accept optional `ExecutionNodeManagementAuthorizationHook` checks so approval/security policies can be tightened without changing core orchestration seams
 
 These use cases keep execution node inventory management explicit and authoritative, decoupled from hidden startup assumptions or adapter-local side effects.
+
+## Story 5.2.2 persistence note
+
+Concrete SQLite persistence for `IExecutionNodeRepository` now lives in:
+
+- `src/infrastructure/persistence/nodes/SqliteExecutionNodeRepository.ts`
+- `src/infrastructure/persistence/nodes/SqliteExecutionNodePersistenceMigrations.ts`
+- `src/infrastructure/persistence/nodes/ExecutionNodePersistenceMapper.ts`
+
+Durable operational history for health/capability/availability updates is recorded in `execution_node_status_history` and documented in `docs/architecture/execution-node-persistence-and-status-history.md`.
