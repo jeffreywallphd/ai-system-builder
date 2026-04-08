@@ -44,3 +44,9 @@
   - `src/application/image-workflows/ports/ImageManipulationTranslationContracts.ts`
 - Translation contract architecture note:
   - `docs/architecture/image-manipulation-translation-contracts.md`
+
+## Story 3.1.3 normalized status/error contracts
+- Canonical status/progress/completion/failure contracts are defined in:
+  - `src/application/image-workflows/ports/ImageManipulationExecutionStatusContracts.ts`
+- Architecture note:
+  - `docs/architecture/image-manipulation-execution-status-contracts.md`
