@@ -1057,4 +1057,56 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     });
     expect(removedSnapshot).toBeUndefined();
   });
+
+  it("supports injectable resynchronization policy seams without changing default replay contracts", async () => {
+    const pendingOperationService = new OfflinePendingOperationService(
+      new InMemoryOfflinePendingOperationRepository(),
+    );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
+    );
+    const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
+      new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
+    );
+    const authoritativePort = new FakeAuthoritativeResynchronizationPort();
+    const eventSink = new RecordingOfflineOperationalSink();
+    let observedPlanCount = 0;
+    const coordinator = new OfflineControlledResynchronizationCoordinator(
+      pendingOperationService,
+      localExecutionRegistrationService,
+      snapshotCacheService,
+      authoritativePort,
+      new StaticConnectivityPort(createConnectedState()),
+      {
+        now: () => new Date("2026-04-08T13:00:00.000Z"),
+        eventSink,
+        resynchronizationPolicyPort: {
+          policySource: "offline-resynchronization-policy:test-seam:v1",
+          planResynchronization: (input) => {
+            observedPlanCount += 1;
+            expect(input.queuedMutations).toEqual([]);
+            return Object.freeze([]);
+          },
+          assertNoSilentGlobalDivergence: (input) => {
+            expect(input.decisions).toEqual([]);
+          },
+        },
+      },
+    );
+
+    const result = await coordinator.synchronizeWorkspace({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+      attemptedAt: "2026-04-08T13:00:00.000Z",
+    });
+
+    expect(observedPlanCount).toBe(1);
+    expect(result.outcomes).toEqual([]);
+    expect(eventSink.events[0]?.details).toMatchObject({
+      resynchronizationPolicySource: "offline-resynchronization-policy:test-seam:v1",
+    });
+    expect(eventSink.events[eventSink.events.length - 1]?.details).toMatchObject({
+      resynchronizationPolicySource: "offline-resynchronization-policy:test-seam:v1",
+    });
+  });
 });

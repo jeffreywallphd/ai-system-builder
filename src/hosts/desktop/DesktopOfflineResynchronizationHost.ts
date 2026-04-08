@@ -3,6 +3,7 @@ import { OfflineControlledResynchronizationCoordinator } from "@application/comm
 import type { IOfflineOperationalEventSink } from "@application/common/OfflineOperationalEventPorts";
 import type {
   OfflineControlledResynchronizationResult,
+  IOfflineResynchronizationPolicyPort,
   IOfflineAuthoritativeResynchronizationPort,
   IOfflineConnectivityStatePort,
 } from "@application/common/OfflineControlledResynchronizationCoordinator";
@@ -20,6 +21,7 @@ import {
   createDesktopOfflineSnapshotCacheHostRuntime,
   type DesktopOfflineSnapshotCacheHostRuntime,
 } from "./DesktopOfflineSnapshotCacheHost";
+import type { DesktopOfflineLocalModePolicyResolutionOptions } from "./DesktopOfflineLocalModeProfile";
 import { DesktopOfflineResynchronizationRecoveryRepository } from "@infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository";
 import path from "node:path";
 
@@ -32,6 +34,8 @@ export interface DesktopOfflineResynchronizationHostOptions {
   readonly snapshotCacheMaxEntries?: number;
   readonly resynchronizationRecoveryMaxEntries?: number;
   readonly supportsProtectedAtRestStorage?: boolean;
+  readonly localModePolicy?: DesktopOfflineLocalModePolicyResolutionOptions;
+  readonly resynchronizationPolicyPort?: IOfflineResynchronizationPolicyPort;
   readonly eventSink?: IOfflineOperationalEventSink;
   readonly eventContext?: {
     readonly workspaceId?: string;
@@ -82,15 +86,18 @@ export function createDesktopOfflineResynchronizationHostRuntime(
   const pendingOperationRuntime = createDesktopOfflinePendingOperationHostRuntime({
     storagePaths: options.storagePaths,
     maxEntries: options.pendingOperationMaxEntries,
+    localModePolicy: options.localModePolicy,
   });
   const localExecutionRegistrationRuntime = createDesktopOfflineLocalExecutionRegistrationHostRuntime({
     storagePaths: options.storagePaths,
     maxEntries: options.localExecutionRegistrationMaxEntries,
+    localModePolicy: options.localModePolicy,
   });
   const snapshotCacheRuntime = createDesktopOfflineSnapshotCacheHostRuntime({
     storagePaths: options.storagePaths,
     maxEntries: options.snapshotCacheMaxEntries,
     supportsProtectedAtRestStorage: options.supportsProtectedAtRestStorage,
+    localModePolicy: options.localModePolicy,
   });
   const connectivityStatePort = options.connectivityStatePort
     ?? new DesktopConnectivityStatePortAdapter(new DesktopConnectivityStateService({
@@ -116,6 +123,7 @@ export function createDesktopOfflineResynchronizationHostRuntime(
     {
       now: options.now,
       eventSink: options.eventSink,
+      resynchronizationPolicyPort: options.resynchronizationPolicyPort,
     },
   );
   const recoveryService = new OfflineDesktopStartupRecoveryService(

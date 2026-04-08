@@ -24,6 +24,7 @@ import {
 } from "@application/common/OfflineLocalExecutionRegistrationPersistence";
 import {
   OfflineAuthorityScopes,
+  type OfflineQueuedMutationEnvelope,
   OfflineQueuedMutationStatuses,
   type OfflineResourceClass,
   resolveOfflineResourceAuthorityBoundary,
@@ -157,11 +158,31 @@ export interface OfflineControlledResynchronizationResult {
 export interface OfflineControlledResynchronizationCoordinatorOptions {
   readonly now?: () => Date;
   readonly eventSink?: IOfflineOperationalEventSink;
+  readonly resynchronizationPolicyPort?: IOfflineResynchronizationPolicyPort;
 }
+
+export interface IOfflineResynchronizationPolicyPort {
+  readonly policySource: string;
+  planResynchronization(input: {
+    readonly queuedMutations: ReadonlyArray<OfflineQueuedMutationEnvelope>;
+    readonly authoritativeRevisions: ReadonlyArray<AuthoritativeResourceRevisionSnapshot>;
+  }): ReturnType<typeof planOfflineResynchronization>;
+  assertNoSilentGlobalDivergence(input: {
+    readonly decisions: ReturnType<typeof planOfflineResynchronization>;
+  }): void;
+}
+
+const DefaultOfflineResynchronizationPolicyPort: IOfflineResynchronizationPolicyPort = Object.freeze({
+  policySource: "offline-resynchronization-policy:default:v1",
+  planResynchronization: (input) => planOfflineResynchronization(input),
+  assertNoSilentGlobalDivergence: (input) =>
+    assertResynchronizationPlanPreventsSilentGlobalDivergence(input.decisions),
+});
 
 export class OfflineControlledResynchronizationCoordinator {
   private readonly now: () => Date;
   private readonly eventSink: IOfflineOperationalEventSink | undefined;
+  private readonly resynchronizationPolicyPort: IOfflineResynchronizationPolicyPort;
 
   constructor(
     private readonly pendingOperationService: OfflinePendingOperationService,
@@ -173,6 +194,8 @@ export class OfflineControlledResynchronizationCoordinator {
   ) {
     this.now = options?.now ?? (() => new Date());
     this.eventSink = options?.eventSink;
+    this.resynchronizationPolicyPort = options?.resynchronizationPolicyPort
+      ?? DefaultOfflineResynchronizationPolicyPort;
   }
 
   public async synchronizeWorkspace(input: {
@@ -203,6 +226,7 @@ export class OfflineControlledResynchronizationCoordinator {
           connectivityState: connectivity.state,
           canResynchronize: connectivity.canResynchronize,
           canQueueOperations: connectivity.canQueueOperations,
+          resynchronizationPolicySource: this.resynchronizationPolicyPort.policySource,
         }),
       });
       return Object.freeze({
@@ -239,6 +263,7 @@ export class OfflineControlledResynchronizationCoordinator {
       details: Object.freeze({
         connectivityState: connectivity.state,
         canResynchronize: connectivity.canResynchronize,
+        resynchronizationPolicySource: this.resynchronizationPolicyPort.policySource,
       }),
     });
 
@@ -341,11 +366,13 @@ export class OfflineControlledResynchronizationCoordinator {
       }
     }
 
-    const plannedDecisions = planOfflineResynchronization({
+    const plannedDecisions = this.resynchronizationPolicyPort.planResynchronization({
       queuedMutations: replayPreparation.prepared.map((entry) => entry.operationEnvelope),
       authoritativeRevisions,
     });
-    assertResynchronizationPlanPreventsSilentGlobalDivergence(plannedDecisions);
+    this.resynchronizationPolicyPort.assertNoSilentGlobalDivergence({
+      decisions: plannedDecisions,
+    });
     const decisionByOperationId = new Map(plannedDecisions.map((decision) => [decision.mutationId, decision]));
 
     const outcomes: OfflineReconciliationOutcomeDto[] = [];
@@ -1018,6 +1045,7 @@ export class OfflineControlledResynchronizationCoordinator {
         invalidatedSnapshotCount: invalidatedSnapshotKeys.size,
         cacheFailureCount,
         pendingCleanupRecordCount: pendingOperationCleanupRecords.length,
+        resynchronizationPolicySource: this.resynchronizationPolicyPort.policySource,
       }),
       diagnostics: Object.freeze({
         replayFailureSummaries,

@@ -211,6 +211,30 @@ Required:
 - preserve `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)` invariants.
 - when reconnect replay is rejected due revocation/permission-loss outcomes, persist non-retryable reason codes and apply snapshot invalidation/reduced-visibility cleanup.
 
+## Deployment-profile seam extension guidance (Story 19.3.7)
+
+Use existing seam contracts; do not add fake toggles.
+
+Canonical seams:
+- desktop profile policy seam:
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `IDesktopOfflineLocalModePolicyResolverPort`
+  - `DesktopOfflineLocalModePolicyResolutionOptions`
+- reconnect decision-policy seam:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `IOfflineResynchronizationPolicyPort`
+- host policy-context propagation seam:
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+
+Rules:
+- profile seams may narrow policy in first-scope production but must not broaden resource/execution/offline authority behavior without explicit domain/application updates;
+- keep reconnect policy injection explicit through the policy port instead of branching UI or adapter code;
+- keep `home`, `classroom`, and `organization` differences documented as policy-source seams until supported behavior exists end-to-end;
+- no mock deployment-profile toggles and no unsupported remote replay/sync mode claims.
+
 ## What must remain server-authoritative
 
 - replay authorization and final apply/reject decisions;

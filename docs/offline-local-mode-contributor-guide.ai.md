@@ -92,6 +92,24 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - no local cache/draft promotion to authoritative truth without reconnect decisions.
 - no replay control-flow dependency on best-effort event publication.
 
+## Deployment-profile seam guidance (Story 19.3.7)
+
+- Use policy seams already in code; avoid placeholder behavior:
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `IDesktopOfflineLocalModePolicyResolverPort`
+  - `DesktopOfflineLocalModePolicyResolutionOptions`
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `IOfflineResynchronizationPolicyPort`
+- Host runtime seams now accept local-mode policy context/options:
+  - `DesktopOfflinePendingOperationHost`
+  - `DesktopOfflineSnapshotCacheHost`
+  - `DesktopOfflineLocalExecutionRegistrationHost`
+  - `DesktopOfflineResynchronizationHost`
+- Guardrails to keep behavior honest:
+  - deployment-policy seam can narrow baseline behavior but cannot broaden offline scope by configuration alone,
+  - unsupported remote replay endpoint declarations are denied,
+  - avoid shipping mock deployment-profile toggles or fake sync modes.
+
 ## Prohibited patterns
 
 - local cache as global write authority;

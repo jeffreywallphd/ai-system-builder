@@ -4,11 +4,15 @@ import {
   OfflinePendingOperationService,
 } from "@application/common/OfflinePendingOperationPersistence";
 import { DesktopOfflinePendingOperationRepository } from "@infrastructure/desktop/DesktopOfflinePendingOperationRepository";
-import { assertDesktopOfflineLocalModeAuthorityBoundary } from "./DesktopOfflineLocalModeProfile";
+import {
+  assertDesktopOfflineLocalModeAuthorityBoundary,
+  type DesktopOfflineLocalModePolicyResolutionOptions,
+} from "./DesktopOfflineLocalModeProfile";
 
 export interface DesktopOfflinePendingOperationHostOptions {
   readonly storagePaths: DesktopStoragePaths;
   readonly maxEntries?: number;
+  readonly localModePolicy?: DesktopOfflineLocalModePolicyResolutionOptions;
 }
 
 export interface DesktopOfflinePendingOperationHostRuntime {
@@ -23,7 +27,7 @@ const OFFLINE_PENDING_OPERATION_DATABASE_NAME = "offline-pending-operation-queue
 export function createDesktopOfflinePendingOperationHostRuntime(
   options: DesktopOfflinePendingOperationHostOptions,
 ): DesktopOfflinePendingOperationHostRuntime {
-  assertDesktopOfflineLocalModeAuthorityBoundary();
+  assertDesktopOfflineLocalModeAuthorityBoundary(options.localModePolicy);
 
   const databasePath = path.join(
     options.storagePaths.storageDirectory,

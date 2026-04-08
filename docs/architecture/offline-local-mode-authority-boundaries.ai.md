@@ -152,6 +152,28 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - offline operational-event sanitization now redacts path/prompt/credential-like string values in addition to key-based sensitive-field removal.
 - reconnect diagnostics now include explicit `resynchronization-attempt-started` / `resynchronization-attempt-completed` markers and `snapshot-refresh-failed` cache-failure diagnostics.
 
+## Deployment-profile and future remote/offline evolution seams (Story 19.3.7)
+
+- Added explicit desktop offline policy-resolution seam in:
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `IDesktopOfflineLocalModePolicyResolverPort`
+  - `DesktopOfflineLocalModePolicyResolutionOptions`
+- Added host runtime option seams so deployment-policy context can flow through offline host factories without changing baseline behavior:
+  - `DesktopOfflinePendingOperationHost`
+  - `DesktopOfflineSnapshotCacheHost`
+  - `DesktopOfflineLocalExecutionRegistrationHost`
+  - `DesktopOfflineResynchronizationHost`
+- Added reconnect decision-policy seam in:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `IOfflineResynchronizationPolicyPort`
+- Default production behavior remains the existing policy:
+  - `planOfflineResynchronization(...)`
+  - `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`
+- Guardrails keep current behavior honest:
+  - deployment-policy seam cannot broaden offline resource/execution scope beyond current production baseline,
+  - unsupported remote replay endpoint declarations are rejected,
+  - no placeholder profile toggles or fake sync modes are shipped.
+
 ## Intentionally deferred behavior (must remain deferred unless explicitly scoped)
 
 - no silent auto-merge expansion beyond baseline authoritative revision match.
