@@ -93,3 +93,19 @@ This keeps provenance explainable for history/reuse/audit while preserving sourc
 - Keep storage/preview internals behind ports and host composition.
 - Keep lineage immutable for durable result history/reuse/audit semantics.
 
+## Story 6.2.1 handoff baseline (implemented)
+
+Run finalization now includes an explicit result-persistence handoff seam instead of adapter-local or UI-local persistence:
+
+- `src/application/runs/use-cases/FinalizeRunExecutionOutcomeUseCase.ts` extracts `ImageManipulationCollectedExecutionResult` payloads from execution diagnostics and calls a typed persistence port.
+- `src/application/runs/ports/RunOrchestrationPersistencePorts.ts` defines `IRunCollectedResultPersistencePort` plus typed request/result envelopes for persistence orchestration.
+- `src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts` passes the dependency into terminal finalization so completion/cancel/failure updates can trigger authoritative persistence handoff.
+
+Failure behavior is explicit:
+
+- persistence errors do not block authoritative terminal lifecycle finalization
+- finalization hints downgrade (`outputAvailability`/`terminalQuality`) when persistence fails or partially persists
+- persistence diagnostics are written to `executionTelemetry.finalizationInternal.resultPersistenceDiagnostics`
+
+Concrete backend-to-managed-storage copying remains behind `IRunCollectedResultPersistencePort` for follow-on infrastructure stories.
+

@@ -14,8 +14,11 @@ import type {
   AuthoritativeRunQueueEntryRecord,
   AuthoritativeRunQueueMutationResult,
   IAuthoritativeRunPersistenceRepository,
+  IRunCollectedResultPersistencePort,
   IRunOrchestrationQueuePersistenceRepository,
   IRunOrchestrationIntentRepository,
+  RunCollectedResultPersistenceRequest,
+  RunCollectedResultPersistenceResult,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
 import {
   IngestRunExecutionUpdateUseCase,
@@ -185,6 +188,29 @@ class CapturingAuthoritativeRunAuditRecorder {
       wasReplay: false,
       sequence: this.events.length,
       event: input,
+    });
+  }
+}
+
+class CapturingResultCollectionPersistencePort implements IRunCollectedResultPersistencePort {
+  public readonly calls: RunCollectedResultPersistenceRequest[] = [];
+
+  public async persistCollectedResult(
+    request: RunCollectedResultPersistenceRequest,
+  ): Promise<RunCollectedResultPersistenceResult> {
+    this.calls.push(request);
+    return Object.freeze({
+      status: "persisted",
+      outputs: Object.freeze([Object.freeze({
+        outputId: "generated:1",
+        kind: "asset",
+        assetId: "asset:generated:persisted-1",
+      })]),
+      outputAvailabilityHint: "available",
+      terminalQualityHint: "standard",
+      internalDiagnostics: Object.freeze({
+        persistedCount: 1,
+      }),
     });
   }
 }
@@ -480,6 +506,87 @@ describe("IngestRunExecutionUpdateUseCase", () => {
     expect(authoritativeAuditRecorder.events).toHaveLength(1);
     expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.lifecycle.transitioned");
     expect(authoritativeAuditRecorder.events[0]?.payload?.userSafeDetails?.toState).toBe("completed");
+  });
+
+  it("persists collected execution output handoff through the finalization seam", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const queueRepository = new InMemoryQueueRepository();
+    const intentRepository = new InMemoryOrchestrationIntentRepository();
+    const resultCollectionPersistencePort = new CapturingResultCollectionPersistencePort();
+    seedRun(runRepository);
+    const useCase = new IngestRunExecutionUpdateUseCase({
+      runRepository,
+      queueRepository,
+      orchestrationIntentRepository: intentRepository,
+      resultCollectionPersistencePort,
+    });
+
+    const result = await useCase.execute({
+      runId: "run:1",
+      senderNodeId: "node:trusted-1",
+      update: Object.freeze({
+        runId: "run:1",
+        senderNodeId: "node:trusted-1",
+        senderBackendKind: "local-worker",
+        senderBackendRunId: "backend-run-1",
+        occurredAt: "2026-04-07T12:02:00.000Z",
+        toState: "completed",
+        execution: Object.freeze({
+          outcome: "succeeded",
+          finishedAt: "2026-04-07T12:02:00.000Z",
+        }),
+        internalDiagnostics: Object.freeze({
+          collectedExecutionResult: Object.freeze({
+            schemaVersion: "1.0.0",
+            collectionId: "collection:run:1",
+            discoveryId: "discovery:run:1",
+            executionJobId: "job:run:1",
+            runId: "run:1",
+            workspaceId: "workspace-alpha",
+            collectedAt: "2026-04-07T12:01:59.000Z",
+            status: "collected",
+            discoveredOutputs: Object.freeze([Object.freeze({
+              descriptorId: "descriptor:1",
+              discoveredAt: "2026-04-07T12:01:59.000Z",
+              outputRole: "primary",
+              outputIndex: 0,
+              media: Object.freeze({
+                mediaKind: "image",
+                mimeType: "image/png",
+              }),
+              temporaryReference: Object.freeze({
+                kind: "backend-object-handle",
+                backendFamily: "comfyui",
+                objectHandle: "comfy-output:output:generated.png",
+              }),
+            })]),
+            records: Object.freeze([Object.freeze({
+              descriptorId: "descriptor:1",
+              temporaryReference: Object.freeze({
+                kind: "backend-object-handle",
+                backendFamily: "comfyui",
+                objectHandle: "comfy-output:output:generated.png",
+              }),
+              persistence: Object.freeze({
+                status: "not-persisted",
+                reason: "awaiting-managed-asset-persistence",
+              }),
+            })]),
+            summary: Object.freeze({
+              discoveredCount: 1,
+              collectedCount: 1,
+              persistedCount: 0,
+              notPersistedCount: 1,
+              failedCount: 0,
+            }),
+          }),
+        }),
+      }),
+    });
+
+    expect(resultCollectionPersistencePort.calls).toHaveLength(1);
+    expect(result.mutation.run.finalization?.outputs[0]?.assetId).toBe("asset:generated:persisted-1");
+    expect(result.status.finalization?.outputAvailability).toBe("available");
   });
 
   it("finalizes cancelled runs with explicit terminal hints and queue release state", async () => {

@@ -94,3 +94,19 @@ Lineage records relationships and snapshot references needed for audit/history/r
 - Keep storage adapters and preview pipelines replaceable behind typed ports.
 - Keep run/workflow/system/input lineage pointers immutable once a result becomes durable.
 
+## Story 6.2.1 handoff baseline (implemented)
+
+Result-collection handoff from terminal run finalization into authoritative persistence is now explicit in the run application layer:
+
+- `src/application/runs/use-cases/FinalizeRunExecutionOutcomeUseCase.ts` parses `ImageManipulationCollectedExecutionResult` handoff metadata from run execution diagnostics and invokes a dedicated persistence port.
+- `src/application/runs/ports/RunOrchestrationPersistencePorts.ts` defines `IRunCollectedResultPersistencePort` and typed request/result contracts for run-scoped result persistence orchestration.
+- `src/application/runs/use-cases/IngestRunExecutionUpdateUseCase.ts` wires the handoff dependency into terminal finalization flow so completed/cancelled/failed updates can trigger persistence.
+
+Failure posture in this story is explicit and safe:
+
+- persistence-port exceptions do not roll back run terminalization
+- finalization output availability/quality degrade explicitly when persistence fails
+- persistence diagnostics are captured under run metadata (`executionTelemetry.finalizationInternal.resultPersistenceDiagnostics`) for audit and follow-on recovery logic
+
+This story intentionally leaves concrete adapter/storage-copy implementation behind the new port seam so Feature 6 follow-ons can add provider-specific materialization without changing run orchestration contracts.
+
