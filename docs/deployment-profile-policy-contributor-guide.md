@@ -11,6 +11,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-preset-definitions.md`
 - `docs/architecture/deployment-profile-policy-effective-resolution-and-overrides.md`
 - `docs/architecture/deployment-profile-policy-persistence-and-repositories.md`
+- `docs/architecture/deployment-profile-policy-authoritative-write-apis.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 
@@ -29,8 +30,10 @@ Provide a practical implementation workflow for extending deployment-profile pol
    - `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
 4. Keep transport payload changes aligned with shared contracts/schemas:
    - `src/shared/contracts/deployment/DeploymentPolicyAdministrationContracts.ts`
+   - `src/shared/contracts/deployment/DeploymentPolicyWriteContracts.ts`
    - `src/shared/dto/deployment/DeploymentPolicyAdministrationDtos.ts`
    - `src/shared/schemas/deployment/DeploymentPolicyAdministrationSchemaContracts.ts`
+   - `src/shared/schemas/deployment/DeploymentPolicyWriteSchemaContracts.ts`
 5. Update `.md` and `.ai.md` docs together and keep architecture discoverability entries current.
 
 ## Implementing policy persistence changes
@@ -55,19 +58,22 @@ Provide a practical implementation workflow for extending deployment-profile pol
 
 1. Keep policy update orchestration in application use cases:
    - `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
-2. Validate updates at write time (before persistence):
+2. Keep authoritative write transport/backend adapters in:
+   - `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts`
+   - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+3. Validate updates at write time (before persistence):
    - supported scope semantics,
    - known family/setting identifiers,
    - control-mode eligibility and expected control mode assertions,
    - setting value type/range/enum constraints,
    - remove-operation safety (cannot remove missing override records),
    - policy-required ticket-reference presence.
-3. Enforce permission gates in one place:
+4. Enforce permission gates in one place:
    - active profile selection permission,
    - override management permission,
    - runtime-admin override permission.
-4. Persist only validated operations through `IDeploymentPolicyPersistenceRepository`.
-5. Keep runtime feature behavior enforcement separate from write-time validation.
+5. Persist only validated operations through `IDeploymentPolicyPersistenceRepository`.
+6. Keep runtime feature behavior enforcement separate from write-time validation.
 
 ## Adding a new policy family
 

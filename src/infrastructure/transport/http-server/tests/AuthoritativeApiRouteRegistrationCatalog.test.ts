@@ -15,6 +15,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: true,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: true,
         [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: true,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: true,
         [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
         [AuthoritativeApiRouteBackendKeys.nodeTrust]: true,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
@@ -37,6 +38,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(selectedRouteFamilyIds.has("workspace-administration")).toBeTrue();
     expect(selectedRouteFamilyIds.has("authorization-management")).toBeTrue();
     expect(selectedRouteFamilyIds.has("deployment-policy-read")).toBeTrue();
+    expect(selectedRouteFamilyIds.has("deployment-policy-write")).toBeTrue();
     expect(selectedRouteFamilyIds.has("system-runtime")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-submission")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-read")).toBeTrue();
@@ -63,6 +65,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
         [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
         [AuthoritativeApiRouteBackendKeys.auditLedger]: false,
         [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,
@@ -90,6 +93,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
         [AuthoritativeApiRouteBackendKeys.workspaceAdministration]: false,
         [AuthoritativeApiRouteBackendKeys.authorizationManagement]: false,
         [AuthoritativeApiRouteBackendKeys.deploymentPolicyRead]: false,
+        [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: false,
         [AuthoritativeApiRouteBackendKeys.auditLedger]: true,
         [AuthoritativeApiRouteBackendKeys.nodeTrust]: false,
         [AuthoritativeApiRouteBackendKeys.certificateOperations]: false,

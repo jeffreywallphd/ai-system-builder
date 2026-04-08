@@ -15,6 +15,7 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep durable policy persistence seams in `src/application/deployment/ports/*` and `src/infrastructure/persistence/deployment/*`.
 - Keep feature-facing decisions in `src/application/policy-administration/*` evaluation interfaces/services.
 - Keep authoritative policy mutation validation/permission enforcement in `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`.
+- Keep authoritative write transport/backend wiring in `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts` and `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.
 - Keep docs/tests aligned for `.md` and `.ai.md` surfaces.
 

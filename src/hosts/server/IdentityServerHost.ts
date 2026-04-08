@@ -84,6 +84,8 @@ import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/Author
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
 import { DeploymentPolicyReadBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyReadBackendApi";
+import { DeploymentPolicyWriteBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyWriteBackendApi";
+import { WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService } from "@infrastructure/api/deployment/WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService";
 import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
@@ -175,6 +177,7 @@ import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/us
 import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import { RecoverRunOrchestrationStartupStateUseCase } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
 import { ReadDeploymentPolicyAdministrationUseCase } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
+import { DeploymentPolicyAdministrationAuthoritativeUpdateUseCase } from "@application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -1078,6 +1081,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
     }),
   });
+  const deploymentPolicyWriteBackendApi = new DeploymentPolicyWriteBackendApi({
+    updateDeploymentPolicyStateUseCase: new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
+      deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
+      permissionService: new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
+        workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
+      }),
+    }),
+  });
   const auditLedgerBackendApi = new AuditLedgerBackendApi({
     auditLedgerQueryService: new AuditLedgerQueryService({
       repository: persistentPlatformServices.auditLedgerRepository,
@@ -1239,6 +1250,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     assetManagementBackendApi,
     auditLedgerBackendApi,
     deploymentPolicyReadBackendApi,
+    deploymentPolicyWriteBackendApi,
     authoritativeRunSubmissionBackendApi,
     authoritativeRunQueryBackendApi,
     authoritativeRunMutationBackendApi,

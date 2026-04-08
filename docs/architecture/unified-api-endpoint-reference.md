@@ -45,7 +45,7 @@ Canonical family modules:
 | `identity-auth` | `/api/v1/identity` | `src/infrastructure/api/identity/IdentityAuthBackendApi.ts` | `src/shared/contracts/identity/IdentityTransportContracts.ts` + `src/shared/schemas/identity/IdentityTransportSchemaContracts.ts` | `src/ui/shared/identity/IdentityAuthClient.ts` |
 | `workspace-invitations` + `workspace-administration` | `/api/v1/workspaces/invitations`, `/api/v1/workspaces/onboarding`, `/api/v1/workspaces` | `src/infrastructure/api/workspaces/WorkspaceInvitationBackendApi.ts`, `src/infrastructure/api/workspaces/WorkspaceAdministrationBackendApi.ts` | `src/shared/contracts/workspaces/WorkspaceTransportContracts.ts` + `src/shared/schemas/workspaces/WorkspaceTransportSchemaContracts.ts` | `src/ui/shared/workspaces/WorkspaceAdministrationClient.ts` |
 | `authorization-management` | `/api/v1/authorization` | `src/infrastructure/api/authorization/AuthorizationManagementBackendApi.ts` | `src/shared/contracts/authorization/AuthorizationPolicyContracts.ts`, `src/shared/contracts/authorization/ResourceVisibilitySharingContracts.ts`, `src/shared/schemas/authorization/AuthorizationSchemaContracts.ts` | `src/ui/shared/authorization/AuthorizationManagementClient.ts` |
-| `deployment-policy-read` | `/api/v1/deployment/policy` | `src/infrastructure/api/deployment/DeploymentPolicyReadBackendApi.ts` | `src/shared/contracts/deployment/DeploymentPolicyReadContracts.ts`, `src/shared/schemas/deployment/DeploymentPolicyReadSchemaContracts.ts` | `src/ui/shared/api/SharedApiClient.ts` (admin/system policy-read consumers) |
+| `deployment-policy-read` + `deployment-policy-write` | `/api/v1/deployment/policy` | `src/infrastructure/api/deployment/DeploymentPolicyReadBackendApi.ts`, `src/infrastructure/api/deployment/DeploymentPolicyWriteBackendApi.ts` | `src/shared/contracts/deployment/DeploymentPolicyReadContracts.ts`, `src/shared/schemas/deployment/DeploymentPolicyReadSchemaContracts.ts`, `src/shared/contracts/deployment/DeploymentPolicyWriteContracts.ts`, `src/shared/schemas/deployment/DeploymentPolicyWriteSchemaContracts.ts` | `src/ui/shared/api/SharedApiClient.ts` (admin/system policy read/write consumers) |
 | `audit-ledger` | `/api/v1/audit/events` | `src/infrastructure/api/audit/AuditLedgerBackendApi.ts` | `src/shared/contracts/audit/AuditEventContracts.ts`, `src/shared/dto/audit/AuditEventDtos.ts`, `src/shared/schemas/audit/AuditEventSchemaContracts.ts` | `src/ui/shared/api/SharedApiClient.ts` (authoritative admin/governance retrieval clients) |
 | `node-trust` | `/api/v1/nodes` | `src/infrastructure/api/nodes/NodeTrustBackendApi.ts` | `src/shared/contracts/nodes/NodeTrustApiContracts.ts` + `src/shared/schemas/nodes/NodeTrustApiSchemaContracts.ts` | `src/ui/shared/nodes/NodeEnrollmentReviewClient.ts`, `src/ui/shared/nodes/NodeInventoryClient.ts` |
 | `security-certificate-operations` + `security-secret-metadata` | `/api/v1/security/certificates`, `/api/v1/security/secrets` | `src/infrastructure/api/security/CertificateOperationsBackendApi.ts`, `src/infrastructure/api/security/SecretMetadataBackendApi.ts` | `src/shared/contracts/security/SecretTransportContracts.ts`, `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`, `src/shared/schemas/security/SecretApiSchemaContracts.ts` | `src/ui/shared/security/SecretMetadataManagementClient.ts` |
@@ -116,6 +116,19 @@ Authoritative policy expectations:
 - bearer session required
 - workspace scope required (`workspaceId`)
 - policy state inspection uses canonical server-side read contracts; clients do not read deployment-policy repositories/configuration directly
+
+### Deployment policy administration write (`/api/v1/deployment/policy/*`)
+
+- active profile mutation:
+  - `POST /api/v1/deployment/policy/active-profile`
+- override mutation:
+  - `POST /api/v1/deployment/policy/overrides`
+
+Authoritative policy expectations:
+
+- bearer session required
+- workspace scope required (`workspaceId`)
+- policy writes are validated and authorized server-side using canonical write contracts/schemas and authoritative update orchestration; clients do not write raw untyped configuration blobs
 
 ### Audit ledger read/query (`/api/v1/audit/events*`)
 
