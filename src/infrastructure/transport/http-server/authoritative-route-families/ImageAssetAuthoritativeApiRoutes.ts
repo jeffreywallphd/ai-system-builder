@@ -7,7 +7,7 @@ import {
 export const ImageAssetManagementAuthoritativeApiRouteFamily = Object.freeze({
   routeFamilyId: "image-asset-management",
   domain: AuthoritativeApiRouteDomains.assets,
-  description: "Image asset ingestion and metadata APIs.",
+  description: "Image asset ingestion, metadata, and protected original-content APIs.",
   routePrefixes: Object.freeze([
     "/api/v1/image-assets",
   ]),

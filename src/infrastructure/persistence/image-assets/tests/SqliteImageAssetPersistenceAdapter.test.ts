@@ -176,6 +176,18 @@ describe("SqliteImageAssetPersistenceAdapter", () => {
       "image-asset:upstream:002",
     ]);
 
+    await adapter.setImageAssetOriginalObjectReference("image-asset:test:uploaded", {
+      storageInstanceId: "storage-alpha",
+      objectKey: "workspaces/workspace-alpha/image-assets/image-asset:test:uploaded/original/input.png",
+      objectVersionId: "v1",
+    });
+    const originalReference = await adapter.getImageAssetOriginalObjectReference("image-asset:test:uploaded");
+    expect(originalReference).toEqual({
+      storageInstanceId: "storage-alpha",
+      objectKey: "workspaces/workspace-alpha/image-assets/image-asset:test:uploaded/original/input.png",
+      objectVersionId: "v1",
+    });
+
     const filtered = await adapter.listImageAssets({
       workspaceId: "workspace-alpha",
       originKinds: [ImageAssetOriginKinds.generatedResult],

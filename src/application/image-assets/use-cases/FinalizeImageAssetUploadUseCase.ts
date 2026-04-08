@@ -129,6 +129,14 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
         occurredAt,
         correlationId: request.correlationId,
       });
+      await this.dependencies.imageAssetRepository.setImageAssetOriginalObjectReference(
+        saved.imageAsset.assetId,
+        {
+          storageInstanceId: request.storageReference.storageInstanceId,
+          objectKey: request.storageReference.objectKey,
+          objectVersionId: request.storageReference.objectVersionId,
+        },
+      );
 
       return {
         ok: true,

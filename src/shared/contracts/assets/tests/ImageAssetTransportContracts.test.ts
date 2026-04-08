@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   ImageAssetTransportRoutes,
   buildImageAssetAccessPath,
+  buildImageAssetOriginalContentPath,
   buildImageAssetRoutePath,
   buildImageAssetUploadCompletionPath,
   toImageAssetListQueryParams,
@@ -34,6 +35,7 @@ describe("ImageAssetTransportContracts", () => {
       buildImageAssetUploadCompletionPath({ assetId: "asset:1", uploadSessionId: "upload:1" }),
     ).toBe("/api/v1/image-assets/asset%3A1/uploads/upload%3A1/complete");
     expect(buildImageAssetAccessPath({ assetId: "asset:1" })).toBe("/api/v1/image-assets/asset%3A1/access");
+    expect(buildImageAssetOriginalContentPath({ assetId: "asset:1" })).toBe("/api/v1/image-assets/asset%3A1/original");
   });
 
   it("exposes canonical image-asset API routes", () => {
@@ -42,6 +44,7 @@ describe("ImageAssetTransportContracts", () => {
     expect(ImageAssetTransportRoutes.initiateUpload).toBe("/api/v1/image-assets/:assetId/uploads/initiate");
     expect(ImageAssetTransportRoutes.requestPreview).toBe("/api/v1/image-assets/:assetId/preview");
     expect(ImageAssetTransportRoutes.requestAccess).toBe("/api/v1/image-assets/:assetId/access");
+    expect(ImageAssetTransportRoutes.getOriginalContent).toBe("/api/v1/image-assets/:assetId/original");
     expect(ImageAssetTransportRoutes.listEvents).toBe("/api/v1/image-assets/events");
   });
 });

@@ -136,6 +136,24 @@ async function startServer(): Promise<string> {
         };
       },
     },
+    getImageAssetOriginalContentUseCase: {
+      async execute() {
+        return {
+          ok: true as const,
+          value: Object.freeze({
+            assetId: "image-asset:001",
+            workspaceId: "workspace-alpha",
+            mediaType: "image/png" as const,
+            sizeBytes: 5,
+            contentDisposition: "attachment" as const,
+            contentDispositionFileName: "image.png",
+            stream: (async function* stream() {
+              yield Buffer.from("hello", "utf8");
+            })(),
+          }),
+        };
+      },
+    },
     imageAssetStoragePort: {
       async reserveStorageLocation() {
         throw new Error("not used");
@@ -221,6 +239,8 @@ describe("IdentityHttpServer image asset management routes", () => {
 
     const unauthenticated = await fetch(`${baseUrl}/api/v1/image-assets?workspaceId=workspace-alpha`);
     expect(unauthenticated.status).toBe(401);
+    const unauthenticatedOriginal = await fetch(`${baseUrl}/api/v1/image-assets/image-asset%3A001/original?workspaceId=workspace-alpha`);
+    expect(unauthenticatedOriginal.status).toBe(401);
 
     const created = await fetch(`${baseUrl}/api/v1/image-assets?workspaceId=workspace-alpha`, {
       method: "POST",
@@ -290,5 +310,15 @@ describe("IdentityHttpServer image asset management routes", () => {
     const listedBody = await listed.json();
     expect(listedBody.ok).toBe(true);
     expect(listedBody.data.items).toHaveLength(1);
+
+    const original = await fetch(`${baseUrl}/api/v1/image-assets/image-asset%3A001/original?workspaceId=workspace-alpha`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(original.status).toBe(200);
+    expect(original.headers.get("content-type")).toBe("image/png");
+    expect(original.headers.get("content-disposition")).toContain("attachment");
+    expect(await original.text()).toBe("hello");
   });
 });

@@ -12,6 +12,8 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/FinalizeImageAssetUploadUseCase.ts`
 - `src/application/image-assets/use-cases/GetImageAssetMetadataUseCase.ts`
+- `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/ListImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
@@ -20,6 +22,7 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
+- `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
@@ -168,3 +171,16 @@ Query and response behavior:
 - pagination metadata (`limit`, `offset`, `returned`, `hasMore`) is returned for UI selector/browser surfaces
 - metadata results are sourced from authoritative repository state (no filesystem scanning)
 - responses expose logical availability flags (`isReadyForUse`, `isPreviewable`, `isDownloadable`) and do not expose physical storage details
+
+## Story 1.3.2: protected original-content retrieval flow
+
+This story adds the authoritative original-content retrieval path for image assets through application/use-case and API seams:
+
+- `GetImageAssetOriginalContentUseCase` now provides a dedicated retrieval workflow for original image content.
+- Authorization is evaluated before any storage content open/read call:
+  - active workspace membership is required
+  - centralized image-asset policy checks are evaluated for `download-original`
+  - denied private reads return safe non-leaky outcomes
+- Retrieval uses the managed storage abstraction (`IImageAssetStoragePort.openReadStream`) with `purpose=download-original`; no raw filesystem paths or direct public object URLs are exposed.
+- Upload finalization now persists the authoritative latest original-object reference in repository storage metadata (`latest_object_key`/`latest_object_version_id`) so retrieval resolves through managed storage coordinates instead of host-path shortcuts.
+- HTTP/API transport now streams original content through protected server endpoints with safe headers (`content-type`, `content-length`, `content-disposition`, `x-content-type-options`, `cache-control`) and no storage-layout leakage in API payloads.

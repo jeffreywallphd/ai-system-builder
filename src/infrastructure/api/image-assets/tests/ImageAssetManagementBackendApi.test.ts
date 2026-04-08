@@ -116,6 +116,24 @@ describe("ImageAssetManagementBackendApi", () => {
           };
         },
       },
+      getImageAssetOriginalContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              mediaType: "image/png" as const,
+              sizeBytes: 4,
+              contentDisposition: "attachment" as const,
+              contentDispositionFileName: "image.png",
+              stream: (async function* bytes() {
+                yield new Uint8Array([1, 2, 3, 4]);
+              })(),
+            }),
+          };
+        },
+      },
       imageAssetStoragePort: {
         async reserveStorageLocation() {
           throw new Error("not used");
@@ -229,6 +247,7 @@ describe("ImageAssetManagementBackendApi", () => {
       finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
       getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
       imageAssetStoragePort: {
         async reserveStorageLocation() { throw new Error("not used"); },
         async writeObject() { throw new Error("not used"); },
@@ -281,6 +300,7 @@ describe("ImageAssetManagementBackendApi", () => {
       finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
       getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
       imageAssetStoragePort: {
         async reserveStorageLocation() { throw new Error("not used"); },
         async writeObject() { throw new Error("not used"); },
@@ -322,5 +342,60 @@ describe("ImageAssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("invalid-request");
+  });
+
+  it("opens protected image-asset original content streams", async () => {
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      initiateImageAssetCreationUseCase: { async execute() { throw new Error("not used"); } },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              mediaType: "image/png" as const,
+              sizeBytes: 4,
+              contentDisposition: "attachment" as const,
+              contentDispositionFileName: "image.png",
+              stream: (async function* bytes() {
+                yield new Uint8Array([1, 2, 3, 4]);
+              })(),
+            }),
+          };
+        },
+      },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const opened = await backend.openImageAssetOriginalContentStream({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+    });
+
+    expect(opened.ok).toBeTrue();
+    if (!opened.ok || !opened.data) {
+      return;
+    }
+    expect(opened.data.mimeType).toBe("image/png");
+    expect(opened.data.contentDisposition).toBe("attachment");
+
+    const chunks: number[] = [];
+    for await (const chunk of opened.data.stream) {
+      chunks.push(...chunk);
+    }
+    expect(chunks).toEqual([1, 2, 3, 4]);
   });
 });

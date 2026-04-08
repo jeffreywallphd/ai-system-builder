@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type {
   IImageAssetRepository,
+  ImageAssetStoredObjectReference,
   ImageAssetRepositoryListQuery,
   ImageAssetRepositoryMutationContext,
   ImageAssetRepositoryMutationResult,
@@ -190,6 +191,63 @@ export class SqliteImageAssetPersistenceAdapter
       mutation,
       requireExisting: false,
       requireAbsent: false,
+    });
+  }
+
+  public async setImageAssetOriginalObjectReference(
+    assetId: string,
+    reference: ImageAssetStoredObjectReference,
+  ): Promise<void> {
+    const normalizedAssetId = normalizeImageAssetLookup(assetId);
+    const normalizedStorageInstanceId = normalizeImageAssetLookup(reference.storageInstanceId);
+    const normalizedObjectKey = normalizeImageAssetLookup(reference.objectKey);
+    const normalizedObjectVersionId = normalizeImageAssetLookup(reference.objectVersionId);
+    if (!normalizedAssetId || !normalizedStorageInstanceId || !normalizedObjectKey) {
+      throw new Error("Image asset original object reference requires assetId, storageInstanceId, and objectKey.");
+    }
+
+    this.getDatabase().prepare(`
+      UPDATE image_asset_records
+      SET
+        latest_object_key = ?,
+        latest_object_version_id = ?
+      WHERE asset_id = ?
+        AND storage_instance_id = ?
+    `).run(
+      normalizedObjectKey,
+      normalizedObjectVersionId ?? null,
+      normalizedAssetId,
+      normalizedStorageInstanceId,
+    );
+  }
+
+  public async getImageAssetOriginalObjectReference(assetId: string): Promise<ImageAssetStoredObjectReference | undefined> {
+    const normalizedAssetId = normalizeImageAssetLookup(assetId);
+    if (!normalizedAssetId) {
+      return undefined;
+    }
+
+    const row = this.getDatabase().prepare(`
+      SELECT storage_instance_id, latest_object_key, latest_object_version_id
+      FROM image_asset_records
+      WHERE asset_id = ?
+      LIMIT 1
+    `).get(normalizedAssetId) as {
+      readonly storage_instance_id?: string;
+      readonly latest_object_key?: string | null;
+      readonly latest_object_version_id?: string | null;
+    } | undefined;
+
+    const storageInstanceId = normalizeImageAssetLookup(row?.storage_instance_id);
+    const objectKey = normalizeImageAssetLookup(row?.latest_object_key ?? undefined);
+    if (!storageInstanceId || !objectKey) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      storageInstanceId,
+      objectKey,
+      objectVersionId: normalizeImageAssetLookup(row?.latest_object_version_id ?? undefined),
     });
   }
 
