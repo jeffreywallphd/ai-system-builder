@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ComfyImageManipulationPropertySchema,
   createComfyImageManipulationDefaultConfig,
@@ -154,6 +154,37 @@ function resolveSelectedItem(
 function toSelectionRole(value: string | undefined): ImageManipulationSelectionRole | undefined {
   if (value === "source" || value === "output" || value === "reference") {
     return value;
+  }
+  return undefined;
+}
+
+const galleryPreviewRoleOrder: ReadonlyArray<ImageManipulationSelectionRole> = Object.freeze([
+  "output",
+  "source",
+  "reference",
+]);
+
+export function resolveNextGalleryPreviewRoleByKey(input: {
+  readonly activeRole: ImageManipulationSelectionRole;
+  readonly key: string;
+}): ImageManipulationSelectionRole | undefined {
+  const activeIndex = galleryPreviewRoleOrder.indexOf(input.activeRole);
+  if (activeIndex < 0) {
+    return undefined;
+  }
+  if (input.key === "Home") {
+    return galleryPreviewRoleOrder[0];
+  }
+  if (input.key === "End") {
+    return galleryPreviewRoleOrder[galleryPreviewRoleOrder.length - 1];
+  }
+  if (input.key === "ArrowRight" || input.key === "ArrowDown") {
+    const nextIndex = (activeIndex + 1) % galleryPreviewRoleOrder.length;
+    return galleryPreviewRoleOrder[nextIndex];
+  }
+  if (input.key === "ArrowLeft" || input.key === "ArrowUp") {
+    const nextIndex = (activeIndex - 1 + galleryPreviewRoleOrder.length) % galleryPreviewRoleOrder.length;
+    return galleryPreviewRoleOrder[nextIndex];
   }
   return undefined;
 }
@@ -808,6 +839,14 @@ export function ImageManipulationRuntimeEditorPanel({
   const sessionPersistence = useMemo(() => new SystemRuntimeWindowSessionPersistenceService(), []);
   const requestIdRef = useRef(0);
   const runPollRequestIdRef = useRef(0);
+  const pageHeadingId = useId();
+  const sourceSelectId = useId();
+  const referenceSelectId = useId();
+  const imageLibrarySearchId = useId();
+  const outputTabId = useId();
+  const sourceTabId = useId();
+  const referenceTabId = useId();
+  const galleryTabPanelId = useId();
 
   const roleBindings = useMemo(
     () => datasetBindingService.resolveRoleBindings(hydratedRuntime?.datasetBindings ?? emptyHydratedDatasetBindings),
@@ -1143,6 +1182,11 @@ export function ImageManipulationRuntimeEditorPanel({
     referenceLoadError,
     outputLoadError,
   ]);
+  const activeGalleryTabId = selection.activePreviewRole === "output"
+    ? outputTabId
+    : selection.activePreviewRole === "source"
+      ? sourceTabId
+      : referenceTabId;
 
   const loadCollection = (
     datasetBindingId: ReferenceImageDatasetBindingId | undefined,
@@ -2194,7 +2238,11 @@ export function ImageManipulationRuntimeEditorPanel({
   };
 
   return (
-    <section className="ui-image-editor-page ui-stack ui-stack--sm">
+    <section className="ui-image-editor-page ui-stack ui-stack--sm" aria-labelledby={pageHeadingId}>
+      <header className="ui-image-editor-page__header">
+        <h2 id={pageHeadingId} className="ui-image-editor-page__title">Image manipulation studio</h2>
+        <p className="ui-text-small ui-text-secondary">Upload, adjust settings, run, monitor, and continue from results.</p>
+      </header>
       {isHydrating ? (
         <ImageStatusNotice
           title="Loading editor"
@@ -2209,7 +2257,7 @@ export function ImageManipulationRuntimeEditorPanel({
         />
       ) : null}
       <div className="ui-image-editor-page__layout">
-        <aside className="ui-image-editor-page__left-column ui-stack ui-stack--sm">
+        <aside className="ui-image-editor-page__left-column ui-stack ui-stack--sm" aria-label="Preparation and run controls">
           <ImageUploadPanel
             title="Choose a photo"
             acceptedMimeTypes={["image/png", "image/jpeg", "image/webp"]}
@@ -2371,9 +2419,10 @@ export function ImageManipulationRuntimeEditorPanel({
                 tone="danger"
               />
             ) : null}
-            <label className="ui-form-field">
+            <label className="ui-form-field" htmlFor={sourceSelectId}>
               <span className="ui-form-field__label">Source photo</span>
               <select
+                id={sourceSelectId}
                 className="ui-input"
                 value={selection.sourceRecordId ?? ""}
                 disabled={sourceItems.length < 1 || isLoadingSources}
@@ -2394,9 +2443,10 @@ export function ImageManipulationRuntimeEditorPanel({
                 ))}
               </select>
             </label>
-            <label className="ui-form-field">
+            <label className="ui-form-field" htmlFor={referenceSelectId}>
               <span className="ui-form-field__label">Face reference photo</span>
               <select
+                id={referenceSelectId}
                 className="ui-input"
                 value={selection.referenceRecordId ?? ""}
                 disabled={referenceItems.length < 1 || isLoadingReferences}
@@ -2557,8 +2607,10 @@ export function ImageManipulationRuntimeEditorPanel({
             {sessionToken ? (
               <section className="ui-stack ui-stack--2xs">
                 <p className="ui-text-small ui-text-secondary">Image library</p>
-                <div className="ui-row ui-row--xs">
+                <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
+                  <label className="ui-visually-hidden" htmlFor={imageLibrarySearchId}>Search images by filename</label>
                   <input
+                    id={imageLibrarySearchId}
                     type="search"
                     className="ui-input"
                     value={imageLibrarySearch}
@@ -2675,7 +2727,7 @@ export function ImageManipulationRuntimeEditorPanel({
               These selections stay linked to system-managed image collections.
             </p>
           </section>
-          <section className="ui-image-surface ui-stack ui-stack--sm">
+          <section className="ui-image-surface ui-stack ui-stack--sm ui-image-editor-page__run-panel">
             <header className="ui-image-surface__header">
               <h3 className="ui-image-surface__title">Create image</h3>
             </header>
@@ -2723,7 +2775,7 @@ export function ImageManipulationRuntimeEditorPanel({
                   ))}
                 </ul>
               ) : null}
-              <div className="ui-row ui-row--xs">
+              <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
                 <button
                   type="button"
                   className="ui-button ui-button--ghost ui-button--sm"
@@ -2812,7 +2864,7 @@ export function ImageManipulationRuntimeEditorPanel({
                     <li key={message}>{message}</li>
                   ))}
                 </ul>
-                <div className="ui-row ui-row--xs">
+                <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
                   {failureRecoveryGuidance.canRetryNow ? (
                     <button
                       type="button"
@@ -2864,7 +2916,12 @@ export function ImageManipulationRuntimeEditorPanel({
             <section className="ui-stack ui-stack--2xs" aria-live="polite">
               <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>Run progress</p>
               <div
-                aria-hidden="true"
+                role="progressbar"
+                aria-label="Run progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={runProgress.available ? runProgress.percentComplete : 0}
+                aria-valuetext={runProgress.available ? `${runProgress.percentComplete}% ${runProgress.summary}` : runProgress.summary}
                 style={{
                   width: "100%",
                   height: "0.5rem",
@@ -2928,7 +2985,7 @@ export function ImageManipulationRuntimeEditorPanel({
             </details>
           </section>
         </aside>
-        <div className="ui-image-editor-page__right-column ui-stack ui-stack--sm">
+        <div className="ui-image-editor-page__right-column ui-stack ui-stack--sm" role="region" aria-label="Preview, review, and history">
           <ImagePreviewPanel
             className="ui-image-editor-page__preview-panel"
             title="Image preview"
@@ -3003,7 +3060,7 @@ export function ImageManipulationRuntimeEditorPanel({
                     ) : null}
                   </article>
                 </div>
-                <div className="ui-row ui-row--xs">
+                <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
                   <button
                     type="button"
                     className="ui-button ui-button--ghost ui-button--sm"
@@ -3106,7 +3163,7 @@ export function ImageManipulationRuntimeEditorPanel({
                             {resolveRunOutputCount(run)} output{resolveRunOutputCount(run) === 1 ? "" : "s"}
                           </span>
                           <span className="ui-text-secondary">{resolveRunHistorySummary(run)}</span>
-                          <div className="ui-row ui-row--xs">
+                          <div className="ui-row ui-row--xs ui-image-editor-page__action-row">
                             <button
                               type="button"
                               className={`ui-button ui-button--sm ${selectedHistoryRunId === run.runId ? "ui-button--primary" : "ui-button--ghost"}`}
@@ -3159,49 +3216,93 @@ export function ImageManipulationRuntimeEditorPanel({
             <div className="ui-image-editor-page__gallery-contexts" role="tablist" aria-label="Image collections">
               <button
                 type="button"
+                id={outputTabId}
                 role="tab"
+                tabIndex={selection.activePreviewRole === "output" ? 0 : -1}
                 aria-selected={selection.activePreviewRole === "output"}
+                aria-controls={galleryTabPanelId}
                 className={`ui-button ui-button--sm ${selection.activePreviewRole === "output" ? "ui-button--primary" : "ui-button--ghost"}`}
                 onClick={() => setSelection((current) => setActivePreviewRole(current, "output"))}
+                onKeyDown={(event) => {
+                  const nextRole = resolveNextGalleryPreviewRoleByKey({
+                    activeRole: selection.activePreviewRole,
+                    key: event.key,
+                  });
+                  if (!nextRole) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setSelection((current) => setActivePreviewRole(current, nextRole));
+                }}
               >
                 Results ({outputItems.length})
               </button>
               <button
                 type="button"
+                id={sourceTabId}
                 role="tab"
+                tabIndex={selection.activePreviewRole === "source" ? 0 : -1}
                 aria-selected={selection.activePreviewRole === "source"}
+                aria-controls={galleryTabPanelId}
                 className={`ui-button ui-button--sm ${selection.activePreviewRole === "source" ? "ui-button--primary" : "ui-button--ghost"}`}
                 onClick={() => setSelection((current) => setActivePreviewRole(current, "source"))}
+                onKeyDown={(event) => {
+                  const nextRole = resolveNextGalleryPreviewRoleByKey({
+                    activeRole: selection.activePreviewRole,
+                    key: event.key,
+                  });
+                  if (!nextRole) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setSelection((current) => setActivePreviewRole(current, nextRole));
+                }}
               >
                 Source ({sourceItems.length})
               </button>
               <button
                 type="button"
+                id={referenceTabId}
                 role="tab"
+                tabIndex={selection.activePreviewRole === "reference" ? 0 : -1}
                 aria-selected={selection.activePreviewRole === "reference"}
+                aria-controls={galleryTabPanelId}
                 className={`ui-button ui-button--sm ${selection.activePreviewRole === "reference" ? "ui-button--primary" : "ui-button--ghost"}`}
                 onClick={() => setSelection((current) => setActivePreviewRole(current, "reference"))}
+                onKeyDown={(event) => {
+                  const nextRole = resolveNextGalleryPreviewRoleByKey({
+                    activeRole: selection.activePreviewRole,
+                    key: event.key,
+                  });
+                  if (!nextRole) {
+                    return;
+                  }
+                  event.preventDefault();
+                  setSelection((current) => setActivePreviewRole(current, nextRole));
+                }}
               >
                 Face reference ({referenceItems.length})
               </button>
             </div>
-            <ImageGallerySlider
-              className="ui-image-editor-page__gallery-slider-panel"
-              title={activeGallery.title}
-              subtitle={activeGallery.subtitle}
-              items={activeGallery.items}
-              selectedImageId={activeGallery.selectedId}
-              loading={activeGallery.loading}
-              errorMessage={activeGallery.errorMessage}
-              emptyMessage={activeGallery.emptyMessage}
-              onImageSelected={(imageId) => {
-                setSelection((current) => setRoleSelection(current, {
-                  role: current.activePreviewRole,
-                  recordId: imageId,
-                  syncPreviewRole: true,
-                }));
-              }}
-            />
+            <div id={galleryTabPanelId} role="tabpanel" aria-labelledby={activeGalleryTabId}>
+              <ImageGallerySlider
+                className="ui-image-editor-page__gallery-slider-panel"
+                title={activeGallery.title}
+                subtitle={activeGallery.subtitle}
+                items={activeGallery.items}
+                selectedImageId={activeGallery.selectedId}
+                loading={activeGallery.loading}
+                errorMessage={activeGallery.errorMessage}
+                emptyMessage={activeGallery.emptyMessage}
+                onImageSelected={(imageId) => {
+                  setSelection((current) => setRoleSelection(current, {
+                    role: current.activePreviewRole,
+                    recordId: imageId,
+                    syncPreviewRole: true,
+                  }));
+                }}
+              />
+            </div>
           </section>
         </div>
       </div>
@@ -3210,4 +3311,7 @@ export function ImageManipulationRuntimeEditorPanel({
 }
 
 export default ImageManipulationRuntimeEditorPanel;
+
+
+
 

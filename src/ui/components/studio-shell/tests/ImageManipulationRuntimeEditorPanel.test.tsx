@@ -6,6 +6,7 @@ import ImageManipulationRuntimeEditorPanel, {
   buildImageRunLaunchPrecheckState,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
+  resolveNextGalleryPreviewRoleByKey,
   resolveLinkedRunForSelectedOutput,
   resolveRunHistorySummary,
   resolveRunOutputRecordId,
@@ -69,6 +70,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
 
     expect(html).toContain("Image preview");
     expect(html).toContain("Image browser");
+    expect(html).toContain("Image manipulation studio");
     expect(html).toContain("Selected photos");
     expect(html).toContain("Create image");
     expect(html).toContain("Status: Ready");
@@ -92,7 +94,34 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Results (0)");
     expect(html).toContain("Source (0)");
     expect(html).toContain("Face reference (0)");
+    expect(html).toContain("role=\"tabpanel\"");
+    expect(html).toContain("role=\"progressbar\"");
+    expect(html).toContain("Preparation and run controls");
+    expect(html).toContain("Preview, review, and history");
     expect(html).toContain("disabled=\"\"");
+  });
+
+  it("resolves keyboard navigation targets for image-browser tabs", () => {
+    expect(resolveNextGalleryPreviewRoleByKey({
+      activeRole: "output",
+      key: "ArrowRight",
+    })).toBe("source");
+    expect(resolveNextGalleryPreviewRoleByKey({
+      activeRole: "output",
+      key: "ArrowLeft",
+    })).toBe("reference");
+    expect(resolveNextGalleryPreviewRoleByKey({
+      activeRole: "reference",
+      key: "Home",
+    })).toBe("output");
+    expect(resolveNextGalleryPreviewRoleByKey({
+      activeRole: "source",
+      key: "End",
+    })).toBe("reference");
+    expect(resolveNextGalleryPreviewRoleByKey({
+      activeRole: "source",
+      key: "Enter",
+    })).toBeUndefined();
   });
 
   it("groups recent assets into continuity windows for rediscovery", () => {

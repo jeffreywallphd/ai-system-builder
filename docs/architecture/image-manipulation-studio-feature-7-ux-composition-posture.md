@@ -398,3 +398,40 @@ Safety posture:
 - Technical diagnostics remain available in advanced details only.
 - Retryability and recovery type are derived from normalized readiness and persistence diagnostics, not local backend shortcuts.
 
+## Epic 7.4 Story 7.4.1: Responsive layout, accessibility, and multi-surface readiness
+
+Story 7.4.1 hardens the runtime editor for desktop and narrow-surface usability without expanding into unsupported full mobile authoring complexity.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/styles/components/assets.css`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+Accessibility hardening:
+
+- The runtime editor now exposes an explicit page heading and named layout regions so assistive technologies can navigate preparation controls vs preview/review regions quickly.
+- Image-collection tabs in the browser panel now include complete tab semantics:
+  - roving `tabIndex`,
+  - `aria-controls` / `role="tabpanel"` linkage,
+  - keyboard switching with `ArrowLeft`, `ArrowRight`, `ArrowUp`, `ArrowDown`, `Home`, and `End`.
+- Run progress now exposes a real `role="progressbar"` contract with value and descriptive status text.
+
+Responsive and discoverability hardening:
+
+- Action rows (precheck, recovery, review, run-history continuation, and library search actions) now wrap cleanly and remain readable/actionable at narrower widths.
+- The launch/run panel is sticky on wider layouts so launch state and primary execution controls remain discoverable while reviewing long context panels.
+- On narrow widths, action buttons and image-browser tab controls collapse to full-width or balanced stacked targets to preserve touch usability.
+
+Multi-surface posture (intentionally bounded):
+
+- Desktop remains the primary full-authoring surface.
+- Narrow/thinner surfaces prioritize continuity operations only:
+  - upload/select image,
+  - adjust parameters,
+  - run/precheck,
+  - monitor status,
+  - review results,
+  - continue/share/save outputs.
+- Advanced diagnostics and run lineage remain available, but secondary, preserving a scalable seam for future thin-client surfaces without introducing a separate local state model.
+
