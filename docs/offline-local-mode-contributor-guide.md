@@ -23,6 +23,8 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - application pending-operation persistence/replay-preparation service:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+- application local-execution registration persistence/replay-preparation service:
+  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - application offline audit/operational event hooks:
@@ -32,10 +34,12 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - desktop persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
 - runtime event adapter for offline hooks:
   - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - shared offline contracts and schema parsers:
@@ -64,7 +68,11 @@ Use this map when deciding where to extend behavior:
   - `OfflinePendingOperationService.queueOperation(...)`
   - `OfflinePendingOperationService.prepareReplayOperations(...)`
   - `OfflinePendingOperationService.markOperationReplayOutcome(...)`
+  - `OfflineLocalExecutionRegistrationService.queueRegistration(...)`
+  - `OfflineLocalExecutionRegistrationService.prepareReplayRegistrations(...)`
+  - `OfflineLocalExecutionRegistrationService.markRegistrationReplayOutcome(...)`
   - `DesktopOfflinePendingOperationHost.createDesktopOfflinePendingOperationHostRuntime(...)`
+  - `DesktopOfflineLocalExecutionRegistrationHost.createDesktopOfflineLocalExecutionRegistrationHostRuntime(...)`
 - reconnect orchestration and post-sync cleanup:
   - `OfflineControlledResynchronizationCoordinator.synchronizeWorkspace(...)`
   - `DesktopOfflineResynchronizationHost.createDesktopOfflineResynchronizationHostRuntime(...)`
@@ -221,6 +229,9 @@ At minimum, update:
 - `src/hosts/desktop/tests/DesktopOfflineResynchronizationHost.test.ts`
 - `src/infrastructure/api/system-runtime/tests/DesktopOfflineOperationalEventSink.test.ts`
 - `src/infrastructure/desktop/tests/DesktopOfflinePendingOperationRepository.test.ts`
+- `src/application/common/tests/OfflineLocalExecutionRegistrationPersistence.test.ts`
+- `src/hosts/desktop/tests/DesktopOfflineLocalExecutionRegistrationHost.test.ts`
+- `src/infrastructure/desktop/tests/DesktopOfflineLocalExecutionRegistrationRepository.test.ts`
 - `src/shared/contracts/runtime/tests/OfflineSynchronizationContracts.test.ts`
 - `src/shared/dto/runtime/tests/OfflineSynchronizationDtos.test.ts`
 - `src/shared/schemas/runtime/tests/OfflineSynchronizationSchemaContracts.test.ts`

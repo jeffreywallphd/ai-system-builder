@@ -19,18 +19,31 @@ import {
   OfflinePendingOperationService,
 } from "../OfflinePendingOperationPersistence";
 import {
+  type IOfflineLocalExecutionRegistrationRepository,
+  type OfflineLocalExecutionRegistrationRecord,
+  OfflineLocalExecutionRegistrationService,
+} from "../OfflineLocalExecutionRegistrationPersistence";
+import {
+  OfflineLocalExecutionClasses,
+  OfflineLocalExecutionOutcomes,
+  OfflineLocalExecutionOutputClasses,
+  OfflineNodeOperationalModes,
   OfflineQueuedMutationIntents,
   OfflineQueuedMutationStatuses,
   OfflineResourceClasses,
+  OfflineWorkstationModes,
   OfflineDeviceTrustPostures,
   OfflineSensitivityMarkings,
   OfflineStorageRules,
   OfflineWorkspaceAccessRoles,
   OfflineWorkspaceSharingPostures,
+  createOfflineLocalExecutionRecord,
+  createOfflineLocalExecutionRegistrationEnvelope,
   createOfflineQueuedMutationEnvelope,
   type OfflineResourcePolicyEvaluationInput,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
+  OfflineLocalExecutionRegistrationStatuses,
   OfflineConnectivityStates,
   type OfflineConnectivitySurfaceStateDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
@@ -66,6 +79,37 @@ class InMemoryOfflinePendingOperationRepository implements IOfflinePendingOperat
 
   private keyOf(workspaceId: string, operationId: string): string {
     return `${workspaceId}::${operationId}`;
+  }
+}
+
+class InMemoryOfflineLocalExecutionRegistrationRepository implements IOfflineLocalExecutionRegistrationRepository {
+  private readonly records = new Map<string, OfflineLocalExecutionRegistrationRecord>();
+
+  public async upsertRegistration(record: OfflineLocalExecutionRegistrationRecord): Promise<void> {
+    this.records.set(this.keyOf(record.actorWorkspaceContext.workspaceId, record.registration.registrationId), record);
+  }
+
+  public async findRegistration(
+    workspaceId: string,
+    registrationId: string,
+  ): Promise<OfflineLocalExecutionRegistrationRecord | undefined> {
+    return this.records.get(this.keyOf(workspaceId, registrationId));
+  }
+
+  public async listRegistrationsByWorkspace(
+    workspaceId: string,
+  ): Promise<ReadonlyArray<OfflineLocalExecutionRegistrationRecord>> {
+    return Object.freeze(
+      [...this.records.values()].filter((entry) => entry.actorWorkspaceContext.workspaceId === workspaceId),
+    );
+  }
+
+  public async deleteRegistration(workspaceId: string, registrationId: string): Promise<boolean> {
+    return this.records.delete(this.keyOf(workspaceId, registrationId));
+  }
+
+  private keyOf(workspaceId: string, registrationId: string): string {
+    return `${workspaceId}::${registrationId}`;
   }
 }
 
@@ -112,6 +156,7 @@ class StaticConnectivityPort implements IOfflineConnectivityStatePort {
 
 class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeResynchronizationPort {
   public readonly replayedOperations: string[] = [];
+  public readonly replayedLocalExecutionRegistrations: string[] = [];
   public readonly refreshedSnapshots: string[] = [];
   private readonly revisionByResourceKey: ReadonlyMap<string, { readonly authoritativeRevision: string } & Partial<{
     readonly resourceExists: boolean;
@@ -122,6 +167,7 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
     readonly revisionComparable: boolean;
   }>>;
   private readonly replayResultByOperationId: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+  private readonly replayResultByRegistrationId: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
   private readonly missingSnapshotResourceKeys: ReadonlySet<string>;
 
   constructor(options?: {
@@ -134,10 +180,12 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
       readonly revisionComparable: boolean;
     }>>;
     readonly replayResultsByOperationId?: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
+    readonly replayResultsByRegistrationId?: ReadonlyMap<string, AuthoritativeReplayExecutionResult>;
     readonly missingSnapshotResourceKeys?: ReadonlySet<string>;
   }) {
     this.revisionByResourceKey = options?.revisionsByResourceKey ?? new Map();
     this.replayResultByOperationId = options?.replayResultsByOperationId ?? new Map();
+    this.replayResultByRegistrationId = options?.replayResultsByRegistrationId ?? new Map();
     this.missingSnapshotResourceKeys = options?.missingSnapshotResourceKeys ?? new Set();
   }
 
@@ -194,6 +242,23 @@ class FakeAuthoritativeResynchronizationPort implements IOfflineAuthoritativeRes
       kind: AuthoritativeReplayExecutionResultKinds.applied,
       reason: "Authoritative replay applied.",
       authoritativeRevisionAfter: "run:rev:2",
+    });
+  }
+
+  public async replayPreparedLocalExecutionRegistration(input: {
+    readonly workspaceId: string;
+    readonly attemptedAt: string;
+    readonly registration: { readonly registrationId: string };
+  }) {
+    this.replayedLocalExecutionRegistrations.push(input.registration.registrationId);
+    const configured = this.replayResultByRegistrationId.get(input.registration.registrationId);
+    if (configured) {
+      return configured;
+    }
+    return Object.freeze({
+      kind: AuthoritativeReplayExecutionResultKinds.applied,
+      reason: "Authoritative local execution registration applied.",
+      authoritativeRevisionAfter: "local-exec:rev:2",
     });
   }
 
@@ -270,10 +335,56 @@ function createConnectedState(): OfflineConnectivitySurfaceStateDto {
   });
 }
 
+function createLocalExecutionRegistration(input: {
+  readonly registrationId: string;
+  readonly executionId: string;
+  readonly queuedAt: string;
+  readonly status?: (typeof OfflineLocalExecutionRegistrationStatuses)[keyof typeof OfflineLocalExecutionRegistrationStatuses];
+}) {
+  const execution = createOfflineLocalExecutionRecord({
+    executionId: input.executionId,
+    executionClass: OfflineLocalExecutionClasses.localWorkflowValidation,
+    resourceClass: OfflineResourceClasses.localRuntimeSession,
+    resourceId: `runtime:session:${input.executionId}`,
+    startedAt: "2026-04-08T12:09:50.000Z",
+    completedAt: "2026-04-08T12:09:59.000Z",
+    executedByActorUserIdentityId: "user:alpha",
+    nodeOperationalMode: OfflineNodeOperationalModes.workstationClient,
+    workstationMode: OfflineWorkstationModes.interactiveUserSession,
+    outcome: OfflineLocalExecutionOutcomes.succeeded,
+    inputDigest: `sha256:input:${input.executionId}`,
+    outputs: [{
+      outputId: `output:${input.executionId}`,
+      outputClass: OfflineLocalExecutionOutputClasses.metricsSnapshot,
+      contentDigest: `sha256:output:${input.executionId}`,
+      sizeBytes: 100,
+    }],
+  });
+
+  return createOfflineLocalExecutionRegistrationEnvelope({
+    registrationId: input.registrationId,
+    execution,
+    queuedAt: input.queuedAt,
+    userVisibleRegistrationStatus: input.status,
+    divergenceDisclosureToken: `offline-warning:${input.registrationId}`,
+    replayDescriptor: {
+      method: "POST",
+      path: `/v1/offline/local-executions/${input.executionId}/register`,
+      idempotencyKey: `idem:${input.registrationId}`,
+      payload: Object.freeze({
+        executionId: input.executionId,
+      }),
+    },
+  });
+}
+
 describe("OfflineControlledResynchronizationCoordinator", () => {
   it("revalidates cache, replays eligible operations, and records explicit outcomes", async () => {
     const pendingOperationService = new OfflinePendingOperationService(
       new InMemoryOfflinePendingOperationRepository(),
+    );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
     );
     const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
@@ -282,6 +393,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     const eventSink = new RecordingOfflineOperationalSink();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
+      localExecutionRegistrationService,
       snapshotCacheService,
       authoritativePort,
       new StaticConnectivityPort(createConnectedState()),
@@ -356,6 +468,17 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
         kind: OfflinePendingOperationDependencyKinds.replayAfterDependencyApplied,
       }],
     });
+    await localExecutionRegistrationService.queueRegistration({
+      registration: createLocalExecutionRegistration({
+        registrationId: "registration:apply:1",
+        executionId: "execution:apply:1",
+        queuedAt: "2026-04-08T12:10:02.000Z",
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
 
     const result = await coordinator.synchronizeWorkspace({
       workspaceId: "workspace:alpha",
@@ -369,11 +492,17 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     ]);
     expect(result.replayedOperationIds).toEqual(["operation:apply:1"]);
     expect(result.appliedOperationIds).toEqual(["operation:apply:1"]);
+    expect(result.replayPreparedRegistrationIds).toEqual(["registration:apply:1"]);
+    expect(result.replayedRegistrationIds).toEqual(["registration:apply:1"]);
+    expect(result.appliedRegistrationIds).toEqual(["registration:apply:1"]);
     expect(result.blockedOperationIds).toEqual([]);
     expect(result.blockedOperations).toEqual([]);
+    expect(result.blockedRegistrationIds).toEqual([]);
+    expect(result.blockedRegistrations).toEqual([]);
     expect(result.outcomes.map((outcome) => outcome.action)).toEqual([
       "apply-to-authoritative",
       "conflict-requires-review",
+      "apply-to-authoritative",
     ]);
     expect(result.outcomes[1]?.conflicts?.[0]?.conflictClass).toBe("stale-base-edit");
     expect(result.invalidatedSnapshotKeys).toEqual([]);
@@ -401,6 +530,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(persistedConflict?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
     expect(removedApplied).toBeUndefined();
     expect(authoritativePort.replayedOperations).toEqual(["operation:apply:1"]);
+    expect(authoritativePort.replayedLocalExecutionRegistrations).toEqual(["registration:apply:1"]);
 
     expect(result.refreshedSnapshotKeys).toEqual([
       "run-submission-intent::run:intent:1",
@@ -412,6 +542,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       OfflineOperationalEventTypes.replaySucceeded,
       OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
       OfflineOperationalEventTypes.conflictDetected,
+      OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
     ]);
   });
 
@@ -419,12 +550,16 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     const pendingOperationService = new OfflinePendingOperationService(
       new InMemoryOfflinePendingOperationRepository(),
     );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
+    );
     const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
     );
     const authoritativePort = new FakeAuthoritativeResynchronizationPort();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
+      localExecutionRegistrationService,
       snapshotCacheService,
       authoritativePort,
       new StaticConnectivityPort(Object.freeze({
@@ -445,6 +580,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(result.replayPreparedOperationIds).toEqual([]);
     expect(result.replayedOperationIds).toEqual([]);
     expect(result.blockedOperations).toEqual([]);
+    expect(result.replayPreparedRegistrationIds).toEqual([]);
+    expect(result.replayedRegistrationIds).toEqual([]);
+    expect(result.blockedRegistrations).toEqual([]);
     expect(result.outcomes).toEqual([]);
     expect(result.invalidatedSnapshotKeys).toEqual([]);
     expect(result.pendingOperationCleanupRecords).toEqual([]);
@@ -454,6 +592,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
   it("detects supported conflict classes during resynchronization and preserves local operations", async () => {
     const pendingOperationService = new OfflinePendingOperationService(
       new InMemoryOfflinePendingOperationRepository(),
+    );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
     );
     const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
@@ -485,6 +626,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     });
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
+      localExecutionRegistrationService,
       snapshotCacheService,
       authoritativePort,
       new StaticConnectivityPort(createConnectedState()),
@@ -671,6 +813,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     const pendingOperationService = new OfflinePendingOperationService(
       new InMemoryOfflinePendingOperationRepository(),
     );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
+    );
     const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
     );
@@ -678,6 +823,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     const eventSink = new RecordingOfflineOperationalSink();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
+      localExecutionRegistrationService,
       snapshotCacheService,
       authoritativePort,
       new StaticConnectivityPort(createConnectedState()),
@@ -753,9 +899,82 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     ]);
   });
 
+  it("replays local execution registrations with explicit conflict lineage when authoritative linkage conflicts", async () => {
+    const pendingOperationService = new OfflinePendingOperationService(
+      new InMemoryOfflinePendingOperationRepository(),
+    );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
+    );
+    const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
+      new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
+    );
+    const authoritativePort = new FakeAuthoritativeResynchronizationPort({
+      replayResultsByRegistrationId: new Map([
+        [
+          "registration:conflict:1",
+          Object.freeze({
+            kind: AuthoritativeReplayExecutionResultKinds.conflict,
+            reason: "Authoritative history linkage conflict.",
+          }),
+        ],
+      ]),
+    });
+    const eventSink = new RecordingOfflineOperationalSink();
+    const coordinator = new OfflineControlledResynchronizationCoordinator(
+      pendingOperationService,
+      localExecutionRegistrationService,
+      snapshotCacheService,
+      authoritativePort,
+      new StaticConnectivityPort(createConnectedState()),
+      {
+        now: () => new Date("2026-04-08T12:46:00.000Z"),
+        eventSink,
+      },
+    );
+
+    await localExecutionRegistrationService.queueRegistration({
+      registration: createLocalExecutionRegistration({
+        registrationId: "registration:conflict:1",
+        executionId: "execution:conflict:1",
+        queuedAt: "2026-04-08T12:45:00.000Z",
+      }),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:alpha",
+        actorUserIdentityId: "user:alpha",
+      },
+    });
+
+    const result = await coordinator.synchronizeWorkspace({
+      workspaceId: "workspace:alpha",
+      actorUserIdentityId: "user:alpha",
+      attemptedAt: "2026-04-08T12:46:00.000Z",
+    });
+
+    expect(result.replayPreparedRegistrationIds).toEqual(["registration:conflict:1"]);
+    expect(result.replayedRegistrationIds).toEqual(["registration:conflict:1"]);
+    expect(result.appliedRegistrationIds).toEqual([]);
+    expect(result.outcomes).toHaveLength(1);
+    expect(result.outcomes[0]).toMatchObject({
+      operationId: "registration:conflict:1",
+      action: "conflict-requires-review",
+    });
+    const persisted = await localExecutionRegistrationService.findQueuedRegistration(
+      "workspace:alpha",
+      "registration:conflict:1",
+    );
+    expect(persisted?.registration.userVisibleRegistrationStatus).toBe("registration-conflict");
+    expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.conflictDetected,
+    ]);
+  });
+
   it("invalidates stale cached snapshots when authoritative refresh is unavailable", async () => {
     const pendingOperationService = new OfflinePendingOperationService(
       new InMemoryOfflinePendingOperationRepository(),
+    );
+    const localExecutionRegistrationService = new OfflineLocalExecutionRegistrationService(
+      new InMemoryOfflineLocalExecutionRegistrationRepository(),
     );
     const snapshotCacheService = new OfflineAuthoritativeSnapshotCacheService(
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
@@ -768,6 +987,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     });
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
+      localExecutionRegistrationService,
       snapshotCacheService,
       authoritativePort,
       new StaticConnectivityPort(createConnectedState()),

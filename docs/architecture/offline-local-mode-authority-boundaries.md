@@ -25,6 +25,8 @@ Non-negotiable philosophy:
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - application pending-operation persistence + replay-preparation service and contracts:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+- application local-execution registration persistence + replay-preparation service and contracts:
+  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - application controlled resynchronization coordinator:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - application offline audit/operational event hook contracts:
@@ -37,6 +39,8 @@ Non-negotiable philosophy:
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - desktop host pending-operation persistence runtime factory:
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+- desktop host local-execution registration persistence runtime factory:
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
 - desktop host controlled resynchronization runtime factory:
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - runtime adapter for offline hook publication into existing audit/operational streams:
@@ -45,6 +49,8 @@ Non-negotiable philosophy:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - desktop offline pending-operation persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+- desktop offline local-execution registration persistence adapter:
+  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
 - shared contract package for runtime DTO/schema/state:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -263,11 +269,20 @@ Execution seams:
 - `evaluateOfflineLocalExecutionEligibility(...)`
 - `createOfflineLocalExecutionRecord(...)`
 - `createOfflineLocalExecutionRegistrationEnvelope(...)`
+- `OfflineLocalExecutionRegistrationService.queueRegistration(...)`
+- `OfflineLocalExecutionRegistrationService.prepareReplayRegistrations(...)`
+- `OfflineLocalExecutionRegistrationService.markRegistrationReplayOutcome(...)`
 - desktop profile enforcement via:
   - `DesktopOfflineSupportedExecutionClasses`
   - `evaluateDesktopOfflineLocalExecutionEligibility(...)`
 
 Offline local execution history must remain `explicit-local-activity` until authoritative registration outcome is applied.
+
+Story 19.3.3 registration/linkage baseline:
+- local execution output metadata is durably persisted with canonical metadata digest so reconnect replay intent is queryable across desktop restart;
+- reconnect replay of local-execution registrations is explicit and status-bound (`queued-pending-registration`, `registration-conflict`, `registration-rejected`, `registration-applied`);
+- authoritative linkage is emitted as `protected-local-execution-registered` audit/operational outcomes, without claiming disconnected server orchestration;
+- conflict/rejection linkage outcomes are retained explicitly in local queue state and reconciliation outcomes; no silent backdating.
 
 ## Server-authoritative-only examples
 
@@ -300,6 +315,8 @@ This section documents the implemented Story 19.2.8 baseline for desktop cache p
   - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - Application pending-operation durability and replay preparation:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+- Application local-execution registration durability and replay preparation:
+  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - Application reconnect planning and execution:
   - `src/application/common/OfflineLocalModeResynchronization.ts`
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
@@ -310,10 +327,12 @@ This section documents the implemented Story 19.2.8 baseline for desktop cache p
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
   - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - Desktop infrastructure persistence adapters:
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
 - Shared contract + DTO + schema boundary:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`

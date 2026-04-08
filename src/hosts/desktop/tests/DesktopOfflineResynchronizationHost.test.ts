@@ -31,6 +31,15 @@ class NoopAuthoritativePort implements IOfflineAuthoritativeResynchronizationPor
     });
   }
 
+  public async replayPreparedLocalExecutionRegistration(
+    _input: Parameters<IOfflineAuthoritativeResynchronizationPort["replayPreparedLocalExecutionRegistration"]>[0],
+  ) {
+    return Object.freeze({
+      kind: AuthoritativeReplayExecutionResultKinds.failed,
+      reason: "noop",
+    });
+  }
+
   public async fetchResourceSnapshotForCache(
     _input: Parameters<IOfflineAuthoritativeResynchronizationPort["fetchResourceSnapshotForCache"]>[0],
   ) {
@@ -55,6 +64,8 @@ describe("DesktopOfflineResynchronizationHost", () => {
 
     expect(runtime.coordinator).toBeDefined();
     expect(runtime.pendingOperationRuntime.databasePath).toContain("offline-pending-operation-queue.sqlite");
+    expect(runtime.localExecutionRegistrationRuntime.databasePath)
+      .toContain("offline-local-execution-registration-queue.sqlite");
     expect(runtime.snapshotCacheRuntime.databasePath).toContain("offline-authoritative-snapshot-cache.sqlite");
     runtime.dispose();
   });
