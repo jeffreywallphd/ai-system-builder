@@ -82,3 +82,13 @@ These ports provide:
 - metadata create/update/retrieve/list/archive/soft-delete seams
 - managed-storage location reservation, binary write/read, mediated access-handle, and lifecycle delete seams
 - storage-instance plus logical object-key references without raw filesystem path contracts
+
+## Story 6.1.1: Generated result asset lifecycle foundation
+
+Feature 6 introduces a dedicated generated-result domain model for authoritative persistence progression and lineage capture:
+
+- `src/domain/image-assets/GeneratedResultAssetDomain.ts`
+- `src/domain/image-assets/tests/GeneratedResultAssetDomain.test.ts`
+- `docs/architecture/generated-result-asset-domain-foundation.md`
+
+This model keeps generated outputs as first-class platform resources linked to run/system/workflow/node context and logical input assets while enforcing explicit lifecycle transitions (`pending-collection -> available -> preview-ready -> archived`, with retryable failed-collection handling).
