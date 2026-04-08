@@ -1,6 +1,11 @@
 import type { AssignmentReadySelectionItem } from "@application/runs/use-cases/SelectAssignmentReadyRunsUseCase";
 import type { DispatchAssignedRunExecutionUseCase } from "@application/runs/use-cases/DispatchAssignedRunExecutionUseCase";
 import type { SelectAssignmentReadyRunsUseCase } from "@application/runs/use-cases/SelectAssignmentReadyRunsUseCase";
+import type {
+  ExecutionNodeListQuery,
+  ImageRunExecutionNodeSelectionDecision,
+  IImageRunExecutionNodeSelectionServicePort,
+} from "@application/nodes/ports/ExecutionNodeManagementPorts";
 import {
   type ClaimRunForNodeDispatchPreparationUseCase,
   type ClaimRunForNodeDispatchPreparationResult,
@@ -11,12 +16,22 @@ interface ProcessQueuedRunDispatchUseCaseDependencies {
   readonly selectAssignmentReadyRunsUseCase: Pick<SelectAssignmentReadyRunsUseCase, "execute">;
   readonly claimRunForNodeDispatchPreparationUseCase: Pick<ClaimRunForNodeDispatchPreparationUseCase, "execute">;
   readonly dispatchAssignedRunExecutionUseCase: Pick<DispatchAssignedRunExecutionUseCase, "execute">;
+  readonly runNodeSelectionService: Pick<IImageRunExecutionNodeSelectionServicePort, "selectExecutionNodeForRun">;
+  readonly queueRepository: {
+    releaseRunClaim(input: {
+      readonly runId: string;
+      readonly claimToken: string;
+      readonly releasedAt: string;
+    }): Promise<boolean>;
+  };
   readonly now?: () => Date;
 }
 
 export interface ProcessQueuedRunDispatchRequest {
   readonly reservationOwner: string;
-  readonly nodeId: string;
+  readonly nodeId?: string;
+  readonly candidateNodeIds?: ReadonlyArray<string>;
+  readonly selectionQuery?: ExecutionNodeListQuery;
   readonly asOf?: string;
   readonly queueId?: string;
   readonly workspaceId?: string;
@@ -40,11 +55,16 @@ export interface ProcessQueuedRunDispatchFailure {
   readonly status: "failed";
   readonly runId: string;
   readonly queueId: string;
-  readonly nodeId: string;
+  readonly nodeId?: string;
   readonly dispatchAttemptId?: string;
-  readonly stage: "claim" | "dispatch";
+  readonly stage: "selection" | "claim" | "dispatch";
   readonly message: string;
   readonly conflictReason?: RunNodeDispatchClaimConflictError["conflict"]["reason"];
+  readonly selection?: {
+    readonly outcome: ImageRunExecutionNodeSelectionDecision["outcome"];
+    readonly reasons: ImageRunExecutionNodeSelectionDecision["reasons"];
+    readonly candidateCount: number;
+  };
 }
 
 export type ProcessQueuedRunDispatchOutcome =
@@ -54,7 +74,7 @@ export type ProcessQueuedRunDispatchOutcome =
 export interface ProcessQueuedRunDispatchResult {
   readonly asOf: string;
   readonly reservationOwner: string;
-  readonly nodeId: string;
+  readonly requestedNodeId?: string;
   readonly selectedCount: number;
   readonly outcomes: ReadonlyArray<ProcessQueuedRunDispatchOutcome>;
 }
@@ -81,7 +101,7 @@ export class ProcessQueuedRunDispatchUseCase {
 
   public async execute(input: ProcessQueuedRunDispatchRequest): Promise<ProcessQueuedRunDispatchResult> {
     const reservationOwner = normalizeRequired(input.reservationOwner, "reservationOwner");
-    const nodeId = normalizeRequired(input.nodeId, "nodeId");
+    const requestedNodeId = normalizeOptional(input.nodeId);
     const asOf = normalizeOptional(input.asOf) ?? this.now().toISOString();
 
     const selected = await this.dependencies.selectAssignmentReadyRunsUseCase.execute({
@@ -95,9 +115,21 @@ export class ProcessQueuedRunDispatchUseCase {
 
     const outcomes: ProcessQueuedRunDispatchOutcome[] = [];
     for (const item of selected.items) {
+      const selection = await this.selectExecutionNodeForRun({
+        item,
+        asOf: selected.asOf,
+        requestedNodeId,
+        candidateNodeIds: input.candidateNodeIds,
+        selectionQuery: input.selectionQuery,
+      });
+      if ("error" in selection) {
+        outcomes.push(selection.error);
+        continue;
+      }
+
       const claimed = await this.claimForDispatch({
         item,
-        nodeId,
+        nodeId: selection.value.selectedNodeId,
         reservationOwner,
       });
       if ("error" in claimed) {
@@ -114,7 +146,7 @@ export class ProcessQueuedRunDispatchUseCase {
           status: "dispatched",
           runId: item.run.runId,
           queueId: item.queue.queueId,
-          nodeId,
+          nodeId: selection.value.selectedNodeId,
           dispatchAttemptId: claimed.value.dispatchPreparation.dispatchAttemptId,
           backendKind: dispatched.receipt.backendKind,
           dispatchId: dispatched.receipt.dispatchId,
@@ -126,7 +158,7 @@ export class ProcessQueuedRunDispatchUseCase {
           status: "failed",
           runId: item.run.runId,
           queueId: item.queue.queueId,
-          nodeId,
+          nodeId: selection.value.selectedNodeId,
           dispatchAttemptId: claimed.value.dispatchPreparation.dispatchAttemptId,
           stage: "dispatch",
           message: error instanceof Error ? error.message : String(error),
@@ -137,9 +169,64 @@ export class ProcessQueuedRunDispatchUseCase {
     return Object.freeze({
       asOf: selected.asOf,
       reservationOwner,
-      nodeId,
+      requestedNodeId,
       selectedCount: selected.items.length,
       outcomes: Object.freeze(outcomes),
+    });
+  }
+
+  private async selectExecutionNodeForRun(input: {
+    readonly item: AssignmentReadySelectionItem;
+    readonly asOf: string;
+    readonly requestedNodeId?: string;
+    readonly candidateNodeIds?: ReadonlyArray<string>;
+    readonly selectionQuery?: ExecutionNodeListQuery;
+  }): Promise<
+    | { readonly value: { readonly selectedNodeId: string } }
+    | { readonly error: ProcessQueuedRunDispatchFailure }
+  > {
+    const selectionDecision = await this.dependencies.runNodeSelectionService.selectExecutionNodeForRun({
+      asOf: input.asOf,
+      run: Object.freeze({
+        runId: input.item.run.runId,
+        workspaceId: input.item.run.workspaceId ?? "workspace:unknown",
+        workflowId: input.item.run.workflowId,
+      }),
+      requirements: Object.freeze({
+        requiredExecutionTarget: "image-manipulation",
+        requiredBackendFamilies: Object.freeze(["comfyui"]),
+        requiresRemoteScheduling: true,
+      }),
+      candidateNodeIds: resolveCandidateNodeIds({
+        requestedNodeId: input.requestedNodeId,
+        candidateNodeIds: input.candidateNodeIds,
+      }),
+      query: input.selectionQuery,
+    });
+
+    if (selectionDecision.selectedNodeId) {
+      return Object.freeze({
+        value: Object.freeze({
+          selectedNodeId: selectionDecision.selectedNodeId,
+        }),
+      });
+    }
+
+    await this.releaseSelectionClaim(input.item, input.asOf);
+    return Object.freeze({
+      error: Object.freeze({
+        status: "failed",
+        runId: input.item.run.runId,
+        queueId: input.item.queue.queueId,
+        stage: "selection",
+        message: selectionDecision.reasons[0]?.message
+          ?? "No eligible execution node was available for dispatch.",
+        selection: Object.freeze({
+          outcome: selectionDecision.outcome,
+          reasons: selectionDecision.reasons,
+          candidateCount: selectionDecision.candidates.length,
+        }),
+      }),
     });
   }
 
@@ -188,4 +275,27 @@ export class ProcessQueuedRunDispatchUseCase {
       });
     }
   }
+
+  private async releaseSelectionClaim(item: AssignmentReadySelectionItem, releasedAt: string): Promise<void> {
+    await this.dependencies.queueRepository.releaseRunClaim({
+      runId: item.run.runId,
+      claimToken: item.queue.claimToken,
+      releasedAt,
+    });
+  }
+}
+
+function resolveCandidateNodeIds(input: {
+  readonly requestedNodeId?: string;
+  readonly candidateNodeIds?: ReadonlyArray<string>;
+}): ReadonlyArray<string> | undefined {
+  if (input.requestedNodeId) {
+    return Object.freeze([input.requestedNodeId]);
+  }
+  if (!input.candidateNodeIds || input.candidateNodeIds.length === 0) {
+    return undefined;
+  }
+  return Object.freeze(input.candidateNodeIds
+    .map((entry) => normalizeOptional(entry))
+    .filter((entry): entry is string => Boolean(entry)));
 }

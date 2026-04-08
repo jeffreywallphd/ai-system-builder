@@ -50,6 +50,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Keep arbitration behavior explicit in `RolePrioritySchedulingArbitration.ts` (or an explicit replacement module) with deterministic fallback ordering.
 - Keep affinity preference handling in `SchedulingPlacementAffinityPreference.ts`; keep hard denials in rule modules.
 - Reuse node eligibility + assignment policy seams.
+- Reuse image-run node eligibility + deterministic selection seams before dispatch claim (`IImageRunNodeEligibilityEvaluationServicePort` + `IImageRunExecutionNodeSelectionServicePort`).
 - Preserve claim release behavior for ineligible node-targeted selections.
 - Keep deterministic queue ordering and reservation TTL semantics.
 

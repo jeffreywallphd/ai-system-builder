@@ -80,6 +80,7 @@ Provide an implementation checklist for contributors extending the authoritative
 8. Reuse `RunNodeAssignmentEligibilityService` and `IRunAssignmentPolicyPort` for node eligibility checks.
 9. On ineligible node-targeted claims, keep immediate `releaseRunClaim` behavior so stale leases do not block queue flow.
 10. Preserve deterministic queue ordering and reservation TTL behavior unless changes are explicitly versioned and documented.
+11. For image-run dispatch orchestration, keep node resolution in `IImageRunExecutionNodeSelectionServicePort` + `IImageRunNodeEligibilityEvaluationServicePort` before claim/dispatch, and surface structured no-eligible-node reasons.
 
 ## Queue integration and reservation/arbitration extension seams
 
@@ -155,6 +156,7 @@ Provide an implementation checklist for contributors extending the authoritative
 
 - Bypassing reservation claim semantics (`claimAssignmentReadyRuns`) is prohibited.
 - Bypassing `ClaimRunForNodeDispatchPreparationUseCase` for assignment writes is prohibited.
+- Bypassing run-node selection eligibility/selection services for image dispatch assignment is prohibited.
 - Performing dispatch directly from route handlers without canonical command building is prohibited.
 - Mutating canonical run lifecycle directly from infrastructure adapters is prohibited.
 - Embedding scheduling policy logic in UI components/state, transport handlers, persistence adapters, or backend dispatch adapters is prohibited.
