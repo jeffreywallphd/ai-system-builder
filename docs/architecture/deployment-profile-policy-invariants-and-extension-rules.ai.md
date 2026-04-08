@@ -17,6 +17,7 @@ Story 20.1.7 documents the deployment-profile invariants and contributor extensi
 - `src/application/policy-administration/DeploymentPolicyEvaluationPorts.ts`
 - `src/application/policy-administration/DeploymentPolicyEvaluationService.ts`
 - `src/application/policy-administration/CanonicalDeploymentPolicySnapshotResolver.ts`
+- `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
 
 ## Summary
 

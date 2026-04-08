@@ -14,11 +14,13 @@ Implementation workflow for adding policy families, preset behavior, and feature
 - Keep effective-value resolution and override validation in `src/application/deployment/*` contracts/services.
 - Keep durable policy persistence seams in `src/application/deployment/ports/*` and `src/infrastructure/persistence/deployment/*`.
 - Keep feature-facing decisions in `src/application/policy-administration/*` evaluation interfaces/services.
+- Keep authoritative policy mutation validation/permission enforcement in `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`.
 - Keep payload contracts and schema validation in `src/shared/contracts|dto|schemas/deployment/*`.
 - Keep docs/tests aligned for `.md` and `.ai.md` surfaces.
 
 ## Guardrails
 
 - Use `IDeployment*PolicyEvaluationPort` interfaces for feature policy decisions.
+- Keep write-time policy mutation checks centralized in the policy-administration use case layer.
 - Keep preset/profile behavior data-driven from canonical definitions.
 - Do not put profile-specific branching into UI, transport handlers, or backend adapters.

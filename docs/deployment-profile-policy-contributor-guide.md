@@ -26,6 +26,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
    - `src/application/policy-administration/DeploymentPolicyEvaluationPorts.ts`
    - `src/application/policy-administration/DeploymentPolicyEvaluationService.ts`
    - `src/application/policy-administration/CanonicalDeploymentPolicySnapshotResolver.ts`
+   - `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
 4. Keep transport payload changes aligned with shared contracts/schemas:
    - `src/shared/contracts/deployment/DeploymentPolicyAdministrationContracts.ts`
    - `src/shared/dto/deployment/DeploymentPolicyAdministrationDtos.ts`
@@ -49,6 +50,24 @@ Provide a practical implementation workflow for extending deployment-profile pol
 4. Keep persistence out of UI and transport handlers.
 5. Update authoritative composition wiring when repository availability changes:
    - `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
+
+## Implementing authoritative policy update workflows
+
+1. Keep policy update orchestration in application use cases:
+   - `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
+2. Validate updates at write time (before persistence):
+   - supported scope semantics,
+   - known family/setting identifiers,
+   - control-mode eligibility and expected control mode assertions,
+   - setting value type/range/enum constraints,
+   - remove-operation safety (cannot remove missing override records),
+   - policy-required ticket-reference presence.
+3. Enforce permission gates in one place:
+   - active profile selection permission,
+   - override management permission,
+   - runtime-admin override permission.
+4. Persist only validated operations through `IDeploymentPolicyPersistenceRepository`.
+5. Keep runtime feature behavior enforcement separate from write-time validation.
 
 ## Adding a new policy family
 

@@ -32,6 +32,7 @@ describe("deployment profile policy persistence documentation", () => {
     expect(doc).toContain("IDeploymentPolicyPersistenceRepository.ts");
     expect(doc).toContain("DeploymentPolicyAdministrationPersistenceDtos.ts");
     expect(doc).toContain("SqliteDeploymentPolicyPersistenceAdapter.ts");
+    expect(doc).toContain("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts");
     expect(doc).toContain("deployment_policy_override_history");
   });
 
@@ -49,6 +50,7 @@ describe("deployment profile policy persistence documentation", () => {
     expect(aiDoc).toContain("docs/architecture/deployment-profile-policy-persistence-and-repositories.md");
     expect(aiDoc).toContain("IDeploymentPolicyPersistenceRepository.ts");
     expect(aiDoc).toContain("SqliteDeploymentPolicyPersistenceAdapter.ts");
+    expect(aiDoc).toContain("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts");
   });
 });
 
