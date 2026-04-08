@@ -41,5 +41,6 @@
 - `docs/architecture/image-manipulation-validation-failure-taxonomy-foundation.md`
 - `docs/architecture/image-manipulation-resilience-state-contracts.md`
 - `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
+- `docs/architecture/image-manipulation-studio-resilience-messaging-conventions.md`
 - `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`

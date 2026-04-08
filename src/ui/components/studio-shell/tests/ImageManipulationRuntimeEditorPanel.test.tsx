@@ -278,7 +278,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(guidance?.canRetryNow).toBeFalse();
   });
 
-  it("builds operational recovery guidance for retryable failed runs", () => {
+  it("builds retry-later guidance for retryable failed runs", () => {
     const precheck = buildImageRunLaunchPrecheckState({
       selectedSourceRecordId: "record:source:1",
       selectedSourceAssetId: "asset:source:1",
@@ -317,7 +317,7 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     });
 
     expect(guidance?.mode).toBe("run-failed");
-    expect(guidance?.kind).toBe("operational");
+    expect(guidance?.kind).toBe("retry-later");
     expect(guidance?.canRetryNow).toBeTrue();
   });
 

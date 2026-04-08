@@ -19,6 +19,7 @@ import {
   deriveImageManipulationRetryRecoveryContractFromResilienceSnapshot,
   type ImageManipulationRetryRecoveryContract,
 } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
+import type { ImageManipulationIssueClassification } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
 import {
   ImageManipulationResilienceDurabilityClasses,
   ImageManipulationResilienceScopes,
@@ -29,6 +30,13 @@ import {
   type ImageManipulationResilienceSnapshot,
   type ImageManipulationResilienceStateKind,
 } from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
+import {
+  ImageStudioFailureMappingLayers,
+  ImageStudioOperationalMessageKinds,
+  deriveImageStudioOperationalGuidance,
+  mapImageStudioFailureCodeToClassification,
+  type ImageStudioOperationalMessageKind,
+} from "./ImageStudioOperationalMessaging";
 
 export type ImageStudioSurfaceStateKind = "loading" | "empty" | "error" | "ready" | "degraded";
 
@@ -38,7 +46,10 @@ export interface ImageStudioSurfaceStateViewModel {
   readonly description: string;
   readonly detail?: string;
   readonly retryable?: boolean;
+  readonly messageKind?: ImageStudioOperationalMessageKind;
+  readonly recommendedActions?: ReadonlyArray<string>;
   readonly recovery?: ImageManipulationRetryRecoveryContract;
+  readonly classification?: ImageManipulationIssueClassification;
   readonly resilience?: ImageManipulationResilienceSnapshot;
 }
 
@@ -93,6 +104,10 @@ export interface ImageStudioSnapshotEnvelope<T> {
   readonly state: ImageStudioSnapshotLoadState;
   readonly data?: T;
   readonly errorMessage?: string;
+  readonly issueCode?: string;
+  readonly failureClassification?: ImageManipulationIssueClassification;
+  readonly resilience?: ImageManipulationResilienceSnapshot;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
 }
 
 export interface ImageStudioPresenterComposeInput {
@@ -261,8 +276,21 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
   }
 
   if (envelope?.state === "error") {
+    const classification = envelope.failureClassification
+      ?? mapImageStudioFailureCodeToClassification({
+        code: envelope.issueCode,
+        fallbackLayer: ImageStudioFailureMappingLayers.protectedRetrieval,
+      });
     return Object.freeze({
-      state: errorState(ImageStudioSurfaceTitles.input, envelope.errorMessage ?? "Image options could not be loaded."),
+      state: errorState(
+        ImageStudioSurfaceTitles.input,
+        envelope.errorMessage ?? "Image options could not be loaded.",
+        {
+          classification,
+          recovery: envelope.recovery,
+          resilience: envelope.resilience,
+        },
+      ),
       selectedSelectionId,
       options,
     });
@@ -277,11 +305,17 @@ function composeInputSurface(input: ImageStudioPresenterComposeInput): ImageStud
   }
 
   if (selectedSelectionId && options.length > 0 && !options.some((entry) => entry.selectionId === selectedSelectionId)) {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: "im.retrieval.validation.selected-input-missing",
+      fallbackLayer: ImageStudioFailureMappingLayers.protectedRetrieval,
+    });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.input,
         "Your current image is no longer in the loaded list.",
         "Refresh image options or choose another image.",
+        undefined,
+        classification,
       ),
       selectedSelectionId,
       options,
@@ -314,10 +348,22 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
   }
 
   if (workflowsEnvelope?.state === "error" || systemsEnvelope?.state === "error") {
+    const issueCode = workflowsEnvelope?.issueCode ?? systemsEnvelope?.issueCode;
+    const classification = workflowsEnvelope?.failureClassification
+      ?? systemsEnvelope?.failureClassification
+      ?? mapImageStudioFailureCodeToClassification({
+        code: issueCode,
+        fallbackLayer: ImageStudioFailureMappingLayers.workflowConfiguration,
+      });
     return Object.freeze({
       state: errorState(
         ImageStudioSurfaceTitles.workflow,
         workflowsEnvelope?.errorMessage ?? systemsEnvelope?.errorMessage ?? "Edit options are unavailable.",
+        {
+          classification,
+          recovery: workflowsEnvelope?.recovery ?? systemsEnvelope?.recovery,
+          resilience: workflowsEnvelope?.resilience ?? systemsEnvelope?.resilience,
+        },
       ),
       selectedWorkflowId,
       selectedSystemId,
@@ -337,11 +383,17 @@ function composeWorkflowSurface(input: ImageStudioPresenterComposeInput): ImageS
   }
 
   if (!workflows.some((entry) => entry.workflowId === selectedWorkflowId)) {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: "im.workflow.validation.selected-workflow-missing",
+      fallbackLayer: ImageStudioFailureMappingLayers.workflowConfiguration,
+    });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.workflow,
         "The selected edit is no longer available.",
         "Choose a different edit option.",
+        undefined,
+        classification,
       ),
       selectedWorkflowId,
       selectedSystemId,
@@ -383,6 +435,12 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
 
   if (!readiness.ready) {
     const blockingCount = readiness.issues.filter((issue) => issue.severity === "blocking").length;
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: blockingCount > 0
+        ? "im.readiness.validation.readiness-blocked"
+        : "im.readiness.operational.readiness-advisory",
+      fallbackLayer: ImageStudioFailureMappingLayers.runReadiness,
+    });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.readiness,
@@ -401,6 +459,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
             : "Workflow readiness has non-blocking advisories.",
           observedAt: readiness.assessedAtIso,
         }),
+        classification,
       ),
       assessedAtIso: readiness.assessedAtIso,
       issues,
@@ -408,6 +467,10 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
   }
 
   if (readiness.issues.length > 0) {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: "im.readiness.operational.readiness-advisory",
+      fallbackLayer: ImageStudioFailureMappingLayers.runReadiness,
+    });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.readiness,
@@ -420,6 +483,7 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
           summary: "Readiness allows execution with recommendations.",
           observedAt: readiness.assessedAtIso,
         }),
+        classification,
       ),
       assessedAtIso: readiness.assessedAtIso,
       issues,
@@ -468,6 +532,11 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
   }
 
   if (envelope?.state === "error") {
+    const classification = envelope.failureClassification
+      ?? mapImageStudioFailureCodeToClassification({
+        code: envelope.issueCode,
+        fallbackLayer: ImageStudioFailureMappingLayers.executionDispatch,
+      });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.run,
@@ -480,6 +549,8 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
           summary: "Run-monitoring updates are temporarily unavailable.",
           observedAt: activeRun.updatedAtIso,
         }),
+        classification,
+        envelope.recovery,
       ),
       activeRun,
       monitoring: envelope.data,
@@ -488,6 +559,12 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
   }
 
   if (activeRun.status === "failed" || activeRun.status === "cancelled") {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: activeRun.status === "failed"
+        ? "im.dispatch.operational.execution-failed"
+        : "im.dispatch.operational.execution-cancelled",
+      fallbackLayer: ImageStudioFailureMappingLayers.executionDispatch,
+    });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.run,
@@ -501,6 +578,7 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
           observedAt: activeRun.updatedAtIso,
           durability: ImageManipulationResilienceDurabilityClasses.unknown,
         }),
+        classification,
       ),
       activeRun,
       monitoring: envelope?.data,
@@ -539,6 +617,11 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
   }
 
   if (envelope?.state === "error") {
+    const classification = envelope.failureClassification
+      ?? mapImageStudioFailureCodeToClassification({
+        code: envelope.issueCode,
+        fallbackLayer: ImageStudioFailureMappingLayers.previewGeneration,
+      });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.results,
@@ -554,6 +637,8 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
             ?? "unknown",
           durability: ImageManipulationResilienceDurabilityClasses.temporary,
         }),
+        classification,
+        envelope.recovery,
       ),
       selectedResultId,
       cards,
@@ -587,6 +672,11 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
   }
 
   if (envelope?.state === "error") {
+    const classification = envelope.failureClassification
+      ?? mapImageStudioFailureCodeToClassification({
+        code: envelope.issueCode,
+        fallbackLayer: ImageStudioFailureMappingLayers.protectedRetrieval,
+      });
     return Object.freeze({
       state: degradedState(
         ImageStudioSurfaceTitles.continuation,
@@ -600,6 +690,8 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
           observedAt: input.interaction.authoritative.activeRun?.updatedAtIso ?? "unknown",
           durability: ImageManipulationResilienceDurabilityClasses.temporary,
         }),
+        classification,
+        envelope.recovery,
       ),
       continuationSessionId,
     });
@@ -782,12 +874,30 @@ function emptyState(title: string, description: string): ImageStudioSurfaceState
   });
 }
 
-function errorState(title: string, description: string): ImageStudioSurfaceStateViewModel {
+function errorState(
+  title: string,
+  description: string,
+  guidanceInput?: {
+    readonly classification?: ImageManipulationIssueClassification;
+    readonly recovery?: ImageManipulationRetryRecoveryContract;
+    readonly resilience?: ImageManipulationResilienceSnapshot;
+  },
+): ImageStudioSurfaceStateViewModel {
+  const guidance = deriveImageStudioOperationalGuidance({
+    classification: guidanceInput?.classification,
+    recovery: guidanceInput?.recovery,
+    fallbackSummary: description,
+  });
   return Object.freeze({
     kind: "error",
     title,
     description,
-    retryable: true,
+    retryable: guidance.canRetryNow,
+    messageKind: guidance.kind,
+    recommendedActions: guidance.recommendedActions,
+    recovery: guidanceInput?.recovery,
+    classification: guidanceInput?.classification,
+    resilience: guidanceInput?.resilience,
   });
 }
 
@@ -804,14 +914,27 @@ function degradedState(
   description: string,
   detail?: string,
   resilience?: ImageManipulationResilienceSnapshot,
+  classification?: ImageManipulationIssueClassification,
+  recovery?: ImageManipulationRetryRecoveryContract,
 ): ImageStudioSurfaceStateViewModel {
+  const resolvedRecovery = recovery ?? deriveImageManipulationRetryRecoveryContractFromResilienceSnapshot(resilience);
+  const guidance = deriveImageStudioOperationalGuidance({
+    recovery: resolvedRecovery,
+    classification,
+    fallbackSummary: detail ?? description,
+  });
   return Object.freeze({
     kind: "degraded",
     title,
     description,
     detail,
-    retryable: true,
-    recovery: deriveImageManipulationRetryRecoveryContractFromResilienceSnapshot(resilience),
+    retryable: guidance.canRetryNow,
+    messageKind: guidance.kind === ImageStudioOperationalMessageKinds.none
+      ? ImageStudioOperationalMessageKinds.waitAndRetryLater
+      : guidance.kind,
+    recommendedActions: guidance.recommendedActions,
+    recovery: resolvedRecovery,
+    classification,
     resilience,
   });
 }
