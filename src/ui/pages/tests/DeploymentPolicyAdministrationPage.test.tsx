@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import DeploymentPolicyAdministrationPage from "../DeploymentPolicyAdministrationPage";
+import DeploymentPolicyAdministrationPage, {
+  validateOverrideDraft,
+  validateProfileChangeDraft,
+} from "../DeploymentPolicyAdministrationPage";
 import type { IdentityAuthSessionStore } from "@ui/shared/identity/IdentityAuthSessionStore";
 
 describe("DeploymentPolicyAdministrationPage", () => {
@@ -59,5 +62,100 @@ describe("DeploymentPolicyAdministrationPage", () => {
     expect(html).toContain("Profile selector");
     expect(html).toContain("active (resolved)");
     expect(html).toContain("Desktop administration shell");
+    expect(html).toContain("Active profile administration");
+    expect(html).toContain("Policy override administration");
+    expect(html).toContain("Control support matrix");
+  });
+});
+
+describe("DeploymentPolicyAdministrationPage draft validation", () => {
+  it("requires confirmation and ticket reference for profile updates when policy requires ticket references", () => {
+    const notConfirmed = validateProfileChangeDraft({
+      draft: {
+        profileId: "home",
+        reason: "",
+        ticketReference: "CHG-1",
+        dryRun: true,
+        confirmed: false,
+      },
+      ticketReferenceRequired: true,
+    });
+    expect(notConfirmed.ok).toBeFalse();
+
+    const missingTicket = validateProfileChangeDraft({
+      draft: {
+        profileId: "home",
+        reason: "",
+        ticketReference: "",
+        dryRun: true,
+        confirmed: true,
+      },
+      ticketReferenceRequired: true,
+    });
+    expect(missingTicket.ok).toBeFalse();
+  });
+
+  it("validates typed override values and remove preconditions", () => {
+    const missingOverride = validateOverrideDraft({
+      draft: {
+        profileId: "home",
+        settingPath: "storage-governance.retentionDaysDefault",
+        operation: "remove",
+        valueText: "",
+        valueBoolean: "true",
+        reason: "",
+        ticketReference: "CHG-2",
+        dryRun: true,
+        confirmed: true,
+      },
+      selectedSetting: {
+        familyId: "storage-governance",
+        familyLabel: "Storage governance",
+        settingKey: "retentionDaysDefault",
+        description: "Retention days",
+        controlMode: "runtime-admin",
+        valueType: "number",
+        effectiveValue: 90,
+        effectiveValueDisplay: "90",
+        effectiveSource: "policy-default",
+        sourceLabel: "Policy default",
+        provenanceSummary: "none",
+        administrationStatus: "editable",
+        administrationStatusReason: "editable",
+      },
+      ticketReferenceRequired: true,
+    });
+    expect(missingOverride.ok).toBeFalse();
+
+    const invalidNumber = validateOverrideDraft({
+      draft: {
+        profileId: "home",
+        settingPath: "storage-governance.retentionDaysDefault",
+        operation: "upsert",
+        valueText: "abc",
+        valueBoolean: "true",
+        reason: "",
+        ticketReference: "CHG-2",
+        dryRun: true,
+        confirmed: true,
+      },
+      selectedSetting: {
+        familyId: "storage-governance",
+        familyLabel: "Storage governance",
+        settingKey: "retentionDaysDefault",
+        description: "Retention days",
+        controlMode: "runtime-admin",
+        valueType: "number",
+        effectiveValue: 90,
+        effectiveValueDisplay: "90",
+        effectiveSource: "policy-default",
+        sourceLabel: "Policy default",
+        provenanceSummary: "none",
+        administrationStatus: "editable",
+        administrationStatusReason: "editable",
+      },
+      ticketReferenceRequired: true,
+    });
+    expect(invalidNumber.ok).toBeFalse();
   });
 });

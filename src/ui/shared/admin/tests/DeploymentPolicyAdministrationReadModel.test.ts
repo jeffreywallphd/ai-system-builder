@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   buildDeploymentPolicyAdministrationInspectionReadModel,
+  toAdministrationStatusLabel,
   toControlModeLabel,
 } from "../DeploymentPolicyAdministrationReadModel";
 import {
@@ -29,12 +30,14 @@ describe("DeploymentPolicyAdministrationReadModel", () => {
     expect(overrideSetting?.effectiveSource).toBe(DeploymentPolicyResolutionSources.adminState);
     expect(overrideSetting?.sourceLabel).toBe("Admin override");
     expect(overrideSetting?.provenanceSummary).toContain("security-admin");
+    expect(overrideSetting?.administrationStatus).toBe("editable");
 
     const presetSetting = projected.policyGroups
       .flatMap((group) => group.settings)
       .find((setting) => setting.settingKey === "defaultSharingVisibility");
     expect(presetSetting?.effectiveSource).toBe(DeploymentPolicyResolutionSources.profilePreset);
     expect(presetSetting?.provenanceSummary).toContain("preset lineage");
+    expect(presetSetting?.administrationStatus).toBe("inspect-only");
 
     const defaultSetting = projected.policyGroups
       .flatMap((group) => group.settings)
@@ -47,6 +50,9 @@ describe("DeploymentPolicyAdministrationReadModel", () => {
     expect(toControlModeLabel(DeploymentPolicyControlModes.profileFixed)).toBe("Profile fixed");
     expect(toControlModeLabel(DeploymentPolicyControlModes.profileDefaultAdminOverridable)).toBe("Profile default (admin overridable)");
     expect(toControlModeLabel(DeploymentPolicyControlModes.runtimeAdmin)).toBe("Runtime admin");
+    expect(toAdministrationStatusLabel("editable")).toBe("Editable");
+    expect(toAdministrationStatusLabel("inspect-only")).toBe("Inspect only");
+    expect(toAdministrationStatusLabel("unsupported")).toBe("Unsupported");
   });
 });
 
