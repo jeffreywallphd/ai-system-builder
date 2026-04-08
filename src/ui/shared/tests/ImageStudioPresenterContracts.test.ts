@@ -211,6 +211,8 @@ describe("ImageStudioPresenterContracts", () => {
     expect(selectImageStudioSurfaceState(viewModel, "run").kind).toBe("degraded");
     expect(selectImageStudioSurfaceState(viewModel, "results").kind).toBe("degraded");
     expect(selectImageStudioSurfaceState(viewModel, "continuation").kind).toBe("empty");
+    expect(selectImageStudioSurfaceState(viewModel, "run").resilience?.state).toBe("temporarily-unavailable");
+    expect(selectImageStudioSurfaceState(viewModel, "results").resilience?.state).toBe("pending-recovery");
 
     const action = selectImageStudioPrimaryAction(viewModel);
     expect(action.actionId).toBe("review-progress");

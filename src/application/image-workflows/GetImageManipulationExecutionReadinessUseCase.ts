@@ -4,6 +4,14 @@ import {
   type ImageManipulationExecutionBackendCapabilities,
 } from "./ports";
 import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+  createImageManipulationResilienceCondition,
+  createImageManipulationResilienceSnapshot,
+  type ImageManipulationResilienceSnapshot,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
+import {
   ImageRunExecutionNodeSelectionOutcomes,
   type IImageRunExecutionNodeSelectionServicePort,
 } from "@application/nodes/ports/ExecutionNodeManagementPorts";
@@ -55,6 +63,7 @@ export interface ImageManipulationExecutionReadinessSummary {
   readonly message?: string;
   readonly capabilities: ImageManipulationExecutionBackendCapabilities;
   readonly nodeAvailability: ImageManipulationExecutionNodeAvailabilitySummary;
+  readonly resilience?: ImageManipulationResilienceSnapshot;
   readonly issues: ReadonlyArray<ImageManipulationExecutionReadinessIssue>;
   readonly diagnostics?: Readonly<Record<string, unknown>>;
 }
@@ -178,6 +187,12 @@ export class GetImageManipulationExecutionReadinessUseCase {
       message: status.message,
       capabilities: status.capabilities,
       nodeAvailability: nodeAvailability.summary,
+      resilience: this.buildResilienceSnapshot({
+        checkedAt: status.checkedAt,
+        backendHealth: status.health,
+        nodeAvailability: nodeAvailability.summary,
+        issues: Object.freeze(issues),
+      }),
       issues: Object.freeze(issues),
       diagnostics: status.diagnostics,
     });
@@ -187,9 +202,10 @@ export class GetImageManipulationExecutionReadinessUseCase {
     code: string,
     message: string,
   ): ImageManipulationExecutionReadinessSummary {
+    const nowIso = this.now().toISOString();
     return Object.freeze({
+      checkedAt: nowIso,
       backendFamily: DefaultBackendFamily,
-      checkedAt: this.now().toISOString(),
       readiness: ImageManipulationExecutionReadinessStates.unavailable,
       readyForExecution: false,
       message,
@@ -204,9 +220,20 @@ export class GetImageManipulationExecutionReadinessUseCase {
       }),
       nodeAvailability: this.buildNodeAvailability({
         state: ImageManipulationExecutionNodeAvailabilityStates.unknown,
-        checkedAt: this.now().toISOString(),
+        checkedAt: nowIso,
         reasonCode: code,
       }).summary,
+      resilience: createImageManipulationResilienceSnapshot({
+        observedAt: nowIso,
+        conditions: Object.freeze([createImageManipulationResilienceCondition({
+          code,
+          scope: ImageManipulationResilienceScopes.executionAvailability,
+          state: ImageManipulationResilienceStateKinds.unavailable,
+          summary: message,
+          observedAt: nowIso,
+          durability: ImageManipulationResilienceDurabilityClasses.unknown,
+        })]),
+      }),
       issues: Object.freeze([Object.freeze({
         code,
         severity: "error" as const,
@@ -371,6 +398,74 @@ export class GetImageManipulationExecutionReadinessUseCase {
         .slice(0, 5)
         .map(([code]) => code),
     );
+  }
+
+  private buildResilienceSnapshot(input: {
+    readonly checkedAt: string;
+    readonly backendHealth: "healthy" | "degraded" | "unavailable";
+    readonly nodeAvailability: ImageManipulationExecutionNodeAvailabilitySummary;
+    readonly issues: ReadonlyArray<ImageManipulationExecutionReadinessIssue>;
+  }): ImageManipulationResilienceSnapshot {
+    const conditions = new Map<string, ReturnType<typeof createImageManipulationResilienceCondition>>();
+
+    if (input.backendHealth === ImageManipulationExecutionBackendHealthStates.degraded) {
+      conditions.set("backend-degraded", createImageManipulationResilienceCondition({
+        code: "backend-degraded",
+        scope: ImageManipulationResilienceScopes.executionAvailability,
+        state: ImageManipulationResilienceStateKinds.degraded,
+        summary: "Backend is reachable but degraded.",
+        observedAt: input.checkedAt,
+        durability: ImageManipulationResilienceDurabilityClasses.temporary,
+      }));
+    } else if (input.backendHealth === ImageManipulationExecutionBackendHealthStates.unavailable) {
+      conditions.set("backend-unavailable", createImageManipulationResilienceCondition({
+        code: "backend-unavailable",
+        scope: ImageManipulationResilienceScopes.executionAvailability,
+        state: ImageManipulationResilienceStateKinds.unavailable,
+        summary: "Execution backend is unavailable.",
+        observedAt: input.checkedAt,
+      }));
+    }
+
+    if (input.nodeAvailability.state === ImageManipulationExecutionNodeAvailabilityStates.constrained) {
+      conditions.set("execution-node-no-eligible-match", createImageManipulationResilienceCondition({
+        code: "execution-node-no-eligible-match",
+        scope: ImageManipulationResilienceScopes.nodeEligibility,
+        state: ImageManipulationResilienceStateKinds.blocked,
+        summary: "Workflow is valid but no eligible execution node is currently routable.",
+        observedAt: input.checkedAt,
+        durability: ImageManipulationResilienceDurabilityClasses.temporary,
+      }));
+    } else if (input.nodeAvailability.state === ImageManipulationExecutionNodeAvailabilityStates.unavailable) {
+      conditions.set("execution-node-candidates-unavailable", createImageManipulationResilienceCondition({
+        code: "execution-node-candidates-unavailable",
+        scope: ImageManipulationResilienceScopes.nodeEligibility,
+        state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+        summary: "No execution-node candidates are available for this request right now.",
+        observedAt: input.checkedAt,
+        durability: ImageManipulationResilienceDurabilityClasses.temporary,
+      }));
+    }
+
+    for (const issue of input.issues) {
+      if (conditions.has(issue.code)) {
+        continue;
+      }
+      conditions.set(issue.code, createImageManipulationResilienceCondition({
+        code: issue.code,
+        scope: ImageManipulationResilienceScopes.executionAvailability,
+        state: issue.severity === "error"
+          ? ImageManipulationResilienceStateKinds.blocked
+          : ImageManipulationResilienceStateKinds.degraded,
+        summary: issue.message,
+        observedAt: input.checkedAt,
+      }));
+    }
+
+    return createImageManipulationResilienceSnapshot({
+      observedAt: input.checkedAt,
+      conditions: Object.freeze([...conditions.values()]),
+    });
   }
 }
 

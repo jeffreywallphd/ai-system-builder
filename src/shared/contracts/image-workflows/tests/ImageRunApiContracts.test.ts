@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  ImageRunReadinessStates,
   buildImageRunEventCursor,
   ImageRunSubmissionReadinessIssueCategories,
   ImageRunSubmissionReadinessIssueSeverities,
@@ -8,6 +9,7 @@ import {
   toListImageRunEventsQueryParams,
   toListImageRunsQueryParams,
 } from "../ImageRunApiContracts";
+import type { ImageRunSubmissionBackendReadinessDependencyDto } from "../ImageRunApiContracts";
 
 describe("ImageRunApiContracts", () => {
   it("serializes list-runs query params with repeated filter values", () => {
@@ -58,6 +60,39 @@ describe("ImageRunApiContracts", () => {
     expect(ImageRunSubmissionReadinessStates.blocked).toBe("blocked");
     expect(ImageRunSubmissionReadinessIssueCategories.policyDenial).toBe("policy-denial");
     expect(ImageRunSubmissionReadinessIssueSeverities.warning).toBe("warning");
+  });
+
+  it("keeps readiness contracts resilience-aware for API and presenter consumers", () => {
+    const backendDependency: ImageRunSubmissionBackendReadinessDependencyDto = {
+      adapterHealth: "degraded",
+      ready: true,
+      issues: [],
+      resilience: {
+        observedAt: "2026-04-08T12:30:00.000Z",
+        state: "degraded",
+        usable: true,
+        partiallyUsable: true,
+        conditions: [{
+          code: "backend-degraded",
+          scope: "execution-availability",
+          state: "degraded",
+          summary: "Backend is reachable but degraded.",
+          observedAt: "2026-04-08T12:30:00.000Z",
+          durability: "temporary",
+          recovery: {
+            kind: "retry",
+            retryable: true,
+            blocking: false,
+          },
+        }],
+        degradedConditions: [],
+        blockedConditions: [],
+        unavailableConditions: [],
+      },
+    };
+
+    expect(ImageRunReadinessStates.degraded).toBe("degraded");
+    expect(backendDependency.resilience?.state).toBe("degraded");
   });
 });
 
