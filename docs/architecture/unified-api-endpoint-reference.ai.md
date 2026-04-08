@@ -34,6 +34,7 @@
 - `storage-management` -> `/api/v1/storage/*` (authenticated + workspace policy enforcement)
 - `asset-management` -> `/api/v1/assets/*` (authenticated + workspace/visibility checks)
 - `image-asset-management` -> `/api/v1/image-assets*` (authenticated + workspace-scoped ingestion, metadata, and protected original-content retrieval; no direct public file-url bypasses)
+- `image-run-api` -> `/api/v1/image-systems/:systemId/runs`, `/api/v1/image-runs*` (authenticated + workspace-scoped authoritative image run submission, list/detail monitoring, and cancellation; delegates to run orchestration control-plane APIs)
 - `system-runtime` -> `/api/v1/runtime/*` + `/ws` realtime (authenticated + workspace/topic policy checks)
   - includes authoritative execution readiness read:
     - `GET /api/v1/runtime/execution/readiness`

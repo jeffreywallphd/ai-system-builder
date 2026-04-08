@@ -250,6 +250,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedRouteFamilyIds).toContain("run-submission");
     expect(observedRouteFamilyIds).toContain("run-read");
     expect(observedRouteFamilyIds).toContain("run-mutation");
+    expect(observedRouteFamilyIds).toContain("image-run-api");
     expect(observedRouteFamilyIds).toContain("run-execution-update");
     await runtime.stop();
   });

@@ -27,6 +27,7 @@ export const AuthoritativeServerRequiredRouteFamilyIds = Object.freeze([
   "run-submission",
   "run-read",
   "run-mutation",
+  "image-run-api",
   "run-execution-update",
 ]);
 

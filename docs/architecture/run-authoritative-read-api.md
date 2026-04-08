@@ -39,6 +39,9 @@ Authoritative run read routes:
   - Canonical lifecycle/status envelope read.
 - `GET /api/v1/runtime/queue`
   - Canonical operational queue visibility read projection for run-control surfaces.
+- Image-monitoring aliases backed by the same authoritative query use cases:
+  - `GET /api/v1/image-runs`
+  - `GET /api/v1/image-runs/:runId`
 
 Shared run transport contracts now include:
 
@@ -90,6 +93,7 @@ Authoritative server required route-family coverage now includes `run-read`.
   - `src/infrastructure/api/runs/tests/AuthoritativeRunQueryBackendApi.test.ts`
 - HTTP transport:
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunReadApi.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageRunAuthoritativeApi.test.ts`
 - Shared contracts/schemas:
   - `src/shared/contracts/runtime/tests/RunOrchestrationTransportContracts.test.ts`
   - `src/shared/schemas/runtime/tests/RunOrchestrationTransportSchemaContracts.test.ts`

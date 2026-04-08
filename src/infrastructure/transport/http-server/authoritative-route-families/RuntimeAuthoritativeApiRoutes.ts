@@ -66,3 +66,18 @@ export const RunExecutionUpdateAuthoritativeApiRouteFamily = Object.freeze({
     AuthoritativeApiRouteBackendKeys.runExecutionUpdate,
   ]),
 }) satisfies AuthoritativeApiRouteFamilyRegistration;
+
+export const ImageRunAuthoritativeApiRouteFamily = Object.freeze({
+  routeFamilyId: "image-run-api",
+  domain: AuthoritativeApiRouteDomains.runtime,
+  description: "Authoritative image-run submission, query/list, and cancellation endpoints.",
+  routePrefixes: Object.freeze([
+    "/api/v1/image-systems",
+    "/api/v1/image-runs",
+  ]),
+  requiredBackendKeys: Object.freeze([
+    AuthoritativeApiRouteBackendKeys.runSubmission,
+    AuthoritativeApiRouteBackendKeys.runRead,
+    AuthoritativeApiRouteBackendKeys.runMutation,
+  ]),
+}) satisfies AuthoritativeApiRouteFamilyRegistration;

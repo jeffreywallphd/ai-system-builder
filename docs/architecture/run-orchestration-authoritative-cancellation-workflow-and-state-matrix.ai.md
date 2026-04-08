@@ -17,6 +17,9 @@ Story 16.3.1 implements authoritative cancellation behavior for queued and in-fl
   - `src/infrastructure/api/runs/AuthoritativeRunMutationBackendApi.ts`
 - Identity HTTP cancellation route:
   - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+  - runtime + image-run aliases:
+    - `POST /api/v1/runtime/runs/:runId/cancel`
+    - `POST /api/v1/image-runs/:runId/cancel`
 - Host composition wiring:
   - `src/hosts/server/IdentityServerHost.ts`
 
