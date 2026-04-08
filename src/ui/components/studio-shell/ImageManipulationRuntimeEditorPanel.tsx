@@ -426,6 +426,80 @@ export function resolveRunTransitionMessage(input: {
   return undefined;
 }
 
+export interface ImageSliceRefreshNeededState {
+  readonly title: string;
+  readonly message: string;
+}
+
+export function resolveRefreshNeededState(input: {
+  readonly isLoadingCollections: boolean;
+  readonly isLoadingRunHistory: boolean;
+  readonly isCheckingExecutionReadiness: boolean;
+  readonly hasCollectionLoadError: boolean;
+  readonly runHistoryError?: string;
+  readonly executionReadinessError?: string;
+  readonly recentImageAssetsError?: string;
+  readonly recentSystemsError?: string;
+  readonly imageLibraryError?: string;
+}): ImageSliceRefreshNeededState | undefined {
+  if (input.isLoadingCollections || input.isLoadingRunHistory || input.isCheckingExecutionReadiness) {
+    return undefined;
+  }
+
+  const hasAnyRefreshIssue = input.hasCollectionLoadError
+    || Boolean(input.runHistoryError)
+    || Boolean(input.executionReadinessError)
+    || Boolean(input.recentImageAssetsError)
+    || Boolean(input.recentSystemsError)
+    || Boolean(input.imageLibraryError);
+
+  if (!hasAnyRefreshIssue) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    title: "Refresh recommended",
+    message: "Some workspace data is partially unavailable. Refresh readiness and review context to restore authoritative state.",
+  });
+}
+
+export interface ImageResultReviewNotice {
+  readonly title: string;
+  readonly message: string;
+  readonly tone: "neutral" | "warning";
+}
+
+export function resolveResultReviewNotice(input: {
+  readonly runLifecycleState: ImageManipulationRunLifecycleSnapshot["state"];
+  readonly selectedOutputRecordId?: string;
+  readonly outputItemCount: number;
+  readonly outputLoadError?: string;
+  readonly isLoadingOutputs: boolean;
+  readonly isRefreshingReview: boolean;
+}): ImageResultReviewNotice | undefined {
+  if (input.isLoadingOutputs || input.isRefreshingReview) {
+    return undefined;
+  }
+
+  if (input.runLifecycleState === "completed" && !input.selectedOutputRecordId && input.outputItemCount < 1) {
+    return Object.freeze({
+      title: "Preview pending",
+      message: "Execution completed, but result previews are still catching up. Wait or refresh review.",
+      tone: "warning",
+    });
+  }
+
+  if (input.runLifecycleState === "completed" && Boolean(input.outputLoadError)) {
+    return Object.freeze({
+      title: "Results partially available",
+      message: "Run completion is recorded, but some result previews are unavailable right now. Refresh review to retry retrieval.",
+      tone: "warning",
+    });
+  }
+
+  return undefined;
+}
+
 function resolveHistoryRunBadgeTone(
   status: ImageRunHistoryRecord["status"] | undefined,
 ): "neutral" | "success" | "warning" | "danger" {
@@ -1554,12 +1628,31 @@ export function ImageManipulationRuntimeEditorPanel({
     isPersistingRunResult,
     isRefreshingAfterRun,
   });
+  const refreshNeededState = resolveRefreshNeededState({
+    isLoadingCollections: isLoadingSources || isLoadingOutputs || isLoadingReferences,
+    isLoadingRunHistory,
+    isCheckingExecutionReadiness,
+    hasCollectionLoadError,
+    runHistoryError,
+    executionReadinessError,
+    recentImageAssetsError,
+    recentSystemsError,
+    imageLibraryError,
+  });
   const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
   const runProgress = useMemo(() => buildRunProgressSnapshot(activeRunStatus), [activeRunStatus]);
   const selectionConfirmationMessage = useMemo(() => resolveSelectionConfirmationMessage({
     selectedSourceItem,
     selectedReferenceItem,
   }), [selectedReferenceItem, selectedSourceItem]);
+  const resultReviewNotice = resolveResultReviewNotice({
+    runLifecycleState: runLifecycle.state,
+    selectedOutputRecordId: selectedOutputItem?.image.recordId,
+    outputItemCount: outputItems.length,
+    outputLoadError,
+    isLoadingOutputs,
+    isRefreshingReview,
+  });
   const session = useMemo(() => authSessionStore.getSession(), [authSessionStore]);
   const actorUserIdentityId = session?.userIdentityId;
   const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.initialCapabilityState?.workspaceId;
@@ -2719,6 +2812,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
   const handleFailureRecoveryAction = async (actionId: ImageRunFailureRecoveryActionId): Promise<void> => {
     if (actionId === ImageRunFailureRecoveryActionIds.retryLaunch) {
+      setStatusMessage("Retrying launch with the latest authoritative setup.");
       await startImageCreationRun();
       return;
     }
@@ -2773,6 +2867,14 @@ export function ImageManipulationRuntimeEditorPanel({
           loading
         />
       ) : null}
+      {!isHydrating && persistedSession ? (
+        <ImageStatusNotice
+          title="Session restored"
+          message={(isLoadingSources || isLoadingOutputs || isLoadingReferences || isLoadingRunHistory)
+            ? "Previous selections were restored. Authoritative collections are still refreshing."
+            : "Previous selections and settings were restored from your last runtime session."}
+        />
+      ) : null}
       {!isHydrating && collectionLoadingMessage ? (
         <ImageStatusNotice
           title="Refreshing image collections"
@@ -2786,6 +2888,25 @@ export function ImageManipulationRuntimeEditorPanel({
           message="You can keep editing settings and try loading images again from the browser tabs."
           tone="warning"
         />
+      ) : null}
+      {refreshNeededState ? (
+        <section className="ui-row ui-row--xs ui-row--middle">
+          <ImageStatusNotice
+            title={refreshNeededState.title}
+            message={refreshNeededState.message}
+            tone="warning"
+          />
+          <button
+            type="button"
+            className="ui-button ui-button--ghost ui-button--sm"
+            disabled={isRefreshingReview || isCheckingExecutionReadiness}
+            onClick={() => {
+              void refreshRecoveryContext();
+            }}
+          >
+            {isRefreshingReview || isCheckingExecutionReadiness ? "Refreshing..." : "Refresh now"}
+          </button>
+        </section>
       ) : null}
       <div className="ui-image-editor-page__layout">
         <aside className="ui-image-editor-page__left-column ui-stack ui-stack--sm" aria-label="Preparation and run controls">
@@ -3591,6 +3712,13 @@ export function ImageManipulationRuntimeEditorPanel({
                 </span>
               </div>
             </header>
+            {resultReviewNotice ? (
+              <ImageStatusNotice
+                title={resultReviewNotice.title}
+                message={resultReviewNotice.message}
+                tone={resultReviewNotice.tone}
+              />
+            ) : null}
             {!selectedOutputItem ? (
               <ImageStatusNotice
                 title="No result selected"

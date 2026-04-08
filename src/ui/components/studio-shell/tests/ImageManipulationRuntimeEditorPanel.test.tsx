@@ -14,6 +14,8 @@ import ImageManipulationRuntimeEditorPanel, {
   resolveGalleryLoadingMessage,
   resolvePreviewLoadingMessage,
   resolveReusableRunOutputForRecovery,
+  resolveRefreshNeededState,
+  resolveResultReviewNotice,
   resolveRunTransitionMessage,
   resolveRunHistorySummary,
   resolveRunOutputRecordId,
@@ -146,6 +148,45 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
       isPersistingRunResult: false,
       isRefreshingAfterRun: false,
     })).toContain("Retrieving");
+  });
+
+  it("flags refresh-needed state only when authoritative surfaces are no longer actively loading", () => {
+    expect(resolveRefreshNeededState({
+      isLoadingCollections: true,
+      isLoadingRunHistory: false,
+      isCheckingExecutionReadiness: false,
+      hasCollectionLoadError: true,
+    })).toBeUndefined();
+
+    const state = resolveRefreshNeededState({
+      isLoadingCollections: false,
+      isLoadingRunHistory: false,
+      isCheckingExecutionReadiness: false,
+      hasCollectionLoadError: true,
+    });
+    expect(state?.title).toBe("Refresh recommended");
+    expect(state?.message).toContain("partially unavailable");
+  });
+
+  it("surfaces preview-pending and partial-result review notices from authoritative lifecycle state", () => {
+    const pending = resolveResultReviewNotice({
+      runLifecycleState: "completed",
+      selectedOutputRecordId: undefined,
+      outputItemCount: 0,
+      isLoadingOutputs: false,
+      isRefreshingReview: false,
+    });
+    expect(pending?.title).toBe("Preview pending");
+
+    const partial = resolveResultReviewNotice({
+      runLifecycleState: "completed",
+      selectedOutputRecordId: undefined,
+      outputItemCount: 0,
+      outputLoadError: "Unavailable",
+      isLoadingOutputs: false,
+      isRefreshingReview: false,
+    });
+    expect(partial?.title).toBe("Results partially available");
   });
 
   it("groups recent assets into continuity windows for rediscovery", () => {
