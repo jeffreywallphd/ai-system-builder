@@ -33,3 +33,8 @@ Story 20.2.8 documents the authoritative end-to-end baseline for deployment-poli
 - First-scope governance payloads intentionally avoid raw override values.
 - Supported write scope kind is currently `deployment-policy-scope`.
 - Default startup scope remains `platform:default` unless host composition config overrides it.
+
+## Story 20.3.7 continuity note
+
+- Final lifecycle hardening coverage now runs through `src/application/policy-administration/tests/DeploymentPolicyAdministrationRegressionLifecycle.integration.test.ts`.
+- That suite guards bootstrap/read/write/evaluation/permission/audit/observability continuity across the implemented policy stack.

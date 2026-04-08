@@ -157,6 +157,20 @@ Current limits:
 - supported mutation scope kind remains `deployment-policy-scope`,
 - startup bootstrap currently resolves one canonical scope by default (`platform:default`) unless host wiring overrides scope configuration.
 
+## Story 20.3.7 regression-hardening continuity
+
+This baseline is carried forward by the final regression-hardening suite in:
+
+- `src/application/policy-administration/tests/DeploymentPolicyAdministrationRegressionLifecycle.integration.test.ts`
+
+That suite verifies cross-layer continuity for:
+
+- bootstrap fallback + persisted-profile activation semantics,
+- authoritative read/write contract pathways and provenance handling,
+- evaluation seam consumption for dependent feature behavior,
+- permission-safe runtime-admin mutation rejection,
+- governance-event redaction posture and observability signal publication.
+
 ## Related focused architecture notes
 
 - `docs/architecture/deployment-profile-policy-persistence-and-repositories.md`

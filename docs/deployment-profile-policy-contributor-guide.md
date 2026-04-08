@@ -22,6 +22,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 - `docs/architecture/deployment-profile-policy-evolution-seams-and-neutrality-safeguards.md`
+- `docs/architecture/deployment-profile-policy-regression-hardening-baseline.md`
 
 ## Required implementation path
 
@@ -185,3 +186,9 @@ Current limits that should remain explicit in feature work:
 4. Are shared DTO/schema contracts updated when payload shape changed?
 5. Are `.md` and `.ai.md` docs updated together?
 6. Are domain/application/policy-administration tests updated for new policy behavior?
+
+## Story 20.3.7 regression hardening baseline
+
+- Treat `src/application/policy-administration/tests/DeploymentPolicyAdministrationRegressionLifecycle.integration.test.ts` as the cross-layer regression guard for final policy lifecycle behavior.
+- Keep this regression coverage representative across bootstrap resolution, authoritative read/write flows, dependent-feature evaluation seams, permission rejection behavior, governance event redaction, and observability publication.
+- Keep `docs/architecture/deployment-profile-policy-regression-hardening-baseline.md` and `.ai.md` updated as scope expands; explicitly maintain deferred edges rather than implying unimplemented governance behavior.
