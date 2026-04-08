@@ -14,6 +14,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
 - `docs/architecture/image-manipulation-comfyui-transport-client.md`
 
 ## Operational behavior
@@ -101,3 +102,26 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
 - Sensitive connection details stay in server-side env/config composition and are not pushed into UI code.
 - Safe config snapshots expose `hasAuthToken` only, not token values.
 - Transport requests can include auth token as bearer header without changing application contracts.
+
+## Story 3.2.5 translation and dispatch integration coverage
+
+### Added behavior
+
+- Added end-to-end infrastructure integration coverage at
+  `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
+  for translation output handoff into concrete Comfy dispatch transport.
+
+### Scenarios covered
+
+- Supported template set translates and dispatches successfully through:
+  `ComfyImageManipulationTemplateTranslationAdapter` ->
+  `ComfyUiRunExecutionDispatchAdapter` ->
+  `ComfyUiRunExecutionTransportGateway` ->
+  `ComfyUiTransportClient`.
+- Invalid translation mapping emits blocking diagnostics and short-circuits dispatch.
+- Backend unavailable submission normalizes to `ComfyUiTransportClientError` (`transport-unavailable`).
+- Malformed backend submission response normalizes to `ComfyUiTransportClientError` (`invalid-response`).
+
+### Boundary posture preserved
+
+- Application/domain remain unaware of raw Comfy payload internals; integration assertions verify dispatch receipts stay normalized and do not surface prompt-graph payload data.

@@ -10,6 +10,7 @@ Story 3.2.1 adds the concrete infrastructure translation adapter that maps suppo
 - `src/infrastructure/comfyui/execution/mappers/ComfyImageManipulationTemplateTranslationAdapter.ts`
 - `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.test.ts`
 - `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.integration.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
 - `docs/architecture/image-manipulation-comfyui-template-translation-mappings.md`
 
 ## Mapping summary
@@ -31,3 +32,14 @@ Unsupported or invalid mappings return failed translation results with blocking 
 - Input remains authoritative Feature 2 workflow/system translation data.
 - Comfy payload assembly remains infrastructure-only.
 - Result payload includes Comfy-ready request content in `executionPayload.inputs["comfy.request"]` without making Comfy DTOs authoritative product records.
+
+## Story 3.2.5 update
+
+- Added integrated translation+dispatch regression coverage in
+  `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`.
+- New controlled scenarios validate:
+  - successful translation and dispatch for the supported template set,
+  - unsupported template diagnostics and dispatch short-circuit behavior,
+  - backend-unavailable normalization (`transport-unavailable`),
+  - malformed submission-response normalization (`invalid-response`).
+- Coverage remains backend-state controlled by using mocked transport responses and does not depend on an external Comfy runtime.

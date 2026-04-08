@@ -15,6 +15,7 @@ This note documents Story 3.2.2 for Feature 3 / Epic 3.2:
 - `src/infrastructure/execution/tests/ComfyUiTransportClient.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
 
 ## Transport scope
 
@@ -108,3 +109,25 @@ Adapter dependency and configuration management now has an explicit composition 
 - Adapter auth token is consumed from server environment configuration only.
 - Safe config snapshots expose `hasAuthToken` boolean instead of token value.
 - Transport logging remains bounded to operational metadata and does not include credential payloads.
+
+## Story 3.2.5 translation-dispatch integration hardening
+
+Added controlled integration coverage for the concrete translation and dispatch path:
+
+1. Supported template translation + dispatch success
+- Confirms supported template translation outputs can be dispatched through
+  `ComfyUiRunExecutionDispatchAdapter -> ComfyUiRunExecutionTransportGateway -> ComfyUiTransportClient`.
+- Verifies submission payload shape at the transport boundary remains bounded (`client_id`, `prompt` only).
+
+2. Invalid mapping behavior
+- Confirms unsupported template translation fails with blocking diagnostics.
+- Confirms failed translation does not dispatch to transport.
+
+3. Backend unavailable behavior
+- Confirms dispatch normalizes unavailable backend failures as typed `ComfyUiTransportClientError` with `transport-unavailable`.
+
+4. Malformed backend response behavior
+- Confirms malformed prompt-submission responses normalize as `invalid-response`.
+
+These checks are implemented in:
+- `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
