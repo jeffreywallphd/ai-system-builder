@@ -6,6 +6,7 @@ This note documents Story 2.2.1 through Story 2.2.5 for Feature 2 / Epic 2.2:
 - application-layer create/update authoring use cases for authoritative image workflow definitions (Story 2.2.3)
 - application-layer create/update authoring use cases for authoritative image system definitions (Story 2.2.4)
 - application-layer query/list use cases for authoritative workflow/system discovery and reopen flows (Story 2.2.5)
+- reusable readiness validation services for consistent workflow/system readiness evaluation across authoring and query/list flows (Story 2.2.6)
 
 ## Purpose
 
@@ -43,10 +44,12 @@ The contract layer in this story focuses on:
 - `src/application/image-workflows/ImageWorkflowSystemQueryContracts.ts`
 - `src/application/image-workflows/ImageWorkflowSystemQueryErrors.ts`
 - `src/application/image-workflows/ImageWorkflowSystemQueryShared.ts`
+- `src/application/image-workflows/ImageWorkflowSystemReadinessValidationService.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
 - `src/application/image-workflows/tests/ImageSystemDefinitionAuthoringUseCases.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemQueryUseCases.test.ts`
+- `src/application/image-workflows/tests/ImageWorkflowSystemReadinessValidationService.test.ts`
 
 ## Scope and boundary rules
 
@@ -185,6 +188,31 @@ These use cases enforce query-time guardrails:
 List queries support workspace-scoped filters for ownership, visibility, lifecycle/runtime status, operation kinds, workflow lineage/version selectors, sharing policy, and tags, with bounded pagination and optional search matching over stable definition metadata.
 
 This keeps discovery and reopen paths anchored to authoritative API/application metadata instead of cached studio-only assumptions.
+
+## Story 2.2.6 readiness validation services
+
+Story 2.2.6 introduces a reusable application service:
+
+- `ImageWorkflowSystemReadinessValidationService`
+
+The service centralizes readiness and validation behavior for both resources:
+
+- workflow readiness/structure evaluation (complete vs incomplete posture),
+- system readiness/structure evaluation (including runnable posture),
+- aggregated authoring assessments that unify:
+  - readiness issues,
+  - validation issues,
+  - workflow/system compatibility issues,
+  - workflow-binding reference issues.
+
+Assessment output keeps machine-readable issue codes and adds user-facing summaries/classification so API/UI layers can distinguish:
+
+- draft
+- incomplete
+- valid
+- runnable
+
+Authoring use cases and query contracts now reuse this service so readiness semantics stay consistent and incomplete/invalid definitions are surfaced before later run-submission and execution orchestration layers consume the definitions.
 
 ## Downstream integration guidance
 

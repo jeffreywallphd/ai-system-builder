@@ -1,7 +1,5 @@
 import {
   ImageWorkflowCategories,
-  ImageWorkflowLifecycleStates,
-  evaluateImageWorkflowDefinitionCompleteness,
   isImageWorkflowLifecycleTransitionAllowed,
   type ImageWorkflowDefinition,
 } from "@domain/image-workflows/ImageWorkflowDomain";
@@ -10,12 +8,10 @@ import {
   ImageWorkflowBindingContractError,
 } from "@shared/contracts/image-workflows/ImageWorkflowBindingContracts";
 import type {
-  ImageDefinitionValidationIssue,
   ImageDefinitionValidationResult,
   IImageWorkflowDefinitionValidationService,
 } from "./ports";
 import {
-  ImageDefinitionValidationSeverities,
   ImageWorkflowSystemAuthorizationResourceKinds,
   ImageWorkflowSystemPermissionActions,
   type IImageWorkflowSystemAuthorizationPort,
@@ -23,7 +19,6 @@ import {
   type ImageWorkflowSystemMutationContext,
 } from "./ports";
 import {
-  ImageWorkflowDefinitionReadinessStates,
   type ImageWorkflowDefinitionReadinessSummary,
   type ImageWorkflowDefinitionStructureSummary,
 } from "./ImageWorkflowDefinitionAuthoringContracts";
@@ -31,6 +26,7 @@ import {
   ImageWorkflowDefinitionAuthoringError,
   ImageWorkflowDefinitionAuthoringErrorCodes,
 } from "./ImageWorkflowDefinitionAuthoringErrors";
+import { ImageWorkflowSystemReadinessValidationService } from "./ImageWorkflowSystemReadinessValidationService";
 
 interface BuildMutationContextInput {
   readonly operationKey?: string;
@@ -145,44 +141,40 @@ export async function assertWorkflowDefinitionReadyForPersistence(input: {
   readonly validation: ImageDefinitionValidationResult;
   readonly structure: ImageWorkflowDefinitionStructureSummary;
 }> {
+  const readinessService = new ImageWorkflowSystemReadinessValidationService();
   assertBindingContractCompatibility(input.workflow);
 
-  const completenessIssues = evaluateImageWorkflowDefinitionCompleteness(input.workflow);
-  const readiness = createReadinessSummary({
-    completenessIssues,
-    occurredAt: new Date().toISOString(),
+  const assessment = await readinessService.evaluateWorkflowAuthoring({
+    workspaceId: input.workspaceId,
+    workflow: input.workflow,
+    validationService: input.validationService,
   });
 
-  if (!readiness.ready) {
+  if (!assessment.readiness.ready) {
     throw new ImageWorkflowDefinitionAuthoringError(
       ImageWorkflowDefinitionAuthoringErrorCodes.incomplete,
       "Image workflow definition is incomplete and cannot be persisted.",
       Object.freeze({
-        completenessIssues,
+        completenessIssues: assessment.readiness.completenessIssues,
+        issues: assessment.issues,
       }),
     );
   }
 
-  const validation = await input.validationService.validateWorkflowDefinition({
-    workspaceId: input.workspaceId,
-    workflow: input.workflow,
-    mode: input.workflow.lifecycleState === ImageWorkflowLifecycleStates.published ? "publish" : "authoring",
-  });
-
-  if (!validation.valid || hasErrorSeverity(validation.issues)) {
+  if (assessment.blocking) {
     throw new ImageWorkflowDefinitionAuthoringError(
       ImageWorkflowDefinitionAuthoringErrorCodes.validationFailed,
       "Image workflow definition failed authoring validation.",
       Object.freeze({
-        issues: validation.issues,
+        issues: assessment.issues,
       }),
     );
   }
 
   return Object.freeze({
-    readiness,
-    validation,
-    structure: buildStructureSummary(input.workflow),
+    readiness: assessment.readiness,
+    validation: assessment.validation,
+    structure: assessment.structure,
   });
 }
 
@@ -225,10 +217,6 @@ export function assertWorkflowCategorySupported(workflow: ImageWorkflowDefinitio
       `Image workflow category '${workflow.category}' is not supported for image workflow authoring use cases.`,
     );
   }
-}
-
-function hasErrorSeverity(issues: ReadonlyArray<ImageDefinitionValidationIssue>): boolean {
-  return issues.some((issue) => issue.severity === ImageDefinitionValidationSeverities.error);
 }
 
 function parseTimestamp(value: Date | string | undefined, field: string): Date {
@@ -314,54 +302,4 @@ function toOutputSlotPurpose(value: ImageWorkflowDefinition["outputExpectations"
     return "generated-image-collection";
   }
   return "metadata";
-}
-
-function createReadinessSummary(input: {
-  readonly completenessIssues: ReturnType<typeof evaluateImageWorkflowDefinitionCompleteness>;
-  readonly occurredAt: string;
-}): ImageWorkflowDefinitionReadinessSummary {
-  if (input.completenessIssues.length === 0) {
-    return Object.freeze({
-      state: ImageWorkflowDefinitionReadinessStates.definitionReady,
-      ready: true,
-      evaluatedAt: input.occurredAt,
-      completenessIssues: input.completenessIssues,
-    });
-  }
-
-  return Object.freeze({
-    state: ImageWorkflowDefinitionReadinessStates.definitionIncomplete,
-    ready: false,
-    evaluatedAt: input.occurredAt,
-    completenessIssues: input.completenessIssues,
-  });
-}
-
-function buildStructureSummary(workflow: ImageWorkflowDefinition): ImageWorkflowDefinitionStructureSummary {
-  return Object.freeze({
-    inputSlots: Object.freeze({
-      total: workflow.inputSlots.length,
-      required: workflow.inputSlots.filter((slot) => slot.required).length,
-    }),
-    parameters: Object.freeze({
-      total: workflow.parameterSpecifications.length,
-      required: workflow.parameterSpecifications.filter((parameter) => parameter.required).length,
-    }),
-    outputExpectations: Object.freeze({
-      total: workflow.outputExpectations.length,
-      required: workflow.outputExpectations.filter((output) => output.required).length,
-    }),
-    bindings: Object.freeze({
-      input: workflow.inputBindings.length,
-      output: workflow.outputBindings.length,
-    }),
-    backendTranslation: Object.freeze({
-      translatorId: workflow.backendTranslation.translatorId,
-      templateId: workflow.backendTranslation.templateId,
-      contractVersion: workflow.backendTranslation.contractVersion,
-      inputBindings: workflow.backendTranslation.inputBindings.length,
-      parameterBindings: workflow.backendTranslation.parameterBindings.length,
-      outputBindings: workflow.backendTranslation.outputBindings.length,
-    }),
-  });
 }

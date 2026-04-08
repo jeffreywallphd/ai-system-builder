@@ -396,6 +396,8 @@ describe("image workflow definition authoring use cases", () => {
 
     expect(result.workflow.workflowId).toBe("workflow-alpha-v1");
     expect(result.readiness.ready).toBeTrue();
+    expect(result.readiness.classification).toBe("draft");
+    expect(result.readiness.summary.length).toBeGreaterThan(0);
     expect(result.validation.valid).toBeTrue();
     expect(result.structure.inputSlots.total).toBe(1);
     expect(result.structure.parameters.required).toBe(1);
