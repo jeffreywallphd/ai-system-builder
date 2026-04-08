@@ -97,6 +97,9 @@ describe("SurfaceRouteAccessPolicy", () => {
     expect(
       isRoutePathAccessibleForSession(ROUTE_PATHS.securityPolicy, session, { strict: true }),
     ).toBeFalse();
+    expect(
+      isRoutePathAccessibleForSession(ROUTE_PATHS.deploymentPolicyAdmin, session, { strict: true }),
+    ).toBeFalse();
   });
 
   it("keeps desktop admin routes unavailable without workspace context", () => {

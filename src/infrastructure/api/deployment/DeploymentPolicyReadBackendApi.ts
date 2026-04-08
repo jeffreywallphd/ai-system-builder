@@ -1,4 +1,7 @@
-import type { ReadDeploymentPolicyAdministrationUseCase } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
+import {
+  ReadDeploymentPolicyAdministrationPermissionError,
+  type ReadDeploymentPolicyAdministrationUseCase,
+} from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { SharedApiErrorCodes, type SharedApiResponseEnvelope } from "@shared/contracts/api/SharedApiContractPrimitives";
 import type { ReadDeploymentPolicyStateResponse } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
 import { DeploymentPolicyPersistenceScopeKinds } from "@shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos";
@@ -57,6 +60,15 @@ export class DeploymentPolicyReadBackendApi {
         data: result,
       });
     } catch (error) {
+      if (error instanceof ReadDeploymentPolicyAdministrationPermissionError) {
+        return Object.freeze({
+          ok: false,
+          error: Object.freeze({
+            code: SharedApiErrorCodes.forbidden,
+            message: error.reason ?? error.message,
+          }),
+        });
+      }
       const message = error instanceof Error ? error.message : "Unknown deployment policy read failure.";
       return Object.freeze({
         ok: false,

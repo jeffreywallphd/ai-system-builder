@@ -94,12 +94,20 @@ export interface ReadDeploymentPolicyStateRequest {
 
 export interface ReadDeploymentPolicyStateResponse {
   readonly scope: DeploymentPolicyPersistenceScope;
+  readonly authorization: ReadDeploymentPolicyAuthorization;
   readonly activeProfile: DeploymentPolicyActiveProfileReadModel;
   readonly snapshot: DeploymentPolicyAdministrationSnapshot;
   readonly validation: DeploymentPolicyValidationOutcome;
   readonly overrideRecords?: ReadonlyArray<DeploymentPolicyOverridePersistenceRecord>;
   readonly effectiveMetadata?: DeploymentPolicyEffectiveMetadataRecord;
   readonly catalog?: DeploymentPolicyCatalogReadModel;
+}
+
+export interface ReadDeploymentPolicyAuthorization {
+  readonly canReadState: boolean;
+  readonly canSelectActiveProfile: boolean;
+  readonly canManageOverrides: boolean;
+  readonly canManageRuntimeAdminOverrides: boolean;
 }
 
 export function toDeploymentPolicyFamilyMetadataReadModel(

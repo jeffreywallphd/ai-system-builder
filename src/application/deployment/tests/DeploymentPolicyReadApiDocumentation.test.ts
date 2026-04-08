@@ -35,6 +35,7 @@ describe("deployment profile policy authoritative read api documentation", () =>
     expect(doc).toContain("DeploymentPolicyReadBackendApi.ts");
     expect(doc).toContain("DeploymentAuthoritativeApiRoutes.ts");
     expect(doc).toContain("/api/v1/deployment/policy/state");
+    expect(doc).toContain("deployment-policy.state.read");
   });
 
   it("keeps architecture docs discoverable for authoritative read APIs", () => {

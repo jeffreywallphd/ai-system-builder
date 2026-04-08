@@ -10,6 +10,8 @@
 
 Provide production administration workflows that let authorized admins safely mutate supported deployment-profile state without raw-config editing. Workflows must clearly distinguish editable, inspect-only, and unsupported controls while routing all writes through authoritative APIs with contract validation.
 
+Mutation surfaces are desktop-first and permission-gated so inspection-only sessions can read policy state without receiving interactive mutation controls.
+
 ## Canonical files
 
 - Admin page workflow surface:
@@ -55,6 +57,13 @@ Provide production administration workflows that let authorized admins safely mu
 - No mock-only toggle controls for unsupported policy families/settings.
 - No profile-specific policy branching in UI beyond canonical read-model status classification.
 - All write requests must use typed shared contracts and schema parsing.
+- Mutation permissions stay explicit and authoritative:
+  - `deployment-policy.profile.select`
+  - `deployment-policy.override.manage`
+  - `deployment-policy.override.runtime-admin.manage`
+- Supported posture for this scope:
+  - owner/admin can inspect state,
+  - owner is required for policy mutations.
 
 ## Tests
 

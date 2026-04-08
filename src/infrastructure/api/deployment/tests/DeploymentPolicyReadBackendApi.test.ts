@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { ReadDeploymentPolicyStateResponse } from "@shared/contracts/deployment/DeploymentPolicyReadContracts";
+import { ReadDeploymentPolicyAdministrationPermissionError } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { DeploymentPolicyReadBackendApi } from "../DeploymentPolicyReadBackendApi";
 
 describe("DeploymentPolicyReadBackendApi", () => {
@@ -10,6 +11,12 @@ describe("DeploymentPolicyReadBackendApi", () => {
           scope: Object.freeze({
             kind: "deployment-policy-scope",
             scopeId: "workspace-alpha",
+          }),
+          authorization: Object.freeze({
+            canReadState: true,
+            canSelectActiveProfile: true,
+            canManageOverrides: true,
+            canManageRuntimeAdminOverrides: true,
           }),
           activeProfile: Object.freeze({
             profileId: "home",
@@ -78,5 +85,25 @@ describe("DeploymentPolicyReadBackendApi", () => {
     expect(response.ok).toBeFalse();
     expect(response.error?.code).toBe("invalid-request");
     expect(response.error?.validationErrors?.length).toBeGreaterThan(0);
+  });
+
+  it("returns forbidden when read permission checks deny policy state inspection", async () => {
+    const api = new DeploymentPolicyReadBackendApi({
+      readDeploymentPolicyStateUseCase: {
+        execute: async () => {
+          throw new ReadDeploymentPolicyAdministrationPermissionError({
+            reason: "Workspace owner or admin role is required.",
+          });
+        },
+      } as never,
+    });
+
+    const response = await api.readPolicyState({
+      actorUserIdentityId: "user:member",
+      workspaceId: "workspace-alpha",
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("forbidden");
   });
 });

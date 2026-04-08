@@ -37,7 +37,7 @@ Responses include canonical updated policy state from authoritative update flow:
 
 ## Authorization/failure model
 
-- server-side permission checks via workspace role assignments (`owner`/`admin` for policy administration writes),
+- server-side permission checks via workspace role assignments (`owner` for policy administration writes in current supported scope),
 - stable failure semantics:
   - invalid payload/validation -> `invalid-request`
   - permission denied -> `forbidden`

@@ -1,5 +1,6 @@
 import type { IWorkspaceRoleAssignmentRepository } from "@application/workspaces/ports/IWorkspaceRoleAssignmentRepository";
 import {
+  DeploymentPolicyAdministrationPermissionKeys,
   type DeploymentPolicyAdministrationPermissionDecision,
   type DeploymentPolicyAdministrationPermissionKey,
   type IDeploymentPolicyAdministrationPermissionService,
@@ -47,11 +48,15 @@ implements IDeploymentPolicyAdministrationPermissionService {
       });
     }
 
+    const allowedRoles = input.requiredPermission === DeploymentPolicyAdministrationPermissionKeys.readState
+      ? Object.freeze([WorkspaceRoles.owner, WorkspaceRoles.admin])
+      : Object.freeze([WorkspaceRoles.owner]);
+
     const roleAssignments = await this.dependencies.workspaceRoleAssignmentRepository.listRoleAssignments({
       workspaceId,
       userIdentityId: actorUserIdentityId,
       statuses: Object.freeze([WorkspaceRoleAssignmentStatuses.active]),
-      roles: Object.freeze([WorkspaceRoles.owner, WorkspaceRoles.admin]),
+      roles: allowedRoles,
       limit: 1,
     });
 
@@ -64,7 +69,9 @@ implements IDeploymentPolicyAdministrationPermissionService {
     return Object.freeze({
       allowed: false,
       reasonCode: "deployment-policy-permission-admin-role-required",
-      reason: `Workspace owner or admin role is required for '${input.requiredPermission}'.`,
+      reason: input.requiredPermission === DeploymentPolicyAdministrationPermissionKeys.readState
+        ? `Workspace owner or admin role is required for '${input.requiredPermission}'.`
+        : `Workspace owner role is required for '${input.requiredPermission}'.`,
     });
   }
 }

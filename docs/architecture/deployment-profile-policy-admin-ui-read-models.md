@@ -36,13 +36,15 @@ The inspection read model projects authoritative response payloads into admin-re
 
 This keeps policy state understandable to administrators while preserving read-only boundaries for this story scope.
 
+Read responses project session authorization flags (`canReadState`, `canSelectActiveProfile`, `canManageOverrides`, `canManageRuntimeAdminOverrides`) so page composition can keep mutation controls explicitly read-only when a session has inspection-only posture.
+
 ## Access and scope model
 
 - Route: `ROUTE_PATHS.deploymentPolicyAdmin` (`/settings/deployment-policy`)
 - Surface access: desktop admin and desktop operational surfaces
 - Required role/capability posture:
   - roles: `owner` or `admin`
-  - capability: `system.manage`
+  - capability: `deployment-policy.state.read`
   - workspace context: required
 
 ## Contract boundary requirements

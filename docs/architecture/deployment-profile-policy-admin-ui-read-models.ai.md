@@ -37,8 +37,10 @@ Story 20.3.1 adds production admin inspection read models and page composition s
 - Surface eligibility: desktop admin + desktop operational
 - Required role/capability posture:
   - role: owner/admin
-  - capability: `system.manage`
+  - capability: `deployment-policy.state.read`
   - workspace context required
+
+Read responses now include authorization projection flags (`canReadState`, `canSelectActiveProfile`, `canManageOverrides`, `canManageRuntimeAdminOverrides`) consumed by admin UI composition to keep mutation controls non-interactive for inspection-only sessions.
 
 ## Coverage
 

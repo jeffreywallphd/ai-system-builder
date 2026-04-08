@@ -36,6 +36,7 @@ Expose authoritative read-only deployment-policy administration APIs so admin an
 - Required request scope:
   - authenticated workspace session
   - workspace-scoped read (`workspaceId` query)
+  - policy read permission (`deployment-policy.state.read`)
 
 Supported query options:
 
@@ -50,11 +51,12 @@ Supported query options:
 `ReadDeploymentPolicyStateResponse` returns:
 
 1. normalized scope
-2. active profile read model (including source kind and optional selection record)
-3. effective snapshot and validation output from canonical resolution
-4. optional override records with provenance metadata
-5. optional effective metadata record
-6. optional catalog metadata for presets and policy families/settings
+2. authorization projection for inspection vs mutation capability posture (`canReadState`, `canSelectActiveProfile`, `canManageOverrides`, `canManageRuntimeAdminOverrides`)
+3. active profile read model (including source kind and optional selection record)
+4. effective snapshot and validation output from canonical resolution
+5. optional override records with provenance metadata
+6. optional effective metadata record
+7. optional catalog metadata for presets and policy families/settings
 
 Active profile source is explicit:
 

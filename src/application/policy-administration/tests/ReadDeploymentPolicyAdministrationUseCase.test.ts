@@ -10,6 +10,7 @@ import {
 } from "@shared/dto/deployment/DeploymentPolicyAdministrationPersistenceDtos";
 import { DeploymentPolicyResolutionSources } from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
 import { ReadDeploymentPolicyAdministrationUseCase } from "../use-cases/ReadDeploymentPolicyAdministrationUseCase";
+import { DeploymentPolicyAdministrationPermissionKeys } from "../use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 
 class InMemoryDeploymentPolicyPersistenceRepository implements IDeploymentPolicyPersistenceRepository {
   public activeProfileSelection: DeploymentPolicyActiveProfileSelectionRecord | undefined;
@@ -51,9 +52,30 @@ class InMemoryDeploymentPolicyPersistenceRepository implements IDeploymentPolicy
   }
 }
 
+class StubPermissionService {
+  public denied = new Set<string>();
+
+  public async evaluatePermission(input: {
+    readonly actorUserIdentityId: string;
+    readonly requiredPermission: string;
+    readonly scope: { readonly kind: string; readonly scopeId: string };
+    readonly asOf?: string;
+  }) {
+    void input.actorUserIdentityId;
+    void input.scope;
+    void input.asOf;
+    return Object.freeze({
+      allowed: !this.denied.has(input.requiredPermission),
+      reasonCode: this.denied.has(input.requiredPermission) ? "forbidden" : undefined,
+      reason: this.denied.has(input.requiredPermission) ? "Denied by test policy." : undefined,
+    });
+  }
+}
+
 describe("ReadDeploymentPolicyAdministrationUseCase", () => {
   it("returns active profile, effective snapshot, override provenance, and catalog metadata", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const permissionService = new StubPermissionService();
     repository.activeProfileSelection = Object.freeze({
       scope: Object.freeze({
         kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
@@ -117,6 +139,7 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
 
     const useCase = new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: repository,
+      permissionService,
     });
 
     const response = await useCase.execute({
@@ -127,6 +150,10 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
       actorUserIdentityId: "user:admin",
     });
 
+    expect(response.authorization.canReadState).toBeTrue();
+    expect(response.authorization.canSelectActiveProfile).toBeTrue();
+    expect(response.authorization.canManageOverrides).toBeTrue();
+    expect(response.authorization.canManageRuntimeAdminOverrides).toBeTrue();
     expect(response.activeProfile.profileId).toBe("organization");
     expect(response.snapshot.profileId).toBe("organization");
     expect(response.overrideRecords?.[0]?.provenance?.ticketReference).toBe("CHG-2201");
@@ -137,8 +164,10 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
 
   it("falls back to home profile when no persisted active profile exists", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const permissionService = new StubPermissionService();
     const useCase = new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: repository,
+      permissionService,
     });
 
     const response = await useCase.execute({
@@ -158,5 +187,23 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
     expect(response.catalog).toBeUndefined();
     expect(response.overrideRecords).toBeUndefined();
     expect(response.effectiveMetadata).toBeUndefined();
+  });
+
+  it("throws permission error when actor lacks deployment-policy read permission", async () => {
+    const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const permissionService = new StubPermissionService();
+    permissionService.denied.add(DeploymentPolicyAdministrationPermissionKeys.readState);
+    const useCase = new ReadDeploymentPolicyAdministrationUseCase({
+      deploymentPolicyRepository: repository,
+      permissionService,
+    });
+
+    await expect(useCase.execute({
+        scope: Object.freeze({
+          kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
+          scopeId: "workspace-gamma",
+        }),
+        actorUserIdentityId: "user:member",
+      })).rejects.toThrow("not authorized");
   });
 });

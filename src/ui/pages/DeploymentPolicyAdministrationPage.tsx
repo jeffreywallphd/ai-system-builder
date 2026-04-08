@@ -165,11 +165,16 @@ export default function DeploymentPolicyAdministrationPage(
     void loadPolicyState();
   }, [actorUserIdentityId, resolvedWorkspaceId, selectedProfileId, sessionToken]);
 
-  const settingOptions = useMemo(() => buildSettingOptions(inspection), [inspection]);
+  const settingOptions = useMemo(
+    () => buildSettingOptions(inspection, inspection?.canMutateRuntimeAdminOverrides ?? false),
+    [inspection],
+  );
   const selectedSetting = useMemo(
     () => resolveSelectedSetting(inspection, overrideDraft.settingPath),
     [inspection, overrideDraft.settingPath],
   );
+  const canMutateActiveProfile = inspection?.canMutateActiveProfile ?? false;
+  const canMutateOverrides = inspection?.canMutateOverrides ?? false;
 
   const ticketReferenceRequired = useMemo(
     () => isTicketReferenceRequired(inspection),
@@ -217,6 +222,12 @@ export default function DeploymentPolicyAdministrationPage(
 
   const applyActiveProfileChange = async (): Promise<void> => {
     if (!inspection || !sessionToken || !actorUserIdentityId || !resolvedWorkspaceId) {
+      return;
+    }
+    if (!canMutateActiveProfile) {
+      setProfileMutationError("Your session can inspect policy state but cannot change the active deployment profile.");
+      setProfileMutationValidationIssues(Object.freeze([]));
+      setProfileMutationResult(undefined);
       return;
     }
 
@@ -269,6 +280,12 @@ export default function DeploymentPolicyAdministrationPage(
 
   const applyOverrideUpdate = async (): Promise<void> => {
     if (!inspection || !selectedSetting || !sessionToken || !actorUserIdentityId || !resolvedWorkspaceId) {
+      return;
+    }
+    if (!canMutateOverrides) {
+      setOverrideMutationError("Your session can inspect policy state but cannot apply deployment policy overrides.");
+      setOverrideMutationValidationIssues(Object.freeze([]));
+      setOverrideMutationResult(undefined);
       return;
     }
 
@@ -400,7 +417,7 @@ export default function DeploymentPolicyAdministrationPage(
         description="Choose whether to inspect the active profile or force a supported profile for comparison and update preparation."
         mode="read-only"
         scopeLabel={resolvedWorkspaceId}
-        permissionLabel="system.manage"
+        permissionLabel="deployment-policy.state.read"
       >
         <div className="ui-security-policy-page__grid">
           <AdminSettingsField label="Profile selector" hint="Active uses persisted profile selection for this workspace scope.">
@@ -433,7 +450,7 @@ export default function DeploymentPolicyAdministrationPage(
             description="Understand the profile source and effective policy snapshot used for evaluation."
             mode="read-only"
             scopeLabel={inspection.workspaceId}
-            permissionLabel="system.manage"
+            permissionLabel="deployment-policy.state.read"
           >
             <div className="ui-security-policy-page__property-grid">
               <AdminReadonlyProperty label="Active profile" value={inspection.activeProfileId} />
@@ -455,7 +472,7 @@ export default function DeploymentPolicyAdministrationPage(
             description="Clear separation between editable, inspect-only, and unsupported policy controls for this inspected profile."
             mode="read-only"
             scopeLabel={inspection.requestedProfileId}
-            permissionLabel="system.manage"
+            permissionLabel="deployment-policy.state.read"
           >
             <div className="ui-security-policy-page__property-grid">
               <AdminReadonlyProperty label="Editable controls" value={editableCount} />
@@ -470,11 +487,17 @@ export default function DeploymentPolicyAdministrationPage(
           <AdminSettingsSection
             title="Active profile administration"
             description="Apply a supported active-profile change with explicit confirmation and optional dry-run validation."
-            mode="editable"
+            mode={canMutateActiveProfile ? "editable" : "read-only"}
             scopeLabel={inspection.workspaceId}
             permissionLabel="deployment-policy.profile.select"
           >
-            <div className="ui-security-policy-page__grid">
+            {!canMutateActiveProfile ? (
+              <p className="ui-text-secondary">
+                This session is inspection-only for active profile selection. Use a workspace owner desktop session to apply profile changes.
+              </p>
+            ) : (
+              <>
+                <div className="ui-security-policy-page__grid">
               <AdminSettingsField label="Target active profile">
                 <select
                   className="ui-select"
@@ -518,19 +541,19 @@ export default function DeploymentPolicyAdministrationPage(
                   <option value="apply">apply</option>
                 </select>
               </AdminSettingsField>
-            </div>
-            <label className="ui-checkbox-field">
+                </div>
+                <label className="ui-checkbox-field">
               <input
                 type="checkbox"
                 checked={profileDraft.confirmed}
                 onChange={(event) => setProfileDraft((current) => Object.freeze({ ...current, confirmed: event.target.checked }))}
               />
               <span>I understand this changes the active deployment-profile posture for the selected workspace scope.</span>
-            </label>
-            <p className="ui-text-secondary ui-text-small">
+                </label>
+                <p className="ui-text-secondary ui-text-small">
               Policy impact: this changes which preset lineage (`home`, `classroom`, `organization`) is used by default for policy evaluation and future override interpretation.
-            </p>
-            <div className="ui-page__actions">
+                </p>
+                <div className="ui-page__actions">
               <button
                 type="button"
                 className="ui-button ui-button--primary ui-button--sm"
@@ -539,7 +562,9 @@ export default function DeploymentPolicyAdministrationPage(
               >
                 {profileMutationPending ? "Applying..." : "Apply profile change"}
               </button>
-            </div>
+                </div>
+              </>
+            )}
             {profileMutationError ? <p className="ui-security-policy-page__alert ui-security-policy-page__alert--error" role="alert">{profileMutationError}</p> : null}
             {profileMutationValidationIssues.length > 0 ? (
               <ul className="ui-deployment-policy-admin-page__issue-list">
@@ -552,11 +577,15 @@ export default function DeploymentPolicyAdministrationPage(
           <AdminSettingsSection
             title="Policy override administration"
             description="Update or remove supported overrides through authoritative typed operations only."
-            mode={settingOptions.length > 0 ? "editable" : "read-only"}
+            mode={canMutateOverrides && settingOptions.length > 0 ? "editable" : "read-only"}
             scopeLabel={inspection.requestedProfileId}
             permissionLabel="deployment-policy.override.manage"
           >
-            {settingOptions.length < 1 ? (
+            {!canMutateOverrides ? (
+              <p className="ui-text-secondary">
+                This session is inspection-only for override administration. Use a workspace owner desktop session to apply override mutations.
+              </p>
+            ) : settingOptions.length < 1 ? (
               <p className="ui-text-secondary">No editable controls are currently available in this profile snapshot.</p>
             ) : (
               <>
@@ -718,7 +747,7 @@ export default function DeploymentPolicyAdministrationPage(
             description="Compare supported built-in deployment profiles and identify which preset currently drives evaluation."
             mode="read-only"
             scopeLabel="supported profiles"
-            permissionLabel="system.manage"
+            permissionLabel="deployment-policy.state.read"
           >
             <div className="ui-deployment-policy-admin-page__preset-grid">
               {inspection.presetComparisons.map((preset) => (
@@ -744,7 +773,7 @@ export default function DeploymentPolicyAdministrationPage(
             description="Browse policy settings grouped by administration section and inspect effective value provenance with explicit control support state."
             mode="read-only"
             scopeLabel={inspection.requestedProfileId}
-            permissionLabel="system.manage"
+            permissionLabel="deployment-policy.state.read"
           >
             <div className="ui-stack ui-stack--md">
               {inspection.policyGroups.map((group) => (
@@ -925,6 +954,7 @@ function resolveSelectedSetting(
 
 function buildSettingOptions(
   inspection: DeploymentPolicyAdministrationInspectionReadModel | undefined,
+  includeRuntimeAdminControls: boolean,
 ): ReadonlyArray<DeploymentPolicySettingOption> {
   if (!inspection) {
     return Object.freeze([]);
@@ -934,6 +964,9 @@ function buildSettingOptions(
   for (const group of inspection.policyGroups) {
     for (const setting of group.settings) {
       if (setting.administrationStatus !== "editable") {
+        continue;
+      }
+      if (!includeRuntimeAdminControls && setting.controlMode === "runtime-admin") {
         continue;
       }
 

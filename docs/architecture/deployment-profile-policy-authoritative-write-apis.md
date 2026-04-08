@@ -70,7 +70,7 @@ Successful writes return canonical updated policy information:
 
 Authorization is enforced server-side through a workspace-role-backed permission service:
 
-- workspace `owner`/`admin` role required for policy administration write permissions.
+- workspace `owner` role required for policy administration write permissions in current supported scope.
 
 Stable failure mapping:
 

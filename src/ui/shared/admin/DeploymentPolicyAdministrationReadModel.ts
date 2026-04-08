@@ -65,6 +65,11 @@ export interface DeploymentPolicyFamilyFeatureImpactReadModel {
 
 export interface DeploymentPolicyAdministrationInspectionReadModel {
   readonly workspaceId: string;
+  readonly authorization: ReadDeploymentPolicyStateResponse["authorization"];
+  readonly canInspectPolicyState: boolean;
+  readonly canMutateActiveProfile: boolean;
+  readonly canMutateOverrides: boolean;
+  readonly canMutateRuntimeAdminOverrides: boolean;
   readonly activeProfileId: DeploymentProfileId;
   readonly requestedProfileId: DeploymentProfileId;
   readonly activeProfileSourceLabel: string;
@@ -144,6 +149,11 @@ export function buildDeploymentPolicyAdministrationInspectionReadModel(
 
   return Object.freeze({
     workspaceId: response.scope.scopeId,
+    authorization: response.authorization,
+    canInspectPolicyState: response.authorization.canReadState,
+    canMutateActiveProfile: response.authorization.canSelectActiveProfile,
+    canMutateOverrides: response.authorization.canManageOverrides,
+    canMutateRuntimeAdminOverrides: response.authorization.canManageRuntimeAdminOverrides,
     activeProfileId: response.activeProfile.profileId,
     requestedProfileId,
     activeProfileSourceLabel: response.activeProfile.source === "persisted-selection"

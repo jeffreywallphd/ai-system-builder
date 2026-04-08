@@ -1085,9 +1085,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
+  const deploymentPolicyPermissionService = new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
+    workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
+  });
   const deploymentPolicyReadBackendApi = new DeploymentPolicyReadBackendApi({
     readDeploymentPolicyStateUseCase: new ReadDeploymentPolicyAdministrationUseCase({
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
+      permissionService: deploymentPolicyPermissionService,
     }),
   });
   const deploymentPolicyGovernanceEventSink = new FanoutDeploymentPolicyGovernanceEventSink([
@@ -1118,9 +1122,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const deploymentPolicyWriteBackendApi = new DeploymentPolicyWriteBackendApi({
     updateDeploymentPolicyStateUseCase: new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
-      permissionService: new WorkspaceRoleBasedDeploymentPolicyAdministrationPermissionService({
-        workspaceRoleAssignmentRepository: persistentPlatformServices.workspaceRepository,
-      }),
+      permissionService: deploymentPolicyPermissionService,
       governanceEventSink: deploymentPolicyGovernanceEventSink,
     }),
   });

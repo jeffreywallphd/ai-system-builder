@@ -323,3 +323,4 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 - Feature 20.3.2 production-safe admin update workflows for supported profile and override controls with explicit confirmation/validation/result handling and editable vs inspect-only vs unsupported control separation: docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md.
 - Feature 20.3.3 policy explainability and impact-summary baseline for authoritative metadata-driven admin messaging and governance-warning visibility: docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md.
+- Feature 20.3.4 policy-admin permission boundary and admin-lite posture baseline for desktop-first policy-control exposure, explicit read-vs-mutation authorization projection, and route loophole prevention: docs/architecture/deployment-profile-policy-admin-permission-boundaries.md.

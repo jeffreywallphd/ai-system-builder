@@ -386,7 +386,7 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
         UiSurfaceKeys.desktopOperational,
       ]),
       requiredRoles: Object.freeze(["owner", "admin"]),
-      requiredCapabilities: Object.freeze(["system.manage"]),
+      requiredCapabilities: Object.freeze(["deployment-policy.state.read"]),
       workspaceContext: WorkspaceContextRequirement.required,
     }),
   }),

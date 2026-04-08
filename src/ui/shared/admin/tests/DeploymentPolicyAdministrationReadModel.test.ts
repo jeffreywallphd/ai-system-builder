@@ -19,6 +19,9 @@ describe("DeploymentPolicyAdministrationReadModel", () => {
     const projected = buildDeploymentPolicyAdministrationInspectionReadModel(createResponseFixture());
 
     expect(projected.workspaceId).toBe("workspace-alpha");
+    expect(projected.canInspectPolicyState).toBeTrue();
+    expect(projected.canMutateActiveProfile).toBeTrue();
+    expect(projected.canMutateOverrides).toBeTrue();
     expect(projected.activeProfileId).toBe("organization");
     expect(projected.requestedProfileId).toBe("organization");
     expect(projected.policyGroups[0]?.familyId).toBe("approval-governance");
@@ -92,6 +95,12 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
     scope: Object.freeze({
       kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
       scopeId: "workspace-alpha",
+    }),
+    authorization: Object.freeze({
+      canReadState: true,
+      canSelectActiveProfile: true,
+      canManageOverrides: true,
+      canManageRuntimeAdminOverrides: true,
     }),
     activeProfile: Object.freeze({
       profileId: DeploymentProfileIds.organization,
