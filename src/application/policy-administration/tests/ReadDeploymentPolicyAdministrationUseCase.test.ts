@@ -11,6 +11,7 @@ import {
 import { DeploymentPolicyResolutionSources } from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
 import { ReadDeploymentPolicyAdministrationUseCase } from "../use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { DeploymentPolicyAdministrationPermissionKeys } from "../use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
+import { DeploymentProfileIds } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 import type {
   DeploymentPolicyAdministrationObservabilityEvent,
   IDeploymentPolicyAdministrationObservabilityPort,
@@ -208,6 +209,31 @@ describe("ReadDeploymentPolicyAdministrationUseCase", () => {
     expect(response.catalog).toBeUndefined();
     expect(response.overrideRecords).toBeUndefined();
     expect(response.effectiveMetadata).toBeUndefined();
+  });
+
+  it("supports non-home default fallback profile when configured", async () => {
+    const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const permissionService = new StubPermissionService();
+    const useCase = new ReadDeploymentPolicyAdministrationUseCase({
+      deploymentPolicyRepository: repository,
+      permissionService,
+      defaultProfileId: DeploymentProfileIds.organization,
+    });
+
+    const response = await useCase.execute({
+      scope: Object.freeze({
+        kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
+        scopeId: "workspace-delta",
+      }),
+      actorUserIdentityId: "user:viewer",
+      includeCatalog: false,
+      includeOverrideRecords: false,
+      includeEffectiveMetadata: false,
+    });
+
+    expect(response.activeProfile.profileId).toBe(DeploymentProfileIds.organization);
+    expect(response.activeProfile.source).toBe("default-fallback");
+    expect(response.snapshot.profileId).toBe(DeploymentProfileIds.organization);
   });
 
   it("throws permission error when actor lacks deployment-policy read permission", async () => {

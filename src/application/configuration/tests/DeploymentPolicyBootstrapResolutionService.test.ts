@@ -185,6 +185,25 @@ describe("DeploymentPolicyBootstrapResolutionService", () => {
     expect(context.profileId).toBe(DeploymentProfileIds.home);
   });
 
+  it("supports configured non-home fallback behavior when persisted profile selection is missing", async () => {
+    const repository = new InMemoryDeploymentPolicyPersistenceRepository();
+    const service = new DeploymentPolicyBootstrapResolutionService({
+      deploymentPolicyRepository: repository,
+      fallbackProfileId: DeploymentProfileIds.organization,
+      now: () => new Date("2026-04-06T12:00:00.000Z"),
+    });
+
+    const resolved = await service.execute();
+    const context = await resolved.contextResolver.resolveContext({
+      workspaceSlug: "beta",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+    });
+
+    expect(resolved.activeProfile.profileId).toBe(DeploymentProfileIds.organization);
+    expect(resolved.activeProfile.source).toBe(DeploymentPolicyBootstrapActiveProfileSourceKinds.defaultFallback);
+    expect(context.profileId).toBe(DeploymentProfileIds.organization);
+  });
+
   it("fails startup resolution explicitly when persisted state is invalid", async () => {
     const repository = new InMemoryDeploymentPolicyPersistenceRepository();
     const observabilityPort = new RecordingDeploymentPolicyAdministrationObservabilityPort();

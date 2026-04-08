@@ -38,6 +38,7 @@ export interface ReadDeploymentPolicyAdministrationUseCaseDependencies {
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: DeploymentProfilePresetCatalog;
   readonly presetDefinitions?: DeploymentProfilePresetDefinitionCatalog;
+  readonly defaultProfileId?: DeploymentProfileId;
 }
 
 export class ReadDeploymentPolicyAdministrationPermissionError extends Error {
@@ -59,12 +60,14 @@ export class ReadDeploymentPolicyAdministrationUseCase {
   private readonly familyCatalog: DeploymentPolicyFamilyCatalog;
   private readonly presetCatalog: DeploymentProfilePresetCatalog;
   private readonly presetDefinitions: DeploymentProfilePresetDefinitionCatalog;
+  private readonly defaultProfileId: DeploymentProfileId;
 
   public constructor(private readonly dependencies: ReadDeploymentPolicyAdministrationUseCaseDependencies) {
     const registry = createCanonicalDeploymentPolicyConfigurationRegistry();
     this.familyCatalog = dependencies.familyCatalog ?? registry.familyCatalog;
     this.presetCatalog = dependencies.presetCatalog ?? registry.presetCatalog;
     this.presetDefinitions = dependencies.presetDefinitions ?? createCanonicalDeploymentProfilePresetDefinitions();
+    this.defaultProfileId = dependencies.defaultProfileId ?? DeploymentProfileIds.home;
   }
 
   public async execute(
@@ -121,7 +124,7 @@ export class ReadDeploymentPolicyAdministrationUseCase {
       });
 
       const activeSelection = await this.dependencies.deploymentPolicyRepository.getActiveProfileSelection(scope);
-      const activeProfileId = activeSelection?.profileId ?? DeploymentProfileIds.home;
+      const activeProfileId = activeSelection?.profileId ?? this.defaultProfileId;
       const resolvedProfileId = input.profileId ?? activeProfileId;
 
       const overrideRecords = await this.dependencies.deploymentPolicyRepository.listOverrideRecords({
@@ -284,7 +287,7 @@ export class ReadDeploymentPolicyAdministrationUseCase {
   ): ReadDeploymentPolicyStateResponse["activeProfile"] {
     if (!selection) {
       return Object.freeze({
-        profileId: DeploymentProfileIds.home,
+        profileId: this.defaultProfileId,
         source: DeploymentPolicyActiveProfileSourceKinds.defaultFallback,
       });
     }

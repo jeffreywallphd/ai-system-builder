@@ -500,6 +500,37 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     expect(governanceEventSink.events).toHaveLength(0);
   });
 
+  it("uses set-active-profile operation for dry-run snapshot profile resolution", async () => {
+    const repository = new InMemoryDeploymentPolicyRepository();
+    const permissionService = new StubPermissionService();
+
+    const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
+      deploymentPolicyRepository: repository,
+      permissionService,
+      defaultProfileId: DeploymentProfileIds.classroom,
+    });
+
+    const result = await useCase.execute({
+      scope: createScope("workspace-g"),
+      actorUserIdentityId: "user-admin",
+      dryRun: true,
+      operations: [Object.freeze({
+        kind: "set-active-profile" as const,
+        profileId: DeploymentProfileIds.organization,
+      })],
+    });
+
+    expect(result.ok).toBeTrue();
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.snapshot.profileId).toBe(DeploymentProfileIds.organization);
+    expect(result.value.activeProfileSelection).toBeUndefined();
+    expect(repository.setActiveProfileCalls).toBe(0);
+    expect(repository.saveMetadataCalls).toBe(0);
+  });
+
   it("enforces runtime-admin permission for runtime-admin setting mutations", async () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();

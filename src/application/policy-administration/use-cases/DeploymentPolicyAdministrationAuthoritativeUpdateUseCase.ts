@@ -4,6 +4,7 @@ import {
   DeploymentPolicyControlModes,
   type DeploymentPolicyFamilyCatalog,
   type DeploymentProfileId,
+  DeploymentProfileIds,
   createCanonicalDeploymentPolicyConfigurationRegistry,
 } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 import {
@@ -181,6 +182,7 @@ export interface DeploymentPolicyAdministrationAuthoritativeUpdateUseCaseDepende
   readonly observabilityPort?: IDeploymentPolicyAdministrationObservabilityPort;
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: ReturnType<typeof createCanonicalDeploymentPolicyConfigurationRegistry>["presetCatalog"];
+  readonly defaultProfileId?: DeploymentProfileId;
   readonly clock?: DeploymentPolicyAdministrationClock;
   readonly idGenerator?: DeploymentPolicyAdministrationIdGenerator;
 }
@@ -288,6 +290,7 @@ function mergeIssues(
 export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
   private readonly familyCatalog: DeploymentPolicyFamilyCatalog;
   private readonly presetCatalog: ReturnType<typeof createCanonicalDeploymentPolicyConfigurationRegistry>["presetCatalog"];
+  private readonly defaultProfileId: DeploymentProfileId;
   private readonly clock: DeploymentPolicyAdministrationClock;
   private readonly idGenerator: DeploymentPolicyAdministrationIdGenerator;
 
@@ -295,6 +298,7 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
     const registry = createCanonicalDeploymentPolicyConfigurationRegistry();
     this.familyCatalog = dependencies.familyCatalog ?? registry.familyCatalog;
     this.presetCatalog = dependencies.presetCatalog ?? registry.presetCatalog;
+    this.defaultProfileId = dependencies.defaultProfileId ?? DeploymentProfileIds.home;
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
     };
@@ -1360,19 +1364,23 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
     readonly activeProfileSelection?: DeploymentPolicyActiveProfileSelectionRecord;
     readonly operations: ReadonlyArray<DeploymentPolicyAdministrationMutationOperation>;
   }): DeploymentProfileId {
-    const overrideProfile = [...input.operations]
+    const profileFromOperations = [...input.operations]
       .reverse()
-      .find((operation) => operation.kind === "apply-override-operations") as ApplyDeploymentPolicyOverrideOperations | undefined;
+      .find((operation) =>
+        operation.kind === "apply-override-operations" || operation.kind === "set-active-profile");
 
-    if (overrideProfile) {
-      return overrideProfile.command.profileId;
+    if (profileFromOperations?.kind === "apply-override-operations") {
+      return profileFromOperations.command.profileId;
+    }
+    if (profileFromOperations?.kind === "set-active-profile") {
+      return profileFromOperations.profileId;
     }
 
     if (input.activeProfileSelection) {
       return input.activeProfileSelection.profileId;
     }
 
-    return "home";
+    return this.defaultProfileId;
   }
 
   private toAdminOverrideRecord(record: DeploymentPolicyOverridePersistenceRecord): DeploymentPolicyAdminOverrideRecord {
