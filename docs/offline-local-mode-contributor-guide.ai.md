@@ -26,6 +26,27 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 5. Infrastructure adapter and persistence updates.
 6. Adapter/UI consumption updates.
 
+## Desktop cache + reconnect extension map
+
+- cache admission + snapshot persistence:
+  - `src/application/common/OfflineResourceClassificationPolicy.ts`
+  - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+  - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+- connectivity transitions:
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
+- queue durability + replay prep:
+  - `src/application/common/OfflinePendingOperationPersistence.ts`
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+- reconnect coordination + cache cleanup:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- shared queue/connectivity/outcome contracts:
+  - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
+  - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
+  - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+
 ## Invariants to preserve
 
 - offline local state is not authoritative global truth;
@@ -37,6 +58,14 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - reconnect paths must perform explicit cache refresh/invalidation maintenance so stale/revoked content is not left looking authoritative.
 - pending-operation persistence keeps actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic reconnect replay.
 - reconnect cleanup semantics classify pending operations (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain behavior for queryable local state transitions.
+
+## Deferred unless explicitly scoped
+
+- no automatic multi-branch conflict merge expansion.
+- no desktop-to-desktop queue merge protocol.
+- no secret plaintext cache path.
+- no local cache/draft promotion to authoritative truth without reconnect decisions.
+- no replay control-flow dependency on best-effort event publication.
 
 ## Prohibited patterns
 

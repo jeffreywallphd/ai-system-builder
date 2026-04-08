@@ -240,6 +240,149 @@ The following must remain server-authoritative and cannot be finalized offline:
 - marking queued operations as globally applied before authoritative acceptance.
 - blending offline local execution history into authoritative orchestration history without registration outcome.
 
+## Desktop cache and controlled resynchronization workflow map (Epic 19.2)
+
+This section documents the implemented Story 19.2.8 baseline for desktop cache population, connectivity transitions, pending-operation replay, conflict handling, and post-sync cleanup.
+
+### Cross-layer module map
+
+- Domain boundary and policy catalog:
+  - `src/domain/platform/OfflineLocalModeBoundaries.ts`
+- Application cache policy and authoritative snapshot service:
+  - `src/application/common/OfflineResourceClassificationPolicy.ts`
+  - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
+- Application pending-operation durability and replay preparation:
+  - `src/application/common/OfflinePendingOperationPersistence.ts`
+- Application reconnect planning and execution:
+  - `src/application/common/OfflineLocalModeResynchronization.ts`
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- Application offline operational/audit event seam:
+  - `src/application/common/OfflineOperationalEventPorts.ts`
+- Desktop host profile and connectivity runtime:
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `src/hosts/desktop/DesktopConnectivityStateService.ts`
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- Desktop infrastructure persistence adapters:
+  - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+- Shared contract + DTO + schema boundary:
+  - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
+  - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
+  - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
+
+### Flow 1: cache population and offline transition
+
+```mermaid
+sequenceDiagram
+  participant Host as Desktop Host Runtime
+  participant Conn as DesktopConnectivityStateService
+  participant Policy as OfflineResourceClassificationPolicy
+  participant CacheSvc as OfflineAuthoritativeSnapshotCacheService
+  participant CacheRepo as DesktopOfflineSnapshotCacheRepository (SQLite)
+  participant Sink as OfflineOperationalEventSink
+
+  Host->>Conn: startMonitoring()/observe()
+  Conn-->>Host: connected/degraded/reconnecting/disconnected state
+  Conn->>Sink: offline-entered/offline-exited (best-effort, sanitized)
+  Host->>Policy: classifyOfflineResourceLocalModePolicy(resource, policy)
+  Policy-->>Host: posture(cache/read/edit/queueMutation/execute)
+  Host->>CacheSvc: cacheSnapshot(...)
+  CacheSvc->>CacheSvc: enforce server-authoritative resource + policy gates
+  CacheSvc->>CacheSvc: reject filesystem references, compute snapshot digest
+  CacheSvc->>CacheRepo: upsertSnapshot(record)
+  CacheRepo->>CacheRepo: retention bound + digest integrity on read
+```
+
+### Flow 2: reconnect replay, conflict handling, and explicit outcomes
+
+```mermaid
+sequenceDiagram
+  participant Host as DesktopOfflineResynchronizationHost
+  participant Coord as OfflineControlledResynchronizationCoordinator
+  participant QueueSvc as OfflinePendingOperationService
+  participant Auth as IOfflineAuthoritativeResynchronizationPort
+  participant Planner as planOfflineResynchronization(...)
+  participant Sink as OfflineOperationalEventSink
+
+  Host->>Coord: synchronizeWorkspace(workspaceId, actor, attemptedAt)
+  Coord->>QueueSvc: prepareReplayOperations()
+  QueueSvc-->>Coord: prepared[] + blocked[] (reason code/message/dependencies)
+  Coord->>Auth: fetchResourceRevisions(resourceTargets)
+  Coord->>Planner: plan + assert no silent global divergence
+  loop each prepared operation
+    alt apply-to-authoritative
+      Coord->>Auth: replayPreparedOperation(...)
+      Coord->>QueueSvc: markOperationAsApplied() or markOperationReplayOutcome()
+      Coord->>Sink: replay-succeeded or replay-failed
+    else conflict/reject path
+      Coord->>QueueSvc: markOperationReplayOutcome(sync-conflict/sync-rejected)
+      Coord->>Sink: conflict-detected or replay-failed
+    end
+  end
+  Coord-->>Host: outcomes + cleanup classifications + refreshed/invalidated cache keys
+```
+
+### Flow 3: post-sync cache refresh and invalidation cleanup
+
+```mermaid
+sequenceDiagram
+  participant Coord as OfflineControlledResynchronizationCoordinator
+  participant Auth as IOfflineAuthoritativeResynchronizationPort
+  participant CacheSvc as OfflineAuthoritativeSnapshotCacheService
+
+  Coord->>Coord: compute refreshTargets + invalidateTargets
+  loop invalidate targets
+    Coord->>CacheSvc: deleteSnapshot(workspaceId, resourceClass, resourceId)
+  end
+  loop refresh targets
+    Coord->>Auth: fetchResourceSnapshotForCache(...)
+    alt refresh payload returned
+      Coord->>CacheSvc: cacheSnapshot(..., lastSynchronizedAt=now)
+    else no payload (deleted/revoked/not refreshable)
+      Coord->>CacheSvc: deleteSnapshot(...)
+    end
+  end
+```
+
+### Implemented operation replay gates and cleanup guarantees
+
+- replay starts only when `connectivity.canResynchronize=true`;
+- replay preparation blocks non-pending, non-retryable, retry-exhausted, retry-not-eligible, and dependency-not-ready operations with explicit structured reasons;
+- prepared operations are replayed deterministically (`queuedAt`, then `mutationId`) and dependency-aware;
+- reconnect plans are validated with `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`;
+- post-replay pending-operation cleanup is always classified as one of:
+  - `successful` (`removed-from-queue`)
+  - `conflicted` (`retained-for-review`)
+  - `failed` (`retained-for-review`)
+  - `abandoned` (`retained-for-review`)
+- cache maintenance always applies explicit refresh/invalidate behavior after replay planning and replay outcomes.
+
+### Explicit conflict-detection and decision mapping
+
+- canonical conflict classes stay bounded to:
+  - `stale-base-edit`
+  - `deleted-or-revoked-resource`
+  - `permission-changed-during-disconnection`
+  - `invalidated-run-submission`
+  - `resource-version-mismatch`
+  - `authoritative-state-unavailable`
+- canonical reconnect actions stay bounded to:
+  - `apply-to-authoritative`
+  - `conflict-requires-review`
+  - `reject-not-allowed`
+- canonical decision rules remain explicit and serialized in outcomes (`decisionRule`) to prevent hidden auto-resolution.
+
+### Intentionally deferred behavior (explicitly not implemented)
+
+- no background/automatic conflict merge beyond explicit baseline match checks;
+- no multi-device local queue merge protocol between desktop clients;
+- no offline promotion of local cache or local draft artifacts to authoritative server truth without reconnect replay decisions;
+- no offline execution-class expansion beyond `local-workflow-preview` and `local-workflow-validation`;
+- no secret plaintext caching path in offline stores;
+- no best-effort event publication coupling to replay/control flow (event sink failures never alter reconciliation decisions).
+
 ## Extension rules for contributors
 
 - register new offline resource classes in `OfflineLocalModeBoundaries` with authority scope, capability matrix, storage bucket, behavior class, and eligibility metadata;

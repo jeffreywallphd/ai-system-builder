@@ -43,6 +43,31 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
   - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
 
+## Desktop cache and reconnect workflow entry points
+
+Use this map when deciding where to extend behavior:
+
+- cache population and policy admission:
+  - `OfflineResourceClassificationPolicy.classifyOfflineResourceLocalModePolicy(...)`
+  - `OfflineAuthoritativeSnapshotCacheService.cacheSnapshot(...)`
+  - `DesktopOfflineSnapshotCacheHost.createDesktopOfflineSnapshotCacheHostRuntime(...)`
+- offline transitions and connectivity state:
+  - `DesktopConnectivityStateService.observe(...)`
+  - `DesktopConnectivityStateService.setDeliberateOfflineMode(...)`
+  - `DesktopConnectivityStateService.startMonitoring(...)`
+- queue durability and replay preparation:
+  - `OfflinePendingOperationService.queueOperation(...)`
+  - `OfflinePendingOperationService.prepareReplayOperations(...)`
+  - `OfflinePendingOperationService.markOperationReplayOutcome(...)`
+  - `DesktopOfflinePendingOperationHost.createDesktopOfflinePendingOperationHostRuntime(...)`
+- reconnect orchestration and post-sync cleanup:
+  - `OfflineControlledResynchronizationCoordinator.synchronizeWorkspace(...)`
+  - `DesktopOfflineResynchronizationHost.createDesktopOfflineResynchronizationHostRuntime(...)`
+- shared contract updates:
+  - `OfflineSynchronizationContracts.ts` (types + transitions)
+  - `OfflineSynchronizationDtos.ts` (mapping)
+  - `OfflineSynchronizationSchemaContracts.ts` (validation)
+
 ## Required extension sequence
 
 1. Update shared contracts and schema validation first when any payload shape, status transition, conflict marker, or registration envelope changes.
@@ -61,6 +86,42 @@ Provide a durable implementation workflow for extending offline/local-mode behav
    - enforce allowed resource and execution classes through profile gates.
    - emit explicit offline-entered/offline-exited events from host-owned connectivity transitions.
 5. Update adapters/UI surfaces last to consume new canonical contracts; do not invent ad hoc offline object shapes.
+
+## Workflow-specific extension checklists
+
+### Extending cache population policy
+
+- update domain boundary capability/policy metadata first (`OfflineLocalModeBoundaries.ts`);
+- update classification gating (`OfflineResourceClassificationPolicy.ts`);
+- keep snapshot cache constraints unchanged:
+  - server-authoritative classes only,
+  - logical payload only (no filesystem references),
+  - digest integrity and retention bounds;
+- add/update application + infrastructure tests:
+  - `OfflineAuthoritativeSnapshotCache.test.ts`
+  - `DesktopOfflineSnapshotCacheRepository.test.ts`
+  - `DesktopOfflineSnapshotCacheHost.test.ts`
+
+### Extending connectivity transitions
+
+- keep transition authority in `DesktopConnectivityStateService` (not UI components);
+- preserve explicit state model (`connected`, `degraded`, `reconnecting`, `disconnected`);
+- preserve explicit deliberate-offline distinction (`offlineModeIntent='deliberate'`);
+- keep transition events best-effort and sanitized;
+- add/update tests:
+  - `DesktopConnectivityStateService.test.ts`
+  - `DesktopOfflineOperationalEventSink.test.ts`
+
+### Extending replay/conflict/cleanup behavior
+
+- add policy changes in `OfflineLocalModeResynchronization.ts` first;
+- keep explicit replay-preparation blocked reasons with structured metadata;
+- ensure coordinator cleanup classification remains explicit and queryable;
+- preserve post-sync cache maintenance semantics (refresh or invalidate);
+- add/update tests:
+  - `OfflinePendingOperationPersistence.test.ts`
+  - `OfflineControlledResynchronizationCoordinator.test.ts`
+  - `DesktopOfflineResynchronizationHost.test.ts`
 
 ## Adding a new offline resource class
 
@@ -162,3 +223,13 @@ When architecture behavior changes, update both:
 When contributor guidance changes, update both:
 - `docs/offline-local-mode-contributor-guide.md`
 - `docs/offline-local-mode-contributor-guide.ai.md`
+
+## Intentionally deferred behavior guardrails
+
+Do not implement these without explicit story scope:
+
+- automatic multi-branch conflict merging for offline drafts/queues;
+- desktop-to-desktop queue merge/sync outside authoritative replay;
+- secret plaintext offline cache or replay payload inclusion;
+- broadening local execution classes beyond profile-supported classes;
+- making operational/audit event publication required for replay success.
