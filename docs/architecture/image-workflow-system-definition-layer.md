@@ -16,6 +16,7 @@ This note is the reference implementation baseline for later AI capabilities tha
 Story 2.2.5 extends this baseline with authoritative query/list use cases so workflow/system discovery and reopen flows are driven by persisted platform metadata, not studio-local cache state.
 Story 2.2.6 extends the baseline with reusable readiness validation services so draft/incomplete/valid/runnable posture is evaluated consistently before later run-submission orchestration consumes definitions.
 Story 2.3.1 extends the baseline with an explicit initial supported workflow template set so authoring and downstream translation targets remain bounded and deterministic.
+Story 2.3.2 extends the baseline with internal translation-ready metadata for supported templates and consistency checks that keep translation descriptors aligned with typed requirements.
 
 ## Canonical implementation seams
 
@@ -45,6 +46,11 @@ Initial supported workflow template families for this slice:
 - `image-to-image` (`image-template:image-to-image-restyle:v1`)
 - `enhance-upscale` (`image-template:enhance-upscale:v1`)
 - `mask-guided-edit` (`image-template:mask-guided-edit:v1`)
+
+Template metadata split for translation-ready templates:
+
+- `display`: user-facing text surfaced by Studio and API projections.
+- `translation`: internal adapter metadata (translation key, capability hints, input/parameter/output mapping descriptors).
 
 ## Layered model and responsibilities
 
@@ -110,6 +116,11 @@ The following are explicitly not source-of-truth resources:
 - filesystem paths or ad hoc adapter metadata
 
 ComfyUI remains an infrastructure execution adapter boundary. Studio/UI layers remain authoring and projection surfaces over domain/application contracts.
+
+ComfyUI adapter consumption rule for Story 2.3.2:
+
+- use translation metadata keys to resolve adapter-internal graph templates;
+- keep raw ComfyUI graph JSON/prompt/history payloads out of workflow/system definition contracts and user-facing APIs.
 
 ## Versioning and evolution seams
 

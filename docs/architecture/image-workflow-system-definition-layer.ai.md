@@ -6,6 +6,7 @@ Story 2.1.5 defines the architecture contract for the image manipulation slice s
 Story 2.2.5 adds the authoritative query/list seam used by workflow/system discovery and reopen behavior.
 Story 2.2.6 adds a reusable readiness validation service seam used by authoring and query flows so incomplete/invalid definitions are surfaced consistently before run submission.
 Story 2.3.1 adds an explicit initial supported workflow template set for bounded authoring and translation-ready operation scope.
+Story 2.3.2 adds internal translation metadata for supported templates with consistency checks so backend adapters can translate without leaking backend graph shape into workflow/system source-of-truth models.
 
 ## Canonical seams
 
@@ -25,6 +26,11 @@ Initial supported template families:
 - `enhance-upscale` (`image-template:enhance-upscale:v1`)
 - `mask-guided-edit` (`image-template:mask-guided-edit:v1`)
 
+Template metadata split (Story 2.3.2):
+
+- `display`: user-facing labels and rationale
+- `translation`: internal keys, capability hints, and mapping descriptors used by adapters
+
 ## Layer model
 
 - Workflow definition: reusable typed contract for inputs, parameters, outputs, lifecycle, version lineage, and backend translation mappings.
@@ -42,6 +48,10 @@ Not authoritative:
 - filesystem paths in bindings/references
 
 ComfyUI remains an adapter boundary; Studio remains a projection/configuration surface.
+
+Adapter rule:
+
+- resolve adapter graph/prompt payloads from `translation` identifiers inside infrastructure adapters only; do not expose graph JSON or node ids via workflow/system contracts.
 
 ## Versioning/readiness seams
 
