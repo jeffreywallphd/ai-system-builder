@@ -41,3 +41,31 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 - Add WebSocket progress streaming within `ComfyUiTransportClient` without changing application contracts.
 - Add additional control operations (for example queue inspection expansion) in the same infrastructure seam.
 - Keep future backend adapters aligned to abstraction-first dispatch gateways.
+
+## Story 3.2.3 health + capability probes
+
+### Added behavior
+
+- `ComfyUiTransportClient` now exposes backend probe logic:
+  - reachability/responsiveness via `GET /queue`
+  - capability discovery via `GET /object_info`
+  - required-node capability compatibility checks for supported workflow templates
+
+### Normalized probe states
+
+- `ready`
+- `degraded`
+- `incompatible`
+- `unavailable`
+
+These states are infrastructure-normalized and avoid leaking raw response payloads upward.
+
+### Application-facing capability mapping
+
+- Added `ComfyUiImageManipulationCapabilityProbeAdapter` to project probe results into
+  `IImageManipulationExecutionCapabilityPort` / `ImageManipulationExecutionBackendStatus`.
+- Health mapping remains app-contract compatible:
+  - `ready -> healthy`
+  - `degraded|incompatible -> degraded`
+  - `unavailable -> unavailable`
+- Readiness detail is carried in diagnostics for later node-assignment and UX readiness messaging.

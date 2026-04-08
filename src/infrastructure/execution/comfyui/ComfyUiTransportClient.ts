@@ -28,7 +28,9 @@ export type ComfyUiTransportCancellationStatus =
 export type ComfyUiTransportOperation =
   | "submit-prompt"
   | "query-prompt-state"
-  | "request-cancellation";
+  | "request-cancellation"
+  | "probe-reachability"
+  | "probe-capabilities";
 
 export type ComfyUiTransportErrorCode =
   | "invalid-configuration"
@@ -109,6 +111,36 @@ export interface ComfyUiPromptCancellationResult {
   readonly status: ComfyUiTransportCancellationStatus;
   readonly acknowledgedAt: string;
   readonly state?: ComfyUiTransportPromptState;
+}
+
+export const ComfyUiBackendProbeStates = Object.freeze({
+  ready: "ready",
+  degraded: "degraded",
+  unavailable: "unavailable",
+  incompatible: "incompatible",
+});
+
+export type ComfyUiBackendProbeState =
+  typeof ComfyUiBackendProbeStates[keyof typeof ComfyUiBackendProbeStates];
+
+export interface ComfyUiBackendCapabilitySnapshot {
+  readonly supportsPromptSubmission: boolean;
+  readonly supportsQueueInspection: boolean;
+  readonly supportsPromptHistory: boolean;
+  readonly supportsCancellation: boolean;
+  readonly supportsCapabilityDiscovery: boolean;
+  readonly availableNodeTypes: ReadonlyArray<string>;
+  readonly missingRequiredNodeTypes: ReadonlyArray<string>;
+}
+
+export interface ComfyUiBackendProbeResult {
+  readonly checkedAt: string;
+  readonly state: ComfyUiBackendProbeState;
+  readonly reachable: boolean;
+  readonly responsive: boolean;
+  readonly message: string;
+  readonly capabilities: ComfyUiBackendCapabilitySnapshot;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
 }
 
 export class ComfyUiTransportClient {
@@ -312,6 +344,148 @@ export class ComfyUiTransportClient {
     }
   }
 
+  public async probeBackend(input: {
+    readonly requiredNodeTypes?: ReadonlyArray<string>;
+  } = {}): Promise<ComfyUiBackendProbeResult> {
+    const checkedAt = this.now().toISOString();
+    const requiredNodeTypes = normalizeRequiredNodeTypes(input.requiredNodeTypes ?? []);
+
+    try {
+      await this.requestJson<unknown>({
+        operation: "probe-reachability",
+        path: "/queue",
+        init: Object.freeze({
+          method: "GET",
+        }),
+      });
+    } catch (error) {
+      const diagnostics = error instanceof ComfyUiTransportClientError
+        ? Object.freeze({
+          errorCode: error.code,
+          operation: error.diagnostics.operation,
+          statusCode: error.diagnostics.statusCode,
+        })
+        : undefined;
+      return Object.freeze({
+        checkedAt,
+        state: ComfyUiBackendProbeStates.unavailable,
+        reachable: false,
+        responsive: false,
+        message: "ComfyUI backend is not reachable.",
+        capabilities: Object.freeze({
+          supportsPromptSubmission: false,
+          supportsQueueInspection: false,
+          supportsPromptHistory: false,
+          supportsCancellation: false,
+          supportsCapabilityDiscovery: false,
+          availableNodeTypes: Object.freeze([]),
+          missingRequiredNodeTypes: Object.freeze(requiredNodeTypes),
+        }),
+        diagnostics,
+      });
+    }
+
+    let availableNodeTypes: ReadonlyArray<string> = Object.freeze([]);
+    let supportsCapabilityDiscovery = false;
+    let capabilityProbeError: ComfyUiTransportClientError | undefined;
+    try {
+      const objectInfo = await this.requestJson<unknown>({
+        operation: "probe-capabilities",
+        path: "/object_info",
+        init: Object.freeze({
+          method: "GET",
+        }),
+      });
+
+      if (objectInfo && typeof objectInfo === "object" && !Array.isArray(objectInfo)) {
+        availableNodeTypes = Object.freeze(Object.keys(objectInfo).sort());
+        supportsCapabilityDiscovery = true;
+      }
+    } catch (error) {
+      if (error instanceof ComfyUiTransportClientError) {
+        capabilityProbeError = error;
+      } else {
+        capabilityProbeError = new ComfyUiTransportClientError({
+          code: "transport-unavailable",
+          message: "ComfyUI capability probe request failed.",
+          retryable: true,
+          diagnostics: {
+            operation: "probe-capabilities",
+            path: "/object_info",
+          },
+        });
+      }
+    }
+
+    if (capabilityProbeError) {
+      return Object.freeze({
+        checkedAt,
+        state: ComfyUiBackendProbeStates.degraded,
+        reachable: true,
+        responsive: true,
+        message: "ComfyUI backend is reachable but capability discovery is degraded.",
+        capabilities: Object.freeze({
+          supportsPromptSubmission: true,
+          supportsQueueInspection: true,
+          supportsPromptHistory: true,
+          supportsCancellation: true,
+          supportsCapabilityDiscovery: false,
+          availableNodeTypes: Object.freeze([]),
+          missingRequiredNodeTypes: Object.freeze([]),
+        }),
+        diagnostics: Object.freeze({
+          reason: "capability-probe-failed",
+          errorCode: capabilityProbeError.code,
+          statusCode: capabilityProbeError.diagnostics.statusCode,
+        }),
+      });
+    }
+
+    const missingRequiredNodeTypes = Object.freeze(requiredNodeTypes.filter((nodeType) => !availableNodeTypes.includes(nodeType)));
+    if (missingRequiredNodeTypes.length > 0) {
+      return Object.freeze({
+        checkedAt,
+        state: ComfyUiBackendProbeStates.incompatible,
+        reachable: true,
+        responsive: true,
+        message: "ComfyUI backend is reachable but missing required workflow node capabilities.",
+        capabilities: Object.freeze({
+          supportsPromptSubmission: true,
+          supportsQueueInspection: true,
+          supportsPromptHistory: true,
+          supportsCancellation: true,
+          supportsCapabilityDiscovery,
+          availableNodeTypes,
+          missingRequiredNodeTypes,
+        }),
+        diagnostics: Object.freeze({
+          reason: "missing-required-node-types",
+          missingRequiredNodeTypes,
+        }),
+      });
+    }
+
+    return Object.freeze({
+      checkedAt,
+      state: ComfyUiBackendProbeStates.ready,
+      reachable: true,
+      responsive: true,
+      message: "ComfyUI backend is reachable and supports required execution capabilities.",
+      capabilities: Object.freeze({
+        supportsPromptSubmission: true,
+        supportsQueueInspection: true,
+        supportsPromptHistory: true,
+        supportsCancellation: true,
+        supportsCapabilityDiscovery,
+        availableNodeTypes,
+        missingRequiredNodeTypes: Object.freeze([]),
+      }),
+      diagnostics: Object.freeze({
+        reason: "ready",
+      }),
+    });
+  }
+
   private async requestJson<TResponse>(input: {
     readonly operation: ComfyUiTransportOperation;
     readonly path: string;
@@ -513,6 +687,20 @@ function normalizePositiveInteger(value: number | undefined, fallback: number): 
     return fallback;
   }
   return Math.floor(value);
+}
+
+function normalizeRequiredNodeTypes(nodeTypes: ReadonlyArray<string>): ReadonlyArray<string> {
+  const deduped = new Set<string>();
+  for (const entry of nodeTypes) {
+    if (typeof entry !== "string") {
+      continue;
+    }
+    const trimmed = entry.trim();
+    if (trimmed) {
+      deduped.add(trimmed);
+    }
+  }
+  return Object.freeze([...deduped]);
 }
 
 function resolveStateFromHistory(historyEntry: ComfyHistoryPromptEntryDto): {

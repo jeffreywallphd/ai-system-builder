@@ -1,5 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import {
+  ComfyUiBackendProbeStates,
   ComfyUiTransportClient,
   ComfyUiTransportClientError,
   ComfyUiTransportCancellationStatuses,
@@ -191,5 +192,108 @@ describe("ComfyUiTransportClient", () => {
       expect(typed.code).toBe("request-timeout");
       expect(typed.retryable).toBeTrue();
     }
+  });
+
+  it("reports ready backend probe state when reachability and required capabilities are present", async () => {
+    const fetchFn = mock(async (url: string) => {
+      if (url.endsWith("/queue")) {
+        return new Response(JSON.stringify({
+          queue_running: [],
+          queue_pending: [],
+        }));
+      }
+      return new Response(JSON.stringify({
+        LoadImage: Object.freeze({}),
+        SaveImage: Object.freeze({}),
+      }));
+    });
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+      now: () => new Date("2026-04-08T10:04:00.000Z"),
+    });
+
+    const probe = await client.probeBackend({
+      requiredNodeTypes: Object.freeze(["LoadImage", "SaveImage"]),
+    });
+
+    expect(probe.state).toBe(ComfyUiBackendProbeStates.ready);
+    expect(probe.reachable).toBeTrue();
+    expect(probe.responsive).toBeTrue();
+    expect(probe.capabilities.supportsCapabilityDiscovery).toBeTrue();
+    expect(probe.capabilities.missingRequiredNodeTypes).toEqual([]);
+  });
+
+  it("reports degraded backend probe state when capability discovery fails", async () => {
+    const fetchFn = mock(async (url: string) => {
+      if (url.endsWith("/queue")) {
+        return new Response(JSON.stringify({
+          queue_running: [],
+          queue_pending: [],
+        }));
+      }
+      return new Response("not found", {
+        status: 404,
+      });
+    });
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+    });
+
+    const probe = await client.probeBackend({
+      requiredNodeTypes: Object.freeze(["LoadImage"]),
+    });
+
+    expect(probe.state).toBe(ComfyUiBackendProbeStates.degraded);
+    expect(probe.reachable).toBeTrue();
+    expect(probe.responsive).toBeTrue();
+    expect(probe.capabilities.supportsCapabilityDiscovery).toBeFalse();
+  });
+
+  it("reports unavailable backend probe state when reachability check fails", async () => {
+    const fetchFn = mock(async () => {
+      throw new Error("ECONNREFUSED");
+    });
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+    });
+
+    const probe = await client.probeBackend({
+      requiredNodeTypes: Object.freeze(["LoadImage"]),
+    });
+
+    expect(probe.state).toBe(ComfyUiBackendProbeStates.unavailable);
+    expect(probe.reachable).toBeFalse();
+    expect(probe.responsive).toBeFalse();
+    expect(probe.capabilities.missingRequiredNodeTypes).toEqual(["LoadImage"]);
+  });
+
+  it("reports incompatible backend probe state when required node capabilities are missing", async () => {
+    const fetchFn = mock(async (url: string) => {
+      if (url.endsWith("/queue")) {
+        return new Response(JSON.stringify({
+          queue_running: [],
+          queue_pending: [],
+        }));
+      }
+      return new Response(JSON.stringify({
+        LoadImage: Object.freeze({}),
+      }));
+    });
+    const client = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+    });
+
+    const probe = await client.probeBackend({
+      requiredNodeTypes: Object.freeze(["LoadImage", "SaveImage"]),
+    });
+
+    expect(probe.state).toBe(ComfyUiBackendProbeStates.incompatible);
+    expect(probe.reachable).toBeTrue();
+    expect(probe.responsive).toBeTrue();
+    expect(probe.capabilities.missingRequiredNodeTypes).toEqual(["SaveImage"]);
   });
 });
