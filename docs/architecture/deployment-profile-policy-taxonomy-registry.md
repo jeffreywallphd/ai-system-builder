@@ -77,7 +77,7 @@ UI/transport/infrastructure layers should reference registry metadata through do
 When adding a new policy family or setting:
 
 1. Extend `createCanonicalDeploymentPolicyFamilyCatalog(...)` with scope, `valueKind`, and validation rules.
-2. Add/adjust profile defaults in `createCanonicalDeploymentProfilePresetCatalog(...)`.
+2. Add/adjust profile defaults in `createCanonicalDeploymentProfilePresetDefinitions(...)` (consumed by `createCanonicalDeploymentProfilePresetCatalog(...)`).
 3. Verify profile relationships via `createCanonicalDeploymentPolicyConfigurationRegistry()`.
 4. Add domain tests for allowed/disallowed values and range rules.
 5. Add application tests proving admin override validation follows taxonomy rules.
