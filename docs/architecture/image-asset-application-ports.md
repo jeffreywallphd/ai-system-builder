@@ -37,6 +37,10 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/audit/AuthoritativeImageAssetAuditSink.ts`
+- `src/infrastructure/api/image-assets/ImageAssetManagementObservability.ts`
+- `src/infrastructure/api/image-assets/ImageAssetManagementObservabilityRedaction.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementObservability.test.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 
@@ -263,3 +267,28 @@ This story hardens image-ingestion boundaries so unsupported or malformed upload
   - invalid assets are rejected with clear, actionable API errors
   - filename/media metadata is normalized and sanitized at the boundary
   - invalid upload states are blocked before availability transition and downstream execution use
+
+## Story 1.4.4: operational diagnostics and observability hardening
+
+This story adds structured, redacted developer diagnostics for image-asset ingestion and retrieval operations, without exposing sensitive storage or payload material.
+
+- Added `ImageAssetManagementObservability`:
+  - structured operation events for create, upload ingest, upload finalize, metadata reads, original retrieval, preview request, and preview open
+  - consistent outcome and severity mapping (`success`, `rejected`, `failure`)
+  - request-to-asset trace metadata (`workspaceId`, `assetId`, `actorUserIdentityId`, `correlationId`, `operationKey`)
+- Added `ImageAssetManagementObservabilityRedaction`:
+  - centralized redaction for upload/preview tokens, storage object keys/references, payload/stream fields, path-like values, and checksum/fingerprint fields
+  - diagnostics keep stable operator signals (validation codes, stage markers, pagination counts) while enforcing the non-leaky platform posture
+- `ImageAssetManagementBackendApi` now publishes observability events for all core ingestion and retrieval paths:
+  - create + storage reservation
+  - upload ingestion validation/write
+  - upload finalization
+  - metadata get/list
+  - original content open
+  - preview request/open
+- `IdentityServerHost` now wires image-asset observability through the shared server logger bridge so production debugging no longer depends on ad hoc local console tracing.
+
+Security posture:
+
+- End-user API error payloads are unchanged; richer diagnostics remain operational-only.
+- Observability publishing is best-effort and cannot block ingestion or retrieval control flow.

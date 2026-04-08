@@ -83,6 +83,7 @@ import { StorageManagementBackendApi } from "@infrastructure/api/storage/Storage
 import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/api/storage/WorkspaceAwareStoragePolicyEvaluationAdapter";
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
 import { ImageAssetManagementBackendApi } from "@infrastructure/api/image-assets/ImageAssetManagementBackendApi";
+import { ImageAssetManagementObservability } from "@infrastructure/api/image-assets/ImageAssetManagementObservability";
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
@@ -1096,6 +1097,9 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     imageAssetStoragePort: imageAssetStorageAdapter,
     uploadSessionTokenSecret: resolveImageAssetUploadSessionTokenSecret(env),
+    observability: new ImageAssetManagementObservability({
+      logger: createImageAssetManagementOperationalLogger(options.logger),
+    }),
   });
   const runSubmissionAuditSink = new PlatformRunSubmissionAuditSink(
     persistentPlatformServices.platformPersistenceRepository,
@@ -1848,6 +1852,58 @@ function createEncryptionOperationalLogger(logger: IdentityHttpServerLogger | un
           ?? resolveOptionalString(event.event),
         details: Object.freeze({
           encryption: event,
+        }),
+      });
+    },
+  });
+}
+
+function createImageAssetManagementOperationalLogger(logger: IdentityHttpServerLogger | undefined): {
+  info(event: Record<string, unknown>): void;
+  warn(event: Record<string, unknown>): void;
+  error(event: Record<string, unknown>): void;
+} | undefined {
+  if (!logger) {
+    return undefined;
+  }
+
+  return Object.freeze({
+    info: (event: Record<string, unknown>) => {
+      logger.info({
+        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.assetId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          imageAssetManagement: event,
+        }),
+      });
+    },
+    warn: (event: Record<string, unknown>) => {
+      logger.warn({
+        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.assetId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          imageAssetManagement: event,
+        }),
+      });
+    },
+    error: (event: Record<string, unknown>) => {
+      logger.error({
+        event: resolveOptionalString(event.event) ?? "image-asset-management.operation",
+        requestId: resolveOptionalString(event.requestId)
+          ?? resolveOptionalString(event.correlationId)
+          ?? resolveOptionalString(event.operationKey)
+          ?? resolveOptionalString(event.assetId)
+          ?? resolveOptionalString(event.workspaceId),
+        details: Object.freeze({
+          imageAssetManagement: event,
         }),
       });
     },
