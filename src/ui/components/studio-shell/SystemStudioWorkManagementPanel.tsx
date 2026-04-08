@@ -13,6 +13,10 @@ import {
   createWorkflowParameterInitialValues,
   validateWorkflowParameterValues,
 } from "./SystemWorkflowParameterFormPresenter";
+import {
+  presentSavedImageSystemOptions,
+  presentSupportedEditTypeOptions,
+} from "./SystemWorkflowSelectionPresenter";
 
 function readDefaultReferenceValues(content: string): {
   readonly imageSystemDefinitionId?: string;
@@ -136,7 +140,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
           return;
         }
         if (!response?.ok || !response.data) {
-          setWorkflowLoadError("Could not load supported workflows.");
+          setWorkflowLoadError("Could not load supported edit types.");
           setSupportedWorkflows([]);
           return;
         }
@@ -156,7 +160,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
         if (disposed) {
           return;
         }
-        setWorkflowLoadError("Could not load supported workflows.");
+        setWorkflowLoadError("Could not load supported edit types.");
         setSupportedWorkflows([]);
       })
       .finally(() => {
@@ -218,7 +222,6 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     setIsSystemListLoading(true);
     setSystemLoadError(undefined);
     void listImageSystemDefinitions({
-      workflowIds: workflowAssetId.trim() ? [workflowAssetId.trim()] : undefined,
       limit: 50,
     }).then((response) => {
       if (disposed) {
@@ -258,7 +261,6 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     draft?.draftId,
     imageSystemOperationsAvailable,
     selectedSavedSystemId,
-    workflowAssetId,
   ]);
 
   useEffect(() => {
@@ -306,17 +308,29 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       values: workflowParameterValues,
     })
     : undefined;
+  const editTypeOptions = presentSupportedEditTypeOptions({
+    workflows: supportedWorkflows,
+    selectedWorkflowId: workflowAssetId,
+  });
+  const selectedEditTypeOption = editTypeOptions.find((entry) => entry.selected);
+  const savedSystemOptions = presentSavedImageSystemOptions({
+    systems: savedSystems,
+    workflows: supportedWorkflows,
+    selectedSystemId: selectedSavedSystemId,
+  });
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-studio-work-management-panel">
-      <p className="ui-text-small ui-text-secondary">Save reusable image systems, update existing definitions, reopen saved systems, and rename from one place.</p>
+      <p className="ui-text-small ui-text-secondary">
+        Save reusable image systems, reopen prior work, choose an edit type, and keep setup details in sync from authoritative definitions.
+      </p>
       <div className="ui-row ui-row--wrap" style={{ gap: "0.5rem" }}>
         <button
           type="button"
           className="ui-button ui-button--primary"
           onClick={() => {
             if (!selectedWorkflowDetail) {
-              setStatus("Choose a supported workflow operation before saving.");
+              setStatus("Choose a supported edit type before saving.");
               return;
             }
             if (workflowParameterValidation?.hasIssues) {
@@ -433,7 +447,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               return;
             }
             if (!selectedWorkflowDetail) {
-              setStatus("Choose a supported workflow operation before updating.");
+              setStatus("Choose a supported edit type before updating.");
               return;
             }
             if (workflowParameterValidation?.hasIssues) {
@@ -492,7 +506,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       <div className="ui-stack ui-stack--xs" data-testid="system-studio-saved-systems">
         <strong>Saved image systems</strong>
         <label className="ui-field">
-          <span className="ui-field__label">Choose saved system</span>
+          <span className="ui-field__label">Reopen saved work</span>
           <select
             className="ui-select"
             value={selectedSavedSystemId}
@@ -500,9 +514,10 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
             disabled={!imageSystemOperationsAvailable || isSystemListLoading}
           >
             <option value="">Select a saved image system</option>
-            {savedSystems.map((system) => (
+            {savedSystemOptions.map((system) => (
               <option key={system.systemId} value={system.systemId}>
-                {system.title} ({system.readinessState})
+                {system.title}
+                {system.editTypeTitle ? ` - ${system.editTypeTitle}` : ""}
               </option>
             ))}
           </select>
@@ -520,13 +535,16 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
           <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
             <strong>{selectedSavedSystemDetail.title}</strong>
             <p className="ui-text-small ui-text-secondary">
-              Workflow: {selectedSavedSystemDetail.workflowId}
-              {" | "}
-              Version: {selectedSavedSystemDetail.workflowVersionTag}
-            </p>
-            <p className="ui-text-small ui-text-secondary">
               Readiness: {selectedSavedSystemDetail.readinessSummary}
             </p>
+            <details>
+              <summary className="ui-text-small ui-text-secondary">Advanced system metadata</summary>
+              <p className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem" }}>
+                Workflow ID: {selectedSavedSystemDetail.workflowId}
+                {" | "}
+                Workflow version: {selectedSavedSystemDetail.workflowVersionTag}
+              </p>
+            </details>
           </div>
         ) : null}
       </div>
@@ -569,28 +587,54 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       </label>
 
       <div className="ui-stack ui-stack--xs" data-testid="system-studio-workflow-picker">
-        <strong>Supported workflow operations</strong>
+        <strong>Supported edit types</strong>
         <label className="ui-field">
-          <span className="ui-field__label">Choose operation</span>
+          <span className="ui-field__label">Choose edit type</span>
           <select
             className="ui-select"
             value={workflowAssetId}
             onChange={(event) => setWorkflowAssetId(event.currentTarget.value)}
             disabled={!workflowPickerAvailable || isWorkflowListLoading}
           >
-            <option value="">Select a supported workflow</option>
-            {supportedWorkflows.map((workflow) => (
+            <option value="">Select a supported edit type</option>
+            {editTypeOptions.map((workflow) => (
               <option key={workflow.workflowId} value={workflow.workflowId}>
-                {workflow.title} ({workflow.operationKind})
+                {workflow.title}
               </option>
             ))}
           </select>
         </label>
+        {selectedEditTypeOption?.recommended ? (
+          <span className="ui-text-small ui-text-secondary">Recommended default edit type is selected for this draft.</span>
+        ) : editTypeOptions[0] ? (
+          <span className="ui-text-small ui-text-secondary">
+            Recommended: {editTypeOptions[0].title}
+          </span>
+        ) : null}
+        {editTypeOptions.length > 0 ? (
+          <div className="ui-grid ui-grid--2">
+            {editTypeOptions.map((option) => (
+              <button
+                key={option.workflowId}
+                type="button"
+                className="ui-button ui-button--ghost"
+                onClick={() => setWorkflowAssetId(option.workflowId)}
+                aria-pressed={option.selected}
+              >
+                <span>{option.title}{option.selected ? " (Selected)" : ""}</span>
+                <span className="ui-text-small ui-text-secondary">{option.summary}</span>
+                {option.recommended ? (
+                  <span className="ui-text-small ui-text-secondary">Recommended</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {isWorkflowListLoading ? (
-          <span className="ui-text-small ui-text-secondary">Loading supported workflows...</span>
+          <span className="ui-text-small ui-text-secondary">Loading supported edit types...</span>
         ) : null}
         {!workflowPickerAvailable ? (
-          <span className="ui-text-small ui-text-secondary">Workflow selection is unavailable in this host.</span>
+          <span className="ui-text-small ui-text-secondary">Edit-type selection is unavailable in this host.</span>
         ) : null}
         {workflowLoadError ? (
           <span className="ui-text-small ui-text-danger">{workflowLoadError}</span>
@@ -601,10 +645,18 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
             <p className="ui-text-small ui-text-secondary">{selectedWorkflowDetail.summary}</p>
             <p className="ui-text-small ui-text-secondary">{selectedWorkflowDetail.rationale}</p>
             <p className="ui-text-small ui-text-secondary">
-              ID: {selectedWorkflowDetail.workflowId}
-              {" | "}
-              Version: {selectedWorkflowDetail.version.versionTag}
+              Default settings for this edit type are loaded from the supported template.
             </p>
+            <details>
+              <summary className="ui-text-small ui-text-secondary">Advanced template metadata</summary>
+              <p className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem" }}>
+                Workflow ID: {selectedWorkflowDetail.workflowId}
+                {" | "}
+                Version: {selectedWorkflowDetail.version.versionTag}
+                {" | "}
+                Operation kind: {selectedWorkflowDetail.operationKind}
+              </p>
+            </details>
           </div>
         ) : null}
         {selectedWorkflowDetail && workflowParameterValidation ? (

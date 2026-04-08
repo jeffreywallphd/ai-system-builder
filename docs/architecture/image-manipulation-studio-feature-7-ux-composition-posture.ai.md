@@ -81,3 +81,22 @@ Guardrails preserved:
 - logical image asset ids and metadata remain canonical identity state,
 - reuse actions continue routing through authoritative metadata/content retrieval and ingestion seams rather than local shortcuts.
 
+## Epic 7.2 Story 7.2.2 implementation update
+
+Story 7.2.2 upgrades "Choose edit" so supported image manipulations are presented as user-facing edit types backed by authoritative workflow/system definitions.
+
+Added seams:
+
+- `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+- `src/ui/components/studio-shell/SystemWorkflowSelectionPresenter.ts`
+- `src/ui/components/studio-shell/tests/SystemWorkflowSelectionPresenter.test.ts`
+- `src/ui/components/studio-shell/tests/SystemStudioWorkManagementPanel.test.tsx`
+
+Implementation posture:
+
+- edit-type options come from authoritative workflow-definition APIs (supported-template metadata),
+- default UX copy favors edit-type language (name + summary) over raw workflow jargon,
+- saved-system reopen remains first-class and is not gated by currently selected edit type,
+- authoritative IDs (`workflowId`, `systemId`, versions) remain the persisted/runtime truth,
+- technical metadata is kept in advanced details instead of primary UX copy.
+
