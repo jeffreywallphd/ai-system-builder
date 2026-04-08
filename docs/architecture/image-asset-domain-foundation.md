@@ -44,3 +44,27 @@ Implemented invariants include:
 - Domain-only: no HTTP, React, Electron, filesystem APIs, or ComfyUI runtime details.
 - Image assets are modeled as logical protected resources for authoritative API and policy enforcement layers.
 - The model is lineage-ready for future run orchestration and generated-output traceability without redesign.
+
+## Story 1.1.3: Shared DTO/schema contracts
+
+Image-asset transport contracts for authoritative API and event surfaces are now defined in:
+
+- `src/shared/contracts/assets/ImageAssetTransportContracts.ts`
+- `src/shared/dto/assets/ImageAssetTransportDtos.ts`
+- `src/shared/dto/assets/ImageAssetPersistenceDtos.ts`
+- `src/shared/schemas/assets/ImageAssetTransportSchemaContracts.ts`
+
+The shared contracts now cover:
+
+- image asset creation request/response
+- upload initiation and completion/finalization request/response
+- metadata lookup and list/query request/response
+- preview request/response
+- logical download/export access grant request/response
+- image-asset event envelopes for lifecycle/upload/access flow reporting
+
+Boundary posture for this story:
+
+- external API DTOs are explicitly separate from persistence DTOs
+- contracts remain host-neutral for desktop and thin-client convergence
+- API/event payloads do not expose raw filesystem paths

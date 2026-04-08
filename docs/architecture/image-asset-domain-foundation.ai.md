@@ -41,3 +41,27 @@ Both uploaded source and generated result image assets are first-class through `
 - Domain contracts remain infrastructure-agnostic.
 - No raw filesystem path assumptions are encoded in the model.
 - The model is ready for authoritative API, policy checks, preview-safe retrieval, and future run-lineage orchestration.
+
+## Story 1.1.3 shared DTO/schema contract additions
+
+Shared API and event contracts for image assets now live in:
+
+- `src/shared/contracts/assets/ImageAssetTransportContracts.ts`
+- `src/shared/dto/assets/ImageAssetTransportDtos.ts`
+- `src/shared/dto/assets/ImageAssetPersistenceDtos.ts`
+- `src/shared/schemas/assets/ImageAssetTransportSchemaContracts.ts`
+
+Coverage includes:
+
+- create image asset request/response contracts
+- upload initiation and upload completion contracts
+- metadata read and list/query contracts (workspace, ownership, status, visibility, media, storage filters)
+- preview request contracts
+- logical download/export access grant contracts
+- image-asset lifecycle/audit event contracts
+
+Boundary guarantees in these shared contracts:
+
+- external API DTOs are separated from internal persistence DTOs
+- contracts are desktop/thin-client safe and server-authoritative
+- no raw filesystem path fields are exposed in API/event payloads
