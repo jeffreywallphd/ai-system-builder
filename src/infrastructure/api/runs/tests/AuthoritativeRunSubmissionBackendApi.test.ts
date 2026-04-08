@@ -184,6 +184,10 @@ describe("AuthoritativeRunSubmissionBackendApi", () => {
     expect(logger.warnEvents).toHaveLength(1);
     expect(logger.warnEvents[0]?.correlationId).toBe("corr-123");
     expect(logger.warnEvents[0]?.requestId).toBe("client-request-1");
+    expect(logger.warnEvents[0]?.slice).toBe("image-manipulation");
+    expect(logger.warnEvents[0]?.correlation.requestId).toBe("client-request-1");
+    expect(logger.warnEvents[0]?.correlation.correlationId).toBe("corr-123");
+    expect(logger.warnEvents[0]?.resilience?.[0]?.category).toBe("validation");
     const serialized = JSON.stringify(logger.warnEvents[0]);
     expect(serialized).not.toContain("should never be logged");
     expect(serialized).toContain("[REDACTED]");

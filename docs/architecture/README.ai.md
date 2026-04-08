@@ -240,6 +240,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 8 / Epic 8.1 Story 8.1.3 retry/recovery/escalation contract baseline for automatic/manual retry posture, user-action-required flow, backend-recovery-pending semantics, and operator/admin escalation guidance: `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
 - Feature 8 / Epic 8.1 Story 8.1.4 resilience/error-handling architecture baseline for infrastructure-to-application normalization flow, API/presenter projection boundaries, and retry/recovery ownership rules: `docs/architecture/image-manipulation-resilience-error-handling-architecture.md`
 - Feature 8 / Epic 8.2 Story 8.2.1 hardened ingestion/retrieval validation and failure normalization posture for malformed/unsupported/corrupted/stale image asset requests: `docs/architecture/image-asset-validation-retrieval-hardening.md`
+- Feature 8 / Epic 8.2 Story 8.2.5 structured resilience diagnostics, request-to-run/result correlation, and redaction-safe observability conventions across image slice services: `docs/architecture/image-manipulation-resilience-diagnostics-correlation-redaction-conventions.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

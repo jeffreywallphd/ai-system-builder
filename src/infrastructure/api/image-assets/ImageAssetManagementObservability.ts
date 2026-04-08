@@ -1,5 +1,12 @@
 import type { ImageAssetManagementApiResponse } from "./sdk/PublicImageAssetManagementApiContract";
 import { sanitizeImageAssetManagementObservabilityPayload } from "./ImageAssetManagementObservabilityRedaction";
+import {
+  createImageManipulationSliceCorrelation,
+  deriveImageManipulationResilienceDiagnostics,
+  IMAGE_MANIPULATION_SLICE_NAME,
+  type ImageManipulationSliceCorrelation,
+  type ImageManipulationSliceResilienceDiagnostic,
+} from "@infrastructure/logging/ImageManipulationSliceDiagnostics";
 
 export const ImageAssetManagementObservabilityFlows = Object.freeze({
   create: "create",
@@ -16,6 +23,7 @@ export type ImageAssetManagementObservabilityFlow =
   typeof ImageAssetManagementObservabilityFlows[keyof typeof ImageAssetManagementObservabilityFlows];
 
 export interface ImageAssetManagementObservabilityLogEvent {
+  readonly slice: typeof IMAGE_MANIPULATION_SLICE_NAME;
   readonly event: string;
   readonly flow: ImageAssetManagementObservabilityFlow;
   readonly outcome: "success" | "rejected" | "failure";
@@ -30,6 +38,8 @@ export interface ImageAssetManagementObservabilityLogEvent {
     readonly operationKey?: string;
   }>;
   readonly diagnostics: Readonly<Record<string, unknown>>;
+  readonly correlation: Readonly<ImageManipulationSliceCorrelation>;
+  readonly resilience?: ReadonlyArray<ImageManipulationSliceResilienceDiagnostic>;
 }
 
 export interface ImageAssetManagementObservabilityLogger {
@@ -81,8 +91,26 @@ export class ImageAssetManagementObservability {
         ?? trace.workspaceId
         ?? normalizeOptional(trace.actorUserIdentityId)
         ?? "image-asset-api";
+      const correlation = createImageManipulationSliceCorrelation({
+        requestId,
+        correlationId: trace.correlationId,
+        workspaceId: trace.workspaceId,
+        assetId: trace.assetId,
+        operationKey: trace.operationKey,
+      });
+      const resilience = !input.response.ok
+        ? deriveImageManipulationResilienceDiagnostics({
+          details: input.response.error?.details,
+          defaultCode: `image-asset-${input.flow}-${input.response.error?.code ?? "failed"}`,
+          defaultSummary: input.response.error?.message?.trim() || "Image asset API operation failed.",
+          defaultCategory: input.response.error?.code === "invalid-request" ? "validation" : "operational",
+          defaultRetryable: false,
+          defaultDegraded: input.response.error?.code === "internal",
+        })
+        : undefined;
 
       const event = sanitizeImageAssetManagementObservabilityPayload(Object.freeze({
+        slice: IMAGE_MANIPULATION_SLICE_NAME,
         event: `image-asset-management.${input.flow}.completed`,
         flow: input.flow,
         outcome: outcome.outcome,
@@ -90,6 +118,8 @@ export class ImageAssetManagementObservability {
         occurredAt,
         requestId,
         trace,
+        correlation,
+        resilience,
         diagnostics: Object.freeze({
           request: input.request,
           response: input.response,

@@ -132,6 +132,8 @@ describe("ComfyUi execution observability and redaction", () => {
     expect(events.some((event) => event.event === "translation.succeeded")).toBeTrue();
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("secret portrait prompt text");
+    expect(events.every((event) => event.slice === "image-manipulation")).toBeTrue();
+    expect(events.some((event) => event.correlation.runId === "run-1")).toBeTrue();
   });
 
   it("logs dispatch and transport failures with redaction and execution correlation ids", async () => {
@@ -208,6 +210,9 @@ describe("ComfyUi execution observability and redaction", () => {
     expect(events.some((event) => event.event === "dispatch.started" && event.runId === "run-1")).toBeTrue();
     expect(events.some((event) => event.event === "transport.request-failed")).toBeTrue();
     expect(events.some((event) => event.event === "dispatch.failed" && event.dispatchAttemptId === "dispatch-1")).toBeTrue();
+    const failedDispatch = events.find((event) => event.event === "dispatch.failed");
+    expect(failedDispatch?.correlation.runId).toBe("run-1");
+    expect(failedDispatch?.resilience?.length).toBeGreaterThan(0);
     const serialized = JSON.stringify(events);
     expect(serialized).not.toContain("do-not-log-this");
     expect(serialized).not.toContain("C:\\unsafe\\path");
@@ -238,5 +243,8 @@ describe("ComfyUi execution observability and redaction", () => {
     const normalizationEvent = logger.warnEvents.find((event) => event.event === "progress-normalization.completed");
     expect(normalizationEvent).toBeDefined();
     expect(normalizationEvent?.details?.normalizedState).toBe("preparing");
+    expect(normalizationEvent?.slice).toBe("image-manipulation");
+    expect(normalizationEvent?.correlation.workspaceId).toBe("workspace-1");
+    expect(normalizationEvent?.resilience?.[0]?.category).toBe("degraded");
   });
 });

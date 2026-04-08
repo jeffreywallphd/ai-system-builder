@@ -61,6 +61,11 @@ describe("RunOrchestrationObservability", () => {
     expect(serialized).not.toContain("do not leak this");
     expect(serialized).not.toContain("hidden");
     expect(serialized).toContain("[REDACTED]");
+    expect(logged.slice).toBe("image-manipulation");
+    expect(logged.correlation.runId).toBe("run:redaction");
+    expect(logged.correlation.workspaceId).toBe("workspace-alpha");
+    expect(logged.resilience?.length).toBeGreaterThan(0);
+    expect(logged.resilience?.[0]?.category).toBe("operational");
   });
 
   it("emits operation and counter metrics with operation/outcome tags", async () => {
@@ -91,6 +96,9 @@ describe("RunOrchestrationObservability", () => {
     expect(metrics.some((event) => event.name === "run_orchestration_operation_total")).toBeTrue();
     expect(metrics.some((event) => event.name === "run_orchestration_queue_items_total" && event.value === 3)).toBeTrue();
     expect(metrics.some((event) => event.name === "run_orchestration_state_running_total" && event.value === 1)).toBeTrue();
+    expect(logger.infoEvents[0]?.slice).toBe("image-manipulation");
+    expect(logger.infoEvents[0]?.correlation.workspaceId).toBe("workspace-alpha");
+    expect(logger.infoEvents[0]?.resilience).toBeUndefined();
     for (const metric of metrics) {
       expect(metric.tags?.operation).toBe("query.list-queue-status");
       expect(metric.tags?.outcome).toBe("success");

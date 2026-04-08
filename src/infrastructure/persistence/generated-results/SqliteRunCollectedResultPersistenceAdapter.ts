@@ -27,6 +27,17 @@ import {
 } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
 import { deriveImageManipulationRetryRecoveryContractFromClassification } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 import { createWorkspaceTenancyMetadata } from "@shared/persistence/PersistenceTenancyMetadataFactory";
+import {
+  ConsolePersistenceDiagnosticsLogger,
+  type IPersistenceDiagnosticsLogger,
+  type PersistenceDiagnosticsLogLevel,
+} from "@infrastructure/logging/PersistenceDiagnosticsLogger";
+import {
+  createImageManipulationSliceCorrelation,
+  deriveImageManipulationResilienceDiagnostics,
+  IMAGE_MANIPULATION_SLICE_NAME,
+  type ImageManipulationSliceResilienceDiagnostic,
+} from "@infrastructure/logging/ImageManipulationSliceDiagnostics";
 import type {
   GeneratedResultPersistenceRecord,
   GeneratedResultPreviewPersistenceRecord,
@@ -46,6 +57,7 @@ const KnownImageMediaTypes = new Set([
 
 interface SqliteRunCollectedResultPersistenceAdapterDependencies {
   readonly repository: IGeneratedResultPersistenceRepository;
+  readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger;
   readonly now?: () => Date;
 }
 
@@ -291,9 +303,11 @@ function createFailedPreviewRecord(input: {
 
 export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollectedResultPersistencePort {
   private readonly now: () => Date;
+  private readonly diagnosticsLogger: IPersistenceDiagnosticsLogger;
 
   public constructor(private readonly dependencies: SqliteRunCollectedResultPersistenceAdapterDependencies) {
     this.now = dependencies.now ?? (() => new Date());
+    this.diagnosticsLogger = dependencies.diagnosticsLogger ?? new ConsolePersistenceDiagnosticsLogger();
   }
 
   public async persistCollectedResult(request: RunCollectedResultPersistenceRequest): Promise<RunCollectedResultPersistenceResult> {
@@ -432,10 +446,43 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         const failureMessage = retryable
           ? "Result persistence is temporarily unavailable."
           : "Result persistence failed.";
+        const resultSaveResilience = deriveImageManipulationResilienceDiagnostics({
+          diagnostics: [Object.freeze({
+            code: failureCode,
+            category: retryable ? "degraded" : "operational",
+            summary: failureMessage,
+            retryable: collectionFailure.recovery.retryEligible,
+            degraded: collectionFailure.classification.degraded,
+            recoveryKind: collectionFailure.recovery.recoveryKind,
+            retryAfterMs: collectionFailure.recovery.retryAfterMs,
+            scope: "result-collection",
+            state: "result-persistence-failed",
+          })],
+          defaultCode: failureCode,
+          defaultSummary: failureMessage,
+        });
 
         if (retryable) {
           storageUnavailableCount += 1;
         }
+        this.recordPersistenceDiagnostic({
+          level: retryable ? "warn" : "error",
+          operation: "persist-collected-result.save-result",
+          code: failureCode,
+          retryable,
+          occurredAt,
+          request,
+          resultAssetId,
+          resilience: resultSaveResilience,
+          details: Object.freeze({
+            message: failureMessage,
+            outputDescriptorId: record.descriptorId,
+            event: "result-save-failed",
+            errorSummary: toSafeErrorSummary(error),
+            classification: collectionFailure.classification,
+            recovery: collectionFailure.recovery,
+          }),
+        });
 
         try {
           const failedRecord = Object.freeze({
@@ -466,6 +513,22 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
             }),
           });
         } catch {
+          this.recordPersistenceDiagnostic({
+            level: "error",
+            operation: "persist-collected-result.save-result-fallback",
+            code: failureCode,
+            retryable: false,
+            occurredAt,
+            request,
+            resultAssetId,
+            resilience: resultSaveResilience,
+            details: Object.freeze({
+              message: "Failed to persist fallback failed-collection record after save failure.",
+              outputDescriptorId: record.descriptorId,
+              event: "result-save-fallback-failed",
+              fallbackFailureRecordPersisted: false,
+            }),
+          });
           failedCount += 1;
           perRecordDiagnostics.push(Object.freeze({
             descriptorId: record.descriptorId,
@@ -486,6 +549,27 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
       }
 
       if (!saved) {
+        this.recordPersistenceDiagnostic({
+          level: "error",
+          operation: "persist-collected-result.save-result",
+          code: "im.result.operational.result-storage-write-failed",
+          retryable: false,
+          occurredAt,
+          request,
+          resultAssetId,
+          resilience: deriveImageManipulationResilienceDiagnostics({
+            defaultCode: "im.result.operational.result-storage-write-failed",
+            defaultSummary: "Result persistence failed before a record was produced.",
+            defaultCategory: "operational",
+            defaultRetryable: false,
+            defaultDegraded: true,
+          }),
+          details: Object.freeze({
+            message: "Result persistence failed before a record was produced.",
+            outputDescriptorId: record.descriptorId,
+            event: "result-save-missing-record",
+          }),
+        });
         failedCount += 1;
         perRecordDiagnostics.push(Object.freeze({
           descriptorId: record.descriptorId,
@@ -549,6 +633,40 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
           const failureMessage = retryable
             ? "Preview provisioning is temporarily unavailable."
             : "Preview provisioning failed.";
+          const previewResilience = deriveImageManipulationResilienceDiagnostics({
+            diagnostics: [Object.freeze({
+              code: failureCode,
+              category: retryable ? "degraded" : "operational",
+              summary: failureMessage,
+              retryable: previewFailure.recovery.retryEligible,
+              degraded: previewFailure.classification.degraded,
+              recoveryKind: previewFailure.recovery.recoveryKind,
+              retryAfterMs: previewFailure.recovery.retryAfterMs,
+              scope: "preview-generation",
+              state: "preview-persistence-failed",
+            })],
+            defaultCode: failureCode,
+            defaultSummary: failureMessage,
+          });
+          this.recordPersistenceDiagnostic({
+            level: retryable ? "warn" : "error",
+            operation: "persist-collected-result.save-preview",
+            code: failureCode,
+            retryable,
+            occurredAt,
+            request,
+            resultAssetId: saved.record.resultAssetId,
+            previewDerivativeId: pendingPreview.derivativeId,
+            resilience: previewResilience,
+            details: Object.freeze({
+              message: failureMessage,
+              outputDescriptorId: record.descriptorId,
+              event: "preview-pending-save-failed",
+              errorSummary: toSafeErrorSummary(error),
+              classification: previewFailure.classification,
+              recovery: previewFailure.recovery,
+            }),
+          });
           try {
             await this.dependencies.repository.savePreview(createFailedPreviewRecord({
               pendingRecord: pendingPreview,
@@ -584,6 +702,23 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
               }),
             }));
           } catch {
+            this.recordPersistenceDiagnostic({
+              level: "error",
+              operation: "persist-collected-result.save-preview-fallback",
+              code: failureCode,
+              retryable: false,
+              occurredAt,
+              request,
+              resultAssetId: saved.record.resultAssetId,
+              previewDerivativeId: pendingPreview.derivativeId,
+              resilience: previewResilience,
+              details: Object.freeze({
+                message: "Failed to persist preview failed state after pending preview save failure.",
+                outputDescriptorId: record.descriptorId,
+                event: "preview-failed-record-save-failed",
+                failedPreviewRecordPersisted: false,
+              }),
+            });
             previewProvisioningUnavailableCount += 1;
             perRecordDiagnostics.push(Object.freeze({
               descriptorId: record.descriptorId,
@@ -670,4 +805,71 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
       }),
     });
   }
+
+  private recordPersistenceDiagnostic(input: {
+    readonly level: PersistenceDiagnosticsLogLevel;
+    readonly operation: string;
+    readonly code: string;
+    readonly retryable: boolean;
+    readonly occurredAt: string;
+    readonly request: RunCollectedResultPersistenceRequest;
+    readonly resultAssetId?: string;
+    readonly previewDerivativeId?: string;
+    readonly resilience: ReadonlyArray<ImageManipulationSliceResilienceDiagnostic>;
+    readonly details: Readonly<Record<string, unknown>>;
+  }): void {
+    const correlation = createImageManipulationSliceCorrelation({
+      requestId: normalizeOptional(input.request.operationKey),
+      correlationId: normalizeOptional(input.request.operationKey),
+      workspaceId: normalizeOptional(input.request.workspaceId) ?? normalizeOptional(input.request.collectedResult.workspaceId),
+      runId: normalizeOptional(input.request.runId),
+      workflowId: normalizeOptional(input.request.workflowId),
+      systemId: normalizeOptional(input.request.systemId),
+      executionJobId: normalizeOptional(input.request.collectedResult.executionJobId),
+      operationKey: normalizeOptional(input.request.operationKey),
+      resultAssetId: normalizeOptional(input.resultAssetId),
+      previewDerivativeId: normalizeOptional(input.previewDerivativeId),
+    });
+
+    const event = Object.freeze({
+      type: "persistence-diagnostic" as const,
+      slice: IMAGE_MANIPULATION_SLICE_NAME,
+      level: input.level,
+      repository: "generated-result-persistence",
+      operation: input.operation,
+      code: input.code,
+      retryable: input.retryable,
+      occurredAt: input.occurredAt,
+      correlation,
+      resilience: input.resilience,
+      details: Object.freeze({
+        ...input.details,
+        correlation,
+      }),
+    });
+
+    if (input.level === "error") {
+      this.diagnosticsLogger.error(event);
+      return;
+    }
+    if (input.level === "warn") {
+      this.diagnosticsLogger.warn(event);
+      return;
+    }
+    this.diagnosticsLogger.info(event);
+  }
+}
+
+const UnsafePathFragmentPattern = /(?:[A-Za-z]:[\\/][^\s]*|\\\\[^\s]+|\/[^\s]+)/g;
+const UnsafeTokenFragmentPattern = /\b(?:Bearer\s+[A-Za-z0-9._-]+|sk-[A-Za-z0-9_-]{8,}|[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)\b/g;
+
+function toSafeErrorSummary(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "Unknown error";
+  }
+
+  const normalized = normalizeOptional(error.message) ?? "Unknown error";
+  return normalized
+    .replace(UnsafePathFragmentPattern, "[REDACTED]")
+    .replace(UnsafeTokenFragmentPattern, "[REDACTED]");
 }
