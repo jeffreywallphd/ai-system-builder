@@ -1,5 +1,6 @@
 import {
   ImageAssetTransportRoutes,
+  toImageAssetListQueryParams,
 } from "@shared/contracts/assets/ImageAssetTransportContracts";
 import type {
   CreateImageAssetApiRequest,
@@ -27,6 +28,21 @@ export interface RecentStudioImageAsset {
   readonly lifecycleStatus: string;
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+export interface ImageLibraryStudioImageAsset extends RecentStudioImageAsset {
+  readonly visibility: string;
+  readonly previewAvailable: boolean;
+}
+
+export interface ImageLibraryStudioImageAssetPage {
+  readonly items: ReadonlyArray<ImageLibraryStudioImageAsset>;
+  readonly pagination: {
+    readonly limit: number;
+    readonly offset: number;
+    readonly returned: number;
+    readonly hasMore: boolean;
+  };
 }
 
 export interface ImageAssetOriginalContent {
@@ -123,13 +139,41 @@ export class ImageAssetManagementService {
     readonly sessionToken: string;
     readonly limit?: number;
   }): Promise<ImageAssetManagementApiResponse<ReadonlyArray<RecentStudioImageAsset>>> {
-    const query = new URLSearchParams();
-    query.set("workspaceId", input.workspaceId);
-    query.set("ownerUserIdentityId", input.actorUserIdentityId);
-    query.set("status", "available");
-    query.set("originKind", "uploaded-source");
-    query.set("limit", String(input.limit ?? 8));
-    query.set("offset", "0");
+    const listed = await this.listImageLibraryImageAssets({
+      actorUserIdentityId: input.actorUserIdentityId,
+      workspaceId: input.workspaceId,
+      sessionToken: input.sessionToken,
+      limit: input.limit ?? 8,
+      offset: 0,
+    });
+    if (!listed.ok || !listed.data) {
+      return listed as ImageAssetManagementApiResponse<ReadonlyArray<RecentStudioImageAsset>>;
+    }
+    return {
+      ok: true,
+      data: listed.data.items,
+    };
+  }
+
+  public async listImageLibraryImageAssets(input: {
+    readonly actorUserIdentityId: string;
+    readonly workspaceId: string;
+    readonly sessionToken: string;
+    readonly search?: string;
+    readonly limit?: number;
+    readonly offset?: number;
+  }): Promise<ImageAssetManagementApiResponse<ImageLibraryStudioImageAssetPage>> {
+    const query = toImageAssetListQueryParams({
+      workspaceId: input.workspaceId,
+      filters: {
+        ownerUserIds: [input.actorUserIdentityId],
+        statuses: ["available"],
+        originKinds: ["uploaded-source"],
+        search: input.search,
+        limit: input.limit ?? 24,
+        offset: input.offset ?? 0,
+      },
+    });
 
     const listed = await this.requestJson<ListImageAssetMetadataApiResponse>(
       "GET",
@@ -137,20 +181,30 @@ export class ImageAssetManagementService {
       { sessionToken: input.sessionToken },
     );
     if (!listed.ok || !listed.data) {
-      return listed as ImageAssetManagementApiResponse<ReadonlyArray<RecentStudioImageAsset>>;
+      return listed as ImageAssetManagementApiResponse<ImageLibraryStudioImageAssetPage>;
     }
 
     return {
       ok: true,
-      data: Object.freeze(listed.data.items.map((item) => Object.freeze({
-        assetId: item.assetId,
-        originalFilename: item.normalizedFilename,
-        mediaType: item.mediaType,
-        sizeBytes: item.sizeBytes,
-        lifecycleStatus: item.lifecycle.status,
-        createdAt: item.ownership.createdAt,
-        updatedAt: item.ownership.updatedAt,
-      }))),
+      data: Object.freeze({
+        items: Object.freeze(listed.data.items.map((item) => Object.freeze({
+          assetId: item.assetId,
+          originalFilename: item.normalizedFilename,
+          mediaType: item.mediaType,
+          sizeBytes: item.sizeBytes,
+          lifecycleStatus: item.lifecycle.status,
+          createdAt: item.ownership.createdAt,
+          updatedAt: item.ownership.updatedAt,
+          visibility: item.visibility,
+          previewAvailable: item.preview.available,
+        }))),
+        pagination: Object.freeze({
+          limit: listed.data.pagination.limit,
+          offset: listed.data.pagination.offset,
+          returned: listed.data.pagination.returned,
+          hasMore: listed.data.pagination.hasMore,
+        }),
+      }),
     };
   }
 

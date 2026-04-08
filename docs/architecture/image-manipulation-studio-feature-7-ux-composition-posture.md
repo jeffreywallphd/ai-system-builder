@@ -187,3 +187,33 @@ Feature and foundation notes referenced by this posture:
 - Add API service methods for new authoritative operations instead of calling transport adapters directly from components.
 - Preserve user-language consistency by extending `ImageStudioUxCopy` rather than adding ad hoc strings.
 
+## Epic 7.2 Story 7.2.1: Primary image entry and selection experience
+
+Story 7.2.1 hardens the "Choose image" phase into a production-backed entry flow by composing authoritative image-asset APIs with explicit UI states for upload, library discovery, and selection confirmation.
+
+Implemented seams:
+
+- `src/ui/services/ImageAssetManagementService.ts`
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/ui/services/tests/ImageAssetManagementService.test.ts`
+
+Entry-flow behavior:
+
+- Users can start from either path:
+  - upload a new source image through authoritative create-upload-finalize APIs, or
+  - browse and reuse authorized existing image assets from recent history and a searchable/paged image library.
+- The editor now shows explicit image-entry states:
+  - upload in progress (`uploading`, `processing`),
+  - library loading,
+  - library empty,
+  - library error,
+  - selection confirmed.
+- Selection confirmation is rendered with user-facing copy while preserving canonical identity under the hood (asset ids and metadata stay in service and runtime state, not raw storage paths).
+
+Architecture and boundary notes:
+
+- Library/recent listing continues to use `GET /api/v1/image-assets` with workspace/owner/status/origin filters through shared transport query conventions.
+- UI does not expose backend-local paths or storage internals; users interact with filenames, timestamps, and actions ("Use as source"/"Use as face reference").
+- Source/reference selection remains compatible with existing dataset-binding and run-request seams, so downstream workflow/readiness/result flows can extend without entry-flow rework.
+
