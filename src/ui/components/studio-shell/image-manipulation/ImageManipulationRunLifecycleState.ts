@@ -41,7 +41,7 @@ export function mapExecutionFlowSnapshotToRunLifecycleState(
   if (snapshot.overallStatus === "failed" || snapshot.overallStatus === "partially-completed") {
     return Object.freeze({
       state: "failed",
-      message: "Run failed. Check advanced details.",
+      message: "Run failed. Review recovery guidance.",
     });
   }
 
@@ -110,7 +110,7 @@ export function mapRuntimeStatusToRunLifecycleState(
   if (status === "failed") {
     return Object.freeze({
       state: "failed",
-      message: "Run failed. Check advanced details.",
+      message: "Run failed. Review recovery guidance.",
     });
   }
   return Object.freeze({

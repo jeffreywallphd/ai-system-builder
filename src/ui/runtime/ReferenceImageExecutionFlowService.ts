@@ -32,6 +32,8 @@ export interface ReferenceImageExecutionFlowIssue {
   readonly code: string;
   readonly userMessage: string;
   readonly technicalMessage?: string;
+  readonly retryable?: boolean;
+  readonly recoveryKind?: "user-fixable" | "operational";
 }
 
 export interface ReferenceImageExecutionFlowStep {
@@ -154,11 +156,17 @@ export class ReferenceImageExecutionFlowService {
     const persisted = await request.persistOutputs(request.persistenceRequestFactory({ executionId, runtimeResult }));
     const appendPersistenceDiagnostics = (codePrefix: string, userFallback: string) => {
       for (const diagnostic of persisted.data?.diagnostics ?? []) {
+        const recoveryKind = diagnostic.stage === PersistReferenceImageOutputDiagnosticStages.requestConstruction
+          || diagnostic.stage === PersistReferenceImageOutputDiagnosticStages.runtimeConfigurationResolution
+          ? "user-fixable"
+          : "operational";
         issues.push(Object.freeze({
           stepId: ReferenceImageExecutionStepIds.persistence,
           code: `${codePrefix}:${diagnostic.code}`,
           userMessage: diagnostic.userMessage || persisted.data?.userMessage || userFallback,
           technicalMessage: diagnostic.technicalMessage,
+          retryable: diagnostic.retryable,
+          recoveryKind,
         }));
       }
     };

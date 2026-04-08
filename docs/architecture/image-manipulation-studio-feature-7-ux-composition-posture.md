@@ -362,3 +362,39 @@ Architecture posture preserved:
 - continuation actions mutate or chain through existing studio/runtime API seams,
 - session continuity remains within runtime-safe persisted selection/property state, with no backend path shortcuts.
 
+## Epic 7.3 Story 7.3.4: Failure-recovery and retry-guidance UX
+
+Story 7.3.4 hardens failure handling so users can recover from failed runs and blocked launches with explicit next steps instead of guessing.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/image-manipulation/ImageManipulationRunLifecycleState.ts`
+- `src/ui/runtime/ReferenceImageExecutionFlowService.ts`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+Failure-recovery behavior:
+
+- Runtime editor now renders a dedicated failure-recovery surface that classifies issues as:
+  - user-fixable (setup/config/input corrections required), or
+  - operational (backend/readiness/runtime availability issues).
+- Recovery guidance appears for both:
+  - launch-blocked states (cannot proceed pre-run), and
+  - failed run states (run started but did not complete).
+- Recovery actions are explicit and architecture-aligned:
+  - `Retry now` (only when launch is currently ready and failure is retryable),
+  - `Review setup`,
+  - `Refresh readiness`,
+  - `Reopen latest setup`.
+
+Retry/continuation coherence:
+
+- Run-history continuation copy now uses recovery-oriented language for failed/cancelled history entries (`Recover context`).
+- Recover-context flow restores prior parameters/selection and guides users directly back into retry-safe state.
+
+Safety posture:
+
+- Main failure UX uses normalized/safe user-facing summaries instead of raw backend error text.
+- Technical diagnostics remain available in advanced details only.
+- Retryability and recovery type are derived from normalized readiness and persistence diagnostics, not local backend shortcuts.
+
