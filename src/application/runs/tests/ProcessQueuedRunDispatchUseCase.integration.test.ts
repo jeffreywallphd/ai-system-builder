@@ -407,6 +407,8 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
         }),
       },
       dispatchResultHandler,
+      runRepository,
+      queueRepository,
       now: () => new Date("2026-04-08T12:00:07.000Z"),
     });
 
@@ -491,6 +493,8 @@ describe("ProcessQueuedRunDispatchUseCase integration", () => {
         },
       },
       dispatchResultHandler,
+      runRepository,
+      queueRepository,
       now: () => new Date("2026-04-08T12:10:07.000Z"),
     });
 

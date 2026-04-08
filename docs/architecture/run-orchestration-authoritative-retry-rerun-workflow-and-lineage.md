@@ -44,6 +44,7 @@ Define the production retry/rerun control flow for authoritative runs so eligibl
 - Ineligible source lifecycle states:
   - `submitted`, `queued`, `assignment-pending`, `assigned`, `dispatching`, `running`, `cancelling`, `retry-pending`, `completed`
 - Ineligible if authoritative submission snapshot metadata is unavailable.
+- Retry always creates a new authoritative run record; source runs are never re-dispatched in place.
 
 Ineligible requests return explicit failure semantics and do not create new runs.
 
@@ -65,6 +66,13 @@ Ineligible requests return explicit failure semantics and do not create new runs
   - `ValidateRunSubmissionUseCase`
   - `CreateAuthoritativeRunUseCase`
 - This preserves shared policy checks, queue admission behavior, mutation idempotency semantics, and audit consistency.
+
+## Current resubmission guardrails (explicit)
+
+- Retry requests are accepted only from `failed` and `cancelled` source states.
+- All other source states must fail deterministically with explicit ineligible semantics.
+- Retry flows through canonical submission validation/creation instead of mutating source-run lifecycle state.
+- Duplicate retry intent resolution remains owned by canonical submission idempotency semantics, not by reusing or redispatching source runs.
 
 ## Prohibited shortcuts
 

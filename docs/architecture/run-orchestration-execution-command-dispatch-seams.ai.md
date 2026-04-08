@@ -33,7 +33,18 @@ Story 16.2.4 introduces canonical execution-command preparation and a backend ad
   - queue + assignment claim data,
   - runtime target + parameters/tags/metadata,
   - storage/resource/policy references,
-  - normalized backend kind.
+- normalized backend kind.
+
+## Duplicate-dispatch hardening
+- `DispatchAssignedRunExecutionUseCase` now runs a pre-dispatch authoritative guard before backend dispatch.
+- Guard checks:
+  - run exists and remains in `assigned` state,
+  - dispatch attempt exists,
+  - dispatch attempt node matches command assignment node,
+  - dispatch attempt has not already been finalized with a dispatch result.
+- Guard atomically transitions the run to `dispatching` using optimistic concurrency (`expectedRevision`) before backend adapter dispatch.
+- Concurrent dispatch races now fail closed with `duplicate-dispatch-detected` instead of issuing duplicate backend executions.
+- Guard failures are explicit and typed with `RunDispatchGuardError` codes.
 
 ## Safety/fail-closed behavior
 Typed build errors now cover:
