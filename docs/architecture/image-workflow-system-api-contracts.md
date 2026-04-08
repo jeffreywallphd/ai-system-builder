@@ -223,6 +223,31 @@ Follow-on API and UI work should:
 3. Treat DTO projections in `src/shared/dto/image-workflows/ImageWorkflowSystemApiDtos.ts` as transport mapping seams.
 4. Keep persistence and backend adapter payload models separate from these shared external contracts.
 
+## Story 2.4.1 studio workflow picker integration
+
+System Studio now consumes authoritative workflow metadata through studio-shell API operations instead of local template JSON assumptions:
+
+- `StudioShellBackendApi.listImageWorkflowDefinitions(...)`
+- `StudioShellBackendApi.getImageWorkflowDefinition(...)`
+- bridge/service wiring:
+  - `electron/main/main.ts` IPC handlers:
+    - `ai-loom-desktop-studio-shell:image-workflows:list`
+    - `ai-loom-desktop-studio-shell:image-workflows:get`
+  - `electron/preload.ts` desktop bridge methods:
+    - `studioShell.listImageWorkflowDefinitions(...)`
+    - `studioShell.getImageWorkflowDefinition(...)`
+  - `src/ui/services/StudioShellService.ts` methods:
+    - `listImageWorkflowDefinitions(...)`
+    - `getImageWorkflowDefinition(...)`
+  - `src/ui/pages/StudioShellPage.tsx` extension operation wiring
+  - `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx` picker UX and selection flow
+
+UI behavior in this story:
+
+- users select supported operations by logical workflow id (`workflowId`) with user-facing title/summary/rationale;
+- selection state is held as stable workflow DTO + logical id and applied through `modifySystemDefinition` workflow bindings;
+- workflow selection no longer depends on raw backend template payload injection in component-local config.
+
 ## Related architecture notes
 
 - `docs/architecture/image-workflow-system-definition-layer.md`

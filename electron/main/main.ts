@@ -992,6 +992,14 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
     return JSON.stringify(await studioShellBackendApi.validateDraft(request));
   });
+  ipcMain.handle("ai-loom-desktop-studio-shell:image-workflows:list", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listImageWorkflowDefinitions"]>[0];
+    return JSON.stringify(await studioShellBackendApi.listImageWorkflowDefinitions(request));
+  });
+  ipcMain.handle("ai-loom-desktop-studio-shell:image-workflows:get", async (_event, requestJson: string) => {
+    const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getImageWorkflowDefinition"]>[0];
+    return JSON.stringify(await studioShellBackendApi.getImageWorkflowDefinition(request));
+  });
   ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
     return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));
   });
