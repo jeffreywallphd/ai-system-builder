@@ -241,3 +241,25 @@ Image-asset lifecycle and protected retrieval flows now emit authoritative audit
   - `RequestImageAssetPreviewContentUseCase`
   - `OpenImageAssetPreviewContentUseCase`
 - Coverage now includes success/rejected/failed outcomes for core create/finalize/access paths with reason-code details where available.
+
+## Story 1.4.2 implementation scope
+
+Image-ingestion validation and guardrails are now enforced at API/use-case boundaries before assets transition deeper into the image slice:
+
+- Create/initiation contract guardrails:
+  - normalize and validate supported image media types
+  - require filename extensions and enforce media-type/extension compatibility
+  - sanitize and normalize deterministic `normalizedFilename` values from user input
+- Upload ingestion API guardrails:
+  - require request `contentType`
+  - reject unsupported content types
+  - reject content-type mismatch against upload-session reservation media type
+  - validate optional `expectedChecksumSha256` format
+  - default expected upload size from reservation metadata when caller omits it
+  - return structured invalid-request detail code metadata (`validationCode`) for diagnostics
+- Upload finalization guardrails:
+  - validate `finalizedMediaType` against supported image media types
+  - reject empty uploaded content
+  - apply detectable signature/media-type mismatch checks (file-signature sniffing via `file-type`) before availability transition
+
+Guardrail effect: unsupported/bad uploads are rejected early with clear responses and do not become `available` image assets.

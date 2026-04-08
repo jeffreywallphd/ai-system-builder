@@ -238,3 +238,28 @@ This story adds authoritative audit capture for image-asset create/upload/access
   - `RequestImageAssetPreviewContentUseCase`
   - `OpenImageAssetPreviewContentUseCase`
 - Outcome coverage includes success/rejected/failed status with reason-code context where available, while preserving redaction-safe payload boundaries for governance/admin review surfaces.
+
+## Story 1.4.2: ingestion validation and guardrails for supported image uploads
+
+This story hardens image-ingestion boundaries so unsupported or malformed uploads are rejected before they propagate into preview, workflow binding, and execution paths.
+
+- Create/initiation boundary guardrails now enforce:
+  - supported image media type normalization
+  - required filename extension for image uploads
+  - media-type and extension compatibility checks (for example, `image/png` with `.png`)
+  - deterministic normalized filename sanitization
+- Upload-content ingestion API guardrails now enforce:
+  - required `contentType`
+  - supported `contentType` values only
+  - strict match between upload-session reserved media type and request `contentType`
+  - structured invalid-request detail codes (`validationCode`) for operator diagnostics
+  - sha256 expectation format validation (`expectedChecksumSha256`)
+  - upload-size expectation defaults to reservation metadata when omitted by caller
+- Upload finalization guardrails now enforce:
+  - supported `finalizedMediaType` values at contract validation boundary
+  - empty-content rejection during verification
+  - signature-based media-type mismatch detection where detectable (via `file-type` sniffing)
+- Resulting posture:
+  - invalid assets are rejected with clear, actionable API errors
+  - filename/media metadata is normalized and sanitized at the boundary
+  - invalid upload states are blocked before availability transition and downstream execution use

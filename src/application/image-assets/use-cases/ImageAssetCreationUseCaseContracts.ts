@@ -5,7 +5,9 @@ import type {
   ImageAssetLineageMetadata,
   ImageAssetOriginKind,
   ImageAssetSharingPolicy,
+  SupportedImageMediaType,
 } from "@domain/image-assets/ImageAssetDomain";
+import { SupportedImageMediaTypes } from "@domain/image-assets/ImageAssetDomain";
 import type {
   ImageAssetStorageObjectArea,
   ReserveImageAssetStorageLocationResult,
@@ -90,9 +92,32 @@ function normalizeRequired(value: string, field: string): string {
   return normalized;
 }
 
+const SupportedImageExtensionsByMediaType: Readonly<Record<SupportedImageMediaType, ReadonlyArray<string>>> = Object.freeze({
+  "image/png": Object.freeze([".png"]),
+  "image/jpeg": Object.freeze([".jpg", ".jpeg"]),
+  "image/webp": Object.freeze([".webp"]),
+  "image/gif": Object.freeze([".gif"]),
+  "image/bmp": Object.freeze([".bmp"]),
+  "image/tiff": Object.freeze([".tif", ".tiff"]),
+  "image/avif": Object.freeze([".avif"]),
+  "image/heic": Object.freeze([".heic"]),
+  "image/heif": Object.freeze([".heif"]),
+});
+
 function normalizeOptional(value?: string | null): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function normalizeMediaType(value: string): SupportedImageMediaType {
+  const normalized = normalizeRequired(value, "mediaType")
+    .toLowerCase()
+    .split(";")[0]
+    ?.trim();
+  if (!normalized || !SupportedImageMediaTypes.includes(normalized as SupportedImageMediaType)) {
+    throw new ImageAssetCreationContractError(`mediaType '${value}' is not supported for image ingestion.`);
+  }
+  return normalized as SupportedImageMediaType;
 }
 
 function normalizeTimestamp(value?: string): string | undefined {
@@ -115,7 +140,7 @@ function normalizeSizeBytes(value: number): number {
 }
 
 function normalizeFilename(value: string, field: string): string {
-  const normalized = normalizeRequired(value, field);
+  const normalized = normalizeRequired(value, field).normalize("NFKC").replace(/\s+/g, " ");
   if (normalized.length > 255) {
     throw new ImageAssetCreationContractError(`${field} must be 255 characters or fewer.`);
   }
@@ -128,18 +153,51 @@ function normalizeFilename(value: string, field: string): string {
   return normalized;
 }
 
-function deriveNormalizedFilename(originalFilename: string): string {
-  const source = originalFilename.trim().toLowerCase();
+function extractExtension(filename: string): string | undefined {
+  const normalized = filename.trim();
+  const extensionIndex = normalized.lastIndexOf(".");
+  if (extensionIndex <= 0 || extensionIndex === normalized.length - 1) {
+    return undefined;
+  }
+  return normalized.slice(extensionIndex).toLowerCase();
+}
+
+function assertExtensionMatchesMediaType(filename: string, mediaType: SupportedImageMediaType): string {
+  const extension = extractExtension(filename);
+  if (!extension) {
+    throw new ImageAssetCreationContractError("originalFilename must include a supported file extension.");
+  }
+  const supportedExtensions = SupportedImageExtensionsByMediaType[mediaType];
+  if (!supportedExtensions.includes(extension)) {
+    throw new ImageAssetCreationContractError(
+      `originalFilename extension '${extension}' is not supported for mediaType '${mediaType}'.`,
+    );
+  }
+  return extension;
+}
+
+function deriveNormalizedFilename(sourceFilename: string, requiredExtension: string): string {
+  const extensionless = sourceFilename.trim().toLowerCase().replace(/\.[^.]+$/, "");
+  const source = extensionless.length > 0 ? extensionless : sourceFilename.trim().toLowerCase();
   const collapsed = source.replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-");
   const trimmed = collapsed.replace(/^-+/, "").replace(/-+$/, "");
-  const fallback = trimmed || "image-asset";
-  return fallback.length > 255 ? fallback.slice(0, 255) : fallback;
+  const fallbackBase = trimmed || "image-asset";
+  const maxBaseLength = 255 - requiredExtension.length;
+  const base = fallbackBase.length > maxBaseLength ? fallbackBase.slice(0, maxBaseLength) : fallbackBase;
+  return `${base}${requiredExtension}`;
 }
 
 export function validateInitiateImageAssetCreationRequest(
   input: InitiateImageAssetCreationRequest,
 ): InitiateImageAssetCreationRequest {
+  const mediaType = normalizeMediaType(input.mediaType);
   const originalFilename = normalizeFilename(input.originalFilename, "originalFilename");
+  const extension = assertExtensionMatchesMediaType(originalFilename, mediaType);
+  const requestedNormalizedFilename = normalizeOptional(input.normalizedFilename);
+  const normalizedFilename = deriveNormalizedFilename(
+    requestedNormalizedFilename ?? originalFilename,
+    extension,
+  );
 
   return Object.freeze({
     ...input,
@@ -149,10 +207,9 @@ export function validateInitiateImageAssetCreationRequest(
     assetId: normalizeOptional(input.assetId),
     ownerUserId: normalizeOptional(input.ownerUserId),
     storageInstanceId: normalizeOptional(input.storageInstanceId),
-    mediaType: normalizeRequired(input.mediaType, "mediaType").toLowerCase(),
+    mediaType,
     originalFilename,
-    normalizedFilename: normalizeOptional(input.normalizedFilename)
-      ?? deriveNormalizedFilename(originalFilename),
+    normalizedFilename,
     sizeBytes: normalizeSizeBytes(input.sizeBytes),
     fingerprint: Object.freeze({
       algorithm: input.fingerprint.algorithm,

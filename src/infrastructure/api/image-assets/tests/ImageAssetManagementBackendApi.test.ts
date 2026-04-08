@@ -231,6 +231,7 @@ describe("ImageAssetManagementBackendApi", () => {
       workspaceId: "workspace-alpha",
       assetId: "image-asset:001",
       uploadSessionId,
+      contentType: "image/png",
       content: (async function* bytes() {
         yield new Uint8Array([1, 2, 3, 4]);
       })(),
@@ -309,6 +310,124 @@ describe("ImageAssetManagementBackendApi", () => {
       return;
     }
     expect(response.error.code).toBe("invalid-request");
+  });
+
+  it("rejects upload ingestion when contentType is missing or mismatched", async () => {
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      initiateImageAssetCreationUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: baseAsset,
+              upload: Object.freeze({
+                status: "upload-pending" as const,
+                reservation: Object.freeze({
+                  reservationId: "reservation-001",
+                  reference: Object.freeze({
+                    storageInstanceId: "storage-alpha",
+                    objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                    area: ImageAssetStorageObjectAreas.original,
+                  }),
+                  expiresAt: "2026-04-08T10:20:00.000Z",
+                }),
+              }),
+            }),
+          };
+        },
+      },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const created = await backend.createImageAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      mediaType: "image/png",
+      originalFilename: "image.png",
+      sizeBytes: 4,
+      fingerprint: {
+        algorithm: "sha256",
+        digest: "a".repeat(64),
+      },
+    });
+    expect(created.ok).toBeTrue();
+    if (!created.ok || !created.data) {
+      return;
+    }
+
+    const missingType = await backend.ingestImageAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      content: (async function* bytes() {
+        yield new Uint8Array([1, 2, 3, 4]);
+      })(),
+    });
+    expect(missingType.ok).toBeFalse();
+    if (!missingType.ok && missingType.error) {
+      expect(missingType.error.code).toBe("invalid-request");
+      expect(missingType.error.details).toEqual(
+        expect.objectContaining({
+          validationCode: "content-type-required",
+        }),
+      );
+    }
+
+    const mismatch = await backend.ingestImageAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      contentType: "image/jpeg",
+      content: (async function* bytes() {
+        yield new Uint8Array([1, 2, 3, 4]);
+      })(),
+    });
+    expect(mismatch.ok).toBeFalse();
+    if (!mismatch.ok && mismatch.error) {
+      expect(mismatch.error.code).toBe("invalid-request");
+      expect(mismatch.error.details).toEqual(
+        expect.objectContaining({
+          validationCode: "content-type-mismatch",
+        }),
+      );
+    }
+
+    const invalidChecksum = await backend.ingestImageAssetUploadContent({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+      contentType: "image/png",
+      expectedChecksumSha256: "not-a-sha",
+      content: (async function* bytes() {
+        yield new Uint8Array([1, 2, 3, 4]);
+      })(),
+    });
+    expect(invalidChecksum.ok).toBeFalse();
+    if (!invalidChecksum.ok && invalidChecksum.error) {
+      expect(invalidChecksum.error.code).toBe("invalid-request");
+      expect(invalidChecksum.error.details).toEqual(
+        expect.objectContaining({
+          validationCode: "expected-checksum-invalid",
+        }),
+      );
+    }
   });
 
   it("rejects upload session tokens with tampered signature length without throwing", async () => {

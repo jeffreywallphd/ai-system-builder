@@ -395,6 +395,7 @@ describe("InitiateImageAssetCreationUseCase", () => {
     expect(result.value.imageAsset.workspaceId).toBe("workspace-alpha");
     expect(result.value.imageAsset.ownerUserId).toBe("user-actor");
     expect(result.value.imageAsset.storageInstanceId).toBe("storage-alpha");
+    expect(result.value.imageAsset.normalizedFilename).toBe("photo.png");
     expect(result.value.imageAsset.lifecycle.status).toBe("ingesting");
     expect(result.value.upload.status).toBe("upload-pending");
     expect(result.value.upload.reservation.reference.area).toBe("original");
@@ -574,6 +575,36 @@ describe("InitiateImageAssetCreationUseCase", () => {
       fingerprint: {
         algorithm: ImageAssetFingerprintAlgorithms.sha256,
         digest: "",
+      },
+      visibility: ResourceVisibilities.private,
+      sharingPolicy: {
+        mode: SharingPolicyModes.ownerOnly,
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: ImageAssetCreationErrorCodes.invalidRequest,
+      }),
+    });
+  });
+
+  it("rejects original filenames whose extension does not match mediaType", async () => {
+    const fixture = buildFixture();
+    fixture.storageInstanceRepository.records.set("storage-alpha", createStorage({ id: "storage-alpha" }));
+
+    const result = await fixture.useCase.execute({
+      actorUserId: "user-actor",
+      workspaceId: "workspace-alpha",
+      operationKey: "image-asset:create:extension-mismatch",
+      storageInstanceId: "storage-alpha",
+      mediaType: "image/png",
+      originalFilename: "photo.jpeg",
+      sizeBytes: 64,
+      fingerprint: {
+        algorithm: ImageAssetFingerprintAlgorithms.sha256,
+        digest: "e".repeat(64),
       },
       visibility: ResourceVisibilities.private,
       sharingPolicy: {
