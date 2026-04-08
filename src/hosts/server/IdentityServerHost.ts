@@ -196,6 +196,7 @@ import { ReadDeploymentPolicyAdministrationUseCase } from "@application/policy-a
 import { DeploymentPolicyAdministrationAuthoritativeUpdateUseCase } from "@application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
+import { GetImageManipulationExecutionReadinessUseCase } from "@application/image-workflows/GetImageManipulationExecutionReadinessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
 import { UpdateAuthorizationVisibilityUseCase } from "@application/authorization/use-cases/UpdateAuthorizationVisibilityUseCase";
 import { BulkGrantAuthorizationWorkspaceRoleAccessUseCase } from "@application/authorization/use-cases/BulkGrantAuthorizationWorkspaceRoleAccessUseCase";
@@ -1153,6 +1154,10 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(
       persistentPlatformServices.platformPersistenceRepository,
     ),
+    getImageManipulationExecutionReadinessUseCase: new GetImageManipulationExecutionReadinessUseCase({
+      capabilityPort: options.runExecutionAdapters?.capabilityProbePort,
+      now: () => workspaceClock.now(),
+    }),
     runRepository: persistentPlatformServices.platformPersistenceRepository,
     auditEventRepository: persistentPlatformServices.platformPersistenceRepository,
     authorizationDecisionEvaluator,

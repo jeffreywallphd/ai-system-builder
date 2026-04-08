@@ -24,6 +24,7 @@ export type RunOrchestrationTransportContractVersion =
 export const RunOrchestrationTransportRoutes = Object.freeze({
   submitRun: "/api/v1/runtime/runs/start",
   listRuns: "/api/v1/runtime/runs",
+  getExecutionReadiness: "/api/v1/runtime/execution/readiness",
   getRunDetail: "/api/v1/runtime/runs/:runId",
   getRunStatus: "/api/v1/runtime/runs/:runId/status",
   cancelRun: "/api/v1/runtime/runs/:runId/cancel",
@@ -357,6 +358,49 @@ export interface RunQueueStatusReadRequest {
   readonly offset?: number;
 }
 
+export interface ExecutionReadinessReadRequest {
+  readonly workspaceId: string;
+  readonly systemId?: string;
+  readonly operationKind?: string;
+  readonly translationContractVersion?: string;
+}
+
+export const ExecutionReadinessStates = Object.freeze({
+  ready: "ready",
+  degraded: "degraded",
+  unavailable: "unavailable",
+} as const);
+
+export type ExecutionReadinessState =
+  typeof ExecutionReadinessStates[keyof typeof ExecutionReadinessStates];
+
+export interface ExecutionReadinessIssue {
+  readonly code: string;
+  readonly severity: "error" | "warning";
+  readonly message: string;
+}
+
+export interface ExecutionReadinessCapabilitySummary {
+  readonly backendFamily: string;
+  readonly supportsProgressPolling: boolean;
+  readonly supportsProgressStreaming: boolean;
+  readonly supportsCancellation: boolean;
+  readonly supportsOutputDiscovery: boolean;
+  readonly supportedOperationKinds: ReadonlyArray<string>;
+  readonly supportedTranslationContractVersions: ReadonlyArray<string>;
+}
+
+export interface ExecutionReadinessReadResponse {
+  readonly backendFamily: string;
+  readonly checkedAt: string;
+  readonly readiness: ExecutionReadinessState;
+  readonly readyForExecution: boolean;
+  readonly message?: string;
+  readonly capabilities: ExecutionReadinessCapabilitySummary;
+  readonly issues: ReadonlyArray<ExecutionReadinessIssue>;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
+}
+
 export interface RunQueueStatusItem {
   readonly runId: string;
   readonly workflowId: string;
@@ -512,6 +556,10 @@ export interface RunOrchestrationTransportContract {
   readonly listQueueStatus: {
     readonly request: RunQueueStatusReadRequest;
     readonly response: SharedApiResponseEnvelope<RunQueueStatusReadResponse>;
+  };
+  readonly getExecutionReadiness: {
+    readonly request: ExecutionReadinessReadRequest;
+    readonly response: SharedApiResponseEnvelope<ExecutionReadinessReadResponse>;
   };
   readonly listSchedulingStaleReservations: {
     readonly request: SchedulingAdminListStaleReservationsRequest;

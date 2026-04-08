@@ -260,6 +260,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     let observedComfyHasAuthToken: boolean | undefined;
     let observedRegisteredBackends: ReadonlyArray<string> | undefined;
     let observedHasCancellationSignalPort = false;
+    let observedHasCapabilityProbePort = false;
 
     const root = createAuthoritativeServerCompositionRoot({
       hostOptions: {
@@ -289,9 +290,11 @@ describe("AuthoritativeServerCompositionRoot", () => {
             const registration = context.getArtifact<{
               readonly registeredBackendKinds: ReadonlyArray<string>;
               readonly cancellationSignalPort?: unknown;
+              readonly capabilityProbePort?: unknown;
             }>(AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey);
             observedRegisteredBackends = registration?.registeredBackendKinds;
             observedHasCancellationSignalPort = !!registration?.cancellationSignalPort;
+            observedHasCapabilityProbePort = !!registration?.capabilityProbePort;
           },
         },
       },
@@ -315,6 +318,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedComfyHasAuthToken).toBeTrue();
     expect(observedRegisteredBackends).toEqual(["comfyui"]);
     expect(observedHasCancellationSignalPort).toBeTrue();
+    expect(observedHasCapabilityProbePort).toBeTrue();
     await runtime.stop();
   });
 
@@ -322,6 +326,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     let observedRunExecutionRegistration: {
       readonly registeredBackendKinds: ReadonlyArray<string>;
       readonly cancellationSignalPort?: unknown;
+      readonly capabilityProbePort?: unknown;
     } | undefined;
 
     const root = createAuthoritativeServerCompositionRoot({
@@ -354,6 +359,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const runtime = await root.compose(boot);
     expect(observedRunExecutionRegistration?.registeredBackendKinds).toEqual(["comfyui"]);
     expect(observedRunExecutionRegistration?.cancellationSignalPort).toBeDefined();
+    expect(observedRunExecutionRegistration?.capabilityProbePort).toBeDefined();
     await runtime.stop();
   });
 

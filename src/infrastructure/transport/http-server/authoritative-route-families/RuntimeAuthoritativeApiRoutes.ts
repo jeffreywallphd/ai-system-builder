@@ -35,6 +35,7 @@ export const RunReadAuthoritativeApiRouteFamily = Object.freeze({
   routePrefixes: Object.freeze([
     "/api/v1/runtime/runs",
     "/api/v1/runtime/queue",
+    "/api/v1/runtime/execution",
   ]),
   requiredBackendKeys: Object.freeze([
     AuthoritativeApiRouteBackendKeys.runRead,

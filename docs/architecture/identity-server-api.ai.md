@@ -37,6 +37,7 @@
   - `POST /api/v1/assets/:assetId/uploads/initiate`
 - Authenticated runtime mutation + read/list endpoints:
   - `POST /api/v1/runtime/runs/start`
+  - `GET /api/v1/runtime/execution/readiness`
   - `POST /api/v1/runtime/runs/:executionId/cancel`
   - `GET /api/v1/runtime/runs/:executionId/status`
   - `GET /api/v1/runtime/runs/:executionId/result`
@@ -226,6 +227,10 @@ Persisted session records now intentionally exclude:
   - required `workspaceId`
   - optional `limit`/`offset`
   - repeatable `status` filters (`queued`, `running`, `completed`, `failed`, `cancelled`)
+- Runtime execution-readiness route is now part of the same authoritative run-read surface:
+  - `GET /api/v1/runtime/execution/readiness`
+  - intended for desktop/thin clients and later studio/admin readiness UX
+  - response is normalized (`readiness`, `readyForExecution`, `capabilities`, `issues`) and adapter-backed
 
 ## Runtime realtime websocket delivery (story 14.2.6)
 

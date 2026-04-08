@@ -28,11 +28,28 @@ describe("AuthoritativeRunExecutionAdapterRegistration", () => {
             message: "accepted",
           }),
         },
+        capabilityProbeAdapter: {
+          getExecutionBackendStatus: async () => Object.freeze({
+            backendFamily: "adapter.comfyui.image-manipulation",
+            health: "healthy",
+            checkedAt: "2026-04-08T16:01:10.000Z",
+            capabilities: Object.freeze({
+              backendFamily: "adapter.comfyui.image-manipulation",
+              supportsProgressPolling: true,
+              supportsProgressStreaming: false,
+              supportsCancellation: true,
+              supportsOutputDiscovery: true,
+              supportedOperationKinds: Object.freeze(["image-to-image"]),
+              supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+            }),
+          }),
+        },
       } as never,
     });
 
     expect(registration).toBeDefined();
     expect(registration?.registeredBackendKinds).toEqual([RunExecutionBackendKinds.comfyUi]);
+    expect(registration?.capabilityProbePort).toBeDefined();
 
     const receipt = await registration?.dispatchPort?.dispatch(Object.freeze({
       commandId: "run-execution-command:dispatch-attempt:99",
@@ -88,5 +105,10 @@ describe("AuthoritativeRunExecutionAdapterRegistration", () => {
       requestedAt: "2026-04-08T16:01:00.000Z",
     });
     expect(cancellation?.status).toBe("accepted");
+
+    const status = await registration?.capabilityProbePort?.getExecutionBackendStatus({
+      workspaceId: "workspace-alpha",
+    });
+    expect(status?.backendFamily).toContain("comfyui");
   });
 });

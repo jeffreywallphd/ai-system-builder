@@ -13,5 +13,6 @@ export * from "./ImageSystemDefinitionAuthoringErrors";
 export * from "./ImageWorkflowSystemQueryContracts";
 export * from "./ImageWorkflowSystemQueryErrors";
 export * from "./ImageWorkflowSystemReadinessValidationService";
+export * from "./GetImageManipulationExecutionReadinessUseCase";
 export * from "./InitialSupportedImageWorkflowTemplateRegistry";
 export * from "./ports";

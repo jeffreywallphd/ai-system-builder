@@ -8,6 +8,7 @@ import { AuthorizationResponseAccessLevels } from "@application/authorization/us
 import type { ListAuthoritativeRunQueueStatusUseCase } from "@application/runs/use-cases/ListAuthoritativeRunQueueStatusUseCase";
 import type { GetAuthoritativeRunUseCase } from "@application/runs/use-cases/GetAuthoritativeRunUseCase";
 import type { ListAuthoritativeRunsUseCase } from "@application/runs/use-cases/ListAuthoritativeRunsUseCase";
+import type { GetImageManipulationExecutionReadinessUseCase } from "@application/image-workflows/GetImageManipulationExecutionReadinessUseCase";
 import type {
   ListStaleSchedulingReservationsUseCase,
 } from "@application/runs/use-cases/ListStaleSchedulingReservationsUseCase";
@@ -33,6 +34,7 @@ import type {
 import { AuthorizationResourceFamilies } from "@domain/authorization/AuthorizationPermissionCatalog";
 import type {
   RunDetail,
+  ExecutionReadinessReadResponse,
   RunListReadResponse,
   RunQueueStatusItem,
   RunQueueStatusReadResponse,
@@ -93,11 +95,20 @@ export interface AuthoritativeRunDetailRequest {
 
 export interface AuthoritativeRunStatusRequest extends AuthoritativeRunDetailRequest {}
 
+export interface AuthoritativeExecutionReadinessRequest {
+  readonly workspaceId: string;
+  readonly authorization: AuthoritativeRunQueryAuthorizationContext;
+  readonly systemId?: string;
+  readonly operationKind?: string;
+  readonly translationContractVersion?: string;
+}
+
 export interface AuthoritativeRunQueryBackendApiDependencies {
   readonly listAuthoritativeRunsUseCase: ListAuthoritativeRunsUseCase;
   readonly listAuthoritativeRunQueueStatusUseCase: ListAuthoritativeRunQueueStatusUseCase;
   readonly listStaleSchedulingReservationsUseCase: ListStaleSchedulingReservationsUseCase;
   readonly getAuthoritativeRunUseCase: GetAuthoritativeRunUseCase;
+  readonly getImageManipulationExecutionReadinessUseCase?: GetImageManipulationExecutionReadinessUseCase;
   readonly runRepository: IAuthoritativeRunPersistenceRepository;
   readonly queueRepository?: IRunOrchestrationQueuePersistenceRepository;
   readonly auditEventRepository?: IPlatformAuditEventRepository;
@@ -265,6 +276,113 @@ export class AuthoritativeRunQueryBackendApi {
             items: Object.freeze(adminVisibleItems),
           })
           : undefined,
+      }),
+    });
+  }
+
+  public async getExecutionReadiness(
+    request: AuthoritativeExecutionReadinessRequest,
+  ): Promise<SharedApiResponseEnvelope<ExecutionReadinessReadResponse>> {
+    const workspaceId = request.workspaceId.trim();
+    if (!workspaceId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-execution-readiness.completed",
+        operation: "query.get-execution-readiness",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["invalid-request"]),
+      });
+      return this.invalidRequest("workspaceId is required.");
+    }
+
+    const actorUserIdentityId = request.authorization.actorUserIdentityId.trim();
+    if (!actorUserIdentityId) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-execution-readiness.completed",
+        operation: "query.get-execution-readiness",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["forbidden"]),
+      });
+      return this.forbidden("Execution readiness visibility requires an authenticated actor.");
+    }
+
+    const allowed = await this.isWorkspaceRunReadAllowed(request.authorization);
+    if (!allowed) {
+      await this.recordObservability({
+        event: "run.orchestration.query.get-execution-readiness.completed",
+        operation: "query.get-execution-readiness",
+        outcome: "failure",
+        severity: "warn",
+        workspaceId,
+        markers: Object.freeze(["authorization-denied"]),
+      });
+      return this.forbidden("Execution readiness visibility is not authorized for this actor.");
+    }
+
+    const readiness = this.dependencies.getImageManipulationExecutionReadinessUseCase
+      ? await this.dependencies.getImageManipulationExecutionReadinessUseCase.execute({
+        workspaceId,
+        systemId: request.systemId,
+        operationKind: request.operationKind,
+        translationContractVersion: request.translationContractVersion,
+      })
+      : Object.freeze({
+        backendFamily: "adapter.image-manipulation.execution",
+        checkedAt: this.now().toISOString(),
+        readiness: "unavailable" as const,
+        readyForExecution: false,
+        message: "Execution readiness use case is not configured.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.image-manipulation.execution",
+          supportsProgressPolling: false,
+          supportsProgressStreaming: false,
+          supportsCancellation: false,
+          supportsOutputDiscovery: false,
+          supportedOperationKinds: Object.freeze([]),
+          supportedTranslationContractVersions: Object.freeze([]),
+        }),
+        issues: Object.freeze([Object.freeze({
+          code: "execution-readiness-use-case-not-configured",
+          severity: "error" as const,
+          message: "Execution readiness use case is not configured.",
+        })]),
+        diagnostics: undefined,
+      });
+
+    await this.recordObservability({
+      event: "run.orchestration.query.get-execution-readiness.completed",
+      operation: "query.get-execution-readiness",
+      outcome: "success",
+      severity: readiness.readyForExecution ? "info" : "warn",
+      workspaceId,
+      details: Object.freeze({
+        backendFamily: readiness.backendFamily,
+        readiness: readiness.readiness,
+        operationKind: request.operationKind,
+        translationContractVersion: request.translationContractVersion,
+      }),
+      counters: Object.freeze({
+        readiness_issues_total: readiness.issues.length,
+      }),
+      markers: Object.freeze([
+        `readiness:${readiness.readiness}`,
+      ]),
+    });
+
+    return Object.freeze({
+      ok: true,
+      data: Object.freeze({
+        backendFamily: readiness.backendFamily,
+        checkedAt: readiness.checkedAt,
+        readiness: readiness.readiness,
+        readyForExecution: readiness.readyForExecution,
+        message: readiness.message,
+        capabilities: readiness.capabilities,
+        issues: readiness.issues,
+        diagnostics: readiness.diagnostics,
       }),
     });
   }
@@ -680,6 +798,39 @@ export class AuthoritativeRunQueryBackendApi {
         authenticatedAt: authorization.authenticatedAt?.trim() || undefined,
       }),
       requiredPermissionKey: "run.manage",
+      target: Object.freeze({
+        kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
+        workspaceId,
+        capabilityResourceType: AuthoritativeRunResourceType,
+      }),
+      asOf: this.now().toISOString(),
+    });
+
+    return deriveAuthorizationResponseAccessLevel(decision.decision) !== AuthorizationResponseAccessLevels.deny;
+  }
+
+  private async isWorkspaceRunReadAllowed(
+    authorization: AuthoritativeRunQueryAuthorizationContext,
+  ): Promise<boolean> {
+    if (!this.dependencies.authorizationDecisionEvaluator) {
+      return true;
+    }
+    const actorUserIdentityId = authorization.actorUserIdentityId.trim();
+    if (!actorUserIdentityId) {
+      return false;
+    }
+    const workspaceId = authorization.activeWorkspaceId.trim();
+    if (!workspaceId) {
+      return false;
+    }
+
+    const decision = await this.dependencies.authorizationDecisionEvaluator.evaluateDecision({
+      actor: Object.freeze({
+        actorUserIdentityId,
+        activeWorkspaceId: workspaceId,
+        authenticatedAt: authorization.authenticatedAt?.trim() || undefined,
+      }),
+      requiredPermissionKey: "run.read",
       target: Object.freeze({
         kind: AuthorizationPolicyEvaluationTargetKinds.workspaceCapability,
         workspaceId,

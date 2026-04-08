@@ -247,6 +247,7 @@ import {
   parseSchedulingAdminReleaseStaleReservationRequest,
   parseSchedulingAdminReevaluateDeferredRunsRequest,
   parseRunCancellationRequest,
+  parseExecutionReadinessReadRequest,
   parseRunLifecycleUpdateRequest,
   parseRunListReadRequest,
   parseRunQueueStatusReadRequest,
@@ -5268,6 +5269,54 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               return;
             }
             const apiResponse = await options.authoritativeRunQueryBackendApi.listRuns({
+              ...parsedRequest.data,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path === RunOrchestrationTransportRoutes.getExecutionReadiness
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateExecutionReadinessReadRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+            const apiResponse = await options.authoritativeRunQueryBackendApi.getExecutionReadiness({
               ...parsedRequest.data,
               authorization: Object.freeze({
                 actorUserIdentityId: context.actor.userIdentityId,
@@ -11116,6 +11165,41 @@ function parseAndValidateAuthoritativeRunQueueStatusReadRequest(input: {
       ok: false,
       statusCode: 400,
       body: buildRuntimeInvalidRequestResponse("Run queue request is invalid."),
+    };
+  }
+}
+
+function parseAndValidateExecutionReadinessReadRequest(input: {
+  readonly workspaceId: string;
+  readonly searchParams: URLSearchParams;
+}):
+  | {
+    readonly ok: true;
+    readonly data: ReturnType<typeof parseExecutionReadinessReadRequest>;
+  }
+  | { readonly ok: false; readonly statusCode: number; readonly body: { readonly ok: false; readonly error: { readonly code: string; readonly message: string } } } {
+  try {
+    return {
+      ok: true,
+      data: parseExecutionReadinessReadRequest({
+        workspaceId: input.workspaceId,
+        systemId: normalizeOptionalString(input.searchParams.get("systemId")),
+        operationKind: normalizeOptionalString(input.searchParams.get("operationKind")),
+        translationContractVersion: normalizeOptionalString(input.searchParams.get("translationContractVersion")),
+      }),
+    };
+  } catch (error) {
+    if (error instanceof RunOrchestrationTransportSchemaValidationError) {
+      return {
+        ok: false,
+        statusCode: 400,
+        body: buildRuntimeInvalidRequestResponse(error.issues[0]?.message ?? "Execution readiness query is invalid."),
+      };
+    }
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildRuntimeInvalidRequestResponse("Execution readiness query is invalid."),
     };
   }
 }
