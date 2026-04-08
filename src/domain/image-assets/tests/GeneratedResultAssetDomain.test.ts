@@ -23,6 +23,14 @@ function createPendingGeneratedResult() {
     },
     lineage: {
       inputAssetIds: ["asset-input-001"],
+      workflowTemplateVersionId: "template-background-replace-v1:rev-3",
+      workflowTemplateVersionTag: "1.3.0",
+      systemSnapshotId: "system-image-editor:snapshot:7",
+      systemVersionTag: "2.1.0",
+      parameterSnapshotId: "run-image-001:params:v1",
+      selectedNodeId: "node-gpu-01",
+      executionAdapterKind: "comfyui-adapter",
+      executionBackendFamily: "comfyui",
     },
     storageInstanceId: "storage-alpha",
     storageBindingReference: "storage-instance://storage-alpha/output",
@@ -43,6 +51,14 @@ describe("GeneratedResultAssetDomain", () => {
     expect(asset.source.workflowId).toBe("workflow-background-replace");
     expect(asset.source.executionNodeId).toBe("node-gpu-01");
     expect(asset.source.outputSlot).toBe("primary-image");
+    expect(asset.lineage.workflowTemplateVersionId).toBe("template-background-replace-v1:rev-3");
+    expect(asset.lineage.workflowTemplateVersionTag).toBe("1.3.0");
+    expect(asset.lineage.systemSnapshotId).toBe("system-image-editor:snapshot:7");
+    expect(asset.lineage.systemVersionTag).toBe("2.1.0");
+    expect(asset.lineage.parameterSnapshotId).toBe("run-image-001:params:v1");
+    expect(asset.lineage.selectedNodeId).toBe("node-gpu-01");
+    expect(asset.lineage.executionAdapterKind).toBe("comfyui-adapter");
+    expect(asset.lineage.executionBackendFamily).toBe("comfyui");
     expect(asset.lifecycle.status).toBe(GeneratedResultAssetStatuses.pendingCollection);
     expect(asset.lineage.inputAssetIds).toEqual(["asset-input-001"]);
   });
@@ -187,6 +203,128 @@ describe("GeneratedResultAssetDomain", () => {
       storageBindingReference: "C:\\temp\\result.png",
       createdBy: "user-artist",
     })).toThrow("logical storage reference");
+  });
+
+  it("requires coherent lineage context references", () => {
+    expect(() => createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-007",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-007",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        workflowTemplateVersionId: "template-background-replace-v1:rev-4",
+        workflowTemplateVersionTag: "1.4.0",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    })).toThrow("requires source.workflowTemplateId");
+
+    expect(() => createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-008",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-008",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        workflowTemplateId: "template-background-replace-v1",
+        executionNodeId: "node-gpu-01",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        selectedNodeId: "node-gpu-02",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    })).toThrow("must match source.executionNodeId");
+  });
+
+  it("requires paired workflow-template lineage version fields", () => {
+    expect(() => createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-009",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-009",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        workflowTemplateId: "template-background-replace-v1",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        workflowTemplateVersionId: "template-background-replace-v1:rev-5",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    })).toThrow("workflowTemplateVersionTag is required");
+
+    expect(() => createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-010",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-010",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        workflowTemplateId: "template-background-replace-v1",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        workflowTemplateVersionTag: "1.5.0",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    })).toThrow("workflowTemplateVersionId is required");
+  });
+
+  it("normalizes adapter lineage fields and rejects invalid version tags", () => {
+    const asset = createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-011",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-011",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        workflowTemplateId: "template-background-replace-v1",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        workflowTemplateVersionId: "template-background-replace-v1:rev-6",
+        workflowTemplateVersionTag: "1.6.0",
+        executionAdapterKind: "ComfyUI-Adapter",
+        executionBackendFamily: "ComfyUI",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    });
+
+    expect(asset.lineage.executionAdapterKind).toBe("comfyui-adapter");
+    expect(asset.lineage.executionBackendFamily).toBe("comfyui");
+
+    expect(() => createGeneratedResultAsset({
+      resultAssetId: "asset-generated-result-012",
+      workspaceId: "workspace-alpha",
+      source: {
+        runId: "run-image-012",
+        systemId: "system-image-editor",
+        workflowId: "workflow-background-replace",
+        workflowTemplateId: "template-background-replace-v1",
+        outputSlot: "primary-image",
+      },
+      lineage: {
+        inputAssetIds: ["asset-input-001"],
+        workflowTemplateVersionId: "template-background-replace-v1:rev-7",
+        workflowTemplateVersionTag: "v1",
+      },
+      storageInstanceId: "storage-alpha",
+      createdBy: "user-artist",
+    })).toThrow("workflowTemplateVersionTag must use semantic version format");
   });
 
   it("blocks visibility mutation for archived generated result assets", () => {
