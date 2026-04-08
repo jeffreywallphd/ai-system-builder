@@ -3,6 +3,7 @@
 This note documents Story 2.2.1 and Story 2.2.2 for Feature 2 / Epic 2.2:
 - shared request/response DTO and schema validation contracts for authoritative image workflow and image system APIs
 - application-layer repository/service ports for authoritative persistence, authorization-aware access, validation, compatibility checks, and version resolution
+ - application-layer create/update authoring use cases for authoritative image workflow definitions (Story 2.2.3)
 
 ## Purpose
 
@@ -25,7 +26,12 @@ The contract layer in this story focuses on:
 - `src/shared/dto/image-workflows/tests/ImageWorkflowSystemApiDtos.test.ts`
 - `src/shared/schemas/image-workflows/tests/ImageWorkflowSystemApiSchemaContracts.test.ts`
 - `src/application/image-workflows/ports/ImageWorkflowSystemDefinitionPorts.ts`
+- `src/application/image-workflows/CreateImageWorkflowDefinitionUseCase.ts`
+- `src/application/image-workflows/UpdateImageWorkflowDefinitionUseCase.ts`
+- `src/application/image-workflows/ImageWorkflowDefinitionAuthoringContracts.ts`
+- `src/application/image-workflows/ImageWorkflowDefinitionAuthoringErrors.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
+- `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
 
 ## Scope and boundary rules
 
@@ -84,6 +90,32 @@ These ports are intended for application use cases in authoritative server servi
 - future translation/execution preparation paths that require version-pinned workflow translation metadata
 
 The port layer intentionally excludes SQLite table details, API framework/controller details, and ComfyUI transport payloads.
+
+## Story 2.2.3 workflow authoring use cases
+
+Story 2.2.3 introduces application-layer write use cases for image workflow definitions:
+
+- `CreateImageWorkflowDefinitionUseCase`
+- `UpdateImageWorkflowDefinitionUseCase`
+
+These use cases enforce authoring-time guardrails before persistence:
+
+- workspace scope consistency (requested workspace and workflow ownership workspace must match)
+- authorization checks via image workflow permission actions (`image-workflow.create`, `image-workflow.update`)
+- lifecycle transition policy checks during update
+- slot-contract validation posture (including required `source-image` input slot constraints)
+- completeness checks for required bindings and backend translation mappings
+- application validation service checks with structured issue handling (error severity blocks mutation)
+
+On success, they return stable authoring result objects designed for API/controller mapping, including:
+
+- authoritative workflow identity and persisted definition snapshot
+- mutation metadata (`changed`, replay flag, operation key, occurred timestamp)
+- readiness summary with completeness diagnostics
+- validation summary for UI/API projection
+- structural metadata counts for inputs/parameters/outputs/bindings/translation mappings
+
+The resulting write path remains independent of UI presentation and backend graph execution adapters.
 
 ## Downstream integration guidance
 
