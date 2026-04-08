@@ -4,6 +4,7 @@ import {
   OfflineResourceClasses,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
+  DesktopOfflineResynchronizationEndpointKinds,
   DesktopOfflineLocalModeProfileError,
   assertDesktopOfflineLocalModeAuthorityBoundary,
   evaluateDesktopOfflineLocalExecutionEligibility,
@@ -62,6 +63,65 @@ describe("DesktopOfflineLocalModeProfile", () => {
       workstationMode: "interactive-user-session",
       allowOfflineExecutionByPolicy: true,
       allowAuthoritativeRegistrationByPolicy: true,
+    })).toThrow(DesktopOfflineLocalModeProfileError);
+  });
+
+  it("supports deployment-profile policy seams that can narrow baseline behavior without broadening", () => {
+    const seamOptions = {
+      policyContext: {
+        deploymentProfileId: "classroom",
+      },
+      policyResolver: {
+        resolvePolicy: () => Object.freeze({
+          allowedResourceClasses: Object.freeze([
+            OfflineResourceClasses.workflowDefinition,
+          ]),
+          supportedExecutionClasses: Object.freeze([
+            OfflineLocalExecutionClasses.localWorkflowPreview,
+          ]),
+          policySource: "desktop-offline-policy:classroom:v1",
+          resynchronizationEndpointKind: DesktopOfflineResynchronizationEndpointKinds.authoritativeServerOnly,
+        }),
+      },
+    } as const;
+
+    const inspection = inspectDesktopOfflineLocalModeProfile(seamOptions);
+    expect(inspection.deploymentProfileId).toBe("classroom");
+    expect(inspection.policySource).toBe("desktop-offline-policy:classroom:v1");
+    expect(inspection.allowedResourceClasses).toEqual([OfflineResourceClasses.workflowDefinition]);
+    expect(inspection.supportedExecutionClasses).toEqual([OfflineLocalExecutionClasses.localWorkflowPreview]);
+    expect(() => resolveDesktopOfflineResourceBoundary(OfflineResourceClasses.workflowDraft, seamOptions))
+      .toThrow(DesktopOfflineLocalModeProfileError);
+    expect(() => evaluateDesktopOfflineLocalExecutionEligibility({
+      executionClass: OfflineLocalExecutionClasses.localWorkflowValidation,
+      resourceClass: OfflineResourceClasses.localRuntimeSession,
+      resourcePolicy: {
+        workspaceVisibility: "private",
+        workspaceAccessRole: "owner",
+        workspaceSharingPosture: "workspace-only",
+        sensitivityMarking: "standard",
+        storageRule: "allow-offline-cache",
+        deviceTrustPosture: "trusted",
+      },
+      workstationMode: "interactive-user-session",
+      allowOfflineExecutionByPolicy: true,
+      allowAuthoritativeRegistrationByPolicy: true,
+    }, seamOptions)).toThrow(DesktopOfflineLocalModeProfileError);
+  });
+
+  it("rejects deployment-profile seams that pretend unsupported offline scope", () => {
+    expect(() => inspectDesktopOfflineLocalModeProfile({
+      policyContext: {
+        deploymentProfileId: "organization",
+      },
+      policyResolver: {
+        resolvePolicy: () => Object.freeze({
+          allowedResourceClasses: Object.freeze([
+            OfflineResourceClasses.secretPlaintextMaterial,
+          ]),
+          policySource: "desktop-offline-policy:organization:v1",
+        }),
+      },
     })).toThrow(DesktopOfflineLocalModeProfileError);
   });
 });

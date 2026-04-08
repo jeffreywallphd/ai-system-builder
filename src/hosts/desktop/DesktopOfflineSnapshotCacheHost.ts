@@ -4,12 +4,16 @@ import {
   OfflineAuthoritativeSnapshotCacheService,
 } from "@application/common/OfflineAuthoritativeSnapshotCache";
 import { DesktopOfflineSnapshotCacheRepository } from "@infrastructure/desktop/DesktopOfflineSnapshotCacheRepository";
-import { assertDesktopOfflineLocalModeAuthorityBoundary } from "./DesktopOfflineLocalModeProfile";
+import {
+  assertDesktopOfflineLocalModeAuthorityBoundary,
+  type DesktopOfflineLocalModePolicyResolutionOptions,
+} from "./DesktopOfflineLocalModeProfile";
 
 export interface DesktopOfflineSnapshotCacheHostOptions {
   readonly storagePaths: DesktopStoragePaths;
   readonly maxEntries?: number;
   readonly supportsProtectedAtRestStorage?: boolean;
+  readonly localModePolicy?: DesktopOfflineLocalModePolicyResolutionOptions;
 }
 
 export interface DesktopOfflineSnapshotCacheHostRuntime {
@@ -24,7 +28,7 @@ const OFFLINE_SNAPSHOT_CACHE_DATABASE_NAME = "offline-authoritative-snapshot-cac
 export function createDesktopOfflineSnapshotCacheHostRuntime(
   options: DesktopOfflineSnapshotCacheHostOptions,
 ): DesktopOfflineSnapshotCacheHostRuntime {
-  assertDesktopOfflineLocalModeAuthorityBoundary();
+  assertDesktopOfflineLocalModeAuthorityBoundary(options.localModePolicy);
 
   const databasePath = path.join(
     options.storagePaths.storageDirectory,

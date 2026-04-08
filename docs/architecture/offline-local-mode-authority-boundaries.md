@@ -473,6 +473,31 @@ sequenceDiagram
 - no secret plaintext caching path in offline stores;
 - no best-effort event publication coupling to replay/control flow (event sink failures never alter reconciliation decisions).
 
+## Deployment-profile and future remote/offline evolution seams (Story 19.3.7)
+
+The current production model remains one bounded desktop offline profile, but explicit code seams now exist so future profile- or environment-specific policy can be introduced without rewriting the offline stack.
+
+Canonical seam points:
+- desktop local-mode profile policy resolver seam:
+  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+  - `IDesktopOfflineLocalModePolicyResolverPort`
+  - `DesktopOfflineLocalModePolicyResolutionOptions`
+- host runtime wiring seam for policy context propagation:
+  - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
+- reconnect policy seam:
+  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+  - `IOfflineResynchronizationPolicyPort`
+
+Current production guardrails for these seams:
+- deployment-policy seams can narrow currently allowed resource/execution classes but cannot broaden beyond baseline production classes;
+- reconnect policy is injectable by port, but default production behavior remains `planOfflineResynchronization(...)` plus `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`;
+- resynchronization endpoint kind remains `authoritative-server-only` in production and rejects unsupported remote replay endpoint declarations.
+
+No mock deployment-profile toggles are shipped. `home`, `classroom`, and `organization` profile differences are intentionally represented as policy-resolution seams and documentation, not pretend runtime behavior in this story.
+
 ## Extension rules for contributors
 
 - register new offline resource classes in `OfflineLocalModeBoundaries` with authority scope, capability matrix, storage bucket, behavior class, and eligibility metadata;

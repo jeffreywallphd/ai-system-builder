@@ -65,6 +65,10 @@ describe("offline local-mode documentation guidance", () => {
     expect(doc).toContain("### Flow 2: reconnect replay, conflict handling, and explicit outcomes");
     expect(doc).toContain("### Flow 3: post-sync cache refresh and invalidation cleanup");
     expect(doc).toContain("## Intentionally deferred behavior (explicitly not implemented)");
+    expect(doc).toContain("## Deployment-profile and future remote/offline evolution seams (Story 19.3.7)");
+    expect(doc).toContain("IDesktopOfflineLocalModePolicyResolverPort");
+    expect(doc).toContain("IOfflineResynchronizationPolicyPort");
+    expect(doc).toContain("No mock deployment-profile toggles are shipped");
     expect(doc).toContain("client code must not treat offline local state as silently authoritative global truth");
     expect(doc).toContain("src/domain/platform/OfflineLocalModeBoundaries.ts");
     expect(doc).toContain("src/application/common/OfflineLocalModeResynchronization.ts");
@@ -81,6 +85,10 @@ describe("offline local-mode documentation guidance", () => {
     expect(contributorDoc).toContain("## Workflow-specific extension checklists");
     expect(contributorDoc).toContain("## Adding a new offline resource class");
     expect(contributorDoc).toContain("## Extending reconnect conflict handling");
+    expect(contributorDoc).toContain("## Deployment-profile seam extension guidance (Story 19.3.7)");
+    expect(contributorDoc).toContain("IDesktopOfflineLocalModePolicyResolverPort");
+    expect(contributorDoc).toContain("IOfflineResynchronizationPolicyPort");
+    expect(contributorDoc).toContain("no mock deployment-profile toggles");
     expect(contributorDoc).toContain("## What must remain server-authoritative");
     expect(contributorDoc).toContain("## Prohibited patterns");
     expect(contributorDoc).toContain("## Intentionally deferred behavior guardrails");
@@ -115,10 +123,14 @@ describe("offline local-mode documentation guidance", () => {
     expect(aiDoc).toContain("docs/offline-local-mode-contributor-guide.md");
     expect(aiDoc).toContain("offline local state as silently authoritative global truth");
     expect(aiDoc).toContain("Desktop cache + resync workflow baseline (Story 19.2.8)");
+    expect(aiDoc).toContain("Deployment-profile and future remote/offline evolution seams (Story 19.3.7)");
+    expect(aiDoc).toContain("IOfflineResynchronizationPolicyPort");
 
     expect(contributorAiDoc).toContain("docs/offline-local-mode-contributor-guide.md");
     expect(contributorAiDoc).toContain("control-plane-client");
     expect(contributorAiDoc).toContain("## Desktop cache + reconnect extension map");
+    expect(contributorAiDoc).toContain("Deployment-profile seam guidance (Story 19.3.7)");
+    expect(contributorAiDoc).toContain("IDesktopOfflineLocalModePolicyResolverPort");
 
     expect(hooksDoc).toContain("offline-entered");
     expect(hooksDoc).toContain("replay-succeeded");

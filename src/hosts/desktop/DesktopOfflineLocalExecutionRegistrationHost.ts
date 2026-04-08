@@ -2,11 +2,15 @@ import path from "node:path";
 import type { DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
 import { OfflineLocalExecutionRegistrationService } from "@application/common/OfflineLocalExecutionRegistrationPersistence";
 import { DesktopOfflineLocalExecutionRegistrationRepository } from "@infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository";
-import { assertDesktopOfflineLocalModeAuthorityBoundary } from "./DesktopOfflineLocalModeProfile";
+import {
+  assertDesktopOfflineLocalModeAuthorityBoundary,
+  type DesktopOfflineLocalModePolicyResolutionOptions,
+} from "./DesktopOfflineLocalModeProfile";
 
 export interface DesktopOfflineLocalExecutionRegistrationHostOptions {
   readonly storagePaths: DesktopStoragePaths;
   readonly maxEntries?: number;
+  readonly localModePolicy?: DesktopOfflineLocalModePolicyResolutionOptions;
 }
 
 export interface DesktopOfflineLocalExecutionRegistrationHostRuntime {
@@ -21,7 +25,7 @@ const OFFLINE_LOCAL_EXECUTION_REGISTRATION_DATABASE_NAME = "offline-local-execut
 export function createDesktopOfflineLocalExecutionRegistrationHostRuntime(
   options: DesktopOfflineLocalExecutionRegistrationHostOptions,
 ): DesktopOfflineLocalExecutionRegistrationHostRuntime {
-  assertDesktopOfflineLocalModeAuthorityBoundary();
+  assertDesktopOfflineLocalModeAuthorityBoundary(options.localModePolicy);
 
   const databasePath = path.join(
     options.storagePaths.storageDirectory,
