@@ -91,6 +91,21 @@ Known assumptions:
 - Slot matching currently uses backend-field/node-id hints with deterministic order fallback when exact node mapping is not available.
 - Temporary backend object handles are retrieval hints only and are never treated as final logical asset identity.
 
+## Story 3.3.4 temporary-reference cleanup semantics
+
+Added explicit cleanup behavior for adapter-managed temporary output references:
+
+- `ComfyUiOutputDiscoveryCollector` now tracks temporary references discovered per execution job.
+- Added `releaseTemporaryReferences(...)` to release adapter-local tracked references after cancellation/early-failure flows.
+- Cleanup outcomes are normalized and explicit:
+  - `completed`
+  - `none`
+  - `degraded`
+
+Guarantees and limitations:
+- Cleanup is best effort and limited to adapter-local tracked state.
+- Backend-generated files and runtime-global backend state are not guaranteed to be deleted by this adapter cleanup path.
+
 ## Relationship to adjacent architecture notes
 
 - Execution application ports:

@@ -177,3 +177,12 @@
 - Dispatch failures now normalize through `ComfyUiRunExecutionDispatchAdapter` into typed `ComfyUiRunExecutionDispatchError` with stable machine codes/categories, user-safe summaries, and sanitized diagnostics.
 - Progress polling failures in `ComfyUiExecutionStatusNormalizer` now use the same normalization utility, including explicit missing-model/dependency and translation-mismatch categorization.
 - Output-collection contracts now support normalized collection anomaly payloads (`collectionFailure`) with integrity rules for `partially-collected` / `failed` statuses.
+
+## Story 3.3.4 update
+- Added concrete cancellation adapter at `src/infrastructure/execution/comfyui/ComfyUiExecutionCancellationAdapter.ts` implementing `IImageManipulationExecutionCancellationPort` with normalized outcomes (`accepted`, `already-terminal`, `not-supported`, `rejected`, `not-found`, `failed`).
+- Cancellation failures now include normalized failure details (machine code/category/retryability/sanitized diagnostics) so higher layers can reason about retry/cancel behavior without transport-specific exception handling.
+- Added explicit adapter-local cleanup semantics for temporary output references in
+  `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts` via `releaseTemporaryReferences(...)` with normalized cleanup statuses (`completed`, `none`, `degraded`).
+- Composed cancellation + cleanup seam into canonical adapter composition (`ComfyUiExecutionAdapterComposition`) and added focused tests:
+  - `src/infrastructure/execution/tests/ComfyUiExecutionCancellationAdapter.test.ts`
+  - `src/infrastructure/execution/tests/ComfyUiOutputDiscoveryCollector.test.ts` (cleanup release behavior)

@@ -39,6 +39,23 @@ export interface ComfyUiOutputDiscoveryCollectionResult {
   readonly collected: ImageManipulationCollectedExecutionResult;
 }
 
+export const ComfyUiTemporaryReferenceCleanupStatuses = Object.freeze({
+  completed: "completed",
+  none: "none",
+  degraded: "degraded",
+});
+
+export type ComfyUiTemporaryReferenceCleanupStatus =
+  typeof ComfyUiTemporaryReferenceCleanupStatuses[keyof typeof ComfyUiTemporaryReferenceCleanupStatuses];
+
+export interface ComfyUiTemporaryReferenceCleanupResult {
+  readonly status: ComfyUiTemporaryReferenceCleanupStatus;
+  readonly releasedReferenceCount: number;
+  readonly acknowledgedAt: string;
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
 interface NormalizedImageArtifact {
   readonly nodeId: string;
   readonly outputIndex: number;
@@ -49,6 +66,11 @@ interface NormalizedImageArtifact {
 
 export class ComfyUiOutputDiscoveryCollector {
   private readonly now: () => Date;
+  private readonly trackedTemporaryReferences = new Map<string, {
+    readonly executionJobId: string;
+    readonly backendExecutionId: string;
+    readonly referenceCount: number;
+  }>();
 
   public constructor(
     private readonly dependencies: {
@@ -161,9 +183,64 @@ export class ComfyUiOutputDiscoveryCollector {
       },
     });
 
+    this.trackedTemporaryReferences.set(
+      request.executionJobId,
+      Object.freeze({
+        executionJobId: request.executionJobId,
+        backendExecutionId: request.backendExecutionId,
+        referenceCount: discoveredOutputs.length,
+      }),
+    );
+
     return Object.freeze({
       discovery,
       collected,
+    });
+  }
+
+  public async releaseTemporaryReferences(input: {
+    readonly executionJobId: string;
+    readonly backendExecutionId?: string;
+    readonly requestedAt?: string;
+    readonly reason?: string;
+  }): Promise<ComfyUiTemporaryReferenceCleanupResult> {
+    const acknowledgedAt = this.resolveTimestamp(input.requestedAt);
+    const executionJobId = normalizeString(input.executionJobId);
+    const backendExecutionId = normalizeString(input.backendExecutionId);
+
+    const trackedByExecution = executionJobId
+      ? this.trackedTemporaryReferences.get(executionJobId)
+      : undefined;
+
+    const trackedByBackend = backendExecutionId
+      ? [...this.trackedTemporaryReferences.values()].find((entry) => entry.backendExecutionId === backendExecutionId)
+      : undefined;
+
+    const tracked = trackedByExecution ?? trackedByBackend;
+    if (!tracked) {
+      return Object.freeze({
+        status: ComfyUiTemporaryReferenceCleanupStatuses.none,
+        releasedReferenceCount: 0,
+        acknowledgedAt,
+        message: "No adapter-tracked temporary output references were found for cleanup.",
+        details: Object.freeze({
+          guarantee: "best-effort-adapter-local-state-only",
+          reason: normalizeString(input.reason) ?? "unspecified",
+        }),
+      });
+    }
+
+    this.trackedTemporaryReferences.delete(tracked.executionJobId);
+    return Object.freeze({
+      status: ComfyUiTemporaryReferenceCleanupStatuses.completed,
+      releasedReferenceCount: tracked.referenceCount,
+      acknowledgedAt,
+      message: "Adapter-tracked temporary output references were released.",
+      details: Object.freeze({
+        guarantee: "best-effort-adapter-local-state-only",
+        reason: normalizeString(input.reason) ?? "unspecified",
+        backendExecutionId: tracked.backendExecutionId,
+      }),
     });
   }
 

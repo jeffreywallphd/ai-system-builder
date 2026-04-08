@@ -156,4 +156,60 @@ describe("ComfyUiOutputDiscoveryCollector", () => {
     expect(result.collected.collectionFailure?.code).toBe("output-collection-failed");
     expect(result.collected.summary.collectedCount).toBe(0);
   });
+
+  it("releases adapter-tracked temporary output references on explicit cleanup requests", async () => {
+    const fetchFn = mock(async () => new Response(JSON.stringify({
+      "prompt-collect-4": Object.freeze({
+        status: Object.freeze({
+          completed: true,
+          status_str: "success",
+        }),
+        outputs: Object.freeze({
+          "2": Object.freeze({
+            images: Object.freeze([
+              Object.freeze({
+                filename: "output.png",
+                subfolder: "results",
+                type: "output",
+              }),
+            ]),
+          }),
+        }),
+      }),
+    })));
+    const transportClient = new ComfyUiTransportClient({
+      baseUrl: "http://localhost:8188",
+      fetch: fetchFn as unknown as typeof fetch,
+      now: () => new Date("2026-04-08T13:30:00.000Z"),
+    });
+    const collector = new ComfyUiOutputDiscoveryCollector({
+      transportClient,
+      now: () => new Date("2026-04-08T13:30:00.000Z"),
+    });
+
+    await collector.discoverAndCollect({
+      executionJobId: "job-4",
+      runId: "run-4",
+      workspaceId: "workspace-4",
+      backendExecutionId: "prompt-collect-4",
+    });
+
+    const released = await collector.releaseTemporaryReferences({
+      executionJobId: "job-4",
+      requestedAt: "2026-04-08T13:30:10.000Z",
+      reason: "run-cancelled",
+    });
+
+    expect(released.status).toBe("completed");
+    expect(released.releasedReferenceCount).toBe(1);
+
+    const noTracked = await collector.releaseTemporaryReferences({
+      executionJobId: "job-4",
+      requestedAt: "2026-04-08T13:30:20.000Z",
+      reason: "retry-cleanup",
+    });
+
+    expect(noTracked.status).toBe("none");
+    expect(noTracked.releasedReferenceCount).toBe(0);
+  });
 });

@@ -289,3 +289,19 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
 - Dispatch adapter now normalizes failures into typed `ComfyUiRunExecutionDispatchError` payloads instead of leaking raw transport exceptions.
 - Progress normalizer (`ComfyUiExecutionStatusNormalizer`) now uses the same category/code mapping as dispatch.
 - Output discovery/collection contracts now support normalized collection anomalies through optional `collectionFailure` with status-integrity rules.
+
+## Story 3.3.4 update
+- Added concrete cancellation adapter at `src/infrastructure/execution/comfyui/ComfyUiExecutionCancellationAdapter.ts` implementing `IImageManipulationExecutionCancellationPort` with normalized outcomes:
+  - `accepted`
+  - `already-terminal`
+  - `not-supported`
+  - `rejected`
+  - `not-found`
+  - `failed`
+- Cancellation failures now carry normalized failure details so orchestration/UI layers can reason about retry/cancel behavior without backend exception coupling.
+- Added explicit adapter-local cleanup semantics for temporary output references in
+  `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts` via `releaseTemporaryReferences(...)` and normalized cleanup statuses (`completed`, `none`, `degraded`).
+- Updated composition and test coverage:
+  - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+  - `src/infrastructure/execution/tests/ComfyUiExecutionCancellationAdapter.test.ts`
+  - `src/infrastructure/execution/tests/ComfyUiOutputDiscoveryCollector.test.ts` (cleanup release behavior)

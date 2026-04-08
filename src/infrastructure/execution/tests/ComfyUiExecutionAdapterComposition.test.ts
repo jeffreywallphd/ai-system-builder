@@ -2,6 +2,7 @@ import { describe, expect, it, mock } from "bun:test";
 import { ComfyUiExecutionAdapterConfig } from "@infrastructure/config/ComfyUiExecutionAdapterConfig";
 import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
 import { ComfyUiImageManipulationCapabilityProbeAdapter } from "../comfyui/ComfyUiImageManipulationCapabilityProbeAdapter";
+import { ComfyUiExecutionCancellationAdapter } from "../comfyui/ComfyUiExecutionCancellationAdapter";
 import { ComfyUiOutputDiscoveryCollector } from "../comfyui/ComfyUiOutputDiscoveryCollector";
 import { createComfyUiExecutionAdapterInfrastructure } from "../comfyui/ComfyUiExecutionAdapterComposition";
 
@@ -35,6 +36,7 @@ describe("ComfyUiExecutionAdapterComposition", () => {
     expect(composed).toBeDefined();
     expect(composed?.config.baseUrl).toBe("http://localhost:8188");
     expect(composed?.runDispatchAdapter).toBeInstanceOf(ComfyUiRunExecutionDispatchAdapter);
+    expect(composed?.cancellationAdapter).toBeInstanceOf(ComfyUiExecutionCancellationAdapter);
     expect(composed?.capabilityProbeAdapter).toBeInstanceOf(ComfyUiImageManipulationCapabilityProbeAdapter);
     expect(composed?.outputDiscoveryCollector).toBeInstanceOf(ComfyUiOutputDiscoveryCollector);
 
