@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import {
   OfflineLocalExecutionRegistrationRetryBackoffPolicies,
   OfflineLocalExecutionRegistrationService,
@@ -17,6 +18,10 @@ import {
   createOfflineLocalExecutionRegistrationEnvelope,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import { DesktopOfflineLocalExecutionRegistrationRepository } from "../DesktopOfflineLocalExecutionRegistrationRepository";
+import {
+  DesktopOfflineValueProtectionPostures,
+  type DesktopOfflineValueProtectionPort,
+} from "../DesktopOfflineValueProtection";
 
 const tempRoots: string[] = [];
 
@@ -103,6 +108,60 @@ describe("DesktopOfflineLocalExecutionRegistrationRepository", () => {
     expect(loaded?.canonicalExecutionMetadataJson).toContain("\"executionId\":\"execution:persist:1\"");
     expect(loaded?.retryability.retryCount).toBe(1);
     reopened.dispose();
+  });
+
+  it("protects persisted local execution registration payload fields when local protected storage is available", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "ai-loom-offline-local-exec-registration-protection-"));
+    tempRoots.push(root);
+    const databasePath = path.join(root, "offline-local-exec-registration.sqlite");
+    const valueProtection: DesktopOfflineValueProtectionPort = Object.freeze({
+      posture: DesktopOfflineValueProtectionPostures.protectedAtRest,
+      protect: (value: string) => `enc::${Buffer.from(value, "utf8").toString("base64")}`,
+      unprotect: (value: string) => {
+        if (!value.startsWith("enc::")) {
+          return value;
+        }
+        return Buffer.from(value.slice("enc::".length), "base64").toString("utf8");
+      },
+    });
+
+    const repository = new DesktopOfflineLocalExecutionRegistrationRepository({
+      databasePath,
+      maxEntries: 100,
+      valueProtection,
+    });
+    const service = new OfflineLocalExecutionRegistrationService(repository);
+
+    await service.queueRegistration({
+      registration: createRegistration(
+        "registration:protected:1",
+        "execution:protected:1",
+        "2026-04-08T12:01:00.000Z",
+      ),
+      actorWorkspaceContext: {
+        workspaceId: "workspace:protected",
+        actorUserIdentityId: "user:protected",
+      },
+    });
+
+    const db = new Database(databasePath, { readonly: true });
+    const row = db.prepare(`
+      SELECT registration_envelope_json, canonical_execution_metadata_json, payload_protection_posture
+      FROM offline_local_execution_registrations
+      WHERE workspace_id = ? AND registration_id = ?
+    `).get("workspace:protected", "registration:protected:1") as {
+      readonly registration_envelope_json: string;
+      readonly canonical_execution_metadata_json: string;
+      readonly payload_protection_posture: string;
+    };
+    db.close();
+
+    expect(row.payload_protection_posture).toBe("protected-at-rest");
+    expect(row.registration_envelope_json.startsWith("enc::")).toBeTrue();
+    expect(row.canonical_execution_metadata_json.startsWith("enc::")).toBeTrue();
+    expect(row.registration_envelope_json).not.toContain("execution:protected:1");
+
+    repository.dispose();
   });
 
   it("enforces retention bound when local execution registration count exceeds configured max entries", async () => {

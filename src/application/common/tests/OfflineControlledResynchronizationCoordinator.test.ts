@@ -806,6 +806,12 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(permission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(invalidSubmission?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncRejected);
     expect(version?.operation.userVisibleSyncStatus).toBe(OfflineQueuedMutationStatuses.syncConflict);
+    expect(revoked?.retryability.retryable).toBeFalse();
+    expect(permission?.retryability.retryable).toBeFalse();
+    expect(invalidSubmission?.retryability.retryable).toBeFalse();
+    expect(revoked?.retryability.nonRetryableReasonCode).toBe("deleted-or-revoked-resource");
+    expect(permission?.retryability.nonRetryableReasonCode).toBe("permission-changed-during-disconnection");
+    expect(invalidSubmission?.retryability.nonRetryableReasonCode).toBe("invalidated-run-submission");
     expect(invalidatedSnapshot).toBeUndefined();
   });
 

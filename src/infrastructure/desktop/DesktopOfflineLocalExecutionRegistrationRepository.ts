@@ -9,6 +9,11 @@ import {
   JsonOfflineLocalExecutionRegistrationSerializer,
   OfflineLocalExecutionRegistrationPersistenceError,
 } from "@application/common/OfflineLocalExecutionRegistrationPersistence";
+import {
+  createElectronSafeStorageDesktopOfflineValueProtectionPort,
+  type DesktopOfflineValueProtectionPort,
+  DesktopOfflineValueProtectionPostures,
+} from "./DesktopOfflineValueProtection";
 
 interface MigrationDefinition {
   readonly version: number;
@@ -60,6 +65,16 @@ const MIGRATIONS: ReadonlyArray<MigrationDefinition> = Object.freeze([
       `,
     ]),
   },
+  {
+    version: 2,
+    name: "add-offline-local-execution-registration-value-protection-posture",
+    statements: Object.freeze([
+      `
+      ALTER TABLE offline_local_execution_registrations
+      ADD COLUMN payload_protection_posture TEXT NOT NULL DEFAULT 'unprotected-at-rest'
+      `,
+    ]),
+  },
 ]);
 
 interface LocalExecutionRegistrationRow {
@@ -71,6 +86,7 @@ interface LocalExecutionRegistrationRow {
   readonly canonical_execution_metadata_digest: string;
   readonly registration_envelope_json: string;
   readonly retryability_json: string;
+  readonly payload_protection_posture: string;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -79,6 +95,7 @@ export interface DesktopOfflineLocalExecutionRegistrationRepositoryOptions {
   readonly databasePath: string;
   readonly maxEntries?: number;
   readonly serializer?: IOfflineLocalExecutionRegistrationSerializer;
+  readonly valueProtection?: DesktopOfflineValueProtectionPort;
 }
 
 const DEFAULT_MAX_ENTRIES = 5000;
@@ -87,11 +104,14 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
   private readonly databasePath: string;
   private readonly serializer: IOfflineLocalExecutionRegistrationSerializer;
   private readonly maxEntries: number;
+  private readonly valueProtection: DesktopOfflineValueProtectionPort;
   private database?: Database.Database;
 
   constructor(options: DesktopOfflineLocalExecutionRegistrationRepositoryOptions) {
     this.databasePath = options.databasePath;
     this.serializer = options.serializer ?? new JsonOfflineLocalExecutionRegistrationSerializer();
+    this.valueProtection = options.valueProtection
+      ?? createElectronSafeStorageDesktopOfflineValueProtectionPort();
     this.maxEntries = Number.isInteger(options.maxEntries) && (options.maxEntries ?? 0) > 0
       ? options.maxEntries!
       : DEFAULT_MAX_ENTRIES;
@@ -122,6 +142,7 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
           canonical_execution_metadata_digest,
           registration_envelope_json,
           retryability_json,
+          payload_protection_posture,
           created_at,
           updated_at
         ) VALUES (
@@ -144,6 +165,7 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
           @canonical_execution_metadata_digest,
           @registration_envelope_json,
           @retryability_json,
+          @payload_protection_posture,
           @created_at,
           @updated_at
         )
@@ -165,6 +187,7 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
           canonical_execution_metadata_digest = excluded.canonical_execution_metadata_digest,
           registration_envelope_json = excluded.registration_envelope_json,
           retryability_json = excluded.retryability_json,
+          payload_protection_posture = excluded.payload_protection_posture,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at
       `)
@@ -188,6 +211,7 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
           canonical_execution_metadata_digest,
           registration_envelope_json,
           retryability_json,
+          payload_protection_posture,
           created_at,
           updated_at
         FROM offline_local_execution_registrations
@@ -212,6 +236,7 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
           canonical_execution_metadata_digest,
           registration_envelope_json,
           retryability_json,
+          payload_protection_posture,
           created_at,
           updated_at
         FROM offline_local_execution_registrations
@@ -334,24 +359,60 @@ export class DesktopOfflineLocalExecutionRegistrationRepository implements IOffl
       max_retry_count: retryability.maxRetryCount,
       next_eligible_replay_at: retryability.nextEligibleReplayAt ?? null,
       last_attempted_at: retryability.lastAttemptedAt ?? null,
-      canonical_execution_metadata_json: serialized.canonicalExecutionMetadataJson,
+      canonical_execution_metadata_json: this.valueProtection.protect(serialized.canonicalExecutionMetadataJson, {
+        store: "offline-local-execution-registration",
+        field: "canonical_execution_metadata_json",
+      }),
       canonical_execution_metadata_digest: serialized.canonicalExecutionMetadataDigest,
-      registration_envelope_json: serialized.registrationEnvelopeJson,
-      retryability_json: serialized.retryabilityJson,
+      registration_envelope_json: this.valueProtection.protect(serialized.registrationEnvelopeJson, {
+        store: "offline-local-execution-registration",
+        field: "registration_envelope_json",
+      }),
+      retryability_json: this.valueProtection.protect(serialized.retryabilityJson, {
+        store: "offline-local-execution-registration",
+        field: "retryability_json",
+      }),
+      payload_protection_posture: this.valueProtection.posture,
       created_at: serialized.createdAt,
       updated_at: serialized.updatedAt,
     };
   }
 
   private fromRow(row: LocalExecutionRegistrationRow): OfflineLocalExecutionRegistrationRecord {
+    if (
+      row.payload_protection_posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+      && row.payload_protection_posture !== DesktopOfflineValueProtectionPostures.unprotectedAtRest
+    ) {
+      throw new OfflineLocalExecutionRegistrationPersistenceError(
+        `Registration '${row.registration_id}' persisted payload protection posture is invalid.`,
+      );
+    }
+    if (
+      row.payload_protection_posture === DesktopOfflineValueProtectionPostures.protectedAtRest
+      && this.valueProtection.posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+    ) {
+      throw new OfflineLocalExecutionRegistrationPersistenceError(
+        `Registration '${row.registration_id}' requires protected-at-rest decoding, but protected storage is unavailable.`,
+      );
+    }
+
     const serialized: OfflineLocalExecutionRegistrationSerializedRecord = {
       registrationId: row.registration_id,
       workspaceId: row.workspace_id,
       actorUserIdentityId: row.actor_user_identity_id,
-      registrationEnvelopeJson: row.registration_envelope_json,
-      retryabilityJson: row.retryability_json,
+      registrationEnvelopeJson: this.valueProtection.unprotect(row.registration_envelope_json, {
+        store: "offline-local-execution-registration",
+        field: "registration_envelope_json",
+      }),
+      retryabilityJson: this.valueProtection.unprotect(row.retryability_json, {
+        store: "offline-local-execution-registration",
+        field: "retryability_json",
+      }),
       localStateScope: row.local_state_scope as OfflineLocalExecutionRegistrationSerializedRecord["localStateScope"],
-      canonicalExecutionMetadataJson: row.canonical_execution_metadata_json,
+      canonicalExecutionMetadataJson: this.valueProtection.unprotect(row.canonical_execution_metadata_json, {
+        store: "offline-local-execution-registration",
+        field: "canonical_execution_metadata_json",
+      }),
       canonicalExecutionMetadataDigest: row.canonical_execution_metadata_digest,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

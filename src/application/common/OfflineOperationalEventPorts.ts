@@ -38,9 +38,11 @@ export interface IOfflineOperationalEventSink {
 }
 
 const SensitiveOfflineDetailKeyPattern = /(payload|token|secret|credential|password|diagnostic|internal|path|file|directory|content|body|bytes|raw)/i;
+const SensitiveOfflineStringValuePattern = /(file:\/\/|[a-zA-Z]:\\|\\\\|\/Users\/|\/home\/|\/var\/|\/tmp\/|\/etc\/|api[_-]?key|bearer\s+[a-z0-9\-_.]+|prompt\s*:)/i;
 const MaxOfflineEventStringLength = 256;
 const MaxOfflineEventArrayLength = 20;
 const MaxOfflineEventObjectEntries = 24;
+const RedactedMarker = "[REDACTED]";
 
 export async function publishOfflineOperationalEventBestEffort(
   sink: IOfflineOperationalEventSink | undefined,
@@ -97,9 +99,7 @@ function sanitizeUnknown(value: unknown): unknown {
     return value;
   }
   if (typeof value === "string") {
-    return value.length > MaxOfflineEventStringLength
-      ? `${value.slice(0, MaxOfflineEventStringLength)}...`
-      : value;
+    return sanitizeStringValue(value);
   }
   if (typeof value === "number" || typeof value === "boolean") {
     return value;
@@ -125,9 +125,30 @@ function sanitizeOptionalSummary(value: string | undefined): string | undefined 
   if (!normalized) {
     return undefined;
   }
+  return sanitizeStringValue(normalized);
+}
+
+function sanitizeStringValue(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    return normalized;
+  }
+  if (SensitiveOfflineStringValuePattern.test(normalized) || looksLikeRootedPath(normalized)) {
+    return RedactedMarker;
+  }
   return normalized.length > MaxOfflineEventStringLength
     ? `${normalized.slice(0, MaxOfflineEventStringLength)}...`
     : normalized;
+}
+
+function looksLikeRootedPath(value: string): boolean {
+  if (!value.startsWith("/") || value.startsWith("//")) {
+    return false;
+  }
+  if (!value.includes("/")) {
+    return false;
+  }
+  return value.length > 4;
 }
 
 function normalizeRequired(value: string, field: string): string {

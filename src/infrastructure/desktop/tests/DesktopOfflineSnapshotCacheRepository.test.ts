@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import Database from "better-sqlite3";
 import { DesktopOfflineSnapshotCacheRepository } from "../DesktopOfflineSnapshotCacheRepository";
 import {
   computeOfflineSnapshotDigest,
@@ -18,6 +19,10 @@ import {
   OfflineWorkspaceSharingPostures,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
+import {
+  DesktopOfflineValueProtectionPostures,
+  type DesktopOfflineValueProtectionPort,
+} from "../DesktopOfflineValueProtection";
 
 const tempRoots: string[] = [];
 
@@ -93,6 +98,53 @@ describe("DesktopOfflineSnapshotCacheRepository", () => {
     expect(loaded?.snapshot.id).toBe("wf-1");
     expect(loaded?.eligibilityMarkers.workspaceAccessRole).toBe("owner");
     expect(loaded?.cacheProtectionPosture).toBe("unprotected-at-rest");
+    repository.dispose();
+  });
+
+  it("protects persisted snapshot payload fields when local protected storage is available", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "ai-loom-offline-cache-protection-"));
+    tempRoots.push(root);
+    const databasePath = path.join(root, "offline-cache.sqlite");
+    const valueProtection: DesktopOfflineValueProtectionPort = Object.freeze({
+      posture: DesktopOfflineValueProtectionPostures.protectedAtRest,
+      protect: (value: string) => `enc::${Buffer.from(value, "utf8").toString("base64")}`,
+      unprotect: (value: string) => {
+        if (!value.startsWith("enc::")) {
+          return value;
+        }
+        return Buffer.from(value.slice("enc::".length), "base64").toString("utf8");
+      },
+    });
+
+    const repository = new DesktopOfflineSnapshotCacheRepository({
+      databasePath,
+      maxEntries: 10,
+      valueProtection,
+    });
+
+    await repository.upsertSnapshot(createSnapshotRecord({
+      workspaceId: "workspace-a",
+      resourceId: "wf-protected-1",
+      cachedAt: "2026-04-07T19:10:00.000Z",
+    }));
+
+    const db = new Database(databasePath, { readonly: true });
+    const row = db.prepare(`
+      SELECT snapshot_json, eligibility_markers_json, value_protection_posture
+      FROM offline_authoritative_snapshot_cache
+      WHERE workspace_id = ? AND resource_id = ?
+    `).get("workspace-a", "wf-protected-1") as {
+      readonly snapshot_json: string;
+      readonly eligibility_markers_json: string;
+      readonly value_protection_posture: string;
+    };
+    db.close();
+
+    expect(row.value_protection_posture).toBe("protected-at-rest");
+    expect(row.snapshot_json.startsWith("enc::")).toBeTrue();
+    expect(row.eligibility_markers_json.startsWith("enc::")).toBeTrue();
+    expect(row.snapshot_json).not.toContain("workflow-definition");
+
     repository.dispose();
   });
 

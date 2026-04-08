@@ -9,6 +9,11 @@ import {
   JsonOfflinePendingOperationSerializer,
   OfflinePendingOperationPersistenceError,
 } from "@application/common/OfflinePendingOperationPersistence";
+import {
+  createElectronSafeStorageDesktopOfflineValueProtectionPort,
+  type DesktopOfflineValueProtectionPort,
+  DesktopOfflineValueProtectionPostures,
+} from "./DesktopOfflineValueProtection";
 
 interface MigrationDefinition {
   readonly version: number;
@@ -62,6 +67,16 @@ const MIGRATIONS: ReadonlyArray<MigrationDefinition> = Object.freeze([
       `,
     ]),
   },
+  {
+    version: 2,
+    name: "add-offline-pending-operation-value-protection-posture",
+    statements: Object.freeze([
+      `
+      ALTER TABLE offline_pending_operations
+      ADD COLUMN payload_protection_posture TEXT NOT NULL DEFAULT 'unprotected-at-rest'
+      `,
+    ]),
+  },
 ]);
 
 interface PendingOperationRow {
@@ -76,6 +91,7 @@ interface PendingOperationRow {
   readonly resource_base_versions_json: string;
   readonly retryability_json: string;
   readonly pending_run_submission_json: string | null;
+  readonly payload_protection_posture: string;
   readonly created_at: string;
   readonly updated_at: string;
 }
@@ -84,6 +100,7 @@ export interface DesktopOfflinePendingOperationRepositoryOptions {
   readonly databasePath: string;
   readonly maxEntries?: number;
   readonly serializer?: IOfflinePendingOperationSerializer;
+  readonly valueProtection?: DesktopOfflineValueProtectionPort;
 }
 
 const DEFAULT_MAX_ENTRIES = 5000;
@@ -92,11 +109,14 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
   private readonly databasePath: string;
   private readonly serializer: IOfflinePendingOperationSerializer;
   private readonly maxEntries: number;
+  private readonly valueProtection: DesktopOfflineValueProtectionPort;
   private database?: Database.Database;
 
   constructor(options: DesktopOfflinePendingOperationRepositoryOptions) {
     this.databasePath = options.databasePath;
     this.serializer = options.serializer ?? new JsonOfflinePendingOperationSerializer();
+    this.valueProtection = options.valueProtection
+      ?? createElectronSafeStorageDesktopOfflineValueProtectionPort();
     this.maxEntries = Number.isInteger(options.maxEntries) && (options.maxEntries ?? 0) > 0
       ? options.maxEntries!
       : DEFAULT_MAX_ENTRIES;
@@ -130,6 +150,7 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
           resource_base_versions_json,
           retryability_json,
           pending_run_submission_json,
+          payload_protection_posture,
           created_at,
           updated_at
         ) VALUES (
@@ -154,6 +175,7 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
           @resource_base_versions_json,
           @retryability_json,
           @pending_run_submission_json,
+          @payload_protection_posture,
           @created_at,
           @updated_at
         )
@@ -177,6 +199,7 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
           resource_base_versions_json = excluded.resource_base_versions_json,
           retryability_json = excluded.retryability_json,
           pending_run_submission_json = excluded.pending_run_submission_json,
+          payload_protection_posture = excluded.payload_protection_posture,
           created_at = excluded.created_at,
           updated_at = excluded.updated_at
       `)
@@ -203,6 +226,7 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
           resource_base_versions_json,
           retryability_json,
           pending_run_submission_json,
+          payload_protection_posture,
           created_at,
           updated_at
         FROM offline_pending_operations
@@ -228,6 +252,7 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
           resource_base_versions_json,
           retryability_json,
           pending_run_submission_json,
+          payload_protection_posture,
           created_at,
           updated_at
         FROM offline_pending_operations
@@ -348,31 +373,89 @@ export class DesktopOfflinePendingOperationRepository implements IOfflinePending
       max_retry_count: retryability.maxRetryCount,
       next_eligible_replay_at: retryability.nextEligibleReplayAt ?? null,
       last_attempted_at: retryability.lastAttemptedAt ?? null,
-      canonical_replay_payload_json: serialized.canonicalReplayPayloadJson,
+      canonical_replay_payload_json: this.valueProtection.protect(serialized.canonicalReplayPayloadJson, {
+        store: "offline-pending-operation",
+        field: "canonical_replay_payload_json",
+      }),
       canonical_replay_payload_digest: serialized.canonicalReplayPayloadDigest,
-      operation_envelope_json: serialized.operationEnvelopeJson,
-      dependencies_json: serialized.dependenciesJson,
-      resource_base_versions_json: serialized.resourceBaseVersionsJson,
-      retryability_json: serialized.retryabilityJson,
-      pending_run_submission_json: serialized.pendingRunSubmissionJson ?? null,
+      operation_envelope_json: this.valueProtection.protect(serialized.operationEnvelopeJson, {
+        store: "offline-pending-operation",
+        field: "operation_envelope_json",
+      }),
+      dependencies_json: this.valueProtection.protect(serialized.dependenciesJson, {
+        store: "offline-pending-operation",
+        field: "dependencies_json",
+      }),
+      resource_base_versions_json: this.valueProtection.protect(serialized.resourceBaseVersionsJson, {
+        store: "offline-pending-operation",
+        field: "resource_base_versions_json",
+      }),
+      retryability_json: this.valueProtection.protect(serialized.retryabilityJson, {
+        store: "offline-pending-operation",
+        field: "retryability_json",
+      }),
+      pending_run_submission_json: serialized.pendingRunSubmissionJson
+        ? this.valueProtection.protect(serialized.pendingRunSubmissionJson, {
+          store: "offline-pending-operation",
+          field: "pending_run_submission_json",
+        })
+        : null,
+      payload_protection_posture: this.valueProtection.posture,
       created_at: serialized.createdAt,
       updated_at: serialized.updatedAt,
     };
   }
 
   private fromRow(row: PendingOperationRow): OfflinePendingOperationRecord {
+    if (
+      row.payload_protection_posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+      && row.payload_protection_posture !== DesktopOfflineValueProtectionPostures.unprotectedAtRest
+    ) {
+      throw new OfflinePendingOperationPersistenceError(
+        `Operation '${row.operation_id}' persisted payload protection posture is invalid.`,
+      );
+    }
+    if (
+      row.payload_protection_posture === DesktopOfflineValueProtectionPostures.protectedAtRest
+      && this.valueProtection.posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+    ) {
+      throw new OfflinePendingOperationPersistenceError(
+        `Operation '${row.operation_id}' requires protected-at-rest decoding, but protected storage is unavailable.`,
+      );
+    }
+
     const serialized: OfflinePendingOperationSerializedRecord = {
       operationId: row.operation_id,
       workspaceId: row.workspace_id,
       actorUserIdentityId: row.actor_user_identity_id,
-      operationEnvelopeJson: row.operation_envelope_json,
-      dependenciesJson: row.dependencies_json,
-      resourceBaseVersionsJson: row.resource_base_versions_json,
-      retryabilityJson: row.retryability_json,
+      operationEnvelopeJson: this.valueProtection.unprotect(row.operation_envelope_json, {
+        store: "offline-pending-operation",
+        field: "operation_envelope_json",
+      }),
+      dependenciesJson: this.valueProtection.unprotect(row.dependencies_json, {
+        store: "offline-pending-operation",
+        field: "dependencies_json",
+      }),
+      resourceBaseVersionsJson: this.valueProtection.unprotect(row.resource_base_versions_json, {
+        store: "offline-pending-operation",
+        field: "resource_base_versions_json",
+      }),
+      retryabilityJson: this.valueProtection.unprotect(row.retryability_json, {
+        store: "offline-pending-operation",
+        field: "retryability_json",
+      }),
       localStateScope: row.local_state_scope as OfflinePendingOperationSerializedRecord["localStateScope"],
-      canonicalReplayPayloadJson: row.canonical_replay_payload_json,
+      canonicalReplayPayloadJson: this.valueProtection.unprotect(row.canonical_replay_payload_json, {
+        store: "offline-pending-operation",
+        field: "canonical_replay_payload_json",
+      }),
       canonicalReplayPayloadDigest: row.canonical_replay_payload_digest,
-      pendingRunSubmissionJson: row.pending_run_submission_json ?? undefined,
+      pendingRunSubmissionJson: row.pending_run_submission_json
+        ? this.valueProtection.unprotect(row.pending_run_submission_json, {
+          store: "offline-pending-operation",
+          field: "pending_run_submission_json",
+        })
+        : undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
