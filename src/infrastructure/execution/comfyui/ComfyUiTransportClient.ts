@@ -192,6 +192,11 @@ export class ComfyUiTransportClient {
       });
 
       if (response.node_errors && Object.keys(response.node_errors).length > 0) {
+        const nodeErrorTypes = Object.freeze(
+          Object.values(response.node_errors)
+            .map((value) => normalizeNodeErrorType(value))
+            .filter((value): value is string => Boolean(value)),
+        );
         throw new ComfyUiTransportClientError({
           code: "prompt-rejected",
           message: "ComfyUI rejected the prompt request due to node validation errors.",
@@ -201,6 +206,7 @@ export class ComfyUiTransportClient {
             path: "/prompt",
             details: Object.freeze({
               nodeErrorKeys: Object.freeze(Object.keys(response.node_errors)),
+              nodeErrorTypes,
             }),
           },
         });
@@ -720,6 +726,24 @@ function normalizeRequiredNodeTypes(nodeTypes: ReadonlyArray<string>): ReadonlyA
     }
   }
   return Object.freeze([...deduped]);
+}
+
+function normalizeNodeErrorType(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+  const candidate = value as Readonly<Record<string, unknown>>;
+  const type = candidate.type;
+  if (typeof type === "string") {
+    const normalized = type.trim().toLowerCase();
+    return normalized || undefined;
+  }
+  const message = candidate.message;
+  if (typeof message === "string") {
+    const normalized = message.trim().toLowerCase();
+    return normalized || undefined;
+  }
+  return undefined;
 }
 
 function resolveStateFromHistory(historyEntry: ComfyHistoryPromptEntryDto): {

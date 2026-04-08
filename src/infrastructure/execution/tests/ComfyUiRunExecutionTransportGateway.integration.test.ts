@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import { RunExecutionBackendKinds, type CanonicalRunExecutionCommand } from "@application/runs/ports/RunExecutionDispatchPorts";
 import { ComfyUiTransportClient } from "../comfyui/ComfyUiTransportClient";
-import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
+import { ComfyUiRunExecutionDispatchAdapter, ComfyUiRunExecutionDispatchError } from "../runs/ComfyUiRunExecutionDispatchAdapter";
 import { ComfyUiRunExecutionTransportGateway } from "../runs/ComfyUiRunExecutionTransportGateway";
 
 function createCommand(parameters: Readonly<Record<string, unknown>>): CanonicalRunExecutionCommand {
@@ -96,6 +96,17 @@ describe("ComfyUiRunExecutionTransportGateway integration", () => {
 
     await expect(adapter.dispatch(createCommand(Object.freeze({
       seed: 77,
-    })))).rejects.toThrow("comfy.request");
+    })))).rejects.toBeInstanceOf(ComfyUiRunExecutionDispatchError);
+
+    try {
+      await adapter.dispatch(createCommand(Object.freeze({
+        seed: 77,
+      })));
+    } catch (error) {
+      const typed = error as ComfyUiRunExecutionDispatchError;
+      expect(typed.failure.category).toBe("translation");
+      expect(typed.failure.code).toBe("dispatch-translation-mismatch");
+      expect(typed.failure.userMessage).toContain("workflow");
+    }
   });
 });

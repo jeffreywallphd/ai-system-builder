@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  createImageManipulationOutputCollectionFailure,
   ImageManipulationCollectedExecutionStatuses,
   ImageManipulationOutputDiscoveryContractsSchemaVersion,
   ImageManipulationOutputPersistenceStatuses,
@@ -146,6 +147,55 @@ describe("ImageManipulationOutputDiscoveryContracts", () => {
       schemaVersion: "0.9.0",
       collectionId: "collection:run-1",
     })).toThrow("unsupported-image-manipulation-collected-result-schema-version:0.9.0");
+  });
+
+  it("requires normalized collectionFailure for partially-collected and failed statuses", () => {
+    const partial = createCollectedResult();
+    partial.status = ImageManipulationCollectedExecutionStatuses.partiallyCollected;
+    partial.summary = {
+      ...partial.summary,
+      failedCount: 1,
+      persistedCount: 0,
+    };
+    partial.records = [{
+      ...partial.records[0]!,
+      persistence: {
+        status: ImageManipulationOutputPersistenceStatuses.failed,
+        errorCode: "persist-failed",
+        message: "Failed to persist output.",
+        retryable: true,
+      },
+    }];
+    partial.collectionFailure = createImageManipulationOutputCollectionFailure({
+      failedAt: "2026-04-08T19:00:06.000Z",
+      rawMessage: "Partial output persistence failure",
+      partialProgressObserved: true,
+      partialOutputCount: 1,
+    });
+
+    const parsedPartial = validateImageManipulationCollectedExecutionResult(partial);
+    expect(parsedPartial.collectionFailure?.category).toBe("output");
+
+    const failed = createCollectedResult();
+    failed.status = ImageManipulationCollectedExecutionStatuses.failed;
+    failed.summary = {
+      ...failed.summary,
+      failedCount: 1,
+      persistedCount: 0,
+    };
+    failed.records = [{
+      ...failed.records[0]!,
+      persistence: {
+        status: ImageManipulationOutputPersistenceStatuses.failed,
+        errorCode: "collect-failed",
+        message: "Output retrieval failed.",
+        retryable: true,
+      },
+    }];
+
+    expect(() => validateImageManipulationCollectedExecutionResult(failed)).toThrow(
+      "Failed collected execution result requires collectionFailure.",
+    );
   });
 
   it("parses schema-versioned discovery and collection records", () => {

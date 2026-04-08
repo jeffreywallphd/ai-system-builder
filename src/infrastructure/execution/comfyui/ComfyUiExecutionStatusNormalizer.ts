@@ -1,8 +1,10 @@
 import {
-  ImageManipulationExecutionErrorCategories,
   ImageManipulationExecutionStates,
   normalizeImageManipulationBackendJobState,
+  normalizeImageManipulationExecutionFailure,
   normalizeImageManipulationProgressPercent,
+  sanitizeImageManipulationDiagnostics,
+  ImageManipulationFailureNormalizationSources,
   type ImageManipulationBackendDiagnostics,
   type ImageManipulationBackendJobSnapshot,
   type ImageManipulationExecutionFailure,
@@ -147,6 +149,7 @@ export function normalizeComfyUiExecutionState(
       state,
       failedAt: input.finishedAt ?? updatedAt,
       statusCode: input.backendStatusCode,
+      backendErrorCode: resolveBackendErrorCode(input.backendDetails, input.backendStatusCode),
       rawMessage: input.backendSnapshot?.statusMessage,
       progressPercent: normalizedPercent,
       partialOutputCount: clampNonNegativeInteger(input.progress?.partialOutputCount) ?? 0,
@@ -162,7 +165,7 @@ export function normalizeComfyUiExecutionState(
     rawMessage: normalizeOptional(input.backendSnapshot?.statusMessage),
     details: Object.freeze({
       interpretation: quality,
-      ...(input.backendDetails ?? {}),
+      ...(sanitizeImageManipulationDiagnostics(input.backendDetails) ?? {}),
     }),
   });
 
@@ -259,56 +262,23 @@ function buildFailure(input: {
   readonly state: ImageManipulationExecutionStateSnapshot["state"];
   readonly failedAt: string;
   readonly statusCode?: string;
+  readonly backendErrorCode?: string;
   readonly rawMessage?: string;
   readonly progressPercent?: number;
   readonly partialOutputCount: number;
   readonly backendDetails?: Readonly<Record<string, unknown>>;
 }): ImageManipulationExecutionFailure {
-  if (input.state === ImageManipulationExecutionStates.cancelled) {
-    return Object.freeze({
-      code: "execution-cancelled",
-      category: ImageManipulationExecutionErrorCategories.cancellation,
-      summary: "Execution was cancelled.",
-      userMessage: "The run was cancelled before it finished.",
-      retryable: false,
-      failedAt: input.failedAt,
-      stageCode: "cancelled",
-      partialProgressObserved: Boolean(input.progressPercent && input.progressPercent > 0),
-      partialOutputCount: input.partialOutputCount,
-      diagnostics: buildFailureDiagnostics(input.statusCode, input.rawMessage, input.backendDetails),
-    });
-  }
-
-  const category = classifyFailureCategory(input.statusCode, input.rawMessage);
-  const retryable = category === ImageManipulationExecutionErrorCategories.timeout
-    || category === ImageManipulationExecutionErrorCategories.connectivity
-    || category === ImageManipulationExecutionErrorCategories.capacity;
-
-  return Object.freeze({
-    code: toFailureCode(category),
-    category,
-    summary: "Execution failed.",
-    userMessage: retryable
-      ? "The run stopped before finishing. Try again."
-      : "The run stopped before finishing.",
-    retryable,
+  return normalizeImageManipulationExecutionFailure({
+    source: ImageManipulationFailureNormalizationSources.progressPolling,
     failedAt: input.failedAt,
-    stageCode: "execution",
+    backendStatusCode: input.statusCode,
+    backendErrorCode: input.backendErrorCode,
+    rawMessage: input.rawMessage,
+    diagnostics: input.backendDetails,
+    state: input.state === ImageManipulationExecutionStates.cancelled ? "cancelled" : "failed",
+    stageCode: input.state === ImageManipulationExecutionStates.cancelled ? "cancelled" : "execution",
     partialProgressObserved: Boolean(input.progressPercent && input.progressPercent > 0),
     partialOutputCount: input.partialOutputCount,
-    diagnostics: buildFailureDiagnostics(input.statusCode, input.rawMessage, input.backendDetails),
-  });
-}
-
-function buildFailureDiagnostics(
-  statusCode: string | undefined,
-  rawMessage: string | undefined,
-  backendDetails: Readonly<Record<string, unknown>> | undefined,
-): Readonly<Record<string, unknown>> {
-  return Object.freeze({
-    backendStatusCode: normalizeOptional(statusCode),
-    rawMessage: normalizeOptional(rawMessage),
-    ...(backendDetails ?? {}),
   });
 }
 
@@ -334,7 +304,7 @@ function buildWarnings(input: {
         diagnostics: Object.freeze({
           rawState: normalizeOptional(input.rawState),
           backendStatusCode: normalizeOptional(input.backendStatusCode),
-          ...(input.backendDetails ?? {}),
+          ...(sanitizeImageManipulationDiagnostics(input.backendDetails) ?? {}),
         }),
       }),
     ]);
@@ -350,7 +320,7 @@ function buildWarnings(input: {
       diagnostics: Object.freeze({
         rawState: normalizeOptional(input.rawState),
         backendStatusCode: normalizeOptional(input.backendStatusCode),
-        ...(input.backendDetails ?? {}),
+        ...(sanitizeImageManipulationDiagnostics(input.backendDetails) ?? {}),
       }),
     }),
   ]);
@@ -395,47 +365,6 @@ function buildUserMessage(input: {
     return "Execution cancelled.";
   }
   return "Execution failed.";
-}
-
-function classifyFailureCategory(
-  statusCode: string | undefined,
-  rawMessage: string | undefined,
-): ImageManipulationExecutionFailure["category"] {
-  const normalized = `${statusCode ?? ""} ${rawMessage ?? ""}`.toLowerCase();
-  if (normalized.includes("timeout") || normalized.includes("timed out")) {
-    return ImageManipulationExecutionErrorCategories.timeout;
-  }
-  if (
-    normalized.includes("network")
-    || normalized.includes("econn")
-    || normalized.includes("connection")
-    || normalized.includes("unreachable")
-  ) {
-    return ImageManipulationExecutionErrorCategories.connectivity;
-  }
-  if (normalized.includes("capacity") || normalized.includes("queue full") || normalized.includes("overload")) {
-    return ImageManipulationExecutionErrorCategories.capacity;
-  }
-  if (normalized.includes("validation") || normalized.includes("invalid")) {
-    return ImageManipulationExecutionErrorCategories.validation;
-  }
-  return ImageManipulationExecutionErrorCategories.execution;
-}
-
-function toFailureCode(category: ImageManipulationExecutionFailure["category"]): string {
-  if (category === ImageManipulationExecutionErrorCategories.timeout) {
-    return "execution-timeout";
-  }
-  if (category === ImageManipulationExecutionErrorCategories.connectivity) {
-    return "execution-connectivity-failed";
-  }
-  if (category === ImageManipulationExecutionErrorCategories.capacity) {
-    return "execution-capacity-exhausted";
-  }
-  if (category === ImageManipulationExecutionErrorCategories.validation) {
-    return "execution-invalid-request";
-  }
-  return "execution-failed";
 }
 
 function classifyStateQuality(input: {
@@ -497,4 +426,18 @@ function toIsoString(value: string | undefined): string | undefined {
     return undefined;
   }
   return new Date(parsed).toISOString();
+}
+
+function resolveBackendErrorCode(
+  details: Readonly<Record<string, unknown>> | undefined,
+  fallback: string | undefined,
+): string | undefined {
+  if (!details) {
+    return normalizeOptional(fallback);
+  }
+  const fromDetails = details["errorCode"];
+  if (typeof fromDetails === "string") {
+    return normalizeOptional(fromDetails);
+  }
+  return normalizeOptional(fallback);
 }

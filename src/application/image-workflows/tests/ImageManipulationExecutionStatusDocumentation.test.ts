@@ -23,6 +23,8 @@ describe("image manipulation execution status documentation", () => {
     expect(doc).toContain("cancelled");
     expect(doc).toContain("partial-output");
     expect(doc).toContain("retryability");
+    expect(doc).toContain("translation mismatch");
+    expect(doc).toContain("missing model");
     expect(doc).toContain("Raw ComfyUI queue/history DTOs remain infrastructure-only.");
   });
 });
