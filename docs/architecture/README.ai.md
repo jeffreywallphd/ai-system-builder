@@ -238,6 +238,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 7 / Epic 7.4 Story 7.4.4 completion verification and Feature 8 integration guidance (flow baseline, explicit boundaries, verification cross-references, and resilience extension points): `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
 - Feature 8 / Epic 8.1 Story 8.1.2 resilience-state contract baseline for degraded/partial/pending-recovery/blocked availability semantics across the image slice: `docs/architecture/image-manipulation-resilience-state-contracts.md`
 - Feature 8 / Epic 8.1 Story 8.1.3 retry/recovery/escalation contract baseline for automatic/manual retry posture, user-action-required flow, backend-recovery-pending semantics, and operator/admin escalation guidance: `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
+- Feature 8 / Epic 8.1 Story 8.1.4 resilience/error-handling architecture baseline for infrastructure-to-application normalization flow, API/presenter projection boundaries, and retry/recovery ownership rules: `docs/architecture/image-manipulation-resilience-error-handling-architecture.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
