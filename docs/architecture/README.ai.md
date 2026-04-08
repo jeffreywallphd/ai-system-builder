@@ -233,6 +233,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 6 generated-result domain and API contract foundations used by Story 6.1.5: `docs/architecture/generated-result-asset-domain-foundation.md`, `docs/architecture/generated-result-api-contracts.md`
 - Feature 7 / Epic 7.1 Story 7.1.1 canonical image-studio interaction model (ordered user journey, authoritative/transient/derived state partitions, transition/invalidation rules, continuation/reopen semantics): `docs/architecture/image-manipulation-studio-interaction-model.md`
 - Feature 7 / Epic 7.1 Story 7.1.2 studio-facing presenter contracts and composed DTO strategy (major-surface view models, centralized selectors/mappers, standardized loading/empty/error/ready/degraded states, and hidden-by-default diagnostics): `docs/architecture/image-manipulation-studio-presenter-contracts.md`
+- Feature 7 / Epic 7.1 Story 7.1.3 user-facing studio UX language posture and primary-vs-advanced terminology rules: `docs/architecture/image-manipulation-studio-ux-language-guidelines.md`
+- Feature 7 / Epic 7.1 Story 7.1.4 full studio architecture and UX-composition posture (Feature 1-6 composition, authoritative guardrails, and seam ownership split across state/presenter/components/API services): `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).
