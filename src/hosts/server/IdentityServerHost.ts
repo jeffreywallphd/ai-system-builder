@@ -123,6 +123,8 @@ import { AssetLifecycleService } from "@application/assets/use-cases/AssetLifecy
 import { FinalizeImageAssetUploadUseCase } from "@application/image-assets/use-cases/FinalizeImageAssetUploadUseCase";
 import { GetImageAssetMetadataUseCase } from "@application/image-assets/use-cases/GetImageAssetMetadataUseCase";
 import { GetImageAssetOriginalContentUseCase } from "@application/image-assets/use-cases/GetImageAssetOriginalContentUseCase";
+import { OpenImageAssetPreviewContentUseCase } from "@application/image-assets/use-cases/OpenImageAssetPreviewContentUseCase";
+import { RequestImageAssetPreviewContentUseCase } from "@application/image-assets/use-cases/RequestImageAssetPreviewContentUseCase";
 import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/InitiateImageAssetCreationUseCase";
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
@@ -1068,6 +1070,18 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
     }),
     getImageAssetOriginalContentUseCase: new GetImageAssetOriginalContentUseCase({
+      imageAssetRepository,
+      imageAssetStoragePort: imageAssetStorageAdapter,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    requestImageAssetPreviewContentUseCase: new RequestImageAssetPreviewContentUseCase({
+      imageAssetRepository,
+      imageAssetStoragePort: imageAssetStorageAdapter,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      authorizationPolicyDecisionEvaluator: authorizationDecisionEvaluator,
+    }),
+    openImageAssetPreviewContentUseCase: new OpenImageAssetPreviewContentUseCase({
       imageAssetRepository,
       imageAssetStoragePort: imageAssetStorageAdapter,
       workspaceAuthorizationReadRepository: workspaceRepository,
