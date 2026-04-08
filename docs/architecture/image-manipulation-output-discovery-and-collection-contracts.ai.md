@@ -90,6 +90,17 @@ This keeps ComfyUI (and future backends) behind adapter boundaries and prepares 
 - Slot matching uses backend-field/node-id hints and order fallback when exact hints are unavailable.
 - Temporary backend references are transitional retrieval pointers, not product asset identifiers.
 
+## Story 3.3.4 cleanup semantics update
+
+- `ComfyUiOutputDiscoveryCollector` now maintains adapter-local tracking for temporary output references created during discovery/collection.
+- Added explicit cleanup API:
+  - `releaseTemporaryReferences(...)`
+- Cleanup results are normalized as:
+  - `completed` (tracked references released),
+  - `none` (nothing tracked for the execution),
+  - `degraded` (cleanup attempt failed).
+- Cleanup guarantees are explicitly bounded to adapter-local state only; backend-side artifact deletion remains out of scope for this adapter story and is treated as best effort/not guaranteed.
+
 ## Architectural boundary posture
 
 - Contracts live at the adapter/application seam, not UI transport.

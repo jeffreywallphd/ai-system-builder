@@ -8,6 +8,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionCancellationAdapter.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionDispatchAdapter.ts`
@@ -17,6 +18,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 - `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiOutputDiscoveryCollector.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiExecutionCancellationAdapter.test.ts`
 - `docs/architecture/image-manipulation-comfyui-transport-client.md`
 
 ## Operational behavior
@@ -173,3 +175,30 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
 
 - Story scope is image output discovery/collection only; non-image artifacts are out of scope here.
 - Slot matching uses backend-field/node-id hinting with deterministic order fallback when exact hints are unavailable.
+
+## Story 3.3.4 cancellation and cleanup behavior
+
+### Added behavior
+
+- Added `ComfyUiExecutionCancellationAdapter` implementing
+  `IImageManipulationExecutionCancellationPort` with normalized cancellation outcomes:
+  - `accepted`
+  - `already-terminal`
+  - `not-supported`
+  - `rejected`
+  - `not-found`
+  - `failed`
+- Adapter maps Comfy transport failures into normalized failure diagnostics attached to cancellation result details, using the shared image-manipulation failure normalization utility.
+
+### Cleanup behavior
+
+- `ComfyUiOutputDiscoveryCollector` now tracks adapter-managed temporary output references discovered during collection.
+- Added explicit cleanup operation:
+  - `releaseTemporaryReferences(...)`
+- Cancellation flow invokes this cleanup as best effort and reports cleanup status (`completed` / `none` / `degraded`) in cancellation result details.
+
+### Guarantees and limitations
+
+- Cancellation guarantee is best effort via ComfyUI `POST /interrupt` semantics.
+- Cleanup guarantee is limited to adapter-local tracked temporary reference state; it does not guarantee deletion of backend-generated files or runtime-global Comfy queue side effects.
+- Degraded cleanup is explicit and observable in result details so higher layers can choose retry/reconciliation behavior without hidden partial-state assumptions.
