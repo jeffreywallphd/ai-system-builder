@@ -8,14 +8,19 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
 - `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/ImageAssetMetadataReadUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/FinalizeImageAssetUploadUseCase.ts`
+- `src/application/image-assets/use-cases/GetImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
+- `src/application/image-assets/use-cases/ListImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
+- `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
+- `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
@@ -142,3 +147,24 @@ This story adds authoritative upload finalization after managed binary write com
 - no availability transition until storage verification succeeds
 - explicit invalid-state rejection for non-pending assets
 - failure path durability (cleanup attempt plus persisted `failed` status)
+
+## Story 1.2.5: asset listing and metadata retrieval use cases
+
+This story adds authoritative image-asset metadata read use cases for image pickers/detail flows:
+
+- `GetImageAssetMetadataUseCase` for get-by-id metadata retrieval
+- `ListImageAssetMetadataUseCase` for scoped workspace listing with filter + pagination contracts
+- `ImageAssetMetadataReadUseCaseContracts.ts` for request validation and stable metadata projection models
+
+Authorization and scope behavior:
+
+- both read operations require active workspace membership
+- `view-metadata` authorization is evaluated through centralized image-asset policy contracts and evaluator seams
+- denied private reads return safe `not-found` behavior
+
+Query and response behavior:
+
+- listing supports filters for owner/origin/lifecycle/visibility/media/storage/lineage identifiers plus `createdAfter|createdBefore|updatedAfter|updatedBefore` activity windows
+- pagination metadata (`limit`, `offset`, `returned`, `hasMore`) is returned for UI selector/browser surfaces
+- metadata results are sourced from authoritative repository state (no filesystem scanning)
+- responses expose logical availability flags (`isReadyForUse`, `isPreviewable`, `isDownloadable`) and do not expose physical storage details
