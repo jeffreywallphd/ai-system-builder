@@ -149,6 +149,7 @@ import {
   resolveRunLifecycleState,
   resolveRunSubmissionSource,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import { ImageRunApiRoutes } from "@shared/contracts/image-workflows/ImageRunApiContracts";
 import {
   RuntimeRealtimeSubscriptionModes,
   RuntimeRealtimeTopics,
@@ -5240,6 +5241,100 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
       if (
+        options.authoritativeRunSubmissionBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/image-systems/")
+        && path.endsWith("/runs")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const systemId = decodePathTail(path, "/api/v1/image-systems/", "/runs");
+            if (!systemId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and systemId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                systemId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const payloadRecord = asRecord(parsedBody.value);
+            const runtimeTarget = asRecord(payloadRecord?.runtimeTarget);
+            const requestedSystemId = typeof runtimeTarget?.systemId === "string"
+              ? runtimeTarget.systemId.trim()
+              : undefined;
+            if (requestedSystemId && requestedSystemId !== systemId) {
+              const invalid = buildRuntimeInvalidRequestResponse(
+                "runtimeTarget.systemId must match the systemId route parameter.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                systemId,
+              }), invalid);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAuthoritativeRunSubmissionMutationRequest({
+              payload: Object.freeze({
+                ...(payloadRecord ?? {}),
+                runtimeTarget: Object.freeze({
+                  ...(runtimeTarget ?? {}),
+                  systemId,
+                }),
+              }),
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                systemId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunSubmissionBackendApi.submitRun({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              submission: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              runId: apiResponse.data?.run.runId,
+              systemId,
+              versionId: parsedRequest.data.runtimeTarget.versionId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
         options.authoritativeRunQueryBackendApi
         && request.method === "GET"
         && path === RunOrchestrationTransportRoutes.listRuns
@@ -5268,6 +5363,55 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               }), parsedRequest.body);
               return;
             }
+            const apiResponse = await options.authoritativeRunQueryBackendApi.listRuns({
+              ...parsedRequest.data,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              query: Object.fromEntries(searchParams.entries()),
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
+        && path === ImageRunApiRoutes.listRuns
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const parsedRequest = parseAndValidateAuthoritativeRunListReadRequest({
+              workspaceId: context.workspace.workspaceId,
+              searchParams,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(logger, requestId, request, parsedRequest.statusCode, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+              }), parsedRequest.body);
+              return;
+            }
+
             const apiResponse = await options.authoritativeRunQueryBackendApi.listRuns({
               ...parsedRequest.data,
               authorization: Object.freeze({
@@ -5553,6 +5697,54 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       if (
         options.authoritativeRunQueryBackendApi
         && request.method === "GET"
+        && path.startsWith("/api/v1/image-runs/")
+        && !path.endsWith("/status")
+        && !path.endsWith("/cancel")
+        && !path.endsWith("/events")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/image-runs/");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunQueryBackendApi.getRunDetail({
+              runId,
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              runId,
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunQueryBackendApi
+        && request.method === "GET"
         && path.startsWith("/api/v1/runtime/runs/")
         && !path.endsWith("/status")
         && !path.endsWith("/result")
@@ -5597,6 +5789,78 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               runId,
               workspaceId: context.workspace.workspaceId,
               actorUserIdentityId: context.actor.userIdentityId,
+            }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.authoritativeRunMutationBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/image-runs/")
+        && path.endsWith("/cancel")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildRuntimeInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/image-runs/", "/cancel");
+            if (!runId) {
+              const invalid = buildRuntimeInvalidRequestResponse("workspaceId and runId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedBody = await parseAndValidateRuntimeMutationBody(request, maxBodyBytes, true);
+            if (!parsedBody.ok) {
+              writeJson(response, 400, parsedBody.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedBody.body);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateAuthoritativeRunCancellationMutationRequest({
+              payload: parsedBody.value,
+              runId,
+              actorUserIdentityId: context.actor.userIdentityId,
+            });
+            if (!parsedRequest.ok) {
+              writeJson(response, 400, parsedRequest.body);
+              logResponse(logger, requestId, request, 400, Object.freeze({
+                workspaceId: context.workspace.workspaceId,
+                actorUserIdentityId: context.actor.userIdentityId,
+                runId,
+              }), parsedRequest.body);
+              return;
+            }
+
+            const apiResponse = await options.authoritativeRunMutationBackendApi.cancelRun({
+              workspaceId: context.workspace.workspaceId,
+              authorization: Object.freeze({
+                actorUserIdentityId: context.actor.userIdentityId,
+                activeWorkspaceId: context.workspace.workspaceId,
+                authenticatedAt: context.session.authenticatedAt,
+              }),
+              cancellation: parsedRequest.data,
+            });
+            const statusCode = mapRunSubmissionStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, Object.freeze({
+              workspaceId: context.workspace.workspaceId,
+              actorUserIdentityId: context.actor.userIdentityId,
+              runId,
             }), apiResponse);
           },
         );

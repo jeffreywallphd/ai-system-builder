@@ -21,6 +21,9 @@ Story 16.1.6 adds authoritative run read pathways for list/detail/status visibil
 - Adds authoritative detail endpoint handling: `GET /api/v1/runtime/runs/:runId`.
 - Adds authoritative lifecycle visibility handling: `GET /api/v1/runtime/runs/:runId/status`.
 - Adds authoritative queue visibility handling: `GET /api/v1/runtime/queue`.
+- Adds image-run alias read endpoints for shared studio/thin-client monitoring:
+  - `GET /api/v1/image-runs`
+  - `GET /api/v1/image-runs/:runId`
 - Uses shared query conventions (`workspaceId`, `limit`, `offset`, `search`, `sortBy`, `sortDirection`) plus repeated `state` and `source` filters.
 
 ## Authorization posture
@@ -47,6 +50,7 @@ Story 16.1.6 adds authoritative run read pathways for list/detail/status visibil
 - `src/application/runs/tests/ListAuthoritativeRunsUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/AuthoritativeRunQueryBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunReadApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageRunAuthoritativeApi.test.ts`
 - `src/shared/contracts/runtime/tests/RunOrchestrationTransportContracts.test.ts`
 - `src/shared/schemas/runtime/tests/RunOrchestrationTransportSchemaContracts.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`

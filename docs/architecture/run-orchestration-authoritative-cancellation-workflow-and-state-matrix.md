@@ -29,7 +29,7 @@ Define the production cancellation control flow for authoritative runs, includin
 
 ## Authoritative cancellation workflow
 
-1. Authenticated actor calls `POST /api/v1/runtime/runs/:runId/cancel` with workspace context.
+1. Authenticated actor calls `POST /api/v1/runtime/runs/:runId/cancel` or `POST /api/v1/image-runs/:runId/cancel` with workspace context.
 2. Transport layer validates payload shape and actor spoofing constraints.
 3. Backend API evaluates `run.cancel` authorization for `resourceType=authoritative-run`.
 4. Application cancellation use case re-validates cancellation authorization through mutation-authorization ports before lifecycle mutation.
@@ -94,3 +94,4 @@ Define the production cancellation control flow for authoritative runs, includin
   - `src/infrastructure/api/runs/tests/AuthoritativeRunMutationBackendApi.test.ts`
 - Identity HTTP cancellation route behavior:
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerAuthoritativeRunCancellationApi.test.ts`
+  - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageRunAuthoritativeApi.test.ts`

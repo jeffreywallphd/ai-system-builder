@@ -44,6 +44,7 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(selectedRouteFamilyIds.has("run-submission")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-read")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-mutation")).toBeTrue();
+    expect(selectedRouteFamilyIds.has("image-run-api")).toBeTrue();
     expect(selectedRouteFamilyIds.has("run-execution-update")).toBeTrue();
     expect(selectedRouteFamilyIds.has("node-trust")).toBeFalse();
     expect(selectedDomains.has("identity")).toBeTrue();
@@ -55,6 +56,8 @@ describe("AuthoritativeApiRouteRegistrationCatalog", () => {
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/workspaces");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/runtime/queue");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/image-systems");
+    expect(plan.registeredRoutePrefixes).toContain("/api/v1/image-runs");
     expect(plan.registeredRoutePrefixes).toContain("/api/v1/deployment/policy");
   });
 

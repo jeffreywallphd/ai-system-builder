@@ -53,6 +53,7 @@ Canonical family modules:
 | `storage-management` | `/api/v1/storage` | `src/infrastructure/api/storage/StorageManagementBackendApi.ts` | `src/shared/schemas/storage/StorageTransportSchemaContracts.ts` (plus DTO contracts via `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`) | `src/ui/shared/storage/StorageAdministrationClient.ts` |
 | `asset-management` | `/api/v1/assets` | `src/infrastructure/api/assets/AssetManagementBackendApi.ts` | `src/shared/contracts/assets/AssetWorkflowClientContracts.ts` | `src/ui/shared/assets/AssetWorkflowClient.ts` |
 | `image-asset-management` | `/api/v1/image-assets` | `src/infrastructure/api/image-assets/ImageAssetManagementBackendApi.ts` | `src/shared/contracts/assets/ImageAssetTransportContracts.ts`, `src/infrastructure/api/image-assets/sdk/PublicImageAssetManagementApiContract.ts` | authoritative server integration surface for desktop/thin clients (shared client adapter pending story scope) |
+| `image-run-api` | `/api/v1/image-systems`, `/api/v1/image-runs` | `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`, `src/infrastructure/api/runs/AuthoritativeRunQueryBackendApi.ts`, `src/infrastructure/api/runs/AuthoritativeRunMutationBackendApi.ts` | `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`, `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts` | authoritative image-run studio/thin-client monitoring + control surface (shared image-run client adapter pending story scope) |
 | `system-runtime` | `/api/v1/runtime` and websocket path `/ws` | `src/infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`, `src/infrastructure/api/system-runtime/AuthoritativeRuntimeEventStream.ts` | `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`, `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`, `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`, `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts` | `src/ui/shared/runtime/RuntimeControlClient.ts` |
 
 ## Endpoint groups and auth expectations
@@ -237,6 +238,16 @@ Readiness endpoint intent:
 - `GET /api/v1/runtime/execution/readiness` is the authoritative adapter-backed readiness surface for image-manipulation execution.
 - Desktop/thin clients and later studio/admin readiness flows should use this route instead of direct backend probes.
 - Response shape is normalized for UX/operations consumers: backend readiness state, actionable `readyForExecution`, capability summary, and issue list.
+
+### Image run authoritative aliases (`/api/v1/image-systems/*`, `/api/v1/image-runs*`)
+
+- image-oriented authoritative route aliases:
+  - `POST /api/v1/image-systems/:systemId/runs` (submission)
+  - `GET /api/v1/image-runs` (list)
+  - `GET /api/v1/image-runs/:runId` (detail)
+  - `POST /api/v1/image-runs/:runId/cancel` (cancellation)
+- all aliases require bearer auth + `workspaceId` scope and delegate to authoritative run orchestration backend APIs.
+- transport handlers remain thin wrappers over run submission/query/mutation use cases; no direct studio-to-backend execution shortcuts.
 
 ## Runtime realtime event delivery model
 

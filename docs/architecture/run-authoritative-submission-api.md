@@ -24,7 +24,7 @@ Expose production run submission as an authoritative server operation so desktop
 
 ## API behavior
 
-`POST /api/v1/runtime/runs/start` now supports authoritative run submission through the control-plane path:
+`POST /api/v1/runtime/runs/start` and `POST /api/v1/image-systems/:systemId/runs` now support authoritative run submission through the control-plane path:
 
 1. Require authenticated workspace session (`workspaceId` query scope).
 2. Parse canonical run submission payload (legacy start-run payload compatibility remains at the transport parser level).
@@ -35,6 +35,11 @@ Expose production run submission as an authoritative server operation so desktop
    - image submission readiness evaluation (blocking vs advisory findings)
    - authoritative creation (`CreateAuthoritativeRunUseCase`)
 6. Return canonical run detail + shared mutation metadata on acceptance.
+
+Image-route alias guardrail:
+
+- `:systemId` route value is enforced against `runtimeTarget.systemId` when the payload supplies that field.
+- alias route still resolves actor/workspace context from the authenticated session and delegates to `SubmitImageRunUseCase`.
 
 ## Failure semantics
 
@@ -61,5 +66,8 @@ Expose production run submission as an authoritative server operation so desktop
   - actor/workspace mismatch rejection
   - canonical response forwarding
   - HTTP error-status mapping for backend denials
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageRunAuthoritativeApi.test.ts`
+  - image-system route submission alias delegation
+  - route/system mismatch rejection
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
   - route-family registration/selection coverage for `run-submission`
