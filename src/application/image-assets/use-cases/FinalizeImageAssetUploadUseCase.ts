@@ -46,6 +46,7 @@ interface UploadedContentObservation {
   readonly sizeBytes: number;
   readonly checksumSha256: string;
   readonly checksumSha512: string;
+  readonly detectedMediaType?: string;
 }
 
 export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploadUseCase {
@@ -141,6 +142,7 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
 
       const normalizedFingerprint = this.resolveNormalizedFingerprint(request, existing, observed);
       const normalizedMediaType = request.finalizedMediaType ?? existing.mediaType;
+      this.assertDetectedMediaType(normalizedMediaType, observed.detectedMediaType);
       const normalized = rehydrateImageAsset({
         ...existing,
         mediaType: normalizedMediaType,
@@ -258,17 +260,31 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
 
     const sha256 = createHash("sha256");
     const sha512 = createHash("sha512");
+    const signatureBytes: Uint8Array[] = [];
+    let signatureByteLength = 0;
+    const signatureByteLimit = 4096;
     let sizeBytes = 0;
     for await (const chunk of opened.stream) {
       sizeBytes += chunk.byteLength;
       sha256.update(chunk);
       sha512.update(chunk);
+      if (signatureByteLength < signatureByteLimit) {
+        const remaining = signatureByteLimit - signatureByteLength;
+        const slice = chunk.byteLength > remaining ? chunk.slice(0, remaining) : chunk;
+        signatureBytes.push(slice);
+        signatureByteLength += slice.byteLength;
+      }
+    }
+
+    if (sizeBytes < 1) {
+      throw new Error("Uploaded content is empty.");
     }
 
     const observed: UploadedContentObservation = {
       sizeBytes,
       checksumSha256: sha256.digest("hex"),
       checksumSha512: sha512.digest("hex"),
+      detectedMediaType: await detectMediaTypeFromSignature(signatureBytes),
     };
 
     if (opened.sizeBytes !== observed.sizeBytes) {
@@ -284,6 +300,20 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
     }
 
     return observed;
+  }
+
+  private assertDetectedMediaType(
+    expectedMediaType: string,
+    detectedMediaType: string | undefined,
+  ): void {
+    if (!detectedMediaType) {
+      return;
+    }
+    if (detectedMediaType !== expectedMediaType) {
+      throw new Error(
+        `Uploaded content signature media type '${detectedMediaType}' does not match expected media type '${expectedMediaType}'.`,
+      );
+    }
   }
 
   private assertContentConsistency(
@@ -482,6 +512,42 @@ function mapFailureReason(error: unknown): string {
     return "upload-finalization-failed";
   }
   return "upload-finalization-failed";
+}
+
+type FileTypeFromBuffer = (buffer: Uint8Array) => Promise<{ readonly mime?: string } | undefined>;
+
+async function resolveFileTypeFromBuffer(): Promise<FileTypeFromBuffer | undefined> {
+  try {
+    const moduleRecord = await import("file-type") as Readonly<Record<string, unknown>>;
+    const candidate = moduleRecord.fileTypeFromBuffer as FileTypeFromBuffer | undefined;
+    if (typeof candidate === "function") {
+      return candidate;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function detectMediaTypeFromSignature(chunks: ReadonlyArray<Uint8Array>): Promise<string | undefined> {
+  if (chunks.length === 0) {
+    return undefined;
+  }
+  const detector = await resolveFileTypeFromBuffer();
+  if (!detector) {
+    return undefined;
+  }
+
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  const payload = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    payload.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+
+  const detected = await detector(payload);
+  return detected?.mime?.toLowerCase();
 }
 
 function mapFailureCode(

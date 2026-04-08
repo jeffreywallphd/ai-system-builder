@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
+import { SupportedImageMediaTypes, type SupportedImageMediaType } from "@domain/image-assets/ImageAssetDomain";
 import type { ImageAssetStorageObjectReference, IImageAssetStoragePort } from "@application/image-assets/ports/ImageAssetStoragePort";
 import { isImageAssetStorageError } from "@application/image-assets/ports/ImageAssetStoragePort";
 import type { IFinalizeImageAssetUploadUseCase } from "@application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts";
@@ -51,6 +52,8 @@ interface ImageAssetUploadSessionTokenPayload {
   readonly reservationId: string;
   readonly workspaceId: string;
   readonly assetId: string;
+  readonly mediaType: SupportedImageMediaType;
+  readonly expectedSizeBytes: number;
   readonly storageReference: ImageAssetStorageObjectReference;
   readonly expiresAt?: string;
 }
@@ -71,6 +74,7 @@ export interface ImageAssetManagementBackendApiDependencies {
 }
 
 const UploadSessionTokenVersion = "img-upload-v1";
+const Sha256HexPattern = /^[a-f0-9]{64}$/;
 
 export class ImageAssetManagementBackendApi {
   private readonly clock: { now(): Date };
@@ -128,6 +132,8 @@ export class ImageAssetManagementBackendApi {
       reservationId: outcome.value.upload.reservation.reservationId,
       workspaceId: outcome.value.imageAsset.workspaceId,
       assetId: outcome.value.imageAsset.assetId,
+      mediaType: outcome.value.imageAsset.mediaType,
+      expectedSizeBytes: outcome.value.imageAsset.sizeBytes,
       storageReference: outcome.value.upload.reservation.reference,
       expiresAt: outcome.value.upload.reservation.expiresAt,
     });
@@ -158,19 +164,51 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<IngestImageAssetUploadContentApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required");
     }
 
     const uploadSession = this.resolveUploadSessionToken(request.uploadSessionId);
     if (!uploadSession) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId is invalid.");
+      return this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid");
     }
 
     if (uploadSession.workspaceId !== request.workspaceId || uploadSession.assetId !== request.assetId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId does not match workspaceId/assetId.");
+      return this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch");
     }
     if (uploadSession.expiresAt && new Date(uploadSession.expiresAt).getTime() < this.clock.now().getTime()) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidState, "uploadSessionId has expired.");
+      return this.failed(
+        ImageAssetManagementApiErrorCodes.invalidState,
+        "uploadSessionId has expired.",
+        Object.freeze({
+          validationCode: "upload-session-expired",
+        }),
+      );
+    }
+
+    const normalizedContentType = normalizeMediaType(request.contentType);
+    if (!normalizedContentType) {
+      return this.invalidRequest("contentType is required for image upload ingestion.", "content-type-required");
+    }
+    if (!SupportedImageMediaTypes.includes(normalizedContentType as SupportedImageMediaType)) {
+      return this.invalidRequest(
+        `contentType '${normalizedContentType}' is not supported for image ingestion.`,
+        "content-type-unsupported",
+      );
+    }
+    if (normalizedContentType !== uploadSession.mediaType) {
+      return this.invalidRequest(
+        `contentType '${normalizedContentType}' does not match reserved mediaType '${uploadSession.mediaType}'.`,
+        "content-type-mismatch",
+      );
+    }
+
+    const expectedChecksumSha256 = normalizeSha256(request.expectedChecksumSha256);
+    if (request.expectedChecksumSha256 !== undefined && !expectedChecksumSha256) {
+      return this.invalidRequest("expectedChecksumSha256 must be a lowercase hexadecimal sha256 digest.", "expected-checksum-invalid");
+    }
+
+    if (request.expectedSizeBytes !== undefined && (!Number.isInteger(request.expectedSizeBytes) || request.expectedSizeBytes < 1)) {
+      return this.invalidRequest("expectedSizeBytes must be an integer >= 1.", "expected-size-invalid");
     }
 
     try {
@@ -181,11 +219,11 @@ export class ImageAssetManagementBackendApi {
         reservationId: uploadSession.reservationId,
         reference: uploadSession.storageReference,
         content: request.content,
-        expectedSizeBytes: request.expectedSizeBytes,
-        expectedChecksum: request.expectedChecksumSha256
+        expectedSizeBytes: request.expectedSizeBytes ?? uploadSession.expectedSizeBytes,
+        expectedChecksum: expectedChecksumSha256
           ? Object.freeze({
             algorithm: "sha256",
-            digest: request.expectedChecksumSha256,
+            digest: expectedChecksumSha256,
           })
           : undefined,
         overwriteExisting: true,
@@ -469,6 +507,12 @@ export class ImageAssetManagementBackendApi {
       if (!normalizeRequired(payload.reservationId) || !normalizeRequired(payload.workspaceId) || !normalizeRequired(payload.assetId)) {
         return undefined;
       }
+      if (!payload.mediaType || !SupportedImageMediaTypes.includes(payload.mediaType)) {
+        return undefined;
+      }
+      if (!Number.isInteger(payload.expectedSizeBytes) || payload.expectedSizeBytes < 1) {
+        return undefined;
+      }
       if (!payload.storageReference || !normalizeRequired(payload.storageReference.storageInstanceId) || !normalizeRequired(payload.storageReference.objectKey)) {
         return undefined;
       }
@@ -616,6 +660,21 @@ export class ImageAssetManagementBackendApi {
       }),
     };
   }
+
+  private invalidRequest(
+    message: string,
+    validationCode: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): ImageAssetManagementApiResponse<never> {
+    return this.failed(
+      ImageAssetManagementApiErrorCodes.invalidRequest,
+      message,
+      Object.freeze({
+        validationCode,
+        ...(details ?? {}),
+      }),
+    );
+  }
 }
 
 function toImageAssetSummaryDto(summary: ImageAssetMetadataSummary): ImageAssetSummaryDto {
@@ -672,4 +731,21 @@ function normalizeRequired(value: string | undefined): string | undefined {
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function normalizeMediaType(value: string | undefined): string | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  const [mediaType] = normalized.split(";");
+  return mediaType?.trim() || undefined;
+}
+
+function normalizeSha256(value: string | undefined): string | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  return Sha256HexPattern.test(normalized) ? normalized : undefined;
 }

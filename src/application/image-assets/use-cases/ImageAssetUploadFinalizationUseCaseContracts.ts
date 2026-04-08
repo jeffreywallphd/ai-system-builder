@@ -1,4 +1,12 @@
-import type { ImageAsset, ImageAssetFingerprint } from "@domain/image-assets/ImageAssetDomain";
+import type {
+  ImageAsset,
+  ImageAssetFingerprint,
+  SupportedImageMediaType,
+} from "@domain/image-assets/ImageAssetDomain";
+import {
+  ImageAssetFingerprintAlgorithms,
+  SupportedImageMediaTypes,
+} from "@domain/image-assets/ImageAssetDomain";
 import type { ImageAssetStorageObjectReference } from "../ports/ImageAssetStoragePort";
 
 export class ImageAssetUploadFinalizationContractError extends Error {
@@ -81,6 +89,17 @@ function normalizeOptional(value?: string | null): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function normalizeOptionalMediaType(value: string | undefined): SupportedImageMediaType | undefined {
+  const normalized = normalizeOptional(value)?.toLowerCase().split(";")[0]?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+  if (!SupportedImageMediaTypes.includes(normalized as SupportedImageMediaType)) {
+    throw new ImageAssetUploadFinalizationContractError(`finalizedMediaType '${value}' is not supported for image ingestion.`);
+  }
+  return normalized as SupportedImageMediaType;
+}
+
 function normalizeTimestamp(value?: string): string | undefined {
   if (!value) {
     return undefined;
@@ -121,9 +140,26 @@ function normalizeExpectedFingerprint(
     return undefined;
   }
 
+  const digest = normalizeRequired(fingerprint.digest, "expectedFingerprint.digest").toLowerCase();
+  if (!/^[a-f0-9]+$/.test(digest)) {
+    throw new ImageAssetUploadFinalizationContractError("expectedFingerprint.digest must be lowercase hexadecimal.");
+  }
+  if (
+    fingerprint.algorithm === ImageAssetFingerprintAlgorithms.sha256
+    && digest.length !== 64
+  ) {
+    throw new ImageAssetUploadFinalizationContractError("expectedFingerprint.digest must be 64 hex characters for sha256.");
+  }
+  if (
+    fingerprint.algorithm === ImageAssetFingerprintAlgorithms.sha512
+    && digest.length !== 128
+  ) {
+    throw new ImageAssetUploadFinalizationContractError("expectedFingerprint.digest must be 128 hex characters for sha512.");
+  }
+
   return Object.freeze({
     algorithm: fingerprint.algorithm,
-    digest: normalizeRequired(fingerprint.digest, "expectedFingerprint.digest").toLowerCase(),
+    digest,
   });
 }
 
@@ -142,7 +178,7 @@ export function validateFinalizeImageAssetUploadRequest(
       objectVersionId: normalizeOptional(input.storageReference.objectVersionId),
       area: input.storageReference.area,
     }),
-    finalizedMediaType: normalizeOptional(input.finalizedMediaType)?.toLowerCase(),
+    finalizedMediaType: normalizeOptionalMediaType(input.finalizedMediaType),
     expectedSizeBytes: normalizeOptionalSizeBytes(input.expectedSizeBytes),
     expectedChecksumSha256: normalizeOptionalSha256Digest(input.expectedChecksumSha256, "expectedChecksumSha256"),
     expectedFingerprint: normalizeExpectedFingerprint(input.expectedFingerprint),

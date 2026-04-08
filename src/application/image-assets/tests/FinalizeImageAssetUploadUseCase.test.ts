@@ -280,6 +280,8 @@ function buildFixture() {
     workspaceAuthorizationReadRepository,
     auditSink,
     reference,
+    objectKey,
+    contentByKey,
   };
 }
 
@@ -367,5 +369,55 @@ describe("FinalizeImageAssetUploadUseCase", () => {
     ]);
     expect(fixture.auditSink.events.at(-1)?.type).toBe("image-asset-upload-finalized");
     expect(fixture.auditSink.events.at(-1)?.outcome).toBe("rejected");
+  });
+
+  it("rejects upload finalization when detected content signature does not match mediaType", async () => {
+    const fixture = buildFixture();
+    const existing = fixture.imageAssetRepository.records.get("image-asset:001");
+    if (!existing) {
+      throw new Error("missing fixture asset");
+    }
+
+    fixture.imageAssetRepository.records.set("image-asset:001", {
+      ...existing,
+      mediaType: "image/jpeg",
+      normalizedFilename: "source.jpg",
+      originalFilename: "source.jpg",
+    });
+
+    const result = await fixture.useCase.execute({
+      actorUserId: "user-actor",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      operationKey: "image-asset:finalize:signature-mismatch",
+      storageReference: fixture.reference,
+      cleanupOnFailure: false,
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: ImageAssetUploadFinalizationErrorCodes.conflict,
+      }),
+    });
+  });
+
+  it("rejects unsupported finalizedMediaType values at the boundary", async () => {
+    const fixture = buildFixture();
+    const result = await fixture.useCase.execute({
+      actorUserId: "user-actor",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      operationKey: "image-asset:finalize:unsupported-media-type",
+      storageReference: fixture.reference,
+      finalizedMediaType: "text/plain",
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: ImageAssetUploadFinalizationErrorCodes.invalidRequest,
+      }),
+    });
   });
 });
