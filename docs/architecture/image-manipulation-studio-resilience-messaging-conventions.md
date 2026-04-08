@@ -5,6 +5,7 @@
 - Feature 8: Validation, Error Handling, and Operational Resilience
 - Epic 8.3: User-Facing Recovery UX, Operational Messaging, and Safe Retry Flows
 - Story 8.3.1: Unified user-facing error and degraded-state messaging across the image manipulation studio flow
+- Story 8.3.2: Safe retry and recovery actions for supported failure and degraded scenarios
 
 ## Purpose
 
@@ -50,3 +51,32 @@ Each kind must provide:
 - Presenter and runtime panel consume normalized guidance; they do not define retry policy heuristics per component.
 - Main copy remains non-technical; technical details stay in advanced diagnostics sections.
 - Fallback classification from non-taxonomy codes is centralized in `ImageStudioOperationalMessaging`, not duplicated in components.
+
+## Story 8.3.2 safe recovery action posture
+
+Runtime recovery actions are now derived from normalized guidance plus authoritative context (launch precheck, run history, recent work), not ad hoc per-button checks.
+
+Primary supported actions:
+
+1. `Retry launch`
+2. `Revisit setup`
+3. `Refresh readiness`
+4. `Wait and refresh`
+5. `Reopen latest setup`
+6. `Reuse prior result`
+7. `Reselect source image`
+
+Safety rules:
+
+- `Retry launch` is only enabled when shared recovery policy says retry is both eligible and safe, and launch precheck is currently ready.
+- User-fixable and terminal conditions never expose an enabled retry-launch path.
+- `Reuse prior result` is only offered when authoritative run history contains a reusable output record.
+- `Reopen latest setup` remains bound to authoritative saved-system APIs and draft synchronization.
+- Recovery actions preserve durable run/result/system IDs and do not create hidden local continuity state.
+
+Scenario mapping highlights:
+
+- Missing/invalid setup (for example no source image) => `Reselect source image`, `Revisit setup`.
+- Backend unavailable or pending recovery => `Wait and refresh`, `Refresh readiness`.
+- Retry-safe transient run failure => `Retry launch`.
+- Recover without rerun pressure => `Reuse prior result` from successful prior output.
