@@ -27,6 +27,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
 - `docs/architecture/run-orchestration-scheduling-node-availability-and-eligibility-refresh.md`
 - `docs/architecture/run-orchestration-scheduling-dispatch-outcome-requeue-and-release.md`
+- `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.
