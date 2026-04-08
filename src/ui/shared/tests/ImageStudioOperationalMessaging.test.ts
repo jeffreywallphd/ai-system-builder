@@ -46,5 +46,41 @@ describe("ImageStudioOperationalMessaging", () => {
 
     expect(guidance.kind).toBe("wait-and-retry-later");
     expect(guidance.canRetryNow).toBeTrue();
+    expect(guidance.temporary).toBeTrue();
+  });
+
+  it("classifies no-eligible-node guidance as temporary operational availability", () => {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: "execution-node-no-eligible-match",
+      fallbackLayer: ImageStudioFailureMappingLayers.executionDispatch,
+    });
+    const guidance = deriveImageStudioOperationalGuidance({
+      classification,
+      fallbackSummary: "No execution node is currently eligible.",
+      retryable: true,
+      launchReady: false,
+    });
+
+    expect(guidance.kind).toBe("wait-and-retry-later");
+    expect(guidance.temporary).toBeTrue();
+    expect(guidance.statusSummary).toContain("no eligible execution node");
+    expect(guidance.actionNow).toBe("wait");
+  });
+
+  it("classifies preview delay guidance distinctly from setup issues", () => {
+    const classification = mapImageStudioFailureCodeToClassification({
+      code: "im.preview.operational.preview-service-delayed",
+      fallbackLayer: ImageStudioFailureMappingLayers.previewGeneration,
+    });
+    const guidance = deriveImageStudioOperationalGuidance({
+      classification,
+      fallbackSummary: "Preview generation is delayed.",
+      retryable: true,
+      launchReady: true,
+    });
+
+    expect(guidance.kind).toBe("wait-and-retry-later");
+    expect(guidance.statusSummary).toContain("preview service is delayed");
+    expect(guidance.actionNow).toBe("retry");
   });
 });

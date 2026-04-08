@@ -272,4 +272,20 @@ describe("ImageStudioPresenterContracts", () => {
     expect(viewModel.readiness.state.messageKind).toBe("user-action-required");
     expect(viewModel.readiness.state.recommendedActions?.length).toBeGreaterThan(0);
   });
+
+  it("treats preview-service delay as temporary operational degradation", () => {
+    const interaction = createInitialImageStudioInteractionState();
+    const viewModel = composeImageStudioPresenterViewModel({
+      interaction,
+      resultPreviews: {
+        state: "error",
+        issueCode: "im.preview.operational.preview-service-delayed",
+        errorMessage: "Preview service is delayed.",
+      },
+    });
+
+    expect(viewModel.results.state.kind).toBe("degraded");
+    expect(viewModel.results.state.messageKind).toBe("wait-and-retry-later");
+    expect(viewModel.results.state.recommendedActions?.some((action) => action.includes("preview"))).toBeTrue();
+  });
 });

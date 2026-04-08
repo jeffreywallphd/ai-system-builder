@@ -84,6 +84,8 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Settings ready");
     expect(html).toContain("Launch precheck: setup");
     expect(html).toContain("Launch precheck: execution environment");
+    expect(html).toContain("Execution readiness has not been checked yet.");
+    expect(html).toContain("Refresh readiness before launching.");
     expect(html).toContain("Fix setup issues before starting");
     expect(html).toContain("Refresh precheck");
     expect(html).toContain("Choose a source photo first");
@@ -257,6 +259,55 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.setupBlockingIssues).toHaveLength(0);
     expect(precheck.backendBlockingIssues).toHaveLength(0);
     expect(precheck.backendAdvisories.length).toBeGreaterThan(0);
+    expect(precheck.backendOperationalStatus.category).toBe("degraded");
+    expect(precheck.backendOperationalStatus.temporary).toBeTrue();
+  });
+
+  it("classifies no-eligible-node readiness as operational and temporary", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "unavailable",
+        readyForExecution: false,
+        message: "No eligible node satisfies required capabilities.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        nodeAvailability: Object.freeze({
+          state: "constrained",
+          checkedAt: "2026-04-08T18:00:00.000Z",
+          candidateNodeCount: 2,
+          eligibleNodeCount: 0,
+          unavailableNodeCount: 1,
+          incompatibleNodeCount: 1,
+          topBlockingReasonCodes: Object.freeze(["execution-node-no-eligible-match"]),
+          topTransientAvailabilityReasonCodes: Object.freeze(["node-offline"]),
+          reasonCode: "execution-node-no-eligible-match",
+        }),
+        issues: Object.freeze([{
+          code: "execution-node-no-eligible-match",
+          severity: "error",
+          message: "No eligible node.",
+        }]),
+      }),
+    });
+
+    expect(precheck.launchReady).toBeFalse();
+    expect(precheck.backendOperationalStatus.category).toBe("no-eligible-node");
+    expect(precheck.backendOperationalStatus.temporary).toBeTrue();
+    expect(precheck.backendOperationalStatus.summary).toContain("no eligible execution node");
   });
 
   it("builds user-fixable recovery guidance when launch is blocked by setup issues", () => {
@@ -384,6 +435,59 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.launchReady).toBeFalse();
     expect(precheck.setupBlockingIssues.length).toBeGreaterThan(0);
     expect(precheck.backendBlockingIssues.length).toBeGreaterThan(0);
+    expect(precheck.backendOperationalStatus.category).toBe("unknown");
+  });
+
+  it("uses operational outage/no-node context in launch-blocked recovery guidance", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "unavailable",
+        readyForExecution: false,
+        message: "No eligible node satisfies required capabilities.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        nodeAvailability: Object.freeze({
+          state: "constrained",
+          checkedAt: "2026-04-08T18:00:00.000Z",
+          candidateNodeCount: 2,
+          eligibleNodeCount: 0,
+          unavailableNodeCount: 1,
+          incompatibleNodeCount: 1,
+          topBlockingReasonCodes: Object.freeze(["execution-node-no-eligible-match"]),
+          topTransientAvailabilityReasonCodes: Object.freeze(["node-offline"]),
+          reasonCode: "execution-node-no-eligible-match",
+        }),
+        issues: Object.freeze([{
+          code: "execution-node-no-eligible-match",
+          severity: "error",
+          message: "No eligible node.",
+        }]),
+      }),
+    });
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: { state: "idle" },
+      flowIssues: Object.freeze([]),
+      launchPrecheck: precheck,
+    });
+
+    expect(guidance?.mode).toBe("launch-blocked");
+    expect(guidance?.title).toContain("No eligible execution node");
+    expect(guidance?.recommendedActions[0]).toContain("Wait for node availability");
   });
 
   it("derives safe recovery action plans for blocked launches and retryable failures", () => {

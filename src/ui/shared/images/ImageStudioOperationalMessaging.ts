@@ -34,6 +34,9 @@ export interface ImageStudioOperationalGuidance {
   readonly summary: string;
   readonly recommendedActions: ReadonlyArray<string>;
   readonly canRetryNow: boolean;
+  readonly temporary: boolean;
+  readonly statusSummary: string;
+  readonly actionNow: "wait" | "retry" | "adjust-configuration" | "contact-operator" | "contact-admin" | "none";
 }
 
 export function mapImageStudioFailureCodeToClassification(input: {
@@ -78,6 +81,7 @@ export function deriveImageStudioOperationalGuidance(input: {
   readonly launchReady?: boolean;
 }): ImageStudioOperationalGuidance {
   const classification = input.classification;
+  const statusContext = resolveOperationalStatusContext(classification);
   const recovery = input.recovery
     ?? (classification
       ? deriveImageManipulationRetryRecoveryContractFromClassification({
@@ -96,6 +100,9 @@ export function deriveImageStudioOperationalGuidance(input: {
         "Use advanced details only if you need technical diagnostics.",
       ]),
       canRetryNow: false,
+      temporary: false,
+      statusSummary: "Configuration needs adjustments before retry.",
+      actionNow: "adjust-configuration",
     });
   }
 
@@ -108,6 +115,9 @@ export function deriveImageStudioOperationalGuidance(input: {
         "Use advanced details only if you need technical diagnostics.",
       ]),
       canRetryNow: false,
+      temporary: false,
+      statusSummary: "Configuration needs adjustments before retry.",
+      actionNow: "adjust-configuration",
     });
   }
 
@@ -118,11 +128,11 @@ export function deriveImageStudioOperationalGuidance(input: {
     return Object.freeze({
       kind: ImageStudioOperationalMessageKinds.waitAndRetryLater,
       summary: input.fallbackSummary,
-      recommendedActions: Object.freeze([
-        "Refresh readiness and check service availability.",
-        "Retry when availability stabilizes.",
-      ]),
+      recommendedActions: Object.freeze(resolveRetryLaterActions(statusContext)),
       canRetryNow,
+      temporary: true,
+      statusSummary: statusContext.statusSummary,
+      actionNow: canRetryNow ? "retry" : "wait",
     });
   }
 
@@ -135,6 +145,9 @@ export function deriveImageStudioOperationalGuidance(input: {
         "Contact an operator if this continues.",
       ]),
       canRetryNow: false,
+      temporary: statusContext.category !== "outage",
+      statusSummary: statusContext.statusSummary,
+      actionNow: "contact-operator",
     });
   }
 
@@ -150,6 +163,11 @@ export function deriveImageStudioOperationalGuidance(input: {
         "Contact support if this keeps happening.",
       ]),
       canRetryNow: false,
+      temporary: false,
+      statusSummary: "The current failure is not automatically recoverable.",
+      actionNow: recovery?.escalation.category === ImageManipulationEscalationCategories.admin
+        ? "contact-admin"
+        : "none",
     });
   }
 
@@ -158,7 +176,96 @@ export function deriveImageStudioOperationalGuidance(input: {
     summary: input.fallbackSummary,
     recommendedActions: Object.freeze([]),
     canRetryNow: false,
+    temporary: false,
+    statusSummary: "No operational recovery action is currently required.",
+    actionNow: "none",
   });
+}
+
+type OperationalStatusCategory =
+  | "general"
+  | "no-eligible-node"
+  | "backend-degraded"
+  | "outage"
+  | "preview-delayed";
+
+function resolveOperationalStatusContext(
+  classification: ImageManipulationIssueClassification | undefined,
+): {
+  readonly category: OperationalStatusCategory;
+  readonly statusSummary: string;
+} {
+  const reason = classification?.issueCode?.toLowerCase() ?? "";
+  if (reason.includes("execution-node-no-eligible-match")) {
+    return Object.freeze({
+      category: "no-eligible-node",
+      statusSummary: "Workflow is valid, but no eligible execution node is currently available.",
+    });
+  }
+  if (reason.includes("execution-node-candidates-unavailable")) {
+    return Object.freeze({
+      category: "outage",
+      statusSummary: "Execution nodes are temporarily unavailable.",
+    });
+  }
+  if (reason.includes("backend-degraded") || reason.includes("execution-degraded")) {
+    return Object.freeze({
+      category: "backend-degraded",
+      statusSummary: "Backend is available with degraded capacity.",
+    });
+  }
+  if (
+    reason.includes("backend-unavailable")
+    || reason.includes("timeout")
+    || reason.includes("connect")
+    || reason.includes("unavailable")
+    || reason.includes("offline")
+  ) {
+    return Object.freeze({
+      category: "outage",
+      statusSummary: "Execution backend is temporarily unavailable.",
+    });
+  }
+  if (
+    reason.includes("preview")
+    && (reason.includes("pending") || reason.includes("delay") || reason.includes("timeout") || reason.includes("unavailable"))
+  ) {
+    return Object.freeze({
+      category: "preview-delayed",
+      statusSummary: "Result preview service is delayed; result records may still be available.",
+    });
+  }
+  return Object.freeze({
+    category: "general",
+    statusSummary: "Operational availability requires verification before retry.",
+  });
+}
+
+function resolveRetryLaterActions(input: {
+  readonly category: OperationalStatusCategory;
+}): ReadonlyArray<string> {
+  if (input.category === "no-eligible-node") {
+    return Object.freeze([
+      "Wait for node availability or adjust execution settings.",
+      "Retry after checking readiness again.",
+    ]);
+  }
+  if (input.category === "preview-delayed") {
+    return Object.freeze([
+      "Wait for preview processing to finish.",
+      "Refresh results to load preview updates.",
+    ]);
+  }
+  if (input.category === "backend-degraded") {
+    return Object.freeze([
+      "You can continue, but expect slower or partial backend behavior.",
+      "Retry if quality or completion is impacted.",
+    ]);
+  }
+  return Object.freeze([
+    "Refresh readiness and check service availability.",
+    "Retry when availability stabilizes.",
+  ]);
 }
 
 function resolveIssueKindFromCode(code: string): ImageManipulationIssueKind {
