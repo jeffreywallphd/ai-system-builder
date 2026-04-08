@@ -83,6 +83,7 @@ import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/A
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
 import { AuthoritativeRunExecutionUpdateBackendApi } from "@infrastructure/api/runs/AuthoritativeRunExecutionUpdateBackendApi";
+import { DeploymentPolicyReadBackendApi } from "@infrastructure/api/deployment/DeploymentPolicyReadBackendApi";
 import { RunOrchestrationObservability } from "@infrastructure/api/runs/RunOrchestrationObservability";
 import { AssetBackedRunSubmissionTargetResolver } from "@infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver";
 import { PlatformRunSubmissionAuditSink } from "@infrastructure/api/runs/PlatformRunSubmissionAuditSink";
@@ -173,6 +174,7 @@ import { ReleaseStaleSchedulingReservationUseCase } from "@application/runs/use-
 import { RequestAuthoritativeRunCancellationUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunCancellationUseCase";
 import { RequestAuthoritativeRunRetryUseCase } from "@application/runs/use-cases/RequestAuthoritativeRunRetryUseCase";
 import { RecoverRunOrchestrationStartupStateUseCase } from "@application/runs/use-cases/RecoverRunOrchestrationStartupStateUseCase";
+import { ReadDeploymentPolicyAdministrationUseCase } from "@application/policy-administration/use-cases/ReadDeploymentPolicyAdministrationUseCase";
 import { AuthorizationPolicyMutationService } from "@application/authorization/use-cases/AuthorizationPolicyMutationService";
 import { GrantAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/GrantAuthorizationSharingAccessUseCase";
 import { RevokeAuthorizationSharingAccessUseCase } from "@application/authorization/use-cases/RevokeAuthorizationSharingAccessUseCase";
@@ -1071,6 +1073,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     observability: runOrchestrationObservability,
     now: () => workspaceClock.now(),
   });
+  const deploymentPolicyReadBackendApi = new DeploymentPolicyReadBackendApi({
+    readDeploymentPolicyStateUseCase: new ReadDeploymentPolicyAdministrationUseCase({
+      deploymentPolicyRepository: persistentPlatformServices.deploymentPolicyRepository,
+    }),
+  });
   const auditLedgerBackendApi = new AuditLedgerBackendApi({
     auditLedgerQueryService: new AuditLedgerQueryService({
       repository: persistentPlatformServices.auditLedgerRepository,
@@ -1231,6 +1238,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageManagementBackendApi,
     assetManagementBackendApi,
     auditLedgerBackendApi,
+    deploymentPolicyReadBackendApi,
     authoritativeRunSubmissionBackendApi,
     authoritativeRunQueryBackendApi,
     authoritativeRunMutationBackendApi,
