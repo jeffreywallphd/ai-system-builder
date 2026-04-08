@@ -18,12 +18,18 @@ import {
   type PrepareOfflineReplayOperation,
 } from "@application/common/OfflinePendingOperationPersistence";
 import {
+  type OfflineLocalExecutionRegistrationService,
+  type OfflineReplayPreparationBlockedLocalExecutionRegistration,
+  type PrepareOfflineReplayLocalExecutionRegistration,
+} from "@application/common/OfflineLocalExecutionRegistrationPersistence";
+import {
   OfflineAuthorityScopes,
   OfflineQueuedMutationStatuses,
   type OfflineResourceClass,
   resolveOfflineResourceAuthorityBoundary,
 } from "@domain/platform/OfflineLocalModeBoundaries";
 import {
+  OfflineLocalExecutionRegistrationStatuses,
   type OfflineConnectivitySurfaceStateDto,
   type OfflineReconciliationOutcomeDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
@@ -111,6 +117,11 @@ export interface IOfflineAuthoritativeResynchronizationPort {
     readonly operation: PrepareOfflineReplayOperation;
     readonly attemptedAt: string;
   }): Promise<AuthoritativeReplayExecutionResult>;
+  replayPreparedLocalExecutionRegistration(input: {
+    readonly workspaceId: string;
+    readonly registration: PrepareOfflineReplayLocalExecutionRegistration;
+    readonly attemptedAt: string;
+  }): Promise<AuthoritativeReplayExecutionResult>;
   fetchResourceSnapshotForCache(input: {
     readonly workspaceId: string;
     readonly resourceClass: OfflineResourceClass;
@@ -131,6 +142,11 @@ export interface OfflineControlledResynchronizationResult {
   readonly blockedOperations: ReadonlyArray<OfflineReplayPreparationBlockedOperation>;
   readonly replayedOperationIds: ReadonlyArray<string>;
   readonly appliedOperationIds: ReadonlyArray<string>;
+  readonly replayPreparedRegistrationIds: ReadonlyArray<string>;
+  readonly blockedRegistrationIds: ReadonlyArray<string>;
+  readonly blockedRegistrations: ReadonlyArray<OfflineReplayPreparationBlockedLocalExecutionRegistration>;
+  readonly replayedRegistrationIds: ReadonlyArray<string>;
+  readonly appliedRegistrationIds: ReadonlyArray<string>;
   readonly refreshedSnapshotKeys: ReadonlyArray<string>;
   readonly invalidatedSnapshotKeys: ReadonlyArray<string>;
   readonly pendingOperationCleanupRecords: ReadonlyArray<OfflinePendingOperationCleanupRecord>;
@@ -148,6 +164,7 @@ export class OfflineControlledResynchronizationCoordinator {
 
   constructor(
     private readonly pendingOperationService: OfflinePendingOperationService,
+    private readonly localExecutionRegistrationService: OfflineLocalExecutionRegistrationService,
     private readonly snapshotCacheService: OfflineAuthoritativeSnapshotCacheService,
     private readonly authoritativePort: IOfflineAuthoritativeResynchronizationPort,
     private readonly connectivityPort: IOfflineConnectivityStatePort,
@@ -177,6 +194,11 @@ export class OfflineControlledResynchronizationCoordinator {
         blockedOperations: Object.freeze([]),
         replayedOperationIds: Object.freeze([]),
         appliedOperationIds: Object.freeze([]),
+        replayPreparedRegistrationIds: Object.freeze([]),
+        blockedRegistrationIds: Object.freeze([]),
+        blockedRegistrations: Object.freeze([]),
+        replayedRegistrationIds: Object.freeze([]),
+        appliedRegistrationIds: Object.freeze([]),
         refreshedSnapshotKeys: Object.freeze([]),
         invalidatedSnapshotKeys: Object.freeze([]),
         pendingOperationCleanupRecords: Object.freeze([]),
@@ -195,6 +217,19 @@ export class OfflineControlledResynchronizationCoordinator {
       ...operation,
     })));
     const blockedOperationIds = Object.freeze(blockedOperations.map((operation) => operation.operationId));
+    const registrationReplayPreparation = await this.localExecutionRegistrationService.prepareReplayRegistrations({
+      workspaceId,
+      preparedAt: attemptedAt,
+    });
+    const replayPreparedRegistrationIds = Object.freeze(
+      registrationReplayPreparation.prepared.map((registration) => registration.registrationId),
+    );
+    const blockedRegistrations = Object.freeze(registrationReplayPreparation.blocked.map((registration) => Object.freeze({
+      ...registration,
+    })));
+    const blockedRegistrationIds = Object.freeze(
+      blockedRegistrations.map((registration) => registration.registrationId),
+    );
 
     const cachedSnapshots = await this.snapshotCacheService.listWorkspaceSnapshots(workspaceId);
     const resourceTargets = dedupeResourceTargets([
@@ -280,6 +315,8 @@ export class OfflineControlledResynchronizationCoordinator {
     const outcomes: OfflineReconciliationOutcomeDto[] = [];
     const replayedOperationIds: string[] = [];
     const appliedOperationIds: string[] = [];
+    const replayedRegistrationIds: string[] = [];
+    const appliedRegistrationIds: string[] = [];
 
     for (const blockedOperation of blockedOperations) {
       const blockedRecord = await this.pendingOperationService.findQueuedOperation(
@@ -589,6 +626,174 @@ export class OfflineControlledResynchronizationCoordinator {
       });
     }
 
+    for (const blockedRegistration of blockedRegistrations) {
+      const blockedRecord = await this.localExecutionRegistrationService.findQueuedRegistration(
+        workspaceId,
+        blockedRegistration.registrationId,
+      );
+      if (!blockedRecord) {
+        continue;
+      }
+
+      if (blockedRegistration.reasonCode === "registration-not-pending") {
+        continue;
+      }
+
+      if (
+        blockedRegistration.reasonCode === "retry-exhausted"
+        || blockedRegistration.reasonCode === "non-retryable"
+      ) {
+        await this.localExecutionRegistrationService.markRegistrationReplayOutcome({
+          workspaceId,
+          registrationId: blockedRegistration.registrationId,
+          nextStatus: OfflineLocalExecutionRegistrationStatuses.registrationRejected,
+          attemptedAt,
+          incrementRetryCount: false,
+          retryable: false,
+          nonRetryableReasonCode: blockedRegistration.reasonCode,
+        });
+      }
+
+      const blockedDecision = deriveDecisionFromBlockedRegistrationPreparation({
+        blockedRegistration,
+      });
+      outcomes.push(toOfflineReconciliationOutcomeDto(blockedDecision, {
+        resolvedAt: attemptedAt,
+        conflictCode: blockedDecision.conflictClass,
+        conflictSummary: blockedRegistration.message,
+      }, {
+        resourceClass: blockedRecord.registration.resourceClass,
+        resourceId: blockedRecord.registration.resourceId,
+      }));
+      this.publishReplayOutcomeEvent({
+        workspaceId,
+        actorUserIdentityId,
+        attemptedAt,
+        operationId: blockedRegistration.registrationId,
+        resourceClass: blockedRecord.registration.resourceClass,
+        resourceId: blockedRecord.registration.resourceId,
+        eventType: blockedDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? OfflineOperationalEventTypes.conflictDetected
+          : OfflineOperationalEventTypes.replayFailed,
+        outcome: blockedDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? "conflict"
+          : "failed",
+        summary: blockedRegistration.message,
+        details: Object.freeze({
+          decisionRule: blockedDecision.decisionRule,
+          conflictClass: blockedDecision.conflictClass,
+          blockedReasonCode: blockedRegistration.reasonCode,
+          registrationId: blockedRecord.registration.registrationId,
+          executionId: blockedRecord.registration.executionId,
+          executionClass: blockedRecord.registration.executionClass,
+          historyScope: blockedRecord.registration.execution.historyScope,
+        }),
+      });
+    }
+
+    for (const preparedRegistration of registrationReplayPreparation.prepared) {
+      const registrationId = preparedRegistration.registrationId;
+      replayedRegistrationIds.push(registrationId);
+      const replayResult = await this.authoritativePort.replayPreparedLocalExecutionRegistration({
+        workspaceId,
+        registration: preparedRegistration,
+        attemptedAt,
+      });
+
+      if (replayResult.kind === AuthoritativeReplayExecutionResultKinds.applied) {
+        await this.localExecutionRegistrationService.markRegistrationAsApplied(workspaceId, registrationId);
+        appliedRegistrationIds.push(registrationId);
+        const appliedDecision = Object.freeze({
+          mutationId: registrationId,
+          action: OfflineResynchronizationActions.applyToAuthoritative,
+          decisionRule: OfflineResynchronizationDecisionRules.autoApplyWhenAuthoritativeBaselineMatches,
+          preserveLocalDraftAsUnsynced: false,
+          requiresUserAttention: false,
+          requiresAdminAttention: false,
+          reason: normalizeOptional(replayResult.reason)
+            ?? "Local execution registration was applied to authoritative history.",
+        });
+        outcomes.push(toOfflineReconciliationOutcomeDto(appliedDecision, {
+          resolvedAt: attemptedAt,
+          authoritativeRevisionAfter: replayResult.authoritativeRevisionAfter,
+        }, {
+          resourceClass: preparedRegistration.targetResourceClass,
+          resourceId: preparedRegistration.targetResourceId,
+        }));
+        this.publishReplayOutcomeEvent({
+          workspaceId,
+          actorUserIdentityId,
+          attemptedAt,
+          operationId: registrationId,
+          resourceClass: preparedRegistration.targetResourceClass,
+          resourceId: preparedRegistration.targetResourceId,
+          eventType: OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
+          outcome: "succeeded",
+          summary: normalizeOptional(replayResult.reason)
+            ?? "Protected local execution metadata registered through authoritative linkage.",
+          details: Object.freeze({
+            registrationId,
+            executionId: preparedRegistration.executionId,
+            executionClass: preparedRegistration.executionClass,
+            historyScope: preparedRegistration.registrationEnvelope.execution.historyScope,
+            authoritativeRevisionAfter: replayResult.authoritativeRevisionAfter,
+          }),
+          channel: OfflineOperationalEventChannels.audit,
+        });
+        continue;
+      }
+
+      const replayDecision = deriveDecisionFromAuthoritativeReplayResult({
+        operationId: registrationId,
+        replayResult,
+      });
+      await this.localExecutionRegistrationService.markRegistrationReplayOutcome({
+        workspaceId,
+        registrationId,
+        nextStatus: replayDecision.action === OfflineResynchronizationActions.rejectNotAllowed
+          ? OfflineLocalExecutionRegistrationStatuses.registrationRejected
+          : OfflineLocalExecutionRegistrationStatuses.registrationConflict,
+        attemptedAt,
+        incrementRetryCount: true,
+        retryable: replayResult.retryable,
+        nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+      });
+      outcomes.push(toOfflineReconciliationOutcomeDto(replayDecision, {
+        resolvedAt: attemptedAt,
+        conflictCode: replayDecision.conflictClass,
+        conflictSummary: replayDecision.reason,
+      }, {
+        resourceClass: preparedRegistration.targetResourceClass,
+        resourceId: preparedRegistration.targetResourceId,
+      }));
+      this.publishReplayOutcomeEvent({
+        workspaceId,
+        actorUserIdentityId,
+        attemptedAt,
+        operationId: registrationId,
+        resourceClass: preparedRegistration.targetResourceClass,
+        resourceId: preparedRegistration.targetResourceId,
+        eventType: replayDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? OfflineOperationalEventTypes.conflictDetected
+          : OfflineOperationalEventTypes.replayFailed,
+        outcome: replayDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? "conflict"
+          : "failed",
+        summary: replayDecision.reason,
+        details: Object.freeze({
+          decisionRule: replayDecision.decisionRule,
+          conflictClass: replayDecision.conflictClass,
+          replayResultKind: replayResult.kind,
+          retryable: replayResult.retryable,
+          nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+          registrationId,
+          executionId: preparedRegistration.executionId,
+          executionClass: preparedRegistration.executionClass,
+          historyScope: preparedRegistration.registrationEnvelope.execution.historyScope,
+        }),
+      });
+    }
+
     for (const key of [...invalidateTargets.keys()].sort((left, right) => left.localeCompare(right))) {
       const target = invalidateTargets.get(key);
       if (!target) {
@@ -645,6 +850,11 @@ export class OfflineControlledResynchronizationCoordinator {
       blockedOperations,
       replayedOperationIds: Object.freeze(replayedOperationIds),
       appliedOperationIds: Object.freeze(appliedOperationIds),
+      replayPreparedRegistrationIds,
+      blockedRegistrationIds,
+      blockedRegistrations,
+      replayedRegistrationIds: Object.freeze(replayedRegistrationIds),
+      appliedRegistrationIds: Object.freeze(appliedRegistrationIds),
       refreshedSnapshotKeys: Object.freeze([...refreshedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
       invalidatedSnapshotKeys: Object.freeze([...invalidatedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
       pendingOperationCleanupRecords: Object.freeze(
@@ -854,6 +1064,37 @@ function deriveDecisionFromBlockedReplayPreparation(input: {
     requiresUserAttention: true,
     requiresAdminAttention: false,
     reason: input.blockedOperation.message,
+  });
+}
+
+function deriveDecisionFromBlockedRegistrationPreparation(input: {
+  readonly blockedRegistration: OfflineReplayPreparationBlockedLocalExecutionRegistration;
+}) {
+  if (
+    input.blockedRegistration.reasonCode === "retry-exhausted"
+    || input.blockedRegistration.reasonCode === "non-retryable"
+  ) {
+    return Object.freeze({
+      mutationId: input.blockedRegistration.registrationId,
+      action: OfflineResynchronizationActions.rejectNotAllowed,
+      conflictClass: OfflineResynchronizationConflictClasses.authoritativeStateUnavailable,
+      decisionRule: OfflineResynchronizationDecisionRules.rejectReplayAndRequireUserReview,
+      preserveLocalDraftAsUnsynced: false,
+      requiresUserAttention: true,
+      requiresAdminAttention: false,
+      reason: input.blockedRegistration.message,
+    });
+  }
+
+  return Object.freeze({
+    mutationId: input.blockedRegistration.registrationId,
+    action: OfflineResynchronizationActions.conflictRequiresReview,
+    conflictClass: OfflineResynchronizationConflictClasses.authoritativeStateUnavailable,
+    decisionRule: OfflineResynchronizationDecisionRules.unsafeAutoMergeDeferred,
+    preserveLocalDraftAsUnsynced: false,
+    requiresUserAttention: true,
+    requiresAdminAttention: false,
+    reason: input.blockedRegistration.message,
   });
 }
 

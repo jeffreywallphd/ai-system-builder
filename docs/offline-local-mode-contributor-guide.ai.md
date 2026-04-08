@@ -16,6 +16,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 1. Shared offline contracts/schemas.
 2. Domain offline boundary catalog and policy model.
 3. Application classification/resynchronization/cache/pending-operation persistence seams.
+   - include local-execution registration persistence/replay seams (`src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`) when supported local execution registration behavior changes.
    - include controlled reconnect coordinator (`src/application/common/OfflineControlledResynchronizationCoordinator.ts`) and keep replay outcome capture explicit.
    - include structured blocked replay metadata (reason code/message/dependency blockers) in coordinator results so UI/admin surfaces can explain non-replayed operations.
    - include offline event hook contracts (`src/application/common/OfflineOperationalEventPorts.ts`) and emit sanitized reconnect outcome events.
@@ -41,8 +42,11 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
   - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - queue durability + replay prep:
   - `src/application/common/OfflinePendingOperationPersistence.ts`
+  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
   - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
 - reconnect coordination + cache cleanup:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
@@ -61,6 +65,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - offline local state is not authoritative global truth;
 - reconnect conflict/rejection outcomes are visible and explicit;
 - queued operations keep divergence disclosure and replay descriptors;
+- local execution registrations keep explicit-local history scope and output metadata until authoritative linkage succeeds;
 - desktop host remains control-plane-client and non-authoritative.
 - authoritative snapshot cache stores logical payload + sync metadata, not filesystem references.
 - snapshot cache writes respect eligibility and protected-storage requirements.

@@ -11,16 +11,19 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/application/common/OfflineLocalModeResynchronization.ts`
 - `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
 - `src/application/common/OfflinePendingOperationPersistence.ts`
+- `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
 - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
 - `src/application/common/OfflineOperationalEventPorts.ts`
 - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
 - `src/hosts/desktop/DesktopConnectivityStateService.ts`
 - `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
 - `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
+- `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
 - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
 - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
+- `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
@@ -48,6 +51,8 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Snapshot records persist logical resource snapshots and offline eligibility markers, not raw filesystem references.
 - Dedicated pending-operation persistence and replay-preparation service + SQLite queue store for durable unsynced operation intent.
 - Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
+- Dedicated local-execution registration persistence and replay-preparation service + SQLite queue store for durable local execution metadata registration intent.
+- Local-execution registration records persist actor/workspace context, execution metadata/output linkage payload, retryability metadata, and canonical metadata digest for deterministic reconnect registration replay.
 - Controlled reconnect coordinator revalidates stale cached snapshots, plans replay decisions, executes eligible replay through authoritative APIs in dependency order, updates local queue status, and captures explicit reconciliation outcomes.
 - Coordinator applies explicit post-sync cache maintenance: refresh stale snapshots, invalidate revoked/deleted/permission-lost/invalidated resources, and invalidate stale snapshots that cannot be refreshed.
 - Coordinator emits structured blocked replay metadata (reason code/message/dependency blockers) so UI/admin surfaces can expose why replay did not proceed.
@@ -105,6 +110,18 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
   - no silent auto-merge claims,
   - no hidden replay of rejected operations,
   - no implication that local state becomes authoritative without reconnect outcomes.
+
+## Local execution registration baseline (Story 19.3.3)
+
+- new canonical seams:
+  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
+  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
+  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+- reconnect coordinator now replays queued local execution registrations explicitly and keeps lineage explicit:
+  - local record history scope remains `explicit-local-activity` until authoritative registration succeeds,
+  - registration outcomes map to explicit statuses (`queued-pending-registration`, `registration-conflict`, `registration-rejected`, `registration-applied`),
+  - success emits `protected-local-execution-registered` without implying disconnected authoritative orchestration,
+  - conflict/rejection remains queryable in local queue + reconciliation outcomes (no silent backdating).
 
 ## Implemented guarantees now called out explicitly
 

@@ -11,6 +11,10 @@ import {
   type DesktopOfflinePendingOperationHostRuntime,
 } from "./DesktopOfflinePendingOperationHost";
 import {
+  createDesktopOfflineLocalExecutionRegistrationHostRuntime,
+  type DesktopOfflineLocalExecutionRegistrationHostRuntime,
+} from "./DesktopOfflineLocalExecutionRegistrationHost";
+import {
   createDesktopOfflineSnapshotCacheHostRuntime,
   type DesktopOfflineSnapshotCacheHostRuntime,
 } from "./DesktopOfflineSnapshotCacheHost";
@@ -20,6 +24,7 @@ export interface DesktopOfflineResynchronizationHostOptions {
   readonly authoritativePort: IOfflineAuthoritativeResynchronizationPort;
   readonly connectivityStatePort?: IOfflineConnectivityStatePort;
   readonly pendingOperationMaxEntries?: number;
+  readonly localExecutionRegistrationMaxEntries?: number;
   readonly snapshotCacheMaxEntries?: number;
   readonly supportsProtectedAtRestStorage?: boolean;
   readonly eventSink?: IOfflineOperationalEventSink;
@@ -33,6 +38,7 @@ export interface DesktopOfflineResynchronizationHostOptions {
 export interface DesktopOfflineResynchronizationHostRuntime {
   readonly coordinator: OfflineControlledResynchronizationCoordinator;
   readonly pendingOperationRuntime: DesktopOfflinePendingOperationHostRuntime;
+  readonly localExecutionRegistrationRuntime: DesktopOfflineLocalExecutionRegistrationHostRuntime;
   readonly snapshotCacheRuntime: DesktopOfflineSnapshotCacheHostRuntime;
   readonly connectivityStatePort: IOfflineConnectivityStatePort;
   dispose(): void;
@@ -53,6 +59,10 @@ export function createDesktopOfflineResynchronizationHostRuntime(
     storagePaths: options.storagePaths,
     maxEntries: options.pendingOperationMaxEntries,
   });
+  const localExecutionRegistrationRuntime = createDesktopOfflineLocalExecutionRegistrationHostRuntime({
+    storagePaths: options.storagePaths,
+    maxEntries: options.localExecutionRegistrationMaxEntries,
+  });
   const snapshotCacheRuntime = createDesktopOfflineSnapshotCacheHostRuntime({
     storagePaths: options.storagePaths,
     maxEntries: options.snapshotCacheMaxEntries,
@@ -67,6 +77,7 @@ export function createDesktopOfflineResynchronizationHostRuntime(
 
   const coordinator = new OfflineControlledResynchronizationCoordinator(
     pendingOperationRuntime.service,
+    localExecutionRegistrationRuntime.service,
     snapshotCacheRuntime.service,
     options.authoritativePort,
     connectivityStatePort,
@@ -79,10 +90,12 @@ export function createDesktopOfflineResynchronizationHostRuntime(
   return Object.freeze({
     coordinator,
     pendingOperationRuntime,
+    localExecutionRegistrationRuntime,
     snapshotCacheRuntime,
     connectivityStatePort,
     dispose: () => {
       pendingOperationRuntime.dispose();
+      localExecutionRegistrationRuntime.dispose();
       snapshotCacheRuntime.dispose();
     },
   });
