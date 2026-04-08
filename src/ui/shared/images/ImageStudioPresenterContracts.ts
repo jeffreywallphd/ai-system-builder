@@ -15,6 +15,16 @@ import {
   getImageStudioStepLabel,
   mapImageStudioBlockerCodeToUserMessage,
 } from "./ImageStudioUxCopy";
+import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+  createImageManipulationResilienceCondition,
+  createImageManipulationResilienceSnapshot,
+  type ImageManipulationResilienceScope,
+  type ImageManipulationResilienceSnapshot,
+  type ImageManipulationResilienceStateKind,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
 
 export type ImageStudioSurfaceStateKind = "loading" | "empty" | "error" | "ready" | "degraded";
 
@@ -24,6 +34,7 @@ export interface ImageStudioSurfaceStateViewModel {
   readonly description: string;
   readonly detail?: string;
   readonly retryable?: boolean;
+  readonly resilience?: ImageManipulationResilienceSnapshot;
 }
 
 export interface ImageStudioInputOptionDto {
@@ -374,6 +385,17 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
           ? "This edit needs attention before it can start."
           : "This edit has recommendations before launch.",
         blockingCount > 0 ? `${blockingCount} blocking issue(s).` : undefined,
+        createSurfaceResilience({
+          code: blockingCount > 0 ? "readiness-blocked" : "readiness-advisory",
+          scope: ImageManipulationResilienceScopes.executionAvailability,
+          state: blockingCount > 0
+            ? ImageManipulationResilienceStateKinds.blocked
+            : ImageManipulationResilienceStateKinds.degraded,
+          summary: blockingCount > 0
+            ? "Workflow readiness has blocking issues."
+            : "Workflow readiness has non-blocking advisories.",
+          observedAt: readiness.assessedAtIso,
+        }),
       ),
       assessedAtIso: readiness.assessedAtIso,
       issues,
@@ -386,6 +408,13 @@ function composeReadinessSurface(interaction: ImageStudioInteractionState): Imag
         ImageStudioSurfaceTitles.readiness,
         "Ready to run with recommendations.",
         `${readiness.issues.length} recommendation(s) available.`,
+        createSurfaceResilience({
+          code: "readiness-advisory",
+          scope: ImageManipulationResilienceScopes.executionAvailability,
+          state: ImageManipulationResilienceStateKinds.degraded,
+          summary: "Readiness allows execution with recommendations.",
+          observedAt: readiness.assessedAtIso,
+        }),
       ),
       assessedAtIso: readiness.assessedAtIso,
       issues,
@@ -435,7 +464,18 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
 
   if (envelope?.state === "error") {
     return Object.freeze({
-      state: degradedState(ImageStudioSurfaceTitles.run, "Live updates are temporarily unavailable.", envelope.errorMessage),
+      state: degradedState(
+        ImageStudioSurfaceTitles.run,
+        "Live updates are temporarily unavailable.",
+        envelope.errorMessage,
+        createSurfaceResilience({
+          code: "run-monitoring-temporarily-unavailable",
+          scope: ImageManipulationResilienceScopes.backendConnectivity,
+          state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+          summary: "Run-monitoring updates are temporarily unavailable.",
+          observedAt: activeRun.updatedAtIso,
+        }),
+      ),
       activeRun,
       monitoring: envelope.data,
       recentRuns,
@@ -448,6 +488,14 @@ function composeRunSurface(input: ImageStudioPresenterComposeInput): ImageStudio
         ImageStudioSurfaceTitles.run,
         activeRun.status === "failed" ? "The last edit did not finish." : "The last edit was cancelled.",
         "Review details and try again.",
+        createSurfaceResilience({
+          code: activeRun.status === "failed" ? "run-failed" : "run-cancelled",
+          scope: ImageManipulationResilienceScopes.authoritativeState,
+          state: ImageManipulationResilienceStateKinds.blocked,
+          summary: activeRun.status === "failed" ? "The active run failed." : "The active run was cancelled.",
+          observedAt: activeRun.updatedAtIso,
+          durability: ImageManipulationResilienceDurabilityClasses.unknown,
+        }),
       ),
       activeRun,
       monitoring: envelope?.data,
@@ -487,7 +535,21 @@ function composeResultsSurface(input: ImageStudioPresenterComposeInput): ImageSt
 
   if (envelope?.state === "error") {
     return Object.freeze({
-      state: degradedState(ImageStudioSurfaceTitles.results, "Results are available but previews could not be loaded.", envelope.errorMessage),
+      state: degradedState(
+        ImageStudioSurfaceTitles.results,
+        "Results are available but previews could not be loaded.",
+        envelope.errorMessage,
+        createSurfaceResilience({
+          code: "result-preview-pending",
+          scope: ImageManipulationResilienceScopes.previewReadiness,
+          state: ImageManipulationResilienceStateKinds.pendingRecovery,
+          summary: "Result records exist but preview rendering is not ready yet.",
+          observedAt: input.interaction.authoritative.results?.resolvedAtIso
+            ?? input.interaction.authoritative.activeRun?.updatedAtIso
+            ?? "unknown",
+          durability: ImageManipulationResilienceDurabilityClasses.temporary,
+        }),
+      ),
       selectedResultId,
       cards,
     });
@@ -525,6 +587,14 @@ function composeContinuationSurface(input: ImageStudioPresenterComposeInput): Im
         ImageStudioSurfaceTitles.continuation,
         "Previous sessions could not be restored right now.",
         envelope.errorMessage,
+        createSurfaceResilience({
+          code: "continuation-retrieval-temporarily-unavailable",
+          scope: ImageManipulationResilienceScopes.assetRetrieval,
+          state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+          summary: "Session retrieval is temporarily unavailable.",
+          observedAt: input.interaction.authoritative.activeRun?.updatedAtIso ?? "unknown",
+          durability: ImageManipulationResilienceDurabilityClasses.temporary,
+        }),
       ),
       continuationSessionId,
     });
@@ -724,13 +794,40 @@ function readyState(title: string, description: string): ImageStudioSurfaceState
   });
 }
 
-function degradedState(title: string, description: string, detail?: string): ImageStudioSurfaceStateViewModel {
+function degradedState(
+  title: string,
+  description: string,
+  detail?: string,
+  resilience?: ImageManipulationResilienceSnapshot,
+): ImageStudioSurfaceStateViewModel {
   return Object.freeze({
     kind: "degraded",
     title,
     description,
     detail,
     retryable: true,
+    resilience,
+  });
+}
+
+function createSurfaceResilience(input: {
+  readonly code: string;
+  readonly scope: ImageManipulationResilienceScope;
+  readonly state: ImageManipulationResilienceStateKind;
+  readonly summary: string;
+  readonly observedAt: string;
+  readonly durability?: "temporary" | "persistent" | "unknown";
+}): ImageManipulationResilienceSnapshot {
+  return createImageManipulationResilienceSnapshot({
+    observedAt: input.observedAt,
+    conditions: Object.freeze([createImageManipulationResilienceCondition({
+      code: input.code,
+      scope: input.scope,
+      state: input.state,
+      summary: input.summary,
+      observedAt: input.observedAt,
+      durability: input.durability,
+    })]),
   });
 }
 

@@ -4,6 +4,11 @@ import {
   ImageManipulationFailureSummaryCategories,
   type ImageManipulationFailureSummaryCategory,
 } from "./ImageManipulationValidationFailureTaxonomy";
+import type {
+  ImageManipulationResilienceCondition,
+  ImageManipulationResilienceSnapshot,
+  ImageManipulationResilienceStateKind,
+} from "./ImageManipulationResilienceStateContracts";
 
 export class ImageRunApiContractError extends Error {
   constructor(message: string) {
@@ -60,6 +65,12 @@ export const ImageRunFailureCategories = Object.freeze({
 } as const);
 
 export type ImageRunFailureCategory = ImageManipulationFailureSummaryCategory;
+
+export type ImageRunResilienceState = ImageManipulationResilienceStateKind;
+
+export type ImageRunResilienceConditionDto = ImageManipulationResilienceCondition;
+
+export type ImageRunResilienceSummaryDto = ImageManipulationResilienceSnapshot;
 
 export const ImageRunEventCategories = Object.freeze({
   lifecycle: "lifecycle",
@@ -161,6 +172,7 @@ export interface ImageRunSummaryDto {
 export interface ImageRunDetailDto extends ImageRunSummaryDto {
   readonly submittedByActorId?: string;
   readonly correlationId?: string;
+  readonly resilience?: ImageRunResilienceSummaryDto;
   readonly cancellation?: {
     readonly requestedAt: string;
     readonly requestedByActorId?: string;
@@ -217,6 +229,7 @@ export interface ImageRunResultSummaryDto {
   readonly partialOutputCount?: number;
   readonly hadPartialOutputs: boolean;
   readonly outputs: ReadonlyArray<ImageRunResultOutputReferenceDto>;
+  readonly resilience?: ImageRunResilienceSummaryDto;
   readonly warningCount?: number;
   readonly summary?: string;
 }
@@ -317,6 +330,7 @@ export interface ImageRunExecutionReadinessSummaryDto {
     readonly supportedOperationKinds: ReadonlyArray<string>;
     readonly supportedTranslationContractVersions: ReadonlyArray<string>;
   };
+  readonly resilience?: ImageRunResilienceSummaryDto;
   readonly issues: ReadonlyArray<ImageRunExecutionReadinessIssueDto>;
 }
 
@@ -350,6 +364,7 @@ export interface ImageRunSubmissionDefinitionValidityDto {
 export interface ImageRunSubmissionBackendReadinessDependencyDto {
   readonly adapterHealth: "healthy" | "degraded" | "unavailable" | "unknown";
   readonly ready: boolean;
+  readonly resilience?: ImageRunResilienceSummaryDto;
   readonly issues: ReadonlyArray<ImageRunSubmissionReadinessIssueDto>;
 }
 

@@ -8,6 +8,7 @@ import {
   ImageManipulationExecutionNodeAvailabilityStates,
   ImageManipulationExecutionReadinessStates,
 } from "../GetImageManipulationExecutionReadinessUseCase";
+import { ImageManipulationResilienceStateKinds } from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
 import {
   type ExecutionNodeEligibilityDecisionKind,
   ExecutionNodeEligibilityDecisionKinds,
@@ -76,6 +77,7 @@ describe("GetImageManipulationExecutionReadinessUseCase", () => {
     expect(readiness.readiness).toBe(ImageManipulationExecutionReadinessStates.unavailable);
     expect(readiness.readyForExecution).toBeFalse();
     expect(readiness.issues[0]?.code).toBe("execution-adapter-not-configured");
+    expect(readiness.resilience.state).toBe(ImageManipulationResilienceStateKinds.unavailable);
   });
 
   it("normalizes healthy adapter responses into actionable readiness", async () => {
@@ -122,6 +124,7 @@ describe("GetImageManipulationExecutionReadinessUseCase", () => {
     expect(readiness.issues).toHaveLength(0);
     expect(readiness.nodeAvailability.state).toBe(ImageManipulationExecutionNodeAvailabilityStates.available);
     expect(readiness.nodeAvailability.selectedNodeId).toBe("node:image:001");
+    expect(readiness.resilience.state).toBe(ImageManipulationResilienceStateKinds.healthy);
   });
 
   it("flags compatibility mismatches as degraded and non-actionable", async () => {
@@ -164,6 +167,7 @@ describe("GetImageManipulationExecutionReadinessUseCase", () => {
     ]);
     expect(readiness.nodeAvailability.state).toBe(ImageManipulationExecutionNodeAvailabilityStates.unknown);
     expect(readiness.nodeAvailability.reasonCode).toBe("node-availability-evaluation-skipped-backend-blocking");
+    expect(readiness.resilience.state).toBe(ImageManipulationResilienceStateKinds.blocked);
   });
 
   it("returns degraded readiness when no eligible execution node is currently routable", async () => {
@@ -217,5 +221,6 @@ describe("GetImageManipulationExecutionReadinessUseCase", () => {
     expect(readiness.nodeAvailability.state).toBe(ImageManipulationExecutionNodeAvailabilityStates.constrained);
     expect(readiness.nodeAvailability.reasonCode).toBe("execution-node-no-eligible-match");
     expect(readiness.issues.map((issue) => issue.code)).toContain("execution-node-no-eligible-match");
+    expect(readiness.resilience.blockedConditions.map((entry) => entry.code)).toContain("execution-node-no-eligible-match");
   });
 });
