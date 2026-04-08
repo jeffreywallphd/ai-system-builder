@@ -120,7 +120,16 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 ## Test and doc checklist
 
 - update relevant offline tests across domain/application/host/shared contract modules;
+- include `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts` when validating cross-layer production regression posture;
 - include desktop connectivity-state transition coverage in host tests when connectivity semantics change;
 - include shared desktop offline-status service/presenter/surface coverage when offline UX behavior changes;
 - include interaction-flow coverage for preserved drafts/conflicts/replay-outcome interpretation when reconnect UX behavior changes;
 - keep `.md` and `.ai.md` offline docs paired and updated together.
+
+## Story 19.3.8 hardening note
+
+Maintain one representative cross-layer offline lifecycle regression:
+
+- `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
+
+This suite should continue verifying authoritative replay primacy, explicit unsynced local-state visibility, durable pending-operation/local-execution persistence, explicit conflict/rejection outcomes, reconnect cache refresh/invalidation behavior, startup interrupted-resync recovery posture, and shared-contract/presenter compatibility.

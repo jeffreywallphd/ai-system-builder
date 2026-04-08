@@ -152,6 +152,17 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - offline operational-event sanitization now redacts path/prompt/credential-like string values in addition to key-based sensitive-field removal.
 - reconnect diagnostics now include explicit `resynchronization-attempt-started` / `resynchronization-attempt-completed` markers and `snapshot-refresh-failed` cache-failure diagnostics.
 
+## Story 19.3.8 production-hardening regression baseline
+
+- representative cross-layer lifecycle guard:
+  - `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
+- expected invariant coverage:
+  - server-authoritative replay primacy and explicit apply/reject ownership,
+  - explicit unsynced conflict/rejection local state (no silent global divergence),
+  - durable pending-operation/local-execution persistence through reconnect and restart recovery posture,
+  - explicit cache refresh/invalidation maintenance for stale/revoked resources,
+  - shared contract/schema parsing and desktop presenter compatibility for unresolved-work visibility.
+
 ## Deployment-profile and future remote/offline evolution seams (Story 19.3.7)
 
 - Added explicit desktop offline policy-resolution seam in:
