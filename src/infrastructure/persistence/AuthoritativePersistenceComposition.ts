@@ -26,6 +26,8 @@ import { SqliteAssetUploadSessionPersistenceAdapter } from "./assets/SqliteAsset
 import { ASSET_UPLOAD_SESSION_PERSISTENCE_MIGRATIONS } from "./assets/SqliteAssetUploadSessionPersistenceMigrations";
 import { SqliteImageAssetPersistenceAdapter } from "./image-assets/SqliteImageAssetPersistenceAdapter";
 import { IMAGE_ASSET_PERSISTENCE_MIGRATIONS } from "./image-assets/SqliteImageAssetPersistenceMigrations";
+import { SqliteImageWorkflowSystemPersistenceAdapter } from "./image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
+import { IMAGE_WORKFLOW_SYSTEM_PERSISTENCE_MIGRATIONS } from "./image-workflows/SqliteImageWorkflowSystemPersistenceMigrations";
 import { SqlitePlatformPersistenceAdapter } from "./platform/SqlitePlatformPersistenceAdapter";
 import { PLATFORM_PERSISTENCE_MIGRATIONS } from "./platform/SqlitePlatformPersistenceMigrations";
 import { SqliteAuditLedgerRepository } from "./audit/SqliteAuditLedgerRepository";
@@ -55,6 +57,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly assetAuditRecorder: SqliteAssetAuditRecorder;
   readonly assetUploadSessionRepository: SqliteAssetUploadSessionPersistenceAdapter;
   readonly imageAssetRepository: SqliteImageAssetPersistenceAdapter;
+  readonly imageWorkflowSystemRepository: SqliteImageWorkflowSystemPersistenceAdapter;
   readonly platformPersistenceRepository: SqlitePlatformPersistenceAdapter;
   readonly auditLedgerRepository: SqliteAuditLedgerRepository;
   readonly deploymentPolicyRepository: SqliteDeploymentPolicyPersistenceAdapter;
@@ -101,6 +104,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     domainId: "image-assets",
     migrationTableName: "image_asset_repository_migrations",
     migrations: IMAGE_ASSET_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "image-workflow-system",
+    migrationTableName: "image_workflow_system_repository_migrations",
+    migrations: IMAGE_WORKFLOW_SYSTEM_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "platform",
@@ -235,6 +243,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const assetAuditRecorder = new SqliteAssetAuditRecorder(databasePath);
   const assetUploadSessionRepository = new SqliteAssetUploadSessionPersistenceAdapter(databasePath);
   const imageAssetRepository = new SqliteImageAssetPersistenceAdapter(databasePath);
+  const imageWorkflowSystemRepository = new SqliteImageWorkflowSystemPersistenceAdapter(databasePath);
   const platformPersistenceRepository = new SqlitePlatformPersistenceAdapter(databasePath);
   const auditLedgerRepository = new SqliteAuditLedgerRepository(databasePath);
   const deploymentPolicyRepository = new SqliteDeploymentPolicyPersistenceAdapter(databasePath);
@@ -255,6 +264,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     assetAuditRecorder,
     assetUploadSessionRepository,
     imageAssetRepository,
+    imageWorkflowSystemRepository,
     platformPersistenceRepository,
     auditLedgerRepository,
     deploymentPolicyRepository,
@@ -273,6 +283,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       assetAuditRecorder.dispose();
       assetUploadSessionRepository.dispose();
       imageAssetRepository.dispose();
+      imageWorkflowSystemRepository.dispose();
       platformPersistenceRepository.dispose();
       auditLedgerRepository.dispose();
       deploymentPolicyRepository.dispose();
