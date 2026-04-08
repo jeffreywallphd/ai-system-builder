@@ -25,3 +25,15 @@
 - Product/API/UI layers depend on normalized contracts.
 - Provider-specific DTO shapes stay in infrastructure adapters.
 - Additional execution backends can plug into the same canonical state/failure model.
+
+## ComfyUI backend-state interpretation update
+- Added concrete infrastructure normalizer:
+  - `src/infrastructure/execution/comfyui/ComfyUiExecutionStatusNormalizer.ts`
+- It maps ComfyUI prompt snapshots into canonical image-manipulation execution state snapshots with:
+  - stable state mapping (`queued`, `preparing`, `running`, `completed`, `failed`, `cancelled`),
+  - user-safe progress messaging and warnings,
+  - developer-facing diagnostics separated into `backendDiagnostics` and failure diagnostics,
+  - partial-progress and partial-output continuity for downstream output/failure stories.
+- Unknown/degraded handling:
+  - unknown raw backend state -> safe `preparing` + `backend-state-unknown` warning,
+  - degraded backend hints -> `backend-state-degraded` warning with non-breaking progress semantics.

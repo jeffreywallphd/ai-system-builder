@@ -60,3 +60,18 @@ This keeps user-facing messaging safe while preserving diagnostic detail for log
 - Application and UI layers consume normalized status contracts only.
 - Raw ComfyUI queue/history DTOs remain infrastructure-only.
 - The contracts are extensible to additional backends by adding provider-side mapping logic, not by changing product-facing state semantics.
+
+## ComfyUI state interpretation normalization
+- Infrastructure module:
+  - `src/infrastructure/execution/comfyui/ComfyUiExecutionStatusNormalizer.ts`
+- Purpose:
+  - map backend prompt snapshots into canonical status/progress objects for image-manipulation execution ports.
+- Normalization behavior:
+  - interprets ComfyUI backend states into canonical `queued | preparing | running | completed | failed | cancelled`,
+  - preserves user-safe summaries in `message`/warnings,
+  - records developer diagnostics in `backendDiagnostics` and failure diagnostics,
+  - keeps partial-progress/partial-output context (`partialOutputCount`, `partialProgressObserved`) for later output collection/failure handling stories.
+- Resilience behavior:
+  - unknown backend states degrade safely to `preparing` and emit warning `backend-state-unknown`,
+  - degraded backend status hints emit warning `backend-state-degraded`,
+  - missing/invalid queue/progress fields are tolerated with bounded defaults and clamped percent values.
