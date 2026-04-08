@@ -53,6 +53,9 @@ import {
 } from "@domain/workspaces/WorkspaceDomain";
 import { SqliteImageAssetPersistenceAdapter } from "@infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter";
 import { ManagedImageAssetStorageAdapter } from "@infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter";
+import { StudioShellBackendApi } from "../../../../api/studio-shell/StudioShellBackendApi";
+import { InMemoryStudioShellRepository } from "@infrastructure/studio-shell/InMemoryStudioShellRepository";
+import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
 import type {
   WorkspaceAuthorizationSnapshot,
@@ -1108,5 +1111,139 @@ describe("IdentityHttpServer image asset management routes", () => {
     expect(policyCallsForMember.length).toBeGreaterThan(0);
 
     expect(outsiderUserIdentityId).not.toBe(memberUserIdentityId);
+  });
+
+  it("supports studio reuse flow via protected original retrieval and canonical image-asset ids", async () => {
+    const fixture = await startProductionImageAssetServer();
+    const ownerToken = await registerAndLogin(fixture.baseUrl, "image.asset.integration.studio.owner");
+    const ownerUserIdentityId = await resolveSessionUserIdentityId(fixture.baseUrl, ownerToken);
+
+    fixture.workspaceAuthorizationReadRepository.setOwnerUserIdentityId(ownerUserIdentityId);
+    fixture.workspaceAuthorizationReadRepository.setActiveMembers([ownerUserIdentityId]);
+
+    const tinyPngBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO7Z2YcAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const tinyPngDigest = createHash("sha256").update(tinyPngBytes).digest("hex");
+
+    const created = await fetch(`${fixture.baseUrl}/api/v1/image-assets?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerToken}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        mediaType: "image/png",
+        originalFilename: "studio-reuse.png",
+        sizeBytes: tinyPngBytes.byteLength,
+        fingerprint: {
+          algorithm: "sha256",
+          digest: tinyPngDigest,
+        },
+      }),
+    });
+    expect(created.status).toBe(200);
+    const createdBody = await created.json();
+    expect(createdBody.ok).toBe(true);
+    const assetId = createdBody.data.asset.assetId as string;
+    const uploadEndpoint = createdBody.data.upload.uploadEndpoint as string;
+    const uploadSessionId = createdBody.data.upload.uploadSessionId as string;
+
+    const uploaded = await fetch(`${fixture.baseUrl}${uploadEndpoint}?workspaceId=workspace-alpha`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${ownerToken}`,
+        "content-type": "image/png",
+      },
+      body: tinyPngBytes,
+    });
+    expect(uploaded.status).toBe(200);
+
+    const finalized = await fetch(
+      `${fixture.baseUrl}${uploadEndpoint.replace("/content", "/complete")}?workspaceId=workspace-alpha`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          expectedSizeBytes: tinyPngBytes.byteLength,
+          expectedChecksumSha256: tinyPngDigest,
+        }),
+      },
+    );
+    expect(finalized.status).toBe(200);
+
+    const listed = await fetch(
+      `${fixture.baseUrl}/api/v1/image-assets?workspaceId=workspace-alpha&status=available&ownerUserIdentityId=${encodeURIComponent(ownerUserIdentityId)}`,
+      {
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+      },
+    );
+    expect(listed.status).toBe(200);
+    const listedBody = await listed.json();
+    expect(listedBody.ok).toBe(true);
+    expect(listedBody.data.items.some((item: { readonly assetId: string }) => item.assetId === assetId)).toBeTrue();
+
+    const original = await fetch(
+      `${fixture.baseUrl}/api/v1/image-assets/${encodeURIComponent(assetId)}/original?workspaceId=workspace-alpha`,
+      {
+        headers: {
+          authorization: `Bearer ${ownerToken}`,
+        },
+      },
+    );
+    expect(original.status).toBe(200);
+    const originalBytes = new Uint8Array(await original.arrayBuffer());
+    const payloadBase64 = Buffer.from(originalBytes).toString("base64");
+
+    const studioApi = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+    const initialized = await studioApi.initializeStudio("studio-system", "System Studio");
+    const createdDraft = await studioApi.createDraft({
+      studioId: "studio-system",
+      sessionId: initialized.data!.activeSessionId!,
+      assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+      content: JSON.stringify({ systemSpec: {} }),
+      metadata: {
+        title: "Reference image",
+        tags: ["system"],
+        taxonomy: {
+          structuralKind: "system",
+          semanticRole: "system",
+          behaviorKind: "deterministic",
+        },
+      },
+    });
+
+    const ingested = await studioApi.ingestReferenceImageUpload({
+      studioId: "studio-system",
+      draftId: createdDraft.data!.draft!.draftId,
+      fileName: "studio-reuse.png",
+      mimeType: "image/png",
+      payloadBase64,
+      sourceImageAssetId: assetId,
+      targetDatasetBindingId: "input-image-dataset",
+    });
+
+    expect(ingested.ok).toBeTrue();
+    expect(ingested.data?.image.assetId).toBe(assetId);
+    expect(ingested.data?.selectedRecordId).toBe(ingested.data?.recordId);
+    expect(ingested.data?.datasetInstanceId).toBe("dataset-instance:reference-image:input");
+
+    const inputItems = await studioApi.listReferenceImageDatasetItems({
+      studioId: "studio-system",
+      draftId: createdDraft.data!.draft!.draftId,
+      datasetBindingId: "input-image-dataset",
+      limit: 10,
+      offset: 0,
+    });
+    expect(inputItems.ok).toBeTrue();
+    expect(inputItems.data?.items[0]?.image.imageReference).toBe(assetId);
+    expect(inputItems.data?.items[0]?.image.imageReference).not.toContain("/uploads/");
+    expect(uploadSessionId.length).toBeGreaterThan(0);
   });
 });

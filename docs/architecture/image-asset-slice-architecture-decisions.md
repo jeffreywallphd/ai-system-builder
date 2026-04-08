@@ -127,6 +127,14 @@ Story 1.4.3 extension:
   - re-ingest into runtime datasets through existing studio ingestion APIs with logical `sourceImageAssetId` lineage
 - reopen continuity remains driven by persisted runtime logical state (dataset-binding ids, selected record ids, property state) without introducing local filesystem/path truth sources
 
+Story 1.4.5 extension:
+
+- Feature 1 completion readiness is now documented in `docs/architecture/image-asset-feature-1-final-baseline.md`, including known limits, extension points, prerequisites for Feature 2+, and explicit follow-on technical debt.
+- End-to-end regression coverage now includes the recent-asset studio reuse path that:
+  - creates/finalizes a canonical image asset through protected HTTP APIs,
+  - retrieves original bytes through protected content routes,
+  - re-ingests that content into studio datasets while preserving canonical `image-asset:*` lineage references.
+
 ## Decision 6: preview-safe access and generated outputs are first-class
 
 The architecture treats preview and generated outputs as normal protected asset flows:
@@ -165,6 +173,7 @@ When extending image ingestion/retrieval:
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageAssetManagement.test.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageFaceIdDatasetFlow.test.ts`
 
 ## Related architecture notes
 

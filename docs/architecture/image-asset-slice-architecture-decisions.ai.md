@@ -19,6 +19,7 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 - `docs/architecture/image-asset-authorization-contracts.md`
 - `docs/architecture/image-asset-application-ports.md`
 - `docs/architecture/image-asset-slice-architecture-decisions.md`
+- `docs/architecture/image-asset-feature-1-final-baseline.md`
 
 ## Core decisions
 
@@ -69,6 +70,11 @@ Story 1.4.3 addition:
   - re-ingest through studio authoritative dataset-ingestion APIs with logical `sourceImageAssetId` lineage.
 - Runtime reopen continuity remains persisted as logical session state (binding ids, selected record ids, property state) while recent-asset reuse avoids any local path/file truth source.
 
+Story 1.4.5 addition:
+
+- Feature 1 completion readiness is now anchored in `docs/architecture/image-asset-feature-1-final-baseline.md`, including explicit limits, extension seams, Feature 2 prerequisites, and declared technical debt.
+- Regression coverage now includes studio recent-asset reuse through canonical `image-asset:*` identifiers, validating protected original-content retrieval followed by studio dataset re-ingestion without local bypass paths.
+
 ## Extension guardrails
 
 - Do not introduce path-based local bypasses for upload, preview, or retrieval.
@@ -92,3 +98,4 @@ Story 1.4.3 addition:
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
 - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageAssetManagement.test.ts`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageFaceIdDatasetFlow.test.ts`

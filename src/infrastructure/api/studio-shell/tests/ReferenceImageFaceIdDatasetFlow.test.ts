@@ -31,12 +31,12 @@ describe("Reference image FaceID dataset flow", () => {
       fileName: "input.png",
       mimeType: "image/png",
       payloadBase64: TinyPngBase64,
-      sourceImageAssetId: "asset:image:source-upload-1",
+      sourceImageAssetId: "image-asset:source-upload-1",
     });
     expect(inputUpload.ok).toBeTrue();
     expect(inputUpload.data?.datasetBindingId).toBe("input-image-dataset");
     expect(inputUpload.data?.datasetInstanceId).toBe("dataset-instance:reference-image:input");
-    expect(inputUpload.data?.image.assetId).toBe("asset:image:source-upload-1");
+    expect(inputUpload.data?.image.assetId).toBe("image-asset:source-upload-1");
 
     const referenceUpload = await api.ingestReferenceImageUpload({
       studioId: "studio-system",
@@ -80,7 +80,7 @@ describe("Reference image FaceID dataset flow", () => {
       offset: 0,
     });
     expect(inputItems.ok).toBeTrue();
-    expect(inputItems.data?.items[0]?.image.imageReference).toBe("asset:image:source-upload-1");
+    expect(inputItems.data?.items[0]?.image.imageReference).toBe("image-asset:source-upload-1");
   });
 
   it("chains persisted output records into the input dataset through dataset bindings", async () => {
