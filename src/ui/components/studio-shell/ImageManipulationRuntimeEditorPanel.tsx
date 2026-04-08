@@ -11,6 +11,10 @@ import { ImageManipulationSystemTemplate } from "@application/system-studio/Imag
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import { validateReferenceImageCrossStudioContext, type CrossStudioIntegrityIssue } from "@application/system-studio/ReferenceImageCrossStudioIntegrity";
 import type { OutputGalleryItem } from "@application/system-runtime/OutputGalleryDataContract";
+import {
+  ImageManipulationFailureNormalizationSources,
+  normalizeImageManipulationExecutionFailure,
+} from "@application/image-workflows/ports/ImageManipulationFailureNormalization";
 import type { ReferenceImageDatasetBindingId } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { FileIngestionPolicy } from "@domain/ingestion/interfaces/IFileIngestion";
 import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system/BrowserImageUploadIngestionAdapter";
@@ -74,6 +78,13 @@ import type {
   RuntimeSdkExecutionStatusResponse,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import type { StudioImageSystemDefinitionSummaryReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { ImageManipulationIssueLayer } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import {
+  ImageStudioFailureMappingLayers,
+  ImageStudioOperationalMessageKinds,
+  deriveImageStudioOperationalGuidance,
+  mapImageStudioFailureCodeToClassification,
+} from "../../shared/images/ImageStudioOperationalMessaging";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -696,7 +707,7 @@ export function buildImageRunLaunchPrecheckState(input: {
   });
 }
 
-type ImageRunRecoveryKind = "user-fixable" | "operational";
+type ImageRunRecoveryKind = "user-fixable" | "retry-later" | "operator-action" | "terminal";
 
 export interface ImageRunFailureRecoveryGuidance {
   readonly mode: "launch-blocked" | "run-failed";
@@ -707,86 +718,72 @@ export interface ImageRunFailureRecoveryGuidance {
   readonly canRetryNow: boolean;
 }
 
-function resolveIssueRecoveryKind(issue: Pick<ReferenceImageExecutionFlowIssue, "code" | "recoveryKind">): ImageRunRecoveryKind {
-  if (issue.recoveryKind) {
-    return issue.recoveryKind;
-  }
-  const code = issue.code.toLowerCase();
-  if (
-    code.includes("invalid-config")
-    || code.includes("missing-source")
-    || code.includes("missing-reference")
-    || code.includes("prompt-required")
-    || code.includes("validation")
-    || code.includes("invalid-request")
-    || code.includes("request-construction")
-    || code.includes("materialization-request-invalid")
-    || code.includes("runtime-configuration-resolution")
-  ) {
+function resolveIssueRecoveryKind(
+  issue: Pick<ReferenceImageExecutionFlowIssue, "code" | "recoveryKind" | "retryable" | "userMessage">,
+): ImageRunRecoveryKind {
+  if (issue.recoveryKind === "user-fixable") {
     return "user-fixable";
   }
-  return "operational";
+  const classification = mapImageStudioFailureCodeToClassification({
+    code: issue.code,
+    fallbackLayer: ImageStudioFailureMappingLayers.executionDispatch,
+  });
+  const guidance = deriveImageStudioOperationalGuidance({
+    classification,
+    retryable: issue.retryable,
+    fallbackSummary: issue.userMessage,
+  });
+  return mapOperationalMessageKindToRunRecoveryKind(guidance.kind);
 }
 
 function resolveRuntimeOperationRecovery(input: {
   readonly code?: string;
   readonly fallbackMessage: string;
+  readonly layer?: ImageManipulationIssueLayer;
 }): {
-  readonly kind: ImageRunRecoveryKind;
+  readonly kind: "user-fixable" | "operational";
   readonly retryable: boolean;
   readonly userMessage: string;
 } {
-  const code = input.code?.trim().toLowerCase();
-  if (!code) {
-    return Object.freeze({
-      kind: "operational",
-      retryable: true,
-      userMessage: input.fallbackMessage,
+  const source = input.layer === ImageStudioFailureMappingLayers.resultCollection
+    ? ImageManipulationFailureNormalizationSources.outputCollection
+    : ImageManipulationFailureNormalizationSources.dispatch;
+  const normalized = normalizeImageManipulationExecutionFailure({
+    source,
+    failedAt: new Date().toISOString(),
+    backendErrorCode: input.code,
+    rawMessage: input.fallbackMessage,
+  });
+  const classification = normalized.classification
+    ?? mapImageStudioFailureCodeToClassification({
+      code: input.code,
+      fallbackLayer: input.layer ?? ImageStudioFailureMappingLayers.executionDispatch,
     });
-  }
-  if (code === "invalid-request" || code.includes("validation")) {
-    return Object.freeze({
-      kind: "user-fixable",
-      retryable: false,
-      userMessage: "Please review your selected image and settings, then try again.",
-    });
-  }
-  if (code === "unauthorized" || code === "forbidden") {
-    return Object.freeze({
-      kind: "user-fixable",
-      retryable: false,
-      userMessage: "Sign in with workspace access, then try again.",
-    });
-  }
-  if (code === "not-found") {
-    return Object.freeze({
-      kind: "user-fixable",
-      retryable: false,
-      userMessage: "That run context is no longer available. Reopen setup and try again.",
-    });
-  }
-  if (code.includes("timeout") || code.includes("quota") || code.includes("rate-limit")) {
-    return Object.freeze({
-      kind: "operational",
-      retryable: true,
-      userMessage: "Execution services are busy right now. Retry shortly.",
-    });
-  }
+  const guidance = deriveImageStudioOperationalGuidance({
+    classification,
+    recovery: normalized.recovery,
+    retryable: normalized.retryable,
+    fallbackSummary: normalized.userMessage ?? input.fallbackMessage,
+  });
   return Object.freeze({
-    kind: "operational",
-    retryable: true,
-    userMessage: input.fallbackMessage,
+    kind: mapOperationalMessageKindToIssueRecoveryKind(guidance.kind),
+    retryable: normalized.retryable,
+    userMessage: guidance.summary,
   });
 }
 
-function resolvePersistenceDiagnosticRecoveryKind(stage: string | undefined): ImageRunRecoveryKind {
-  if (
-    stage === "request-construction-failure"
-    || stage === "runtime-configuration-resolution-failure"
-  ) {
-    return "user-fixable";
-  }
-  return "operational";
+function resolvePersistenceDiagnosticRecoveryKind(stage: string | undefined): "user-fixable" | "operational" {
+  const classification = mapImageStudioFailureCodeToClassification({
+    code: stage === "request-construction-failure" || stage === "runtime-configuration-resolution-failure"
+      ? "im.result.validation.persistence-request-invalid"
+      : "im.result.operational.persistence-unavailable",
+    fallbackLayer: ImageStudioFailureMappingLayers.resultCollection,
+  });
+  const guidance = deriveImageStudioOperationalGuidance({
+    classification,
+    fallbackSummary: "Result persistence could not be completed.",
+  });
+  return mapOperationalMessageKindToIssueRecoveryKind(guidance.kind);
 }
 
 export function buildImageRunFailureRecoveryGuidance(input: {
@@ -796,24 +793,40 @@ export function buildImageRunFailureRecoveryGuidance(input: {
 }): ImageRunFailureRecoveryGuidance | undefined {
   if (input.runLifecycle.state === "failed") {
     const firstIssue = input.flowIssues[0];
-    const kind = firstIssue ? resolveIssueRecoveryKind(firstIssue) : "operational";
-    const retryable = firstIssue?.retryable ?? (kind === "operational");
+    const kind = firstIssue ? resolveIssueRecoveryKind(firstIssue) : "retry-later";
+    const retryable = firstIssue?.retryable ?? kind === "retry-later";
     return Object.freeze({
       mode: "run-failed",
       kind,
       title: kind === "user-fixable"
         ? "This run needs setup changes"
-        : "This run hit an operational issue",
+        : kind === "retry-later"
+          ? "This run hit a temporary issue"
+          : kind === "operator-action"
+            ? "This run needs operator attention"
+            : "This run could not continue",
       summary: firstIssue?.userMessage ?? "The run did not complete.",
-      recommendedActions: Object.freeze(kind === "user-fixable"
-        ? [
-          "Review image selection and settings, then run again.",
-          "Use advanced details only if you need technical diagnostics.",
-        ]
-        : [
-          "Refresh readiness and confirm execution availability.",
-          "Retry when backend availability is restored.",
-        ]),
+      recommendedActions: Object.freeze(
+        kind === "user-fixable"
+          ? [
+            "Review image selection and settings, then run again.",
+            "Use advanced details only if you need technical diagnostics.",
+          ]
+          : kind === "retry-later"
+            ? [
+              "Refresh readiness and confirm execution availability.",
+              "Retry when backend availability is restored.",
+            ]
+            : kind === "operator-action"
+              ? [
+                "Retry after service health improves.",
+                "Contact an operator if this keeps happening.",
+              ]
+              : [
+                "Reopen setup and verify your latest selections.",
+                "Contact support if this keeps happening.",
+              ],
+      ),
       canRetryNow: retryable && input.launchPrecheck.launchReady,
     });
   }
@@ -828,7 +841,7 @@ export function buildImageRunFailureRecoveryGuidance(input: {
       : input.launchPrecheck.backendBlockingIssues[0]?.message;
     return Object.freeze({
       mode: "launch-blocked",
-      kind: hasSetupIssues ? "user-fixable" : "operational",
+      kind: hasSetupIssues ? "user-fixable" : "retry-later",
       title: hasSetupIssues
         ? "Fix setup issues before starting"
         : "Execution environment is not ready",
@@ -847,6 +860,27 @@ export function buildImageRunFailureRecoveryGuidance(input: {
   }
 
   return undefined;
+}
+
+function mapOperationalMessageKindToRunRecoveryKind(kind: string): ImageRunRecoveryKind {
+  if (kind === ImageStudioOperationalMessageKinds.userActionRequired) {
+    return "user-fixable";
+  }
+  if (kind === ImageStudioOperationalMessageKinds.operatorActionRequired) {
+    return "operator-action";
+  }
+  if (kind === ImageStudioOperationalMessageKinds.terminalFailure) {
+    return "terminal";
+  }
+  return "retry-later";
+}
+
+function mapOperationalMessageKindToIssueRecoveryKind(
+  kind: string,
+): "user-fixable" | "operational" {
+  return kind === ImageStudioOperationalMessageKinds.userActionRequired
+    ? "user-fixable"
+    : "operational";
 }
 
 function isRuntimeTerminalStatus(
@@ -1154,6 +1188,7 @@ export function ImageManipulationRuntimeEditorPanel({
         const recovery = resolveRuntimeOperationRecovery({
           code: response.error?.code,
           fallbackMessage: "Execution environment availability could not be confirmed.",
+          layer: ImageStudioFailureMappingLayers.runReadiness,
         });
         setExecutionReadiness(undefined);
         setExecutionReadinessError(recovery.userMessage);
@@ -1737,6 +1772,7 @@ export function ImageManipulationRuntimeEditorPanel({
         const recovery = resolveRuntimeOperationRecovery({
           code: statusResponse.error?.code,
           fallbackMessage: "Run status could not be refreshed.",
+          layer: ImageStudioFailureMappingLayers.executionDispatch,
         });
         return Object.freeze({
           ok: false,
@@ -2110,6 +2146,7 @@ export function ImageManipulationRuntimeEditorPanel({
         const recovery = resolveRuntimeOperationRecovery({
           code: startResponse.error?.code,
           fallbackMessage: "The run could not be submitted right now.",
+          layer: ImageStudioFailureMappingLayers.executionDispatch,
         });
         setRunLifecycle(Object.freeze({
           state: "failed",
@@ -2184,6 +2221,7 @@ export function ImageManipulationRuntimeEditorPanel({
         const recovery = resolveRuntimeOperationRecovery({
           code: resultResponse.error?.code,
           fallbackMessage: "Run results could not be loaded.",
+          layer: ImageStudioFailureMappingLayers.resultCollection,
         });
         setRunLifecycle(Object.freeze({
           state: "failed",
@@ -2240,6 +2278,7 @@ export function ImageManipulationRuntimeEditorPanel({
         const recovery = resolveRuntimeOperationRecovery({
           code: persistenceResponse.error?.code,
           fallbackMessage: "Run results could not be saved.",
+          layer: ImageStudioFailureMappingLayers.resultCollection,
         });
         setRunLifecycle(Object.freeze({
           state: "failed",
@@ -2983,7 +3022,11 @@ export function ImageManipulationRuntimeEditorPanel({
                 <ImageStatusNotice
                   title={failureRecoveryGuidance.title}
                   message={failureRecoveryGuidance.summary}
-                  tone={failureRecoveryGuidance.kind === "user-fixable" ? "warning" : "danger"}
+                  tone={
+                    failureRecoveryGuidance.kind === "terminal" || failureRecoveryGuidance.kind === "operator-action"
+                      ? "danger"
+                      : "warning"
+                  }
                 />
                 <ul className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
                   {failureRecoveryGuidance.recommendedActions.map((message) => (

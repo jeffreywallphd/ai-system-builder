@@ -142,6 +142,7 @@ describe("ImageStudioPresenterContracts", () => {
     expect(viewModel.input.state.kind).toBe("ready");
     expect(viewModel.workflow.state.kind).toBe("ready");
     expect(viewModel.readiness.state.kind).toBe("degraded");
+    expect(viewModel.readiness.state.messageKind).toBe("wait-and-retry-later");
     expect(viewModel.run.state.kind).toBe("ready");
     expect(viewModel.results.state.kind).toBe("ready");
     expect(viewModel.results.cards[0]?.reusable).toBeTrue();
@@ -215,6 +216,8 @@ describe("ImageStudioPresenterContracts", () => {
     expect(selectImageStudioSurfaceState(viewModel, "results").resilience?.state).toBe("pending-recovery");
     expect(selectImageStudioSurfaceState(viewModel, "run").recovery?.recoveryAction.kind).toBe("retry-automatic");
     expect(selectImageStudioSurfaceState(viewModel, "results").recovery?.recoveryAction.kind).toBe("backend-recovery-pending");
+    expect(selectImageStudioSurfaceState(viewModel, "run").messageKind).toBe("wait-and-retry-later");
+    expect(selectImageStudioSurfaceState(viewModel, "results").messageKind).toBe("wait-and-retry-later");
 
     const action = selectImageStudioPrimaryAction(viewModel);
     expect(action.actionId).toBe("review-progress");
@@ -228,5 +231,45 @@ describe("ImageStudioPresenterContracts", () => {
     expect(gate).toBeDefined();
     const blockers = mapImageStudioStepGateToPresenterBlockers(gate!);
     expect(blockers).toContain("Choose an image to continue.");
+  });
+
+  it("marks blocked readiness as user-action-required messaging", () => {
+    let interaction = createInitialImageStudioInteractionState();
+    interaction = reduceImageStudioInteractionState(interaction, {
+      type: "select-input-image",
+      selection: {
+        selectionId: "selection:2",
+        sourceKind: "dataset-item",
+        assetId: "asset:image:2",
+      },
+    });
+    interaction = reduceImageStudioInteractionState(interaction, {
+      type: "select-workflow-system",
+      selection: {
+        workflowId: "workflow:2",
+        systemId: "system:2",
+        parameterDefaults: {},
+      },
+    });
+    interaction = reduceImageStudioInteractionState(interaction, {
+      type: "readiness-resolved",
+      readiness: {
+        assessedAtIso: "2026-04-08T14:30:00.000Z",
+        ready: false,
+        issues: [{
+          code: "missing-input",
+          message: "Source image is missing.",
+          severity: "blocking",
+        }],
+      },
+    });
+
+    const viewModel = composeImageStudioPresenterViewModel({
+      interaction,
+    });
+
+    expect(viewModel.readiness.state.kind).toBe("degraded");
+    expect(viewModel.readiness.state.messageKind).toBe("user-action-required");
+    expect(viewModel.readiness.state.recommendedActions?.length).toBeGreaterThan(0);
   });
 });
