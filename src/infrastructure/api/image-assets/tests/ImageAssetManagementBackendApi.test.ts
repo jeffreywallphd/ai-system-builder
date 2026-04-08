@@ -8,6 +8,8 @@ import {
 import { ResourceVisibilities, SharingPolicyModes } from "@domain/authorization/AuthorizationDomain";
 import { ImageAssetStorageObjectAreas } from "@application/image-assets/ports/ImageAssetStoragePort";
 import { ImageAssetManagementBackendApi } from "../ImageAssetManagementBackendApi";
+import { ImageAssetManagementObservability } from "../ImageAssetManagementObservability";
+import type { ImageAssetManagementObservabilityLogEvent, ImageAssetManagementObservabilityLogger } from "../ImageAssetManagementObservability";
 
 const baseAsset = Object.freeze({
   assetId: "image-asset:001",
@@ -38,6 +40,24 @@ const baseAsset = Object.freeze({
 });
 
 describe("ImageAssetManagementBackendApi", () => {
+  class CapturingLogger implements ImageAssetManagementObservabilityLogger {
+    public readonly infoEvents: ImageAssetManagementObservabilityLogEvent[] = [];
+    public readonly warnEvents: ImageAssetManagementObservabilityLogEvent[] = [];
+    public readonly errorEvents: ImageAssetManagementObservabilityLogEvent[] = [];
+
+    public info(event: ImageAssetManagementObservabilityLogEvent): void {
+      this.infoEvents.push(event);
+    }
+
+    public warn(event: ImageAssetManagementObservabilityLogEvent): void {
+      this.warnEvents.push(event);
+    }
+
+    public error(event: ImageAssetManagementObservabilityLogEvent): void {
+      this.errorEvents.push(event);
+    }
+  }
+
   it("creates, ingests upload content, finalizes upload, gets detail, and lists assets", async () => {
     const backend = new ImageAssetManagementBackendApi({
       uploadSessionTokenSecret: "test-secret",
@@ -648,5 +668,48 @@ describe("ImageAssetManagementBackendApi", () => {
       chunks.push(...chunk);
     }
     expect(chunks).toEqual([9, 8, 7, 6]);
+  });
+
+  it("emits observability with request-to-asset trace metadata", async () => {
+    const logger = new CapturingLogger();
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      observability: new ImageAssetManagementObservability({ logger }),
+      initiateImageAssetCreationUseCase: { async execute() { throw new Error("not used"); } },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const response = await backend.openImageAssetPreviewContentStream({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      previewToken: "preview-token-secret",
+      correlationId: "corr-preview-1",
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(logger.warnEvents).toHaveLength(1);
+    const event = logger.warnEvents[0];
+    expect(event.flow).toBe("preview-open");
+    expect(event.trace.assetId).toBe("image-asset:001");
+    expect(event.trace.workspaceId).toBe("workspace-alpha");
+    expect(event.trace.correlationId).toBe("corr-preview-1");
+
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain("preview-token-secret");
+    expect(serialized).toContain("[REDACTED]");
   });
 });

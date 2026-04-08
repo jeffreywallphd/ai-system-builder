@@ -26,6 +26,11 @@ import {
   type ImageAssetSummaryDto,
 } from "@shared/contracts/assets/ImageAssetTransportContracts";
 import {
+  ImageAssetManagementObservability,
+  ImageAssetManagementObservabilityFlows,
+  type ImageAssetManagementObservabilityFlow,
+} from "./ImageAssetManagementObservability";
+import {
   ImageAssetManagementApiErrorCodes,
   type CompleteImageAssetUploadApiRequest,
   type CompleteImageAssetUploadApiResponse,
@@ -68,6 +73,7 @@ export interface ImageAssetManagementBackendApiDependencies {
   readonly openImageAssetPreviewContentUseCase: IOpenImageAssetPreviewContentUseCase;
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly uploadSessionTokenSecret: string;
+  readonly observability?: ImageAssetManagementObservability;
   readonly clock?: {
     now(): Date;
   };
@@ -81,6 +87,8 @@ export class ImageAssetManagementBackendApi {
 
   private readonly uploadSessionTokenSecret: string;
 
+  private readonly observability: ImageAssetManagementObservability;
+
   public constructor(private readonly dependencies: ImageAssetManagementBackendApiDependencies) {
     const secret = dependencies.uploadSessionTokenSecret.trim();
     if (!secret) {
@@ -88,6 +96,7 @@ export class ImageAssetManagementBackendApi {
     }
 
     this.uploadSessionTokenSecret = secret;
+    this.observability = dependencies.observability ?? new ImageAssetManagementObservability();
     this.clock = dependencies.clock ?? {
       now: () => new Date(),
     };
@@ -98,7 +107,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<CreateImageAssetApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.create,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const operationKey = normalizeOptional(request.operationKey)
@@ -124,7 +137,18 @@ export class ImageAssetManagementBackendApi {
     });
 
     if (!outcome.ok) {
-      return this.failedFromCreateError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.create,
+        request,
+        this.failedFromCreateError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          correlationId: request.correlationId,
+          operationKey,
+          assetId: request.assetId,
+        }),
+      );
     }
 
     const uploadSessionId = this.createUploadSessionToken({
@@ -140,23 +164,37 @@ export class ImageAssetManagementBackendApi {
 
     const uploadPath = `/api/v1/image-assets/${encodeURIComponent(outcome.value.imageAsset.assetId)}/uploads/${encodeURIComponent(uploadSessionId)}/content`;
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        asset: toImageAssetDetailDto(outcome.value.imageAsset),
-        upload: Object.freeze({
-          uploadSessionId,
-          uploadEndpoint: uploadPath,
-          uploadMethod: "POST",
-          expected: Object.freeze({
-            fileName: outcome.value.imageAsset.originalFilename,
-            mediaType: outcome.value.imageAsset.mediaType,
-            sizeBytes: outcome.value.imageAsset.sizeBytes,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.create,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          asset: toImageAssetDetailDto(outcome.value.imageAsset),
+          upload: Object.freeze({
+            uploadSessionId,
+            uploadEndpoint: uploadPath,
+            uploadMethod: "POST",
+            expected: Object.freeze({
+              fileName: outcome.value.imageAsset.originalFilename,
+              mediaType: outcome.value.imageAsset.mediaType,
+              sizeBytes: outcome.value.imageAsset.sizeBytes,
+            }),
+            expiresAt: outcome.value.upload.reservation.expiresAt,
           }),
-          expiresAt: outcome.value.upload.reservation.expiresAt,
         }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        correlationId: request.correlationId,
+        operationKey,
+        assetId: outcome.value.imageAsset.assetId,
       }),
-    };
+      Object.freeze({
+        stage: "storage-reservation-issued",
+      }),
+    );
   }
 
   public async ingestImageAssetUploadContent(
@@ -164,51 +202,135 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<IngestImageAssetUploadContentApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required"),
+      );
     }
 
     const uploadSession = this.resolveUploadSessionToken(request.uploadSessionId);
     if (!uploadSession) {
-      return this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
     if (uploadSession.workspaceId !== request.workspaceId || uploadSession.assetId !== request.assetId) {
-      return this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
     if (uploadSession.expiresAt && new Date(uploadSession.expiresAt).getTime() < this.clock.now().getTime()) {
-      return this.failed(
-        ImageAssetManagementApiErrorCodes.invalidState,
-        "uploadSessionId has expired.",
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.failed(
+          ImageAssetManagementApiErrorCodes.invalidState,
+          "uploadSessionId has expired.",
+          Object.freeze({
+            validationCode: "upload-session-expired",
+          }),
+        ),
         Object.freeze({
-          validationCode: "upload-session-expired",
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
         }),
       );
     }
 
     const normalizedContentType = normalizeMediaType(request.contentType);
     if (!normalizedContentType) {
-      return this.invalidRequest("contentType is required for image upload ingestion.", "content-type-required");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("contentType is required for image upload ingestion.", "content-type-required"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
     if (!SupportedImageMediaTypes.includes(normalizedContentType as SupportedImageMediaType)) {
-      return this.invalidRequest(
-        `contentType '${normalizedContentType}' is not supported for image ingestion.`,
-        "content-type-unsupported",
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest(
+          `contentType '${normalizedContentType}' is not supported for image ingestion.`,
+          "content-type-unsupported",
+        ),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
       );
     }
     if (normalizedContentType !== uploadSession.mediaType) {
-      return this.invalidRequest(
-        `contentType '${normalizedContentType}' does not match reserved mediaType '${uploadSession.mediaType}'.`,
-        "content-type-mismatch",
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest(
+          `contentType '${normalizedContentType}' does not match reserved mediaType '${uploadSession.mediaType}'.`,
+          "content-type-mismatch",
+        ),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
       );
     }
 
     const expectedChecksumSha256 = normalizeSha256(request.expectedChecksumSha256);
     if (request.expectedChecksumSha256 !== undefined && !expectedChecksumSha256) {
-      return this.invalidRequest("expectedChecksumSha256 must be a lowercase hexadecimal sha256 digest.", "expected-checksum-invalid");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("expectedChecksumSha256 must be a lowercase hexadecimal sha256 digest.", "expected-checksum-invalid"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
     if (request.expectedSizeBytes !== undefined && (!Number.isInteger(request.expectedSizeBytes) || request.expectedSizeBytes < 1)) {
-      return this.invalidRequest("expectedSizeBytes must be an integer >= 1.", "expected-size-invalid");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.invalidRequest("expectedSizeBytes must be an integer >= 1.", "expected-size-invalid"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
     try {
@@ -229,18 +351,38 @@ export class ImageAssetManagementBackendApi {
         overwriteExisting: true,
       });
 
-      return {
-        ok: true,
-        data: Object.freeze({
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        {
+          ok: true,
+          data: Object.freeze({
+            assetId: request.assetId,
+            uploadSessionId: request.uploadSessionId,
+            sizeBytes: writeOutcome.sizeBytes,
+            checksum: writeOutcome.checksum,
+            writtenAt: writeOutcome.writtenAt,
+          }),
+        },
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
           assetId: request.assetId,
-          uploadSessionId: request.uploadSessionId,
-          sizeBytes: writeOutcome.sizeBytes,
-          checksum: writeOutcome.checksum,
-          writtenAt: writeOutcome.writtenAt,
+          correlationId: request.correlationId,
         }),
-      };
+      );
     } catch (error) {
-      return this.failedFromStorageError(error);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadIngest,
+        request,
+        this.failedFromStorageError(error),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
   }
 
@@ -249,16 +391,40 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<CompleteImageAssetUploadApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadFinalize,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const uploadSession = this.resolveUploadSessionToken(request.uploadSessionId);
     if (!uploadSession) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId is invalid.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadFinalize,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId is invalid."),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
     if (uploadSession.workspaceId !== request.workspaceId || uploadSession.assetId !== request.assetId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId does not match workspaceId/assetId.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadFinalize,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId does not match workspaceId/assetId."),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
     const operationKey = normalizeOptional(request.operationKey)
@@ -279,17 +445,42 @@ export class ImageAssetManagementBackendApi {
     });
 
     if (!outcome.ok) {
-      return this.failedFromFinalizeError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadFinalize,
+        request,
+        this.failedFromFinalizeError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+          operationKey,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        asset: toImageAssetDetailDto(outcome.value.imageAsset),
-        uploadSessionId: request.uploadSessionId,
-        finalizedAt: outcome.value.upload.finalizedAt,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.uploadFinalize,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          asset: toImageAssetDetailDto(outcome.value.imageAsset),
+          uploadSessionId: request.uploadSessionId,
+          finalizedAt: outcome.value.upload.finalizedAt,
+        }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        assetId: outcome.value.imageAsset.assetId,
+        correlationId: request.correlationId,
+        operationKey,
       }),
-    };
+      Object.freeze({
+        stage: "upload-finalization",
+      }),
+    );
   }
 
   public async getImageAssetMetadata(
@@ -297,7 +488,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<GetImageAssetMetadataApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.metadataGet,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const outcome = await this.dependencies.getImageAssetMetadataUseCase.execute({
@@ -309,15 +504,35 @@ export class ImageAssetManagementBackendApi {
       occurredAt: request.occurredAt,
     });
     if (!outcome.ok) {
-      return this.failedFromMetadataReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.metadataGet,
+        request,
+        this.failedFromMetadataReadError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        asset: toImageAssetDetailDto(outcome.value.asset),
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.metadataGet,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          asset: toImageAssetDetailDto(outcome.value.asset),
+        }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        assetId: outcome.value.asset.assetId,
+        correlationId: request.correlationId,
       }),
-    };
+    );
   }
 
   public async listImageAssetMetadata(
@@ -325,7 +540,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<ListImageAssetMetadataApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.metadataList,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const outcome = await this.dependencies.listImageAssetMetadataUseCase.execute({
@@ -350,16 +569,38 @@ export class ImageAssetManagementBackendApi {
       occurredAt: request.occurredAt,
     });
     if (!outcome.ok) {
-      return this.failedFromMetadataReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.metadataList,
+        request,
+        this.failedFromMetadataReadError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        items: Object.freeze(outcome.value.items.map((item) => toImageAssetSummaryDto(item))),
-        pagination: outcome.value.pagination,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.metadataList,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          items: Object.freeze(outcome.value.items.map((item) => toImageAssetSummaryDto(item))),
+          pagination: outcome.value.pagination,
+        }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        correlationId: request.correlationId,
       }),
-    };
+      Object.freeze({
+        returned: outcome.value.pagination.returned,
+        hasMore: outcome.value.pagination.hasMore,
+      }),
+    );
   }
 
   public async openImageAssetOriginalContentStream(
@@ -367,7 +608,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<OpenImageAssetOriginalContentStreamApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.originalOpen,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const outcome = await this.dependencies.getImageAssetOriginalContentUseCase.execute({
@@ -378,21 +623,44 @@ export class ImageAssetManagementBackendApi {
       occurredAt: request.occurredAt,
     });
     if (!outcome.ok) {
-      return this.failedFromOriginalContentReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.originalOpen,
+        request,
+        this.failedFromOriginalContentReadError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        assetId: outcome.value.assetId,
-        workspaceId: outcome.value.workspaceId,
-        mimeType: outcome.value.mediaType,
-        sizeBytes: outcome.value.sizeBytes,
-        contentDisposition: outcome.value.contentDisposition,
-        contentDispositionFileName: outcome.value.contentDispositionFileName,
-        stream: outcome.value.stream,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.originalOpen,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          assetId: outcome.value.assetId,
+          workspaceId: outcome.value.workspaceId,
+          mimeType: outcome.value.mediaType,
+          sizeBytes: outcome.value.sizeBytes,
+          contentDisposition: outcome.value.contentDisposition,
+          contentDispositionFileName: outcome.value.contentDispositionFileName,
+          stream: outcome.value.stream,
+        }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        correlationId: request.correlationId,
       }),
-    };
+      Object.freeze({
+        stage: "retrieval-original-content",
+      }),
+    );
   }
 
   public async requestImageAssetPreview(
@@ -400,7 +668,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<RequestImageAssetPreviewApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.previewRequest,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const outcome = await this.dependencies.requestImageAssetPreviewContentUseCase.execute({
@@ -414,29 +686,52 @@ export class ImageAssetManagementBackendApi {
       occurredAt: request.occurredAt,
     });
     if (!outcome.ok) {
-      return this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.previewRequest,
+        request,
+        this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        preview: Object.freeze({
-          assetId: outcome.value.assetId,
-          workspaceId: outcome.value.workspaceId,
-          representation: outcome.value.representation,
-          status: outcome.value.status,
-          mediaType: outcome.value.mediaType,
-          resolvedFrom: outcome.value.resolvedFrom,
-          access: outcome.value.access
-            ? Object.freeze({
-              previewToken: outcome.value.access.previewToken,
-              expiresAt: outcome.value.access.expiresAt,
-              contentEndpoint: `/api/v1/image-assets/${encodeURIComponent(outcome.value.assetId)}/preview/content`,
-            })
-            : undefined,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.previewRequest,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          preview: Object.freeze({
+            assetId: outcome.value.assetId,
+            workspaceId: outcome.value.workspaceId,
+            representation: outcome.value.representation,
+            status: outcome.value.status,
+            mediaType: outcome.value.mediaType,
+            resolvedFrom: outcome.value.resolvedFrom,
+            access: outcome.value.access
+              ? Object.freeze({
+                previewToken: outcome.value.access.previewToken,
+                expiresAt: outcome.value.access.expiresAt,
+                contentEndpoint: `/api/v1/image-assets/${encodeURIComponent(outcome.value.assetId)}/preview/content`,
+              })
+              : undefined,
+          }),
         }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        assetId: outcome.value.assetId,
+        correlationId: request.correlationId,
       }),
-    };
+      Object.freeze({
+        availabilityStatus: outcome.value.status,
+      }),
+    );
   }
 
   public async openImageAssetPreviewContentStream(
@@ -444,7 +739,11 @@ export class ImageAssetManagementBackendApi {
   ): Promise<ImageAssetManagementApiResponse<OpenImageAssetPreviewContentStreamApiResponse>> {
     const actorUserId = normalizeRequired(request.actorUserIdentityId);
     if (!actorUserId) {
-      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.previewOpen,
+        request,
+        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+      );
     }
 
     const outcome = await this.dependencies.openImageAssetPreviewContentUseCase.execute({
@@ -456,21 +755,68 @@ export class ImageAssetManagementBackendApi {
       occurredAt: request.occurredAt,
     });
     if (!outcome.ok) {
-      return this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.previewOpen,
+        request,
+        this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
     }
 
-    return {
-      ok: true,
-      data: Object.freeze({
-        assetId: outcome.value.assetId,
-        workspaceId: outcome.value.workspaceId,
-        mimeType: outcome.value.mediaType,
-        sizeBytes: outcome.value.sizeBytes,
-        contentDisposition: outcome.value.contentDisposition,
-        contentDispositionFileName: outcome.value.contentDispositionFileName,
-        stream: outcome.value.stream,
+    return this.recordOutcome(
+      ImageAssetManagementObservabilityFlows.previewOpen,
+      request,
+      {
+        ok: true,
+        data: Object.freeze({
+          assetId: outcome.value.assetId,
+          workspaceId: outcome.value.workspaceId,
+          mimeType: outcome.value.mediaType,
+          sizeBytes: outcome.value.sizeBytes,
+          contentDisposition: outcome.value.contentDisposition,
+          contentDispositionFileName: outcome.value.contentDispositionFileName,
+          stream: outcome.value.stream,
+        }),
+      },
+      Object.freeze({
+        actorUserIdentityId: actorUserId,
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        correlationId: request.correlationId,
       }),
-    };
+      Object.freeze({
+        stage: "retrieval-preview-content",
+      }),
+    );
+  }
+
+  private async recordOutcome<TRequest, TResponse>(
+    flow: ImageAssetManagementObservabilityFlow,
+    request: TRequest,
+    response: ImageAssetManagementApiResponse<TResponse>,
+    trace?: Readonly<{
+      readonly actorUserIdentityId?: string;
+      readonly workspaceId?: string;
+      readonly assetId?: string;
+      readonly correlationId?: string;
+      readonly operationKey?: string;
+    }>,
+    diagnostics?: Readonly<Record<string, unknown>>,
+  ): Promise<ImageAssetManagementApiResponse<TResponse>> {
+    await this.observability.recordApiOutcome({
+      flow,
+      request,
+      response: response as ImageAssetManagementApiResponse<unknown>,
+      occurredAt: this.clock.now().toISOString(),
+      trace,
+      diagnostics,
+    });
+    return response;
   }
 
   private createUploadSessionToken(payload: ImageAssetUploadSessionTokenPayload): string {

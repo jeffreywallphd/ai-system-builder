@@ -39,6 +39,10 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/audit/AuthoritativeImageAssetAuditSink.ts`
+- `src/infrastructure/api/image-assets/ImageAssetManagementObservability.ts`
+- `src/infrastructure/api/image-assets/ImageAssetManagementObservabilityRedaction.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementObservability.test.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 - `docs/architecture/image-asset-application-ports.md`
@@ -263,3 +267,27 @@ Image-ingestion validation and guardrails are now enforced at API/use-case bound
   - apply detectable signature/media-type mismatch checks (file-signature sniffing via `file-type`) before availability transition
 
 Guardrail effect: unsupported/bad uploads are rejected early with clear responses and do not become `available` image assets.
+
+## Story 1.4.4 implementation scope
+
+Operational diagnostics and developer-facing observability are now first-class for image ingestion and protected retrieval flows:
+
+- Added `ImageAssetManagementObservability` in infrastructure API layer:
+  - structured event taxonomy for create/upload/finalize/get/list/original-open/preview-request/preview-open flow outcomes
+  - consistent outcome/severity mapping (`success`/`rejected`/`failure`)
+  - request-to-asset trace metadata capture (`workspaceId`, `assetId`, `actorUserIdentityId`, `correlationId`, `operationKey`)
+- Added centralized observability redaction in `ImageAssetManagementObservabilityRedaction`:
+  - redacts upload session tokens, preview tokens, storage object keys/references, payload/stream fields, checksums/fingerprints, and path-like values
+  - keeps diagnostics useful (`validationCode`, flow markers, pagination counts, status envelopes) without leaking raw storage details or private payload material
+- Wired `ImageAssetManagementBackendApi` to publish structured diagnostics for core flows:
+  - asset creation + storage reservation issuance
+  - upload ingestion validation failures and storage-write outcomes
+  - upload finalization outcomes
+  - metadata retrieval/listing outcomes
+  - original-content and preview retrieval outcomes
+- Host composition now wires image-asset observability through the shared server logger plumbing so diagnostics flow into existing operational sinks without ad hoc console tracing.
+
+Observability posture:
+
+- Developer diagnostics remain operational-only and do not alter end-user API error payloads.
+- Observability publishing remains best-effort and non-blocking.
