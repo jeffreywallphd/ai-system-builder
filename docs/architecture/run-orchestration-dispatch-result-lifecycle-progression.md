@@ -74,3 +74,18 @@ Failed starts are therefore distinguishable between scheduler-requeueable and te
 - use-case tests for authoritative progression, attempt-result persistence, and lifecycle audit event emission
 - dispatch use-case tests that verify failed backend dispatches are recorded before error propagation
 - SQLite persistence test coverage for dispatch-attempt result recording and retrieval
+
+## Adapter-backed integration regression coverage (Feature 4 / Epic 4.3 / Story 4.3.5)
+
+Authoritative image-run orchestration now includes integration coverage that exercises the orchestration path through the ComfyUI execution-adapter boundary instead of direct studio-to-backend coupling:
+
+- `src/application/runs/tests/RunOrchestrationAdapterBackedExecution.integration.test.ts`
+
+Covered scenarios:
+
+- validated image submission -> authoritative queue admission -> assignment claim -> adapter-routed dispatch -> progress ingestion -> completed finalization
+- adapter dispatch start failure (`failed-to-start`) with authoritative terminal failure persistence and safe failure summary/history capture
+- duplicate-dispatch guard behavior (`dispatchAttemptAlreadyFinalized`) after dispatch-attempt finalization
+- running/cancelling cancellation workflow with backend cancellation signaling and terminal `cancelled` ingestion/finalization
+
+These integration tests assert authoritative run records, queue entries, and durable status-history records as the source of truth rather than backend-local adapter state.

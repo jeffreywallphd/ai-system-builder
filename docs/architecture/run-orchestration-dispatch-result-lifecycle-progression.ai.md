@@ -47,3 +47,13 @@ Story 16.2.5 adds authoritative handling for backend dispatch outcomes so assign
 - Dispatch-result use-case tests for authoritative progression and result persistence.
 - Dispatch use-case tests for failure-path persistence behavior.
 - SQLite adapter test coverage for recording and reading dispatch-attempt results.
+
+## Story 4.3.5 integration coverage extension
+- Added adapter-backed orchestration integration regression coverage:
+  - `src/application/runs/tests/RunOrchestrationAdapterBackedExecution.integration.test.ts`
+- Coverage now exercises:
+  - validated image submission through queue/assignment/dispatch/progress/completion using the ComfyUI dispatch adapter seam,
+  - dispatch start failure and authoritative failed finalization with safe failure history,
+  - duplicate-dispatch guard (`dispatchAttemptAlreadyFinalized`) after attempt finalization,
+  - cancellation request + backend signaling + terminal cancelled ingestion/finalization.
+- Assertions target authoritative run records, queue rows, and durable run status history so orchestration state remains the source of truth over backend-local state.
