@@ -213,6 +213,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 2 / Epic 2.3 Story 2.3.5 durable workflow/system definition persistence architecture (schema, repositories, replay safety, and migration integration): `docs/architecture/image-workflow-system-persistence-and-repositories.md`
 - Feature 3 final baseline for ComfyUI execution adapter boundaries, normalized behavior, supported coverage, and Feature 4/5/6 integration dependencies: `docs/architecture/image-manipulation-feature-3-final-baseline.md`
 - Feature 4 / Epic 4.1 Story 4.1.3 image-run repository and orchestration service ports for authoritative persistence, readiness, queueing, dispatch handoff, update ingestion, cancellation, and output notifications: `docs/architecture/image-run-orchestration-application-ports.md`
+- Feature 4 / Epic 4.1 Story 4.1.5 authoritative run-orchestration posture for image manipulation (authoritative submission/validation, lifecycle normalization, execution handoff, and strict no direct studio-to-backend execution): `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

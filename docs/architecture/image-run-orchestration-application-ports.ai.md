@@ -29,3 +29,7 @@ Story 4.1.3 and Story 4.1.4 define the application-layer repository/orchestratio
 - Scheduler/node-assignment evolution can plug into existing queue reservation and dispatch-correlation seams without redesigning use-case contracts.
 - Submission-readiness contracts remain backend-agnostic while preserving adapter-health/capability findings needed for later scheduling and node-capability integration.
 
+## Related notes
+- `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
+- `docs/architecture/image-run-api-event-contracts.md`
+

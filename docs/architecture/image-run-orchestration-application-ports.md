@@ -69,3 +69,9 @@ Define one backend-neutral application seam for image-run orchestration so use c
 - Queue reservation and claim seams are intentionally first-class (`claimRunsForDispatch`, `releaseRunReservation`) to support future scheduler ownership without changing the run-use-case dependency graph.
 - Execution handoff keeps queue metadata and run identity together so node assignment and dispatch auditing can remain correlated as placement policies grow.
 
+## Related architecture notes
+
+- `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
+- `docs/architecture/image-run-api-event-contracts.md`
+- `docs/architecture/run-submission-validation-policy-eligibility.md`
+
