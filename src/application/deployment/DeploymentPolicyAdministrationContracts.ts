@@ -9,11 +9,9 @@ import {
   type DeploymentProfilePresetCatalog,
   isDeploymentPolicyAdminOverrideAllowed,
   resolveDeploymentPolicySettingDefinition,
-  resolveDeploymentProfilePresetPolicyValues,
   validateDeploymentPolicySettingValue,
 } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 import {
-  DeploymentPolicyAdministrationContractVersions,
   type DeploymentPolicyAdministrationFamilySnapshot,
   type DeploymentPolicyAdministrationSnapshot,
   type DeploymentPolicyAdministrationState,
@@ -21,10 +19,12 @@ import {
   type DeploymentPolicyResolvedSetting,
   type DeploymentPolicyResolutionSource,
   DeploymentPolicyResolutionSources,
-  createDeploymentPolicyEffectiveSummary,
-  createDeploymentPolicyProfilePresetMetadata,
-  toDeploymentPolicyValueKind,
 } from "@shared/contracts/deployment/DeploymentPolicyAdministrationContracts";
+import {
+  type DeploymentPolicyAdminOverrideRecord,
+  resolveDeploymentPolicyEffectiveState,
+  validateDeploymentPolicyAdminOverrideRecords,
+} from "./DeploymentPolicyEffectiveResolutionService";
 
 export class DeploymentPolicyAdministrationContractsError extends Error {
   constructor(message: string) {
@@ -115,62 +115,33 @@ export function evaluateDeploymentPolicyAdministrationSnapshot(input: {
 }): DeploymentPolicyAdministrationSnapshot {
   const evaluationLayer = assertEvaluationLayer(input.evaluationLayer);
   const evaluatedAt = normalizeTimestamp(input.evaluatedAt);
-  const presetValues = resolveDeploymentProfilePresetPolicyValues({
+  return resolveDeploymentPolicyEffectiveState({
     profileId: input.profileId,
+    familyCatalog: input.familyCatalog,
     presetCatalog: input.presetCatalog,
-  });
-
-  const familySnapshots: Record<string, DeploymentPolicyAdministrationFamilySnapshot> = {};
-  for (const family of Object.values(input.familyCatalog)) {
-    const settings: Record<string, DeploymentPolicyResolvedSetting> = {};
-    const presetFamilyValues = presetValues[family.familyId] ?? {};
-    const adminFamilyValues = input.adminState?.values[family.familyId] ?? {};
-
-    for (const setting of family.settings) {
-      const presetValue = presetFamilyValues[setting.settingKey];
-      const hasPresetValue = presetValue !== undefined;
-      let value: DeploymentPolicyScalarValue = hasPresetValue ? presetValue : setting.defaultValue;
-      let source: DeploymentPolicyResolutionSource = hasPresetValue
-        ? DeploymentPolicyResolutionSources.profilePreset
-        : DeploymentPolicyResolutionSources.policyDefault;
-
-      const adminValue = adminFamilyValues[setting.settingKey];
-      if (adminValue !== undefined && isDeploymentPolicyAdminOverrideAllowed(setting.controlMode)) {
-        value = adminValue;
-        source = DeploymentPolicyResolutionSources.adminState;
-      }
-
-      settings[setting.settingKey] = Object.freeze({
-        familyId: family.familyId,
-        settingKey: setting.settingKey,
-        controlMode: setting.controlMode,
-        value,
-        valueType: toDeploymentPolicyValueKind(value),
-        source,
-      });
-    }
-
-    familySnapshots[family.familyId] = Object.freeze({
-      familyId: family.familyId,
-      settings: Object.freeze(settings),
-    });
-  }
-
-  const families = Object.freeze(familySnapshots as Record<DeploymentPolicyFamilyId, DeploymentPolicyAdministrationFamilySnapshot>);
-
-  return Object.freeze({
-    contractVersion: DeploymentPolicyAdministrationContractVersions.v1,
-    profileId: input.profileId,
-    evaluatedAt,
+    adminState: input.adminState,
     evaluationLayer,
-    preset: createDeploymentPolicyProfilePresetMetadata({
-      profileId: input.profileId,
-      presetCatalog: input.presetCatalog,
-    }),
-    families,
-    summary: createDeploymentPolicyEffectiveSummary({
-      families,
-    }),
+    evaluatedAt,
+  }).snapshot;
+}
+
+export function resolveDeploymentPolicyAdministrationSnapshotWithOverrides(input: {
+  readonly profileId: DeploymentProfileId;
+  readonly familyCatalog: DeploymentPolicyFamilyCatalog;
+  readonly presetCatalog: DeploymentProfilePresetCatalog;
+  readonly overrideRecords: ReadonlyArray<DeploymentPolicyAdminOverrideRecord>;
+  readonly evaluationLayer: DeploymentPolicyEvaluationRequestLayer;
+  readonly evaluatedAt?: string | Date;
+}): ReturnType<typeof resolveDeploymentPolicyEffectiveState> {
+  const evaluationLayer = assertEvaluationLayer(input.evaluationLayer);
+  const evaluatedAt = normalizeTimestamp(input.evaluatedAt);
+  return resolveDeploymentPolicyEffectiveState({
+    profileId: input.profileId,
+    familyCatalog: input.familyCatalog,
+    presetCatalog: input.presetCatalog,
+    overrideRecords: input.overrideRecords,
+    evaluationLayer,
+    evaluatedAt,
   });
 }
 
@@ -189,3 +160,5 @@ export type {
   DeploymentPolicyFamilyId,
   DeploymentPolicySettingKey,
 };
+export type { DeploymentPolicyAdminOverrideRecord };
+export { validateDeploymentPolicyAdminOverrideRecords };
