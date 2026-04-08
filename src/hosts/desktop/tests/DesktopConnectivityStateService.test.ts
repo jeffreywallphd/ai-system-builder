@@ -138,6 +138,11 @@ describe("DesktopConnectivityStateService", () => {
     expect(sink.events[0]).toMatchObject({
       workspaceId: "workspace:alpha",
       actorUserIdentityId: "user:alpha",
+      classification: "operational-diagnostic",
+      correlationId: expect.stringContaining("offline-connectivity:"),
+      diagnostics: {
+        trustEnforcement: "optional",
+      },
     });
   });
 });

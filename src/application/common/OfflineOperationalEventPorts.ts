@@ -13,31 +13,48 @@ export const OfflineOperationalEventTypes = Object.freeze({
   replayFailed: "replay-failed",
   conflictDetected: "conflict-detected",
   protectedLocalExecutionRegistered: "protected-local-execution-registered",
+  resynchronizationAttemptStarted: "resynchronization-attempt-started",
+  resynchronizationAttemptCompleted: "resynchronization-attempt-completed",
+  snapshotRefreshFailed: "snapshot-refresh-failed",
 });
 
 export type OfflineOperationalEventType =
   typeof OfflineOperationalEventTypes[keyof typeof OfflineOperationalEventTypes];
 
+export const OfflineOperationalEventClassifications = Object.freeze({
+  userFacingOutcome: "user-facing-outcome",
+  operationalDiagnostic: "operational-diagnostic",
+  combined: "combined",
+});
+
+export type OfflineOperationalEventClassification =
+  typeof OfflineOperationalEventClassifications[keyof typeof OfflineOperationalEventClassifications];
+
 export interface OfflineOperationalEvent {
   readonly channel: OfflineOperationalEventChannel;
   readonly type: OfflineOperationalEventType;
   readonly occurredAt: string;
+  readonly requestId?: string;
+  readonly correlationId?: string;
+  readonly syncAttemptId?: string;
   readonly workspaceId?: string;
   readonly actorUserIdentityId?: string;
   readonly actorServiceId?: string;
   readonly operationId?: string;
   readonly resourceClass?: string;
   readonly resourceId?: string;
+  readonly classification?: OfflineOperationalEventClassification;
   readonly outcome?: "succeeded" | "failed" | "conflict";
   readonly summary?: string;
   readonly details?: Readonly<Record<string, unknown>>;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
 }
 
 export interface IOfflineOperationalEventSink {
   recordOfflineOperationalEvent(event: OfflineOperationalEvent): Promise<void>;
 }
 
-const SensitiveOfflineDetailKeyPattern = /(payload|token|secret|credential|password|diagnostic|internal|path|file|directory|content|body|bytes|raw)/i;
+const SensitiveOfflineDetailKeyPattern = /(payload|token|secret|credential|password|internal|path|file|directory|content|body|bytes|raw)/i;
 const SensitiveOfflineStringValuePattern = /(file:\/\/|[a-zA-Z]:\\|\\\\|\/Users\/|\/home\/|\/var\/|\/tmp\/|\/etc\/|api[_-]?key|bearer\s+[a-z0-9\-_.]+|prompt\s*:)/i;
 const MaxOfflineEventStringLength = 256;
 const MaxOfflineEventArrayLength = 20;
@@ -64,15 +81,20 @@ function sanitizeOfflineOperationalEvent(event: OfflineOperationalEvent): Offlin
     channel: event.channel,
     type: event.type,
     occurredAt: normalizeRequired(event.occurredAt, "occurredAt"),
+    requestId: normalizeOptional(event.requestId),
+    correlationId: normalizeOptional(event.correlationId),
+    syncAttemptId: normalizeOptional(event.syncAttemptId),
     workspaceId: normalizeOptional(event.workspaceId),
     actorUserIdentityId: normalizeOptional(event.actorUserIdentityId),
     actorServiceId: normalizeOptional(event.actorServiceId),
     operationId: normalizeOptional(event.operationId),
     resourceClass: normalizeOptional(event.resourceClass),
     resourceId: normalizeOptional(event.resourceId),
+    classification: event.classification,
     outcome: event.outcome,
     summary: sanitizeOptionalSummary(event.summary),
     details: sanitizeDetails(event.details),
+    diagnostics: sanitizeDetails(event.diagnostics),
   });
 }
 
@@ -86,6 +108,7 @@ function sanitizeDetails(
   const output: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(details).slice(0, MaxOfflineEventObjectEntries)) {
     if (SensitiveOfflineDetailKeyPattern.test(key)) {
+      output[key] = RedactedMarker;
       continue;
     }
     output[key] = sanitizeUnknown(value);
@@ -111,6 +134,7 @@ function sanitizeUnknown(value: unknown): unknown {
     const output: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value as Record<string, unknown>).slice(0, MaxOfflineEventObjectEntries)) {
       if (SensitiveOfflineDetailKeyPattern.test(key)) {
+        output[key] = RedactedMarker;
         continue;
       }
       output[key] = sanitizeUnknown(nested);

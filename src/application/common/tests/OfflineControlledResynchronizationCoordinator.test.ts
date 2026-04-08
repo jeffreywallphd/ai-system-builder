@@ -538,12 +538,25 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     ]);
     expect(authoritativePort.refreshedSnapshots).toContain("run-submission-intent::run:intent:1");
     expect(authoritativePort.refreshedSnapshots).toContain("workflow-definition::workflow:def:1");
-    expect(eventSink.events.map((event) => event.type)).toEqual([
-      OfflineOperationalEventTypes.replaySucceeded,
-      OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
-      OfflineOperationalEventTypes.conflictDetected,
-      OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
-    ]);
+    expect(result.syncAttemptId).toContain("offline-sync:");
+    expect(eventSink.events[0]).toMatchObject({
+      type: OfflineOperationalEventTypes.resynchronizationAttemptStarted,
+      correlationId: result.syncAttemptId,
+      syncAttemptId: result.syncAttemptId,
+    });
+    expect(eventSink.events[eventSink.events.length - 1]).toMatchObject({
+      type: OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
+      correlationId: result.syncAttemptId,
+      syncAttemptId: result.syncAttemptId,
+      diagnostics: {
+        replayFailureSummaries: {
+          totalFailures: 1,
+        },
+      },
+    });
+    expect(eventSink.events.map((event) => event.type)).toContain(OfflineOperationalEventTypes.replaySucceeded);
+    expect(eventSink.events.map((event) => event.type)).toContain(OfflineOperationalEventTypes.conflictDetected);
+    expect(eventSink.events.map((event) => event.type)).toContain(OfflineOperationalEventTypes.protectedLocalExecutionRegistered);
   });
 
   it("skips replay when connectivity cannot resynchronize", async () => {
@@ -557,6 +570,7 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
       new InMemoryOfflineAuthoritativeSnapshotCacheRepository(),
     );
     const authoritativePort = new FakeAuthoritativeResynchronizationPort();
+    const eventSink = new RecordingOfflineOperationalSink();
     const coordinator = new OfflineControlledResynchronizationCoordinator(
       pendingOperationService,
       localExecutionRegistrationService,
@@ -569,6 +583,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
         localModeActive: true,
         canResynchronize: false,
       })),
+      {
+        eventSink,
+      },
     );
 
     const result = await coordinator.synchronizeWorkspace({
@@ -587,6 +604,13 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(result.invalidatedSnapshotKeys).toEqual([]);
     expect(result.pendingOperationCleanupRecords).toEqual([]);
     expect(authoritativePort.replayedOperations).toEqual([]);
+    expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
+    ]);
+    expect(eventSink.events[0]).toMatchObject({
+      outcome: "failed",
+      summary: "Resynchronization attempt was not started because connectivity is not eligible.",
+    });
   });
 
   it("detects supported conflict classes during resynchronization and preserves local operations", async () => {
@@ -901,7 +925,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     expect(persisted?.retryability.retryable).toBeFalse();
     expect(persisted?.retryability.nonRetryableReasonCode).toBe("retry-exhausted");
     expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.resynchronizationAttemptStarted,
       OfflineOperationalEventTypes.replayFailed,
+      OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
     ]);
   });
 
@@ -971,7 +997,9 @@ describe("OfflineControlledResynchronizationCoordinator", () => {
     );
     expect(persisted?.registration.userVisibleRegistrationStatus).toBe("registration-conflict");
     expect(eventSink.events.map((event) => event.type)).toEqual([
+      OfflineOperationalEventTypes.resynchronizationAttemptStarted,
       OfflineOperationalEventTypes.conflictDetected,
+      OfflineOperationalEventTypes.resynchronizationAttemptCompleted,
     ]);
   });
 

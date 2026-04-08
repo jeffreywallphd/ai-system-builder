@@ -6,6 +6,7 @@ import {
   RuntimeRealtimeConnectivityStates,
 } from "@shared/contracts/runtime/SystemRuntimeRealtimeEventContracts";
 import type { SystemRuntimeBackendApi } from "./SystemRuntimeBackendApi";
+import type { OfflineOperationalObservability } from "./OfflineOperationalObservability";
 
 type RuntimeEventPublisherApi = Pick<
   SystemRuntimeBackendApi,
@@ -13,9 +14,20 @@ type RuntimeEventPublisherApi = Pick<
 >;
 
 export class DesktopOfflineOperationalEventSink implements IOfflineOperationalEventSink {
-  public constructor(private readonly runtimeBackendApi: RuntimeEventPublisherApi) {}
+  public constructor(
+    private readonly runtimeBackendApi: RuntimeEventPublisherApi,
+    private readonly observability?: OfflineOperationalObservability,
+  ) {}
 
   public async recordOfflineOperationalEvent(event: OfflineOperationalEvent): Promise<void> {
+    if (this.observability) {
+      try {
+        await this.observability.recordOfflineOperationalEvent(event);
+      } catch {
+        // Offline observability logging/metrics must not block runtime event publication.
+      }
+    }
+
     if (
       event.type === OfflineOperationalEventTypes.offlineEntered
       || event.type === OfflineOperationalEventTypes.offlineExited
@@ -55,11 +67,15 @@ export class DesktopOfflineOperationalEventSink implements IOfflineOperationalEv
         workspaceId: event.workspaceId,
         resourceType: event.resourceClass,
         resourceId: event.resourceId,
-        correlationId: event.operationId,
+        correlationId: event.correlationId ?? event.syncAttemptId ?? event.operationId,
         details: Object.freeze({
+          requestId: event.requestId,
+          syncAttemptId: event.syncAttemptId,
+          classification: event.classification,
           channel: event.channel,
           summary: event.summary,
           details: event.details,
+          diagnostics: event.diagnostics,
         }),
         hasProtectedData: event.type === OfflineOperationalEventTypes.protectedLocalExecutionRegistered,
         redactionReasons: event.type === OfflineOperationalEventTypes.protectedLocalExecutionRegistered
@@ -80,6 +96,12 @@ function toAuditAction(type: OfflineOperationalEvent["type"]): string {
       return "offline.resync.conflict.detected";
     case OfflineOperationalEventTypes.protectedLocalExecutionRegistered:
       return "offline.local-execution.protected.registered";
+    case OfflineOperationalEventTypes.resynchronizationAttemptStarted:
+      return "offline.resync.attempt.started";
+    case OfflineOperationalEventTypes.resynchronizationAttemptCompleted:
+      return "offline.resync.attempt.completed";
+    case OfflineOperationalEventTypes.snapshotRefreshFailed:
+      return "offline.cache.snapshot.refresh.failed";
     case OfflineOperationalEventTypes.offlineEntered:
       return "offline.mode.entered";
     case OfflineOperationalEventTypes.offlineExited:

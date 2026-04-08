@@ -362,12 +362,16 @@ export class DesktopConnectivityStateService {
     const summary = isOffline
       ? "Desktop host entered offline local mode."
       : "Desktop host exited offline local mode.";
+    const transitionCorrelationId = `offline-connectivity:${next.lastChangedAt.replace(/[^0-9A-Za-z]+/g, "-")}`;
     void publishOfflineOperationalEventBestEffort(this.eventSink, Object.freeze({
       channel: OfflineOperationalEventChannels.operational,
       type: eventType,
       occurredAt: next.lastChangedAt,
+      correlationId: transitionCorrelationId,
+      syncAttemptId: transitionCorrelationId,
       workspaceId: this.eventWorkspaceId,
       actorUserIdentityId: this.eventActorUserIdentityId,
+      classification: "operational-diagnostic",
       summary,
       details: Object.freeze({
         previousState: previous.state,
@@ -375,6 +379,12 @@ export class DesktopConnectivityStateService {
         reasonCode: next.reasonCode,
         offlineModeIntent: next.offlineModeIntent,
         canResynchronize: next.canResynchronize,
+      }),
+      diagnostics: Object.freeze({
+        transportReachable: next.transportReachable,
+        trustedSessionAvailable: next.trustedSessionAvailable,
+        trustPrerequisitesSatisfied: next.trustPrerequisitesSatisfied,
+        trustEnforcement: next.trustEnforcement,
       }),
     }));
   }
