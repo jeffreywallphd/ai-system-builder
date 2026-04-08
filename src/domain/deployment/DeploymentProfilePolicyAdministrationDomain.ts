@@ -45,6 +45,28 @@ export const DeploymentPolicyValueKinds = Object.freeze({
 export type DeploymentPolicyValueKind =
   typeof DeploymentPolicyValueKinds[keyof typeof DeploymentPolicyValueKinds];
 
+export const DeploymentPolicyGovernanceSensitivityLevels = Object.freeze({
+  standard: "standard",
+  governanceSensitive: "governance-sensitive",
+  foundational: "foundational",
+});
+
+export type DeploymentPolicyGovernanceSensitivityLevel =
+  typeof DeploymentPolicyGovernanceSensitivityLevels[keyof typeof DeploymentPolicyGovernanceSensitivityLevels];
+
+export interface DeploymentPolicyControlledFeatureArea {
+  readonly areaId: string;
+  readonly label: string;
+  readonly currentBehavior: string;
+}
+
+export interface DeploymentPolicyExplainabilityDefinition {
+  readonly behaviorSummary: string;
+  readonly governedFeatureAreas: ReadonlyArray<DeploymentPolicyControlledFeatureArea>;
+  readonly governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevel;
+  readonly governanceWarning?: string;
+}
+
 export interface DeploymentPolicySettingEnumRule {
   readonly type: "enum";
   readonly allowedValues: ReadonlyArray<string>;
@@ -84,6 +106,7 @@ export interface DeploymentPolicyFamilyDefinition {
   readonly description: string;
   readonly settings: ReadonlyArray<DeploymentPolicySettingDefinition>;
   readonly scope?: DeploymentPolicyFamilyScope;
+  readonly explainability?: DeploymentPolicyExplainabilityDefinition;
 }
 
 export type DeploymentPolicyFamilyCatalog =
@@ -132,8 +155,12 @@ export const DeploymentPolicyFamilyIds = Object.freeze({
 const CanonicalProfileIds = new Set<DeploymentProfileId>(Object.values(DeploymentProfileIds));
 const CanonicalFamilyScopes = new Set<DeploymentPolicyFamilyScope>(Object.values(DeploymentPolicyFamilyScopes));
 const CanonicalValueKinds = new Set<DeploymentPolicyValueKind>(Object.values(DeploymentPolicyValueKinds));
+const CanonicalGovernanceSensitivityLevels = new Set<DeploymentPolicyGovernanceSensitivityLevel>(
+  Object.values(DeploymentPolicyGovernanceSensitivityLevels),
+);
 const PolicyFamilyIdPattern = /^[a-z][a-z0-9-]{2,126}$/;
 const PolicySettingKeyPattern = /^[a-z][a-zA-Z0-9]{2,126}$/;
+const ExplainabilityAreaIdPattern = /^[a-z][a-z0-9-]{2,126}$/;
 
 function normalizeRequired(value: string, field: string): string {
   const normalized = value.trim();
@@ -261,6 +288,55 @@ function normalizeFamilyScope(scope: DeploymentPolicyFamilyScope | undefined): D
   return normalized;
 }
 
+function normalizeExplainabilityDefinition(
+  input: DeploymentPolicyExplainabilityDefinition | undefined,
+  familyId: string,
+): DeploymentPolicyExplainabilityDefinition | undefined {
+  if (!input) {
+    return undefined;
+  }
+
+  const behaviorSummary = normalizeRequired(
+    input.behaviorSummary,
+    `Deployment policy family '${familyId}' explainability behavior summary`,
+  );
+  if (!CanonicalGovernanceSensitivityLevels.has(input.governanceSensitivity)) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy family '${familyId}' has invalid governance sensitivity '${String(input.governanceSensitivity)}'.`,
+    );
+  }
+
+  const governedFeatureAreas: DeploymentPolicyControlledFeatureArea[] = [];
+  for (const area of input.governedFeatureAreas) {
+    const areaId = normalizeRequired(area.areaId, `Policy family '${familyId}' explainability area id`).toLowerCase();
+    if (!ExplainabilityAreaIdPattern.test(areaId)) {
+      throw new DeploymentProfilePolicyAdministrationDomainError(
+        `Deployment policy family '${familyId}' explainability area id '${areaId}' is invalid.`,
+      );
+    }
+    governedFeatureAreas.push(Object.freeze({
+      areaId,
+      label: normalizeRequired(area.label, `Policy family '${familyId}' explainability area label`),
+      currentBehavior: normalizeRequired(
+        area.currentBehavior,
+        `Policy family '${familyId}' explainability area '${areaId}' behavior summary`,
+      ),
+    }));
+  }
+  if (governedFeatureAreas.length < 1) {
+    throw new DeploymentProfilePolicyAdministrationDomainError(
+      `Deployment policy family '${familyId}' explainability must include at least one governed feature area.`,
+    );
+  }
+
+  return Object.freeze({
+    behaviorSummary,
+    governedFeatureAreas: Object.freeze(governedFeatureAreas),
+    governanceSensitivity: input.governanceSensitivity,
+    governanceWarning: normalizeOptional(input.governanceWarning),
+  });
+}
+
 export function normalizeDeploymentProfileId(value: string): DeploymentProfileId {
   const normalized = normalizeRequired(value, "Deployment profile id").toLowerCase();
   if (normalized.startsWith("deployment-profile:")) {
@@ -376,6 +452,7 @@ function normalizeFamilyDefinition(input: DeploymentPolicyFamilyDefinition): Dep
     scope: normalizeFamilyScope(input.scope),
     description: normalizeRequired(input.description, `Deployment policy family '${familyId}' description`),
     settings: Object.freeze([...bySetting.values()]),
+    explainability: normalizeExplainabilityDefinition(input.explainability, familyId),
   });
 }
 
@@ -622,6 +699,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.approvalGovernance,
       scope: DeploymentPolicyFamilyScopes.runSubmission,
       description: "Run and workflow approval strictness, escalation posture, and privileged action governance.",
+      explainability: {
+        behaviorSummary:
+          "Currently drives run-submission approval defaults and escalation timing exposed by deployment scheduling policy evaluation seams.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.governanceSensitive,
+        governanceWarning:
+          "Approval-governance settings influence submission-control posture; review changes with operational governance owners.",
+        governedFeatureAreas: [
+          {
+            areaId: "run-submission-policy-evaluation",
+            label: "Run submission policy decisions",
+            currentBehavior:
+              "Scheduling policy evaluation returns approval mode, high-risk dual-approval, and escalation timeout settings from this family.",
+          },
+          {
+            areaId: "run-submission-validation",
+            label: "Run submission validation",
+            currentBehavior:
+              "Run-submission validation workflows consume scheduling policy decisions to enforce approval prerequisites.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "runSubmissionApprovalMode",
@@ -660,6 +758,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.sharingPosture,
       scope: DeploymentPolicyFamilyScopes.sharing,
       description: "Default resource visibility and sharing constraints for collaborative surfaces.",
+      explainability: {
+        behaviorSummary:
+          "Currently controls workspace visibility defaults and sharing-approval posture returned by deployment authorization policy evaluation seams.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.governanceSensitive,
+        governanceWarning:
+          "Sharing-posture settings can broaden or restrict collaboration exposure; confirm intended data-sharing boundaries before applying overrides.",
+        governedFeatureAreas: [
+          {
+            areaId: "workspace-creation-default-visibility",
+            label: "Workspace default visibility",
+            currentBehavior:
+              "Workspace-creation flows resolve default visibility from this family through deployment authorization policy decisions.",
+          },
+          {
+            areaId: "sharing-policy-evaluation",
+            label: "Sharing policy decisions",
+            currentBehavior:
+              "Authorization policy evaluation exposes public-link and cross-workspace sharing constraints from this family.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "defaultWorkspaceVisibility",
@@ -692,6 +811,25 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.storageGovernance,
       scope: DeploymentPolicyFamilyScopes.storage,
       description: "Storage defaults, synchronization posture, and retention controls.",
+      explainability: {
+        behaviorSummary:
+          "Currently controls storage-tier defaults, external-sync default posture, and retention defaults exposed by deployment storage policy evaluation seams.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.standard,
+        governedFeatureAreas: [
+          {
+            areaId: "storage-policy-evaluation",
+            label: "Storage policy decisions",
+            currentBehavior:
+              "Storage policy evaluation returns default storage tier, external sync default, and retention defaults from this family.",
+          },
+          {
+            areaId: "policy-admin-overrides",
+            label: "Policy override administration",
+            currentBehavior:
+              "Deployment policy admin write workflows can upsert or remove supported storage-governance override values.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "defaultStorageTier",
@@ -730,6 +868,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.securityGovernance,
       scope: DeploymentPolicyFamilyScopes.security,
       description: "Security baseline controls for transport, encryption, and credential rotation posture.",
+      explainability: {
+        behaviorSummary:
+          "Currently defines encryption-at-rest, transport TLS, and credential-rotation settings exposed by deployment security policy evaluation seams.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.foundational,
+        governanceWarning:
+          "Security-governance settings are foundational controls. Changes should follow formal security review and change-management procedures.",
+        governedFeatureAreas: [
+          {
+            areaId: "security-policy-evaluation",
+            label: "Security policy decisions",
+            currentBehavior:
+              "Security policy evaluation exposes encryption-at-rest, TLS-required, and credential-rotation settings from this family.",
+          },
+          {
+            areaId: "policy-inspection-surfaces",
+            label: "Policy administration inspection",
+            currentBehavior:
+              "Admin policy inspection surfaces display source and effective values for security-governance controls and their provenance.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "encryptionAtRestRequired",
@@ -764,6 +923,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.adminControls,
       scope: DeploymentPolicyFamilyScopes.administration,
       description: "Administrative delegation and policy-mutation governance controls.",
+      explainability: {
+        behaviorSummary:
+          "Currently governs admin workflow safety posture, including delegated-admin policy flags, ticket-reference requirements, and dry-run defaults.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.foundational,
+        governanceWarning:
+          "Admin-controls settings govern policy change safety and traceability; unauthorized relaxation can weaken governance controls across the workspace.",
+        governedFeatureAreas: [
+          {
+            areaId: "policy-write-governance",
+            label: "Policy write workflow requirements",
+            currentBehavior:
+              "Policy write workflows enforce ticket-reference and dry-run behavior based on this family's effective settings.",
+          },
+          {
+            areaId: "authorization-policy-decisions",
+            label: "Authorization policy decisions",
+            currentBehavior:
+              "Deployment authorization policy evaluation includes delegated workspace admin allowance from this family.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "allowDelegatedWorkspaceAdmins",
@@ -792,6 +972,27 @@ export function createCanonicalDeploymentPolicyFamilyCatalog(): DeploymentPolicy
       familyId: DeploymentPolicyFamilyIds.auditGovernance,
       scope: DeploymentPolicyFamilyScopes.audit,
       description: "Audit event posture, redaction strictness, and retention administration settings.",
+      explainability: {
+        behaviorSummary:
+          "Currently controls audit export, redaction strictness, and retention settings exposed through deployment audit/admin policy evaluation seams.",
+        governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevels.governanceSensitive,
+        governanceWarning:
+          "Audit-governance settings influence audit visibility and retention posture; ensure policy changes preserve required compliance evidence windows.",
+        governedFeatureAreas: [
+          {
+            areaId: "audit-admin-policy-decisions",
+            label: "Audit/admin policy decisions",
+            currentBehavior:
+              "Audit-and-admin policy evaluation returns audit export, strict redaction, and retention settings from this family.",
+          },
+          {
+            areaId: "policy-admin-inspection",
+            label: "Policy administration visibility",
+            currentBehavior:
+              "Deployment policy admin inspection surfaces use this family's metadata to explain effective audit-governance behavior.",
+          },
+        ],
+      },
       settings: [
         {
           settingKey: "auditExportEnabled",

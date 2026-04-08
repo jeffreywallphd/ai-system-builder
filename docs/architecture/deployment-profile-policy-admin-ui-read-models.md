@@ -32,6 +32,7 @@ The inspection read model projects authoritative response payloads into admin-re
 3. Policy groups ordered into meaningful administrative sections
 4. Effective value rows with source labels (`Preset default`, `Policy default`, `Admin override`)
 5. Provenance explanations that surface actor/ticket/reason/update metadata when overrides apply
+6. Family-level explainability summaries sourced from policy-catalog metadata, including currently supported impact areas and governance-sensitive/foundational warnings
 
 This keeps policy state understandable to administrators while preserving read-only boundaries for this story scope.
 

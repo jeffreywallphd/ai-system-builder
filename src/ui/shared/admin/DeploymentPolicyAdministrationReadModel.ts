@@ -2,6 +2,7 @@ import {
   DeploymentPolicyControlModes,
   DeploymentPolicyFamilyIds,
   type DeploymentPolicyFamilyId,
+  type DeploymentPolicyGovernanceSensitivityLevel,
   type DeploymentPolicyScalarValue,
   type DeploymentPolicySettingKey,
   type DeploymentProfileId,
@@ -49,7 +50,17 @@ export interface DeploymentPolicyGroupReadModel {
   readonly title: string;
   readonly description: string;
   readonly scopeLabel: string;
+  readonly impactSummary: string;
+  readonly featureImpacts: ReadonlyArray<DeploymentPolicyFamilyFeatureImpactReadModel>;
+  readonly governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevel;
+  readonly governanceWarning?: string;
   readonly settings: ReadonlyArray<DeploymentPolicyEffectiveSettingReadModel>;
+}
+
+export interface DeploymentPolicyFamilyFeatureImpactReadModel {
+  readonly areaId: string;
+  readonly label: string;
+  readonly currentBehavior: string;
 }
 
 export interface DeploymentPolicyAdministrationInspectionReadModel {
@@ -115,6 +126,10 @@ export function buildDeploymentPolicyAdministrationInspectionReadModel(
         title,
         description: metadata?.description ?? `Policy family '${familyId}'.`,
         scopeLabel,
+        impactSummary: resolveFamilyImpactSummary(metadata, familyId),
+        featureImpacts: resolveFamilyFeatureImpacts(metadata),
+        governanceSensitivity: metadata?.explainability?.governanceSensitivity ?? "standard",
+        governanceWarning: resolveFamilyGovernanceWarning(metadata, title),
         settings: Object.freeze(settings),
       });
     })
@@ -263,6 +278,48 @@ function mapOverrideRecords(
 
 function buildSettingPath(familyId: string, settingKey: string): string {
   return `${familyId}.${settingKey}`;
+}
+
+function resolveFamilyImpactSummary(
+  metadata: DeploymentPolicyFamilyMetadataReadModel | undefined,
+  familyId: string,
+): string {
+  return metadata?.explainability?.behaviorSummary
+    ?? `Currently exposes effective values for '${familyId}' and their source provenance.`;
+}
+
+function resolveFamilyFeatureImpacts(
+  metadata: DeploymentPolicyFamilyMetadataReadModel | undefined,
+): ReadonlyArray<DeploymentPolicyFamilyFeatureImpactReadModel> {
+  const explainability = metadata?.explainability;
+  if (!explainability) {
+    return Object.freeze([]);
+  }
+
+  return Object.freeze(explainability.governedFeatureAreas.map((entry) => Object.freeze({
+    areaId: entry.areaId,
+    label: entry.label,
+    currentBehavior: entry.currentBehavior,
+  })));
+}
+
+function resolveFamilyGovernanceWarning(
+  metadata: DeploymentPolicyFamilyMetadataReadModel | undefined,
+  familyLabel: string,
+): string | undefined {
+  if (metadata?.explainability?.governanceWarning) {
+    return metadata.explainability.governanceWarning;
+  }
+
+  if (metadata?.explainability?.governanceSensitivity === "foundational") {
+    return `${familyLabel} controls foundational governance posture; handle changes through formal approval workflows.`;
+  }
+
+  if (metadata?.explainability?.governanceSensitivity === "governance-sensitive") {
+    return `${familyLabel} changes can materially affect governance posture and should be reviewed before apply.`;
+  }
+
+  return undefined;
 }
 
 function summarizeValidationRules(

@@ -15,6 +15,8 @@ describe("DeploymentPolicyReadContracts", () => {
     const approval = toDeploymentPolicyFamilyMetadataReadModel(familyCatalog["approval-governance"]!);
 
     expect(approval.familyId).toBe("approval-governance");
+    expect(approval.explainability?.governanceSensitivity).toBe("governance-sensitive");
+    expect(approval.explainability?.governedFeatureAreas.length).toBeGreaterThan(0);
     expect(approval.settings.runSubmissionApprovalMode?.valueKind).toBe("string");
     expect(approval.settings.highRiskRunRequiresDualApproval?.controlMode).toBe("profile-fixed");
   });
