@@ -441,6 +441,26 @@ describe("image workflow definition authoring use cases", () => {
     }
   });
 
+  it("rejects create requests outside the initial supported workflow operation set", async () => {
+    const repository = new InMemoryWorkflowRepository();
+    const useCase = new CreateImageWorkflowDefinitionUseCase(buildPorts({ repository }));
+
+    try {
+      await useCase.execute(buildCreateRequest({
+        workflow: {
+          ...buildCreateRequest().workflow,
+          operationKind: "batch-transform",
+        },
+      }));
+      throw new Error("expected create to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ImageWorkflowDefinitionAuthoringError);
+      const failure = error as ImageWorkflowDefinitionAuthoringError;
+      expect(failure.code).toBe(ImageWorkflowDefinitionAuthoringErrorCodes.invalidRequest);
+      expect(failure.message).toContain("initial supported workflow set");
+    }
+  });
+
   it("rejects unauthorized create requests", async () => {
     const repository = new InMemoryWorkflowRepository();
     const useCase = new CreateImageWorkflowDefinitionUseCase(buildPorts({

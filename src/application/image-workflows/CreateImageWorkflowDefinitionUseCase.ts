@@ -20,6 +20,7 @@ import {
   assertWorkflowActionAuthorized,
   assertWorkflowCategorySupported,
   assertWorkflowDefinitionReadyForPersistence,
+  assertWorkflowOperationSupported,
   assertWorkspaceScope,
   buildMutationContext,
   createBoundaryContext,
@@ -72,6 +73,7 @@ export class CreateImageWorkflowDefinitionUseCase {
       }
 
       assertWorkflowCategorySupported(definition);
+      assertWorkflowOperationSupported(definition);
       assertWorkspaceScope({
         requestedWorkspaceId: context.workspaceId,
         workflowWorkspaceId: definition.ownership.workspaceId,

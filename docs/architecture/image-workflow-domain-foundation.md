@@ -28,7 +28,7 @@ Canonical fields include:
 
 ## Invariants enforced in domain code
 
-- Operation kind must be from the canonical image manipulation set (`image-to-image`, `restyle`, `enhance-upscale`, `batch-transform`).
+- Operation kind must be from the canonical image manipulation set (`image-to-image`, `restyle`, `enhance-upscale`, `mask-guided-edit`, `batch-transform`).
 - Private workflows require owner user identity.
 - Version tags must use semantic version format (`major.minor.patch`).
 - Lifecycle transitions are explicit and guarded (`draft -> review -> published -> deprecated -> retired`, with bounded reversibility).

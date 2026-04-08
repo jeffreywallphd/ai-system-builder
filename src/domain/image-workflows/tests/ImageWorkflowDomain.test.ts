@@ -137,6 +137,39 @@ describe("ImageWorkflowDomain", () => {
     })).toThrow("require ownerUserId");
   });
 
+  it("supports mask-guided-edit as a first-class operation kind", () => {
+    const workflow = createImageWorkflowDefinition({
+      ...createValidWorkflow(),
+      workflowId: "wf:image:mask-guided",
+      operationKind: ImageWorkflowOperationKinds.maskGuidedEdit,
+      inputSlots: [
+        ...createValidWorkflow().inputSlots,
+        {
+          inputId: "maskImage",
+          label: "Mask image",
+          kind: "mask-image",
+          valueType: "image-asset-reference",
+          required: true,
+          allowsMultiple: false,
+          acceptedAssetKinds: ["image-asset"],
+        },
+      ],
+      inputBindings: [
+        ...createValidWorkflow().inputBindings,
+        {
+          bindingId: "bind.input.maskImage",
+          inputId: "maskImage",
+          sourceKind: "runtime-parameter",
+          sourceKey: "maskImage",
+          required: true,
+        },
+      ],
+      createdBy: "user-1",
+    });
+
+    expect(workflow.operationKind).toBe("mask-guided-edit");
+  });
+
   it("enforces parameter invariants and logical references", () => {
     expect(() => createImageWorkflowDefinition({
       ...createValidWorkflow(),

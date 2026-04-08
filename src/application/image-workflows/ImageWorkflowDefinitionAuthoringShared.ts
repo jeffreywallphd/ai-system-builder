@@ -27,6 +27,9 @@ import {
   ImageWorkflowDefinitionAuthoringErrorCodes,
 } from "./ImageWorkflowDefinitionAuthoringErrors";
 import { ImageWorkflowSystemReadinessValidationService } from "./ImageWorkflowSystemReadinessValidationService";
+import { createInitialSupportedImageWorkflowTemplateRegistry } from "./InitialSupportedImageWorkflowTemplateRegistry";
+
+const initialWorkflowTemplateRegistry = createInitialSupportedImageWorkflowTemplateRegistry();
 
 interface BuildMutationContextInput {
   readonly operationKey?: string;
@@ -217,6 +220,23 @@ export function assertWorkflowCategorySupported(workflow: ImageWorkflowDefinitio
       `Image workflow category '${workflow.category}' is not supported for image workflow authoring use cases.`,
     );
   }
+}
+
+export function assertWorkflowOperationSupported(workflow: ImageWorkflowDefinition): void {
+  if (initialWorkflowTemplateRegistry.isOperationSupported(workflow.operationKind)) {
+    return;
+  }
+
+  const supportedOperationKinds = initialWorkflowTemplateRegistry
+    .list()
+    .map((definition) => definition.operationKind)
+    .sort()
+    .join(", ");
+
+  throw new ImageWorkflowDefinitionAuthoringError(
+    ImageWorkflowDefinitionAuthoringErrorCodes.invalidRequest,
+    `Image workflow operationKind '${workflow.operationKind}' is outside the initial supported workflow set: ${supportedOperationKinds}.`,
+  );
 }
 
 function parseTimestamp(value: Date | string | undefined, field: string): Date {
