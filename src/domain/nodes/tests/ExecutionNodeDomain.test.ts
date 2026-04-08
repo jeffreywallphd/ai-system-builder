@@ -9,9 +9,12 @@ import {
 import {
   ExecutionNodeActivationStatuses,
   ExecutionNodeActivationTransitionError,
+  ExecutionNodeBackendReadinessStates,
   ExecutionNodeHealthStatuses,
+  ExecutionNodeResourceClassHints,
   ExecutionNodeTargetKinds,
   createExecutionNodeRecord,
+  evaluateImageExecutionNodeCompatibility,
   evaluateImageExecutionNodeEligibility,
   isExecutionNodeActivationTransitionAllowed,
   recordExecutionNodeHealth,
@@ -33,6 +36,20 @@ describe("ExecutionNodeDomain", () => {
         {
           backendFamily: "adapter.comfyui.image-manipulation",
           supportedExecutionTargets: [ExecutionNodeTargetKinds.imageManipulation],
+          supportedOperationKinds: ["image-to-image", "enhance-upscale"],
+          supportedOperationCapabilities: [
+            "image.workflow.operation.image-to-image.execute",
+            "image.workflow.operation.enhance-upscale.execute",
+          ],
+          supportedInputKinds: ["source-image", "reference-image"],
+          supportedOutputKinds: ["generated-image"],
+          supportedTranslationContractVersions: ["1.0.0", "1.1.0"],
+          resourceClassHints: [ExecutionNodeResourceClassHints.gpuGeneral],
+          executionReadiness: {
+            state: ExecutionNodeBackendReadinessStates.ready,
+            checkedAt: "2026-04-08T12:00:00.000Z",
+            summary: "ready",
+          },
           capabilityProfileVersion: "2026.04.08",
           metadataTags: ["comfyui", "gpu"],
         },
@@ -170,6 +187,66 @@ describe("ExecutionNodeDomain", () => {
     });
     expect(unsupportedBackend.isEligible).toBeFalse();
     expect(unsupportedBackend.reasons).toContain("node-backend-family-unsupported");
+  });
+
+  it("distinguishes hard incompatibilities and soft advisories for workflow-to-node compatibility", () => {
+    const node = createTrustedExecutionNode();
+    const compatibility = evaluateImageExecutionNodeCompatibility(node, {
+      requiredBackendFamilies: ["adapter.comfyui.image-manipulation"],
+      requiredExecutionTarget: ExecutionNodeTargetKinds.imageManipulation,
+      requiredOperationKind: "image-to-image",
+      requiredOperationCapability: "image.workflow.operation.image-to-image.execute",
+      requiredInputKinds: ["source-image", "mask-image"],
+      requiredOutputKinds: ["generated-image"],
+      requiredTranslationContractVersion: "1.0.0",
+      preferredResourceClassHints: [ExecutionNodeResourceClassHints.gpuHighMemory],
+      requiredNodeCapabilities: [NodeRoleCapabilities.api],
+      requiresRemoteScheduling: true,
+    });
+
+    expect(compatibility.compatible).toBeFalse();
+    expect(compatibility.routable).toBeFalse();
+    expect(compatibility.hardIncompatibilities.map((entry) => entry.code)).toContain(
+      "backend-required-input-kind-unsupported",
+    );
+    expect(compatibility.softAdvisories.map((entry) => entry.code)).toContain(
+      "backend-resource-class-preference-unmet",
+    );
+  });
+
+  it("classifies backend-family readiness outages as transient availability issues", () => {
+    const base = createTrustedExecutionNode();
+    const unavailableBackendNode = createExecutionNodeRecord({
+      ...base,
+      backendFamilyCapabilities: [
+        {
+          ...base.backendFamilyCapabilities[0]!,
+          executionReadiness: {
+            state: ExecutionNodeBackendReadinessStates.unavailable,
+            checkedAt: "2026-04-08T12:01:00.000Z",
+            summary: "runtime temporarily unavailable",
+          },
+        },
+      ],
+    });
+
+    const compatibility = evaluateImageExecutionNodeCompatibility(unavailableBackendNode, {
+      requiredBackendFamilies: ["adapter.comfyui.image-manipulation"],
+      requiredExecutionTarget: ExecutionNodeTargetKinds.imageManipulation,
+      requiredOperationKind: "image-to-image",
+      requiredOperationCapability: "image.workflow.operation.image-to-image.execute",
+      requiredInputKinds: ["source-image"],
+      requiredOutputKinds: ["generated-image"],
+      requiredTranslationContractVersion: "1.0.0",
+      requiredNodeCapabilities: [NodeRoleCapabilities.api],
+      requiresRemoteScheduling: true,
+    });
+
+    expect(compatibility.compatible).toBeTrue();
+    expect(compatibility.routable).toBeFalse();
+    expect(compatibility.transientAvailabilityIssues.map((entry) => entry.code)).toContain(
+      "backend-readiness-unavailable",
+    );
   });
 
   it("records health observations and enforces consistent health-to-activation semantics", () => {
