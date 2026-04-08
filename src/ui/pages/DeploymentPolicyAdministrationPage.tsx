@@ -752,6 +752,27 @@ export default function DeploymentPolicyAdministrationPage(
                   <div className="ui-card__header">
                     <h3 className="ui-card__title">{group.title}</h3>
                     <p className="ui-card__subtitle">{group.description}</p>
+                    <p className="ui-text-secondary ui-text-small">
+                      <strong>Current impact:</strong> {group.impactSummary}
+                    </p>
+                    {group.governanceSensitivity !== "standard" ? (
+                      <p className="ui-security-policy-page__alert ui-security-policy-page__alert--warning" role="status">
+                        <strong>{group.governanceSensitivity === "foundational" ? "Foundational policy family." : "Governance-sensitive family."}</strong>
+                        {" "}{group.governanceWarning ?? "Changes can materially affect governance posture."}
+                      </p>
+                    ) : null}
+                    {group.featureImpacts.length > 0 ? (
+                      <div className="ui-stack ui-stack--2xs">
+                        <span className="ui-text-secondary ui-text-small"><strong>Policy-controlled areas (currently supported):</strong></span>
+                        <ul className="ui-deployment-policy-admin-page__impact-list">
+                          {group.featureImpacts.map((impact) => (
+                            <li key={impact.areaId}>
+                              <strong>{impact.label}:</strong> {impact.currentBehavior}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="ui-card__body">
                     <div className="ui-table-wrapper">

@@ -39,6 +39,8 @@ describe("DeploymentPolicyAdministrationReadService", () => {
     expect(result.data.policyState.scope.scopeId).toBe("workspace-alpha");
     expect(result.data.inspection.policyGroups).toHaveLength(1);
     expect(result.data.inspection.policyGroups[0]?.settings[0]?.sourceLabel).toBe("Admin override");
+    expect(result.data.inspection.policyGroups[0]?.impactSummary).toContain("approval");
+    expect(result.data.inspection.policyGroups[0]?.governanceSensitivity).toBe("governance-sensitive");
   });
 
   it("returns stable failure when client rejects the request", async () => {
@@ -180,6 +182,17 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
           familyId: "approval-governance",
           description: "Approval controls",
           scope: "run-submission",
+          explainability: Object.freeze({
+            behaviorSummary: "Current approval policy behavior across run-submission evaluation seams.",
+            governanceSensitivity: "governance-sensitive",
+            governedFeatureAreas: Object.freeze([
+              Object.freeze({
+                areaId: "run-submission-policy-evaluation",
+                label: "Run submission policy decisions",
+                currentBehavior: "Approval mode and escalation settings are returned by policy evaluation.",
+              }),
+            ]),
+          }),
           settings: Object.freeze({
             highRiskDualApprovalRequired: Object.freeze({
               settingKey: "highRiskDualApprovalRequired",

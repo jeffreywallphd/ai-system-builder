@@ -16,6 +16,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-authoritative-write-apis.md`
 - `docs/architecture/deployment-profile-policy-admin-ui-read-models.md`
 - `docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md`
+- `docs/architecture/deployment-profile-policy-explainability-and-impact-summaries.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 
@@ -43,6 +44,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
    - `src/ui/services/DeploymentPolicyAdministrationReadService.ts`
    - `src/ui/services/DeploymentPolicyAdministrationWriteService.ts`
    - `src/ui/pages/DeploymentPolicyAdministrationPage.tsx`
+   - keep explainability/impact summaries sourced from authoritative metadata in policy catalogs/contracts, not ad hoc UI-only strings
 6. Update `.md` and `.ai.md` docs together and keep architecture discoverability entries current.
 
 ## Implementing policy persistence changes

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { DeploymentProfileIds } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
+import {
+  DeploymentPolicyGovernanceSensitivityLevels,
+  DeploymentProfileIds,
+} from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
 import {
   DeploymentPolicyActiveProfileSourceKinds,
   type ReadDeploymentPolicyStateRequest,
@@ -131,6 +134,20 @@ const CatalogSchema = z.object({
     familyId: IdentifierSchema,
     description: z.string().trim().min(1),
     scope: z.string().trim().min(1),
+    explainability: z.object({
+      behaviorSummary: z.string().trim().min(1),
+      governanceSensitivity: z.enum([
+        DeploymentPolicyGovernanceSensitivityLevels.standard,
+        DeploymentPolicyGovernanceSensitivityLevels.governanceSensitive,
+        DeploymentPolicyGovernanceSensitivityLevels.foundational,
+      ]),
+      governanceWarning: z.string().trim().min(1).optional(),
+      governedFeatureAreas: z.array(z.object({
+        areaId: IdentifierSchema,
+        label: z.string().trim().min(1),
+        currentBehavior: z.string().trim().min(1),
+      }).strict()).min(1),
+    }).strict().optional(),
     settings: z.record(IdentifierSchema, z.object({
       settingKey: IdentifierSchema,
       description: z.string().trim().min(1),

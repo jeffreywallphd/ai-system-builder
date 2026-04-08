@@ -22,6 +22,10 @@ describe("DeploymentPolicyAdministrationReadModel", () => {
     expect(projected.activeProfileId).toBe("organization");
     expect(projected.requestedProfileId).toBe("organization");
     expect(projected.policyGroups[0]?.familyId).toBe("approval-governance");
+    expect(projected.policyGroups[0]?.impactSummary).toContain("run-submission approval defaults");
+    expect(projected.policyGroups[0]?.governanceSensitivity).toBe("governance-sensitive");
+    expect(projected.policyGroups[0]?.governanceWarning).toContain("operational governance owners");
+    expect(projected.policyGroups[0]?.featureImpacts[0]?.label).toBe("Run submission policy decisions");
     expect(projected.presetComparisons).toHaveLength(3);
 
     const overrideSetting = projected.policyGroups
@@ -53,6 +57,33 @@ describe("DeploymentPolicyAdministrationReadModel", () => {
     expect(toAdministrationStatusLabel("editable")).toBe("Editable");
     expect(toAdministrationStatusLabel("inspect-only")).toBe("Inspect only");
     expect(toAdministrationStatusLabel("unsupported")).toBe("Unsupported");
+  });
+
+  it("falls back to non-speculative explainability text when catalog explainability metadata is not included", () => {
+    const response = createResponseFixture();
+    const { explainability: _approvalExplainability, ...approvalFamily } = response.catalog!.families["approval-governance"];
+    const { explainability: _sharingExplainability, ...sharingFamily } = response.catalog!.families["sharing-posture"];
+    const { explainability: _auditExplainability, ...auditFamily } = response.catalog!.families["audit-governance"];
+    void _approvalExplainability;
+    void _sharingExplainability;
+    void _auditExplainability;
+    const projected = buildDeploymentPolicyAdministrationInspectionReadModel(Object.freeze({
+      ...response,
+      catalog: Object.freeze({
+        ...response.catalog!,
+        families: Object.freeze({
+          "approval-governance": Object.freeze(approvalFamily),
+          "sharing-posture": Object.freeze(sharingFamily),
+          "audit-governance": Object.freeze(auditFamily),
+        }),
+      }),
+    }));
+
+    const approval = projected.policyGroups.find((group) => group.familyId === "approval-governance");
+    expect(approval?.impactSummary).toContain("effective values");
+    expect(approval?.featureImpacts).toHaveLength(0);
+    expect(approval?.governanceSensitivity).toBe("standard");
+    expect(approval?.governanceWarning).toBeUndefined();
   });
 });
 
@@ -197,6 +228,18 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
           familyId: "approval-governance",
           description: "Approval and risk controls",
           scope: "run-submission",
+          explainability: Object.freeze({
+            behaviorSummary: "Currently drives run-submission approval defaults and escalation timing.",
+            governanceSensitivity: "governance-sensitive",
+            governanceWarning: "Approval-governance settings should be reviewed by operational governance owners.",
+            governedFeatureAreas: Object.freeze([
+              Object.freeze({
+                areaId: "run-submission-policy-evaluation",
+                label: "Run submission policy decisions",
+                currentBehavior: "Scheduling policy evaluation exposes approval mode and escalation controls.",
+              }),
+            ]),
+          }),
           settings: Object.freeze({
             highRiskDualApprovalRequired: Object.freeze({
               settingKey: "highRiskDualApprovalRequired",
@@ -212,6 +255,17 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
           familyId: "sharing-posture",
           description: "Sharing and visibility defaults",
           scope: "sharing",
+          explainability: Object.freeze({
+            behaviorSummary: "Controls visibility and sharing posture in authorization policy decisions.",
+            governanceSensitivity: "governance-sensitive",
+            governedFeatureAreas: Object.freeze([
+              Object.freeze({
+                areaId: "workspace-creation-default-visibility",
+                label: "Workspace default visibility",
+                currentBehavior: "Workspace creation resolves default visibility from sharing posture settings.",
+              }),
+            ]),
+          }),
           settings: Object.freeze({
             defaultSharingVisibility: Object.freeze({
               settingKey: "defaultSharingVisibility",
@@ -229,6 +283,18 @@ function createResponseFixture(): ReadDeploymentPolicyStateResponse {
           familyId: "audit-governance",
           description: "Audit retention controls",
           scope: "audit",
+          explainability: Object.freeze({
+            behaviorSummary: "Controls audit export/redaction/retention settings available through policy evaluation seams.",
+            governanceSensitivity: "foundational",
+            governanceWarning: "Audit governance settings are foundational for compliance posture.",
+            governedFeatureAreas: Object.freeze([
+              Object.freeze({
+                areaId: "audit-admin-policy-decisions",
+                label: "Audit/admin policy decisions",
+                currentBehavior: "Audit policy evaluation returns export and retention posture for admin consumers.",
+              }),
+            ]),
+          }),
           settings: Object.freeze({
             auditRetentionDays: Object.freeze({
               settingKey: "auditRetentionDays",

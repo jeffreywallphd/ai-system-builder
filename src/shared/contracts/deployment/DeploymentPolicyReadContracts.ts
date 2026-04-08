@@ -1,7 +1,10 @@
 import type {
+  DeploymentPolicyControlledFeatureArea,
+  DeploymentPolicyExplainabilityDefinition,
   DeploymentPolicyFamilyDefinition,
   DeploymentPolicyFamilyId,
   DeploymentPolicyFamilyScope,
+  DeploymentPolicyGovernanceSensitivityLevel,
   DeploymentPolicySettingDefinition,
   DeploymentPolicySettingKey,
   DeploymentProfileId,
@@ -57,12 +60,26 @@ export interface DeploymentPolicyFamilyMetadataReadModel {
   readonly familyId: DeploymentPolicyFamilyId;
   readonly description: string;
   readonly scope: DeploymentPolicyFamilyScope;
+  readonly explainability?: DeploymentPolicyExplainabilityReadModel;
   readonly settings: Readonly<Record<DeploymentPolicySettingKey, DeploymentPolicySettingMetadataReadModel>>;
 }
 
 export interface DeploymentPolicyCatalogReadModel {
   readonly presets: Readonly<Record<DeploymentProfileId, DeploymentPolicyPresetReadModel>>;
   readonly families: Readonly<Record<DeploymentPolicyFamilyId, DeploymentPolicyFamilyMetadataReadModel>>;
+}
+
+export interface DeploymentPolicyFeatureImpactReadModel {
+  readonly areaId: DeploymentPolicyControlledFeatureArea["areaId"];
+  readonly label: DeploymentPolicyControlledFeatureArea["label"];
+  readonly currentBehavior: DeploymentPolicyControlledFeatureArea["currentBehavior"];
+}
+
+export interface DeploymentPolicyExplainabilityReadModel {
+  readonly behaviorSummary: DeploymentPolicyExplainabilityDefinition["behaviorSummary"];
+  readonly governanceSensitivity: DeploymentPolicyGovernanceSensitivityLevel;
+  readonly governanceWarning?: DeploymentPolicyExplainabilityDefinition["governanceWarning"];
+  readonly governedFeatureAreas: ReadonlyArray<DeploymentPolicyFeatureImpactReadModel>;
 }
 
 export interface ReadDeploymentPolicyStateRequest {
@@ -104,6 +121,16 @@ export function toDeploymentPolicyFamilyMetadataReadModel(
     familyId: family.familyId,
     description: family.description,
     scope: family.scope,
+    explainability: family.explainability ? Object.freeze({
+      behaviorSummary: family.explainability.behaviorSummary,
+      governanceSensitivity: family.explainability.governanceSensitivity,
+      governanceWarning: family.explainability.governanceWarning,
+      governedFeatureAreas: Object.freeze(family.explainability.governedFeatureAreas.map((entry) => Object.freeze({
+        areaId: entry.areaId,
+        label: entry.label,
+        currentBehavior: entry.currentBehavior,
+      }))),
+    }) : undefined,
     settings: Object.freeze(settings),
   });
 }

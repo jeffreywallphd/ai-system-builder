@@ -26,6 +26,8 @@ Story 20.3.1 adds production admin inspection read models and page composition s
   - policy default,
   - admin override.
 - Produces provenance explanations (actor/ticket/reason/timestamp when available).
+- Produces family-level explainability summaries and controlled-impact listings from canonical policy metadata.
+- Surfaces explicit warnings when policy families are governance-sensitive or foundational.
 - Compares supported preset profiles and highlights active/inspected profile context.
 
 ## Route/access posture
