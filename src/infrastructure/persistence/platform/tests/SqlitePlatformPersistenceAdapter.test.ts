@@ -49,7 +49,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM platform_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(6);
+    expect(versionRow.version).toBe(7);
 
     const tables = database.prepare(`
       SELECT name
@@ -61,7 +61,8 @@ describe("SqlitePlatformPersistenceAdapter", () => {
           'platform_persistence_mutation_replays',
           'platform_run_orchestration_queue',
           'platform_run_node_placement_holds',
-          'platform_run_dispatch_attempts'
+          'platform_run_dispatch_attempts',
+          'platform_run_status_history'
         )
       ORDER BY name ASC
     `).all() as Array<{ name: string }>;
@@ -73,6 +74,7 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       "platform_run_node_placement_holds",
       "platform_run_orchestration_queue",
       "platform_run_records",
+      "platform_run_status_history",
     ]);
 
     database.close();
@@ -206,6 +208,205 @@ describe("SqlitePlatformPersistenceAdapter", () => {
       occurredAt: "2026-04-06T12:01:00.000Z",
       expectedRevision: created.record.revision,
     })).rejects.toThrow("expectedRevision");
+
+    adapter.dispose();
+  });
+
+  it("records and queries durable run status history for lifecycle transitions", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-platform-run-history-"));
+    createdRoots.push(root);
+    const adapter = new SqlitePlatformPersistenceAdapter(path.join(root, "platform.sqlite"));
+
+    const created = await adapter.createRun({
+      runId: "run-history-001",
+      runKind: "workflow",
+      status: "pending",
+      workspaceId: "workspace-alpha",
+      userIdentityId: "user-owner",
+      sourceAggregateRef: "workflow:history",
+      initiatedAt: "2026-04-06T12:00:00.000Z",
+      metadata: {
+        canonicalRun: {
+          identity: {
+            runId: "run-history-001",
+            workflowId: "workflow:history",
+            workspaceId: "workspace-alpha",
+          },
+          submission: {
+            source: "api",
+            submittedAt: "2026-04-06T12:00:00.000Z",
+          },
+          state: "submitted",
+          assignment: {
+            status: "unassigned",
+          },
+          execution: {
+            outcome: "none",
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 1,
+          },
+          updatedAt: "2026-04-06T12:00:00.000Z",
+        },
+      },
+      revision: 0,
+    }, {
+      operationKey: "op-run-history-001-create",
+      actorId: "system:orchestrator",
+      occurredAt: "2026-04-06T12:00:00.000Z",
+      correlationId: "corr-run-history",
+    });
+
+    const running = await adapter.saveRun({
+      ...created.record,
+      status: "running",
+      startedAt: "2026-04-06T12:02:00.000Z",
+      metadata: {
+        canonicalRun: {
+          identity: {
+            runId: "run-history-001",
+            workflowId: "workflow:history",
+            workspaceId: "workspace-alpha",
+          },
+          submission: {
+            source: "api",
+            submittedAt: "2026-04-06T12:00:00.000Z",
+          },
+          state: "running",
+          queue: {
+            queueId: "queue:default",
+            enteredAt: "2026-04-06T12:00:30.000Z",
+            position: null,
+            positionAsOf: "2026-04-06T12:02:00.000Z",
+          },
+          assignment: {
+            status: "assigned",
+            assignedNodeId: "node:alpha",
+            assignedAt: "2026-04-06T12:01:00.000Z",
+          },
+          execution: {
+            adapterKind: "remote-dispatch",
+            adapterRunId: "backend-run-001",
+            startedAt: "2026-04-06T12:02:00.000Z",
+            outcome: "none",
+            progress: {
+              updatedAt: "2026-04-06T12:02:00.000Z",
+              percent: 35,
+              stage: "generation",
+            },
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 1,
+          },
+          updatedAt: "2026-04-06T12:02:00.000Z",
+        },
+      },
+      revision: created.record.revision,
+    }, {
+      operationKey: "op-run-history-001-running",
+      actorId: "node:alpha",
+      occurredAt: "2026-04-06T12:02:00.000Z",
+      correlationId: "corr-run-history",
+      expectedRevision: created.record.revision,
+    });
+
+    await adapter.saveRun({
+      ...running.record,
+      status: "failed",
+      completedAt: "2026-04-06T12:03:00.000Z",
+      terminalReason: "execution-failed",
+      metadata: {
+        canonicalRun: {
+          identity: {
+            runId: "run-history-001",
+            workflowId: "workflow:history",
+            workspaceId: "workspace-alpha",
+          },
+          submission: {
+            source: "api",
+            submittedAt: "2026-04-06T12:00:00.000Z",
+          },
+          state: "failed",
+          queue: {
+            queueId: "queue:default",
+            enteredAt: "2026-04-06T12:00:30.000Z",
+            position: null,
+            positionAsOf: "2026-04-06T12:03:00.000Z",
+            dequeuedAt: "2026-04-06T12:03:00.000Z",
+          },
+          assignment: {
+            status: "released",
+            assignedNodeId: "node:alpha",
+            assignedAt: "2026-04-06T12:01:00.000Z",
+            releasedAt: "2026-04-06T12:03:00.000Z",
+          },
+          execution: {
+            adapterKind: "remote-dispatch",
+            adapterRunId: "backend-run-001",
+            startedAt: "2026-04-06T12:02:00.000Z",
+            finishedAt: "2026-04-06T12:03:00.000Z",
+            outcome: "failed",
+            errorCode: "backend-timeout",
+            errorMessage: "Backend run timed out.",
+          },
+          retry: {
+            attempt: 1,
+            maxAttempts: 2,
+          },
+          updatedAt: "2026-04-06T12:03:00.000Z",
+        },
+        dispatch: {
+          attemptId: "dispatch-attempt:history-1",
+          dispatchId: "dispatch:history-1",
+        },
+      },
+      revision: running.record.revision,
+    }, {
+      operationKey: "op-run-history-001-failed",
+      actorId: "node:alpha",
+      occurredAt: "2026-04-06T12:03:00.000Z",
+      correlationId: "corr-run-history",
+      expectedRevision: running.record.revision,
+    });
+
+    const history = await adapter.listRunStatusHistory({
+      runId: "run-history-001",
+      workspaceId: "workspace-alpha",
+    });
+
+    expect(history).toHaveLength(3);
+    expect(history[0]?.lifecycleState).toBe("failed");
+    expect(history[1]?.lifecycleState).toBe("running");
+    expect(history[2]?.lifecycleState).toBe("submitted");
+    expect(history[0]?.platformStatus).toBe("failed");
+    expect(history[1]?.platformStatus).toBe("running");
+    expect(history[2]?.platformStatus).toBe("pending");
+    expect(history[0]?.safeFailureCode).toBe("backend-timeout");
+    expect(history[0]?.safeFailureMessage).toBe("Backend run timed out.");
+    expect(history[0]?.dispatchAttemptId).toBe("dispatch-attempt:history-1");
+    expect(history[0]?.dispatchId).toBe("dispatch:history-1");
+    expect(history[0]?.backendKind).toBe("remote-dispatch");
+    expect(history[0]?.backendRunId).toBe("backend-run-001");
+    expect(history[0]?.runRevision).toBe(3);
+    expect(history[1]?.runRevision).toBe(2);
+    expect(history[2]?.runRevision).toBe(1);
+
+    const runningOnly = await adapter.listRunStatusHistory({
+      runId: "run-history-001",
+      lifecycleStates: ["running"],
+    });
+    expect(runningOnly).toHaveLength(1);
+    expect(runningOnly[0]?.lifecycleState).toBe("running");
+
+    const beforeFailure = await adapter.listRunStatusHistory({
+      runId: "run-history-001",
+      changedBefore: "2026-04-06T12:02:59.999Z",
+    });
+    expect(beforeFailure).toHaveLength(2);
+    expect(beforeFailure[0]?.lifecycleState).toBe("running");
+    expect(beforeFailure[1]?.lifecycleState).toBe("submitted");
 
     adapter.dispose();
   });

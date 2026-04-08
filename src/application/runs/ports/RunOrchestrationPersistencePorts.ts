@@ -14,6 +14,7 @@ export type AuthoritativeRunPersistenceMutationContext = PlatformPersistenceMuta
 export interface IAuthoritativeRunPersistenceRepository {
   findRunById(runId: string): Promise<PlatformRunRecord | undefined>;
   listRuns(query: PlatformRunListQuery): Promise<ReadonlyArray<PlatformRunRecord>>;
+  listRunStatusHistory?(query: AuthoritativeRunStatusHistoryListQuery): Promise<ReadonlyArray<AuthoritativeRunStatusHistoryRecord>>;
   createRun(
     record: PlatformRunRecord,
     mutation: AuthoritativeRunPersistenceMutationContext,
@@ -24,6 +25,35 @@ export interface IAuthoritativeRunPersistenceRepository {
       readonly expectedRevision?: number;
     },
   ): Promise<PlatformRunMutationResult>;
+}
+
+export interface AuthoritativeRunStatusHistoryRecord {
+  readonly historyEntryId: string;
+  readonly runId: string;
+  readonly workspaceId?: string;
+  readonly lifecycleState: RunLifecycleState;
+  readonly platformStatus: PlatformRunRecord["status"];
+  readonly runRevision: number;
+  readonly changedAt: string;
+  readonly changedByActorId: string;
+  readonly reason?: string;
+  readonly dispatchAttemptId?: string;
+  readonly dispatchId?: string;
+  readonly backendKind?: string;
+  readonly backendRunId?: string;
+  readonly safeFailureCode?: string;
+  readonly safeFailureMessage?: string;
+  readonly snapshot?: Readonly<Record<string, unknown>>;
+}
+
+export interface AuthoritativeRunStatusHistoryListQuery {
+  readonly runId: string;
+  readonly workspaceId?: string;
+  readonly lifecycleStates?: ReadonlyArray<RunLifecycleState>;
+  readonly changedAfter?: string;
+  readonly changedBefore?: string;
+  readonly limit?: number;
+  readonly offset?: number;
 }
 
 export interface IRunOrchestrationIntentRepository {
