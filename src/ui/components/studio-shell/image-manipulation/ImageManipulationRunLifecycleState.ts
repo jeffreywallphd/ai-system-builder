@@ -2,13 +2,18 @@ import {
   ReferenceImageExecutionStepIds,
   type ReferenceImageExecutionFlowSnapshot,
 } from "../../../runtime/ReferenceImageExecutionFlowService";
-import type { RuntimeSdkExecutionStatusResponse } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
+import type {
+  RuntimeExecutionReadinessResponse,
+  RuntimeSdkExecutionStatusResponse,
+} from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 export type ImageManipulationRunLifecycleState =
   | "idle"
   | "validating"
   | "queued"
+  | "preparing"
   | "running"
+  | "degraded"
   | "completed"
   | "failed"
   | "cancelled";
@@ -64,14 +69,27 @@ export function mapExecutionFlowSnapshotToRunLifecycleState(
 
 export function mapRuntimeStatusToRunLifecycleState(
   status: RuntimeSdkExecutionStatusResponse["status"] | undefined,
+  progress?: RuntimeSdkExecutionStatusResponse["progress"],
 ): ImageManipulationRunLifecycleSnapshot {
   if (status === "pending") {
     return Object.freeze({
       state: "queued",
-      message: "Your run is queued.",
+      message: "Your run is queued for execution.",
     });
   }
   if (status === "running") {
+    if (progress && progress.totalNodeCount > 0) {
+      if (progress.completedNodeCount < 1) {
+        return Object.freeze({
+          state: "preparing",
+          message: "Preparing execution resources.",
+        });
+      }
+      return Object.freeze({
+        state: "running",
+        message: `Running (${progress.completedNodeCount}/${progress.totalNodeCount} nodes complete).`,
+      });
+    }
     return Object.freeze({
       state: "running",
       message: "Creating your image.",
@@ -98,5 +116,72 @@ export function mapRuntimeStatusToRunLifecycleState(
   return Object.freeze({
     state: "running",
     message: "Creating your image.",
+  });
+}
+
+export function mapExecutionReadinessToRunLifecycleState(
+  readiness: RuntimeExecutionReadinessResponse | undefined,
+): ImageManipulationRunLifecycleSnapshot {
+  if (!readiness) {
+    return createIdleImageManipulationRunLifecycleState();
+  }
+  if (readiness.readiness === "degraded" && readiness.readyForExecution) {
+    return Object.freeze({
+      state: "degraded",
+      message: readiness.message?.trim() || "Execution environment is degraded but available.",
+    });
+  }
+  if (readiness.readiness === "unavailable" || !readiness.readyForExecution) {
+    return Object.freeze({
+      state: "validating",
+      message: readiness.message?.trim() || "Execution environment is currently unavailable.",
+    });
+  }
+  return createIdleImageManipulationRunLifecycleState();
+}
+
+export interface ImageManipulationRunProgressSnapshot {
+  readonly available: boolean;
+  readonly completedNodeCount: number;
+  readonly totalNodeCount: number;
+  readonly runningNodeCount: number;
+  readonly failedNodeCount: number;
+  readonly percentComplete: number;
+  readonly summary: string;
+}
+
+export function buildRunProgressSnapshot(
+  status: RuntimeSdkExecutionStatusResponse | undefined,
+): ImageManipulationRunProgressSnapshot {
+  const progress = status?.progress;
+  if (!progress || progress.totalNodeCount < 1) {
+    return Object.freeze({
+      available: false,
+      completedNodeCount: 0,
+      totalNodeCount: 0,
+      runningNodeCount: 0,
+      failedNodeCount: 0,
+      percentComplete: 0,
+      summary: "Progress details will appear after execution starts.",
+    });
+  }
+
+  const completed = Math.max(0, progress.completedNodeCount);
+  const total = Math.max(1, progress.totalNodeCount);
+  const percentComplete = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+  const failed = Math.max(0, progress.failedNodeCount);
+  const running = Math.max(0, progress.runningNodeCount);
+  const summary = failed > 0
+    ? `${completed}/${total} nodes complete (${failed} failed, ${running} running).`
+    : `${completed}/${total} nodes complete (${running} running).`;
+
+  return Object.freeze({
+    available: true,
+    completedNodeCount: completed,
+    totalNodeCount: total,
+    runningNodeCount: running,
+    failedNodeCount: failed,
+    percentComplete,
+    summary,
   });
 }

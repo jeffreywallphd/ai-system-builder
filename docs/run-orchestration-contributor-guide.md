@@ -114,6 +114,15 @@ Provide an implementation checklist for contributors extending the authoritative
 4. Keep completion/failure/cancellation finalization in `FinalizeRunExecutionOutcomeUseCase`, including queue finalization and assignment release.
 5. Preserve explicit terminal summary hints (`outputAvailability`, `terminalQuality`) in finalization metadata so downstream result-persistence seams can reason over partial/degraded outcomes without reclassifying backend payloads.
 
+## Image Manipulation Runtime UX (Feature 7, Epic 7.3)
+
+1. Run launch and monitor surfaces in Image Manipulation Studio must consume authoritative runtime/run APIs through shared service seams (`RuntimeOperationsService`, `StudioShellService`), not local backend shortcuts.
+2. Runtime status UX must map authoritative status/progress into stable user states: `validating`, `queued`, `preparing`, `running`, `failed`, `completed`, `cancelled`, and `degraded`.
+3. Progress sections should render authoritative node progress snapshots (counts/percent/timestamp) instead of UI-local counters.
+4. Warning/failure messaging should be sourced from readiness advisories and run-monitoring diagnostics while keeping primary status understandable for non-technical users.
+5. Cancellation must remain authoritative (`cancelRun`) and monitor state must continue to reconcile from authoritative run status until terminal confirmation.
+6. Advanced diagnostics are allowed as a secondary section, but primary run-monitoring cards should stay focused on user-safe status/progress outcomes.
+
 ## Extending cancellation orchestration
 
 1. Keep cancellation transition logic in `RequestAuthoritativeRunCancellationUseCase`.

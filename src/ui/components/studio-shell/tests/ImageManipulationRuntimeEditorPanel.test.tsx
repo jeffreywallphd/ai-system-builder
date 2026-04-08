@@ -72,6 +72,8 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Launch precheck: execution environment");
     expect(html).toContain("Refresh precheck");
     expect(html).toContain("Choose a source photo first");
+    expect(html).toContain("Run progress");
+    expect(html).toContain("Progress details will appear after execution starts.");
     expect(html).toContain("Advanced details");
     expect(html).toContain("Results (0)");
     expect(html).toContain("Source (0)");

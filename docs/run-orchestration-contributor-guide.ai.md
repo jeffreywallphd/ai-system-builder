@@ -73,6 +73,21 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Keep completion/failure/cancellation finalization in `FinalizeRunExecutionOutcomeUseCase`.
 - Preserve explicit terminal summary hints (`outputAvailability`, `terminalQuality`) so future result-persistence/lineage work can classify partial/degraded outcomes through typed metadata instead of backend-specific payload inspection.
 
+## Image runtime UX guidance (Feature 7 / Epic 7.3)
+- For Image Manipulation Studio runtime launch/monitoring, consume authoritative runtime/run APIs through shared UI services (`RuntimeOperationsService`, `StudioShellService`) only.
+- Map authoritative status/progress to stable user-facing lifecycle states:
+  - `validating`
+  - `queued`
+  - `preparing`
+  - `running`
+  - `failed`
+  - `completed`
+  - `cancelled`
+  - `degraded`
+- Render progress cards from authoritative node-progress snapshots (counts/percent/updated timestamp), not UI-local speculative counters.
+- Surface readiness advisories and run diagnostics as warning/failure summaries, with advanced diagnostics kept secondary to primary user-safe status panels.
+- Keep cancellation authoritative (`cancelRun`) and keep monitor state synchronized from authoritative run status until terminal confirmation.
+
 ## Cancellation extension guidance
 - Keep cancellation orchestration in `RequestAuthoritativeRunCancellationUseCase`.
 - Add backend cancellation integration only behind `IRunExecutionCancellationSignalPort`.
