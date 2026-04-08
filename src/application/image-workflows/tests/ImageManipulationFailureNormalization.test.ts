@@ -25,6 +25,8 @@ describe("image manipulation failure normalization", () => {
     expect(failure.classification?.kind).toBe("operational");
     expect(failure.classification?.disposition).toBe("terminal");
     expect(failure.classification?.resolutionActor).toBe("operator");
+    expect(failure.recovery?.recoveryAction.kind).toBe("terminal-not-retryable");
+    expect(failure.recovery?.escalation.category).toBe("operator");
   });
 
   it("classifies graph binding mismatches as translation failures", () => {
@@ -58,6 +60,7 @@ describe("image manipulation failure normalization", () => {
     expect(failure.category).toBe("output");
     expect(failure.code).toBe("output-collection-partial-anomaly");
     expect(failure.retryable).toBeTrue();
+    expect(failure.recovery?.retry.retryMode).toBe("automatic");
     expect(failure.partialOutputCount).toBe(2);
     expect(failure.classification?.layer).toBe("result-collection");
     expect(failure.classification?.disposition).toBe("retryable");
@@ -80,5 +83,19 @@ describe("image manipulation failure normalization", () => {
     const details = failure.diagnostics?.details as Readonly<Record<string, unknown>>;
     expect(String(details.path)).toContain("[redacted-path]");
     expect(String(details.auth)).toContain("[redacted]");
+  });
+
+  it("applies retry-after hints for timeout failures", () => {
+    const failure = normalizeImageManipulationExecutionFailure({
+      source: ImageManipulationFailureNormalizationSources.progressPolling,
+      failedAt: "2026-04-08T20:22:00.000Z",
+      rawMessage: "Request timeout while waiting for backend progress polling.",
+      state: "failed",
+    });
+
+    expect(failure.category).toBe("timeout");
+    expect(failure.retryable).toBeTrue();
+    expect(failure.recovery?.retry.retryAfterMs).toBe(5000);
+    expect(failure.recovery?.recoveryAction.kind).toBe("retry-automatic");
   });
 });

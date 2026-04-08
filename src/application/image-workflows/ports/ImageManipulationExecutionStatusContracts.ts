@@ -3,6 +3,7 @@ import type {
   ImageManipulationIssueClassification,
 } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
 import { ImageManipulationFailureSummaryCategories } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import type { ImageManipulationRetryRecoveryContract } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 
 export const ImageManipulationBackendJobStates = Object.freeze({
   queued: "queued",
@@ -107,6 +108,7 @@ export interface ImageManipulationExecutionFailure {
   readonly summary: string;
   readonly userMessage?: string;
   readonly retryable: boolean;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
   readonly failedAt: string;
   readonly stageCode?: string;
   readonly partialProgressObserved: boolean;

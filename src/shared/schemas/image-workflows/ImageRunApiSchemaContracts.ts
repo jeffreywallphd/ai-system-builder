@@ -207,6 +207,32 @@ const ImageRunFailureSummaryDtoSchema = z.object({
   summary: z.string().trim().min(1).max(1024),
   userMessage: z.string().trim().min(1).max(1024).optional(),
   retryable: z.boolean(),
+  recovery: z.object({
+    retry: z.object({
+      retryEligible: z.boolean(),
+      retrySafe: z.boolean(),
+      retryMode: z.enum(["none", "automatic", "manual"]),
+      retryAfterMs: z.number().int().min(0).optional(),
+    }).strict(),
+    recoveryAction: z.object({
+      kind: z.enum([
+        "none",
+        "retry-automatic",
+        "retry-manual",
+        "user-action-required",
+        "backend-recovery-pending",
+        "terminal-not-retryable",
+      ]),
+      userActionRequired: z.boolean(),
+      backendRecoveryPending: z.boolean(),
+      terminalNotRetryable: z.boolean(),
+      summary: z.string().trim().min(1).max(2000),
+    }).strict(),
+    escalation: z.object({
+      category: z.enum(["none", "operator", "admin"]),
+      required: z.boolean(),
+    }).strict(),
+  }).strict().optional(),
   failedAt: TimestampSchema,
   stageCode: IdentifierSchema.optional(),
   partialProgressObserved: z.boolean(),

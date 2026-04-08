@@ -213,6 +213,8 @@ describe("ImageStudioPresenterContracts", () => {
     expect(selectImageStudioSurfaceState(viewModel, "continuation").kind).toBe("empty");
     expect(selectImageStudioSurfaceState(viewModel, "run").resilience?.state).toBe("temporarily-unavailable");
     expect(selectImageStudioSurfaceState(viewModel, "results").resilience?.state).toBe("pending-recovery");
+    expect(selectImageStudioSurfaceState(viewModel, "run").recovery?.recoveryAction.kind).toBe("retry-automatic");
+    expect(selectImageStudioSurfaceState(viewModel, "results").recovery?.recoveryAction.kind).toBe("backend-recovery-pending");
 
     const action = selectImageStudioPrimaryAction(viewModel);
     expect(action.actionId).toBe("review-progress");
