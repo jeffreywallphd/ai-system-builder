@@ -66,6 +66,54 @@ describe("InitialSupportedImageWorkflowTemplateRegistry", () => {
     }
   });
 
+  it("provides centralized defaults, guidance, and reusable presets for supported templates", () => {
+    const registry = createInitialSupportedImageWorkflowTemplateRegistry();
+    const restyle = registry.getByOperationKind("image-to-image");
+    const upscale = registry.getByOperationKind("enhance-upscale");
+    const masked = registry.getByOperationKind("mask-guided-edit");
+
+    expect(restyle?.configuration.defaults.parameterValues.variationStrength).toBe(0.45);
+    expect(restyle?.configuration.parameterGuidance.map((entry) => entry.parameterId).sort()).toEqual([
+      "prompt",
+      "variationStrength",
+    ]);
+    expect(restyle?.configuration.presets.length).toBeGreaterThan(0);
+
+    expect(upscale?.configuration.defaults.parameterValues.scaleFactor).toBe(2);
+    expect(upscale?.configuration.parameterGuidance[0]?.guardrails?.maximum).toBe(4);
+
+    expect(masked?.configuration.defaults.parameterValues.preserveUnmaskedAreas).toBeTrue();
+    expect(masked?.configuration.parameterGuidance[1]?.guardrails?.allowedValues).toEqual([true, false]);
+  });
+
+  it("resolves defaults and presets for template-driven parameter initialization", () => {
+    const registry = createInitialSupportedImageWorkflowTemplateRegistry();
+
+    const defaultUpscale = registry.resolveDefaultParameterValuesForOperationKind("enhance-upscale");
+    expect(defaultUpscale?.source).toBe("defaults");
+    expect(defaultUpscale?.parameterValues.scaleFactor).toBe(2);
+
+    const boldRestyle = registry.resolveParameterValuesForOperationKind({
+      operationKind: "image-to-image",
+      presetId: "bold-restyle",
+    });
+    expect(boldRestyle?.source).toBe("preset");
+    expect(boldRestyle?.presetId).toBe("bold-restyle");
+    expect(boldRestyle?.parameterValues.variationStrength).toBe(0.7);
+    expect(typeof boldRestyle?.parameterValues.prompt).toBe("string");
+
+    const presets = registry.listPresetsForOperationKind("mask-guided-edit");
+    expect(presets.map((preset) => preset.presetId).sort()).toEqual([
+      "creative-replace",
+      "precise-retouch",
+    ]);
+
+    expect(() => registry.resolveParameterValuesForOperationKind({
+      operationKind: "enhance-upscale",
+      presetId: "missing-preset",
+    })).toThrow("does not contain preset");
+  });
+
   it("rejects template registration when translation metadata drifts from required template definitions", () => {
     const invalidTemplate = {
       ...InitialSupportedImageWorkflowTemplateSet[0]!,
@@ -89,6 +137,31 @@ describe("InitialSupportedImageWorkflowTemplateRegistry", () => {
         ...InitialSupportedImageWorkflowTemplateSet[2]!,
       },
     ])).toThrow("references unknown id");
+  });
+
+  it("rejects template registration when defaults and presets violate parameter requirements", () => {
+    const invalidTemplate = {
+      ...InitialSupportedImageWorkflowTemplateSet[1]!,
+      configuration: {
+        ...InitialSupportedImageWorkflowTemplateSet[1]!.configuration,
+        defaults: {
+          ...InitialSupportedImageWorkflowTemplateSet[1]!.configuration.defaults,
+          parameterValues: {
+            scaleFactor: "not-a-number",
+          },
+        },
+      },
+    } as const;
+
+    expect(() => new InitialSupportedImageWorkflowTemplateRegistry([
+      {
+        ...InitialSupportedImageWorkflowTemplateSet[0]!,
+      },
+      invalidTemplate,
+      {
+        ...InitialSupportedImageWorkflowTemplateSet[2]!,
+      },
+    ])).toThrow("must be a number");
   });
 });
 

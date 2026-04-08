@@ -2,6 +2,7 @@
 
 This note documents Story 2.3.1 for Feature 2 / Epic 2.3: the initial production-ready workflow set for the image manipulation vertical slice.
 Story 2.3.2 extends this set with translation-ready template metadata for adapter consumption.
+Story 2.3.3 adds template-scoped defaults and reusable parameter presets so supported workflows are immediately usable without low-level tuning.
 
 ## Purpose
 
@@ -19,6 +20,7 @@ Story 2.3.2 metadata seam:
 
 - `InitialImageWorkflowTemplateDefinition.display` for user-facing labels and rationale.
 - `InitialImageWorkflowTemplateDefinition.translation` for internal translation keys, capability hints, and mapping descriptors.
+- `InitialImageWorkflowTemplateDefinition.configuration` for defaults, parameter guidance (recommended ranges + guardrails), and reusable preset profiles.
 
 ## Initial supported workflow template families
 
@@ -83,6 +85,23 @@ For Story 2.3.2 it also enforces translation readiness by validating:
 - stable separation between display metadata and backend translation metadata.
 
 These checks prevent silent drift between authoring templates and future adapter translation logic.
+
+For Story 2.3.3 it also enforces configuration readiness by validating:
+
+- default parameter values are present for all required parameters and match parameter value kinds,
+- presets reference known parameters and can be resolved from defaults + preset overrides,
+- parameter guidance exists for each supported parameter and carries user-facing helper text,
+- recommended ranges and guardrails are structurally valid for later studio and system-binding flows.
+
+## Defaults and presets UX role
+
+Defaults and presets are now explicit template metadata, not UI-only constants:
+
+- `configuration.defaults` provides initial render values for first-time form population.
+- `configuration.presets` provides reusable profile bundles that can be selected now and later cloned into system baselines.
+- `configuration.parameterGuidance` provides user-facing labels/help plus recommended ranges and hard guardrails.
+
+`InitialSupportedImageWorkflowTemplateRegistry` additionally exposes preset/default resolution helpers so later system-binding and studio configuration flows can consume one authoritative source.
 
 ## Authoring boundary enforcement
 
