@@ -1,6 +1,7 @@
 import type {
   RuntimeSdkExecutionContext,
   RuntimeQueueItemStatus,
+  RuntimeExecutionReadinessResponse,
   RuntimeSdkExecutionResultResponse,
   RuntimeSdkExecutionStatusResponse,
   RuntimeSdkStartExecutionRequest,
@@ -157,6 +158,23 @@ export class RuntimeOperationsService {
       executionId: input.executionId,
       eventLimit: input.eventLimit,
       logLimit: input.logLimit,
+    }, context.value.sessionToken);
+  }
+
+  public async getExecutionReadiness(input: {
+    readonly systemId?: string;
+    readonly operationKind?: string;
+    readonly translationContractVersion?: string;
+  }): Promise<RuntimeSdkResponse<RuntimeExecutionReadinessResponse>> {
+    const context = this.resolveSessionContext();
+    if (!context.ok) {
+      return context.errorResponse;
+    }
+    return this.client.getExecutionReadiness({
+      workspaceId: context.value.workspaceId,
+      systemId: input.systemId,
+      operationKind: input.operationKind,
+      translationContractVersion: input.translationContractVersion,
     }, context.value.sessionToken);
   }
 

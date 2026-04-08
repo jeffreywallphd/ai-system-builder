@@ -70,6 +70,35 @@ describe("RuntimeOperationsService", () => {
           }),
         }),
       })),
+      getExecutionReadiness: mock(async () => ({
+        ok: true,
+        data: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          checkedAt: "2026-04-07T11:00:00.000Z",
+          readiness: "ready",
+          readyForExecution: true,
+          capabilities: Object.freeze({
+            backendFamily: "adapter.comfyui.image-manipulation",
+            supportsProgressPolling: true,
+            supportsProgressStreaming: false,
+            supportsCancellation: true,
+            supportsOutputDiscovery: true,
+            supportedOperationKinds: Object.freeze(["image-to-image"]),
+            supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+          }),
+          nodeAvailability: Object.freeze({
+            state: "available",
+            checkedAt: "2026-04-07T11:00:00.000Z",
+            candidateNodeCount: 1,
+            eligibleNodeCount: 1,
+            unavailableNodeCount: 0,
+            incompatibleNodeCount: 0,
+            topBlockingReasonCodes: Object.freeze([]),
+            topTransientAvailabilityReasonCodes: Object.freeze([]),
+          }),
+          issues: Object.freeze([]),
+        }),
+      })),
       listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
       dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
     };
@@ -103,10 +132,12 @@ describe("RuntimeOperationsService", () => {
     });
     await service.cancelRun({ executionId: "execution-1", reason: "cancelled" });
     await service.dequeueQueueItem({ queueItemId: "runtime-queue:execution-1" });
+    await service.getExecutionReadiness({ systemId: "system:demo" });
     await service.inspectRun({ executionId: "execution-1", diagnosticsLimit: 5, eventLimit: 6, logLimit: 7 });
 
     expect(client.listQueueItems).toHaveBeenCalledTimes(1);
     expect(client.getRunStatus).toHaveBeenCalledTimes(2);
+    expect(client.getExecutionReadiness).toHaveBeenCalledTimes(1);
     expect(client.startRun).toHaveBeenCalledTimes(1);
     expect(client.cancelRun).toHaveBeenCalledTimes(1);
     expect(client.dequeueQueueItem).toHaveBeenCalledTimes(1);
@@ -136,6 +167,12 @@ describe("RuntimeOperationsService", () => {
         },
       },
     }, "token-1");
+    expect(client.getExecutionReadiness).toHaveBeenCalledWith({
+      workspaceId: "workspace-resolved",
+      systemId: "system:demo",
+      operationKind: undefined,
+      translationContractVersion: undefined,
+    }, "token-1");
   });
 
   it("returns shared unauthorized error when session is unavailable", async () => {
@@ -145,6 +182,7 @@ describe("RuntimeOperationsService", () => {
       getRunStatus: mock(async () => ({ ok: true, data: {} as any })),
       getRunResult: mock(async () => ({ ok: true, data: {} as any })),
       getRunTrace: mock(async () => ({ ok: true, data: {} as any })),
+      getExecutionReadiness: mock(async () => ({ ok: true, data: {} as any })),
       listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
       dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
     };
@@ -235,6 +273,7 @@ describe("RuntimeOperationsService", () => {
           }),
         }),
       })),
+      getExecutionReadiness: mock(async () => ({ ok: true, data: {} as any })),
       listQueueItems: mock(async () => ({ ok: true, data: { items: [], totalCount: 0 } })),
       dequeueQueueItem: mock(async () => ({ ok: true, data: {} as any })),
     };

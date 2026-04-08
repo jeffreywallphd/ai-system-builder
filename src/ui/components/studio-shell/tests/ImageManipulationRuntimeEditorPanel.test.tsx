@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import ImageManipulationRuntimeEditorPanel, {
+  buildImageRunLaunchPrecheckState,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
   resolveSelectionConfirmationMessage,
@@ -67,6 +68,9 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Create image");
     expect(html).toContain("Status: Ready");
     expect(html).toContain("Settings ready");
+    expect(html).toContain("Launch precheck: setup");
+    expect(html).toContain("Launch precheck: execution environment");
+    expect(html).toContain("Refresh precheck");
     expect(html).toContain("Choose a source photo first");
     expect(html).toContain("Advanced details");
     expect(html).toContain("Results (0)");
@@ -140,5 +144,71 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
         },
       } as never,
     })).toBe("Source and face reference photos are selected.");
+  });
+
+  it("builds launch precheck findings that separate setup blockers from backend advisories", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Soft studio relight",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "degraded",
+        readyForExecution: true,
+        message: "One worker is currently unavailable.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        nodeAvailability: Object.freeze({
+          state: "constrained",
+          checkedAt: "2026-04-08T18:00:00.000Z",
+          candidateNodeCount: 2,
+          eligibleNodeCount: 1,
+          unavailableNodeCount: 1,
+          incompatibleNodeCount: 0,
+          topBlockingReasonCodes: Object.freeze([]),
+          topTransientAvailabilityReasonCodes: Object.freeze(["node-offline"]),
+        }),
+        issues: Object.freeze([Object.freeze({
+          code: "node-capacity-low",
+          severity: "warning",
+          message: "Capacity is constrained.",
+        })]),
+      }),
+    });
+
+    expect(precheck.launchReady).toBeTrue();
+    expect(precheck.setupBlockingIssues).toHaveLength(0);
+    expect(precheck.backendBlockingIssues).toHaveLength(0);
+    expect(precheck.backendAdvisories.length).toBeGreaterThan(0);
+  });
+
+  it("blocks launch precheck when setup or backend readiness is unresolved", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: undefined,
+      selectedSourceAssetId: undefined,
+      selectedSourceDatasetInstanceId: undefined,
+      prompt: "",
+      validationIssues: Object.freeze([{
+        scope: "field",
+        code: "prompt-required",
+        path: "prompts.positivePrompt",
+        message: "Prompt is required.",
+      }]),
+      executionReadinessError: "Could not check execution environment availability.",
+    });
+
+    expect(precheck.launchReady).toBeFalse();
+    expect(precheck.setupBlockingIssues.length).toBeGreaterThan(0);
+    expect(precheck.backendBlockingIssues.length).toBeGreaterThan(0);
   });
 });
