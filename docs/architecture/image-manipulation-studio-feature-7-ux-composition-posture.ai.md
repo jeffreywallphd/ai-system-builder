@@ -269,3 +269,33 @@ Multi-surface posture:
 - narrow/thin flows prioritize: upload/select, adjust, run/precheck, monitor, review, and continue/reuse outputs,
 - advanced diagnostics remain available but secondary, preserving bounded seams for future thinner clients without local truth forks.
 
+## Epic 7.4 Story 7.4.2 implementation update
+
+Story 7.4.2 adds end-to-end verification coverage for the full image manipulation studio slice at authoritative API boundaries.
+
+Added seam:
+
+- `src/infrastructure/api/studio-shell/tests/ImageManipulationStudioVerticalSlice.integration.test.ts`
+
+Verification behavior:
+
+- Main scenario verifies one cohesive authoritative flow:
+  - image selection/upload,
+  - edit/workflow selection from authoritative workflow-definition APIs,
+  - settings configuration/save through authoritative system-definition APIs,
+  - readiness confirmation from authoritative system detail/readiness fields,
+  - run launch/materialization through authoritative output persistence,
+  - progress/monitoring via authoritative run-history records,
+  - result review via authoritative output list/detail APIs,
+  - continuation by chaining outputs into input datasets,
+  - reopen by snapshot reload and saved-system re-listing.
+- Secondary scenario verifies failure + continuation:
+  - failed runtime persistence produces structured diagnostics and failed run-history entries,
+  - a subsequent successful run is recorded and coexists with the failed record in authoritative history.
+
+Posture preserved:
+
+- assertions target authoritative APIs and records rather than UI-only local state,
+- no backend-local filesystem identity is treated as canonical,
+- tests are resilient integration checks for vertical-slice regressions.
+
