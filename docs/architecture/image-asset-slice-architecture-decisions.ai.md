@@ -48,6 +48,12 @@ Story 1.3.3 addition:
 - Initial preview behavior uses original-as-preview fallback when compatible and returns `pending-generation`/`unavailable` statuses for future derivation workflows without changing API contracts.
 - Identity HTTP routes now include `GET /api/v1/image-assets/:assetId/preview` and `GET /api/v1/image-assets/:assetId/preview/content`, both server-mediated and storage-layout safe.
 
+Story 1.3.5 addition:
+
+- Identity HTTP integration coverage now includes production-style create/upload/finalize/get/list/original/preview flows backed by authoritative image metadata persistence and managed storage adapters.
+- Regression checks assert authorization enforcement for unauthorized actors and ensure transport responses do not expose raw storage object-key/path internals.
+- Integration assertions now verify that image-asset audit hooks are emitted across successful and rejected protected-content access paths.
+
 ## Extension guardrails
 
 - Do not introduce path-based local bypasses for upload, preview, or retrieval.
