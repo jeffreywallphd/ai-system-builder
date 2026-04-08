@@ -11,6 +11,11 @@ import {
   OfflineSnapshotCacheProtectionPostures,
   computeOfflineSnapshotDigest,
 } from "@application/common/OfflineAuthoritativeSnapshotCache";
+import {
+  createElectronSafeStorageDesktopOfflineValueProtectionPort,
+  type DesktopOfflineValueProtectionPort,
+  DesktopOfflineValueProtectionPostures,
+} from "./DesktopOfflineValueProtection";
 
 interface MigrationDefinition {
   readonly version: number;
@@ -57,12 +62,23 @@ const MIGRATIONS: ReadonlyArray<MigrationDefinition> = Object.freeze([
       `,
     ]),
   },
+  {
+    version: 2,
+    name: "add-offline-snapshot-value-protection-posture",
+    statements: Object.freeze([
+      `
+      ALTER TABLE offline_authoritative_snapshot_cache
+      ADD COLUMN value_protection_posture TEXT NOT NULL DEFAULT 'unprotected-at-rest'
+      `,
+    ]),
+  },
 ]);
 
 export interface DesktopOfflineSnapshotCacheRepositoryOptions {
   readonly databasePath: string;
   readonly maxEntries?: number;
   readonly supportsProtectedAtRestStorage?: boolean;
+  readonly valueProtection?: DesktopOfflineValueProtectionPort;
 }
 
 interface SnapshotRow {
@@ -79,6 +95,7 @@ interface SnapshotRow {
   readonly expires_at: string | null;
   readonly cached_by_actor_user_identity_id: string;
   readonly cache_protection_posture: string;
+  readonly value_protection_posture: string;
   readonly snapshot_digest: string;
   readonly eligibility_markers_json: string;
   readonly snapshot_json: string;
@@ -89,12 +106,16 @@ const DEFAULT_MAX_ENTRIES = 1000;
 export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritativeSnapshotCacheRepository {
   private readonly databasePath: string;
   private readonly capabilities: OfflineAuthoritativeSnapshotCacheRepositoryCapabilities;
+  private readonly valueProtection: DesktopOfflineValueProtectionPort;
   private database?: Database.Database;
 
   constructor(options: DesktopOfflineSnapshotCacheRepositoryOptions) {
     this.databasePath = options.databasePath;
+    this.valueProtection = options.valueProtection
+      ?? createElectronSafeStorageDesktopOfflineValueProtectionPort();
     this.capabilities = Object.freeze({
-      supportsProtectedAtRestStorage: options.supportsProtectedAtRestStorage === true,
+      supportsProtectedAtRestStorage: options.supportsProtectedAtRestStorage === true
+        || this.valueProtection.posture === DesktopOfflineValueProtectionPostures.protectedAtRest,
       maxEntries: Number.isInteger(options.maxEntries) && (options.maxEntries ?? 0) > 0
         ? options.maxEntries!
         : DEFAULT_MAX_ENTRIES,
@@ -123,6 +144,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           expires_at,
           cached_by_actor_user_identity_id,
           cache_protection_posture,
+          value_protection_posture,
           snapshot_digest,
           eligibility_markers_json,
           snapshot_json
@@ -140,6 +162,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           @expires_at,
           @cached_by_actor_user_identity_id,
           @cache_protection_posture,
+          @value_protection_posture,
           @snapshot_digest,
           @eligibility_markers_json,
           @snapshot_json
@@ -155,28 +178,12 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           expires_at = excluded.expires_at,
           cached_by_actor_user_identity_id = excluded.cached_by_actor_user_identity_id,
           cache_protection_posture = excluded.cache_protection_posture,
+          value_protection_posture = excluded.value_protection_posture,
           snapshot_digest = excluded.snapshot_digest,
           eligibility_markers_json = excluded.eligibility_markers_json,
           snapshot_json = excluded.snapshot_json
       `)
-      .run({
-        workspace_id: record.workspaceId,
-        resource_class: record.resourceClass,
-        resource_id: record.resourceId,
-        authoritative_revision: record.authoritativeRevision,
-        authoritative_snapshot_revision: record.authoritativeSnapshotRevision,
-        authority_scope: record.authorityScope,
-        storage_bucket: record.storageBucket,
-        behavior_class: record.behaviorClass,
-        cached_at: record.cachedAt,
-        last_synchronized_at: record.lastSynchronizedAt,
-        expires_at: record.expiresAt ?? null,
-        cached_by_actor_user_identity_id: record.cachedByActorUserIdentityId,
-        cache_protection_posture: record.cacheProtectionPosture,
-        snapshot_digest: record.snapshotDigest,
-        eligibility_markers_json: JSON.stringify(record.eligibilityMarkers),
-        snapshot_json: JSON.stringify(record.snapshot),
-      });
+      .run(this.toRow(record));
 
     this.enforceRetentionBound();
   }
@@ -200,6 +207,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           expires_at,
           cached_by_actor_user_identity_id,
           cache_protection_posture,
+          value_protection_posture,
           snapshot_digest,
           eligibility_markers_json,
           snapshot_json
@@ -228,6 +236,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           expires_at,
           cached_by_actor_user_identity_id,
           cache_protection_posture,
+          value_protection_posture,
           snapshot_digest,
           eligibility_markers_json,
           snapshot_json
@@ -330,7 +339,38 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
       );
     }
 
-    const snapshot = JSON.parse(row.snapshot_json) as Readonly<Record<string, unknown>>;
+    if (
+      row.value_protection_posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+      && row.value_protection_posture !== DesktopOfflineValueProtectionPostures.unprotectedAtRest
+    ) {
+      throw new OfflineAuthoritativeSnapshotCacheError(
+        `Invalid value_protection_posture '${row.value_protection_posture}' in offline snapshot cache record.`,
+      );
+    }
+    if (
+      row.value_protection_posture === DesktopOfflineValueProtectionPostures.protectedAtRest
+      && this.valueProtection.posture !== DesktopOfflineValueProtectionPostures.protectedAtRest
+    ) {
+      throw new OfflineAuthoritativeSnapshotCacheError(
+        "Offline snapshot cache row requires protected-at-rest decoding, but protected storage is unavailable.",
+      );
+    }
+
+    const eligibilityMarkersJson = this.valueProtection.unprotect(
+      row.eligibility_markers_json,
+      {
+        store: "offline-snapshot-cache",
+        field: "eligibility_markers_json",
+      },
+    );
+    const snapshotJson = this.valueProtection.unprotect(
+      row.snapshot_json,
+      {
+        store: "offline-snapshot-cache",
+        field: "snapshot_json",
+      },
+    );
+    const snapshot = JSON.parse(snapshotJson) as Readonly<Record<string, unknown>>;
     const computedDigest = computeOfflineSnapshotDigest(snapshot);
     if (computedDigest !== row.snapshot_digest) {
       throw new OfflineAuthoritativeSnapshotCacheError(
@@ -354,9 +394,40 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
       cacheProtectionPosture: row.cache_protection_posture as OfflineAuthoritativeSnapshotRecord["cacheProtectionPosture"],
       snapshotDigest: row.snapshot_digest,
       eligibilityMarkers: Object.freeze(
-        JSON.parse(row.eligibility_markers_json) as OfflineAuthoritativeSnapshotEligibilityMarkers,
+        JSON.parse(eligibilityMarkersJson) as OfflineAuthoritativeSnapshotEligibilityMarkers,
       ),
       snapshot: Object.freeze(snapshot),
     });
+  }
+
+  private toRow(record: OfflineAuthoritativeSnapshotRecord): Record<string, unknown> {
+    const valueProtectionPosture = this.valueProtection.posture;
+    const eligibilityMarkersJson = JSON.stringify(record.eligibilityMarkers);
+    const snapshotJson = JSON.stringify(record.snapshot);
+    return {
+      workspace_id: record.workspaceId,
+      resource_class: record.resourceClass,
+      resource_id: record.resourceId,
+      authoritative_revision: record.authoritativeRevision,
+      authoritative_snapshot_revision: record.authoritativeSnapshotRevision,
+      authority_scope: record.authorityScope,
+      storage_bucket: record.storageBucket,
+      behavior_class: record.behaviorClass,
+      cached_at: record.cachedAt,
+      last_synchronized_at: record.lastSynchronizedAt,
+      expires_at: record.expiresAt ?? null,
+      cached_by_actor_user_identity_id: record.cachedByActorUserIdentityId,
+      cache_protection_posture: record.cacheProtectionPosture,
+      value_protection_posture: valueProtectionPosture,
+      snapshot_digest: record.snapshotDigest,
+      eligibility_markers_json: this.valueProtection.protect(eligibilityMarkersJson, {
+        store: "offline-snapshot-cache",
+        field: "eligibility_markers_json",
+      }),
+      snapshot_json: this.valueProtection.protect(snapshotJson, {
+        store: "offline-snapshot-cache",
+        field: "snapshot_json",
+      }),
+    };
   }
 }

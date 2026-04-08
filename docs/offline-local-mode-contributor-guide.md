@@ -40,6 +40,7 @@ Provide a durable implementation workflow for extending offline/local-mode behav
   - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - runtime event adapter for offline hooks:
   - `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
 - shared offline contracts and schema parsers:
@@ -165,6 +166,7 @@ Required:
 - keep cache bounded (retention cap) to prevent uncontrolled local-cache sprawl;
 - reject raw filesystem references in snapshot payloads;
 - when storage rule requires encrypted cache, gate writes on protected-at-rest cache capability.
+- preserve explicit value-protection posture metadata so protected vs unprotected local snapshot payload persistence is always visible.
 - after reconnect attempts, apply explicit post-sync cache maintenance rules:
   - refresh stale authoritative snapshots when authoritative revisions change or replay succeeds;
   - invalidate cached snapshots when authoritative state indicates deleted/revoked resources, replay permission loss, or invalidated run submissions;
@@ -179,6 +181,7 @@ Required:
 - keep operation status transitions explicit (`queued-pending-sync`, `sync-conflict`, `sync-rejected`, `sync-applied`).
 - persist pending operation records with explicit `actorWorkspaceContext`, dependency references, resource base-version metadata, and retryability metadata.
 - preserve canonical replay payload serialization + digest so reconnect replay intent is durable across desktop restart.
+- protect persisted replay/envelope JSON fields at rest when platform-protected storage is available; preserve explicit fallback posture metadata when protection is unavailable.
 - replay-preparation output must be deterministic and dependency-aware, and must clearly separate replay-eligible unsynced records from blocked/non-eligible records.
 - apply explicit cleanup classification for post-sync pending-operation handling:
   - `successful`: authoritative apply confirmed and queue entry removed;
@@ -193,6 +196,7 @@ Required:
 - keep decision rules explicit and testable;
 - keep user/admin attention requirements explicit;
 - preserve `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)` invariants.
+- when reconnect replay is rejected due revocation/permission-loss outcomes, persist non-retryable reason codes and apply snapshot invalidation/reduced-visibility cleanup.
 
 ## What must remain server-authoritative
 

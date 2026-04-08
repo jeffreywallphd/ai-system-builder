@@ -47,6 +47,7 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
   - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
   - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+  - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - reconnect coordination + cache cleanup:
   - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
   - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
@@ -69,9 +70,11 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - desktop host remains control-plane-client and non-authoritative.
 - authoritative snapshot cache stores logical payload + sync metadata, not filesystem references.
 - snapshot cache writes respect eligibility and protected-storage requirements.
+- offline repositories should persist explicit value-protection posture metadata and protect sensitive JSON payload fields when platform-protected storage is available.
 - reconnect paths must perform explicit cache refresh/invalidation maintenance so stale/revoked content is not left looking authoritative.
 - pending-operation persistence keeps actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic reconnect replay.
 - reconnect cleanup semantics classify pending operations (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain behavior for queryable local state transitions.
+- revocation/permission-loss replay rejections should persist non-retryable reason codes so rejected local queue state is explicit and not silently reattempted.
 
 ## Deferred unless explicitly scoped
 

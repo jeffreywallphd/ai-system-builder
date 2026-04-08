@@ -429,6 +429,12 @@ export class OfflineControlledResynchronizationCoordinator {
           nextStatus,
           attemptedAt,
           incrementRetryCount: false,
+          retryable: decision.action === OfflineResynchronizationActions.rejectNotAllowed
+            ? false
+            : undefined,
+          nonRetryableReasonCode: decision.action === OfflineResynchronizationActions.rejectNotAllowed
+            ? decision.conflictClass ?? "replay-rejected"
+            : undefined,
         });
         pendingOperationCleanupRecords.push(Object.freeze({
           operationId,
@@ -566,8 +572,12 @@ export class OfflineControlledResynchronizationCoordinator {
           : OfflineQueuedMutationStatuses.syncConflict,
         attemptedAt,
         incrementRetryCount: true,
-        retryable: replayResult.retryable,
+        retryable: replayResult.retryable
+          ?? (replayResult.kind === AuthoritativeReplayExecutionResultKinds.rejected ? false : undefined),
         nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+        nonRetryableReasonCode: replayResult.kind === AuthoritativeReplayExecutionResultKinds.rejected
+          ? replayDecision.conflictClass ?? "replay-rejected"
+          : undefined,
       });
       pendingOperationCleanupRecords.push(Object.freeze({
         operationId,
@@ -755,8 +765,12 @@ export class OfflineControlledResynchronizationCoordinator {
           : OfflineLocalExecutionRegistrationStatuses.registrationConflict,
         attemptedAt,
         incrementRetryCount: true,
-        retryable: replayResult.retryable,
+        retryable: replayResult.retryable
+          ?? (replayResult.kind === AuthoritativeReplayExecutionResultKinds.rejected ? false : undefined),
         nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
+        nonRetryableReasonCode: replayResult.kind === AuthoritativeReplayExecutionResultKinds.rejected
+          ? replayDecision.conflictClass ?? "registration-rejected"
+          : undefined,
       });
       outcomes.push(toOfflineReconciliationOutcomeDto(replayDecision, {
         resolvedAt: attemptedAt,

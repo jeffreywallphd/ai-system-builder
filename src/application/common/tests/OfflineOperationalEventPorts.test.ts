@@ -30,8 +30,11 @@ describe("OfflineOperationalEventPorts", () => {
       details: Object.freeze({
         safeCode: "conflict",
         rawPayload: "should-not-appear",
+        suggestedPath: "/v1/offline/replay",
+        promptSnippet: "prompt: generate a full secret model",
         nested: Object.freeze({
           internalTrace: "drop-me",
+          localFile: "C:\\Users\\alice\\secret.txt",
           retained: true,
         }),
       }),
@@ -40,7 +43,10 @@ describe("OfflineOperationalEventPorts", () => {
     expect(sink.events).toHaveLength(1);
     expect(sink.events[0]?.details).toEqual(Object.freeze({
       safeCode: "conflict",
+      suggestedPath: "[REDACTED]",
+      promptSnippet: "[REDACTED]",
       nested: Object.freeze({
+        localFile: "[REDACTED]",
         retained: true,
       }),
     }));

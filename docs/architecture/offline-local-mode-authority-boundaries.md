@@ -51,6 +51,8 @@ Non-negotiable philosophy:
   - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - desktop offline local-execution registration persistence adapter:
   - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+- desktop offline protected-value adapter:
+  - `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - shared contract package for runtime DTO/schema/state:
   - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
   - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
@@ -72,6 +74,7 @@ Authoritative snapshot cache records must include:
 - eligibility markers (`workspace visibility/role/sharing`, `sensitivity`, `storageRule`, `deviceTrustPosture`);
 - authority and storage posture markers (`authorityScope`, `storageBucket`, `behaviorClass`, cache protection posture);
 - logical snapshot payload + digest only (no raw file-system references).
+- protected local-value posture metadata so persisted snapshot payload fields can be encrypted-at-rest when platform support is available.
 
 Authority scopes remain explicit:
 - `authoritative-server`
@@ -129,6 +132,7 @@ Required semantics:
 - local edits reset sync state to `local-only` and clear queued linkage.
 - persisted pending-operation records include actor/workspace context, operation dependency graph, base-version metadata, retryability metadata, and canonical replay payload digest so reconnect replay is deterministic and auditable.
 - replay preparation filters to replay-eligible unsynced operations and produces deterministic dependency-aware replay ordering.
+- pending-operation and local-execution queue persistence protect replay/envelope JSON fields at rest when desktop protected storage is available; when unavailable, posture remains explicit as unprotected.
 
 ## Sync and reconciliation boundaries
 
@@ -147,6 +151,7 @@ Reconnect decisions are explicit and bounded:
 7. surface blocked replay operations with structured reason metadata (reason code/message/dependency blockers) instead of opaque id-only reporting.
 8. treat terminal blocked replay states (`retry-exhausted`, `non-retryable`) as explicit rejected outcomes and preserve the local unsynced record for manual intervention.
 9. emit explicit pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with remove-vs-retain actions so post-sync local-state transitions are queryable.
+10. when reconnect decisions reject replay due revocation/permission-loss classes, persist non-retryable state with explicit reason code and invalidate affected authoritative snapshot cache entries.
 
 Enforced by:
 - `planOfflineResynchronization(...)`
@@ -229,6 +234,7 @@ Boundary posture:
 - emissions occur from application/host seams (`OfflineControlledResynchronizationCoordinator`, `DesktopConnectivityStateService`);
 - payloads include bounded actor/workspace/resource context and sanitized summaries/details;
 - replay payload bodies/tokens/secrets/internal diagnostics are excluded from hook payloads;
+- sanitized event strings are redacted when they look like filesystem paths, prompt snippets, or credential-like values;
 - hook publication is best-effort and cannot mutate reconciliation decisions.
 
 ## Conflict categories and decision rules
@@ -424,6 +430,7 @@ sequenceDiagram
   - `failed` (`retained-for-review`)
   - `abandoned` (`retained-for-review`)
 - cache maintenance always applies explicit refresh/invalidate behavior after replay planning and replay outcomes.
+- queued replay and registration rows now persist payload/envelope JSON through protected local-value storage when available (Electron `safeStorage`), with explicit per-row protection posture metadata for transparent decode and honest fallback behavior.
 
 ### Explicit conflict-detection and decision mapping
 

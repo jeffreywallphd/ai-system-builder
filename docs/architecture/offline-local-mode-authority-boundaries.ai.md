@@ -24,6 +24,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
 - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
+- `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
 - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
 - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
@@ -53,8 +54,10 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
 - Dedicated local-execution registration persistence and replay-preparation service + SQLite queue store for durable local execution metadata registration intent.
 - Local-execution registration records persist actor/workspace context, execution metadata/output linkage payload, retryability metadata, and canonical metadata digest for deterministic reconnect registration replay.
+- Offline snapshot/pending-operation/registration repositories now persist sensitive JSON envelope/payload fields through protected local-value storage when available (Electron `safeStorage`) and record explicit per-row protection posture metadata.
 - Controlled reconnect coordinator revalidates stale cached snapshots, plans replay decisions, executes eligible replay through authoritative APIs in dependency order, updates local queue status, and captures explicit reconciliation outcomes.
 - Coordinator applies explicit post-sync cache maintenance: refresh stale snapshots, invalidate revoked/deleted/permission-lost/invalidated resources, and invalidate stale snapshots that cannot be refreshed.
+- Reject replay outcomes now persist non-retryable reason codes for revocation/permission-loss rejection classes so reconnect retry visibility remains explicit and bounded.
 - Coordinator emits structured blocked replay metadata (reason code/message/dependency blockers) so UI/admin surfaces can expose why replay did not proceed.
 - Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
 - Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
@@ -129,6 +132,7 @@ Story 19.1.7 hardens the offline/local-mode architecture docs so future features
 - blocked replay operations keep structured reasons/dependency blockers.
 - reconnect cleanup preserves explicit `successful`/`conflicted`/`failed`/`abandoned` classification with remove-vs-retain action.
 - post-sync cache maintenance explicitly refreshes or invalidates entries; stale-unrefreshable cache records are removed.
+- offline operational-event sanitization now redacts path/prompt/credential-like string values in addition to key-based sensitive-field removal.
 
 ## Intentionally deferred behavior (must remain deferred unless explicitly scoped)
 
