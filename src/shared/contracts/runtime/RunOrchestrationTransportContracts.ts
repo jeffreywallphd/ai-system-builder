@@ -413,6 +413,29 @@ export interface ExecutionReadinessCapabilitySummary {
   readonly supportedTranslationContractVersions: ReadonlyArray<string>;
 }
 
+export const ExecutionReadinessNodeAvailabilityStates = Object.freeze({
+  available: "available",
+  constrained: "constrained",
+  unavailable: "unavailable",
+  unknown: "unknown",
+} as const);
+
+export type ExecutionReadinessNodeAvailabilityState =
+  typeof ExecutionReadinessNodeAvailabilityStates[keyof typeof ExecutionReadinessNodeAvailabilityStates];
+
+export interface ExecutionReadinessNodeAvailabilitySummary {
+  readonly state: ExecutionReadinessNodeAvailabilityState;
+  readonly checkedAt: string;
+  readonly candidateNodeCount: number;
+  readonly eligibleNodeCount: number;
+  readonly unavailableNodeCount: number;
+  readonly incompatibleNodeCount: number;
+  readonly selectedNodeId?: string;
+  readonly topBlockingReasonCodes: ReadonlyArray<string>;
+  readonly topTransientAvailabilityReasonCodes: ReadonlyArray<string>;
+  readonly reasonCode?: string;
+}
+
 export interface ExecutionReadinessReadResponse {
   readonly backendFamily: string;
   readonly checkedAt: string;
@@ -420,6 +443,7 @@ export interface ExecutionReadinessReadResponse {
   readonly readyForExecution: boolean;
   readonly message?: string;
   readonly capabilities: ExecutionReadinessCapabilitySummary;
+  readonly nodeAvailability: ExecutionReadinessNodeAvailabilitySummary;
   readonly issues: ReadonlyArray<ExecutionReadinessIssue>;
   readonly diagnostics?: Readonly<Record<string, unknown>>;
 }

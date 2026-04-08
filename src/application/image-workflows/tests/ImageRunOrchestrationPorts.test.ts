@@ -181,6 +181,17 @@ class InMemoryImageRunOrchestrationAdapter
       readonly supportedOperationKinds: ReadonlyArray<string>;
       readonly supportedTranslationContractVersions: ReadonlyArray<string>;
     };
+    readonly nodeAvailability: {
+      readonly state: "available" | "constrained" | "unavailable" | "unknown";
+      readonly checkedAt: string;
+      readonly candidateNodeCount: number;
+      readonly eligibleNodeCount: number;
+      readonly unavailableNodeCount: number;
+      readonly incompatibleNodeCount: number;
+      readonly topBlockingReasonCodes: ReadonlyArray<string>;
+      readonly topTransientAvailabilityReasonCodes: ReadonlyArray<string>;
+      readonly reasonCode?: string;
+    };
     readonly issues: ReadonlyArray<{
       readonly code: string;
       readonly severity: "error" | "warning";
@@ -200,6 +211,16 @@ class InMemoryImageRunOrchestrationAdapter
         supportsOutputDiscovery: true,
         supportedOperationKinds: ["image-to-image"],
         supportedTranslationContractVersions: ["1.0.0"],
+      },
+      nodeAvailability: {
+        state: "available",
+        checkedAt: "2026-04-08T18:00:02.000Z",
+        candidateNodeCount: 1,
+        eligibleNodeCount: 1,
+        unavailableNodeCount: 0,
+        incompatibleNodeCount: 0,
+        topBlockingReasonCodes: [],
+        topTransientAvailabilityReasonCodes: [],
       },
       issues: [],
     };

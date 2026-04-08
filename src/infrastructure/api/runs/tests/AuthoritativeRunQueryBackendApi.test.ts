@@ -1130,6 +1130,17 @@ describe("AuthoritativeRunQueryBackendApi", () => {
             supportedOperationKinds: Object.freeze(["image-to-image"]),
             supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
           }),
+          nodeAvailability: Object.freeze({
+            state: "constrained" as const,
+            checkedAt: "2026-04-08T12:10:00.000Z",
+            candidateNodeCount: 2,
+            eligibleNodeCount: 0,
+            unavailableNodeCount: 1,
+            incompatibleNodeCount: 1,
+            topBlockingReasonCodes: Object.freeze(["node-backend-family-unsupported"]),
+            topTransientAvailabilityReasonCodes: Object.freeze(["node-health-not-routable"]),
+            reasonCode: "execution-node-no-eligible-match",
+          }),
           issues: Object.freeze([Object.freeze({
             code: "translation-contract-version-unsupported",
             severity: "error" as const,
@@ -1155,6 +1166,7 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(response.data?.backendFamily).toBe("adapter.comfyui.image-manipulation");
     expect(response.data?.readiness).toBe("degraded");
     expect(response.data?.readyForExecution).toBeFalse();
+    expect(response.data?.nodeAvailability.state).toBe("constrained");
     expect(response.data?.issues[0]?.code).toBe("translation-contract-version-unsupported");
   });
 

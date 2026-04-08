@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ExecutionReadinessNodeAvailabilityStates,
   ExecutionReadinessStates,
   RunLifecycleEventKinds,
   RunMutationActions,
@@ -465,6 +466,24 @@ const ExecutionReadinessCapabilitySummarySchema = z.object({
   supportedTranslationContractVersions: z.array(IdentifierSchema).max(256),
 }).strict();
 
+const ExecutionReadinessNodeAvailabilitySummarySchema = z.object({
+  state: z.enum([
+    ExecutionReadinessNodeAvailabilityStates.available,
+    ExecutionReadinessNodeAvailabilityStates.constrained,
+    ExecutionReadinessNodeAvailabilityStates.unavailable,
+    ExecutionReadinessNodeAvailabilityStates.unknown,
+  ]),
+  checkedAt: TimestampSchema,
+  candidateNodeCount: z.number().int().min(0),
+  eligibleNodeCount: z.number().int().min(0),
+  unavailableNodeCount: z.number().int().min(0),
+  incompatibleNodeCount: z.number().int().min(0),
+  selectedNodeId: IdentifierSchema.optional(),
+  topBlockingReasonCodes: z.array(z.string().trim().min(1).max(256)).max(64),
+  topTransientAvailabilityReasonCodes: z.array(z.string().trim().min(1).max(256)).max(64),
+  reasonCode: z.string().trim().min(1).max(256).optional(),
+}).strict();
+
 export const ExecutionReadinessReadResponseSchema = z.object({
   backendFamily: IdentifierSchema,
   checkedAt: TimestampSchema,
@@ -476,6 +495,7 @@ export const ExecutionReadinessReadResponseSchema = z.object({
   readyForExecution: z.boolean(),
   message: z.string().trim().min(1).max(2000).optional(),
   capabilities: ExecutionReadinessCapabilitySummarySchema,
+  nodeAvailability: ExecutionReadinessNodeAvailabilitySummarySchema,
   issues: z.array(ExecutionReadinessIssueSchema).max(128),
   diagnostics: z.record(z.string(), z.unknown()).optional(),
 }).strict();
