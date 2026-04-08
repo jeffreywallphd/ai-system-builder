@@ -405,3 +405,109 @@ it("keeps output/history views synchronized across repeated saves for the same d
   expect(history.data?.runs[0]?.lineage?.workflowAssetVersionId).toBe(ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId);
 });
 
+it("chains saved outputs into input/reference datasets for quick-result reuse flows", async () => {
+  const api = new StudioShellBackendApi(new InMemoryStudioShellRepository());
+  const initialized = await api.initializeStudio("studio-system", "System Studio");
+  const created = await api.createDraft({
+    studioId: "studio-system",
+    sessionId: initialized.data!.activeSessionId!,
+    assetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+    content: JSON.stringify({ systemSpec: {} }),
+    metadata: {
+      title: "Reference image",
+      tags: ["system"],
+      taxonomy: {
+        structuralKind: "system",
+        semanticRole: "system",
+        behaviorKind: "deterministic",
+      },
+    },
+  });
+
+  const draftId = created.data!.draft!.draftId;
+  const persisted = await api.persistReferenceImageOutputs({
+    studioId: "studio-system",
+    draftId,
+    executionId: "run:chain:1",
+    sourceAssetId: "generated-output:upload://source-chain.png",
+    parameterSnapshot: { editInstruction: "chain test", resultCount: 1 },
+    runtimeContext: {
+      contractVersion: "1.0.0",
+      selectedImages: [{ selectionId: "source-1", imageId: "source-1", assetRef: { assetId: "generated-output:upload://source-chain.png", recordId: "source-1" } }],
+      parameters: { editInstruction: "chain test", resultCount: 1 },
+      datasets: [{ referenceId: "active-input", instanceId: "dataset-instance:reference-image:input", datasetAssetId: "asset:dataset:image-reference-input", role: "active-input" }],
+      runtime: { systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId, runtimeSessionId: "session:chain:1" },
+    },
+    workflowAssetId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateAssetId,
+    workflowAssetVersionId: ReferenceImageSystemTemplate.primaryWorkflowAsset.workflowTemplateVersionId,
+    systemAssetId: ReferenceImageSystemTemplate.systemAsset.assetId,
+    runtimeResult: {
+      output: {
+        payload: {
+          nodeResults: {
+            workflow: {
+              result: {
+                executionId: "run:chain:1",
+                status: "completed",
+                outputs: [{
+                  nodeId: "save_image",
+                  kind: "image",
+                  reference: "memory://generated-chain-1.png",
+                  metadata: {
+                    filename: "generated-chain-1.png",
+                    format: "png",
+                    width: 1024,
+                    height: 768,
+                  },
+                }],
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+  expect(persisted.ok).toBeTrue();
+  const outputRecordId = persisted.data!.persistedRecordIds[0]!;
+
+  const chainToInput = await api.chainReferenceImageDatasetItemToInput({
+    studioId: "studio-system",
+    draftId,
+    sourceDatasetBindingId: "output-image-dataset",
+    sourceRecordId: outputRecordId,
+    targetDatasetBindingId: "input-image-dataset",
+  });
+  expect(chainToInput.ok).toBeTrue();
+  expect(chainToInput.data?.target.datasetBindingId).toBe("input-image-dataset");
+
+  const chainToReference = await api.chainReferenceImageDatasetItemToInput({
+    studioId: "studio-system",
+    draftId,
+    sourceDatasetBindingId: "output-image-dataset",
+    sourceRecordId: outputRecordId,
+    targetDatasetBindingId: "reference-image-dataset",
+  });
+  expect(chainToReference.ok).toBeTrue();
+  expect(chainToReference.data?.target.datasetBindingId).toBe("reference-image-dataset");
+
+  const listedInputs = await api.listReferenceImageDatasetItems({
+    studioId: "studio-system",
+    draftId,
+    datasetBindingId: "input-image-dataset",
+    limit: 10,
+    offset: 0,
+  });
+  expect(listedInputs.ok).toBeTrue();
+  expect(listedInputs.data?.items.some((item) => item.image.recordId === chainToInput.data?.target.recordId)).toBeTrue();
+
+  const listedReferences = await api.listReferenceImageDatasetItems({
+    studioId: "studio-system",
+    draftId,
+    datasetBindingId: "reference-image-dataset",
+    limit: 10,
+    offset: 0,
+  });
+  expect(listedReferences.ok).toBeTrue();
+  expect(listedReferences.data?.items.some((item) => item.image.recordId === chainToReference.data?.target.recordId)).toBeTrue();
+});
+

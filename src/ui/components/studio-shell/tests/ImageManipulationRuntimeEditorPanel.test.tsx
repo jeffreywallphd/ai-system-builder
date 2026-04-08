@@ -5,6 +5,7 @@ import ImageManipulationRuntimeEditorPanel, {
   buildImageRunLaunchPrecheckState,
   formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
+  resolveLinkedRunForSelectedOutput,
   resolveSelectionConfirmationMessage,
 } from "../ImageManipulationRuntimeEditorPanel";
 
@@ -74,6 +75,12 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Choose a source photo first");
     expect(html).toContain("Run progress");
     expect(html).toContain("Progress details will appear after execution starts.");
+    expect(html).toContain("Result review");
+    expect(html).toContain("Before and after");
+    expect(html).toContain("Use result as source");
+    expect(html).toContain("Use result as face reference");
+    expect(html).toContain("Rerun with changes");
+    expect(html).toContain("No result selected");
     expect(html).toContain("Advanced details");
     expect(html).toContain("Results (0)");
     expect(html).toContain("Source (0)");
@@ -212,5 +219,37 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.launchReady).toBeFalse();
     expect(precheck.setupBlockingIssues.length).toBeGreaterThan(0);
     expect(precheck.backendBlockingIssues.length).toBeGreaterThan(0);
+  });
+
+  it("links the selected output to run history using workflow run ids", () => {
+    const linked = resolveLinkedRunForSelectedOutput({
+      selectedOutputItem: {
+        workflow: {
+          workflowRunId: "run:output:1",
+        },
+      } as never,
+      runHistory: Object.freeze([{
+        runId: "run:output:1",
+        status: "completed",
+      }]) as never,
+    });
+
+    expect(linked?.runId).toBe("run:output:1");
+    expect(linked?.status).toBe("completed");
+  });
+
+  it("falls back to the active run id when result workflow linkage is absent", () => {
+    const linked = resolveLinkedRunForSelectedOutput({
+      selectedOutputItem: undefined,
+      activeRunId: "run:active:1",
+      runHistory: Object.freeze([{
+        runId: "run:active:1",
+        workflowExecutionId: "run:active:1",
+        status: "running",
+      }]) as never,
+    });
+
+    expect(linked?.runId).toBe("run:active:1");
+    expect(linked?.status).toBe("running");
   });
 });

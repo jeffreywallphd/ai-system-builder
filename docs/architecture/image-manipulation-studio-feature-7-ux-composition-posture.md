@@ -302,3 +302,35 @@ Architecture posture preserved:
 - UI does not infer backend availability using local heuristics.
 - Readiness truth stays in authoritative run/node readiness services (Features 4 and 5), with UI acting as presenter and gate consumer.
 
+## Epic 7.3 Story 7.3.2: Result review, before/after context, and quick actions
+
+Story 7.3.2 upgrades completed-run handling into an in-context result-review experience so users can inspect outputs and continue work immediately.
+
+Implemented seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/styles/components/assets.css`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputPersistenceFlow.test.ts`
+
+Result-review UX behavior:
+
+- A dedicated `Result review` surface is rendered inside the runtime editor after result collections are available.
+- The review surface includes a before/after contextual layout:
+  - source image preview (`Before`),
+  - selected output preview (`After`).
+- Status badges expose both result-selection state and linked authoritative run status.
+- Lineage/settings inspection remains available through secondary details to keep primary review focused.
+
+Quick-action continuation behavior:
+
+- `Use result as source` and `Use result as face reference` reuse authoritative dataset-binding chaining (`chainReferenceImageDatasetItemToInput`) instead of local file/path transfer assumptions.
+- `Refresh review` reloads authoritative output and run-history views.
+- `Rerun with changes` keeps users in-context and transitions directly back into the launch flow without navigation resets.
+
+Architecture posture preserved:
+
+- result previews and metadata continue to come from authoritative result/dataset retrieval APIs,
+- run linkage for review status/details resolves from authoritative run-history APIs,
+- no backend-local file assumptions are introduced in result review or continuation actions.
+

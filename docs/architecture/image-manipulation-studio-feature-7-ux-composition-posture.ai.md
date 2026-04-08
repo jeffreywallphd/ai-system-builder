@@ -146,3 +146,35 @@ Launch gating posture:
 - launch is allowed when setup is valid and backend readiness is ready (including degraded-ready with advisories),
 - no UI-local backend heuristics are used; gating honors authoritative readiness response semantics.
 
+## Epic 7.3 Story 7.3.2 implementation update
+
+Story 7.3.2 upgrades completed-run result handling into an in-context review workflow with before/after context and continuation quick actions.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/styles/components/assets.css`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+- `src/infrastructure/api/studio-shell/tests/ReferenceImageOutputPersistenceFlow.test.ts`
+
+Result-review UX behavior:
+
+- A dedicated `Result review` panel now appears in the runtime editor and keeps users in the same context after runs complete.
+- The panel renders a before/after layout:
+  - source preview ("Before"),
+  - selected output preview ("After").
+- Result/run status badges expose selected-result presence and linked authoritative run status.
+- Lineage/settings details remain available behind a secondary details expander.
+
+Authoritative quick-action behavior:
+
+- `Use result as source` and `Use result as face reference` call authoritative dataset chaining (`chainReferenceImageDatasetItemToInput`) rather than local file/path shortcuts.
+- `Refresh review` re-loads authoritative output collections and run history.
+- `Rerun with changes` keeps the user in-context and guides directly back into launch flow without requiring manual navigation.
+
+Architecture posture preserved:
+
+- result review is still backed by authoritative result preview/list APIs (`listReferenceImageOutputs` / dataset listing),
+- run linkage for review badges/details resolves from authoritative run history records (`listReferenceImageRunHistory`),
+- no backend-local filesystem assumptions are introduced in result review or reuse actions.
+
