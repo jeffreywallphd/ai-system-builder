@@ -36,6 +36,8 @@ import { SqliteAuditLedgerRepository } from "./audit/SqliteAuditLedgerRepository
 import { AUDIT_LEDGER_PERSISTENCE_MIGRATIONS } from "./audit/SqliteAuditLedgerPersistenceMigrations";
 import { SqliteDeploymentPolicyPersistenceAdapter } from "./deployment/SqliteDeploymentPolicyPersistenceAdapter";
 import { DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS } from "./deployment/SqliteDeploymentPolicyPersistenceMigrations";
+import { SqliteGeneratedResultPersistenceAdapter } from "./generated-results/SqliteGeneratedResultPersistenceAdapter";
+import { GENERATED_RESULT_PERSISTENCE_MIGRATIONS } from "./generated-results/SqliteGeneratedResultPersistenceMigrations";
 
 interface VersionedMigrationSource {
   readonly domainId: string;
@@ -64,6 +66,7 @@ export interface AuthoritativePersistentPlatformServices {
   readonly platformPersistenceRepository: SqlitePlatformPersistenceAdapter;
   readonly auditLedgerRepository: SqliteAuditLedgerRepository;
   readonly deploymentPolicyRepository: SqliteDeploymentPolicyPersistenceAdapter;
+  readonly generatedResultRepository: SqliteGeneratedResultPersistenceAdapter;
   dispose(): void;
 }
 
@@ -127,6 +130,11 @@ const VersionedMigrationSources = Object.freeze<ReadonlyArray<VersionedMigration
     domainId: "deployment-policy",
     migrationTableName: "deployment_policy_repository_migrations",
     migrations: DEPLOYMENT_POLICY_PERSISTENCE_MIGRATIONS,
+  }),
+  Object.freeze({
+    domainId: "generated-results",
+    migrationTableName: "generated_result_repository_migrations",
+    migrations: GENERATED_RESULT_PERSISTENCE_MIGRATIONS,
   }),
   Object.freeze({
     domainId: "audit-ledger",
@@ -256,6 +264,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
   const platformPersistenceRepository = new SqlitePlatformPersistenceAdapter(databasePath);
   const auditLedgerRepository = new SqliteAuditLedgerRepository(databasePath);
   const deploymentPolicyRepository = new SqliteDeploymentPolicyPersistenceAdapter(databasePath);
+  const generatedResultRepository = new SqliteGeneratedResultPersistenceAdapter(databasePath);
 
   return Object.freeze({
     databasePath,
@@ -278,6 +287,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
     platformPersistenceRepository,
     auditLedgerRepository,
     deploymentPolicyRepository,
+    generatedResultRepository,
     dispose(): void {
       identityRepository.dispose();
       trustedDeviceRepository.dispose();
@@ -298,6 +308,7 @@ export function createAuthoritativePersistentPlatformServices(input: {
       platformPersistenceRepository.dispose();
       auditLedgerRepository.dispose();
       deploymentPolicyRepository.dispose();
+      generatedResultRepository.dispose();
     },
   });
 }

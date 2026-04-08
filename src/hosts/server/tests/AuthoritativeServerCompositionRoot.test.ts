@@ -522,9 +522,11 @@ describe("AuthoritativeServerCompositionRoot", () => {
           assetAuditRecorder: {} as never,
           assetUploadSessionRepository: {} as never,
           imageAssetRepository: {} as never,
+          imageWorkflowSystemRepository: {} as never,
           platformPersistenceRepository: {} as never,
           auditLedgerRepository: {} as never,
           deploymentPolicyRepository: {} as never,
+          generatedResultRepository: {} as never,
           dispose: () => {},
         }) satisfies AuthoritativePersistentPlatformServices,
         resolveDeploymentPolicyBootstrap: async () => {
@@ -681,9 +683,11 @@ describe("AuthoritativeServerCompositionRoot", () => {
       assetAuditRecorder: {} as never,
       assetUploadSessionRepository: {} as never,
       imageAssetRepository: {} as never,
+      imageWorkflowSystemRepository: {} as never,
       platformPersistenceRepository: {} as never,
       auditLedgerRepository: {} as never,
       deploymentPolicyRepository: {} as never,
+      generatedResultRepository: {} as never,
       dispose: () => {
         calls.push("persistent-services-dispose");
       },

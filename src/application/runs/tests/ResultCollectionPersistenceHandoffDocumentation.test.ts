@@ -38,4 +38,21 @@ describe("result collection persistence handoff documentation", () => {
     expect(aiDoc).toContain("FinalizeRunExecutionOutcomeUseCase.ts");
     expect(aiDoc).toContain("resultPersistenceDiagnostics");
   });
+
+  it("documents Story 6.2.2 concrete persistence structures and migration seams", () => {
+    const doc = readFileSync(architectureDocPath, "utf8");
+    const aiDoc = readFileSync(architectureAiDocPath, "utf8");
+
+    expect(doc).toContain("Story 6.2.2 concrete persistence baseline (implemented)");
+    expect(doc).toContain("generated_result_records");
+    expect(doc).toContain("generated_result_lineage_inputs");
+    expect(doc).toContain("SqliteGeneratedResultPersistenceAdapter.ts");
+    expect(doc).toContain("SqliteRunCollectedResultPersistenceAdapter.ts");
+
+    expect(aiDoc).toContain("Story 6.2.2 concrete persistence baseline (implemented)");
+    expect(aiDoc).toContain("generated_result_records");
+    expect(aiDoc).toContain("generated_result_lineage_inputs");
+    expect(aiDoc).toContain("SqliteGeneratedResultPersistenceAdapter.ts");
+    expect(aiDoc).toContain("SqliteRunCollectedResultPersistenceAdapter.ts");
+  });
 });

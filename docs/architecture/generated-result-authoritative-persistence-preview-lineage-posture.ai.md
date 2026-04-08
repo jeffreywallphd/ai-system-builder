@@ -109,3 +109,39 @@ Failure behavior is explicit:
 
 Concrete backend-to-managed-storage copying remains behind `IRunCollectedResultPersistencePort` for follow-on infrastructure stories.
 
+## Story 6.2.2 concrete persistence baseline (implemented)
+
+Generated-result persistence is now concrete in authoritative SQLite infrastructure:
+
+- `src/infrastructure/persistence/generated-results/SqliteGeneratedResultPersistenceMigrations.ts`
+- `src/infrastructure/persistence/generated-results/SqliteGeneratedResultPersistenceAdapter.ts`
+- `src/infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter.ts`
+- `src/application/generated-results/ports/IGeneratedResultPersistenceRepository.ts`
+
+### Persisted structures
+
+- `generated_result_records`: durable result-asset metadata with normalized lifecycle status, run/system/workflow/template/node linkage, storage linkage, visibility/sharing posture, and audit timestamps.
+- `generated_result_lineage_inputs`: explicit upstream input asset lineage pointers per result asset.
+- `generated_result_previews`: preview descriptor persistence tied to `result_asset_id` for availability/protected-access metadata.
+- replay tables (`generated_result_mutation_replays`, `generated_result_preview_mutation_replays`) for idempotent operation-key mutation safety.
+
+### Migration + composition impact
+
+- new migration source domain: `generated-results`
+- migration table: `generated_result_repository_migrations`
+- migration hook registration added in authoritative persistence composition so generated-result schema bootstraps with existing domains.
+- persistent service composition now includes `generatedResultRepository`.
+
+### Run orchestration integration impact
+
+- `SqliteRunCollectedResultPersistenceAdapter` is now wired as the concrete `IRunCollectedResultPersistencePort` in server host composition for terminal finalization flows:
+  - `IngestRunExecutionUpdateUseCase`
+  - `RequestAuthoritativeRunCancellationUseCase`
+  - `RecoverRunOrchestrationStartupStateUseCase`
+
+### Boundary posture
+
+- repository + sqlite rows remain infrastructure concerns
+- application/use-case layers consume typed repository/port contracts
+- persistence DTOs remain isolated from UI/domain presentation models
+

@@ -54,6 +54,28 @@ function normalizeOptional(value?: string): string | undefined {
   return normalized ? normalized : undefined;
 }
 
+function extractWorkflowTemplateId(sourceAggregateRef: string | undefined): string | undefined {
+  const normalized = normalizeOptional(sourceAggregateRef);
+  if (!normalized?.startsWith("template:")) {
+    return undefined;
+  }
+  return normalizeOptional(normalized.slice("template:".length));
+}
+
+function extractRunSystemId(runRecord: PlatformRunRecord): string | undefined {
+  const metadata = isObject(runRecord.metadata) ? runRecord.metadata : undefined;
+  const submissionSnapshot = metadata && isObject(metadata.submissionSnapshot)
+    ? metadata.submissionSnapshot
+    : undefined;
+  const runtimeTarget = submissionSnapshot && isObject(submissionSnapshot.runtimeTarget)
+    ? submissionSnapshot.runtimeTarget
+    : undefined;
+  const systemId = runtimeTarget && typeof runtimeTarget.systemId === "string"
+    ? runtimeTarget.systemId
+    : undefined;
+  return normalizeOptional(systemId);
+}
+
 export class DefaultRunFinalizationResultRegistrationPort implements IRunFinalizationResultRegistrationPort {
   public async registerFinalizationResult(
     request: RunFinalizationRegistrationRequest,
@@ -121,6 +143,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
     const collectedResult = extractCollectedExecutionResult(request.internalDiagnostics);
     const persistenceOutcome = await this.persistCollectedResultIfAvailable({
       run: runWithQueueHistory,
+      runRecord: request.runRecord,
       finalizedAt,
       senderNodeId: request.senderNodeId,
       collectedResult,
@@ -253,6 +276,7 @@ export class FinalizeRunExecutionOutcomeUseCase {
 
   private async persistCollectedResultIfAvailable(input: {
     readonly run: CanonicalRunRecord;
+    readonly runRecord: PlatformRunRecord;
     readonly finalizedAt: string;
     readonly senderNodeId?: string;
     readonly collectedResult?: ImageManipulationCollectedExecutionResult;
@@ -266,6 +290,10 @@ export class FinalizeRunExecutionOutcomeUseCase {
       return await this.resultCollectionPersistencePort.persistCollectedResult({
         runId: input.run.identity.runId,
         workflowId: input.run.identity.workflowId,
+        systemId: extractRunSystemId(input.runRecord),
+        workflowTemplateId: extractWorkflowTemplateId(input.runRecord.sourceAggregateRef),
+        executionNodeId: normalizeOptional(input.senderNodeId) ?? normalizeOptional(input.run.assignment.assignedNodeId),
+        executionAdapterKind: normalizeOptional(input.run.execution.adapterKind),
         workspaceId: input.run.identity.workspaceId,
         occurredAt: input.finalizedAt,
         actorId: normalizeOptional(input.senderNodeId) ?? "system:run-finalization",
