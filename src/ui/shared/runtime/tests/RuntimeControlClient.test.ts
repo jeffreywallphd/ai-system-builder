@@ -107,6 +107,27 @@ describe("HttpRuntimeControlClient", () => {
           },
         }));
       }
+      if (url.includes("/runtime/execution/readiness?")) {
+        return new Response(JSON.stringify({
+          ok: true,
+          data: {
+            backendFamily: "adapter.comfyui.image-manipulation",
+            checkedAt: "2026-04-07T12:00:02.000Z",
+            readiness: "ready",
+            readyForExecution: true,
+            capabilities: {
+              backendFamily: "adapter.comfyui.image-manipulation",
+              supportsProgressPolling: true,
+              supportsProgressStreaming: false,
+              supportsCancellation: true,
+              supportsOutputDiscovery: true,
+              supportedOperationKinds: ["image-to-image"],
+              supportedTranslationContractVersions: ["1.0.0"],
+            },
+            issues: [],
+          },
+        }));
+      }
       if (url.includes("/runtime/queue?")) {
         return new Response(JSON.stringify({
           ok: true,
@@ -184,6 +205,12 @@ describe("HttpRuntimeControlClient", () => {
       eventLimit: 20,
       logLimit: 25,
     }, "token-trace");
+    await client.getExecutionReadiness({
+      workspaceId: "workspace-alpha",
+      systemId: "system:demo",
+      operationKind: "image-to-image",
+      translationContractVersion: "1.0.0",
+    }, "token-readiness");
     await client.listQueueItems({
       workspaceId: "workspace-alpha",
       statuses: ["queued", "running"],
@@ -196,21 +223,23 @@ describe("HttpRuntimeControlClient", () => {
       idempotencyKey: "idempotency-2",
     }, "token-dequeue");
 
-    expect(requests.map((entry) => entry.method)).toEqual(["POST", "POST", "GET", "GET", "GET", "GET", "POST"]);
+    expect(requests.map((entry) => entry.method)).toEqual(["POST", "POST", "GET", "GET", "GET", "GET", "GET", "POST"]);
     expect(requests[0]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/start?workspaceId=workspace-alpha");
     expect(requests[1]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/cancel?workspaceId=workspace-alpha");
     expect(requests[2]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/status?workspaceId=workspace-alpha");
     expect(requests[3]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/result?workspaceId=workspace-alpha&nodeResultLimit=2&diagnosticsLimit=3");
     expect(requests[4]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/runs/execution-1/trace?workspaceId=workspace-alpha&eventLimit=20&logLimit=25");
-    expect(requests[5]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue?workspaceId=workspace-alpha&limit=10&offset=5&status=queued&status=running");
-    expect(requests[6]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue/runtime-queue%3Aexecution-1/dequeue?workspaceId=workspace-alpha");
+    expect(requests[5]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/execution/readiness?workspaceId=workspace-alpha&systemId=system%3Ademo&operationKind=image-to-image&translationContractVersion=1.0.0");
+    expect(requests[6]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue?workspaceId=workspace-alpha&limit=10&offset=5&status=queued&status=running");
+    expect(requests[7]?.url).toBe("http://127.0.0.1:8788/api/v1/runtime/queue/runtime-queue%3Aexecution-1/dequeue?workspaceId=workspace-alpha");
     expect(requests[0]?.authorization).toBe("Bearer token-start");
     expect(requests[1]?.authorization).toBe("Bearer token-cancel");
     expect(requests[2]?.authorization).toBe("Bearer token-status");
     expect(requests[3]?.authorization).toBe("Bearer token-result");
     expect(requests[4]?.authorization).toBe("Bearer token-trace");
-    expect(requests[5]?.authorization).toBe("Bearer token-queue");
-    expect(requests[6]?.authorization).toBe("Bearer token-dequeue");
+    expect(requests[5]?.authorization).toBe("Bearer token-readiness");
+    expect(requests[6]?.authorization).toBe("Bearer token-queue");
+    expect(requests[7]?.authorization).toBe("Bearer token-dequeue");
   });
 });
 

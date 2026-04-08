@@ -258,6 +258,37 @@ This keeps run-level debugging traceable across translation, dispatch, polling n
 
 - Observability sanitization is centralized and composable with platform logging redaction helpers.
 - Adapter logs redact or omit:
+
+## Story 3.4.2 authoritative execution readiness API surface
+
+### Added behavior
+
+- Added an application-facing normalization use case:
+  - `src/application/image-workflows/GetImageManipulationExecutionReadinessUseCase.ts`
+- Added authoritative run-read backend surface:
+  - `AuthoritativeRunQueryBackendApi.getExecutionReadiness(...)`
+- Added authenticated workspace route:
+  - `GET /api/v1/runtime/execution/readiness`
+  - transport handling in `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Added shared route/contract/schema entries:
+  - `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
+  - `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
+  - `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`
+
+### Consumer guidance
+
+- Studio and admin readiness surfaces should use this authoritative API instead of direct Comfy/backend probes.
+- Desktop/thin shared runtime clients can call the same route through:
+  - `src/ui/shared/runtime/RuntimeControlClient.ts#getExecutionReadiness(...)`
+
+### Normalization semantics
+
+- Response remains adapter-backed but infrastructure-safe:
+  - readiness classification (`ready` / `degraded` / `unavailable`)
+  - actionable readiness (`readyForExecution`)
+  - capability summary and supported operation/translation versions
+  - structured issue list for UX and operational surfaces
+- Raw Comfy probe details remain in infrastructure diagnostics, not as client-facing source-of-truth fields.
   - prompt content and raw backend payloads,
   - credentials/tokens/secrets,
   - raw storage/path/file internals and backend object handles,

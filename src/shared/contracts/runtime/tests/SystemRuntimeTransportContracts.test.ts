@@ -6,6 +6,7 @@ describe("SystemRuntimeTransportContracts", () => {
     expect(SystemRuntimeTransportRoutes.startRun).toBe("/api/v1/runtime/runs/start");
     expect(SystemRuntimeTransportRoutes.cancelRun).toBe("/api/v1/runtime/runs/:runId/cancel");
     expect(SystemRuntimeTransportRoutes.getRunStatus).toBe("/api/v1/runtime/runs/:runId/status");
+    expect(SystemRuntimeTransportRoutes.getExecutionReadiness).toBe("/api/v1/runtime/execution/readiness");
     expect(SystemRuntimeTransportRoutes.listQueueItems).toBe("/api/v1/runtime/queue");
     expect(SystemRuntimeTransportRoutes.dequeueQueueItem).toBe("/api/v1/runtime/queue/:queueItemId/dequeue");
     expect(SystemRuntimeTransportRoutes.subscribeRealtime).toBe("/api/v1/runtime/realtime");

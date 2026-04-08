@@ -244,3 +244,25 @@ Where available, logs carry:
 - Focused behavior and redaction coverage:
   - `src/infrastructure/execution/tests/ComfyUiExecutionObservability.test.ts`
   - updated cancellation/output-collector tests in `src/infrastructure/execution/tests/*`
+
+## Story 3.4.2 authoritative readiness surface
+
+### Added seams
+
+- Application normalization use case:
+  - `src/application/image-workflows/GetImageManipulationExecutionReadinessUseCase.ts`
+- Authoritative backend query seam:
+  - `AuthoritativeRunQueryBackendApi.getExecutionReadiness(...)`
+- Transport route:
+  - `GET /api/v1/runtime/execution/readiness`
+  - handler: `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+- Shared contract/schema/runtime-route updates:
+  - `RunOrchestrationTransportContracts.ts`
+  - `RunOrchestrationTransportSchemaContracts.ts`
+  - `SystemRuntimeTransportContracts.ts`
+
+### Consumer posture
+
+- Desktop/thin shared clients use `RuntimeControlClient.getExecutionReadiness(...)`.
+- Later studio/admin readiness surfaces are expected to use this authoritative route.
+- UI/backend probe shortcuts are avoided; adapter health/capability checks are mediated by application/backend normalization.

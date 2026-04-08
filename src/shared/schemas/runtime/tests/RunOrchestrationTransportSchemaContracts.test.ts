@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
+  parseExecutionReadinessReadRequest,
+  parseExecutionReadinessReadResponse,
   RunOrchestrationTransportSchemaValidationError,
   parseRunCancellationRequest,
   parseRunListReadRequest,
@@ -126,6 +128,46 @@ describe("RunOrchestrationTransportSchemaContracts", () => {
 
     expect(parsed.schedulingAdminSummary?.deferredRuns).toBe(1);
     expect(parsed.items[0]?.scheduling?.placement.outcome).toBe("deferred");
+  });
+
+  it("parses execution readiness read request and response contracts", () => {
+    const request = parseExecutionReadinessReadRequest({
+      workspaceId: "workspace-1",
+      systemId: "system-1",
+      operationKind: "image-to-image",
+      translationContractVersion: "1.0.0",
+    });
+    expect(request.workspaceId).toBe("workspace-1");
+    expect(request.operationKind).toBe("image-to-image");
+
+    const response = parseExecutionReadinessReadResponse({
+      backendFamily: "adapter.comfyui.image-manipulation",
+      checkedAt: "2026-04-08T12:10:00.000Z",
+      readiness: "degraded",
+      readyForExecution: false,
+      message: "Execution backend is reachable but incompatible.",
+      capabilities: {
+        backendFamily: "adapter.comfyui.image-manipulation",
+        supportsProgressPolling: true,
+        supportsProgressStreaming: false,
+        supportsCancellation: true,
+        supportsOutputDiscovery: true,
+        supportedOperationKinds: ["image-to-image"],
+        supportedTranslationContractVersions: ["1.0.0"],
+      },
+      issues: [{
+        code: "translation-contract-version-unsupported",
+        severity: "error",
+        message: "Translation contract version '2.0.0' is not supported.",
+      }],
+      diagnostics: {
+        compatibility: {
+          compatible: false,
+        },
+      },
+    });
+    expect(response.readiness).toBe("degraded");
+    expect(response.issues[0]?.severity).toBe("error");
   });
 
   it("parses scheduling admin stale reservation and deferred re-evaluation contracts", () => {

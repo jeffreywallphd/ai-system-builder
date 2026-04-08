@@ -29,6 +29,7 @@ export const SystemRuntimeTransportRoutes = Object.freeze({
   startRun: RunOrchestrationTransportRoutes.submitRun,
   cancelRun: RunOrchestrationTransportRoutes.cancelRun,
   getRunStatus: RunOrchestrationTransportRoutes.getRunStatus,
+  getExecutionReadiness: RunOrchestrationTransportRoutes.getExecutionReadiness,
   getRunResult: "/api/v1/runtime/runs/:executionId/result",
   getRunTrace: "/api/v1/runtime/runs/:executionId/trace",
   listQueueItems: RunOrchestrationTransportRoutes.listQueueStatus,
@@ -103,6 +104,36 @@ export interface RuntimeCancelRunResponse {
   readonly mutation: SharedApiMutationResult;
 }
 
+export interface RuntimeExecutionReadinessRequest {
+  readonly workspaceId: string;
+  readonly systemId?: string;
+  readonly operationKind?: string;
+  readonly translationContractVersion?: string;
+}
+
+export interface RuntimeExecutionReadinessResponse {
+  readonly backendFamily: string;
+  readonly checkedAt: string;
+  readonly readiness: "ready" | "degraded" | "unavailable";
+  readonly readyForExecution: boolean;
+  readonly message?: string;
+  readonly capabilities: {
+    readonly backendFamily: string;
+    readonly supportsProgressPolling: boolean;
+    readonly supportsProgressStreaming: boolean;
+    readonly supportsCancellation: boolean;
+    readonly supportsOutputDiscovery: boolean;
+    readonly supportedOperationKinds: ReadonlyArray<string>;
+    readonly supportedTranslationContractVersions: ReadonlyArray<string>;
+  };
+  readonly issues: ReadonlyArray<{
+    readonly code: string;
+    readonly severity: "error" | "warning";
+    readonly message: string;
+  }>;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
+}
+
 export interface SystemRuntimeTransportContract {
   readonly startRun: {
     readonly request: RuntimeSdkStartExecutionRequest;
@@ -115,6 +146,10 @@ export interface SystemRuntimeTransportContract {
   readonly getRunStatus: {
     readonly request: RuntimeSdkExecutionStatusRequest;
     readonly response: RuntimeSdkResponse<RuntimeSdkExecutionStatusResponse>;
+  };
+  readonly getExecutionReadiness: {
+    readonly request: RuntimeExecutionReadinessRequest;
+    readonly response: RuntimeSdkResponse<RuntimeExecutionReadinessResponse>;
   };
   readonly getRunResult: {
     readonly request: RuntimeSdkExecutionResultRequest;

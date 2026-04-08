@@ -21,6 +21,7 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(RunOrchestrationTransportContractVersions.v1).toBe("run-orchestration-transport/v1");
     expect(RunOrchestrationTransportRoutes.submitRun).toBe("/api/v1/runtime/runs/start");
     expect(RunOrchestrationTransportRoutes.listRuns).toBe("/api/v1/runtime/runs");
+    expect(RunOrchestrationTransportRoutes.getExecutionReadiness).toBe("/api/v1/runtime/execution/readiness");
     expect(RunOrchestrationTransportRoutes.listQueueStatus).toBe("/api/v1/runtime/queue");
     expect(RunOrchestrationTransportRoutes.listSchedulingStaleReservations)
       .toBe("/api/v1/runtime/scheduling/admin/reservations/stale");

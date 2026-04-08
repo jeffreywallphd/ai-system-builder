@@ -24,6 +24,7 @@ class StubAuthoritativeRunQueryBackendApi {
   public lastDetailRequest: Readonly<Record<string, unknown>> | undefined;
   public lastStatusRequest: Readonly<Record<string, unknown>> | undefined;
   public lastQueueRequest: Readonly<Record<string, unknown>> | undefined;
+  public lastExecutionReadinessRequest: Readonly<Record<string, unknown>> | undefined;
 
   public async listRuns(request: Readonly<Record<string, unknown>>) {
     this.lastListRequest = request;
@@ -140,6 +141,34 @@ class StubAuthoritativeRunQueryBackendApi {
         }],
         totalCount: 1,
         asOf: "2026-04-07T10:01:00.000Z",
+      },
+    };
+  }
+
+  public async getExecutionReadiness(request: Readonly<Record<string, unknown>>) {
+    this.lastExecutionReadinessRequest = request;
+    return {
+      ok: true as const,
+      data: {
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T12:10:00.000Z",
+        readiness: "degraded",
+        readyForExecution: false,
+        message: "backend is reachable but incompatible",
+        capabilities: {
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: ["image-to-image"],
+          supportedTranslationContractVersions: ["1.0.0"],
+        },
+        issues: [{
+          code: "translation-contract-version-unsupported",
+          severity: "error",
+          message: "Translation contract version '2.0.0' is not supported.",
+        }],
       },
     };
   }
@@ -276,6 +305,21 @@ describe("IdentityHttpServer authoritative run read routes", () => {
     expect(queueBody.ok).toBe(true);
     expect(queueBody.data.items[0].runId).toBe("run:1");
     expect(backend.lastQueueRequest?.workspaceId).toBe("workspace-alpha");
+
+    const readinessResponse = await fetch(
+      `${baseUrl}/api/v1/runtime/execution/readiness?workspaceId=workspace-alpha&operationKind=image-to-image&translationContractVersion=2.0.0`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(readinessResponse.status).toBe(200);
+    const readinessBody = await readinessResponse.json();
+    expect(readinessBody.ok).toBe(true);
+    expect(readinessBody.data.backendFamily).toBe("adapter.comfyui.image-manipulation");
+    expect(readinessBody.data.readiness).toBe("degraded");
+    expect(backend.lastExecutionReadinessRequest?.operationKind).toBe("image-to-image");
   });
 
   it("maps non-leaky run detail misses to canonical not-found", async () => {

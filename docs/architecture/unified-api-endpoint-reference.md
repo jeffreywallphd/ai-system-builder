@@ -215,6 +215,7 @@ Authoritative policy expectations:
 
 - run control/read:
   - `POST /api/v1/runtime/runs/start`
+  - `GET /api/v1/runtime/execution/readiness`
   - `POST /api/v1/runtime/runs/:executionId/cancel`
   - `GET /api/v1/runtime/runs/:executionId/status`
   - `GET /api/v1/runtime/runs/:executionId/result`
@@ -230,6 +231,12 @@ Authoritative policy expectations:
 - bearer session required
 - workspace scope required for workspace-bound runtime operations
 - websocket topic subscriptions must satisfy purpose/topic policy and workspace scope matching
+
+Readiness endpoint intent:
+
+- `GET /api/v1/runtime/execution/readiness` is the authoritative adapter-backed readiness surface for image-manipulation execution.
+- Desktop/thin clients and later studio/admin readiness flows should use this route instead of direct backend probes.
+- Response shape is normalized for UX/operations consumers: backend readiness state, actionable `readyForExecution`, capability summary, and issue list.
 
 ## Runtime realtime event delivery model
 

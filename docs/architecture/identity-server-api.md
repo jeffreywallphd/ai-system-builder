@@ -30,6 +30,7 @@ This note documents the authoritative HTTP server endpoints for local identity r
 - `POST /api/v1/assets/register` (authenticated)
 - `POST /api/v1/assets/:assetId/uploads/initiate` (authenticated)
 - `POST /api/v1/runtime/runs/start` (authenticated, workspace-scoped)
+- `GET /api/v1/runtime/execution/readiness` (authenticated, workspace-scoped)
 - `POST /api/v1/runtime/runs/:executionId/cancel` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/runs/:executionId/status` (authenticated, workspace-scoped)
 - `GET /api/v1/runtime/runs/:executionId/result` (authenticated, workspace-scoped)
@@ -221,6 +222,10 @@ Trusted-device transport contracts are defined in `src/infrastructure/api/identi
 - Runtime run-control, queue-control, and run-read routes now run through this shared pipeline and preserve shared failure semantics:
   - unauthenticated requests fail with `401` + `authentication-failed`
   - authenticated requests missing required workspace scope fail with `400` + `invalid-request`
+- Runtime execution-readiness route is now part of the same authoritative run-read pipeline:
+  - `GET /api/v1/runtime/execution/readiness`
+  - response is normalized for studio/admin UX and operations consumers (`readiness`, `readyForExecution`, `capabilities`, `issues`)
+  - transport delegates to backend adapter readiness/capability logic; no direct UI-to-backend probe shortcut is required
 
 ### Runtime mutation/read requests
 

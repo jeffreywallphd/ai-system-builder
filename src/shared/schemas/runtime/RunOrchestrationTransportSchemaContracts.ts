@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  ExecutionReadinessStates,
   RunLifecycleEventKinds,
   RunMutationActions,
   RunOrchestrationTransportContractVersions,
@@ -428,6 +429,44 @@ const RunQueueStatusItemSchema = z.object({
   scheduling: RunSchedulingVisibilityProjectionSchema.optional(),
 }).strict();
 
+export const ExecutionReadinessReadRequestSchema = z.object({
+  workspaceId: IdentifierSchema,
+  systemId: IdentifierSchema.optional(),
+  operationKind: IdentifierSchema.optional(),
+  translationContractVersion: IdentifierSchema.optional(),
+}).strict();
+
+const ExecutionReadinessIssueSchema = z.object({
+  code: z.string().trim().min(1).max(256),
+  severity: z.enum(["error", "warning"]),
+  message: z.string().trim().min(1).max(2000),
+}).strict();
+
+const ExecutionReadinessCapabilitySummarySchema = z.object({
+  backendFamily: IdentifierSchema,
+  supportsProgressPolling: z.boolean(),
+  supportsProgressStreaming: z.boolean(),
+  supportsCancellation: z.boolean(),
+  supportsOutputDiscovery: z.boolean(),
+  supportedOperationKinds: z.array(IdentifierSchema).max(256),
+  supportedTranslationContractVersions: z.array(IdentifierSchema).max(256),
+}).strict();
+
+export const ExecutionReadinessReadResponseSchema = z.object({
+  backendFamily: IdentifierSchema,
+  checkedAt: TimestampSchema,
+  readiness: z.enum([
+    ExecutionReadinessStates.ready,
+    ExecutionReadinessStates.degraded,
+    ExecutionReadinessStates.unavailable,
+  ]),
+  readyForExecution: z.boolean(),
+  message: z.string().trim().min(1).max(2000).optional(),
+  capabilities: ExecutionReadinessCapabilitySummarySchema,
+  issues: z.array(ExecutionReadinessIssueSchema).max(128),
+  diagnostics: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
 const RunQueueSchedulingAdminSummarySchema = z.object({
   asOf: TimestampSchema,
   totalRuns: z.number().int().min(0),
@@ -622,6 +661,8 @@ export type RunListReadResponsePayload = z.infer<typeof RunListReadResponseSchem
 export type RunStatusEnvelopePayload = z.infer<typeof RunStatusEnvelopeSchema>;
 export type RunQueueStatusReadRequestPayload = z.infer<typeof RunQueueStatusReadRequestSchema>;
 export type RunQueueStatusReadResponsePayload = z.infer<typeof RunQueueStatusReadResponseSchema>;
+export type ExecutionReadinessReadRequestPayload = z.infer<typeof ExecutionReadinessReadRequestSchema>;
+export type ExecutionReadinessReadResponsePayload = z.infer<typeof ExecutionReadinessReadResponseSchema>;
 export type SchedulingAdminListStaleReservationsRequestPayload =
   z.infer<typeof SchedulingAdminListStaleReservationsRequestSchema>;
 export type SchedulingAdminListStaleReservationsResponsePayload =
@@ -686,6 +727,14 @@ export function parseRunQueueStatusReadRequest(payload: unknown): RunQueueStatus
 
 export function parseRunQueueStatusReadResponse(payload: unknown): RunQueueStatusReadResponsePayload {
   return parseRunOrchestrationSchema("RunQueueStatusReadResponse", RunQueueStatusReadResponseSchema, payload);
+}
+
+export function parseExecutionReadinessReadRequest(payload: unknown): ExecutionReadinessReadRequestPayload {
+  return parseRunOrchestrationSchema("ExecutionReadinessReadRequest", ExecutionReadinessReadRequestSchema, payload);
+}
+
+export function parseExecutionReadinessReadResponse(payload: unknown): ExecutionReadinessReadResponsePayload {
+  return parseRunOrchestrationSchema("ExecutionReadinessReadResponse", ExecutionReadinessReadResponseSchema, payload);
 }
 
 export function parseSchedulingAdminListStaleReservationsRequest(

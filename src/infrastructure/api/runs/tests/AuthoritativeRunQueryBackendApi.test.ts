@@ -1086,5 +1086,112 @@ describe("AuthoritativeRunQueryBackendApi", () => {
     expect(parsedAdmin.totalCount).toBe(1);
     expect(parsedAdmin.items[0]?.staleSeconds).toBe(60);
   });
+
+  it("returns normalized execution readiness summaries for authorized run.read audiences", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    authRepositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([createRoleAssignment({
+        id: "role-viewer-readiness",
+        actorUserIdentityId: "user-viewer",
+        roleKey: "viewer",
+        scope: RoleAssignmentScopes.workspace,
+        workspaceId: "workspace-alpha",
+        assignedByUserIdentityId: "user-owner",
+        assignedAt: "2026-04-07T08:00:00.000Z",
+      })]),
+      permissionGrants: Object.freeze([]),
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-07T10:01:00.000Z") },
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(new InMemoryRunQueueReadRepository()),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      getImageManipulationExecutionReadinessUseCase: {
+        execute: async () => Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          checkedAt: "2026-04-08T12:10:00.000Z",
+          readiness: "degraded" as const,
+          readyForExecution: false,
+          message: "backend is reachable but incompatible",
+          capabilities: Object.freeze({
+            backendFamily: "adapter.comfyui.image-manipulation",
+            supportsProgressPolling: true,
+            supportsProgressStreaming: false,
+            supportsCancellation: true,
+            supportsOutputDiscovery: true,
+            supportedOperationKinds: Object.freeze(["image-to-image"]),
+            supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+          }),
+          issues: Object.freeze([Object.freeze({
+            code: "translation-contract-version-unsupported",
+            severity: "error" as const,
+            message: "Translation contract version '2.0.0' is not supported.",
+          })]),
+        }),
+      } as never,
+      runRepository,
+      authorizationDecisionEvaluator: evaluator,
+      now: () => new Date("2026-04-07T10:01:00.000Z"),
+    });
+
+    const response = await api.getExecutionReadiness({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-viewer",
+        activeWorkspaceId: "workspace-alpha",
+      },
+      operationKind: "image-to-image",
+      translationContractVersion: "2.0.0",
+    });
+    expect(response.ok).toBeTrue();
+    expect(response.data?.backendFamily).toBe("adapter.comfyui.image-manipulation");
+    expect(response.data?.readiness).toBe("degraded");
+    expect(response.data?.readyForExecution).toBeFalse();
+    expect(response.data?.issues[0]?.code).toBe("translation-contract-version-unsupported");
+  });
+
+  it("enforces run.read authorization for execution readiness visibility", async () => {
+    const runRepository = new InMemoryRunRepository();
+    const authRepositories = new InMemoryAuthorizationRepositories();
+    authRepositories.roleGrantSnapshot = Object.freeze({
+      roleAssignments: Object.freeze([]),
+      permissionGrants: Object.freeze([]),
+    });
+    const evaluator = new AuthorizationPolicyDecisionEvaluator({
+      roleGrantReadRepository: authRepositories,
+      sharingGrantReadRepository: authRepositories,
+      resourcePolicyMetadataReadRepository: authRepositories,
+      clock: { now: () => new Date("2026-04-07T10:01:00.000Z") },
+    });
+
+    const api = new AuthoritativeRunQueryBackendApi({
+      listAuthoritativeRunsUseCase: new ListAuthoritativeRunsUseCase(runRepository),
+      listAuthoritativeRunQueueStatusUseCase: createQueueStatusUseCase(runRepository),
+      listStaleSchedulingReservationsUseCase: createStaleReservationUseCase(new InMemoryRunQueueReadRepository()),
+      getAuthoritativeRunUseCase: new GetAuthoritativeRunUseCase(runRepository),
+      runRepository,
+      authorizationDecisionEvaluator: evaluator,
+      now: () => new Date("2026-04-07T10:01:00.000Z"),
+    });
+
+    const denied = await api.getExecutionReadiness({
+      workspaceId: "workspace-alpha",
+      authorization: {
+        actorUserIdentityId: "user-no-access",
+        activeWorkspaceId: "workspace-alpha",
+      },
+    });
+
+    expect(denied.ok).toBeFalse();
+    expect(denied.error?.code).toBe("forbidden");
+  });
 });
 

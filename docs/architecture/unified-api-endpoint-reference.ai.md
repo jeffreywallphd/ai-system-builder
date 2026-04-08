@@ -35,6 +35,10 @@
 - `asset-management` -> `/api/v1/assets/*` (authenticated + workspace/visibility checks)
 - `image-asset-management` -> `/api/v1/image-assets*` (authenticated + workspace-scoped ingestion, metadata, and protected original-content retrieval; no direct public file-url bypasses)
 - `system-runtime` -> `/api/v1/runtime/*` + `/ws` realtime (authenticated + workspace/topic policy checks)
+  - includes authoritative execution readiness read:
+    - `GET /api/v1/runtime/execution/readiness`
+    - intended consumers: desktop/thin runtime clients plus later studio/admin readiness surfaces
+    - response contract is normalized (readiness state, actionable readiness boolean, capability summary, issues) and avoids raw adapter probe leakage
 
 ## Runtime realtime contracts
 

@@ -5,6 +5,8 @@ import type {
   RuntimeDequeueResponse,
   RuntimeQueueListRequest,
   RuntimeQueueListResponse,
+  RuntimeExecutionReadinessRequest,
+  RuntimeExecutionReadinessResponse,
   RuntimeSdkResponse,
   RuntimeSdkExecutionResultRequest,
   RuntimeSdkExecutionResultResponse,
@@ -54,6 +56,10 @@ export interface RuntimeControlClient {
     request: RuntimeSdkExecutionTraceRequest & { readonly workspaceId: string },
     sessionToken: string,
   ): Promise<RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>>;
+  getExecutionReadiness(
+    request: RuntimeExecutionReadinessRequest,
+    sessionToken: string,
+  ): Promise<RuntimeSdkResponse<RuntimeExecutionReadinessResponse>>;
   listQueueItems(
     request: RuntimeQueueListRequest,
     sessionToken: string,
@@ -151,6 +157,23 @@ export class HttpRuntimeControlClient implements RuntimeControlClient {
       sessionToken,
       parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeSdkExecutionTraceResponse>,
     }) as RuntimeSdkResponse<RuntimeSdkExecutionTraceResponse>;
+  }
+
+  public async getExecutionReadiness(
+    request: RuntimeExecutionReadinessRequest,
+    sessionToken: string,
+  ): Promise<RuntimeSdkResponse<RuntimeExecutionReadinessResponse>> {
+    const query = new URLSearchParams();
+    appendSharedApiListQueryConventions(query, { workspaceId: request.workspaceId });
+    appendSharedApiQueryValue(query, "systemId", request.systemId);
+    appendSharedApiQueryValue(query, "operationKind", request.operationKind);
+    appendSharedApiQueryValue(query, "translationContractVersion", request.translationContractVersion);
+    return await this.sharedApiClient.requestJson({
+      method: "GET",
+      path: `${SystemRuntimeTransportRoutes.getExecutionReadiness}${toSharedApiQuerySuffix(query)}`,
+      sessionToken,
+      parseResponse: (payload) => parseSharedApiEnvelope(payload) as SharedApiEnvelope<RuntimeExecutionReadinessResponse>,
+    }) as RuntimeSdkResponse<RuntimeExecutionReadinessResponse>;
   }
 
   public async listQueueItems(
