@@ -36,6 +36,7 @@ Canonical family modules:
 - `src/infrastructure/transport/http-server/authoritative-route-families/SecurityAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/StorageAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/AssetAuthoritativeApiRoutes.ts`
+- `src/infrastructure/transport/http-server/authoritative-route-families/ImageAssetAuthoritativeApiRoutes.ts`
 - `src/infrastructure/transport/http-server/authoritative-route-families/RuntimeAuthoritativeApiRoutes.ts`
 
 ## Traceability matrix
@@ -51,6 +52,7 @@ Canonical family modules:
 | `security-certificate-operations` + `security-secret-metadata` | `/api/v1/security/certificates`, `/api/v1/security/secrets` | `src/infrastructure/api/security/CertificateOperationsBackendApi.ts`, `src/infrastructure/api/security/SecretMetadataBackendApi.ts` | `src/shared/contracts/security/SecretTransportContracts.ts`, `src/shared/schemas/security/CertificateAuthoritySchemaContracts.ts`, `src/shared/schemas/security/SecretApiSchemaContracts.ts` | `src/ui/shared/security/SecretMetadataManagementClient.ts` |
 | `storage-management` | `/api/v1/storage` | `src/infrastructure/api/storage/StorageManagementBackendApi.ts` | `src/shared/schemas/storage/StorageTransportSchemaContracts.ts` (plus DTO contracts via `src/infrastructure/api/storage/sdk/PublicStorageManagementApiContract.ts`) | `src/ui/shared/storage/StorageAdministrationClient.ts` |
 | `asset-management` | `/api/v1/assets` | `src/infrastructure/api/assets/AssetManagementBackendApi.ts` | `src/shared/contracts/assets/AssetWorkflowClientContracts.ts` | `src/ui/shared/assets/AssetWorkflowClient.ts` |
+| `image-asset-management` | `/api/v1/image-assets` | `src/infrastructure/api/image-assets/ImageAssetManagementBackendApi.ts` | `src/shared/contracts/assets/ImageAssetTransportContracts.ts`, `src/infrastructure/api/image-assets/sdk/PublicImageAssetManagementApiContract.ts` | authoritative server integration surface for desktop/thin clients (shared client adapter pending story scope) |
 | `system-runtime` | `/api/v1/runtime` and websocket path `/ws` | `src/infrastructure/api/system-runtime/SystemRuntimeBackendApi.ts`, `src/infrastructure/api/system-runtime/AuthoritativeRuntimeEventStream.ts` | `src/shared/contracts/runtime/SystemRuntimeTransportContracts.ts`, `src/shared/contracts/runtime/SystemRuntimeRealtimeEventContracts.ts`, `src/shared/schemas/runtime/SystemRuntimeTransportSchemaContracts.ts`, `src/shared/schemas/runtime/SystemRuntimeRealtimeEventSchemaContracts.ts` | `src/ui/shared/runtime/RuntimeControlClient.ts` |
 
 ## Endpoint groups and auth expectations
@@ -190,6 +192,22 @@ Authoritative policy expectations:
 
 - bearer session required
 - workspace + visibility authorization checks are enforced server-side
+
+### Image asset ingestion and metadata (`/api/v1/image-assets*`)
+
+- metadata:
+  - `GET /api/v1/image-assets`
+  - `GET /api/v1/image-assets/:assetId`
+- ingestion:
+  - `POST /api/v1/image-assets`
+  - `POST /api/v1/image-assets/:assetId/uploads/:uploadSessionId/content`
+  - `POST /api/v1/image-assets/:assetId/uploads/:uploadSessionId/complete`
+
+Authoritative policy expectations:
+
+- bearer session required
+- workspace scope required (`workspaceId`)
+- transport handlers delegate to image application use cases via `ImageAssetManagementBackendApi`; no raw storage path exposure in response DTOs
 
 ### Runtime control and realtime (`/api/v1/runtime/*`, `/ws`)
 

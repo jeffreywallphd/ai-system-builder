@@ -18,6 +18,7 @@
   - `authoritative-route-families/SecurityAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/StorageAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/AssetAuthoritativeApiRoutes.ts`
+  - `authoritative-route-families/ImageAssetAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/RuntimeAuthoritativeApiRoutes.ts`
 
 ## Endpoint/auth map
@@ -32,6 +33,7 @@
 - `security-*` -> `/api/v1/security/certificates/*`, `/api/v1/security/secrets/*` (authenticated, trusted-session for high-assurance operations)
 - `storage-management` -> `/api/v1/storage/*` (authenticated + workspace policy enforcement)
 - `asset-management` -> `/api/v1/assets/*` (authenticated + workspace/visibility checks)
+- `image-asset-management` -> `/api/v1/image-assets*` (authenticated + workspace-scoped ingestion and metadata access)
 - `system-runtime` -> `/api/v1/runtime/*` + `/ws` realtime (authenticated + workspace/topic policy checks)
 
 ## Runtime realtime contracts

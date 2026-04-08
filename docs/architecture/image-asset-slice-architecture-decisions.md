@@ -90,7 +90,8 @@ Client and host integrations consume typed DTO/schema contracts rather than loca
 Current implementation boundary (April 8, 2026):
 
 - domain invariants, shared transport/auth contracts, application repository/storage ports, concrete SQLite image-asset metadata persistence, a concrete managed image-binary storage adapter, explicit upload finalization lifecycle orchestration, and policy-enforced metadata get/list use cases are implemented
-- host wiring for the full image-asset route surface remains incremental in downstream stories through existing host assembly and API layers
+- authoritative image-asset API wiring is now present for create, upload-content ingest, upload completion, detail retrieval, and metadata listing routes
+- transport handlers stay thin and delegate to image application use cases via `ImageAssetManagementBackendApi`
 
 ## Decision 6: preview-safe access and generated outputs are first-class
 
@@ -126,6 +127,8 @@ When extending image ingestion/retrieval:
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageAssetManagement.test.ts`
 
 ## Related architecture notes
 

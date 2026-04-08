@@ -32,7 +32,8 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 ## Current implementation posture (April 8, 2026)
 
 - Domain invariants, shared DTO/schema contracts, authorization contracts, application ports, concrete SQLite metadata persistence, a concrete managed image-binary storage adapter, upload finalization lifecycle orchestration, and policy-enforced metadata read/list use cases are implemented.
-- Host/API route wiring for the full image-asset ingestion/retrieval surface remains incremental in later stories.
+- Authoritative server API wiring now includes image-asset ingestion and metadata endpoints for create, upload-content ingest, upload completion, metadata detail, and metadata listing.
+- Image-asset transport handlers remain thin and delegate to application-layer image use cases through `ImageAssetManagementBackendApi` and host composition.
 
 ## Extension guardrails
 
@@ -53,3 +54,5 @@ Story 1.1.5 baseline for Feature 1 / Epic 1.1: record the architectural decision
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
+- `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`
+- `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerImageAssetManagement.test.ts`
