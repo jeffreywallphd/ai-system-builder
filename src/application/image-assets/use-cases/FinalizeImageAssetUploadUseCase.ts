@@ -31,6 +31,17 @@ import {
   type IFinalizeImageAssetUploadUseCase,
   type ImageAssetUploadFinalizationResult,
 } from "./ImageAssetUploadFinalizationUseCaseContracts";
+import {
+  ImageAssetFailureDefaults,
+  createImageAssetNormalizedFailure,
+  withImageAssetNormalizedFailureDetails,
+} from "./ImageAssetFailureNormalization";
+import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceRecoveryKinds,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
 
 export interface FinalizeImageAssetUploadUseCaseDependencies {
   readonly imageAssetRepository: IImageAssetRepository;
@@ -70,6 +81,11 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.invalidRequest,
         error instanceof Error ? error.message : "Invalid image asset upload finalization request.",
+        undefined,
+        {
+          reason: "upload-finalization-request-invalid",
+          userFixable: true,
+        },
       );
     }
 
@@ -89,6 +105,12 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.accessDenied,
         "Image asset upload finalization requires active workspace membership.",
+        undefined,
+        {
+          reason: "workspace-membership-required",
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+          kind: ImageAssetFailureDefaults.kind.operational,
+        },
       );
     }
 
@@ -105,6 +127,12 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.notFound,
         "Image asset was not found for the workspace.",
+        undefined,
+        {
+          reason: "asset-not-found",
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+          kind: ImageAssetFailureDefaults.kind.operational,
+        },
       );
     }
 
@@ -119,6 +147,11 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.invalidRequest,
         "storageReference.storageInstanceId does not match image asset storageInstanceId.",
+        undefined,
+        {
+          reason: "storage-reference-mismatch",
+          userFixable: true,
+        },
       );
     }
 
@@ -133,6 +166,12 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
       return this.failure(
         ImageAssetUploadFinalizationErrorCodes.invalidState,
         `Image asset '${existing.assetId}' is '${existing.lifecycle.status}' and cannot be finalized from upload pending state.`,
+        undefined,
+        {
+          reason: "asset-not-ingesting",
+          summaryCategory: ImageAssetFailureDefaults.summary.output,
+          kind: ImageAssetFailureDefaults.kind.operational,
+        },
       );
     }
 
@@ -216,6 +255,31 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
         code,
         error instanceof Error ? error.message : "Image asset upload finalization failed.",
         cleanup,
+        {
+          reason: failureReason,
+          kind: code === ImageAssetUploadFinalizationErrorCodes.invalidRequest || code === ImageAssetUploadFinalizationErrorCodes.conflict
+            ? ImageAssetFailureDefaults.kind.validation
+            : ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: code === ImageAssetUploadFinalizationErrorCodes.conflict
+            ? ImageAssetFailureDefaults.summary.validation
+            : code === ImageAssetUploadFinalizationErrorCodes.internal
+              ? ImageAssetFailureDefaults.summary.internal
+              : ImageAssetFailureDefaults.summary.unknown,
+          userFixable: code === ImageAssetUploadFinalizationErrorCodes.invalidRequest || code === ImageAssetUploadFinalizationErrorCodes.conflict,
+          retryable: isImageAssetStorageError(error) && error.retryable,
+          resilience: code === ImageAssetUploadFinalizationErrorCodes.internal
+            ? {
+              code: "asset-ingestion-finalization-degraded",
+              scope: ImageManipulationResilienceScopes.authoritativeState,
+              state: ImageManipulationResilienceStateKinds.degraded,
+              summary: "Image ingestion finalization degraded due to storage or backend failure.",
+              durability: ImageManipulationResilienceDurabilityClasses.unknown,
+              recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+              recoveryRetryable: isImageAssetStorageError(error) ? error.retryable : false,
+              recoveryRetryAfterMs: 3000,
+            }
+            : undefined,
+        },
       );
     }
   }
@@ -447,13 +511,45 @@ export class FinalizeImageAssetUploadUseCase implements IFinalizeImageAssetUploa
     code: typeof ImageAssetUploadFinalizationErrorCodes[keyof typeof ImageAssetUploadFinalizationErrorCodes],
     message: string,
     details?: Readonly<Record<string, unknown>>,
+    normalization?: {
+      readonly reason: string;
+      readonly kind?: typeof ImageAssetFailureDefaults.kind[keyof typeof ImageAssetFailureDefaults.kind];
+      readonly summaryCategory?: typeof ImageAssetFailureDefaults.summary[keyof typeof ImageAssetFailureDefaults.summary];
+      readonly userFixable?: boolean;
+      readonly retryable?: boolean;
+      readonly resilience?: {
+        readonly code: string;
+        readonly scope: typeof ImageManipulationResilienceScopes[keyof typeof ImageManipulationResilienceScopes];
+        readonly state: typeof ImageManipulationResilienceStateKinds[keyof typeof ImageManipulationResilienceStateKinds];
+        readonly summary: string;
+        readonly durability?: typeof ImageManipulationResilienceDurabilityClasses[keyof typeof ImageManipulationResilienceDurabilityClasses];
+        readonly recoveryKind?: typeof ImageManipulationResilienceRecoveryKinds[keyof typeof ImageManipulationResilienceRecoveryKinds];
+        readonly recoveryRetryable?: boolean;
+        readonly recoveryRetryAfterMs?: number;
+      };
+    },
   ): ImageAssetUploadFinalizationResult<never> {
+    const normalizedDetails = normalization
+      ? withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.ingestion,
+          kind: normalization.kind ?? ImageAssetFailureDefaults.kind.validation,
+          reason: normalization.reason,
+          summaryCategory: normalization.summaryCategory ?? ImageAssetFailureDefaults.summary.validation,
+          userFixable: normalization.userFixable,
+          retryable: normalization.retryable,
+          resilience: normalization.resilience,
+          degraded: Boolean(normalization.resilience),
+        }),
+      )
+      : details;
     return {
       ok: false,
       error: Object.freeze({
         code,
         message,
-        details,
+        details: normalizedDetails,
       }),
     };
   }
@@ -534,9 +630,6 @@ async function detectMediaTypeFromSignature(chunks: ReadonlyArray<Uint8Array>): 
     return undefined;
   }
   const detector = await resolveFileTypeFromBuffer();
-  if (!detector) {
-    return undefined;
-  }
 
   const totalLength = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
   const payload = new Uint8Array(totalLength);
@@ -546,8 +639,54 @@ async function detectMediaTypeFromSignature(chunks: ReadonlyArray<Uint8Array>): 
     offset += chunk.byteLength;
   }
 
-  const detected = await detector(payload);
-  return detected?.mime?.toLowerCase();
+  const detectedMediaType = detector
+    ? (await detector(payload))?.mime?.toLowerCase()
+    : undefined;
+  return detectedMediaType ?? detectMediaTypeFromMagicBytes(payload);
+}
+
+function detectMediaTypeFromMagicBytes(payload: Uint8Array): string | undefined {
+  const startsWith = (signature: ReadonlyArray<number>): boolean =>
+    signature.every((value, index) => payload[index] === value);
+  if (payload.length >= 8 && startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    return "image/png";
+  }
+  if (payload.length >= 3 && startsWith([0xff, 0xd8, 0xff])) {
+    return "image/jpeg";
+  }
+  if (payload.length >= 6 && (startsWith([0x47, 0x49, 0x46, 0x38, 0x37, 0x61]) || startsWith([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))) {
+    return "image/gif";
+  }
+  if (payload.length >= 2 && startsWith([0x42, 0x4d])) {
+    return "image/bmp";
+  }
+  if (payload.length >= 12 && payload[0] === 0x52 && payload[1] === 0x49 && payload[2] === 0x46 && payload[3] === 0x46
+    && payload[8] === 0x57 && payload[9] === 0x45 && payload[10] === 0x42 && payload[11] === 0x50) {
+    return "image/webp";
+  }
+  if (payload.length >= 4) {
+    const littleEndianTiff = startsWith([0x49, 0x49, 0x2a, 0x00]);
+    const bigEndianTiff = startsWith([0x4d, 0x4d, 0x00, 0x2a]);
+    if (littleEndianTiff || bigEndianTiff) {
+      return "image/tiff";
+    }
+  }
+  if (payload.length >= 12) {
+    const isFtyp = payload[4] === 0x66 && payload[5] === 0x74 && payload[6] === 0x79 && payload[7] === 0x70;
+    if (isFtyp) {
+      const brand = String.fromCharCode(payload[8] ?? 0, payload[9] ?? 0, payload[10] ?? 0, payload[11] ?? 0).toLowerCase();
+      if (brand === "avif" || brand === "avis") {
+        return "image/avif";
+      }
+      if (brand.startsWith("heic")) {
+        return "image/heic";
+      }
+      if (brand.startsWith("heif") || brand.startsWith("mif1")) {
+        return "image/heif";
+      }
+    }
+  }
+  return undefined;
 }
 
 function mapFailureCode(

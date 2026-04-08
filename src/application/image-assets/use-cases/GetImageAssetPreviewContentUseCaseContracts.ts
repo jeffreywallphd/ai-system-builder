@@ -1,4 +1,4 @@
-import type { SupportedImageMediaType } from "@domain/image-assets/ImageAssetDomain";
+import { SupportedImageMediaTypes, type SupportedImageMediaType } from "@domain/image-assets/ImageAssetDomain";
 
 export class ImageAssetPreviewContentContractError extends Error {
   constructor(message: string) {
@@ -150,15 +150,26 @@ function normalizeOptionalPositiveInteger(
 export function validateRequestImageAssetPreviewContentRequest(
   input: RequestImageAssetPreviewContentRequest,
 ): RequestImageAssetPreviewContentRequest {
+  if (input.representation && !Object.values(ImageAssetPreviewRepresentations).includes(input.representation)) {
+    throw new ImageAssetPreviewContentContractError("representation must be one of: original, gallery, thumbnail.");
+  }
+  const preferredMediaTypes = input.preferredMediaTypes
+    ? Object.freeze(input.preferredMediaTypes.map((value) => {
+      const normalized = value.trim().toLowerCase();
+      if (!SupportedImageMediaTypes.includes(normalized as SupportedImageMediaType)) {
+        throw new ImageAssetPreviewContentContractError(`preferredMediaTypes entry '${value}' is not a supported image media type.`);
+      }
+      return normalized as SupportedImageMediaType;
+    }))
+    : undefined;
+
   return Object.freeze({
     ...input,
     actorUserId: normalizeRequired(input.actorUserId, "actorUserId"),
     workspaceId: normalizeRequired(input.workspaceId, "workspaceId"),
     assetId: normalizeRequired(input.assetId, "assetId"),
     representation: input.representation ?? ImageAssetPreviewRepresentations.gallery,
-    preferredMediaTypes: input.preferredMediaTypes
-      ? Object.freeze(input.preferredMediaTypes.map((value) => value.trim().toLowerCase() as SupportedImageMediaType))
-      : undefined,
+    preferredMediaTypes,
     expiresInSeconds: normalizeOptionalPositiveInteger(input.expiresInSeconds, "expiresInSeconds", 1),
     correlationId: normalizeOptional(input.correlationId),
     occurredAt: normalizeOptionalTimestamp(input.occurredAt, "occurredAt"),

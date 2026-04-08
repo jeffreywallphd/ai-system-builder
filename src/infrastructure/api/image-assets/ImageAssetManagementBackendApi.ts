@@ -26,6 +26,17 @@ import {
   type ImageAssetSummaryDto,
 } from "@shared/contracts/assets/ImageAssetTransportContracts";
 import {
+  ImageAssetFailureDefaults,
+  createImageAssetNormalizedFailure,
+  withImageAssetNormalizedFailureDetails,
+} from "@application/image-assets/use-cases/ImageAssetFailureNormalization";
+import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceRecoveryKinds,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
+import {
   ImageAssetManagementObservability,
   ImageAssetManagementObservabilityFlows,
   type ImageAssetManagementObservabilityFlow,
@@ -110,7 +121,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.create,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "creation"),
       );
     }
 
@@ -205,7 +216,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required"),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "upload-ingest"),
       );
     }
 
@@ -214,7 +225,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid"),
+        this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -228,7 +239,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch"),
+        this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -244,9 +255,28 @@ export class ImageAssetManagementBackendApi {
         this.failed(
           ImageAssetManagementApiErrorCodes.invalidState,
           "uploadSessionId has expired.",
-          Object.freeze({
-            validationCode: "upload-session-expired",
-          }),
+          withImageAssetNormalizedFailureDetails(
+            Object.freeze({
+              validationCode: "upload-session-expired",
+              staleRequest: true,
+            }),
+            createImageAssetNormalizedFailure({
+              layer: ImageAssetFailureDefaults.layer.ingestion,
+              kind: ImageAssetFailureDefaults.kind.validation,
+              summaryCategory: ImageAssetFailureDefaults.summary.validation,
+              reason: "ingest-upload-session-expired",
+              userFixable: true,
+              resilience: {
+                code: "asset-ingestion-session-expired",
+                scope: ImageManipulationResilienceScopes.authoritativeState,
+                state: ImageManipulationResilienceStateKinds.blocked,
+                summary: "Upload session is stale and must be restarted.",
+                durability: ImageManipulationResilienceDurabilityClasses.temporary,
+                recoveryKind: ImageManipulationResilienceRecoveryKinds.userAction,
+                recoveryRetryable: false,
+              },
+            }),
+          ),
         ),
         Object.freeze({
           actorUserIdentityId: actorUserId,
@@ -262,7 +292,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("contentType is required for image upload ingestion.", "content-type-required"),
+        this.invalidRequest("contentType is required for image upload ingestion.", "content-type-required", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -278,6 +308,8 @@ export class ImageAssetManagementBackendApi {
         this.invalidRequest(
           `contentType '${normalizedContentType}' is not supported for image ingestion.`,
           "content-type-unsupported",
+          undefined,
+          "upload-ingest",
         ),
         Object.freeze({
           actorUserIdentityId: actorUserId,
@@ -294,6 +326,8 @@ export class ImageAssetManagementBackendApi {
         this.invalidRequest(
           `contentType '${normalizedContentType}' does not match reserved mediaType '${uploadSession.mediaType}'.`,
           "content-type-mismatch",
+          undefined,
+          "upload-ingest",
         ),
         Object.freeze({
           actorUserIdentityId: actorUserId,
@@ -309,7 +343,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("expectedChecksumSha256 must be a lowercase hexadecimal sha256 digest.", "expected-checksum-invalid"),
+        this.invalidRequest("expectedChecksumSha256 must be a lowercase hexadecimal sha256 digest.", "expected-checksum-invalid", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -323,7 +357,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadIngest,
         request,
-        this.invalidRequest("expectedSizeBytes must be an integer >= 1.", "expected-size-invalid"),
+        this.invalidRequest("expectedSizeBytes must be an integer >= 1.", "expected-size-invalid", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -394,7 +428,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadFinalize,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "upload-ingest"),
       );
     }
 
@@ -403,7 +437,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadFinalize,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId is invalid."),
+        this.invalidRequest("uploadSessionId is invalid.", "upload-session-invalid", undefined, "upload-ingest"),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -417,7 +451,36 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.uploadFinalize,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "uploadSessionId does not match workspaceId/assetId."),
+        this.invalidRequest("uploadSessionId does not match workspaceId/assetId.", "upload-session-context-mismatch", undefined, "upload-ingest"),
+        Object.freeze({
+          actorUserIdentityId: actorUserId,
+          workspaceId: request.workspaceId,
+          assetId: request.assetId,
+          correlationId: request.correlationId,
+        }),
+      );
+    }
+    if (uploadSession.expiresAt && new Date(uploadSession.expiresAt).getTime() < this.clock.now().getTime()) {
+      return this.recordOutcome(
+        ImageAssetManagementObservabilityFlows.uploadFinalize,
+        request,
+        this.failed(
+          ImageAssetManagementApiErrorCodes.invalidState,
+          "uploadSessionId has expired.",
+          withImageAssetNormalizedFailureDetails(
+            Object.freeze({
+              validationCode: "upload-session-expired",
+              staleRequest: true,
+            }),
+            createImageAssetNormalizedFailure({
+              layer: ImageAssetFailureDefaults.layer.ingestion,
+              kind: ImageAssetFailureDefaults.kind.validation,
+              summaryCategory: ImageAssetFailureDefaults.summary.validation,
+              reason: "finalize-upload-session-expired",
+              userFixable: true,
+            }),
+          ),
+        ),
         Object.freeze({
           actorUserIdentityId: actorUserId,
           workspaceId: request.workspaceId,
@@ -491,7 +554,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.metadataGet,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "retrieval"),
       );
     }
 
@@ -543,7 +606,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.metadataList,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "retrieval"),
       );
     }
 
@@ -611,7 +674,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.originalOpen,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "retrieval"),
       );
     }
 
@@ -671,7 +734,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.previewRequest,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "retrieval"),
       );
     }
 
@@ -742,7 +805,7 @@ export class ImageAssetManagementBackendApi {
       return this.recordOutcome(
         ImageAssetManagementObservabilityFlows.previewOpen,
         request,
-        this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required."),
+        this.invalidRequest("actorUserIdentityId is required.", "actor-user-identity-required", undefined, "retrieval"),
       );
     }
 
@@ -873,20 +936,36 @@ export class ImageAssetManagementBackendApi {
     message: string,
     details?: Readonly<Record<string, unknown>>,
   ): ImageAssetManagementApiResponse<never> {
+    const normalizedDetails = withImageAssetNormalizedFailureDetails(
+      details,
+      createImageAssetNormalizedFailure({
+        layer: ImageAssetFailureDefaults.layer.ingestion,
+        kind: code === ImageAssetCreationErrorCodes.invalidRequest
+          ? ImageAssetFailureDefaults.kind.validation
+          : ImageAssetFailureDefaults.kind.operational,
+        summaryCategory: code === ImageAssetCreationErrorCodes.invalidRequest
+          ? ImageAssetFailureDefaults.summary.validation
+          : code === ImageAssetCreationErrorCodes.internal
+            ? ImageAssetFailureDefaults.summary.internal
+            : ImageAssetFailureDefaults.summary.unknown,
+        reason: code,
+        userFixable: code === ImageAssetCreationErrorCodes.invalidRequest,
+      }),
+    );
     switch (code) {
       case ImageAssetCreationErrorCodes.invalidRequest:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, normalizedDetails);
       case ImageAssetCreationErrorCodes.accessDenied:
       case ImageAssetCreationErrorCodes.policyViolation:
-        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, normalizedDetails);
       case ImageAssetCreationErrorCodes.notFound:
-        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, normalizedDetails);
       case ImageAssetCreationErrorCodes.invalidState:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, normalizedDetails);
       case ImageAssetCreationErrorCodes.conflict:
-        return this.failed(ImageAssetManagementApiErrorCodes.conflict, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.conflict, message, normalizedDetails);
       default:
-        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, normalizedDetails);
     }
   }
 
@@ -895,19 +974,40 @@ export class ImageAssetManagementBackendApi {
     message: string,
     details?: Readonly<Record<string, unknown>>,
   ): ImageAssetManagementApiResponse<never> {
+    const normalizedDetails = details?.imageManipulationFailure
+      ? details
+      : withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.ingestion,
+          kind: code === ImageAssetUploadFinalizationErrorCodes.invalidRequest
+            || code === ImageAssetUploadFinalizationErrorCodes.conflict
+            ? ImageAssetFailureDefaults.kind.validation
+            : ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: code === ImageAssetUploadFinalizationErrorCodes.invalidRequest
+            || code === ImageAssetUploadFinalizationErrorCodes.conflict
+            ? ImageAssetFailureDefaults.summary.validation
+            : code === ImageAssetUploadFinalizationErrorCodes.internal
+              ? ImageAssetFailureDefaults.summary.internal
+              : ImageAssetFailureDefaults.summary.unknown,
+          reason: code,
+          userFixable: code === ImageAssetUploadFinalizationErrorCodes.invalidRequest
+            || code === ImageAssetUploadFinalizationErrorCodes.conflict,
+        }),
+      );
     switch (code) {
       case ImageAssetUploadFinalizationErrorCodes.invalidRequest:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, normalizedDetails);
       case ImageAssetUploadFinalizationErrorCodes.accessDenied:
-        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, normalizedDetails);
       case ImageAssetUploadFinalizationErrorCodes.notFound:
-        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, normalizedDetails);
       case ImageAssetUploadFinalizationErrorCodes.invalidState:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, normalizedDetails);
       case ImageAssetUploadFinalizationErrorCodes.conflict:
-        return this.failed(ImageAssetManagementApiErrorCodes.conflict, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.conflict, message, normalizedDetails);
       default:
-        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, normalizedDetails);
     }
   }
 
@@ -933,18 +1033,37 @@ export class ImageAssetManagementBackendApi {
     message: string,
     details?: Readonly<Record<string, unknown>>,
   ): ImageAssetManagementApiResponse<never> {
+    const normalizedDetails = details?.imageManipulationFailure
+      ? details
+      : withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.retrieval,
+          kind: code === ImageAssetOriginalContentReadErrorCodes.invalidRequest
+            ? ImageAssetFailureDefaults.kind.validation
+            : ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: code === ImageAssetOriginalContentReadErrorCodes.invalidRequest
+            ? ImageAssetFailureDefaults.summary.validation
+            : code === ImageAssetOriginalContentReadErrorCodes.internal
+              ? ImageAssetFailureDefaults.summary.internal
+              : ImageAssetFailureDefaults.summary.unknown,
+          reason: code,
+          userFixable: code === ImageAssetOriginalContentReadErrorCodes.invalidRequest
+            || code === ImageAssetOriginalContentReadErrorCodes.invalidState,
+        }),
+      );
     switch (code) {
       case ImageAssetOriginalContentReadErrorCodes.invalidRequest:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, normalizedDetails);
       case ImageAssetOriginalContentReadErrorCodes.accessDenied:
-        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, normalizedDetails);
       case ImageAssetOriginalContentReadErrorCodes.notFound:
-        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, normalizedDetails);
       case ImageAssetOriginalContentReadErrorCodes.invalidState:
       case ImageAssetOriginalContentReadErrorCodes.contentUnavailable:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, normalizedDetails);
       default:
-        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, normalizedDetails);
     }
   }
 
@@ -953,18 +1072,39 @@ export class ImageAssetManagementBackendApi {
     message: string,
     details?: Readonly<Record<string, unknown>>,
   ): ImageAssetManagementApiResponse<never> {
+    const normalizedDetails = details?.imageManipulationFailure
+      ? details
+      : withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.preview,
+          kind: code === ImageAssetPreviewContentReadErrorCodes.invalidRequest
+            || code === ImageAssetPreviewContentReadErrorCodes.invalidState
+            ? ImageAssetFailureDefaults.kind.validation
+            : ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: code === ImageAssetPreviewContentReadErrorCodes.invalidRequest
+            || code === ImageAssetPreviewContentReadErrorCodes.invalidState
+            ? ImageAssetFailureDefaults.summary.validation
+            : code === ImageAssetPreviewContentReadErrorCodes.internal
+              ? ImageAssetFailureDefaults.summary.internal
+              : ImageAssetFailureDefaults.summary.unknown,
+          reason: code,
+          userFixable: code === ImageAssetPreviewContentReadErrorCodes.invalidRequest
+            || code === ImageAssetPreviewContentReadErrorCodes.invalidState,
+        }),
+      );
     switch (code) {
       case ImageAssetPreviewContentReadErrorCodes.invalidRequest:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, normalizedDetails);
       case ImageAssetPreviewContentReadErrorCodes.accessDenied:
-        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, normalizedDetails);
       case ImageAssetPreviewContentReadErrorCodes.notFound:
-        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, normalizedDetails);
       case ImageAssetPreviewContentReadErrorCodes.invalidState:
       case ImageAssetPreviewContentReadErrorCodes.contentUnavailable:
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, normalizedDetails);
       default:
-        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, normalizedDetails);
     }
   }
 
@@ -973,22 +1113,66 @@ export class ImageAssetManagementBackendApi {
       return this.failed(
         ImageAssetManagementApiErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset upload ingestion failed.",
+        withImageAssetNormalizedFailureDetails(
+          undefined,
+          createImageAssetNormalizedFailure({
+            layer: ImageAssetFailureDefaults.layer.ingestion,
+            kind: ImageAssetFailureDefaults.kind.operational,
+            summaryCategory: ImageAssetFailureDefaults.summary.internal,
+            reason: "upload-ingestion-internal",
+          }),
+        ),
       );
     }
+
+    const normalizedDetails = withImageAssetNormalizedFailureDetails(
+      undefined,
+      createImageAssetNormalizedFailure({
+        layer: ImageAssetFailureDefaults.layer.ingestion,
+        kind: error.code === "image-asset-storage-invalid-request"
+          || error.code === "image-asset-storage-reservation-denied"
+          || error.code === "image-asset-storage-conflict"
+          || error.code === "image-asset-storage-size-limit-exceeded"
+          ? ImageAssetFailureDefaults.kind.validation
+          : ImageAssetFailureDefaults.kind.operational,
+        summaryCategory: error.code === "image-asset-storage-invalid-request"
+          || error.code === "image-asset-storage-reservation-denied"
+          || error.code === "image-asset-storage-conflict"
+          || error.code === "image-asset-storage-size-limit-exceeded"
+          ? ImageAssetFailureDefaults.summary.validation
+          : error.code === "image-asset-storage-io-failure"
+            ? ImageAssetFailureDefaults.summary.connectivity
+            : ImageAssetFailureDefaults.summary.unknown,
+        reason: error.code,
+        retryable: error.retryable,
+        resilience: error.retryable
+          ? {
+            code: "asset-ingestion-temporarily-unavailable",
+            scope: ImageManipulationResilienceScopes.authoritativeState,
+            state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+            summary: "Image ingestion is temporarily unavailable due to storage/backend degradation.",
+            durability: ImageManipulationResilienceDurabilityClasses.temporary,
+            recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+            recoveryRetryable: true,
+            recoveryRetryAfterMs: 3000,
+          }
+          : undefined,
+      }),
+    );
 
     switch (error.code) {
       case "image-asset-storage-invalid-request":
       case "image-asset-storage-reservation-denied":
-        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, error.message);
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, error.message, normalizedDetails);
       case "image-asset-storage-access-denied":
-        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, error.message);
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, error.message, normalizedDetails);
       case "image-asset-storage-not-found":
-        return this.failed(ImageAssetManagementApiErrorCodes.notFound, error.message);
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, error.message, normalizedDetails);
       case "image-asset-storage-conflict":
       case "image-asset-storage-size-limit-exceeded":
-        return this.failed(ImageAssetManagementApiErrorCodes.conflict, error.message);
+        return this.failed(ImageAssetManagementApiErrorCodes.conflict, error.message, normalizedDetails);
       default:
-        return this.failed(ImageAssetManagementApiErrorCodes.internal, error.message);
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, error.message, normalizedDetails);
     }
   }
 
@@ -1011,14 +1195,32 @@ export class ImageAssetManagementBackendApi {
     message: string,
     validationCode: string,
     details?: Readonly<Record<string, unknown>>,
+    context: "upload-ingest" | "retrieval" | "creation" = "upload-ingest",
   ): ImageAssetManagementApiResponse<never> {
+    const layer = context === "retrieval"
+      ? ImageAssetFailureDefaults.layer.retrieval
+      : ImageAssetFailureDefaults.layer.ingestion;
+    const reasonPrefix = context === "creation"
+      ? "create"
+      : context === "retrieval"
+        ? "retrieval"
+        : "ingest";
     return this.failed(
       ImageAssetManagementApiErrorCodes.invalidRequest,
       message,
-      Object.freeze({
-        validationCode,
-        ...(details ?? {}),
-      }),
+      withImageAssetNormalizedFailureDetails(
+        Object.freeze({
+          validationCode,
+          ...(details ?? {}),
+        }),
+        createImageAssetNormalizedFailure({
+          layer,
+          kind: ImageAssetFailureDefaults.kind.validation,
+          summaryCategory: ImageAssetFailureDefaults.summary.validation,
+          reason: `${reasonPrefix}-${validationCode}`,
+          userFixable: true,
+        }),
+      ),
     );
   }
 }
