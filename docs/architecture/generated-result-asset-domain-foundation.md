@@ -1,6 +1,6 @@
 # Generated Result Asset Domain Foundation
 
-This note documents Story 6.1.1 for the image manipulation vertical slice: generated execution outputs are modeled as authoritative, workspace-scoped result assets with explicit lifecycle, provenance, and logical asset linkage.
+This note documents Stories 6.1.1 and 6.1.2 for the image manipulation vertical slice: generated execution outputs are modeled as authoritative, workspace-scoped result assets with explicit lifecycle, provenance, and logical asset linkage.
 
 ## Canonical files
 
@@ -14,6 +14,11 @@ This note documents Story 6.1.1 for the image manipulation vertical slice: gener
 - identity and tenancy: `resultAssetId`, `workspaceId`, optional `ownerUserId`
 - production lineage context: `source.runId`, `source.systemId`, `source.workflowId`, optional `source.workflowTemplateId`, optional `source.executionNodeId`, `source.outputSlot`
 - upstream lineage: `lineage.inputAssetIds`
+- durable lineage references:
+  - workflow template snapshot pointers: `lineage.workflowTemplateVersionId`, `lineage.workflowTemplateVersionTag`
+  - system snapshot pointers: `lineage.systemSnapshotId`, `lineage.systemVersionTag`
+  - parameter snapshot pointer: `lineage.parameterSnapshotId`
+  - execution trace pointers: `lineage.selectedNodeId`, `lineage.executionAdapterKind`, `lineage.executionBackendFamily`
 - storage references: `storageInstanceId`, optional `storageBindingReference`
 - protection posture: `visibility`, optional `sharingPolicyRef`
 - audit metadata: `createdBy`, `lastModifiedBy`, `createdAt`, `updatedAt`
@@ -55,6 +60,24 @@ Generated result assets integrate with the logical asset model by design:
 - `lineage.inputAssetIds` are canonical logical asset ids
 - persistence completion requires explicit logical asset version linkage (`logicalAssetVersionId`)
 - storage references are logical (`storage-instance://...`) and reject filesystem paths
+
+## Lineage integrity and non-duplication posture
+
+The lineage model is explicit but avoids copying canonical run/system/workflow records:
+
+- `source` remains the primary identity pointer set for run/workflow/system/output-slot context.
+- `lineage` stores query-oriented, immutable references to snapshots/versions used at execution time.
+- lineage does not embed backend transport payloads or runtime-internal descriptors.
+
+Additional lineage invariants:
+
+- `lineage.workflowTemplateVersionId` and `lineage.workflowTemplateVersionTag` are required together.
+- version tags use semantic version format (`<major>.<minor>.<patch>`).
+- workflow-template version lineage requires `source.workflowTemplateId`.
+- `lineage.selectedNodeId` must match `source.executionNodeId` when both are present.
+- adapter/backend lineage fields are normalized to lowercase logical identifiers.
+
+This enables later history/reuse/audit surfaces to explain provenance directly from result-asset records while still treating runs, systems, and workflows as authoritative sources of full detail.
 
 This keeps generated results as first-class authoritative assets rather than backend-local files or UI-only artifacts.
 

@@ -63,6 +63,14 @@ export interface GeneratedResultAssetSource {
 
 export interface GeneratedResultAssetLineage {
   readonly inputAssetIds: ReadonlyArray<AssetId>;
+  readonly workflowTemplateVersionId?: string;
+  readonly workflowTemplateVersionTag?: string;
+  readonly systemSnapshotId?: string;
+  readonly systemVersionTag?: string;
+  readonly parameterSnapshotId?: string;
+  readonly selectedNodeId?: string;
+  readonly executionAdapterKind?: string;
+  readonly executionBackendFamily?: string;
 }
 
 export interface GeneratedResultAssetLifecycleMetadata {
@@ -194,8 +202,67 @@ function normalizeLineage(input: GeneratedResultAssetLineage): GeneratedResultAs
     );
   }
 
+  const workflowTemplateVersionId = normalizeOptional(input.workflowTemplateVersionId);
+  const workflowTemplateVersionTag = normalizeOptional(input.workflowTemplateVersionTag);
+  const systemSnapshotId = normalizeOptional(input.systemSnapshotId);
+  const systemVersionTag = normalizeOptional(input.systemVersionTag);
+  const parameterSnapshotId = normalizeOptional(input.parameterSnapshotId);
+  const selectedNodeId = normalizeOptional(input.selectedNodeId);
+  const executionAdapterKind = normalizeOptional(input.executionAdapterKind)?.toLowerCase();
+  const executionBackendFamily = normalizeOptional(input.executionBackendFamily)?.toLowerCase();
+
+  if (workflowTemplateVersionTag && !/^\d+\.\d+\.\d+$/.test(workflowTemplateVersionTag)) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.workflowTemplateVersionTag must use semantic version format '<major>.<minor>.<patch>'.",
+    );
+  }
+
+  if (systemVersionTag && !/^\d+\.\d+\.\d+$/.test(systemVersionTag)) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.systemVersionTag must use semantic version format '<major>.<minor>.<patch>'.",
+    );
+  }
+
+  if (selectedNodeId && !/^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,191}$/.test(selectedNodeId)) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.selectedNodeId must be 3-192 characters and use letters, numbers, '.', '_', ':', or '-'.",
+    );
+  }
+
+  if (executionAdapterKind && !/^[a-z0-9][a-z0-9._:-]{1,126}$/.test(executionAdapterKind)) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.executionAdapterKind must be 2-127 lowercase characters and use alphanumeric, '.', '_', ':', or '-'.",
+    );
+  }
+
+  if (executionBackendFamily && !/^[a-z0-9][a-z0-9._:-]{1,126}$/.test(executionBackendFamily)) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.executionBackendFamily must be 2-127 lowercase characters and use alphanumeric, '.', '_', ':', or '-'.",
+    );
+  }
+
+  if (workflowTemplateVersionId && !workflowTemplateVersionTag) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.workflowTemplateVersionTag is required when workflowTemplateVersionId is provided.",
+    );
+  }
+
+  if (!workflowTemplateVersionId && workflowTemplateVersionTag) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.workflowTemplateVersionId is required when workflowTemplateVersionTag is provided.",
+    );
+  }
+
   return Object.freeze({
     inputAssetIds: Object.freeze(normalized),
+    workflowTemplateVersionId,
+    workflowTemplateVersionTag,
+    systemSnapshotId,
+    systemVersionTag,
+    parameterSnapshotId,
+    selectedNodeId,
+    executionAdapterKind,
+    executionBackendFamily,
   });
 }
 
@@ -433,11 +500,28 @@ function assertUpdatedAtInvariant(createdAt: string, updatedAt: string): void {
 
 function assertInputLineageInvariants(asset: {
   readonly resultAssetId: AssetId;
+  readonly source: GeneratedResultAssetSource;
   readonly lineage: GeneratedResultAssetLineage;
 }): void {
   if (asset.lineage.inputAssetIds.includes(asset.resultAssetId)) {
     throw new GeneratedResultAssetDomainError(
       "Generated result asset lineage.inputAssetIds cannot include resultAssetId itself.",
+    );
+  }
+
+  if (asset.lineage.workflowTemplateVersionId && !asset.source.workflowTemplateId) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.workflowTemplateVersionId requires source.workflowTemplateId.",
+    );
+  }
+
+  if (
+    asset.lineage.selectedNodeId
+    && asset.source.executionNodeId
+    && asset.lineage.selectedNodeId !== asset.source.executionNodeId
+  ) {
+    throw new GeneratedResultAssetDomainError(
+      "Generated result asset lineage.selectedNodeId must match source.executionNodeId when both are provided.",
     );
   }
 }
