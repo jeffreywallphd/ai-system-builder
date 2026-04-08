@@ -1,6 +1,8 @@
 # Image Workflow and System API Contracts
 
-This note documents Story 2.2.1 for Feature 2 / Epic 2.2: shared request/response DTOs and schema validation contracts for authoritative image workflow and image system APIs.
+This note documents Story 2.2.1 and Story 2.2.2 for Feature 2 / Epic 2.2:
+- shared request/response DTO and schema validation contracts for authoritative image workflow and image system APIs
+- application-layer repository/service ports for authoritative persistence, authorization-aware access, validation, compatibility checks, and version resolution
 
 ## Purpose
 
@@ -22,6 +24,8 @@ The contract layer in this story focuses on:
 - `src/shared/contracts/image-workflows/tests/ImageWorkflowSystemApiContracts.test.ts`
 - `src/shared/dto/image-workflows/tests/ImageWorkflowSystemApiDtos.test.ts`
 - `src/shared/schemas/image-workflows/tests/ImageWorkflowSystemApiSchemaContracts.test.ts`
+- `src/application/image-workflows/ports/ImageWorkflowSystemDefinitionPorts.ts`
+- `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 
 ## Scope and boundary rules
 
@@ -47,6 +51,39 @@ Schema guards enforce strict payload shapes and reject unsupported internal fiel
 - Reuses domain parameter normalization via `ImageWorkflowParameterSpecification`.
 
 This keeps Story 2.2.1 focused on API-facing DTO/schema contracts without collapsing domain and transport concerns into one model.
+
+## Story 2.2.2 application-layer ports
+
+Story 2.2.2 establishes application ports that use cases depend on for workflow/system definition persistence and policy-aware orchestration.
+
+### Repository responsibilities
+
+`IImageWorkflowDefinitionRepository` and `IImageSystemDefinitionRepository` define infrastructure-agnostic persistence/query seams for:
+
+- create/read/update/list/archive lifecycle operations
+- workspace-scoped retrieval (required tenancy boundary)
+- optional owner, visibility, and sharing-policy filtering
+- version-aware workflow retrieval through `ImageWorkflowVersionSelector`
+- workflow backend translation-reference lookup for later run-translation and orchestration seams
+
+### Service responsibilities
+
+Dedicated service ports define policy and orchestration consultation points:
+
+- `IImageWorkflowSystemAuthorizationPort` for resource/action authorization consultation
+- `IImageWorkflowDefinitionValidationService` and `IImageSystemDefinitionValidationService` for reusable validation boundaries
+- `IImageWorkflowSystemCompatibilityService` for system/workflow compatibility checks
+- `IImageWorkflowVersionResolutionService` for policy-aware version selection and resolution outcomes
+
+### Intended consumers
+
+These ports are intended for application use cases in authoritative server services that own platform truth for image workflow/system definitions, including:
+
+- workflow/system create/update/read/list/archive use cases
+- publish/readiness and compatibility orchestration paths
+- future translation/execution preparation paths that require version-pinned workflow translation metadata
+
+The port layer intentionally excludes SQLite table details, API framework/controller details, and ComfyUI transport payloads.
 
 ## Downstream integration guidance
 
