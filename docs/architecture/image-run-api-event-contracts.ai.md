@@ -1,7 +1,7 @@
 # AI Companion: Image Run API and Event Contracts
 
 ## Story scope
-Story 4.1.2 defines shared DTO/schema contracts for authoritative image-run APIs and image-run event publication/replay semantics.
+Story 4.1.2 and Story 4.1.4 define shared DTO/schema contracts for authoritative image-run APIs, event publication/replay semantics, and submission-readiness outcomes.
 
 ## Canonical files
 - `src/shared/contracts/image-workflows/ImageRunApiContracts.ts`
@@ -16,6 +16,7 @@ Story 4.1.2 defines shared DTO/schema contracts for authoritative image-run APIs
 - Submit/get/list/cancel contracts for image runs.
 - Run status and progress snapshots with normalized structure.
 - Readiness contracts for execution capability posture.
+- Submission-readiness contracts with blocking/advisory outcomes and typed policy/asset/definition/backend/compatibility findings.
 - Failure/result summaries with user-safe semantics and logical output references.
 - Event envelope contracts for lifecycle/progress/failure/result/cancellation updates.
 - Cursor semantics for replay-safe event consumption (`image-run-event:<sequence>`).

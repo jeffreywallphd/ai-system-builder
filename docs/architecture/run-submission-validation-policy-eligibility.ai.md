@@ -10,6 +10,8 @@ Story 16.1.3 adds the application-layer run submission validator that blocks inv
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
 - `src/application/runs/tests/ValidateRunSubmissionUseCase.test.ts`
 - `docs/architecture/run-submission-validation-policy-eligibility.md`
+- `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
+- `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`
 
 ## Core behavior
 - Structural validation and canonical normalization are explicitly separated from policy/eligibility checks.
@@ -34,6 +36,12 @@ Each rejection includes typed `validationIssues` with stable `kind/path/code/mes
 ## Acceptance-path output
 - Successful validation returns `CanonicalRunSubmissionCommand` with normalized actor/workspace/target identity, parameter maps, reference sets, prerequisites, and occurred-at timestamp.
 - This command is the intended orchestration-safe input for later run acceptance/queueing stories.
+
+## Image run readiness contract posture
+- Introduces one reusable `ImageRunSubmissionReadinessResult` model for image-run submission readiness.
+- Separates blocking/advisory issues and keeps machine-readable `code` separate from user-facing `summary`.
+- Supports structured findings for policy denials, asset-binding completeness, workflow/system validity, backend-readiness dependencies, and compatibility checks.
+- Keeps contracts backend-agnostic while allowing adapter health/capability findings to participate in queue-admission decisions and future scheduling/node-capability integration.
 
 ## Tests
 `ValidateRunSubmissionUseCase.test.ts` verifies:

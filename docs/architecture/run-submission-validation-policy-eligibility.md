@@ -17,6 +17,8 @@ Introduce a reusable application-layer validation boundary that blocks invalid, 
 - `src/application/runs/use-cases/RunSubmissionValidationRules.ts`
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
 - `src/application/runs/tests/ValidateRunSubmissionUseCase.test.ts`
+- `src/application/image-workflows/ImageRunSubmissionReadinessContracts.ts`
+- `src/application/image-workflows/tests/ImageRunSubmissionReadinessContracts.test.ts`
 
 ## Validation architecture
 
@@ -59,6 +61,33 @@ Each rejection returns structured `validationIssues` with:
 - optional `details`
 
 This aligns validation and denial behavior with shared API-style error semantics while preserving precise reason granularity.
+
+## Image run submission readiness contract model
+
+Image-manipulation orchestration extends the baseline validator with reusable readiness-result contracts that preserve one canonical queue-admission decision shape across use cases, APIs, and UI surfaces:
+
+- readiness states: `ready | advisory | blocked`
+- issue categories:
+  - `blocking`
+  - `advisory`
+  - `policy-denial`
+  - `asset-binding`
+  - `workflow-validity`
+  - `system-validity`
+  - `backend-readiness-dependency`
+  - `compatibility`
+- each issue carries:
+  - machine-readable `code`
+  - user-facing `summary`
+  - explicit `blocking` posture
+- structured readiness findings are first-class:
+  - policy denials
+  - asset-binding completeness
+  - workflow/system validity
+  - backend adapter-health + capability dependencies
+  - workflow/system/adapter compatibility outcomes
+
+This keeps submission-readiness evaluation backend-agnostic while allowing adapter health/capability and future scheduling/node-capability checks to consume the same contract without transport/UI duplication.
 
 ## Canonical command output
 
