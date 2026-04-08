@@ -23,6 +23,8 @@ Document the non-negotiable deployment-profile policy invariants, effective-valu
   - `src/application/policy-administration/DeploymentPolicyEvaluationPorts.ts`
   - `src/application/policy-administration/DeploymentPolicyEvaluationService.ts`
   - `src/application/policy-administration/CanonicalDeploymentPolicySnapshotResolver.ts`
+- Authoritative write-time policy update validation and scope/permission enforcement:
+  - `src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`
 - Shared policy snapshot/update/schema contracts:
   - `src/shared/contracts/deployment/DeploymentPolicyAdministrationContracts.ts`
   - `src/shared/dto/deployment/DeploymentPolicyAdministrationDtos.ts`

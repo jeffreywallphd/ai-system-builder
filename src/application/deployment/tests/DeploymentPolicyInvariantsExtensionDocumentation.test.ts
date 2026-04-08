@@ -50,6 +50,7 @@ describe("deployment profile policy invariant and extension documentation", () =
     const doc = readFileSync(contributorDocPath, "utf8");
 
     expect(doc).toContain("## Required implementation path");
+    expect(doc).toContain("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts");
     expect(doc).toContain("## Adding a new policy family");
     expect(doc).toContain("## Adding a new policy decision API for a feature");
     expect(doc).toContain("## Prohibited patterns");
@@ -76,6 +77,7 @@ describe("deployment profile policy invariant and extension documentation", () =
       "src/application/policy-administration/DeploymentPolicyEvaluationPorts.ts",
       "src/application/policy-administration/DeploymentPolicyEvaluationService.ts",
       "src/application/policy-administration/CanonicalDeploymentPolicySnapshotResolver.ts",
+      "src/application/policy-administration/use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts",
       "src/shared/contracts/deployment/DeploymentPolicyAdministrationContracts.ts",
     ];
 
@@ -91,6 +93,7 @@ describe("deployment profile policy invariant and extension documentation", () =
     expect(architectureAiDoc).toContain("docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md");
     expect(architectureAiDoc).toContain("DeploymentPolicyEvaluationService.ts");
     expect(contributorAiDoc).toContain("docs/deployment-profile-policy-contributor-guide.md");
+    expect(contributorAiDoc).toContain("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts");
     expect(contributorAiDoc).toContain("IDeployment*PolicyEvaluationPort");
   });
 });
