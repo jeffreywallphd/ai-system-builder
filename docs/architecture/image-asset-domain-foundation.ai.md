@@ -65,3 +65,17 @@ Boundary guarantees in these shared contracts:
 - external API DTOs are separated from internal persistence DTOs
 - contracts are desktop/thin-client safe and server-authoritative
 - no raw filesystem path fields are exposed in API/event payloads
+
+## Story 1.1.4 application repository/storage port additions
+
+Application-layer image asset persistence and managed-storage interfaces now live in:
+
+- `src/application/image-assets/ports/IImageAssetRepository.ts`
+- `src/application/image-assets/ports/ImageAssetStoragePort.ts`
+- `src/application/image-assets/ports/index.ts`
+
+These contracts provide:
+
+- metadata create/update/retrieve/list/archive/soft-delete seams
+- managed-storage location reservation, write, read, access-handle, and delete seams
+- storage-instance and logical object-key based references only (no raw host paths)
