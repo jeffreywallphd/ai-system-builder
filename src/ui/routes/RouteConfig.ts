@@ -71,6 +71,7 @@ export const ROUTE_PATHS = Object.freeze({
   secretsAdmin: "/settings/secrets",
   governanceReview: "/settings/governance-review",
   governanceReviewThin: "/settings/governance-review/thin",
+  deploymentPolicyAdmin: "/settings/deployment-policy",
   notFound: "*",
 });
 
@@ -427,6 +428,12 @@ export const APP_ROUTES: ReadonlyArray<AppRouteDefinition> = Object.freeze([
     key: "governance-review-thin",
     path: ROUTE_PATHS.governanceReviewThin,
     title: "Governance review (thin)",
+    showInNavigation: false,
+  }),
+  Object.freeze({
+    key: "deployment-policy-admin",
+    path: ROUTE_PATHS.deploymentPolicyAdmin,
+    title: "Deployment profile policy",
     showInNavigation: false,
   }),
 ]);

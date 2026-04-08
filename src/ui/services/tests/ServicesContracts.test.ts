@@ -11,6 +11,7 @@ describe("ui/services contract adherence", () => {
     const nodeEnrollmentReviewModule = await importModule("ui/services/NodeEnrollmentReviewService.ts");
     const authorizationManagementModule = await importModule("ui/services/AuthorizationManagementService.ts");
     const secretMetadataManagementModule = await importModule("ui/services/SecretMetadataManagementService.ts");
+    const deploymentPolicyAdministrationModule = await importModule("ui/services/DeploymentPolicyAdministrationReadService.ts");
 
     expect(Object.keys(nodeModule)).toContain("NodeService");
     expect(Object.keys(modelModule)).toContain("ModelService");
@@ -20,5 +21,6 @@ describe("ui/services contract adherence", () => {
     expect(Object.keys(nodeEnrollmentReviewModule)).toContain("NodeEnrollmentReviewService");
     expect(Object.keys(authorizationManagementModule)).toContain("AuthorizationManagementService");
     expect(Object.keys(secretMetadataManagementModule)).toContain("SecretMetadataManagementService");
+    expect(Object.keys(deploymentPolicyAdministrationModule)).toContain("DeploymentPolicyAdministrationReadService");
   });
 });

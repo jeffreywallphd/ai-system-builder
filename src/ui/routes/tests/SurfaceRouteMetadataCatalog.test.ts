@@ -41,6 +41,7 @@ describe("Surface route metadata catalog", () => {
     expect(routes.some((route) => route.key === "identity-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "governance-review")).toBeFalse();
     expect(routes.some((route) => route.key === "security-policy")).toBeFalse();
+    expect(routes.some((route) => route.key === "deployment-policy-admin")).toBeFalse();
     expect(routes.some((route) => route.key === "secrets-admin")).toBeFalse();
   });
 
@@ -55,6 +56,7 @@ describe("Surface route metadata catalog", () => {
 
     expect(routes.some((route) => route.key === "security-policy")).toBeTrue();
     expect(routes.some((route) => route.key === "governance-review")).toBeTrue();
+    expect(routes.some((route) => route.key === "deployment-policy-admin")).toBeTrue();
     expect(routes.some((route) => route.key === "workspace-admin")).toBeTrue();
     expect(routes.some((route) => route.key === "node-enrollment-review")).toBeTrue();
   });

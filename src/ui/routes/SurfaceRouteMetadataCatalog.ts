@@ -375,6 +375,21 @@ const routeMetadataOverrides: Readonly<Record<string, RouteMetadataOverride>> = 
       workspaceContext: WorkspaceContextRequirement.required,
     }),
   }),
+  "deployment-policy-admin": Object.freeze({
+    group: UiRouteGroupKeys.administration,
+    navigation: Object.freeze({
+      showInSettingsNavigation: true,
+    }),
+    access: Object.freeze({
+      eligibleSurfaces: Object.freeze([
+        UiSurfaceKeys.desktopAdmin,
+        UiSurfaceKeys.desktopOperational,
+      ]),
+      requiredRoles: Object.freeze(["owner", "admin"]),
+      requiredCapabilities: Object.freeze(["system.manage"]),
+      workspaceContext: WorkspaceContextRequirement.required,
+    }),
+  }),
 });
 
 function inferDefaultGroup(path: string): AppSurfaceRouteMetadata["group"] {

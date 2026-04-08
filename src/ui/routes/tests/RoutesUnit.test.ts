@@ -33,6 +33,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('key: "secrets-admin"');
     expect(source).toContain('key: "governance-review"');
     expect(source).toContain('key: "governance-review-thin"');
+    expect(source).toContain('key: "deployment-policy-admin"');
     expect(source).toContain('key: "mcp"');
     expect(source).toContain('key: "services"');
     expect(source).toContain('key: "context"');
@@ -63,6 +64,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain('secretsAdmin: "/settings/secrets"');
     expect(source).toContain('governanceReview: "/settings/governance-review"');
     expect(source).toContain('governanceReviewThin: "/settings/governance-review/thin"');
+    expect(source).toContain('deploymentPolicyAdmin: "/settings/deployment-policy"');
     expect(source).toContain('key: "agent-studio"');
     expect(source).toContain('key: "registry"');
     expect(source).toContain('key: "registry-asset-detail"');
@@ -115,6 +117,7 @@ describe("ui/routes unit coverage", () => {
     expect(source).toContain("path: ROUTE_PATHS.secretsAdmin");
     expect(source).toContain("path: ROUTE_PATHS.governanceReview");
     expect(source).toContain("path: ROUTE_PATHS.governanceReviewThin");
+    expect(source).toContain("path: ROUTE_PATHS.deploymentPolicyAdmin");
     expect(source).toContain("path: ROUTE_PATHS.mcp");
     expect(source).toContain("path: ROUTE_PATHS.services");
     expect(source).toContain("path: ROUTE_PATHS.agentStudio");

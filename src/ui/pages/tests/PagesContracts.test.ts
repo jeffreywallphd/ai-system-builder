@@ -24,6 +24,7 @@ describe("ui/pages contract adherence", () => {
       "ui/pages/WorkspaceMembershipThinClientPage.tsx",
       "ui/pages/WorkspaceInvitationOnboardingPage.tsx",
       "ui/pages/SecretMetadataManagementPage.tsx",
+      "ui/pages/DeploymentPolicyAdministrationPage.tsx",
       "ui/pages/NotFoundPage.tsx",
     ];
 

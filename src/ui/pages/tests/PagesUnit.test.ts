@@ -12,6 +12,7 @@ describe("ui/pages unit coverage", () => {
     const securityPolicy = readSource("ui/pages/SecurityPolicyConfigurationPage.tsx");
     const storageAdmin = readSource("ui/pages/StorageAdministrationPage.tsx");
     const workspaceAdmin = readSource("ui/pages/WorkspaceAdministrationPage.tsx");
+    const deploymentPolicyAdmin = readSource("ui/pages/DeploymentPolicyAdministrationPage.tsx");
     const notFound = readSource("ui/pages/NotFoundPage.tsx");
 
     expect(home).toContain("AI Loom Studio");
@@ -23,6 +24,7 @@ describe("ui/pages unit coverage", () => {
     expect(securityPolicy).toContain("Security and policy configuration");
     expect(storageAdmin).toContain("Managed storage administration");
     expect(workspaceAdmin).toContain("Workspace administration");
+    expect(deploymentPolicyAdmin).toContain("Deployment profile and policy state");
     expect(notFound).toContain("Page Not Found");
   });
 });
