@@ -6,6 +6,7 @@ Story 5.1.3 introduces application-layer repository and service ports for execut
 Story 5.2.1 adds authoritative application use cases for registering and activating execution nodes for image backend hosting.
 Story 5.2.2 adds concrete SQLite persistence + status-history recording for execution-node records.
 Story 5.2.3 adds adapter-backed execution-node health/capability refresh orchestration through existing image execution adapter seams.
+Story 5.2.4 adds authoritative execution-node query/list use cases for operational inventory and studio readiness consumers.
 
 ## Implemented files
 
@@ -15,9 +16,12 @@ Story 5.2.3 adds adapter-backed execution-node health/capability refresh orchest
 - `src/application/nodes/use-cases/RegisterExecutionNodeUseCase.ts`
 - `src/application/nodes/use-cases/ActivateExecutionNodeUseCase.ts`
 - `src/application/nodes/use-cases/RefreshExecutionNodeBackendStateUseCase.ts`
+- `src/application/nodes/use-cases/GetExecutionNodeDetailUseCase.ts`
+- `src/application/nodes/use-cases/ListExecutionNodesUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 - `src/application/nodes/tests/RefreshExecutionNodeBackendStateUseCase.test.ts`
+- `src/application/nodes/tests/ExecutionNodeQueryUseCases.test.ts`
 - Human doc: `docs/architecture/execution-node-repository-and-management-application-ports.md`
 
 ## Core delivery
@@ -68,3 +72,21 @@ These ports are intended for authoritative run orchestration, scheduling, node-a
 - stale probe observations (`maxStatusAgeMs`) persist as node `health=unknown` and backend readiness `unknown`
 - unavailable backend probes transition active nodes to activation `unavailable` with health `unavailable`
 - incompatible readiness is represented as degraded health with backend readiness `unknown` + explicit reason metadata
+
+## Story 5.2.4 query/list notes
+
+- Adds `GetExecutionNodeDetailUseCase` for authoritative get-by-id reads backed by persisted execution-node records.
+- Adds `ListExecutionNodesUseCase` for filtered inventory reads backed by `IExecutionNodeRepository.listExecutionNodes(...)`.
+- List filtering supports:
+  - backend family and execution target
+  - trust/approval/activation/health posture
+  - capability presence (`requiredCapabilitiesAnyOf`)
+  - remote-scheduling and certificate requirements
+  - deployment tags
+  - freshness windows (`lastSeenAfter`, `lastSeenBefore`)
+  - practical enabled/disabled and availability selectors
+  - backend readiness-state selectors (`ready|degraded|unavailable|unknown`)
+- Both query use cases enforce optional authorization seams through
+  `ExecutionNodeManagementAuthorizationHook.assertCanQueryExecutionNodes(...)` and
+  `ExecutionNodeManagementAuthorizationHook.assertCanGetExecutionNodeDetail(...)`.
+- Responses are projected into internal DTO-ready summaries/details suitable for admin/operational inventory and execution-readiness surfaces.

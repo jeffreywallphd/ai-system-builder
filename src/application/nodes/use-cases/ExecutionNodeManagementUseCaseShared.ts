@@ -1,6 +1,8 @@
 import { ExecutionNodeDomainError, type ExecutionNodeRecord } from "@domain/nodes/ExecutionNodeDomain";
 import type {
+  ExecutionNodeBackendCapabilitySummaryDto,
   ExecutionNodeHealthSummaryDto,
+  ExecutionNodeInternalDetailDto,
   ExecutionNodeInternalSummaryDto,
   ExecutionNodeOperationalSummaryDto,
 } from "@shared/contracts/nodes/ExecutionNodeManagementApiContracts";
@@ -155,6 +157,40 @@ export function toExecutionNodeInternalSummary(record: ExecutionNodeRecord): Exe
     health: toHealthSummary(record),
     operational: toOperationalSummary(record),
     backendFamilies: Object.freeze(record.backendFamilyCapabilities.map((capability) => capability.backendFamily)),
+    endpointRef: record.endpoint.endpointRef,
+    configurationRef: record.endpoint.configurationRef,
+    certificateRef: record.certificateRef,
+  });
+}
+
+function toBackendCapabilitySummary(
+  record: ExecutionNodeRecord,
+): ReadonlyArray<ExecutionNodeBackendCapabilitySummaryDto> {
+  return Object.freeze(record.backendFamilyCapabilities.map((capability) => Object.freeze({
+    backendFamily: capability.backendFamily,
+    supportedExecutionTargets: Object.freeze([...capability.supportedExecutionTargets]),
+    supportedOperationKinds: Object.freeze([...(capability.supportedOperationKinds ?? [])]),
+    supportedOperationCapabilities: Object.freeze([...(capability.supportedOperationCapabilities ?? [])]),
+    supportedInputKinds: Object.freeze([...(capability.supportedInputKinds ?? [])]),
+    supportedOutputKinds: Object.freeze([...(capability.supportedOutputKinds ?? [])]),
+    supportedTranslationContractVersions: Object.freeze([...(capability.supportedTranslationContractVersions ?? [])]),
+    resourceClassHints: Object.freeze([...(capability.resourceClassHints ?? [])]),
+    capabilityProfileVersion: capability.capabilityProfileVersion,
+    metadataTags: Object.freeze([...(capability.metadataTags ?? [])]),
+    readiness: Object.freeze({
+      state: capability.executionReadiness?.state ?? "unknown",
+      checkedAt: capability.executionReadiness?.checkedAt,
+      summary: capability.executionReadiness?.summary,
+    }),
+  })));
+}
+
+export function toExecutionNodeInternalDetail(record: ExecutionNodeRecord): ExecutionNodeInternalDetailDto {
+  return Object.freeze({
+    ...toExecutionNodeInternalSummary(record),
+    backendCapabilities: toBackendCapabilitySummary(record),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
     endpointRef: record.endpoint.endpointRef,
     configurationRef: record.endpoint.configurationRef,
     certificateRef: record.certificateRef,
