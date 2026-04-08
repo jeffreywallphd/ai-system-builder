@@ -3,6 +3,7 @@
 ## Why this note exists
 
 Story 2.1.5 defines the architecture contract for the image manipulation slice so later translation, orchestration, and UI integration work builds on typed, reusable platform resources.
+Story 2.2.5 adds the authoritative query/list seam used by workflow/system discovery and reopen behavior.
 
 ## Canonical seams
 
@@ -46,6 +47,10 @@ Use this image slice as the baseline for later AI capabilities:
 - keep parameter/binding validation contract-first
 - keep runtime payloads derived from typed definitions
 - do not bypass domain/application contracts with direct runtime JSON editing
+
+Discovery/reopen rule:
+
+- read/list workflow/system definitions through authoritative application APIs/use cases, not local studio-only state snapshots.
 
 ## Related notes
 
