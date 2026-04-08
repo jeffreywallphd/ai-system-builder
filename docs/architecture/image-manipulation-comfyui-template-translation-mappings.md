@@ -11,6 +11,7 @@ This note documents Story 3.2.1 for Feature 3 / Epic 3.2:
 - `src/infrastructure/comfyui/execution/mappers/ComfyImageManipulationTemplateTranslationAdapter.ts`
 - `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.test.ts`
 - `src/infrastructure/comfyui/execution/tests/ComfyImageManipulationTemplateTranslationAdapter.integration.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
 
 ## Translation boundary posture
 
@@ -57,3 +58,12 @@ Blocking diagnostics force a failed translation result.
 - Workflow/system definitions remain the source of truth.
 - ComfyUI graph/payload details are not promoted into domain/application records.
 - Translation and provider payload construction stay behind infrastructure adapters.
+
+## Story 3.2.5 integration coverage extension
+
+- Added integration coverage for translation and dispatch together using controlled backend scenarios:
+  - supported-template translation followed by successful dispatch transport submission
+  - unsupported template mapping with blocking diagnostics and dispatch short-circuit
+  - backend unavailable dispatch failure normalization
+  - malformed backend response normalization for prompt submission
+- Coverage ensures translation diagnostics remain meaningful and dispatch wiring regressions are caught without relying on uncontrolled external backend state.
