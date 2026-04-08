@@ -5,6 +5,7 @@ import {
   useBlocker,
   useBeforeUnload,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import { ContextNavigationService } from "../routes/ContextNavigation";
 import { useUiDependencies } from "../composition/AppProviders";
@@ -26,6 +27,7 @@ import {
 import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
 import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
 import type { OfflineSynchronizationStateSnapshotDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
+import { ROUTE_PATHS } from "../routes/RouteConfig";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -67,6 +69,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
   const { runtimeConsoleStore, workflowStore } = useUiDependencies();
   const desktopConnectivityService = useMemo(() => new DesktopConnectivityService(), []);
   const location = useLocation();
+  const navigate = useNavigate();
   const contextNavigationService = useMemo(() => new ContextNavigationService(), []);
   const contextNavigation = contextNavigationService.resolve({ pathname: location.pathname, search: location.search });
   const [runtimeConsoleState, setRuntimeConsoleState] = useState<RuntimeConsoleState>(fallbackConsoleState);
@@ -300,6 +303,15 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
             }}
             onToggleOfflineMode={(active) => {
               void toggleOfflineMode(active);
+            }}
+            onOpenPreservedDrafts={() => {
+              void navigate(ROUTE_PATHS.workflowStudio);
+            }}
+            onOpenSyncConflicts={() => {
+              void navigate(ROUTE_PATHS.workflowStudioRuns);
+            }}
+            onOpenReplayOutcomes={() => {
+              void navigate(ROUTE_PATHS.run);
             }}
           />
           <GuidedOnboardingFlowSurface pathname={location.pathname} />

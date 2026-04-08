@@ -8,6 +8,9 @@ export interface DesktopOfflineStatusSurfaceProps {
   readonly errorMessage?: string;
   readonly onRefresh: () => void;
   readonly onToggleOfflineMode: (active: boolean) => void;
+  readonly onOpenPreservedDrafts?: () => void;
+  readonly onOpenSyncConflicts?: () => void;
+  readonly onOpenReplayOutcomes?: () => void;
 }
 
 export default function DesktopOfflineStatusSurface({
@@ -17,6 +20,9 @@ export default function DesktopOfflineStatusSurface({
   errorMessage,
   onRefresh,
   onToggleOfflineMode,
+  onOpenPreservedDrafts,
+  onOpenSyncConflicts,
+  onOpenReplayOutcomes,
 }: DesktopOfflineStatusSurfaceProps): JSX.Element | null {
   if (!snapshot && !isLoading && !errorMessage) {
     return null;
@@ -35,6 +41,11 @@ export default function DesktopOfflineStatusSurface({
 
   const model = buildDesktopOfflineStatusSurfaceModel(snapshot);
   const unsupportedActions = model.policy.unsupportedActions;
+  const followUpHandlers: Record<"preserved-drafts" | "sync-conflicts" | "replay-outcomes", (() => void) | undefined> = {
+    "preserved-drafts": onOpenPreservedDrafts,
+    "sync-conflicts": onOpenSyncConflicts,
+    "replay-outcomes": onOpenReplayOutcomes,
+  };
 
   return (
     <section
@@ -102,6 +113,108 @@ export default function DesktopOfflineStatusSurface({
                 <li key={message}>{message}</li>
               ))}
             </ul>
+          )}
+        </article>
+      </div>
+
+      <div className="ui-offline-status__details">
+        <article className="ui-offline-status__detail-panel">
+          <h2>Preserved drafts</h2>
+          <p className="ui-offline-status__panel-value">{model.drafts.unsyncedCount}</p>
+          <p className="ui-text-small ui-text-secondary">{model.drafts.summary}</p>
+          {model.drafts.preserved.length < 1 ? (
+            <p className="ui-text-small ui-text-secondary">No unsynced drafts are waiting for manual recovery.</p>
+          ) : (
+            <ul className="ui-offline-status__list ui-offline-status__list--spaced">
+              {model.drafts.preserved.map((draft) => (
+                <li key={draft.draftId}>
+                  <strong>{draft.syncStatusLabel}:</strong> {draft.resourceLabel}
+                  <br />
+                  <span className="ui-text-secondary">Changes: {draft.localChangeCount}, Last edited: {draft.lastEditedAtLabel}</span>
+                  <br />
+                  <span className="ui-text-secondary">{draft.recommendedAction}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="ui-offline-status__detail-panel">
+          <h2>Sync conflicts</h2>
+          <p className="ui-offline-status__panel-value">{model.conflicts.totalCount}</p>
+          <p className="ui-text-small ui-text-secondary">{model.conflicts.summary}</p>
+          {model.conflicts.entries.length < 1 ? (
+            <p className="ui-text-small ui-text-secondary">No preserved conflict records are currently available.</p>
+          ) : (
+            <ul className="ui-offline-status__list ui-offline-status__list--spaced">
+              {model.conflicts.entries.map((entry) => (
+                <li key={entry.key}>
+                  <strong>{entry.severityLabel.toUpperCase()}:</strong> {entry.title}
+                  <br />
+                  <span className="ui-text-secondary">{entry.summary}</span>
+                  <br />
+                  <span className="ui-text-secondary">Detected: {entry.detectedAtLabel}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="ui-offline-status__detail-panel">
+          <h2>Replay outcomes</h2>
+          <p className="ui-offline-status__panel-value">{model.replayOutcomes.totalCount}</p>
+          <p className="ui-text-small ui-text-secondary">{model.replayOutcomes.summary}</p>
+          {model.replayOutcomes.entries.length < 1 ? (
+            <p className="ui-text-small ui-text-secondary">Reconnect replay has not produced outcomes yet.</p>
+          ) : (
+            <ul className="ui-offline-status__list ui-offline-status__list--spaced">
+              {model.replayOutcomes.entries.map((entry) => (
+                <li key={entry.key}>
+                  <strong>{entry.title}</strong>
+                  <br />
+                  <span className="ui-text-secondary">{entry.reason}</span>
+                  <br />
+                  <span className="ui-text-secondary">Resolved: {entry.resolvedAtLabel}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </article>
+
+        <article className="ui-offline-status__detail-panel">
+          <h2>Recovery actions</h2>
+          <ul className="ui-offline-status__action-list">
+            {model.followUp.actions.map((action) => {
+              const handler = followUpHandlers[action.actionKey];
+              return (
+                <li key={action.actionKey} className="ui-offline-status__action-item">
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--small"
+                    disabled={!action.enabled || !handler}
+                    onClick={() => {
+                      handler?.();
+                    }}
+                  >
+                    {action.label}
+                  </button>
+                  <span className="ui-text-small ui-text-secondary">{action.description}</span>
+                  {!action.enabled && action.unavailableReason ? (
+                    <span className="ui-text-small ui-text-secondary">{action.unavailableReason}</span>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+          {model.followUp.limitations.length < 1 ? null : (
+            <>
+              <h3 className="ui-offline-status__subheading">Reconciliation limits</h3>
+              <ul className="ui-offline-status__list">
+                {model.followUp.limitations.map((limit) => (
+                  <li key={limit}>{limit}</li>
+                ))}
+              </ul>
+            </>
           )}
         </article>
       </div>

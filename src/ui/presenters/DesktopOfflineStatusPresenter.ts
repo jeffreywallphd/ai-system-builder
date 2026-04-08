@@ -1,7 +1,10 @@
 import {
   OfflineCacheFreshnessStates,
   OfflineConnectivityStates,
+  OfflineDraftSyncStatuses,
   OfflineLocalExecutionRegistrationStatuses,
+  OfflinePendingOperationStatuses,
+  OfflineReconciliationActions,
   OfflineSynchronizationStates,
   type OfflineSynchronizationStateSnapshotDto,
 } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
@@ -30,6 +33,49 @@ export interface DesktopOfflineStatusSurfaceModel {
     readonly requiresAttention: boolean;
     readonly summary: string;
   };
+  readonly drafts: {
+    readonly unsyncedCount: number;
+    readonly localOnlyCount: number;
+    readonly queuedCount: number;
+    readonly conflictCount: number;
+    readonly rejectedCount: number;
+    readonly summary: string;
+    readonly preserved: ReadonlyArray<{
+      readonly draftId: string;
+      readonly resourceLabel: string;
+      readonly syncStatusLabel: string;
+      readonly localChangeCount: number;
+      readonly lastEditedAtLabel: string;
+      readonly recommendedAction: string;
+    }>;
+  };
+  readonly conflicts: {
+    readonly totalCount: number;
+    readonly highSeverityCount: number;
+    readonly summary: string;
+    readonly entries: ReadonlyArray<{
+      readonly key: string;
+      readonly title: string;
+      readonly summary: string;
+      readonly severityLabel: string;
+      readonly detectedAtLabel: string;
+      readonly recommendedAction: string;
+    }>;
+  };
+  readonly replayOutcomes: {
+    readonly totalCount: number;
+    readonly appliedCount: number;
+    readonly reviewRequiredCount: number;
+    readonly rejectedCount: number;
+    readonly summary: string;
+    readonly entries: ReadonlyArray<{
+      readonly key: string;
+      readonly title: string;
+      readonly reason: string;
+      readonly resolvedAtLabel: string;
+      readonly recommendedAction: string;
+    }>;
+  };
   readonly cache: {
     readonly totalCount: number;
     readonly freshCount: number;
@@ -43,6 +89,16 @@ export interface DesktopOfflineStatusSurfaceModel {
   readonly actions: {
     readonly offlineModeToggleLabel: string;
     readonly refreshLabel: string;
+  };
+  readonly followUp: {
+    readonly actions: ReadonlyArray<{
+      readonly actionKey: "preserved-drafts" | "sync-conflicts" | "replay-outcomes";
+      readonly label: string;
+      readonly description: string;
+      readonly enabled: boolean;
+      readonly unavailableReason?: string;
+    }>;
+    readonly limitations: ReadonlyArray<string>;
   };
 }
 
@@ -167,6 +223,226 @@ function buildSynchronizationSummary(snapshot: OfflineSynchronizationStateSnapsh
   });
 }
 
+function buildDraftStatusLabel(syncStatus: string): string {
+  switch (syncStatus) {
+    case OfflineDraftSyncStatuses.localOnly:
+      return "Local only";
+    case OfflineDraftSyncStatuses.queuedPendingSync:
+      return "Queued for replay";
+    case OfflineDraftSyncStatuses.syncConflict:
+      return "Conflict needs review";
+    case OfflineDraftSyncStatuses.syncRejected:
+      return "Rejected for replay";
+    case OfflineDraftSyncStatuses.syncApplied:
+      return "Applied";
+    default:
+      return "Unknown";
+  }
+}
+
+function buildPreservedDraftRecommendedAction(syncStatus: string): string {
+  switch (syncStatus) {
+    case OfflineDraftSyncStatuses.syncConflict:
+      return "Review authoritative changes, then prepare a new queued update from this draft.";
+    case OfflineDraftSyncStatuses.syncRejected:
+      return "Create a fresh local revision before attempting another authoritative update.";
+    case OfflineDraftSyncStatuses.queuedPendingSync:
+      return "Keep this draft queued; it will replay when trusted connectivity is available.";
+    case OfflineDraftSyncStatuses.localOnly:
+    default:
+      return "Queue this draft when you are ready to synchronize it with authoritative state.";
+  }
+}
+
+function buildDraftRecoverySummary(snapshot: OfflineSynchronizationStateSnapshotDto): DesktopOfflineStatusSurfaceModel["drafts"] {
+  const unsyncedDrafts = snapshot.drafts
+    .filter((draft) => draft.syncStatus !== OfflineDraftSyncStatuses.syncApplied);
+  const localOnlyCount = unsyncedDrafts.filter((draft) => draft.syncStatus === OfflineDraftSyncStatuses.localOnly).length;
+  const queuedCount = unsyncedDrafts.filter((draft) => draft.syncStatus === OfflineDraftSyncStatuses.queuedPendingSync).length;
+  const conflictCount = unsyncedDrafts.filter((draft) => draft.syncStatus === OfflineDraftSyncStatuses.syncConflict).length;
+  const rejectedCount = unsyncedDrafts.filter((draft) => draft.syncStatus === OfflineDraftSyncStatuses.syncRejected).length;
+
+  const preserved = Object.freeze(
+    [...unsyncedDrafts]
+      .sort((left, right) => new Date(right.lastEditedAt).getTime() - new Date(left.lastEditedAt).getTime())
+      .slice(0, 5)
+      .map((draft) => Object.freeze({
+        draftId: draft.draftId,
+        resourceLabel: `${draft.resourceClass} ${draft.resourceId}`,
+        syncStatusLabel: buildDraftStatusLabel(draft.syncStatus),
+        localChangeCount: draft.localChanges.length,
+        lastEditedAtLabel: formatTimestamp(draft.lastEditedAt),
+        recommendedAction: buildPreservedDraftRecommendedAction(draft.syncStatus),
+      })),
+  );
+
+  const summaryParts: string[] = [];
+  if (localOnlyCount > 0) {
+    summaryParts.push(`${localOnlyCount} local-only`);
+  }
+  if (queuedCount > 0) {
+    summaryParts.push(`${queuedCount} queued`);
+  }
+  if (conflictCount > 0) {
+    summaryParts.push(`${conflictCount} conflicted`);
+  }
+  if (rejectedCount > 0) {
+    summaryParts.push(`${rejectedCount} rejected`);
+  }
+
+  return Object.freeze({
+    unsyncedCount: unsyncedDrafts.length,
+    localOnlyCount,
+    queuedCount,
+    conflictCount,
+    rejectedCount,
+    summary: unsyncedDrafts.length < 1
+      ? "No preserved unsynced drafts are waiting for review."
+      : `${unsyncedDrafts.length} preserved unsynced draft${unsyncedDrafts.length === 1 ? "" : "s"} (${summaryParts.join(", ")}).`,
+    preserved,
+  });
+}
+
+function buildConflictSummary(snapshot: OfflineSynchronizationStateSnapshotDto): DesktopOfflineStatusSurfaceModel["conflicts"] {
+  const entries: Array<DesktopOfflineStatusSurfaceModel["conflicts"]["entries"][number] & { readonly sortAt: number }> = [];
+  const conflictOutcomeOperationIds = new Set<string>();
+
+  for (const outcome of snapshot.queue.outcomes) {
+    for (const conflict of outcome.conflicts ?? []) {
+      conflictOutcomeOperationIds.add(outcome.operationId);
+      entries.push(Object.freeze({
+        key: `outcome:${outcome.operationId}:${conflict.conflictCode}`,
+        title: `${conflict.resourceClass} ${conflict.resourceId}`,
+        summary: conflict.summary,
+        severityLabel: conflict.severity,
+        detectedAtLabel: formatTimestamp(conflict.detectedAt),
+        recommendedAction: "Conflicts are preserved for manual review; unsupported auto-merge paths are intentionally not attempted.",
+        sortAt: new Date(conflict.detectedAt).getTime(),
+      }));
+    }
+  }
+
+  for (const operation of snapshot.queue.operations) {
+    if (operation.userVisibleSyncStatus !== OfflinePendingOperationStatuses.syncConflict) {
+      continue;
+    }
+    if (conflictOutcomeOperationIds.has(operation.operationId)) {
+      continue;
+    }
+    entries.push(Object.freeze({
+      key: `operation:${operation.operationId}`,
+      title: `${operation.targetResourceClass} ${operation.targetResourceId}`,
+      summary: "Queued operation is blocked by a replay conflict and was retained for review.",
+      severityLabel: "high",
+      detectedAtLabel: formatTimestamp(operation.lastAttemptedAt ?? operation.queuedAt),
+      recommendedAction: "Inspect authoritative state and draft differences, then submit a new explicit update.",
+      sortAt: new Date(operation.lastAttemptedAt ?? operation.queuedAt).getTime(),
+    }));
+  }
+
+  for (const registration of snapshot.queue.localExecutionRegistrations) {
+    if (registration.userVisibleRegistrationStatus !== OfflineLocalExecutionRegistrationStatuses.registrationConflict) {
+      continue;
+    }
+    entries.push(Object.freeze({
+      key: `registration:${registration.registrationId}`,
+      title: `${registration.execution.resourceClass} ${registration.execution.resourceId}`,
+      summary: "Local execution registration conflicted during reconnect and requires manual follow-up.",
+      severityLabel: "medium",
+      detectedAtLabel: formatTimestamp(registration.lastAttemptedAt ?? registration.queuedAt),
+      recommendedAction: "Review registration context and retry with updated authoritative context if still valid.",
+      sortAt: new Date(registration.lastAttemptedAt ?? registration.queuedAt).getTime(),
+    }));
+  }
+
+  entries.sort((left, right) => right.sortAt - left.sortAt);
+
+  const highSeverityCount = entries.filter((entry) => entry.severityLabel === "high").length;
+  return Object.freeze({
+    totalCount: entries.length,
+    highSeverityCount,
+    summary: entries.length < 1
+      ? "No sync conflicts are currently preserved."
+      : `${entries.length} conflict${entries.length === 1 ? "" : "s"} preserved for explicit review.`,
+    entries: Object.freeze(entries.slice(0, 5).map((entry) => Object.freeze({
+      key: entry.key,
+      title: entry.title,
+      summary: entry.summary,
+      severityLabel: entry.severityLabel,
+      detectedAtLabel: entry.detectedAtLabel,
+      recommendedAction: entry.recommendedAction,
+    }))),
+  });
+}
+
+function buildReplayOutcomeTitle(action: string): string {
+  switch (action) {
+    case OfflineReconciliationActions.applyToAuthoritative:
+      return "Applied to authoritative state";
+    case OfflineReconciliationActions.conflictRequiresReview:
+      return "Conflict preserved for review";
+    case OfflineReconciliationActions.rejectNotAllowed:
+      return "Replay rejected";
+    default:
+      return "Replay outcome recorded";
+  }
+}
+
+function buildReplayOutcomeAction(outcome: OfflineSynchronizationStateSnapshotDto["queue"]["outcomes"][number]): string {
+  if (outcome.action === OfflineReconciliationActions.applyToAuthoritative) {
+    return "No follow-up is needed unless additional local changes are pending.";
+  }
+  if (outcome.action === OfflineReconciliationActions.conflictRequiresReview) {
+    return outcome.preserveLocalDraftAsUnsynced
+      ? "Use the preserved unsynced draft to prepare an explicit follow-up update."
+      : "Review authoritative state and create a new local draft before retry.";
+  }
+  return outcome.requiresAdminAttention
+    ? "Replay was rejected; request admin review before retrying with a new change."
+    : "Replay was rejected; revise local intent and resubmit from current authoritative state.";
+}
+
+function buildReplayOutcomeSummary(snapshot: OfflineSynchronizationStateSnapshotDto): DesktopOfflineStatusSurfaceModel["replayOutcomes"] {
+  const outcomes = [...snapshot.queue.outcomes]
+    .sort((left, right) => new Date(right.resolvedAt).getTime() - new Date(left.resolvedAt).getTime());
+
+  const appliedCount = outcomes.filter((entry) => entry.action === OfflineReconciliationActions.applyToAuthoritative).length;
+  const reviewRequiredCount = outcomes.filter((entry) => entry.action === OfflineReconciliationActions.conflictRequiresReview).length;
+  const rejectedCount = outcomes.filter((entry) => entry.action === OfflineReconciliationActions.rejectNotAllowed).length;
+
+  const entries = Object.freeze(
+    outcomes.slice(0, 5).map((outcome) => Object.freeze({
+      key: `outcome:${outcome.operationId}:${outcome.resolvedAt}`,
+      title: buildReplayOutcomeTitle(outcome.action),
+      reason: outcome.reason,
+      resolvedAtLabel: formatTimestamp(outcome.resolvedAt),
+      recommendedAction: buildReplayOutcomeAction(outcome),
+    })),
+  );
+
+  const summaryParts: string[] = [];
+  if (appliedCount > 0) {
+    summaryParts.push(`${appliedCount} applied`);
+  }
+  if (reviewRequiredCount > 0) {
+    summaryParts.push(`${reviewRequiredCount} preserved for review`);
+  }
+  if (rejectedCount > 0) {
+    summaryParts.push(`${rejectedCount} rejected`);
+  }
+
+  return Object.freeze({
+    totalCount: outcomes.length,
+    appliedCount,
+    reviewRequiredCount,
+    rejectedCount,
+    summary: outcomes.length < 1
+      ? "No replay outcomes are available yet."
+      : `${outcomes.length} reconnect replay outcome${outcomes.length === 1 ? "" : "s"} (${summaryParts.join(", ")}).`,
+    entries,
+  });
+}
+
 function buildCacheSummary(snapshot: OfflineSynchronizationStateSnapshotDto): DesktopOfflineStatusSurfaceModel["cache"] {
   const freshCount = snapshot.cachedResources.filter((item) => item.freshness === OfflineCacheFreshnessStates.fresh).length;
   const staleCount = snapshot.cachedResources.filter((item) => item.freshness === OfflineCacheFreshnessStates.stale).length;
@@ -203,9 +479,59 @@ function buildUnsupportedActions(snapshot: OfflineSynchronizationStateSnapshotDt
   return Object.freeze(unsupported);
 }
 
+function buildFollowUpModel(input: {
+  readonly snapshot: OfflineSynchronizationStateSnapshotDto;
+  readonly drafts: DesktopOfflineStatusSurfaceModel["drafts"];
+  readonly conflicts: DesktopOfflineStatusSurfaceModel["conflicts"];
+  readonly replayOutcomes: DesktopOfflineStatusSurfaceModel["replayOutcomes"];
+}): DesktopOfflineStatusSurfaceModel["followUp"] {
+  const actions = Object.freeze([
+    Object.freeze({
+      actionKey: "preserved-drafts" as const,
+      label: "Review preserved drafts",
+      description: "Inspect unsynced local drafts and decide whether to queue, revise, or discard them.",
+      enabled: input.drafts.unsyncedCount > 0,
+      unavailableReason: input.drafts.unsyncedCount > 0 ? undefined : "No preserved unsynced drafts are currently available.",
+    }),
+    Object.freeze({
+      actionKey: "sync-conflicts" as const,
+      label: "Inspect sync conflicts",
+      description: "Review reconnect conflicts retained for explicit user/admin intervention.",
+      enabled: input.conflicts.totalCount > 0,
+      unavailableReason: input.conflicts.totalCount > 0 ? undefined : "No conflicts are currently retained for review.",
+    }),
+    Object.freeze({
+      actionKey: "replay-outcomes" as const,
+      label: "Review replay outcomes",
+      description: "Understand what replay applied, what was rejected, and what remains unresolved.",
+      enabled: input.replayOutcomes.totalCount > 0,
+      unavailableReason: input.replayOutcomes.totalCount > 0 ? undefined : "No reconnect replay outcomes are available yet.",
+    }),
+  ]);
+
+  const limitations: string[] = [];
+  if (input.conflicts.totalCount > 0 || input.drafts.conflictCount > 0) {
+    limitations.push("Unsupported auto-merge scenarios remain manual: the desktop preserves conflicts and does not silently merge divergent branches.");
+  }
+  if (input.drafts.rejectedCount > 0 || input.replayOutcomes.rejectedCount > 0) {
+    limitations.push("Rejected operations are retained for explicit follow-up and are not auto-replayed.");
+  }
+  if (!input.snapshot.connectivity.canResynchronize && input.snapshot.status.pendingOperationCount > 0) {
+    limitations.push("Pending operations remain local until trusted authoritative connectivity supports controlled replay.");
+  }
+
+  return Object.freeze({
+    actions,
+    limitations: Object.freeze(limitations),
+  });
+}
+
 export function buildDesktopOfflineStatusSurfaceModel(
   snapshot: OfflineSynchronizationStateSnapshotDto,
 ): DesktopOfflineStatusSurfaceModel {
+  const drafts = buildDraftRecoverySummary(snapshot);
+  const conflicts = buildConflictSummary(snapshot);
+  const replayOutcomes = buildReplayOutcomeSummary(snapshot);
   return Object.freeze({
     banner: buildBanner(snapshot),
     connectivity: Object.freeze({
@@ -215,6 +541,9 @@ export function buildDesktopOfflineStatusSurfaceModel(
       lastChangedAtLabel: formatTimestamp(snapshot.connectivity.lastChangedAt),
     }),
     synchronization: buildSynchronizationSummary(snapshot),
+    drafts,
+    conflicts,
+    replayOutcomes,
     cache: buildCacheSummary(snapshot),
     policy: Object.freeze({
       unsupportedActions: buildUnsupportedActions(snapshot),
@@ -222,6 +551,12 @@ export function buildDesktopOfflineStatusSurfaceModel(
     actions: Object.freeze({
       offlineModeToggleLabel: snapshot.connectivity.localModeActive ? "Return online" : "Go offline",
       refreshLabel: "Refresh status",
+    }),
+    followUp: buildFollowUpModel({
+      snapshot,
+      drafts,
+      conflicts,
+      replayOutcomes,
     }),
   });
 }

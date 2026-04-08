@@ -93,6 +93,8 @@ Use this map when deciding where to extend behavior:
 5. Update adapters/UI surfaces last to consume new canonical contracts; do not invent ad hoc offline object shapes.
    - Keep offline/local-mode display logic in shared presenter/component seams.
    - Keep host/application synchronization mechanics out of UI components.
+   - Include explicit interaction flows for preserved drafts, sync conflicts, replay outcomes, and first follow-up actions when unresolved local work is in scope.
+   - Keep unsupported auto-merge behavior explicitly disclosed; do not imply merge tooling beyond bounded production replay rules.
 
 ## Workflow-specific extension checklists
 
@@ -225,6 +227,12 @@ At minimum, update:
 - `src/ui/shared/connectivity/tests/DesktopConnectivityService.test.ts`
 - `src/ui/presenters/tests/DesktopOfflineStatusPresenter.test.ts`
 - `src/ui/shared/tests/DesktopOfflineStatusSurface.test.tsx`
+
+For Story 19.3.2-style UX work, include interaction-flow coverage for:
+- preserved unsynced draft visibility and recovery messaging,
+- sync conflict inspection messaging and bounded manual follow-up guidance,
+- replay outcome interpretation (applied/conflict/rejected),
+- explicit unsupported auto-merge disclosure.
 
 When architecture behavior changes, update both:
 - `docs/architecture/offline-local-mode-authority-boundaries.md`

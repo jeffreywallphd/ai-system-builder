@@ -27,6 +27,8 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 6. Adapter/UI consumption updates.
    - keep status derivation in shared presenter seams.
    - keep host/application sync mechanics outside UI components.
+   - include explicit unresolved-work interaction flows (preserved drafts, sync conflicts, replay outcomes, first follow-up actions) when story scope targets reconnect UX.
+   - keep unsupported auto-merge limitations explicit in UI copy.
 
 ## Desktop cache + reconnect extension map
 
@@ -86,4 +88,5 @@ Keep offline-aware feature work aligned to one bounded local-autonomy model and 
 - update relevant offline tests across domain/application/host/shared contract modules;
 - include desktop connectivity-state transition coverage in host tests when connectivity semantics change;
 - include shared desktop offline-status service/presenter/surface coverage when offline UX behavior changes;
+- include interaction-flow coverage for preserved drafts/conflicts/replay-outcome interpretation when reconnect UX behavior changes;
 - keep `.md` and `.ai.md` offline docs paired and updated together.
