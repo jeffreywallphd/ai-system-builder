@@ -115,6 +115,7 @@ Feature 3 contract baselines:
 - `docs/architecture/image-manipulation-translation-contracts.md`
 - `docs/architecture/image-manipulation-execution-status-contracts.md`
 - `docs/architecture/image-manipulation-output-discovery-and-collection-contracts.md`
+- `docs/architecture/image-manipulation-comfyui-template-translation-mappings.md`
 
 Comfy infrastructure audit baseline:
 - `docs/architecture/comfyui-adapter-audit.md`

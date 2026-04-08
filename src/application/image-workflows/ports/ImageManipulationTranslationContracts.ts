@@ -290,6 +290,12 @@ export const ImageManipulationTranslationResultEnvelopeSchema = z.object({
 
 export type ImageManipulationTranslationResultEnvelope = z.infer<typeof ImageManipulationTranslationResultEnvelopeSchema>;
 
+export interface IImageManipulationTemplateTranslationPort {
+  translateToBackendPayload(
+    request: ImageManipulationTranslationRequest,
+  ): Promise<ImageManipulationTranslationResult>;
+}
+
 function deepFreeze<TValue>(value: TValue): TValue {
   if (!value || typeof value !== "object") {
     return value;
