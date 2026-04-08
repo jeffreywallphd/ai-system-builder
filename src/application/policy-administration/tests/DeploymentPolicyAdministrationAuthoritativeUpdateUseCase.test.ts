@@ -34,6 +34,10 @@ import {
   type DeploymentPolicyAdministrationPermissionKey,
 } from "../use-cases/DeploymentPolicyAdministrationAuthoritativeUpdateUseCase";
 import { DeploymentProfileIds } from "@domain/deployment/DeploymentProfilePolicyAdministrationDomain";
+import type {
+  DeploymentPolicyGovernanceEvent,
+  IDeploymentPolicyGovernanceEventSink,
+} from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
 
 class InMemoryDeploymentPolicyRepository implements IDeploymentPolicyPersistenceRepository {
   public activeByScope = new Map<string, DeploymentPolicyActiveProfileSelectionRecord>();
@@ -191,6 +195,14 @@ class StubPermissionService implements IDeploymentPolicyAdministrationPermission
   }
 }
 
+class CapturingDeploymentPolicyGovernanceEventSink implements IDeploymentPolicyGovernanceEventSink {
+  public readonly events: DeploymentPolicyGovernanceEvent[] = [];
+
+  public async recordDeploymentPolicyGovernanceEvent(event: DeploymentPolicyGovernanceEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createScope(scopeId: string): DeploymentPolicyPersistenceScope {
   return createDeploymentPolicyPersistenceScope({
     kind: DeploymentPolicyPersistenceScopeKinds.deploymentPolicyScope,
@@ -343,10 +355,12 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
   it("persists valid active profile selection and safe override updates", async () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();
+    const governanceEventSink = new CapturingDeploymentPolicyGovernanceEventSink();
 
     const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      governanceEventSink,
     });
 
     const result = await useCase.execute({
@@ -389,15 +403,38 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     expect(repository.setActiveProfileCalls).toBe(1);
     expect(repository.upsertOverrideCalls).toBe(1);
     expect(repository.saveMetadataCalls).toBe(1);
+    expect(governanceEventSink.events).toHaveLength(4);
+    expect(governanceEventSink.events.map((event) => event.type)).toEqual([
+      "deployment-policy-active-profile-changed",
+      "deployment-policy-active-profile-changed",
+      "deployment-policy-overrides-mutated",
+      "deployment-policy-overrides-mutated",
+    ]);
+    expect(governanceEventSink.events.map((event) => event.channel)).toEqual([
+      "audit",
+      "operational",
+      "audit",
+      "operational",
+    ]);
+    const overrideEvent = governanceEventSink.events.find((event) => (
+      event.type === "deployment-policy-overrides-mutated" && event.channel === "audit"
+    ));
+    const mutationDetails = (overrideEvent?.details as { mutations?: ReadonlyArray<Record<string, unknown>> } | undefined)?.mutations;
+    expect(overrideEvent?.policyFamilyIds).toEqual(["sharing-posture"]);
+    expect(mutationDetails?.[0]?.before).toEqual({ existed: false });
+    expect(mutationDetails?.[0]?.after).toEqual({ existed: true, valueType: "string", revision: 1 });
+    expect(JSON.stringify(overrideEvent?.details)).not.toContain("\"private\"");
   });
 
   it("supports dry-run validation without mutating persistence", async () => {
     const repository = new InMemoryDeploymentPolicyRepository();
     const permissionService = new StubPermissionService();
+    const governanceEventSink = new CapturingDeploymentPolicyGovernanceEventSink();
 
     const useCase = new DeploymentPolicyAdministrationAuthoritativeUpdateUseCase({
       deploymentPolicyRepository: repository,
       permissionService,
+      governanceEventSink,
     });
 
     const result = await useCase.execute({
@@ -428,6 +465,7 @@ describe("DeploymentPolicyAdministrationAuthoritativeUpdateUseCase", () => {
     expect(result.value.snapshot.families["security-governance"]?.settings.localCredentialRotationDays?.value).toBe(120);
     expect(repository.upsertOverrideCalls).toBe(0);
     expect(repository.saveMetadataCalls).toBe(0);
+    expect(governanceEventSink.events).toHaveLength(0);
   });
 
   it("enforces runtime-admin permission for runtime-admin setting mutations", async () => {

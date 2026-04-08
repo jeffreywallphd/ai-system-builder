@@ -19,6 +19,7 @@ import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorage
 import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "../AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeSchedulingGovernanceEventSink } from "../AuthoritativeSchedulingGovernanceEventSink";
+import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "../AuthoritativeDeploymentPolicyGovernanceEventSink";
 import {
   composeBestEffortSecretAuditHooks,
   createAuthoritativeSecretAccessAuditHook,
@@ -374,6 +375,46 @@ describe("Authoritative security audit adapters", () => {
     expect(repository.events[0]?.action).toBe("run.scheduling.reservation.conflict");
     expect(repository.events[0]?.outcome).toBe("failed");
     expect(repository.events[0]?.protectedResource?.resourceRef).toBe("run:123");
+  });
+
+  it("records deployment policy governance audit-channel events through authoritative policy records", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-08T11:10:00.000Z"),
+      idGenerator: () => "policy-governance-1",
+    });
+    const sink = new AuthoritativeDeploymentPolicyGovernanceEventSink(recorder);
+
+    await sink.recordDeploymentPolicyGovernanceEvent(Object.freeze({
+      channel: "audit",
+      type: "deployment-policy-overrides-mutated",
+      occurredAt: "2026-04-08T11:10:00.000Z",
+      outcome: "succeeded",
+      actorUserIdentityId: "user:policy-admin",
+      scopeKind: "workspace",
+      scopeId: "workspace:primary",
+      profileId: "organization",
+      policyFamilyIds: Object.freeze(["sharing-posture", "admin-controls"]),
+      details: Object.freeze({
+        mutationCount: 2,
+      }),
+    }));
+    await sink.recordDeploymentPolicyGovernanceEvent(Object.freeze({
+      channel: "operational",
+      type: "deployment-policy-overrides-mutated",
+      occurredAt: "2026-04-08T11:10:01.000Z",
+      outcome: "succeeded",
+      actorUserIdentityId: "user:policy-admin",
+      scopeKind: "workspace",
+      scopeId: "workspace:primary",
+    }));
+
+    expect(repository.events).toHaveLength(1);
+    expect(repository.events[0]?.category).toBe("policy");
+    expect(repository.events[0]?.action).toBe("policy.deployment.overrides.mutated");
+    expect(repository.events[0]?.scope.workspaceId).toBe("workspace:primary");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("deployment-policy-profile:workspace:primary:organization");
   });
 
   it("maps published visibility resource policy mutations to publication-oriented sharing actions", async () => {

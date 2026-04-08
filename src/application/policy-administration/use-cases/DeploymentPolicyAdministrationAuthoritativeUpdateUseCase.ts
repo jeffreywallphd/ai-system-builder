@@ -36,6 +36,12 @@ import {
   type DeploymentPolicyAdminOverrideRecord,
   validateDeploymentPolicyAdminOverrideRecords,
 } from "@application/deployment/DeploymentPolicyEffectiveResolutionService";
+import {
+  DeploymentPolicyGovernanceEventChannels,
+  DeploymentPolicyGovernanceEventTypes,
+  publishDeploymentPolicyGovernanceEventBestEffort,
+  type IDeploymentPolicyGovernanceEventSink,
+} from "@application/policy-administration/ports/DeploymentPolicyGovernanceEventPorts";
 
 export const DeploymentPolicyAdministrationPermissionKeys = Object.freeze({
   selectActiveProfile: "deployment-policy.profile.select",
@@ -162,6 +168,7 @@ export interface ApplyDeploymentPolicyAdministrationUpdatesResult {
 export interface DeploymentPolicyAdministrationAuthoritativeUpdateUseCaseDependencies {
   readonly deploymentPolicyRepository: IDeploymentPolicyPersistenceRepository;
   readonly permissionService: IDeploymentPolicyAdministrationPermissionService;
+  readonly governanceEventSink?: IDeploymentPolicyGovernanceEventSink;
   readonly familyCatalog?: DeploymentPolicyFamilyCatalog;
   readonly presetCatalog?: ReturnType<typeof createCanonicalDeploymentPolicyConfigurationRegistry>["presetCatalog"];
   readonly clock?: DeploymentPolicyAdministrationClock;
@@ -171,6 +178,24 @@ export interface DeploymentPolicyAdministrationAuthoritativeUpdateUseCaseDepende
 interface LoadedScopeState {
   readonly activeProfileSelection?: DeploymentPolicyActiveProfileSelectionRecord;
   readonly overridesByProfile: Readonly<Record<DeploymentProfileId, ReadonlyArray<DeploymentPolicyOverridePersistenceRecord>>>;
+}
+
+interface PolicyOverrideSafeSummary {
+  readonly familyId: string;
+  readonly settingKey: string;
+  readonly operation: DeploymentPolicyUpdateOperation["operation"];
+  readonly changed: boolean;
+  readonly wasReplay: boolean;
+  readonly before: Readonly<{
+    readonly existed: boolean;
+    readonly valueType?: string;
+    readonly revision?: number;
+  }>;
+  readonly after: Readonly<{
+    readonly existed: boolean;
+    readonly valueType?: string;
+    readonly revision?: number;
+  }>;
 }
 
 function toFailure<TValue>(
@@ -300,11 +325,13 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
 
     let validationIssues: ReadonlyArray<DeploymentPolicyValidationIssue> = Object.freeze([]);
     const overrideMutations: DeploymentPolicyOverrideMutationResult[] = [];
+    const overrideSafeSummaries: PolicyOverrideSafeSummary[] = [];
     let activeProfileSelectionMutation: DeploymentPolicyPersistenceMutationResult<DeploymentPolicyActiveProfileSelectionRecord>
       | undefined;
 
     for (const operation of input.operations) {
       if (operation.kind === "set-active-profile") {
+        const previousActiveProfileId = currentActiveProfileSelection?.profileId;
         const permission = await this.dependencies.permissionService.evaluatePermission({
           actorUserIdentityId: input.actorUserIdentityId,
           requiredPermission: DeploymentPolicyAdministrationPermissionKeys.selectActiveProfile,
@@ -363,6 +390,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
               `Failed to persist active profile selection: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
             );
           }
+
+          await this.publishGovernanceEventPair({
+            type: DeploymentPolicyGovernanceEventTypes.activeProfileChanged,
+            occurredAt: currentActiveProfileSelection.changedAt,
+            actorUserIdentityId: input.actorUserIdentityId,
+            scope,
+            profileId: currentActiveProfileSelection.profileId,
+            details: Object.freeze({
+              reason: normalizeOptionalString(input.reason),
+              ticketReference: normalizeOptionalString(input.ticketReference),
+              previousProfileId: previousActiveProfileId,
+              nextProfileId: currentActiveProfileSelection.profileId,
+              revision: currentActiveProfileSelection.revision,
+              changed: activeProfileSelectionMutation.changed,
+              wasReplay: activeProfileSelectionMutation.wasReplay,
+            }),
+            correlationId: input.correlationId,
+          });
         } else {
           currentActiveProfileSelection = nextRecord;
         }
@@ -435,6 +480,9 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
 
       if (!input.dryRun) {
         for (const item of operationValidation.appliedOperations) {
+          const previousRecord = item.existingIndex !== undefined
+            ? existingForProfile[item.existingIndex]
+            : undefined;
           const mutation = this.createMutationEnvelope({
             actorUserIdentityId: input.actorUserIdentityId,
             operationPrefix: `override-${item.operation.operation}`,
@@ -478,6 +526,13 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
               } else {
                 existingForProfile.splice(item.existingIndex, 1, result.record);
               }
+              overrideSafeSummaries.push(this.toOverrideSafeSummary({
+                operation: item.operation,
+                changed: result.changed,
+                wasReplay: result.wasReplay,
+                beforeRecord: previousRecord,
+                afterRecord: result.record,
+              }));
 
               overrideMutations.push(Object.freeze({
                 operation: item.operation,
@@ -499,6 +554,13 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
             if (item.existingIndex !== undefined) {
               existingForProfile.splice(item.existingIndex, 1);
             }
+            overrideSafeSummaries.push(this.toOverrideSafeSummary({
+              operation: item.operation,
+              changed: result.changed,
+              wasReplay: result.wasReplay,
+              beforeRecord: previousRecord,
+              afterRecord: undefined,
+            }));
             overrideMutations.push(Object.freeze({
               operation: item.operation,
               changed: result.changed,
@@ -514,6 +576,9 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
         }
       } else {
         for (const item of operationValidation.appliedOperations) {
+          const previousRecord = item.existingIndex !== undefined
+            ? existingForProfile[item.existingIndex]
+            : undefined;
           if (item.operation.operation === DeploymentPolicyUpdateOperationKinds.upsert) {
             const nowIso = command.submittedAt ?? input.occurredAt ?? this.clock.now().toISOString();
             const simulated = Object.freeze({
@@ -542,6 +607,13 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
             } else {
               existingForProfile.splice(item.existingIndex, 1, simulated);
             }
+            overrideSafeSummaries.push(this.toOverrideSafeSummary({
+              operation: item.operation,
+              changed: true,
+              wasReplay: false,
+              beforeRecord: previousRecord,
+              afterRecord: simulated,
+            }));
 
             overrideMutations.push(Object.freeze({
               operation: item.operation,
@@ -555,6 +627,13 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
           if (item.existingIndex !== undefined) {
             const previous = existingForProfile[item.existingIndex];
             existingForProfile.splice(item.existingIndex, 1);
+            overrideSafeSummaries.push(this.toOverrideSafeSummary({
+              operation: item.operation,
+              changed: true,
+              wasReplay: false,
+              beforeRecord: previousRecord,
+              afterRecord: undefined,
+            }));
             overrideMutations.push(Object.freeze({
               operation: item.operation,
               changed: true,
@@ -637,6 +716,24 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
           `Failed to persist effective deployment-policy metadata: ${error instanceof Error ? error.message : "Unknown persistence error."}`,
         );
       }
+    }
+
+    if (!input.dryRun && overrideSafeSummaries.length > 0) {
+      await this.publishGovernanceEventPair({
+        type: DeploymentPolicyGovernanceEventTypes.overridesMutated,
+        occurredAt: input.occurredAt ?? this.clock.now().toISOString(),
+        actorUserIdentityId: input.actorUserIdentityId,
+        scope,
+        profileId: snapshotProfileId,
+        policyFamilyIds: Object.freeze([...new Set(overrideSafeSummaries.map((item) => item.familyId))]),
+        details: Object.freeze({
+          reason: normalizeOptionalString(input.reason),
+          ticketReference: normalizeOptionalString(input.ticketReference),
+          mutationCount: overrideSafeSummaries.length,
+          mutations: Object.freeze(overrideSafeSummaries),
+        }),
+        correlationId: input.correlationId,
+      });
     }
 
     return {
@@ -950,6 +1047,81 @@ export class DeploymentPolicyAdministrationAuthoritativeUpdateUseCase {
         correlationId: normalizeOptionalString(input.correlationId),
         metadata: input.metadata,
       }),
+    });
+  }
+
+  private async publishGovernanceEventPair(input: {
+    readonly type: typeof DeploymentPolicyGovernanceEventTypes[keyof typeof DeploymentPolicyGovernanceEventTypes];
+    readonly occurredAt: string;
+    readonly actorUserIdentityId: string;
+    readonly scope: DeploymentPolicyPersistenceScope;
+    readonly profileId?: string;
+    readonly policyFamilyIds?: ReadonlyArray<string>;
+    readonly details?: Readonly<Record<string, unknown>>;
+    readonly correlationId?: string;
+  }): Promise<void> {
+    const scopeKind = input.scope.scopeId === "system"
+      ? "system"
+      : "workspace";
+
+    await publishDeploymentPolicyGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      channel: DeploymentPolicyGovernanceEventChannels.audit,
+      type: input.type,
+      occurredAt: input.occurredAt,
+      outcome: "succeeded",
+      actorUserIdentityId: input.actorUserIdentityId,
+      scopeKind,
+      scopeId: input.scope.scopeId,
+      profileId: input.profileId,
+      policyFamilyIds: input.policyFamilyIds,
+      correlationId: input.correlationId,
+      details: input.details,
+    });
+
+    await publishDeploymentPolicyGovernanceEventBestEffort(this.dependencies.governanceEventSink, {
+      channel: DeploymentPolicyGovernanceEventChannels.operational,
+      type: input.type,
+      occurredAt: input.occurredAt,
+      outcome: "succeeded",
+      actorUserIdentityId: input.actorUserIdentityId,
+      scopeKind,
+      scopeId: input.scope.scopeId,
+      profileId: input.profileId,
+      policyFamilyIds: input.policyFamilyIds,
+      correlationId: input.correlationId,
+      details: input.details,
+    });
+  }
+
+  private toOverrideSafeSummary(input: {
+    readonly operation: DeploymentPolicyUpdateOperation;
+    readonly changed: boolean;
+    readonly wasReplay: boolean;
+    readonly beforeRecord?: DeploymentPolicyOverridePersistenceRecord;
+    readonly afterRecord?: DeploymentPolicyOverridePersistenceRecord;
+  }): PolicyOverrideSafeSummary {
+    return Object.freeze({
+      familyId: input.operation.familyId,
+      settingKey: input.operation.settingKey,
+      operation: input.operation.operation,
+      changed: input.changed,
+      wasReplay: input.wasReplay,
+      before: this.toSafeOverrideState(input.beforeRecord),
+      after: this.toSafeOverrideState(input.afterRecord),
+    });
+  }
+
+  private toSafeOverrideState(record?: DeploymentPolicyOverridePersistenceRecord): PolicyOverrideSafeSummary["before"] {
+    if (!record) {
+      return Object.freeze({
+        existed: false,
+      });
+    }
+
+    return Object.freeze({
+      existed: true,
+      valueType: record.valueType,
+      revision: record.revision,
     });
   }
 

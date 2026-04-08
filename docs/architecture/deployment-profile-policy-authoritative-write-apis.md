@@ -90,3 +90,9 @@ Stable failure mapping:
 - HTTP transport and route registration:
   - `src/infrastructure/transport/http-server/identity/tests/IdentityHttpServerDeploymentPolicyWriteApi.test.ts`
   - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
+
+## Related governance hooks
+
+Story 20.2.6 extends authoritative write flows with structured audit/operational governance events:
+
+- `docs/architecture/deployment-profile-policy-audit-operational-governance-hooks.md`
