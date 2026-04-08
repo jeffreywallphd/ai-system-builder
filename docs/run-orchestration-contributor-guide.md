@@ -176,7 +176,8 @@ Provide an implementation checklist for contributors extending the authoritative
 7. Are `.md` and `.ai.md` docs updated together for orchestration changes?
 8. Are relevant tests updated across application, infrastructure, transport, and persistence seams?
 9. Does regression coverage still pass for integrated lifecycle hardening in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`?
-10. For scheduling hardening changes, do tests also cover duplicate-intent suppression, no-placement defer metadata, and scheduling-admin schema validation?
+10. Does node-aware dispatch assignment coverage still pass in `src/application/runs/tests/ProcessQueuedRunDispatchUseCase.integration.test.ts` (eligible selection, no-eligible failures, degraded fallback, and durable assignment metadata)?
+11. For scheduling hardening changes, do tests also cover duplicate-intent suppression, no-placement defer metadata, and scheduling-admin schema validation?
 
 ## Current deferred scheduling edges
 

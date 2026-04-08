@@ -53,6 +53,7 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 
 ## Story 16.3.8 hardening baseline
 - Integration regression coverage: `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts`.
+- Node-aware queue-to-dispatch integration coverage: `src/application/runs/tests/ProcessQueuedRunDispatchUseCase.integration.test.ts`.
 - Covered flow includes submission, queue admission, assignment selection, node claim, dispatch, progress ingestion, completion finalization, cancellation/retry policy checks, startup recovery, and run-query contract parsing.
 - Duplicate assignment remains conflict-first (`already-assigned`) and is explicitly asserted.
 
