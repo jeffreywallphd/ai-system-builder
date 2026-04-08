@@ -9,6 +9,7 @@ This note documents Story 3.2.2 for Feature 3 / Epic 3.2:
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiExecutionObservability.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionCancellationAdapter.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
@@ -216,3 +217,55 @@ Added adapter-side output discovery + collection for completed ComfyUI jobs:
 - Cancellation uses ComfyUI `POST /interrupt` semantics and remains best effort.
 - Cleanup covers adapter-local tracked temporary references only; it does not guarantee deletion of backend-generated files or runtime-global Comfy queue artifacts.
 - Degraded cleanup outcomes are explicit in cancellation details so higher layers can avoid hidden partial-state assumptions and trigger follow-up reconciliation when needed.
+
+## Story 3.3.5 observability, structured logging, and redaction
+
+### Added observability seam
+
+- Added a dedicated adapter observability utility:
+  - `src/infrastructure/execution/comfyui/ComfyUiExecutionObservability.ts`
+- This seam provides:
+  - structured event envelopes for Comfy image-manipulation adapter execution flows,
+  - severity-based logging (`info` / `warn` / `error`),
+  - centralized sanitization/redaction before events reach logger sinks.
+
+### Adapter flow coverage
+
+Structured observability now covers major Comfy adapter execution flows:
+
+- translation (`translation.started`, `translation.succeeded`, `translation.failed`)
+- dispatch (`dispatch.started`, `dispatch.accepted`, `dispatch.failed`)
+- transport calls (`transport.request-succeeded`, `transport.request-failed`) through an adapter-specific bridge
+- progress normalization (`progress-normalization.completed`)
+- output discovery/collection (`output-collection.started`, `output-collection.completed`, `output-collection.failed`, cleanup events)
+- cancellation (`cancellation.requested`, `cancellation.completed`)
+
+### Correlation and execution tracing posture
+
+Event records carry bounded correlation identifiers where available:
+
+- `runId`
+- `executionJobId`
+- `backendExecutionId`
+- `translationRequestId`
+- `dispatchAttemptId`
+- `correlationId`
+- `workspaceId`
+
+This keeps run-level debugging traceable across translation, dispatch, polling normalization, cancellation, and output collection paths.
+
+### Redaction and safety posture
+
+- Observability sanitization is centralized and composable with platform logging redaction helpers.
+- Adapter logs redact or omit:
+  - prompt content and raw backend payloads,
+  - credentials/tokens/secrets,
+  - raw storage/path/file internals and backend object handles,
+  - unsafe request/response body fragments.
+- Transport HTTP error logging now captures bounded metadata (for example response body length) instead of raw response body preview content.
+
+### Maintainability posture
+
+- Observability remains infrastructure-local and optional at composition time through:
+  - `createComfyUiExecutionAdapterInfrastructure(..., observabilityLogger)`
+- Existing adapter/application contracts stay unchanged; this story adds diagnostics behavior, not business-model surface changes.

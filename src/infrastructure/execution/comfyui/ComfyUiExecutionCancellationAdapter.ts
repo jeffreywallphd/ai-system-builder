@@ -13,6 +13,7 @@ import {
   ComfyUiTemporaryReferenceCleanupStatuses,
   type ComfyUiTemporaryReferenceCleanupResult,
 } from "./ComfyUiOutputDiscoveryCollector";
+import { ComfyUiExecutionObservability } from "./ComfyUiExecutionObservability";
 
 interface ComfyUiExecutionCancellationTransportClient {
   requestPromptCancellation(input: {
@@ -39,15 +40,18 @@ export interface ComfyUiExecutionCancellationAdapterDependencies {
   readonly cleanupPort?: ComfyUiExecutionCancellationCleanupPort;
   readonly supportsCancellation?: boolean;
   readonly now?: () => Date;
+  readonly observability?: ComfyUiExecutionObservability;
 }
 
 export class ComfyUiExecutionCancellationAdapter implements IImageManipulationExecutionCancellationPort {
   private readonly now: () => Date;
   private readonly supportsCancellation: boolean;
+  private readonly observability?: ComfyUiExecutionObservability;
 
   public constructor(private readonly dependencies: ComfyUiExecutionCancellationAdapterDependencies) {
     this.now = dependencies.now ?? (() => new Date());
     this.supportsCancellation = dependencies.supportsCancellation ?? true;
+    this.observability = dependencies.observability;
   }
 
   public async requestExecutionCancellation(input: {
@@ -66,6 +70,19 @@ export class ComfyUiExecutionCancellationAdapter implements IImageManipulationEx
     const acknowledgedAt = this.resolveTimestamp(input.requestedAt);
     const executionJobId = input.executionJobId.trim();
     const requestedReason = normalizeOptional(input.reason);
+    this.observability?.record({
+      event: "cancellation.requested",
+      severity: "info",
+      runId: input.runId,
+      executionJobId,
+      workspaceId: input.workspaceId,
+      correlationId: normalizeOptional(input.requestedByActorId),
+      occurredAt: acknowledgedAt,
+      details: Object.freeze({
+        supportsCancellation: this.supportsCancellation,
+        hasReason: Boolean(requestedReason),
+      }),
+    });
 
     if (!this.supportsCancellation) {
       const cleanup = await this.tryCleanup({
@@ -211,12 +228,25 @@ export class ComfyUiExecutionCancellationAdapter implements IImageManipulationEx
     if (input.failure) {
       details.failure = input.failure;
     }
-    return Object.freeze({
+    const result = Object.freeze({
       status: input.status,
       acknowledgedAt: input.acknowledgedAt,
       message: input.message,
       details: Object.freeze(details),
     });
+    this.observability?.record({
+      event: "cancellation.completed",
+      severity: input.status === "failed" || input.status === "rejected" ? "warn" : "info",
+      backendExecutionId: normalizeOptional(input.backendExecutionId),
+      occurredAt: input.acknowledgedAt,
+      details: Object.freeze({
+        status: input.status,
+        cleanupStatus: input.cleanup?.status,
+        failureCode: input.failure?.code,
+        failureCategory: input.failure?.category,
+      }),
+    });
+    return result;
   }
 
   private resolveTimestamp(candidate: string | undefined): string {

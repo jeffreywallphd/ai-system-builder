@@ -10,6 +10,7 @@ import {
   type ImageManipulationExecutionFailure,
 } from "@application/image-workflows/ports";
 import { ComfyUiTransportClientError } from "../comfyui/ComfyUiTransportClient";
+import { ComfyUiExecutionObservability } from "../comfyui/ComfyUiExecutionObservability";
 
 export interface ComfyUiDispatchPayload {
   readonly runId: string;
@@ -38,6 +39,7 @@ export interface ComfyUiDispatchGateway {
 interface ComfyUiRunExecutionDispatchAdapterDependencies {
   readonly gateway: ComfyUiDispatchGateway;
   readonly now?: () => Date;
+  readonly observability?: ComfyUiExecutionObservability;
 }
 
 export class ComfyUiRunExecutionDispatchError extends Error {
@@ -60,12 +62,29 @@ export class ComfyUiRunExecutionDispatchError extends Error {
 export class ComfyUiRunExecutionDispatchAdapter implements IRunExecutionBackendAdapter {
   public readonly backendKind = RunExecutionBackendKinds.comfyUi;
   private readonly now: () => Date;
+  private readonly observability?: ComfyUiExecutionObservability;
 
   public constructor(private readonly dependencies: ComfyUiRunExecutionDispatchAdapterDependencies) {
     this.now = dependencies.now ?? (() => new Date());
+    this.observability = dependencies.observability;
   }
 
   public async dispatch(command: CanonicalRunExecutionCommand): Promise<RunExecutionDispatchReceipt> {
+    this.observability?.record({
+      event: "dispatch.started",
+      severity: "info",
+      runId: command.run.runId,
+      dispatchAttemptId: command.dispatchAttemptId,
+      correlationId: command.run.correlationId,
+      details: Object.freeze({
+        queueId: command.queue.queueId,
+        nodeId: command.assignment.nodeId,
+        backendKind: command.backend.kind,
+        hasStorageReferences: command.references.storageReferences.length > 0,
+        hasResourceReferences: command.references.resourceReferences.length > 0,
+      }),
+    });
+
     try {
       const payload: ComfyUiDispatchPayload = Object.freeze({
         runId: command.run.runId,
@@ -84,7 +103,7 @@ export class ComfyUiRunExecutionDispatchAdapter implements IRunExecutionBackendA
       });
 
       const dispatched = await this.dependencies.gateway.submitComfyUiDispatch(payload);
-      return Object.freeze({
+      const receipt = Object.freeze({
         dispatchId: `dispatch:${command.dispatchAttemptId}`,
         backendKind: this.backendKind,
         acceptedAt: dispatched.acceptedAt?.trim() || this.now().toISOString(),
@@ -92,8 +111,35 @@ export class ComfyUiRunExecutionDispatchAdapter implements IRunExecutionBackendA
         backendRunId: dispatched.backendRunId,
         metadata: dispatched.metadata,
       });
+
+      this.observability?.record({
+        event: "dispatch.accepted",
+        severity: "info",
+        runId: command.run.runId,
+        dispatchAttemptId: command.dispatchAttemptId,
+        backendExecutionId: dispatched.backendRunId,
+        correlationId: command.run.correlationId,
+        details: Object.freeze({
+          status: receipt.status,
+          hasQueueNumber: typeof (dispatched.metadata as Record<string, unknown> | undefined)?.queueNumber === "number",
+        }),
+      });
+      return receipt;
     } catch (error) {
       const failure = normalizeDispatchFailure(error, this.now().toISOString());
+      this.observability?.record({
+        event: "dispatch.failed",
+        severity: failure.retryable ? "warn" : "error",
+        runId: command.run.runId,
+        dispatchAttemptId: command.dispatchAttemptId,
+        correlationId: command.run.correlationId,
+        details: Object.freeze({
+          failureCode: failure.code,
+          failureCategory: failure.category,
+          retryable: failure.retryable,
+          stageCode: failure.stageCode,
+        }),
+      });
       throw new ComfyUiRunExecutionDispatchError({
         failure,
         cause: error,

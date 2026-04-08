@@ -5,6 +5,7 @@ import type {
   ComfyQueueStateDto,
   ComfyWorkflowDto,
 } from "@infrastructure/comfyui/dto/ComfyWorkflowDto";
+import { sanitizeComfyUiExecutionObservabilityEvent } from "./ComfyUiExecutionObservability";
 
 export const ComfyUiTransportPromptStates = Object.freeze({
   queued: "queued",
@@ -303,7 +304,7 @@ export class ComfyUiTransportClient {
       });
     } catch (error) {
       if (error instanceof ComfyUiTransportClientError) {
-        this.logFailure("query-prompt-state", startedAt, error);
+        this.logFailure("query-prompt-state", startedAt, error, promptId);
       }
       throw error;
     }
@@ -334,7 +335,7 @@ export class ComfyUiTransportClient {
       });
     } catch (error) {
       if (error instanceof ComfyUiTransportClientError) {
-        this.logFailure("query-prompt-history", startedAt, error);
+        this.logFailure("query-prompt-history", startedAt, error, promptId);
       }
       throw error;
     }
@@ -385,7 +386,7 @@ export class ComfyUiTransportClient {
       });
     } catch (error) {
       if (error instanceof ComfyUiTransportClientError) {
-        this.logFailure("request-cancellation", startedAt, error);
+        this.logFailure("request-cancellation", startedAt, error, promptId);
       }
       throw error;
     }
@@ -591,7 +592,8 @@ export class ComfyUiTransportClient {
             statusCode: response.status,
             details: body
               ? Object.freeze({
-                bodyPreview: body.slice(0, 300),
+                responseBodyLength: body.length,
+                hasBody: true,
               })
               : undefined,
           },
@@ -623,7 +625,6 @@ export class ComfyUiTransportClient {
           details: error instanceof Error
             ? Object.freeze({
               name: error.name,
-              message: error.message,
             })
             : undefined,
         },
@@ -648,7 +649,9 @@ export class ComfyUiTransportClient {
       promptId,
       statusCode,
       durationMs: Date.now() - startedAt,
-      details,
+      details: details
+        ? sanitizeComfyUiExecutionObservabilityEvent(details)
+        : undefined,
     }));
   }
 
@@ -656,16 +659,20 @@ export class ComfyUiTransportClient {
     operation: ComfyUiTransportOperation,
     startedAt: number,
     error: ComfyUiTransportClientError,
+    promptId?: string,
   ): void {
     this.logger?.log(Object.freeze({
       scope: "comfyui-transport",
       event: "request-failed",
       operation,
       at: this.now().toISOString(),
+      promptId,
       durationMs: Date.now() - startedAt,
       statusCode: error.diagnostics.statusCode,
       errorCode: error.code,
-      details: error.diagnostics.details,
+      details: error.diagnostics.details
+        ? sanitizeComfyUiExecutionObservabilityEvent(error.diagnostics.details)
+        : undefined,
     }));
   }
 }

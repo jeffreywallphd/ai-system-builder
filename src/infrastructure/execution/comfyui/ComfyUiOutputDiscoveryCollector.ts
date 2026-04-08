@@ -17,6 +17,7 @@ import {
 } from "@application/image-workflows/ports";
 import type { ComfyHistoryPromptEntryDto } from "@infrastructure/comfyui/dto/ComfyWorkflowDto";
 import { ComfyUiTransportClient } from "./ComfyUiTransportClient";
+import { ComfyUiExecutionObservability } from "./ComfyUiExecutionObservability";
 
 export interface ComfyUiExpectedOutputBinding {
   readonly outputId: string;
@@ -76,6 +77,7 @@ export class ComfyUiOutputDiscoveryCollector {
     private readonly dependencies: {
       readonly transportClient: ComfyUiTransportClient;
       readonly now?: () => Date;
+      readonly observability?: ComfyUiExecutionObservability;
     },
   ) {
     this.now = dependencies.now ?? (() => new Date());
@@ -85,20 +87,33 @@ export class ComfyUiOutputDiscoveryCollector {
     request: ComfyUiOutputDiscoveryCollectionRequest,
   ): Promise<ComfyUiOutputDiscoveryCollectionResult> {
     const discoveredAt = this.resolveTimestamp(request.discoveredAt);
-    const historySnapshot = await this.dependencies.transportClient.queryPromptHistory({
-      promptId: request.backendExecutionId,
+    this.dependencies.observability?.record({
+      event: "output-collection.started",
+      severity: "info",
+      runId: request.runId,
+      executionJobId: request.executionJobId,
+      backendExecutionId: request.backendExecutionId,
+      workspaceId: request.workspaceId,
+      occurredAt: discoveredAt,
+      details: Object.freeze({
+        expectedOutputCount: request.expectedOutputs?.length ?? 0,
+      }),
     });
-    const normalizedArtifacts = extractImageArtifacts(historySnapshot.historyEntry);
-    const malformedArtifactCount = countMalformedImageArtifacts(historySnapshot.historyEntry);
-    const discoveredOutputs = normalizedArtifacts.map((artifact, outputIndex) => this.toDiscoveredDescriptor({
-      request,
-      artifact,
-      outputIndex,
-      discoveredAt,
-      expectedOutputs: request.expectedOutputs ?? [],
-    }));
+    try {
+      const historySnapshot = await this.dependencies.transportClient.queryPromptHistory({
+        promptId: request.backendExecutionId,
+      });
+      const normalizedArtifacts = extractImageArtifacts(historySnapshot.historyEntry);
+      const malformedArtifactCount = countMalformedImageArtifacts(historySnapshot.historyEntry);
+      const discoveredOutputs = normalizedArtifacts.map((artifact, outputIndex) => this.toDiscoveredDescriptor({
+        request,
+        artifact,
+        outputIndex,
+        discoveredAt,
+        expectedOutputs: request.expectedOutputs ?? [],
+      }));
 
-    const discovery = validateImageManipulationOutputDiscoverySnapshot({
+      const discovery = validateImageManipulationOutputDiscoverySnapshot({
       discoveryId: `discovery:${request.executionJobId}`,
       executionJobId: request.executionJobId,
       runId: request.runId,
@@ -118,7 +133,7 @@ export class ComfyUiOutputDiscoveryCollector {
       },
     });
 
-    const records = discoveredOutputs.map((entry, index): ImageManipulationCollectedOutputRecord => Object.freeze({
+      const records = discoveredOutputs.map((entry, index): ImageManipulationCollectedOutputRecord => Object.freeze({
       descriptorId: entry.descriptorId,
       temporaryReference: entry.temporaryReference,
       persistence: Object.freeze({
@@ -131,35 +146,35 @@ export class ComfyUiOutputDiscoveryCollector {
       }),
     }));
 
-    const missingOutputs = discoveredOutputs.length === 0;
-    const hasMalformedArtifacts = malformedArtifactCount > 0;
-    const collectionFailure = missingOutputs || hasMalformedArtifacts
-      ? createImageManipulationOutputCollectionFailure({
-        failedAt: discoveredAt,
-        backendErrorCode: missingOutputs
-          ? "missing-backend-outputs"
-          : "malformed-backend-output-reference",
-        rawMessage: missingOutputs
-          ? "ComfyUI job completed without discoverable image outputs."
-          : "ComfyUI job produced malformed output artifacts that could not be collected.",
-        diagnostics: {
-          backendExecutionId: request.backendExecutionId,
-          malformedArtifactCount,
-          discoveredOutputCount: discoveredOutputs.length,
-        },
-        stageCode: "output-collection",
-        partialProgressObserved: !missingOutputs,
-        partialOutputCount: discoveredOutputs.length,
-      })
-      : undefined;
+      const missingOutputs = discoveredOutputs.length === 0;
+      const hasMalformedArtifacts = malformedArtifactCount > 0;
+      const collectionFailure = missingOutputs || hasMalformedArtifacts
+        ? createImageManipulationOutputCollectionFailure({
+          failedAt: discoveredAt,
+          backendErrorCode: missingOutputs
+            ? "missing-backend-outputs"
+            : "malformed-backend-output-reference",
+          rawMessage: missingOutputs
+            ? "ComfyUI job completed without discoverable image outputs."
+            : "ComfyUI job produced malformed output artifacts that could not be collected.",
+          diagnostics: {
+            backendExecutionId: request.backendExecutionId,
+            malformedArtifactCount,
+            discoveredOutputCount: discoveredOutputs.length,
+          },
+          stageCode: "output-collection",
+          partialProgressObserved: !missingOutputs,
+          partialOutputCount: discoveredOutputs.length,
+        })
+        : undefined;
 
-    const status = missingOutputs
-      ? ImageManipulationCollectedExecutionStatuses.failed
-      : hasMalformedArtifacts
-        ? ImageManipulationCollectedExecutionStatuses.partiallyCollected
-        : ImageManipulationCollectedExecutionStatuses.collected;
+      const status = missingOutputs
+        ? ImageManipulationCollectedExecutionStatuses.failed
+        : hasMalformedArtifacts
+          ? ImageManipulationCollectedExecutionStatuses.partiallyCollected
+          : ImageManipulationCollectedExecutionStatuses.collected;
 
-    const collected = validateImageManipulationCollectedExecutionResult({
+      const collected = validateImageManipulationCollectedExecutionResult({
       collectionId: `collection:${request.executionJobId}`,
       discoveryId: discovery.discoveryId,
       executionJobId: request.executionJobId,
@@ -183,19 +198,50 @@ export class ComfyUiOutputDiscoveryCollector {
       },
     });
 
-    this.trackedTemporaryReferences.set(
-      request.executionJobId,
-      Object.freeze({
+      this.trackedTemporaryReferences.set(
+        request.executionJobId,
+        Object.freeze({
+          executionJobId: request.executionJobId,
+          backendExecutionId: request.backendExecutionId,
+          referenceCount: discoveredOutputs.length,
+        }),
+      );
+
+      const result = Object.freeze({
+        discovery,
+        collected,
+      });
+      this.dependencies.observability?.record({
+        event: "output-collection.completed",
+        severity: status === ImageManipulationCollectedExecutionStatuses.failed ? "warn" : "info",
+        runId: request.runId,
         executionJobId: request.executionJobId,
         backendExecutionId: request.backendExecutionId,
-        referenceCount: discoveredOutputs.length,
-      }),
-    );
-
-    return Object.freeze({
-      discovery,
-      collected,
-    });
+        workspaceId: request.workspaceId,
+        occurredAt: discoveredAt,
+        details: Object.freeze({
+          status,
+          discoveredCount: discovery.outputs.length,
+          malformedArtifactCount,
+          failureCode: collectionFailure?.code,
+        }),
+      });
+      return result;
+    } catch (error) {
+      this.dependencies.observability?.record({
+        event: "output-collection.failed",
+        severity: "error",
+        runId: request.runId,
+        executionJobId: request.executionJobId,
+        backendExecutionId: request.backendExecutionId,
+        workspaceId: request.workspaceId,
+        occurredAt: discoveredAt,
+        details: Object.freeze({
+          errorName: error instanceof Error ? error.name : "unknown-error",
+        }),
+      });
+      throw error;
+    }
   }
 
   public async releaseTemporaryReferences(input: {
@@ -218,7 +264,7 @@ export class ComfyUiOutputDiscoveryCollector {
 
     const tracked = trackedByExecution ?? trackedByBackend;
     if (!tracked) {
-      return Object.freeze({
+      const result = Object.freeze({
         status: ComfyUiTemporaryReferenceCleanupStatuses.none,
         releasedReferenceCount: 0,
         acknowledgedAt,
@@ -228,10 +274,22 @@ export class ComfyUiOutputDiscoveryCollector {
           reason: normalizeString(input.reason) ?? "unspecified",
         }),
       });
+      this.dependencies.observability?.record({
+        event: "output-collection.cleanup",
+        severity: "info",
+        executionJobId: executionJobId,
+        backendExecutionId: backendExecutionId,
+        occurredAt: acknowledgedAt,
+        details: Object.freeze({
+          cleanupStatus: result.status,
+          releasedReferenceCount: result.releasedReferenceCount,
+        }),
+      });
+      return result;
     }
 
     this.trackedTemporaryReferences.delete(tracked.executionJobId);
-    return Object.freeze({
+    const result = Object.freeze({
       status: ComfyUiTemporaryReferenceCleanupStatuses.completed,
       releasedReferenceCount: tracked.referenceCount,
       acknowledgedAt,
@@ -242,6 +300,18 @@ export class ComfyUiOutputDiscoveryCollector {
         backendExecutionId: tracked.backendExecutionId,
       }),
     });
+    this.dependencies.observability?.record({
+      event: "output-collection.cleanup",
+      severity: "info",
+      executionJobId: tracked.executionJobId,
+      backendExecutionId: tracked.backendExecutionId,
+      occurredAt: acknowledgedAt,
+      details: Object.freeze({
+        cleanupStatus: result.status,
+        releasedReferenceCount: result.releasedReferenceCount,
+      }),
+    });
+    return result;
   }
 
   private toDiscoveredDescriptor(input: {
