@@ -68,3 +68,17 @@ Boundary posture for this story:
 - external API DTOs are explicitly separate from persistence DTOs
 - contracts remain host-neutral for desktop and thin-client convergence
 - API/event payloads do not expose raw filesystem paths
+
+## Story 1.1.4: Application repository and managed-storage ports
+
+Image-asset application ports for metadata persistence and managed storage are now defined in:
+
+- `src/application/image-assets/ports/IImageAssetRepository.ts`
+- `src/application/image-assets/ports/ImageAssetStoragePort.ts`
+- `src/application/image-assets/ports/index.ts`
+
+These ports provide:
+
+- metadata create/update/retrieve/list/archive/soft-delete seams
+- managed-storage location reservation, binary write/read, mediated access-handle, and lifecycle delete seams
+- storage-instance plus logical object-key references without raw filesystem path contracts
