@@ -5,6 +5,7 @@
 Story 2.2.1 defines shared API DTO/schema contracts for image workflow and image system configuration flows across desktop and thin-client surfaces.
 Story 2.2.2 adds application-layer repository/service ports for authoritative workflow/system persistence and policy-aware resolution.
 Story 2.2.3 adds application use cases for authoritative image-workflow create/update authoring.
+Story 2.2.4 adds application use cases for authoritative image-system create/update authoring with workflow-binding compatibility and readiness outputs.
 
 ## Canonical files
 
@@ -19,8 +20,13 @@ Story 2.2.3 adds application use cases for authoritative image-workflow create/u
 - `src/application/image-workflows/UpdateImageWorkflowDefinitionUseCase.ts`
 - `src/application/image-workflows/ImageWorkflowDefinitionAuthoringContracts.ts`
 - `src/application/image-workflows/ImageWorkflowDefinitionAuthoringErrors.ts`
+- `src/application/image-workflows/CreateImageSystemDefinitionUseCase.ts`
+- `src/application/image-workflows/UpdateImageSystemDefinitionUseCase.ts`
+- `src/application/image-workflows/ImageSystemDefinitionAuthoringContracts.ts`
+- `src/application/image-workflows/ImageSystemDefinitionAuthoringErrors.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
+- `src/application/image-workflows/tests/ImageSystemDefinitionAuthoringUseCases.test.ts`
 - `docs/architecture/image-workflow-system-api-contracts.md`
 
 ## Contract coverage
@@ -86,6 +92,30 @@ Story 2.2.3 adds application use cases for authoritative image-workflow create/u
   - structural metadata summary (input/parameter/output/binding/translation counts).
 
 This keeps workflow authoring/editing independent of UI surfaces and backend execution graph adapters while preserving a controller-safe response shape for API routes.
+
+## Story 2.2.4 image-system create/update use-case coverage
+
+- `CreateImageSystemDefinitionUseCase` and `UpdateImageSystemDefinitionUseCase` now provide application-level authoring flows for image system definitions.
+- Use-case boundary checks include:
+  - workspace-scope enforcement (`request.workspaceId` must match system ownership workspace),
+  - authorization consultation (`image-system.create`, `image-system.update`),
+  - authoritative workflow-version binding checks (`workflowId`, `workflowLineageId`, `workflowVersionTag`, `workflowRevision`),
+  - strict system/workflow compatibility checks before persistence,
+  - required binding compatibility checks (required input/parameter/output ids declared by the bound workflow),
+  - application validation service enforcement (error-severity issues reject mutation).
+- Workflow rebind on system update uses a safe default posture:
+  - lifecycle resets to `draft`,
+  - runtime status resets to `disabled`,
+  - callers receive fresh readiness diagnostics to guide studio-side reconfiguration.
+- Successful mutations return stable authoring result objects with:
+  - authoritative system identity and persisted record,
+  - mutation metadata (`changed`, replay marker, operation key, timestamp),
+  - readiness summary (`configuration-incomplete`, `configuration-ready`, `configuration-runnable`),
+  - validation summary from application validators,
+  - compatibility outcome and issues,
+  - system structure summary (workflow binding metadata, required counts, configured counts).
+
+This keeps system definition authoring/editing reusable across UI surfaces while enforcing tenancy, authorization, workflow compatibility, and readiness seams before run-submission paths.
 
 Intended consumers:
 - authoritative server application use cases for workflow/system definition create/update/publish/read/list/archive flows,

@@ -1,9 +1,10 @@
 # Image Workflow and System API Contracts
 
-This note documents Story 2.2.1 and Story 2.2.2 for Feature 2 / Epic 2.2:
+This note documents Story 2.2.1 through Story 2.2.4 for Feature 2 / Epic 2.2:
 - shared request/response DTO and schema validation contracts for authoritative image workflow and image system APIs
 - application-layer repository/service ports for authoritative persistence, authorization-aware access, validation, compatibility checks, and version resolution
- - application-layer create/update authoring use cases for authoritative image workflow definitions (Story 2.2.3)
+- application-layer create/update authoring use cases for authoritative image workflow definitions (Story 2.2.3)
+- application-layer create/update authoring use cases for authoritative image system definitions (Story 2.2.4)
 
 ## Purpose
 
@@ -30,8 +31,13 @@ The contract layer in this story focuses on:
 - `src/application/image-workflows/UpdateImageWorkflowDefinitionUseCase.ts`
 - `src/application/image-workflows/ImageWorkflowDefinitionAuthoringContracts.ts`
 - `src/application/image-workflows/ImageWorkflowDefinitionAuthoringErrors.ts`
+- `src/application/image-workflows/CreateImageSystemDefinitionUseCase.ts`
+- `src/application/image-workflows/UpdateImageSystemDefinitionUseCase.ts`
+- `src/application/image-workflows/ImageSystemDefinitionAuthoringContracts.ts`
+- `src/application/image-workflows/ImageSystemDefinitionAuthoringErrors.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
+- `src/application/image-workflows/tests/ImageSystemDefinitionAuthoringUseCases.test.ts`
 
 ## Scope and boundary rules
 
@@ -116,6 +122,39 @@ On success, they return stable authoring result objects designed for API/control
 - structural metadata counts for inputs/parameters/outputs/bindings/translation mappings
 
 The resulting write path remains independent of UI presentation and backend graph execution adapters.
+
+## Story 2.2.4 image-system authoring use cases
+
+Story 2.2.4 introduces application-layer write use cases for image system definitions:
+
+- `CreateImageSystemDefinitionUseCase`
+- `UpdateImageSystemDefinitionUseCase`
+
+These use cases enforce authoring-time guardrails before persistence:
+
+- workspace scope consistency (requested workspace and system ownership workspace must match)
+- authorization checks via image system permission actions (`image-system.create`, `image-system.update`)
+- authoritative workflow-version binding checks (`workflowId`, `workflowLineageId`, `workflowVersionTag`, `workflowRevision`)
+- binding-compatibility checks for required input/parameter/output ids against the resolved workflow definition
+- compatibility-service checks in strict mode (incompatible outcomes block mutation)
+- system validation-service checks with structured issue handling (error severity blocks mutation)
+
+Workflow rebind behavior during system updates is explicit and safe by default:
+
+- lifecycle is reset to `draft`
+- runtime status is reset to `disabled`
+- readiness diagnostics are re-evaluated and returned to guide studio reconfiguration flows
+
+On success, system authoring returns a stable result shape that includes:
+
+- authoritative system identity and persisted definition snapshot
+- mutation metadata (`changed`, replay flag, operation key, occurred timestamp)
+- readiness summary (`configuration-incomplete`, `configuration-ready`, `configuration-runnable`) with issue details
+- validation summary for UI/API projection
+- workflow compatibility outcome and issues
+- structural metadata (workflow binding metadata plus required/configured counts)
+
+This preserves clean architecture boundaries while making system authoring reusable by desktop and thin-client surfaces without coupling to run submission/execution internals.
 
 ## Downstream integration guidance
 
