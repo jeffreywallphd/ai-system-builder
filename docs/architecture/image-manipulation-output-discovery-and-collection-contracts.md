@@ -70,6 +70,27 @@ Temporary references are separate from final logical asset records.
   - user-safe summary/message
   - sanitized diagnostics for developers/admins
 
+## Story 3.3.3 ComfyUI adapter collection implementation
+
+Implemented adapter-side collection for completed ComfyUI jobs:
+
+- `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts` (`queryPromptHistory`)
+
+Behavior:
+- Reads Comfy prompt history output records for a completed backend run.
+- Discovers image artifacts and maps them to `ImageManipulationDiscoveredOutputDescriptor` records.
+- Maps output slot matching from expected backend fields into `matched` / `fallback` / `unmatched`.
+- Produces `ImageManipulationCollectedExecutionResult` records with temporary backend handles and `not-persisted` persistence state for later managed-asset registration.
+- Explicitly normalizes abnormal scenarios:
+  - missing discoverable outputs -> `failed` + `collectionFailure`
+  - malformed/unsafe output references -> `partially-collected` + `collectionFailure`
+
+Known assumptions:
+- Current collection scope is image artifacts; non-image backend artifacts are intentionally excluded.
+- Slot matching currently uses backend-field/node-id hints with deterministic order fallback when exact node mapping is not available.
+- Temporary backend object handles are retrieval hints only and are never treated as final logical asset identity.
+
 ## Relationship to adjacent architecture notes
 
 - Execution application ports:

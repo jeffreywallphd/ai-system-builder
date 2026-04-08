@@ -57,11 +57,38 @@ This keeps ComfyUI (and future backends) behind adapter boundaries and prepares 
 ## Story 3.3.2 failure-normalization update
 - Added helper for output-collection anomaly normalization:
   - `createImageManipulationOutputCollectionFailure(...)`
-  - backed by shared failure utility in `ImageManipulationFailureNormalization.ts`
+- backed by shared failure utility in `ImageManipulationFailureNormalization.ts`
 - Output collection failures now reuse the same normalized model as dispatch/progress paths:
   - machine code/category/retryability
   - user-safe summary/message
   - sanitized developer diagnostics
+
+## Story 3.3.3 ComfyUI output collection implementation
+
+### Concrete adapter seam
+
+- `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts` (`queryPromptHistory`)
+
+### Implemented behavior
+
+- Completed Comfy prompt history outputs are discovered and projected into
+  `ImageManipulationOutputDiscoverySnapshot`.
+- Discovery records include slot matching, media metadata, and temporary backend references.
+- Discovery is collected into `ImageManipulationCollectedExecutionResult` with per-record
+  persistence state (`not-persisted`) for later managed persistence + lineage.
+
+### Abnormal handling
+
+- No discoverable image outputs -> `failed` collection with normalized `collectionFailure`.
+- Malformed/unsafe backend references -> `partially-collected` with normalized `collectionFailure`.
+- This keeps backend layout/object details isolated to adapter metadata and temporary handles.
+
+### Known assumptions
+
+- Current implementation is image-only output collection.
+- Slot matching uses backend-field/node-id hints and order fallback when exact hints are unavailable.
+- Temporary backend references are transitional retrieval pointers, not product asset identifiers.
 
 ## Architectural boundary posture
 

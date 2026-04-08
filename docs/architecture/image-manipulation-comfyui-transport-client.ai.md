@@ -8,6 +8,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 
 - `src/infrastructure/execution/comfyui/ComfyUiTransportClient.ts`
 - `src/infrastructure/execution/comfyui/ComfyUiExecutionAdapterComposition.ts`
+- `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionTransportGateway.ts`
 - `src/infrastructure/execution/runs/ComfyUiRunExecutionDispatchAdapter.ts`
 - `src/infrastructure/config/ComfyUiExecutionAdapterConfig.ts`
@@ -15,6 +16,7 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
 - `src/infrastructure/execution/tests/ComfyUiRunExecutionTransportGateway.integration.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiExecutionAdapterComposition.test.ts`
 - `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
+- `src/infrastructure/execution/tests/ComfyUiOutputDiscoveryCollector.test.ts`
 - `docs/architecture/image-manipulation-comfyui-transport-client.md`
 
 ## Operational behavior
@@ -138,3 +140,36 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
 ### Boundary posture preserved
 
 - Application/domain remain unaware of raw Comfy payload internals; integration assertions verify dispatch receipts stay normalized and do not surface prompt-graph payload data.
+
+## Story 3.3.3 output discovery + collection coverage
+
+### Added behavior
+
+- `ComfyUiTransportClient` now exposes `queryPromptHistory(...)` for prompt-scoped history reads (`GET /history/{promptId}`) used by output discovery.
+- Added `ComfyUiOutputDiscoveryCollector` at:
+  - `src/infrastructure/execution/comfyui/ComfyUiOutputDiscoveryCollector.ts`
+- Collector maps completed Comfy prompt outputs into canonical contracts:
+  - `ImageManipulationOutputDiscoverySnapshot`
+  - `ImageManipulationCollectedExecutionResult`
+
+### Mapping semantics
+
+- Discovers image output artifacts from prompt history outputs.
+- Captures slot matching (`matched` / `fallback` / `unmatched`) using expected output bindings.
+- Emits image media metadata and temporary backend references (`backend-object-handle`).
+- Collection records remain `not-persisted` with reason `awaiting-managed-asset-persistence` to preserve separation from final logical asset identity.
+
+### Abnormal scenario handling
+
+- Missing discoverable image outputs -> explicit `failed` collection + normalized `collectionFailure`.
+- Malformed/unsafe output references -> `partially-collected` + normalized `collectionFailure`.
+- Backend layout details remain adapter-only metadata and never become product source of truth.
+
+### Composition update
+
+- `createComfyUiExecutionAdapterInfrastructure(...)` now composes and returns `outputDiscoveryCollector` alongside dispatch/capability seams.
+
+### Known assumptions
+
+- Story scope is image output discovery/collection only; non-image artifacts are out of scope here.
+- Slot matching uses backend-field/node-id hinting with deterministic order fallback when exact hints are unavailable.

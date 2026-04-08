@@ -3,6 +3,7 @@ import {
   ComfyUiTransportClient,
   type ComfyUiTransportLogger,
 } from "./ComfyUiTransportClient";
+import { ComfyUiOutputDiscoveryCollector } from "./ComfyUiOutputDiscoveryCollector";
 import { ComfyUiRunExecutionTransportGateway } from "../runs/ComfyUiRunExecutionTransportGateway";
 import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
 import { ComfyUiImageManipulationCapabilityProbeAdapter } from "./ComfyUiImageManipulationCapabilityProbeAdapter";
@@ -13,6 +14,7 @@ export interface ComfyUiExecutionAdapterInfrastructure {
   readonly runDispatchGateway: ComfyUiRunExecutionTransportGateway;
   readonly runDispatchAdapter: ComfyUiRunExecutionDispatchAdapter;
   readonly capabilityProbeAdapter: ComfyUiImageManipulationCapabilityProbeAdapter;
+  readonly outputDiscoveryCollector: ComfyUiOutputDiscoveryCollector;
 }
 
 export interface CreateComfyUiExecutionAdapterInfrastructureOptions {
@@ -55,6 +57,10 @@ export function createComfyUiExecutionAdapterInfrastructure(
     transportClient,
     now: input.now,
   });
+  const outputDiscoveryCollector = new ComfyUiOutputDiscoveryCollector({
+    transportClient,
+    now: input.now,
+  });
 
   return Object.freeze({
     config,
@@ -62,5 +68,6 @@ export function createComfyUiExecutionAdapterInfrastructure(
     runDispatchGateway,
     runDispatchAdapter,
     capabilityProbeAdapter,
+    outputDiscoveryCollector,
   });
 }
