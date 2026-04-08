@@ -23,6 +23,8 @@ describe("ExecutionNodeManagementApiContracts", () => {
     expect(ExecutionNodeManagementTransportContractVersions.v1).toBe("execution-node-management-api/v1");
     expect(ExecutionNodeManagementTransportRoutes.listNodes).toBe("/api/v1/execution-nodes");
     expect(ExecutionNodeManagementTransportRoutes.checkReadiness).toBe("/api/v1/execution-nodes/readiness");
+    expect(ExecutionNodeManagementTransportRoutes.setAvailabilityOverride)
+      .toBe("/api/v1/execution-nodes/:nodeId/availability");
     expect(ExecutionNodeManagementTransportRoutes.listBackendAvailability)
       .toBe("/api/v1/execution-nodes/backends/availability");
   });

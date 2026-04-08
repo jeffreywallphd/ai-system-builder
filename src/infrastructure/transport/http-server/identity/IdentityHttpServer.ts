@@ -14,6 +14,7 @@ import type { IdentityAuthBackendApi } from "../../../api/identity/IdentityAuthB
 import type { AuthorizationManagementBackendApi } from "../../../api/authorization/AuthorizationManagementBackendApi";
 import type { AuditLedgerBackendApi } from "../../../api/audit/AuditLedgerBackendApi";
 import type { NodeTrustBackendApi } from "../../../api/nodes/NodeTrustBackendApi";
+import type { ExecutionNodeManagementBackendApi } from "../../../api/nodes/ExecutionNodeManagementBackendApi";
 import type { CertificateOperationsBackendApi } from "../../../api/security/CertificateOperationsBackendApi";
 import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetadataBackendApi";
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
@@ -93,6 +94,16 @@ import {
   type RejectNodeEnrollmentApiRequest,
   type RevokeNodeTrustApiRequest,
 } from "../../../api/nodes/sdk/PublicNodeTrustApiContract";
+import {
+  ExecutionNodeManagementApiErrorCodes,
+  type ExecutionNodeBackendAvailabilityReadApiRequest,
+  type ExecutionNodeManagementApiResponse,
+  type ExecutionNodeEligibilityCheckApiRequest,
+  type ExecutionNodeGetApiRequest,
+  type ExecutionNodeListApiRequest,
+  type ExecutionNodeReadinessCheckApiRequest,
+  type ExecutionNodeSetAvailabilityOverrideApiRequest,
+} from "../../../api/nodes/sdk/PublicExecutionNodeManagementApiContract";
 import {
   CertificateOperationsApiErrorCodes,
   type CertificateOperationsApiResponse,
@@ -204,6 +215,16 @@ import {
   type RejectNodeEnrollmentActionRequestDtoPayload,
   type RevokeNodeTrustActionRequestDtoPayload,
 } from "@shared/schemas/nodes/NodeTrustApiSchemaContracts";
+import { ExecutionNodeManagementTransportRoutes } from "@shared/contracts/nodes/ExecutionNodeManagementApiContracts";
+import {
+  ExecutionNodeManagementApiSchemaValidationError,
+  parseExecutionNodeBackendAvailabilityReadRequestDto,
+  parseExecutionNodeEligibilityCheckRequestDto,
+  parseExecutionNodeListRequestDto,
+  parseExecutionNodeReadinessCheckRequestDto,
+  parseExecutionNodeSetAvailabilityOverrideRequestDto,
+  type ExecutionNodeSetAvailabilityOverrideRequestDtoPayload,
+} from "@shared/schemas/nodes/ExecutionNodeManagementApiSchemaContracts";
 import {
   CreateSecretMetadataCommandSchema,
   DisableSecretMetadataCommandSchema,
@@ -939,6 +960,7 @@ export interface IdentityHttpServerOptions {
   readonly deploymentPolicyWriteBackendApi?: DeploymentPolicyWriteBackendApi;
   readonly authorizationManagementBackendApi?: AuthorizationManagementBackendApi;
   readonly nodeTrustBackendApi?: NodeTrustBackendApi;
+  readonly executionNodeManagementBackendApi?: ExecutionNodeManagementBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
   readonly logger?: IdentityHttpServerLogger;
@@ -2928,6 +2950,330 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapCertificateOperationsStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, renewRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "GET"
+        && path === ExecutionNodeManagementTransportRoutes.listNodes
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const listRequestPayload = Object.freeze({
+              nodeIds: parseOptionalStringList(searchParams, "nodeId", "nodeIds"),
+              nodeTypes: parseOptionalStringList(searchParams, "nodeType", "nodeTypes"),
+              approvalStatuses: parseOptionalStringList(searchParams, "approvalStatus", "approvalStatuses"),
+              trustStates: parseOptionalStringList(searchParams, "trustState", "trustStates"),
+              activationStatuses: parseOptionalStringList(searchParams, "activationStatus", "activationStatuses"),
+              healthStatuses: parseOptionalStringList(searchParams, "healthStatus", "healthStatuses"),
+              operationalAvailabilityModes: parseOptionalStringList(
+                searchParams,
+                "operationalAvailabilityMode",
+                "operationalAvailabilityModes",
+              ),
+              backendFamilies: parseOptionalStringList(searchParams, "backendFamily", "backendFamilies"),
+              executionTargets: parseOptionalStringList(searchParams, "executionTarget", "executionTargets"),
+              requiredCapabilitiesAnyOf: parseOptionalStringList(
+                searchParams,
+                "requiredCapability",
+                "requiredCapabilitiesAnyOf",
+              ),
+              supportsRemoteScheduling: parseOptionalBoolean(searchParams.get("supportsRemoteScheduling")),
+              deploymentTagAnyOf: parseOptionalStringList(searchParams, "deploymentTag", "deploymentTagAnyOf"),
+              includeRevoked: parseOptionalBoolean(searchParams.get("includeRevoked")),
+              lastSeenAfter: normalizeOptionalString(searchParams.get("lastSeenAfter")),
+              lastSeenBefore: normalizeOptionalString(searchParams.get("lastSeenBefore")),
+              limit: parseOptionalInteger(searchParams.get("limit")),
+              offset: parseOptionalInteger(searchParams.get("offset")),
+            });
+
+            try {
+              const parsedListRequest = parseExecutionNodeListRequestDto(listRequestPayload);
+              const apiRequest: ExecutionNodeListApiRequest = Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                ...parsedListRequest,
+              });
+              const apiResponse = await options.executionNodeManagementBackendApi.listNodes(apiRequest);
+              const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
+            } catch (error) {
+              const invalid = buildExecutionNodeManagementValidationErrorResponse(error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, listRequestPayload, invalid);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "GET"
+        && path === ExecutionNodeManagementTransportRoutes.checkReadiness
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const readinessRequestPayload = Object.freeze({
+              workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
+              workflowId: normalizeOptionalString(searchParams.get("workflowId")),
+              runId: normalizeOptionalString(searchParams.get("runId")),
+              candidateNodeIds: parseOptionalStringList(searchParams, "candidateNodeId", "candidateNodeIds"),
+              requiredBackendFamilies: parseOptionalStringList(
+                searchParams,
+                "requiredBackendFamily",
+                "requiredBackendFamilies",
+              ),
+              requiredExecutionTarget: normalizeOptionalString(searchParams.get("requiredExecutionTarget")),
+              requiredNodeCapabilities: parseOptionalStringList(
+                searchParams,
+                "requiredNodeCapability",
+                "requiredNodeCapabilities",
+              ),
+              requiresRemoteScheduling: parseOptionalBoolean(searchParams.get("requiresRemoteScheduling")),
+              requiredOperationKind: normalizeOptionalString(searchParams.get("requiredOperationKind")),
+              requiredOperationCapability: normalizeOptionalString(searchParams.get("requiredOperationCapability")),
+              requiredInputKinds: parseOptionalStringList(searchParams, "requiredInputKind", "requiredInputKinds"),
+              requiredOutputKinds: parseOptionalStringList(searchParams, "requiredOutputKind", "requiredOutputKinds"),
+              requiredTranslationContractVersion: normalizeOptionalString(
+                searchParams.get("requiredTranslationContractVersion"),
+              ),
+              preferredResourceClassHints: parseOptionalStringList(
+                searchParams,
+                "preferredResourceClassHint",
+                "preferredResourceClassHints",
+              ),
+              allowDegraded: parseOptionalBoolean(searchParams.get("allowDegraded")),
+              maxLastSeenAgeMs: parseOptionalInteger(searchParams.get("maxLastSeenAgeMs")),
+              now: normalizeOptionalString(searchParams.get("now")),
+            });
+
+            try {
+              const parsedReadinessRequest = parseExecutionNodeReadinessCheckRequestDto(readinessRequestPayload);
+              const apiRequest: ExecutionNodeReadinessCheckApiRequest = Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                ...parsedReadinessRequest,
+              });
+              const apiResponse = await options.executionNodeManagementBackendApi.checkReadiness(apiRequest);
+              const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
+            } catch (error) {
+              const invalid = buildExecutionNodeManagementValidationErrorResponse(error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, readinessRequestPayload, invalid);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "GET"
+        && path === ExecutionNodeManagementTransportRoutes.checkEligibility
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const eligibilityRequestPayload = Object.freeze({
+              workspaceId: normalizeOptionalString(searchParams.get("workspaceId")),
+              workflowId: normalizeOptionalString(searchParams.get("workflowId")),
+              runId: normalizeOptionalString(searchParams.get("runId")),
+              candidateNodeIds: parseOptionalStringList(searchParams, "candidateNodeId", "candidateNodeIds"),
+              requiredBackendFamilies: parseOptionalStringList(
+                searchParams,
+                "requiredBackendFamily",
+                "requiredBackendFamilies",
+              ),
+              requiredExecutionTarget: normalizeOptionalString(searchParams.get("requiredExecutionTarget")),
+              requiredNodeCapabilities: parseOptionalStringList(
+                searchParams,
+                "requiredNodeCapability",
+                "requiredNodeCapabilities",
+              ),
+              requiresRemoteScheduling: parseOptionalBoolean(searchParams.get("requiresRemoteScheduling")),
+              requiredOperationKind: normalizeOptionalString(searchParams.get("requiredOperationKind")),
+              requiredOperationCapability: normalizeOptionalString(searchParams.get("requiredOperationCapability")),
+              requiredInputKinds: parseOptionalStringList(searchParams, "requiredInputKind", "requiredInputKinds"),
+              requiredOutputKinds: parseOptionalStringList(searchParams, "requiredOutputKind", "requiredOutputKinds"),
+              requiredTranslationContractVersion: normalizeOptionalString(
+                searchParams.get("requiredTranslationContractVersion"),
+              ),
+              preferredResourceClassHints: parseOptionalStringList(
+                searchParams,
+                "preferredResourceClassHint",
+                "preferredResourceClassHints",
+              ),
+              allowDegraded: parseOptionalBoolean(searchParams.get("allowDegraded")),
+              maxLastSeenAgeMs: parseOptionalInteger(searchParams.get("maxLastSeenAgeMs")),
+              now: normalizeOptionalString(searchParams.get("now")),
+            });
+
+            try {
+              const parsedEligibilityRequest = parseExecutionNodeEligibilityCheckRequestDto(eligibilityRequestPayload);
+              const apiRequest: ExecutionNodeEligibilityCheckApiRequest = Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                ...parsedEligibilityRequest,
+              });
+              const apiResponse = await options.executionNodeManagementBackendApi.checkEligibility(apiRequest);
+              const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
+            } catch (error) {
+              const invalid = buildExecutionNodeManagementValidationErrorResponse(error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, eligibilityRequestPayload, invalid);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "GET"
+        && path === ExecutionNodeManagementTransportRoutes.listBackendAvailability
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const availabilityRequestPayload = Object.freeze({
+              backendFamilies: parseOptionalStringList(searchParams, "backendFamily", "backendFamilies"),
+              executionTarget: normalizeOptionalString(searchParams.get("executionTarget")),
+              includeUnavailable: parseOptionalBoolean(searchParams.get("includeUnavailable")),
+            });
+
+            try {
+              const parsedAvailabilityRequest = parseExecutionNodeBackendAvailabilityReadRequestDto(availabilityRequestPayload);
+              const apiRequest: ExecutionNodeBackendAvailabilityReadApiRequest = Object.freeze({
+                actorUserIdentityId: context.principal.userIdentityId,
+                ...parsedAvailabilityRequest,
+              });
+              const apiResponse = await options.executionNodeManagementBackendApi.listBackendAvailability(apiRequest);
+              const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, apiRequest, apiResponse);
+            } catch (error) {
+              const invalid = buildExecutionNodeManagementValidationErrorResponse(error);
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, availabilityRequestPayload, invalid);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "POST"
+        && path.startsWith("/api/v1/execution-nodes/")
+        && path.endsWith("/availability")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/execution-nodes/", "/availability");
+            if (!nodeId || nodeId.includes("/")) {
+              const invalid = buildExecutionNodeManagementInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = await parseAndValidateExecutionNodeSetAvailabilityOverrideRequest(
+              request,
+              context.principal.userIdentityId,
+              nodeId,
+              requestId,
+              logger,
+              maxBodyBytes,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              return;
+            }
+
+            const overrideRequest: ExecutionNodeSetAvailabilityOverrideApiRequest = Object.freeze({
+              actorUserIdentityId: parsedRequest.data.actorUserIdentityId,
+              nodeId: parsedRequest.data.nodeId,
+              action: parsedRequest.data.action,
+              changedAt: parsedRequest.data.changedAt,
+              suppressedUntil: parsedRequest.data.suppressedUntil,
+              expectedRevision: parsedRequest.data.expectedRevision,
+              reason: parsedRequest.data.reason,
+              correlationId: parsedRequest.data.correlationId,
+            });
+
+            const apiResponse = await options.executionNodeManagementBackendApi.setAvailabilityOverride(overrideRequest);
+            const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, overrideRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.executionNodeManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/execution-nodes/")
+      ) {
+        await requireAuthenticatedSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          undefined,
+          async (context) => {
+            const nodeId = decodePathTail(path, "/api/v1/execution-nodes/");
+            if (!nodeId || nodeId.includes("/")) {
+              const invalid = buildExecutionNodeManagementInvalidRequestResponse("nodeId is required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const getRequest: ExecutionNodeGetApiRequest = Object.freeze({
+              actorUserIdentityId: context.principal.userIdentityId,
+              nodeId,
+            });
+
+            const apiResponse = await options.executionNodeManagementBackendApi.getNode(getRequest);
+            const statusCode = mapExecutionNodeManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
           },
         );
         return;
@@ -10492,6 +10838,60 @@ async function parseAndValidateNodeTrustActionRequest<T>(
   }
 }
 
+async function parseAndValidateExecutionNodeSetAvailabilityOverrideRequest(
+  request: IncomingMessage,
+  actorUserIdentityId: string,
+  nodeId: string,
+  requestId: string,
+  logger: IdentityHttpServerLogger,
+  maxBodyBytes: number,
+): Promise<
+  | { readonly ok: true; readonly data: ExecutionNodeSetAvailabilityOverrideRequestDtoPayload & { readonly actorUserIdentityId: string } }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ExecutionNodeManagementApiResponse<never> }
+> {
+  const parsedBody = await parseJsonBody(request, maxBodyBytes);
+  if (!parsedBody.ok) {
+    const body = buildExecutionNodeManagementInvalidRequestResponse(parsedBody.error);
+    logger.warn(Object.freeze({
+      event: "execution-node-management-http.request.invalid-json",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+
+  try {
+    const payload = Object.freeze({
+      ...parsedBody.value as Record<string, unknown>,
+      nodeId,
+    });
+    const parsed = parseExecutionNodeSetAvailabilityOverrideRequestDto(payload);
+    return {
+      ok: true,
+      data: Object.freeze({
+        actorUserIdentityId,
+        ...parsed,
+      }),
+    };
+  } catch (error) {
+    const body = buildExecutionNodeManagementValidationErrorResponse(error);
+    logger.warn(Object.freeze({
+      event: "execution-node-management-http.request.validation-failed",
+      requestId,
+      method: request.method,
+      path: request.url,
+      statusCode: 400,
+      details: {
+        request: redactSensitiveAuthPayload(parsedBody.value),
+        issues: body.error?.validationErrors,
+      },
+    }));
+    return { ok: false, statusCode: 400, body };
+  }
+}
+
 async function parseAndValidateStorageCreateRequest(
   request: IncomingMessage,
   actorUserIdentityId: string,
@@ -12256,6 +12656,27 @@ function mapNodeTrustStatusCode(response: NodeTrustApiResponse<unknown>): number
   }
 }
 
+function mapExecutionNodeManagementStatusCode(response: ExecutionNodeManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case ExecutionNodeManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case ExecutionNodeManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case ExecutionNodeManagementApiErrorCodes.forbidden:
+      return 403;
+    case ExecutionNodeManagementApiErrorCodes.notFound:
+      return 404;
+    case ExecutionNodeManagementApiErrorCodes.conflict:
+      return 409;
+    default:
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
+  }
+}
+
 function mapCertificateOperationsStatusCode(response: CertificateOperationsApiResponse<unknown>): number {
   if (response.ok) {
     return 200;
@@ -12432,6 +12853,7 @@ function resolveRouteBackendAvailability(
     [AuthoritativeApiRouteBackendKeys.deploymentPolicyWrite]: Boolean(options.deploymentPolicyWriteBackendApi),
     [AuthoritativeApiRouteBackendKeys.auditLedger]: Boolean(options.auditLedgerBackendApi),
     [AuthoritativeApiRouteBackendKeys.nodeTrust]: Boolean(options.nodeTrustBackendApi),
+    [AuthoritativeApiRouteBackendKeys.executionNodeManagement]: Boolean(options.executionNodeManagementBackendApi),
     [AuthoritativeApiRouteBackendKeys.certificateOperations]: Boolean(options.certificateOperationsBackendApi),
     [AuthoritativeApiRouteBackendKeys.secretMetadata]: Boolean(options.secretMetadataBackendApi),
     [AuthoritativeApiRouteBackendKeys.storageManagement]: Boolean(options.storageManagementBackendApi),
@@ -12848,6 +13270,39 @@ function buildNodeTrustInvalidRequestResponse(message: string): NodeTrustApiResp
       message,
     },
   });
+}
+
+function buildExecutionNodeManagementInvalidRequestResponse(
+  message: string,
+): ExecutionNodeManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: ExecutionNodeManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
+function buildExecutionNodeManagementValidationErrorResponse(
+  error: unknown,
+): ExecutionNodeManagementApiResponse<never> {
+  if (error instanceof ExecutionNodeManagementApiSchemaValidationError) {
+    return Object.freeze({
+      ok: false,
+      error: {
+        code: ExecutionNodeManagementApiErrorCodes.invalidRequest,
+        message: "Request validation failed.",
+        validationErrors: Object.freeze(error.issues.map((issue) => Object.freeze({
+          path: issue.path,
+          code: issue.code,
+          message: issue.message,
+        }))),
+      },
+    });
+  }
+
+  return buildExecutionNodeManagementInvalidRequestResponse("Request validation failed.");
 }
 
 function buildCertificateOperationsInvalidRequestResponse(message: string): CertificateOperationsApiResponse<never> {

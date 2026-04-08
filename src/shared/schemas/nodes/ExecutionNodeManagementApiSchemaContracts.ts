@@ -13,6 +13,7 @@ import {
   NodeTypes,
 } from "@domain/nodes/NodeTrustDomain";
 import {
+  ExecutionNodeAvailabilityOverrideActions,
   ExecutionNodeEligibilityDecisionKinds,
   ExecutionNodeManagementTransportContractVersions,
   ExecutionNodeReadinessIssueSeverities,
@@ -133,6 +134,12 @@ const EligibilityDecisionSchema = z.enum([
   ExecutionNodeEligibilityDecisionKinds.eligible,
   ExecutionNodeEligibilityDecisionKinds.incompatible,
   ExecutionNodeEligibilityDecisionKinds.unavailable,
+]);
+
+const AvailabilityOverrideActionSchema = z.enum([
+  ExecutionNodeAvailabilityOverrideActions.enable,
+  ExecutionNodeAvailabilityOverrideActions.disable,
+  ExecutionNodeAvailabilityOverrideActions.suppress,
 ]);
 
 const CompatibilityFindingKindSchema = z.enum([
@@ -379,6 +386,42 @@ export const ExecutionNodeGetRequestDtoSchema = z.object({
   nodeId: IdentifierSchema,
 }).strict();
 
+export const ExecutionNodeSetAvailabilityOverrideRequestDtoSchema = z.object({
+  nodeId: IdentifierSchema,
+  action: AvailabilityOverrideActionSchema,
+  changedAt: TimestampSchema.optional(),
+  suppressedUntil: TimestampSchema.optional(),
+  expectedRevision: z.number().int().nonnegative().optional(),
+  reason: z.string().trim().min(1).max(2000).optional(),
+  correlationId: IdentifierSchema.optional(),
+}).strict().superRefine((value, context) => {
+  if (value.action === ExecutionNodeAvailabilityOverrideActions.suppress && !value.suppressedUntil) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["suppressedUntil"],
+      message: "suppressedUntil is required when action='suppress'.",
+    });
+  }
+  if (value.action !== ExecutionNodeAvailabilityOverrideActions.suppress && value.suppressedUntil) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["suppressedUntil"],
+      message: "suppressedUntil is only allowed when action='suppress'.",
+    });
+  }
+  if (
+    value.suppressedUntil
+    && value.changedAt
+    && Date.parse(value.suppressedUntil) <= Date.parse(value.changedAt)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["suppressedUntil"],
+      message: "suppressedUntil must be later than changedAt.",
+    });
+  }
+});
+
 const ExecutionNodeRequirementFieldsSchema = z.object({
   workspaceId: IdentifierSchema.optional(),
   workflowId: IdentifierSchema.optional(),
@@ -421,6 +464,16 @@ export const ExecutionNodeGetResponseDtoSchema = z.object({
   asOf: TimestampSchema,
 }).strict();
 
+export const ExecutionNodeSetAvailabilityOverrideResponseDtoSchema = z.object({
+  contractVersion: ContractVersionSchema,
+  node: NodeSummarySchema,
+  mutation: z.object({
+    changed: z.boolean(),
+    wasReplay: z.boolean(),
+  }).strict(),
+  asOf: TimestampSchema,
+}).strict();
+
 export const ExecutionNodeReadinessCheckResponseDtoSchema = z.object({
   contractVersion: ContractVersionSchema,
   checkedAt: TimestampSchema,
@@ -459,12 +512,16 @@ export const ExecutionNodeBackendAvailabilityReadResponseDtoSchema = z.object({
 
 export type ExecutionNodeListRequestDtoPayload = z.infer<typeof ExecutionNodeListRequestDtoSchema>;
 export type ExecutionNodeGetRequestDtoPayload = z.infer<typeof ExecutionNodeGetRequestDtoSchema>;
+export type ExecutionNodeSetAvailabilityOverrideRequestDtoPayload =
+  z.infer<typeof ExecutionNodeSetAvailabilityOverrideRequestDtoSchema>;
 export type ExecutionNodeReadinessCheckRequestDtoPayload = z.infer<typeof ExecutionNodeReadinessCheckRequestDtoSchema>;
 export type ExecutionNodeEligibilityCheckRequestDtoPayload = z.infer<typeof ExecutionNodeEligibilityCheckRequestDtoSchema>;
 export type ExecutionNodeBackendAvailabilityReadRequestDtoPayload =
   z.infer<typeof ExecutionNodeBackendAvailabilityReadRequestDtoSchema>;
 export type ExecutionNodeListResponseDtoPayload = z.infer<typeof ExecutionNodeListResponseDtoSchema>;
 export type ExecutionNodeGetResponseDtoPayload = z.infer<typeof ExecutionNodeGetResponseDtoSchema>;
+export type ExecutionNodeSetAvailabilityOverrideResponseDtoPayload =
+  z.infer<typeof ExecutionNodeSetAvailabilityOverrideResponseDtoSchema>;
 export type ExecutionNodeReadinessCheckResponseDtoPayload = z.infer<typeof ExecutionNodeReadinessCheckResponseDtoSchema>;
 export type ExecutionNodeEligibilityCheckResponseDtoPayload =
   z.infer<typeof ExecutionNodeEligibilityCheckResponseDtoSchema>;
@@ -523,6 +580,16 @@ export function parseExecutionNodeGetRequestDto(payload: unknown): ExecutionNode
   );
 }
 
+export function parseExecutionNodeSetAvailabilityOverrideRequestDto(
+  payload: unknown,
+): ExecutionNodeSetAvailabilityOverrideRequestDtoPayload {
+  return parseExecutionNodeManagementApiSchema(
+    "ExecutionNodeSetAvailabilityOverrideRequestDto",
+    ExecutionNodeSetAvailabilityOverrideRequestDtoSchema,
+    payload,
+  );
+}
+
 export function parseExecutionNodeReadinessCheckRequestDto(
   payload: unknown,
 ): ExecutionNodeReadinessCheckRequestDtoPayload {
@@ -565,6 +632,16 @@ export function parseExecutionNodeGetResponseDto(payload: unknown): ExecutionNod
   return parseExecutionNodeManagementApiSchema(
     "ExecutionNodeGetResponseDto",
     ExecutionNodeGetResponseDtoSchema,
+    payload,
+  );
+}
+
+export function parseExecutionNodeSetAvailabilityOverrideResponseDto(
+  payload: unknown,
+): ExecutionNodeSetAvailabilityOverrideResponseDtoPayload {
+  return parseExecutionNodeManagementApiSchema(
+    "ExecutionNodeSetAvailabilityOverrideResponseDto",
+    ExecutionNodeSetAvailabilityOverrideResponseDtoSchema,
     payload,
   );
 }

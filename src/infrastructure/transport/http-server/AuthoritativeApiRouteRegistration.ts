@@ -21,6 +21,7 @@ export const AuthoritativeApiRouteBackendKeys = Object.freeze({
   authorizationManagement: "authorization-management",
   auditLedger: "audit-ledger",
   nodeTrust: "node-trust",
+  executionNodeManagement: "execution-node-management",
   certificateOperations: "certificate-operations",
   secretMetadata: "secret-metadata",
   storageManagement: "storage-management",

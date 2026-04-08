@@ -247,6 +247,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(observedRouteFamilyIds).toContain("deployment-policy-write");
     expect(observedRouteFamilyIds).toContain("audit-ledger");
     expect(observedRouteFamilyIds).toContain("node-trust");
+    expect(observedRouteFamilyIds).toContain("execution-node-management");
     expect(observedRouteFamilyIds).toContain("run-submission");
     expect(observedRouteFamilyIds).toContain("run-read");
     expect(observedRouteFamilyIds).toContain("run-mutation");
@@ -511,6 +512,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
           workspaceRepository: {} as never,
           authorizationRepository: {} as never,
           nodeTrustRepository: {} as never,
+          executionNodeRepository: {} as never,
           nodeTrustAuditRecorder: {} as never,
           certificateAuthorityRepository: {} as never,
           secretRecordRepository: {} as never,
@@ -669,6 +671,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
       workspaceRepository: {} as never,
       authorizationRepository: {} as never,
       nodeTrustRepository: {} as never,
+      executionNodeRepository: {} as never,
       nodeTrustAuditRecorder: {} as never,
       certificateAuthorityRepository: {} as never,
       secretRecordRepository: {} as never,
