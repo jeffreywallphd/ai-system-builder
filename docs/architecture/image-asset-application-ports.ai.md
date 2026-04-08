@@ -9,7 +9,12 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/ports/IImageAssetRepository.ts`
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
+- `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
+- `src/application/image-assets/use-cases/index.ts`
+- `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
+- `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
 - `docs/architecture/image-asset-application-ports.md`
 
 ## Repository port scope
@@ -50,3 +55,29 @@ The port contracts remain storage-backend neutral so future adapters (server-man
 - storage reservation/write/read/access-handle/delete seams
 
 This enforces contract usability for application use cases without direct filesystem coupling.
+
+`InitiateImageAssetCreationUseCase.test.ts` verifies Story 1.2.1 behavior:
+
+- successful create/initiate flow with workspace/user ownership + upload-pending reservation
+- storage auto-selection when caller does not provide a storage instance id
+- clean access-denied responses for unauthorized workspace actors and non-admin owner delegation
+- clean denial mapping for create-policy rejection and invalid request payloads
+
+## Story 1.2.1 implementation scope
+
+The image-assets application layer now includes `InitiateImageAssetCreationUseCase` + typed contracts for authoritative ingestion initialization:
+
+- validate create request input at use-case boundary
+- resolve workspace membership/admin posture for caller
+- run image asset create authorization via centralized policy decision contracts
+- resolve/choose managed storage instance using existing storage repository + policy evaluation seams
+- enforce active/writable/workspace-matching storage eligibility and `maxObjectBytes` limits
+- persist initial logical image asset metadata in `ingesting` status
+- reserve managed upload location through `IImageAssetStoragePort`
+- return API/controller-safe output envelope (`imageAsset` + `upload.status=upload-pending` + reservation)
+
+Boundary posture preserved:
+
+- no direct file writes
+- no UI coupling
+- no filesystem path exposure in request/result contracts
