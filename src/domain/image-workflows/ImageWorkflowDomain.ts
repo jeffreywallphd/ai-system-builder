@@ -1,5 +1,27 @@
 
 import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
+import {
+  ImageWorkflowParameterSpecificationError,
+  normalizeImageWorkflowParameterSpecification,
+  type ImageWorkflowParameterSpecification,
+} from "./ImageWorkflowParameterSpecification";
+export {
+  ImageWorkflowParameterSensitivityLevels,
+  ImageWorkflowParameterSemanticMeanings,
+  ImageWorkflowParameterUiControlKinds,
+  ImageWorkflowParameterValueKinds,
+  ImageWorkflowParameterVisibilityOperators,
+  type ImageWorkflowParameterSemanticMeaning,
+  type ImageWorkflowParameterSensitivityLevel,
+  type ImageWorkflowParameterSelectOption,
+  type ImageWorkflowParameterUiControlKind,
+  type ImageWorkflowParameterUiSchema,
+  type ImageWorkflowParameterValidation,
+  type ImageWorkflowParameterValueKind,
+  type ImageWorkflowParameterVisibility,
+  type ImageWorkflowParameterVisibilityOperator,
+  type ImageWorkflowParameterVisibilityRule,
+} from "./ImageWorkflowParameterSpecification";
 
 export class ImageWorkflowDomainError extends Error {
   constructor(message: string) {
@@ -106,16 +128,6 @@ export const ImageWorkflowInputBindingSourceKinds = Object.freeze({
 export type ImageWorkflowInputBindingSourceKind =
   typeof ImageWorkflowInputBindingSourceKinds[keyof typeof ImageWorkflowInputBindingSourceKinds];
 
-export const ImageWorkflowParameterKinds = Object.freeze({
-  string: "string",
-  number: "number",
-  integer: "integer",
-  boolean: "boolean",
-  enum: "enum",
-});
-
-export type ImageWorkflowParameterKind = typeof ImageWorkflowParameterKinds[keyof typeof ImageWorkflowParameterKinds];
-
 export const ImageWorkflowOutputKinds = Object.freeze({
   generatedImage: "generated-image",
   generatedImageCollection: "generated-image-collection",
@@ -159,18 +171,6 @@ export interface ImageWorkflowInputBindingRule {
   readonly sourceKey: string;
   readonly required: boolean;
   readonly defaultValue?: unknown;
-}
-
-export interface ImageWorkflowParameterSpecification {
-  readonly parameterId: string;
-  readonly label: string;
-  readonly description?: string;
-  readonly kind: ImageWorkflowParameterKind;
-  readonly required: boolean;
-  readonly defaultValue?: unknown;
-  readonly minimum?: number;
-  readonly maximum?: number;
-  readonly allowedValues?: ReadonlyArray<string>;
 }
 
 export interface ImageWorkflowOutputExpectation {
@@ -387,101 +387,15 @@ function normalizeInputBinding(binding: ImageWorkflowInputBindingRule): ImageWor
   });
 }
 
-function validateParameterDefaultValue(
-  kind: ImageWorkflowParameterKind,
-  defaultValue: unknown,
-  metadata: {
-    readonly parameterId: string;
-    readonly minimum?: number;
-    readonly maximum?: number;
-    readonly allowedValues: ReadonlyArray<string>;
-  },
-): void {
-  if (defaultValue === undefined) {
-    return;
-  }
-
-  if (kind === ImageWorkflowParameterKinds.string && typeof defaultValue !== "string") {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue must be a string.`);
-  }
-  if (kind === ImageWorkflowParameterKinds.boolean && typeof defaultValue !== "boolean") {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue must be a boolean.`);
-  }
-  if (kind === ImageWorkflowParameterKinds.number) {
-    if (typeof defaultValue !== "number" || !Number.isFinite(defaultValue)) {
-      throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue must be a finite number.`);
-    }
-  }
-  if (kind === ImageWorkflowParameterKinds.integer) {
-    if (typeof defaultValue !== "number" || !Number.isInteger(defaultValue)) {
-      throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue must be an integer.`);
-    }
-  }
-  if (kind === ImageWorkflowParameterKinds.enum) {
-    if (typeof defaultValue !== "string" || !metadata.allowedValues.includes(defaultValue)) {
-      throw new ImageWorkflowDomainError(
-        `Image workflow parameter '${metadata.parameterId}' defaultValue must be one of allowedValues.`,
-      );
-    }
-  }
-
-  if (typeof defaultValue === "number") {
-    if (metadata.minimum !== undefined && defaultValue < metadata.minimum) {
-      throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue cannot be less than minimum.`);
-    }
-    if (metadata.maximum !== undefined && defaultValue > metadata.maximum) {
-      throw new ImageWorkflowDomainError(`Image workflow parameter '${metadata.parameterId}' defaultValue cannot be greater than maximum.`);
-    }
-  }
-}
-
 function normalizeParameter(specification: ImageWorkflowParameterSpecification): ImageWorkflowParameterSpecification {
-  const kind = specification.kind;
-  if (!Object.values(ImageWorkflowParameterKinds).includes(kind)) {
-    throw new ImageWorkflowDomainError(`Image workflow parameter kind '${String(kind)}' is invalid.`);
+  try {
+    return normalizeImageWorkflowParameterSpecification(specification);
+  } catch (error) {
+    if (error instanceof ImageWorkflowParameterSpecificationError) {
+      throw new ImageWorkflowDomainError(error.message);
+    }
+    throw error;
   }
-
-  const minimum = specification.minimum;
-  const maximum = specification.maximum;
-  if (minimum !== undefined && !Number.isFinite(minimum)) {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${specification.parameterId}' minimum must be a finite number.`);
-  }
-  if (maximum !== undefined && !Number.isFinite(maximum)) {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${specification.parameterId}' maximum must be a finite number.`);
-  }
-  if (minimum !== undefined && maximum !== undefined && minimum > maximum) {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${specification.parameterId}' minimum cannot exceed maximum.`);
-  }
-
-  const allowedValues = Object.freeze([
-    ...new Set((specification.allowedValues ?? []).map((entry) => normalizeOptional(entry)).filter(Boolean) as string[]),
-  ]);
-
-  if (kind === ImageWorkflowParameterKinds.enum && allowedValues.length === 0) {
-    throw new ImageWorkflowDomainError(`Image workflow enum parameter '${specification.parameterId}' requires allowedValues.`);
-  }
-  if (kind !== ImageWorkflowParameterKinds.enum && allowedValues.length > 0) {
-    throw new ImageWorkflowDomainError(`Image workflow parameter '${specification.parameterId}' allowedValues are only valid for enum kind.`);
-  }
-
-  validateParameterDefaultValue(kind, specification.defaultValue, {
-    parameterId: specification.parameterId,
-    minimum,
-    maximum,
-    allowedValues,
-  });
-
-  return Object.freeze({
-    parameterId: normalizeRequired(specification.parameterId, "Image workflow parameterId"),
-    label: normalizeRequired(specification.label, `Image workflow parameter '${specification.parameterId}' label`),
-    description: normalizeOptional(specification.description),
-    kind,
-    required: Boolean(specification.required),
-    defaultValue: specification.defaultValue,
-    minimum,
-    maximum,
-    allowedValues,
-  });
 }
 
 function normalizeOutputExpectation(expectation: ImageWorkflowOutputExpectation): ImageWorkflowOutputExpectation {

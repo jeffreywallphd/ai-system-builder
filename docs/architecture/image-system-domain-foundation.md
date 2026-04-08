@@ -15,6 +15,7 @@ The platform now models these as separate resources with different responsibilit
 - `ImageSystemDefinition` (`src/domain/systems/ImageSystemDomain.ts`) defines reusable user-facing runnable configuration: workspace-scoped identity, display metadata, workflow version binding, selected assets, output targets, parameter baselines/profile references, and lifecycle/runtime posture.
 
 This separation keeps workflow authoring independent from per-system saved state and preserves clean architecture boundaries for run orchestration and storage.
+Story 2.1.3 complements this by adding shared parameter-set validation contracts so system parameter values are checked against workflow parameter specifications through typed contracts.
 
 ## Domain model
 

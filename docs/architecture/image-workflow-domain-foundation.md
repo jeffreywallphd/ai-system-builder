@@ -5,7 +5,9 @@ This note documents Story 2.1.1 for the image manipulation vertical slice: a ded
 ## Canonical files
 
 - `src/domain/image-workflows/ImageWorkflowDomain.ts`
+- `src/domain/image-workflows/ImageWorkflowParameterSpecification.ts`
 - `src/domain/image-workflows/tests/ImageWorkflowDomain.test.ts`
+- `src/domain/image-workflows/tests/ImageWorkflowParameterSpecification.test.ts`
 
 ## Domain model
 
@@ -19,7 +21,7 @@ Canonical fields include:
 - version lineage: `version.lineageId`, semantic `version.versionTag`, numeric `revision`, optional `supersedesWorkflowId`
 - lifecycle and activation: `lifecycleState`, `activationStatus`
 - typed inputs: `inputSlots[]` and `inputBindings[]`
-- typed parameters: `parameterSpecifications[]`
+- typed parameters: `parameterSpecifications[]` with explicit semantic meaning, validation metadata, visibility rules, and UI schema hints
 - typed outputs: `outputExpectations[]` and `outputBindings[]`
 - backend translation seam: `backendTranslation` (translator id, contract version, template id, and typed input/parameter/output field mappings)
 - audit metadata: `createdBy`, `lastModifiedBy`, `createdAt`, `updatedAt`
@@ -36,7 +38,7 @@ Canonical fields include:
 - Input/output/parameter identifiers and binding identifiers must be unique.
 - Input/output/backend binding references must resolve to declared slot/parameter/output ids.
 - Input binding source keys and translation fields are logical references and reject filesystem path assumptions.
-- Parameter default values are type-checked and validated against enum/range rules.
+- Parameter defaults and runtime values are validated by value-kind specific parameter specification rules.
 - `published` workflows must satisfy completeness checks:
   - at least one input and output
   - required inputs and outputs have binding rules
