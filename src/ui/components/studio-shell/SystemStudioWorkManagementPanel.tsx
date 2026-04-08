@@ -5,6 +5,12 @@ import type {
 } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
+import SystemWorkflowParameterForm from "./SystemWorkflowParameterForm";
+import {
+  coerceWorkflowParameterInputValue,
+  createWorkflowParameterInitialValues,
+  validateWorkflowParameterValues,
+} from "./SystemWorkflowParameterFormPresenter";
 
 function readDefaultReferenceValues(content: string): {
   readonly workflowBindingId?: string;
@@ -13,6 +19,7 @@ function readDefaultReferenceValues(content: string): {
   readonly datasetInstanceId?: string;
   readonly datasetAssetId?: string;
   readonly datasetVersionId?: string;
+  readonly workflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 } {
   try {
     const parsed = JSON.parse(content) as {
@@ -29,6 +36,9 @@ function readDefaultReferenceValues(content: string): {
               readonly datasetAssetId?: string;
               readonly datasetVersionId?: string;
             }>;
+            readonly state?: {
+              readonly imageWorkflowParameterValuesByWorkflowId?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+            };
           };
         };
       };
@@ -42,6 +52,7 @@ function readDefaultReferenceValues(content: string): {
       datasetInstanceId: firstDatasetBinding?.instanceId,
       datasetAssetId: firstDatasetBinding?.datasetAssetId,
       datasetVersionId: firstDatasetBinding?.datasetVersionId,
+      workflowParameterValuesByWorkflowId: parsed.systemSpec?.serialization?.runtime?.state?.imageWorkflowParameterValuesByWorkflowId,
     });
   } catch {
     return Object.freeze({});
@@ -67,6 +78,8 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const [selectedWorkflowDetail, setSelectedWorkflowDetail] = useState<StudioImageWorkflowDefinitionReadModel>();
   const [workflowLoadError, setWorkflowLoadError] = useState<string>();
   const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(false);
+  const [workflowParameterValues, setWorkflowParameterValues] = useState<Readonly<Record<string, unknown>>>(Object.freeze({}));
+  const [workflowParameterStatus, setWorkflowParameterStatus] = useState<string>();
   const workflowPickerAvailable = Boolean(context.operations.listImageWorkflowDefinitions && context.operations.getImageWorkflowDefinition);
 
   useEffect(() => {
@@ -77,10 +90,12 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     setDatasetAssetId(defaults.datasetAssetId ?? "");
     setDatasetVersionId(defaults.datasetVersionId ?? "");
     setRenameDraftTitle(draft?.metadata.title ?? "");
+    setWorkflowParameterStatus(undefined);
   }, [
     defaults.datasetAssetId,
     defaults.datasetInstanceId,
     defaults.datasetVersionId,
+    defaults.workflowParameterValuesByWorkflowId,
     defaults.workflowAssetId,
     defaults.workflowBindingId,
     defaults.workflowVersionId,
@@ -159,6 +174,11 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
       }
       setSelectedWorkflowDetail(response.data);
       setWorkflowVersionId(response.data.version.versionTag);
+      const savedValues = defaults.workflowParameterValuesByWorkflowId?.[response.data.workflowId];
+      setWorkflowParameterValues(createWorkflowParameterInitialValues({
+        workflow: response.data,
+        existingValues: savedValues,
+      }));
     }).catch(() => {
       if (!disposed) {
         setSelectedWorkflowDetail(undefined);
@@ -168,11 +188,18 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
     return () => {
       disposed = true;
     };
-  }, [draft?.draftId, workflowAssetId, workflowPickerAvailable]);
+  }, [defaults.workflowParameterValuesByWorkflowId, draft?.draftId, workflowAssetId, workflowPickerAvailable]);
 
   if (!draft || !sessionId) {
     return <p className="ui-text-small ui-text-secondary">Open a setup draft to save, reopen, copy, or rename.</p>;
   }
+
+  const workflowParameterValidation = selectedWorkflowDetail
+    ? validateWorkflowParameterValues({
+      workflow: selectedWorkflowDetail,
+      values: workflowParameterValues,
+    })
+    : undefined;
 
   return (
     <section className="ui-stack ui-stack--sm" data-testid="system-studio-work-management-panel">
@@ -321,6 +348,57 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               Version: {selectedWorkflowDetail.version.versionTag}
             </p>
           </div>
+        ) : null}
+        {selectedWorkflowDetail && workflowParameterValidation ? (
+          <SystemWorkflowParameterForm
+            workflow={selectedWorkflowDetail}
+            values={workflowParameterValues}
+            validation={workflowParameterValidation}
+            busy={context.isBusy}
+            onValueChanged={(parameterId, nextValue) => {
+              const specification = selectedWorkflowDetail.parameterSpecifications.find(
+                (entry) => entry.parameterId === parameterId,
+              );
+              if (!specification) {
+                return;
+              }
+              const typedValue = typeof nextValue === "boolean"
+                ? nextValue
+                : coerceWorkflowParameterInputValue(specification, String(nextValue));
+              setWorkflowParameterValues((current) => Object.freeze({
+                ...current,
+                [parameterId]: typedValue,
+              }));
+            }}
+            onSaveRequested={() => {
+              if (workflowParameterValidation.hasIssues) {
+                setWorkflowParameterStatus("Some settings still need attention before saving.");
+                return;
+              }
+              const currentSavedByWorkflow = defaults.workflowParameterValuesByWorkflowId ?? {};
+              void service.modifySystemDefinition({
+                studioId: context.studioId,
+                sessionId,
+                draftId: draft.draftId,
+                runtimeStatePatch: {
+                  imageWorkflowParameterValuesByWorkflowId: {
+                    ...currentSavedByWorkflow,
+                    [selectedWorkflowDetail.workflowId]: workflowParameterValues,
+                  },
+                },
+              }).then((response) => {
+                if (!response.ok) {
+                  setWorkflowParameterStatus("Could not save operation settings.");
+                  return;
+                }
+                setWorkflowParameterStatus("Operation settings saved.");
+                void context.operations.refresh();
+              });
+            }}
+          />
+        ) : null}
+        {workflowParameterStatus ? (
+          <span className="ui-text-small ui-text-secondary">{workflowParameterStatus}</span>
         ) : null}
       </div>
 

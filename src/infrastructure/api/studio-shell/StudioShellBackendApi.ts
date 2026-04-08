@@ -143,6 +143,12 @@ import {
   shapeAuthorizationAwareResponse,
   type AuthorizationResponseAccessLevel,
 } from "@application/authorization/use-cases/AuthorizationResponseRedaction";
+import {
+  ImageWorkflowParameterSensitivityLevels,
+  ImageWorkflowParameterUiControlKinds,
+  normalizeImageWorkflowParameterSpecification,
+  type ImageWorkflowParameterSpecification,
+} from "@domain/image-workflows/ImageWorkflowParameterSpecification";
 
 export interface StudioShellApiError {
   readonly code:
@@ -221,6 +227,8 @@ export interface StudioImageWorkflowDefinitionSummaryReadModel {
 
 export interface StudioImageWorkflowDefinitionReadModel extends StudioImageWorkflowDefinitionSummaryReadModel {
   readonly rationale: string;
+  readonly parameterSpecifications: ReadonlyArray<ImageWorkflowParameterSpecification>;
+  readonly parameterDefaults: Readonly<Record<string, unknown>>;
   readonly minimumRequirements: {
     readonly inputKinds: ReadonlyArray<string>;
     readonly outputKinds: ReadonlyArray<string>;
@@ -3854,6 +3862,7 @@ export class StudioShellBackendApi {
     template: InitialImageWorkflowTemplateDefinition,
     updatedAt: string,
   ): StudioImageWorkflowDefinitionReadModel {
+    const parameterSpecifications = Object.freeze(this.toImageWorkflowParameterSpecifications(template));
     const requiredParameterIds = template.minimumRequirements.parameterSpecifications
       .filter((entry) => entry.required)
       .map((entry) => entry.parameterId);
@@ -3861,6 +3870,8 @@ export class StudioShellBackendApi {
     return Object.freeze({
       ...summary,
       rationale: template.display.rationale,
+      parameterSpecifications,
+      parameterDefaults: Object.freeze({ ...template.configuration.defaults.parameterValues }),
       minimumRequirements: Object.freeze({
         inputKinds: Object.freeze([...new Set(template.minimumRequirements.inputSlots
           .filter((entry) => entry.required)
@@ -3870,6 +3881,84 @@ export class StudioShellBackendApi {
           .map((entry) => entry.kind))]),
         requiredParameterIds: Object.freeze(requiredParameterIds),
       }),
+    });
+  }
+
+  private toImageWorkflowParameterSpecifications(
+    template: InitialImageWorkflowTemplateDefinition,
+  ): ReadonlyArray<ImageWorkflowParameterSpecification> {
+    const guidanceByParameterId = new Map(
+      template.configuration.parameterGuidance.map((entry) => [entry.parameterId, entry] as const),
+    );
+    const defaults = template.configuration.defaults.parameterValues;
+
+    return template.minimumRequirements.parameterSpecifications.map((parameter, index) => {
+      const guidance = guidanceByParameterId.get(parameter.parameterId);
+      const isNumeric = parameter.valueKind === "integer" || parameter.valueKind === "float";
+      const validation = Object.freeze({
+        minimum: isNumeric
+          ? guidance?.guardrails?.minimum ?? guidance?.recommendedRange?.minimum
+          : undefined,
+        maximum: isNumeric
+          ? guidance?.guardrails?.maximum ?? guidance?.recommendedRange?.maximum
+          : undefined,
+        step: isNumeric
+          ? guidance?.recommendedRange?.step
+          : undefined,
+        minLength: parameter.valueKind === "text"
+          ? guidance?.guardrails?.minLength ?? guidance?.recommendedRange?.minLength
+          : undefined,
+        maxLength: parameter.valueKind === "text"
+          ? guidance?.guardrails?.maxLength ?? guidance?.recommendedRange?.maxLength
+          : undefined,
+        options: parameter.valueKind === "select"
+          ? Object.freeze(
+            (guidance?.guardrails?.allowedValues ?? guidance?.recommendedRange?.suggestedValues ?? [])
+              .map((entry) => (typeof entry === "string" ? entry : undefined))
+              .filter((entry): entry is string => Boolean(entry))
+              .map((entry) => Object.freeze({ value: entry, label: entry })),
+          )
+          : undefined,
+        acceptedAssetKinds: undefined,
+      });
+      const control = parameter.valueKind === "boolean"
+        ? ImageWorkflowParameterUiControlKinds.switch
+        : parameter.valueKind === "text"
+          ? parameter.semanticMeaning === "prompt"
+            ? ImageWorkflowParameterUiControlKinds.textArea
+            : ImageWorkflowParameterUiControlKinds.textInput
+          : parameter.valueKind === "integer" || parameter.valueKind === "float"
+            ? guidance?.recommendedRange?.minimum !== undefined || guidance?.recommendedRange?.maximum !== undefined
+              ? ImageWorkflowParameterUiControlKinds.slider
+              : ImageWorkflowParameterUiControlKinds.numberInput
+            : parameter.valueKind === "select"
+              ? ImageWorkflowParameterUiControlKinds.select
+              : parameter.valueKind === "mask-asset-reference"
+                ? ImageWorkflowParameterUiControlKinds.maskSlot
+                : parameter.valueKind === "reference-asset-reference"
+                  ? ImageWorkflowParameterUiControlKinds.referenceSlot
+                  : ImageWorkflowParameterUiControlKinds.assetPicker;
+
+      return normalizeImageWorkflowParameterSpecification({
+        parameterId: parameter.parameterId,
+        label: guidance?.label ?? parameter.parameterId,
+        description: guidance?.helperText,
+        valueKind: parameter.valueKind,
+        semanticMeaning: parameter.semanticMeaning,
+        required: parameter.required,
+        defaultValue: defaults[parameter.parameterId],
+        sensitivity: ImageWorkflowParameterSensitivityLevels.normal,
+        validation,
+        ui: {
+          control,
+          placeholder: parameter.valueKind === "text" && typeof defaults[parameter.parameterId] === "string"
+            ? String(defaults[parameter.parameterId])
+            : undefined,
+          order: index,
+          helpText: guidance?.helperText,
+          advanced: false,
+        },
+      });
     });
   }
 

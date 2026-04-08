@@ -248,6 +248,31 @@ UI behavior in this story:
 - selection state is held as stable workflow DTO + logical id and applied through `modifySystemDefinition` workflow bindings;
 - workflow selection no longer depends on raw backend template payload injection in component-local config.
 
+## Story 2.4.2 typed parameter configuration forms
+
+System Studio now renders workflow-parameter forms from authoritative workflow definition metadata returned by `getImageWorkflowDefinition`.
+
+Implementation seams:
+
+- authoritative API read-model expansion in `StudioShellBackendApi`:
+  - `parameterSpecifications: ImageWorkflowParameterSpecification[]`
+  - `parameterDefaults: Record<string, unknown>`
+- template-to-typed-parameter mapping in `StudioShellBackendApi.toImageWorkflowParameterSpecifications(...)`
+  - carries value kind, required/default semantics, validation bounds, helper text, and UI control hints
+- reusable UI/presenter layer:
+  - `src/ui/components/studio-shell/SystemWorkflowParameterForm.tsx`
+  - `src/ui/components/studio-shell/SystemWorkflowParameterFormPresenter.ts`
+- system-studio integration:
+  - `SystemStudioWorkManagementPanel` renders typed controls from `parameterSpecifications`
+  - values are initialized from authoritative defaults plus saved runtime state
+  - save path uses existing `modifySystemDefinition` seam with `runtimeStatePatch`
+
+Validation posture:
+
+- UI validation reuses shared contract logic (`validateImageSystemParameterSetContract`) instead of component-local rule duplication.
+- Validation feedback is projected per-parameter (and global when needed) with clear user-facing messages.
+- Conditional/disabled control handling is driven by parameter visibility metadata when present.
+
 ## Related architecture notes
 
 - `docs/architecture/image-workflow-system-definition-layer.md`
