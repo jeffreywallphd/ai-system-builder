@@ -24,6 +24,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(ids).toContain("assets:v1");
     expect(ids).toContain("asset-upload-sessions:v1");
     expect(ids).toContain("image-assets:v1");
+    expect(ids).toContain("image-workflow-system:v1");
     expect(ids).toContain("platform:v1");
     expect(ids).toContain("platform:v2");
     expect(ids).toContain("platform:v3");
@@ -43,6 +44,7 @@ describe("AuthoritativePersistenceComposition", () => {
     expect(services.identityRepository).toBeDefined();
     expect(services.workspaceRepository).toBeDefined();
     expect(services.imageAssetRepository).toBeDefined();
+    expect(services.imageWorkflowSystemRepository).toBeDefined();
     expect(services.platformPersistenceRepository).toBeDefined();
     expect(services.auditLedgerRepository).toBeDefined();
     expect(services.deploymentPolicyRepository).toBeDefined();
