@@ -12,6 +12,7 @@
   - `authoritative-route-families/IdentityAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/WorkspaceAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/AuthorizationAuthoritativeApiRoutes.ts`
+  - `authoritative-route-families/DeploymentAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/AuditAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/NodeTrustAuthoritativeApiRoutes.ts`
   - `authoritative-route-families/SecurityAuthoritativeApiRoutes.ts`
@@ -24,6 +25,7 @@
 - `identity-auth` -> `/api/v1/identity/*` (public register/login + authenticated session/admin/trusted-device routes)
 - `workspace-*` -> `/api/v1/workspaces/*` (authenticated + workspace-scoped authorization)
 - `authorization-management` -> `/api/v1/authorization/*` (authenticated policy-evaluated visibility/sharing/reporting)
+- `deployment-policy-read` -> `/api/v1/deployment/policy/state` (authenticated workspace-scoped policy-state inspection; optional catalog/effective/provenance sections)
 - `audit-ledger` -> `/api/v1/audit/events*` (authenticated + workspace-scoped governance audit visibility)
 - `node-trust` -> `/api/v1/nodes/*` (bootstrap enrollment + authenticated review/admin routes)
 - `security-*` -> `/api/v1/security/certificates/*`, `/api/v1/security/secrets/*` (authenticated, trusted-session for high-assurance operations)
