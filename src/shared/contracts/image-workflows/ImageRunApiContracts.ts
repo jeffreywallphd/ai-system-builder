@@ -9,6 +9,7 @@ import type {
   ImageManipulationResilienceSnapshot,
   ImageManipulationResilienceStateKind,
 } from "./ImageManipulationResilienceStateContracts";
+import type { ImageManipulationRetryRecoveryContract } from "./ImageManipulationRetryRecoveryContracts";
 
 export class ImageRunApiContractError extends Error {
   constructor(message: string) {
@@ -203,6 +204,7 @@ export interface ImageRunFailureSummaryDto {
   readonly summary: string;
   readonly userMessage?: string;
   readonly retryable: boolean;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
   readonly failedAt: string;
   readonly stageCode?: string;
   readonly partialProgressObserved: boolean;

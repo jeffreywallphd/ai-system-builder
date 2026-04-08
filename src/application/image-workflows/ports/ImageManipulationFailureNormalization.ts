@@ -6,6 +6,7 @@ import {
   createImageManipulationIssueClassification,
   type ImageManipulationIssueClassification,
 } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
+import { deriveImageManipulationRetryRecoveryContractFromClassification } from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 import {
   ImageManipulationExecutionFailureCategories,
   type ImageManipulationExecutionFailure,
@@ -119,6 +120,11 @@ export function normalizeImageManipulationExecutionFailure(
     retryable,
     stageCode: normalizeOptional(input.stageCode) ?? resolveStageCode(input.source, category, input.state),
   });
+  const recovery = deriveImageManipulationRetryRecoveryContractFromClassification({
+    classification,
+    retryable,
+    retryAfterMs: resolveRetryAfterMs(category),
+  });
   const diagnostics = buildDiagnostics(input);
 
   return Object.freeze({
@@ -127,6 +133,7 @@ export function normalizeImageManipulationExecutionFailure(
     summary,
     userMessage,
     retryable,
+    recovery,
     failedAt: input.failedAt,
     stageCode: normalizeOptional(input.stageCode) ?? resolveStageCode(input.source, category, input.state),
     partialProgressObserved: Boolean(input.partialProgressObserved),
@@ -134,6 +141,21 @@ export function normalizeImageManipulationExecutionFailure(
     classification,
     diagnostics,
   });
+}
+
+function resolveRetryAfterMs(
+  category: ImageManipulationExecutionFailureCategory,
+): number | undefined {
+  if (category === ImageManipulationExecutionFailureCategories.timeout) {
+    return 5000;
+  }
+  if (category === ImageManipulationExecutionFailureCategories.connectivity) {
+    return 3000;
+  }
+  if (category === ImageManipulationExecutionFailureCategories.capacity) {
+    return 10000;
+  }
+  return undefined;
 }
 
 export function sanitizeImageManipulationDiagnostics(

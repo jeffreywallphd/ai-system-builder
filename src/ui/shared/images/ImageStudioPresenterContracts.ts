@@ -16,6 +16,10 @@ import {
   mapImageStudioBlockerCodeToUserMessage,
 } from "./ImageStudioUxCopy";
 import {
+  deriveImageManipulationRetryRecoveryContractFromResilienceSnapshot,
+  type ImageManipulationRetryRecoveryContract,
+} from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
+import {
   ImageManipulationResilienceDurabilityClasses,
   ImageManipulationResilienceScopes,
   ImageManipulationResilienceStateKinds,
@@ -34,6 +38,7 @@ export interface ImageStudioSurfaceStateViewModel {
   readonly description: string;
   readonly detail?: string;
   readonly retryable?: boolean;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
   readonly resilience?: ImageManipulationResilienceSnapshot;
 }
 
@@ -806,6 +811,7 @@ function degradedState(
     description,
     detail,
     retryable: true,
+    recovery: deriveImageManipulationRetryRecoveryContractFromResilienceSnapshot(resilience),
     resilience,
   });
 }

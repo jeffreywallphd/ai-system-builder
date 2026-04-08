@@ -64,6 +64,25 @@ describe("ImageRunApiSchemaContracts", () => {
           category: "timeout",
           summary: "Execution timed out before completion.",
           retryable: true,
+          recovery: {
+            retry: {
+              retryEligible: true,
+              retrySafe: true,
+              retryMode: "automatic",
+              retryAfterMs: 5000,
+            },
+            recoveryAction: {
+              kind: "retry-automatic",
+              userActionRequired: false,
+              backendRecoveryPending: false,
+              terminalNotRetryable: false,
+              summary: "Automatic retry is allowed.",
+            },
+            escalation: {
+              category: "none",
+              required: false,
+            },
+          },
           failedAt: "2026-04-08T15:01:00.000Z",
           partialProgressObserved: true,
           partialOutputCount: 1,
@@ -82,6 +101,7 @@ describe("ImageRunApiSchemaContracts", () => {
     });
 
     expect(parsed.run.failure?.category).toBe("timeout");
+    expect(parsed.run.failure?.recovery?.retry.retryMode).toBe("automatic");
     expect(parsed.run.progress?.percent).toBe(72.5);
   });
 
