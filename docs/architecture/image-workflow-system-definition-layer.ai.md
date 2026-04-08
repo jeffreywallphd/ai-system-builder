@@ -9,6 +9,7 @@ Story 2.3.1 adds an explicit initial supported workflow template set for bounded
 Story 2.3.2 adds internal translation metadata for supported templates with consistency checks so backend adapters can translate without leaking backend graph shape into workflow/system source-of-truth models.
 Story 2.3.3 adds template defaults, parameter guidance, and reusable presets so non-technical users can start from sensible settings instead of backend-style tuning.
 Story 2.3.4 adds explicit template compatibility/capability metadata and readiness evaluation seams so node capability and translation-backend eligibility can be evaluated from authoritative template metadata.
+Story 8.2.2 hardens stale/incompatible workflow-system configuration handling so invalid combinations are rejected consistently in save/update, reopen/query, and run-launch readiness flows.
 
 ## Canonical seams
 
@@ -62,6 +63,10 @@ Adapter rule:
 - Workflow versioning uses lineage + semantic version tags + explicit lifecycle/activation constraints.
 - System rebind to a new workflow version resets runtime posture for safe revalidation.
 - Published workflow and ready system states are gated by completeness/readiness checks in domain/contracts, not UI heuristics.
+- Story 8.2.2 adds stricter workflow-system compatibility guards:
+  - detect workflow-required ids omitted from system-required binding sets,
+  - detect stale system-selected input/output/parameter keys no longer declared by workflow,
+  - degrade query/reopen readiness when bound workflow is missing or lineage/version pinning is stale.
 
 ## Reference-implementation guidance
 

@@ -19,6 +19,7 @@ Story 2.3.1 extends the baseline with an explicit initial supported workflow tem
 Story 2.3.2 extends the baseline with internal translation-ready metadata for supported templates and consistency checks that keep translation descriptors aligned with typed requirements.
 Story 2.3.3 extends the baseline with template-level defaults, parameter guidance, and reusable presets so image workflows are usable without exposing backend tuning jargon.
 Story 2.3.4 extends the baseline with explicit compatibility/capability metadata on supported templates plus readiness-evaluation seams for node capability and backend translation eligibility checks.
+Story 8.2.2 hardens workflow/system configuration handling for stale, incomplete, or incompatible saved definitions by applying stricter cross-definition compatibility checks in authoring, reopen/query, and run-submission readiness paths.
 
 ## Canonical implementation seams
 
@@ -145,6 +146,20 @@ System evolution is explicit and revalidation-friendly:
 - `evaluateImageSystemReadiness(...)` is the runnable gate for lifecycle/runtime transitions
 
 This protects later translation/orchestration stories from silent contract drift.
+
+Story 8.2.2 hardening posture for stale/incompatible saved systems:
+
+- system binding compatibility now enforces both directions:
+  - system-required ids must exist in workflow declarations
+  - workflow-required ids must remain represented in system binding requirements
+- stale configured selections are rejected when:
+  - input selections reference unknown workflow input ids
+  - output targets reference unknown workflow output ids
+  - parameter baselines include unknown workflow parameter ids
+- system query/reopen readiness now degrades to `configuration-incomplete` when:
+  - the bound workflow cannot be resolved
+  - workflow lineage/version/revision pinning mismatches the resolved workflow
+  - workflow/system binding compatibility issues are detected by shared application validation
 
 ## Binding and translation boundary rules
 

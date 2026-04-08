@@ -18,6 +18,11 @@ Story 4.2.2 adds a reusable application-layer readiness service that evaluates q
 - Validates submission parameter values against workflow parameter contracts (unknown/missing/invalid checks).
 - Integrates backend execution-readiness checks and maps capability/dependency failures into blocking or advisory readiness issues.
 - Produces structured readiness sections and normalized issue taxonomy for both API and studio consumption.
+- Story 8.2.2 hardening adds:
+  - stale template id/version mismatch blocking for workflow metadata,
+  - unsupported saved-system lifecycle/runtime/workspace binding checks,
+  - stricter workflow/system binding compatibility (including missing workflow-required ids and stale configured slot/parameter keys),
+  - referenced-asset validation derived from persisted system input selections in addition to explicit submission refs.
 
 ## Queue-admission posture
 - `SubmitImageRunUseCase` now consumes readiness findings before authoritative run creation.
@@ -28,3 +33,4 @@ Story 4.2.2 adds a reusable application-layer readiness service that evaluates q
 - Readiness logic is centralized in application layer; no duplicate readiness policy in transport/UI.
 - Service remains adapter-neutral and reusable through orchestration ports.
 - Validation output is durable and machine-readable for future scheduling/node-assignment policy integration.
+- Readiness findings include shared failure taxonomy classification and retry/recovery guidance so presenters and API callers consume one remediation model.

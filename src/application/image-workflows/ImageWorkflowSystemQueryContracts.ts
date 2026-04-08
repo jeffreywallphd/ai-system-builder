@@ -3,9 +3,11 @@ import {
 } from "@domain/image-workflows/ImageWorkflowDomain";
 import {
   type ImageSystemDefinition,
+  type ImageSystemReadinessIssue,
 } from "@domain/systems/ImageSystemDomain";
 import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import {
+  ImageSystemDefinitionReadinessStates,
   type ImageSystemDefinitionReadinessSummary,
   type ImageSystemDefinitionStructureSummary,
 } from "./ImageSystemDefinitionAuthoringContracts";
@@ -177,8 +179,22 @@ export function toImageWorkflowDefinitionListItem(
 export function toImageSystemDefinitionReadinessSummary(
   system: ImageSystemDefinition,
   evaluatedAt: string,
+  workflow?: ImageWorkflowDefinition,
 ): ImageSystemDefinitionReadinessSummary {
-  return readinessService.evaluateSystemReadiness(system, evaluatedAt).readiness;
+  const baseline = readinessService.evaluateSystemReadiness(system, evaluatedAt).readiness;
+  const compatibilityIssues = resolveSystemConfigurationCompatibilityIssues(system, workflow);
+  if (compatibilityIssues.length < 1) {
+    return baseline;
+  }
+  return Object.freeze({
+    ...baseline,
+    state: ImageSystemDefinitionReadinessStates.configurationIncomplete,
+    ready: false,
+    runnable: false,
+    classification: "incomplete" as const,
+    summary: `System definition has incompatible/stale workflow binding issues (${compatibilityIssues.length}).`,
+    issues: Object.freeze([...baseline.issues, ...compatibilityIssues]),
+  });
 }
 
 export function toImageSystemDefinitionStructureSummary(
@@ -206,4 +222,63 @@ export function toImageSystemDefinitionListItem(
     readiness,
     updatedAt: system.updatedAt,
   });
+}
+
+function resolveSystemConfigurationCompatibilityIssues(
+  system: ImageSystemDefinition,
+  workflow: ImageWorkflowDefinition | undefined,
+): ReadonlyArray<ImageSystemReadinessIssue> {
+  if (!workflow) {
+    return Object.freeze([Object.freeze({
+      code: "bound-workflow-not-found",
+      path: "workflowBinding.workflowId",
+      message: `Bound workflow '${system.workflowBinding.workflowId}' is missing or inaccessible.`,
+    })]);
+  }
+
+  const issues: ImageSystemReadinessIssue[] = [];
+  if (system.workflowBinding.workflowId !== workflow.workflowId) {
+    issues.push(Object.freeze({
+      code: "bound-workflow-id-mismatch",
+      path: "workflowBinding.workflowId",
+      message: `Bound workflow id '${system.workflowBinding.workflowId}' does not match resolved workflow '${workflow.workflowId}'.`,
+    }));
+  }
+  if (system.workflowBinding.workflowLineageId !== workflow.version.lineageId) {
+    issues.push(Object.freeze({
+      code: "bound-workflow-lineage-mismatch",
+      path: "workflowBinding.workflowLineageId",
+      message:
+        `Bound workflow lineage '${system.workflowBinding.workflowLineageId}' does not match resolved lineage '${workflow.version.lineageId}'.`,
+    }));
+  }
+  if (system.workflowBinding.workflowVersionTag !== workflow.version.versionTag) {
+    issues.push(Object.freeze({
+      code: "bound-workflow-version-tag-mismatch",
+      path: "workflowBinding.workflowVersionTag",
+      message:
+        `Bound workflow version '${system.workflowBinding.workflowVersionTag}' does not match resolved version '${workflow.version.versionTag}'.`,
+    }));
+  }
+  if (system.workflowBinding.workflowRevision !== workflow.version.revision) {
+    issues.push(Object.freeze({
+      code: "bound-workflow-revision-mismatch",
+      path: "workflowBinding.workflowRevision",
+      message:
+        `Bound workflow revision '${system.workflowBinding.workflowRevision}' does not match resolved revision '${workflow.version.revision}'.`,
+    }));
+  }
+
+  for (const issue of readinessService.evaluateSystemBindingCompatibility({
+    workflow,
+    system,
+  })) {
+    issues.push(Object.freeze({
+      code: issue.code,
+      path: issue.path,
+      message: issue.message,
+    }));
+  }
+
+  return Object.freeze(issues);
 }

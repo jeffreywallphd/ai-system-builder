@@ -110,12 +110,21 @@ export class ListImageSystemDefinitionsUseCase {
         }
       }
 
-      const paged = Object.freeze(visible
-        .slice(offset, offset + limit)
-        .map((system) => toImageSystemDefinitionListItem(
+      const pagedSystems = visible.slice(offset, offset + limit);
+      const readinessBySystemId = new Map<string, Awaited<ReturnType<typeof toSystemReadinessWithWorkflow>>>();
+      await Promise.all(pagedSystems.map(async (system) => {
+        readinessBySystemId.set(system.systemId, await toSystemReadinessWithWorkflow({
+          ports: this.ports,
+          workspaceId: context.workspaceId,
           system,
-          toImageSystemDefinitionReadinessSummary(system, context.occurredAtIso),
-        )));
+          evaluatedAt: context.occurredAtIso,
+        }));
+      }));
+
+      const paged = Object.freeze(pagedSystems.map((system) => toImageSystemDefinitionListItem(
+        system,
+        readinessBySystemId.get(system.systemId)!,
+      )));
       const hasMore = visible.length > (offset + limit);
 
       return Object.freeze({
@@ -129,6 +138,22 @@ export class ListImageSystemDefinitionsUseCase {
       });
     });
   }
+}
+
+async function toSystemReadinessWithWorkflow(input: {
+  readonly ports: ImageWorkflowSystemDefinitionPorts;
+  readonly workspaceId: string;
+  readonly system: ImageSystemDefinition;
+  readonly evaluatedAt: string;
+}) {
+  const workflow = await input.ports.workflowRepository.findWorkflowDefinitionById(
+    input.system.workflowBinding.workflowId,
+    {
+      workspaceId: input.workspaceId,
+      includeRetired: true,
+    },
+  );
+  return toImageSystemDefinitionReadinessSummary(input.system, input.evaluatedAt, workflow);
 }
 
 function toRepositoryQuery(

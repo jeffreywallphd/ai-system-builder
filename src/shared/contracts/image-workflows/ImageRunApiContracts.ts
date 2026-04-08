@@ -2,6 +2,7 @@ import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiCon
 import type { RunLifecycleState, RunSubmissionSource } from "@domain/runs/RunDomain";
 import {
   ImageManipulationFailureSummaryCategories,
+  type ImageManipulationIssueClassification,
   type ImageManipulationFailureSummaryCategory,
 } from "./ImageManipulationValidationFailureTaxonomy";
 import type {
@@ -343,6 +344,8 @@ export interface ImageRunSubmissionReadinessIssueDto {
   readonly severity: ImageRunSubmissionReadinessIssueSeverity;
   readonly blocking: boolean;
   readonly path?: string;
+  readonly classification?: ImageManipulationIssueClassification;
+  readonly recovery?: ImageManipulationRetryRecoveryContract;
 }
 
 export interface ImageRunSubmissionReadinessPolicyDenialDto {
