@@ -64,3 +64,20 @@ Primary flow terms remain:
 
 Technical IDs/backend terms remain advanced-only and hidden by default.
 
+## Epic 7.2 Story 7.2.1 implementation update
+
+Story 7.2.1 adds production-backed primary image entry/selection behavior for the "Choose image" stage:
+
+- authoritative upload + finalize flow remains in `ImageAssetManagementService.uploadStudioSourceImage(...)`,
+- authoritative recent + library discovery now includes a searchable/paged library listing seam (`listImageLibraryImageAssets(...)`),
+- editor composition (`ImageManipulationRuntimeEditorPanel`) now surfaces explicit entry states:
+  - upload in progress (`uploading` / `processing`),
+  - library loading/empty/error/ready,
+  - selection confirmation after source/reference selection.
+
+Guardrails preserved:
+
+- no raw backend path exposure in entry UX,
+- logical image asset ids and metadata remain canonical identity state,
+- reuse actions continue routing through authoritative metadata/content retrieval and ingestion seams rather than local shortcuts.
+

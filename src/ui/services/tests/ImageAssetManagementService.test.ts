@@ -64,14 +64,24 @@ describe("ImageAssetManagementService", () => {
             normalizedFilename: "portrait.png",
             mediaType: "image/png",
             sizeBytes: 2048,
+            visibility: "workspace",
             lifecycle: {
               status: "available",
+            },
+            preview: {
+              available: true,
             },
             ownership: {
               createdAt: "2026-04-08T00:00:00.000Z",
               updatedAt: "2026-04-08T00:00:00.000Z",
             },
           }],
+          pagination: {
+            limit: 6,
+            offset: 0,
+            returned: 1,
+            hasMore: false,
+          },
         },
       }),
     }) as Response);
@@ -115,6 +125,56 @@ describe("ImageAssetManagementService", () => {
     expect(loaded.data?.fileName).toBe("reused.png");
     expect(loaded.data?.mimeType).toBe("image/png");
     expect(loaded.data?.payloadBase64).toBe("AQIDBA==");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists image library assets with pagination metadata for browsing", async () => {
+    const fetchMock = mock(async () => ({
+      json: async () => ({
+        ok: true,
+        data: {
+          items: [{
+            assetId: "asset:image:library-1",
+            normalizedFilename: "landscape.webp",
+            mediaType: "image/webp",
+            sizeBytes: 4096,
+            visibility: "workspace",
+            lifecycle: {
+              status: "available",
+            },
+            preview: {
+              available: true,
+            },
+            ownership: {
+              createdAt: "2026-04-07T00:00:00.000Z",
+              updatedAt: "2026-04-08T00:00:00.000Z",
+            },
+          }],
+          pagination: {
+            limit: 12,
+            offset: 0,
+            returned: 1,
+            hasMore: true,
+          },
+        },
+      }),
+    }) as Response);
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const service = new ImageAssetManagementService("http://identity.local");
+    const listed = await service.listImageLibraryImageAssets({
+      actorUserIdentityId: "user-1",
+      workspaceId: "workspace-1",
+      sessionToken: "token-1",
+      search: "land",
+      limit: 12,
+      offset: 0,
+    });
+
+    expect(listed.ok).toBeTrue();
+    expect(listed.data?.items[0]?.assetId).toBe("asset:image:library-1");
+    expect(listed.data?.items[0]?.previewAvailable).toBeTrue();
+    expect(listed.data?.pagination.hasMore).toBeTrue();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

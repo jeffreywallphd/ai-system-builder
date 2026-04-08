@@ -2,7 +2,9 @@ import { describe, expect, it } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ReferenceImageSystemTemplate } from "@application/system-studio/ReferenceImageSystemTemplate";
 import ImageManipulationRuntimeEditorPanel, {
+  formatAssetFileSize,
   groupRecentImageAssetsByContinuityWindow,
+  resolveSelectionConfirmationMessage,
 } from "../ImageManipulationRuntimeEditorPanel";
 
 describe("ImageManipulationRuntimeEditorPanel", () => {
@@ -108,5 +110,35 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(grouped[0]?.assets[0]?.assetId).toBe("asset:image:today");
     expect(grouped[1]?.assets[0]?.assetId).toBe("asset:image:week");
     expect(grouped[2]?.assets[0]?.assetId).toBe("asset:image:older");
+  });
+
+  it("formats image library file sizes for non-technical display", () => {
+    expect(formatAssetFileSize(512)).toBe("512 B");
+    expect(formatAssetFileSize(3072)).toBe("3.0 KB");
+    expect(formatAssetFileSize(2 * 1024 * 1024)).toBe("2.0 MB");
+  });
+
+  it("builds selection confirmation copy from selected source/reference asset metadata", () => {
+    expect(resolveSelectionConfirmationMessage({
+      selectedSourceItem: {
+        sourceImage: {
+          assetId: "asset:image:source-1",
+        },
+      } as never,
+      selectedReferenceItem: undefined,
+    })).toBe("Source photo selected and ready.");
+
+    expect(resolveSelectionConfirmationMessage({
+      selectedSourceItem: {
+        sourceImage: {
+          assetId: "asset:image:source-1",
+        },
+      } as never,
+      selectedReferenceItem: {
+        sourceImage: {
+          assetId: "asset:image:reference-1",
+        },
+      } as never,
+    })).toBe("Source and face reference photos are selected.");
   });
 });

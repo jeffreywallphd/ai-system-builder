@@ -21,7 +21,11 @@ import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/Ima
 import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
-import { ImageAssetManagementService, type RecentStudioImageAsset } from "../../services/ImageAssetManagementService";
+import {
+  ImageAssetManagementService,
+  type ImageLibraryStudioImageAsset,
+  type RecentStudioImageAsset,
+} from "../../services/ImageAssetManagementService";
 import ComfyImageManipulationPropertyEditor from "../assets/image-system/ComfyImageManipulationPropertyEditor";
 import {
   createReferenceImageOutputPersistenceRequest,
@@ -199,6 +203,13 @@ interface LoadCollectionsOptions {
   readonly hydration?: boolean;
 }
 
+type ReusableStudioImageAsset = Pick<
+  ImageLibraryStudioImageAsset,
+  "assetId" | "originalFilename" | "mediaType" | "sizeBytes" | "lifecycleStatus" | "createdAt" | "updatedAt"
+>;
+
+type UploadProgressStage = "idle" | "uploading" | "processing";
+
 type RecentImageAssetContinuityGroupKey = "today" | "week" | "older";
 
 interface RecentImageAssetContinuityGroup {
@@ -313,6 +324,38 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+export function formatAssetFileSize(sizeBytes: number): string {
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return "Unknown size";
+  }
+  if (sizeBytes < 1024) {
+    return `${sizeBytes} B`;
+  }
+  if (sizeBytes < 1024 * 1024) {
+    return `${(sizeBytes / 1024).toFixed(1)} KB`;
+  }
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function resolveSelectionConfirmationMessage(input: {
+  readonly selectedSourceItem?: OutputGalleryItem;
+  readonly selectedReferenceItem?: OutputGalleryItem;
+}): string | undefined {
+  const selectedSourceAssetId = input.selectedSourceItem?.sourceImage?.assetId;
+  const selectedReferenceAssetId = input.selectedReferenceItem?.sourceImage?.assetId;
+
+  if (selectedSourceAssetId && selectedReferenceAssetId) {
+    return "Source and face reference photos are selected.";
+  }
+  if (selectedSourceAssetId) {
+    return "Source photo selected and ready.";
+  }
+  if (selectedReferenceAssetId) {
+    return "Face reference photo selected.";
+  }
+  return undefined;
 }
 
 function isRuntimeTerminalStatus(
@@ -460,6 +503,15 @@ export function ImageManipulationRuntimeEditorPanel({
   const [isLoadingRecentImageAssets, setIsLoadingRecentImageAssets] = useState(false);
   const [recentImageAssetsError, setRecentImageAssetsError] = useState<string | undefined>();
   const [isReusingRecentImageAssetId, setIsReusingRecentImageAssetId] = useState<string | undefined>();
+  const [uploadProgressStage, setUploadProgressStage] = useState<UploadProgressStage>("idle");
+  const [imageLibrarySearch, setImageLibrarySearch] = useState("");
+  const [appliedImageLibrarySearch, setAppliedImageLibrarySearch] = useState("");
+  const [imageLibraryAssets, setImageLibraryAssets] = useState<ReadonlyArray<ImageLibraryStudioImageAsset>>([]);
+  const [isLoadingImageLibrary, setIsLoadingImageLibrary] = useState(false);
+  const [isLoadingMoreImageLibrary, setIsLoadingMoreImageLibrary] = useState(false);
+  const [imageLibraryHasMore, setImageLibraryHasMore] = useState(false);
+  const [imageLibraryOffset, setImageLibraryOffset] = useState(0);
+  const [imageLibraryError, setImageLibraryError] = useState<string | undefined>();
 
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
@@ -589,6 +641,10 @@ export function ImageManipulationRuntimeEditorPanel({
       : outputLoadError;
   const hasCollectionLoadError = Boolean(sourceLoadError || outputLoadError || referenceLoadError);
   const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
+  const selectionConfirmationMessage = useMemo(() => resolveSelectionConfirmationMessage({
+    selectedSourceItem,
+    selectedReferenceItem,
+  }), [selectedReferenceItem, selectedSourceItem]);
   const session = useMemo(() => authSessionStore.getSession(), [authSessionStore]);
   const actorUserIdentityId = session?.userIdentityId;
   const workspaceId = session?.workspaceContext?.resolvedWorkspaceId ?? session?.initialCapabilityState?.workspaceId;
@@ -703,8 +759,67 @@ export function ImageManipulationRuntimeEditorPanel({
     });
   };
 
+  const loadImageLibrary = (options?: {
+    readonly append?: boolean;
+    readonly search?: string;
+    readonly offset?: number;
+  }): Promise<ReadonlyArray<ImageLibraryStudioImageAsset>> => {
+    if (!actorUserIdentityId || !workspaceId || !sessionToken) {
+      setImageLibraryAssets(Object.freeze([]));
+      setImageLibraryError(undefined);
+      setImageLibraryHasMore(false);
+      setImageLibraryOffset(0);
+      return Promise.resolve(Object.freeze([]));
+    }
+
+    const append = options?.append === true;
+    const search = options?.search ?? appliedImageLibrarySearch;
+    const offset = options?.offset ?? 0;
+
+    if (append) {
+      setIsLoadingMoreImageLibrary(true);
+    } else {
+      setIsLoadingImageLibrary(true);
+    }
+    setImageLibraryError(undefined);
+
+    return imageAssets.listImageLibraryImageAssets({
+      actorUserIdentityId,
+      workspaceId,
+      sessionToken,
+      search,
+      limit: 12,
+      offset,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        setImageLibraryError("We couldn't load your image library right now.");
+        if (!append) {
+          setImageLibraryAssets(Object.freeze([]));
+          setImageLibraryHasMore(false);
+          setImageLibraryOffset(0);
+        }
+        return Object.freeze([]);
+      }
+
+      const nextItems = append
+        ? Object.freeze([...imageLibraryAssets, ...response.data.items])
+        : response.data.items;
+
+      setImageLibraryAssets(nextItems);
+      setImageLibraryHasMore(response.data.pagination.hasMore);
+      setImageLibraryOffset(response.data.pagination.offset + response.data.pagination.returned);
+      return nextItems;
+    }).finally(() => {
+      if (append) {
+        setIsLoadingMoreImageLibrary(false);
+      } else {
+        setIsLoadingImageLibrary(false);
+      }
+    });
+  };
+
   const reuseRecentImageAsset = async (input: {
-    readonly asset: RecentStudioImageAsset;
+    readonly asset: ReusableStudioImageAsset;
     readonly targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">;
   }): Promise<void> => {
     if (!draft?.draftId || !workspaceId || !sessionToken) {
@@ -872,6 +987,13 @@ export function ImageManipulationRuntimeEditorPanel({
   useEffect(() => {
     void loadRecentAssets();
   }, [actorUserIdentityId, workspaceId, sessionToken]);
+
+  useEffect(() => {
+    void loadImageLibrary({
+      search: appliedImageLibrarySearch,
+      offset: 0,
+    });
+  }, [actorUserIdentityId, workspaceId, sessionToken, appliedImageLibrarySearch]);
 
   useEffect(() => {
     if (!draft?.draftId) {
@@ -1070,6 +1192,7 @@ export function ImageManipulationRuntimeEditorPanel({
               }
               setStatusMessage(undefined);
               setIsUploading(true);
+              setUploadProgressStage("uploading");
               void encodeFileBase64(file)
                 .then(async (payloadBase64) => {
                   const uploaded = await imageAssets.uploadStudioSourceImage({
@@ -1082,6 +1205,7 @@ export function ImageManipulationRuntimeEditorPanel({
                     setStatusMessage(uploaded.error?.message ?? "We couldn't upload this photo.");
                     return undefined;
                   }
+                  setUploadProgressStage("processing");
                   const metadata = await imageAssets.getImageAsset({
                     assetId: uploaded.data.assetId,
                     workspaceId,
@@ -1121,10 +1245,25 @@ export function ImageManipulationRuntimeEditorPanel({
                 .then((preferredSourceRecordId) => Promise.all([
                   loadCollections({ preferredSourceRecordId }),
                   loadRecentAssets(),
+                  loadImageLibrary({
+                    search: appliedImageLibrarySearch,
+                    offset: 0,
+                  }),
                 ]))
-                .finally(() => setIsUploading(false));
+                .finally(() => {
+                  setIsUploading(false);
+                  setUploadProgressStage("idle");
+                });
             }}
           />
+          {uploadProgressStage !== "idle" ? (
+            <ImageStatusNotice
+              title={uploadProgressStage === "uploading" ? "Uploading photo" : "Preparing photo"}
+              message={uploadProgressStage === "uploading"
+                ? "Uploading your photo to your image library."
+                : "Finalizing metadata and linking the photo to this editing session."}
+            />
+          ) : null}
           <ComfyImageManipulationPropertyEditor
             value={config}
             presetId={presetId}
@@ -1238,6 +1377,13 @@ export function ImageManipulationRuntimeEditorPanel({
                 tone="danger"
               />
             ) : null}
+            {selectionConfirmationMessage ? (
+              <ImageStatusNotice
+                title="Selection confirmed"
+                message={selectionConfirmationMessage}
+                tone="success"
+              />
+            ) : null}
             {sessionToken ? (
               <section className="ui-stack ui-stack--2xs">
                 <p className="ui-text-small ui-text-secondary">Recently used images</p>
@@ -1308,6 +1454,123 @@ export function ImageManipulationRuntimeEditorPanel({
                       </section>
                     ))}
                   </div>
+                ) : null}
+              </section>
+            ) : null}
+            {sessionToken ? (
+              <section className="ui-stack ui-stack--2xs">
+                <p className="ui-text-small ui-text-secondary">Image library</p>
+                <div className="ui-row ui-row--xs">
+                  <input
+                    type="search"
+                    className="ui-input"
+                    value={imageLibrarySearch}
+                    placeholder="Search images by filename"
+                    onChange={(event) => setImageLibrarySearch(event.currentTarget.value)}
+                    disabled={isLoadingImageLibrary || isLoadingMoreImageLibrary}
+                  />
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => {
+                      setAppliedImageLibrarySearch(imageLibrarySearch.trim());
+                    }}
+                    disabled={isLoadingImageLibrary || isLoadingMoreImageLibrary}
+                  >
+                    Search
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    onClick={() => {
+                      setImageLibrarySearch("");
+                      setAppliedImageLibrarySearch("");
+                    }}
+                    disabled={isLoadingImageLibrary || isLoadingMoreImageLibrary}
+                  >
+                    Clear
+                  </button>
+                </div>
+                {isLoadingImageLibrary ? (
+                  <ImageStatusNotice
+                    title="Loading image library"
+                    message="Fetching your uploaded image assets."
+                  />
+                ) : null}
+                {!isLoadingImageLibrary && imageLibraryError ? (
+                  <ImageStatusNotice
+                    title="Image library unavailable"
+                    message={imageLibraryError}
+                    tone="warning"
+                  />
+                ) : null}
+                {!isLoadingImageLibrary && !imageLibraryError && imageLibraryAssets.length < 1 ? (
+                  <ImageStatusNotice
+                    title="No library images found"
+                    message={appliedImageLibrarySearch
+                      ? "Try a different search or upload a new photo."
+                      : "Upload a photo to build your image library."}
+                  />
+                ) : null}
+                {!isLoadingImageLibrary && !imageLibraryError && imageLibraryAssets.length > 0 ? (
+                  <ul className="ui-text-small ui-text-secondary ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
+                    {imageLibraryAssets.map((asset) => (
+                      <li key={asset.assetId}>
+                        <div className="ui-stack ui-stack--2xs">
+                          <span>{asset.originalFilename}</span>
+                          <span className="ui-text-secondary">
+                            {formatAssetFileSize(asset.sizeBytes)} - {toFriendlyTimestamp(asset.updatedAt) ?? "Recently updated"}
+                          </span>
+                          <div className="ui-row ui-row--xs">
+                            <button
+                              type="button"
+                              className="ui-button ui-button--ghost ui-button--sm"
+                              disabled={Boolean(isReusingRecentImageAssetId)}
+                              onClick={() => {
+                                void reuseRecentImageAsset({
+                                  asset,
+                                  targetDatasetBindingId: "input-image-dataset",
+                                });
+                              }}
+                            >
+                              {isReusingRecentImageAssetId === asset.assetId ? "Preparing..." : "Use as source"}
+                            </button>
+                            {roleBindings.referenceBindingId ? (
+                              <button
+                                type="button"
+                                className="ui-button ui-button--ghost ui-button--sm"
+                                disabled={Boolean(isReusingRecentImageAssetId)}
+                                onClick={() => {
+                                  void reuseRecentImageAsset({
+                                    asset,
+                                    targetDatasetBindingId: "reference-image-dataset",
+                                  });
+                                }}
+                              >
+                                {isReusingRecentImageAssetId === asset.assetId ? "Preparing..." : "Use as face reference"}
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {imageLibraryHasMore ? (
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={isLoadingImageLibrary || isLoadingMoreImageLibrary}
+                    onClick={() => {
+                      void loadImageLibrary({
+                        append: true,
+                        search: appliedImageLibrarySearch,
+                        offset: imageLibraryOffset,
+                      });
+                    }}
+                  >
+                    {isLoadingMoreImageLibrary ? "Loading..." : "Load more"}
+                  </button>
                 ) : null}
               </section>
             ) : null}
