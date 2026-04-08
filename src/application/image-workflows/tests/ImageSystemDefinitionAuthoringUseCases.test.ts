@@ -440,6 +440,8 @@ describe("image system definition authoring use cases", () => {
     expect(result.system.systemId).toBe("system-alpha");
     expect(result.readiness.state).toBe("configuration-ready");
     expect(result.readiness.ready).toBeTrue();
+    expect(result.readiness.classification).toBe("draft");
+    expect(result.readiness.summary.length).toBeGreaterThan(0);
     expect(result.validation.valid).toBeTrue();
     expect(result.compatibility.outcome).toBe("compatible");
     expect(result.structure.requirements.requiredInputs).toBe(1);
@@ -466,6 +468,7 @@ describe("image system definition authoring use cases", () => {
     }));
 
     expect(result.readiness.state).toBe("configuration-incomplete");
+    expect(result.readiness.classification).toBe("incomplete");
     expect(result.readiness.issues.some((issue) => issue.code === "required-output-binding-missing")).toBeTrue();
   });
 

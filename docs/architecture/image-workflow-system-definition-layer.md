@@ -14,6 +14,7 @@ The image manipulation vertical slice defines how user intent is represented bef
 This note is the reference implementation baseline for later AI capabilities that need the same workflow -> system -> execution contract posture.
 
 Story 2.2.5 extends this baseline with authoritative query/list use cases so workflow/system discovery and reopen flows are driven by persisted platform metadata, not studio-local cache state.
+Story 2.2.6 extends the baseline with reusable readiness validation services so draft/incomplete/valid/runnable posture is evaluated consistently before later run-submission orchestration consumes definitions.
 
 ## Canonical implementation seams
 
@@ -35,6 +36,7 @@ Image workflow asset definitions used by Studio-facing configuration:
 - `src/application/contracts/ImageWorkflowOutputBindingConfiguration.ts`
 - `src/application/contracts/ImageWorkflowUiTriggerBindingConfiguration.ts`
 - `src/application/contracts/ImageWorkflowAssetRegistry.ts`
+- `src/application/image-workflows/ImageWorkflowSystemReadinessValidationService.ts`
 
 ## Layered model and responsibilities
 

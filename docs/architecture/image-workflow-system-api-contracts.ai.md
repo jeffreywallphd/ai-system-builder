@@ -7,6 +7,7 @@ Story 2.2.2 adds application-layer repository/service ports for authoritative wo
 Story 2.2.3 adds application use cases for authoritative image-workflow create/update authoring.
 Story 2.2.4 adds application use cases for authoritative image-system create/update authoring with workflow-binding compatibility and readiness outputs.
 Story 2.2.5 adds application query/list use cases for authoritative workflow/system discovery and reopen surfaces.
+Story 2.2.6 adds reusable readiness validation services so workflow/system readiness, issue classification, and blocking/non-blocking validation outcomes are evaluated consistently across authoring and query flows.
 
 ## Canonical files
 
@@ -32,10 +33,12 @@ Story 2.2.5 adds application query/list use cases for authoritative workflow/sys
 - `src/application/image-workflows/ImageWorkflowSystemQueryContracts.ts`
 - `src/application/image-workflows/ImageWorkflowSystemQueryErrors.ts`
 - `src/application/image-workflows/ImageWorkflowSystemQueryShared.ts`
+- `src/application/image-workflows/ImageWorkflowSystemReadinessValidationService.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
 - `src/application/image-workflows/tests/ImageSystemDefinitionAuthoringUseCases.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemQueryUseCases.test.ts`
+- `src/application/image-workflows/tests/ImageWorkflowSystemReadinessValidationService.test.ts`
 - `docs/architecture/image-workflow-system-api-contracts.md`
 
 ## Contract coverage
@@ -140,6 +143,19 @@ This keeps system definition authoring/editing reusable across UI surfaces while
 - Query contracts define DTO-ready list/detail shapes so Studio picker/editor/reopen flows can consume authoritative metadata directly (not local studio cache assumptions).
 
 This keeps discovery and reopen behavior inside clean application boundaries while preserving tenancy and authorization posture.
+
+## Story 2.2.6 readiness validation service coverage
+
+- `ImageWorkflowSystemReadinessValidationService` is the canonical application service for:
+  - workflow readiness evaluation (readiness state, classification, summary, structure),
+  - system readiness evaluation (including runnable posture classification),
+  - workflow/system authoring assessments that aggregate readiness, validation, compatibility, and binding issues into one structured result.
+- Authoring flows now reuse the service instead of maintaining duplicate readiness/structure logic in create/update helpers.
+- Query/detail/list projections now reuse the same service for readiness + structure metadata so UI/API consumers see consistent states and issue semantics.
+- Readiness summaries now include explicit `classification` and user-facing `summary` fields in addition to machine-readable issue codes.
+- Assessment issues include source and blocking posture (`readiness`, `validation`, `compatibility`, `binding`) so downstream run-submission orchestration can gate incomplete/invalid definitions deterministically before execution work begins.
+
+This keeps readiness behavior backend-agnostic while preserving extension seams for future workflow/system types.
 
 Intended consumers:
 - authoritative server application use cases for workflow/system definition create/update/publish/read/list/archive flows,

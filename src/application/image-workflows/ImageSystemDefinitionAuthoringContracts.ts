@@ -31,6 +31,8 @@ export interface ImageSystemDefinitionReadinessSummary {
   readonly state: ImageSystemDefinitionReadinessState;
   readonly ready: boolean;
   readonly runnable: boolean;
+  readonly classification: "draft" | "incomplete" | "valid" | "runnable";
+  readonly summary: string;
   readonly evaluatedAt: string;
   readonly issues: ReadonlyArray<ImageSystemReadinessIssue>;
 }

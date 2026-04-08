@@ -3,15 +3,10 @@ import {
   type ImageWorkflowDefinition,
 } from "@domain/image-workflows/ImageWorkflowDomain";
 import {
-  ImageSystemLifecycleStates,
-  ImageSystemRuntimeStatuses,
-  evaluateImageSystemReadiness,
   isImageSystemLifecycleTransitionAllowed,
-  isImageSystemRunnable,
   type ImageSystemDefinition,
 } from "@domain/systems/ImageSystemDomain";
 import type {
-  ImageDefinitionValidationIssue,
   ImageDefinitionValidationResult,
   IImageSystemDefinitionValidationService,
   IImageWorkflowSystemAuthorizationPort,
@@ -20,12 +15,10 @@ import type {
   ImageWorkflowSystemCompatibilityResult,
 } from "./ports";
 import {
-  ImageWorkflowCompatibilityOutcomes,
   ImageWorkflowSystemAuthorizationResourceKinds,
   ImageWorkflowSystemPermissionActions,
 } from "./ports";
 import {
-  ImageSystemDefinitionReadinessStates,
   type ImageSystemDefinitionReadinessSummary,
   type ImageSystemDefinitionStructureSummary,
 } from "./ImageSystemDefinitionAuthoringContracts";
@@ -33,6 +26,7 @@ import {
   ImageSystemDefinitionAuthoringError,
   ImageSystemDefinitionAuthoringErrorCodes,
 } from "./ImageSystemDefinitionAuthoringErrors";
+import { ImageWorkflowSystemReadinessValidationService } from "./ImageWorkflowSystemReadinessValidationService";
 
 export async function assertSystemActionAuthorized(input: {
   readonly authorization: IImageWorkflowSystemAuthorizationPort;
@@ -149,45 +143,8 @@ export function assertSystemBindingReferencesWorkflow(input: {
   readonly workflow: ImageWorkflowDefinition;
   readonly system: ImageSystemDefinition;
 }): void {
-  const { workflow, system } = input;
-  const workflowInputIds = new Set(workflow.inputSlots.map((entry) => entry.inputId));
-  const workflowParameterIds = new Set(workflow.parameterSpecifications.map((entry) => entry.parameterId));
-  const workflowOutputIds = new Set(workflow.outputExpectations.map((entry) => entry.outputId));
-
-  const issues: ImageDefinitionValidationIssue[] = [];
-
-  for (const requiredInputId of system.workflowBinding.requiredInputIds) {
-    if (!workflowInputIds.has(requiredInputId)) {
-      issues.push(Object.freeze({
-        code: "required-input-not-declared-by-workflow",
-        path: `workflowBinding.requiredInputIds.${requiredInputId}`,
-        message: `Required input '${requiredInputId}' is not declared by workflow '${workflow.workflowId}'.`,
-        severity: "error",
-      }));
-    }
-  }
-
-  for (const requiredParameterId of system.workflowBinding.requiredParameterIds) {
-    if (!workflowParameterIds.has(requiredParameterId)) {
-      issues.push(Object.freeze({
-        code: "required-parameter-not-declared-by-workflow",
-        path: `workflowBinding.requiredParameterIds.${requiredParameterId}`,
-        message: `Required parameter '${requiredParameterId}' is not declared by workflow '${workflow.workflowId}'.`,
-        severity: "error",
-      }));
-    }
-  }
-
-  for (const requiredOutputId of system.workflowBinding.requiredOutputIds) {
-    if (!workflowOutputIds.has(requiredOutputId)) {
-      issues.push(Object.freeze({
-        code: "required-output-not-declared-by-workflow",
-        path: `workflowBinding.requiredOutputIds.${requiredOutputId}`,
-        message: `Required output '${requiredOutputId}' is not declared by workflow '${workflow.workflowId}'.`,
-        severity: "error",
-      }));
-    }
-  }
+  const readinessService = new ImageWorkflowSystemReadinessValidationService();
+  const issues = readinessService.evaluateSystemBindingCompatibility(input);
 
   if (issues.length > 0) {
     throw new ImageSystemDefinitionAuthoringError(
@@ -212,112 +169,39 @@ export async function assertSystemDefinitionReadyForPersistence(input: {
   readonly compatibility: ImageWorkflowSystemCompatibilityResult;
   readonly structure: ImageSystemDefinitionStructureSummary;
 }> {
-  const readinessIssues = evaluateImageSystemReadiness(input.system);
-  const readiness = createReadinessSummary(input.system, readinessIssues, new Date().toISOString());
-
-  const compatibility = await input.compatibilityService.evaluateSystemWorkflowCompatibility({
+  const readinessService = new ImageWorkflowSystemReadinessValidationService();
+  const assessment = await readinessService.evaluateSystemAuthoring({
     workspaceId: input.workspaceId,
     workflow: input.workflow,
     system: input.system,
-    mode: "strict",
+    validationService: input.validationService,
+    compatibilityService: input.compatibilityService,
   });
 
-  if (compatibility.outcome === ImageWorkflowCompatibilityOutcomes.incompatible) {
+  if (assessment.compatibility.outcome === "incompatible") {
     throw new ImageSystemDefinitionAuthoringError(
       ImageSystemDefinitionAuthoringErrorCodes.incompatible,
       "Image system definition is incompatible with the bound workflow definition.",
       Object.freeze({
-        issues: compatibility.issues,
+        issues: assessment.issues,
       }),
     );
   }
 
-  const validationMode = input.system.runtimeStatus === ImageSystemRuntimeStatuses.enabled
-    ? "runtime"
-    : input.system.lifecycleState === ImageSystemLifecycleStates.ready
-    ? "ready"
-    : "authoring";
-
-  const validation = await input.validationService.validateSystemDefinition({
-    workspaceId: input.workspaceId,
-    system: input.system,
-    mode: validationMode,
-  });
-
-  if (!validation.valid || hasErrorSeverity(validation.issues)) {
+  if (assessment.blocking) {
     throw new ImageSystemDefinitionAuthoringError(
       ImageSystemDefinitionAuthoringErrorCodes.validationFailed,
       "Image system definition failed authoring validation.",
       Object.freeze({
-        issues: validation.issues,
+        issues: assessment.issues,
       }),
     );
   }
 
   return Object.freeze({
-    readiness,
-    validation,
-    compatibility,
-    structure: buildStructureSummary(input.system),
-  });
-}
-
-function hasErrorSeverity(issues: ReadonlyArray<ImageDefinitionValidationIssue>): boolean {
-  return issues.some((issue) => issue.severity === "error");
-}
-
-function createReadinessSummary(
-  system: ImageSystemDefinition,
-  issues: ReturnType<typeof evaluateImageSystemReadiness>,
-  occurredAt: string,
-): ImageSystemDefinitionReadinessSummary {
-  if (isImageSystemRunnable(system)) {
-    return Object.freeze({
-      state: ImageSystemDefinitionReadinessStates.configurationRunnable,
-      ready: true,
-      runnable: true,
-      evaluatedAt: occurredAt,
-      issues,
-    });
-  }
-
-  if (issues.length === 0) {
-    return Object.freeze({
-      state: ImageSystemDefinitionReadinessStates.configurationReady,
-      ready: true,
-      runnable: false,
-      evaluatedAt: occurredAt,
-      issues,
-    });
-  }
-
-  return Object.freeze({
-    state: ImageSystemDefinitionReadinessStates.configurationIncomplete,
-    ready: false,
-    runnable: false,
-    evaluatedAt: occurredAt,
-    issues,
-  });
-}
-
-function buildStructureSummary(system: ImageSystemDefinition): ImageSystemDefinitionStructureSummary {
-  return Object.freeze({
-    workflowBinding: Object.freeze({
-      workflowId: system.workflowBinding.workflowId,
-      workflowLineageId: system.workflowBinding.workflowLineageId,
-      workflowVersionTag: system.workflowBinding.workflowVersionTag,
-      workflowRevision: system.workflowBinding.workflowRevision,
-    }),
-    requirements: Object.freeze({
-      requiredInputs: system.workflowBinding.requiredInputIds.length,
-      requiredParameters: system.workflowBinding.requiredParameterIds.length,
-      requiredOutputs: system.workflowBinding.requiredOutputIds.length,
-    }),
-    configured: Object.freeze({
-      selectedInputs: system.inputAssetSelections.length,
-      outputTargets: system.outputTargetBindings.length,
-      parameterValues: Object.keys(system.parameterBaseline.values).length,
-      parameterProfiles: system.parameterBaseline.profileReferences.length,
-    }),
+    readiness: assessment.readiness,
+    validation: assessment.validation,
+    compatibility: assessment.compatibility,
+    structure: assessment.structure,
   });
 }

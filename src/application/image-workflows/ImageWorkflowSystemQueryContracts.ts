@@ -1,23 +1,21 @@
 import {
-  evaluateImageWorkflowDefinitionCompleteness,
   type ImageWorkflowDefinition,
 } from "@domain/image-workflows/ImageWorkflowDomain";
 import {
-  evaluateImageSystemReadiness,
-  isImageSystemRunnable,
   type ImageSystemDefinition,
 } from "@domain/systems/ImageSystemDomain";
 import type { WorkspaceVisibility } from "@shared/workspaces/WorkspaceOwnership";
 import {
-  ImageSystemDefinitionReadinessStates,
   type ImageSystemDefinitionReadinessSummary,
   type ImageSystemDefinitionStructureSummary,
 } from "./ImageSystemDefinitionAuthoringContracts";
 import {
-  ImageWorkflowDefinitionReadinessStates,
   type ImageWorkflowDefinitionReadinessSummary,
   type ImageWorkflowDefinitionStructureSummary,
 } from "./ImageWorkflowDefinitionAuthoringContracts";
+import { ImageWorkflowSystemReadinessValidationService } from "./ImageWorkflowSystemReadinessValidationService";
+
+const readinessService = new ImageWorkflowSystemReadinessValidationService();
 
 export interface ImageWorkflowDefinitionDetailResult {
   readonly workflow: ImageWorkflowDefinition;
@@ -146,53 +144,13 @@ export function toImageWorkflowDefinitionReadinessSummary(
   workflow: ImageWorkflowDefinition,
   evaluatedAt: string,
 ): ImageWorkflowDefinitionReadinessSummary {
-  const completenessIssues = evaluateImageWorkflowDefinitionCompleteness(workflow);
-  if (completenessIssues.length === 0) {
-    return Object.freeze({
-      state: ImageWorkflowDefinitionReadinessStates.definitionReady,
-      ready: true,
-      evaluatedAt,
-      completenessIssues,
-    });
-  }
-
-  return Object.freeze({
-    state: ImageWorkflowDefinitionReadinessStates.definitionIncomplete,
-    ready: false,
-    evaluatedAt,
-    completenessIssues,
-  });
+  return readinessService.evaluateWorkflowReadiness(workflow, evaluatedAt).readiness;
 }
 
 export function toImageWorkflowDefinitionStructureSummary(
   workflow: ImageWorkflowDefinition,
 ): ImageWorkflowDefinitionStructureSummary {
-  return Object.freeze({
-    inputSlots: Object.freeze({
-      total: workflow.inputSlots.length,
-      required: workflow.inputSlots.filter((slot) => slot.required).length,
-    }),
-    parameters: Object.freeze({
-      total: workflow.parameterSpecifications.length,
-      required: workflow.parameterSpecifications.filter((parameter) => parameter.required).length,
-    }),
-    outputExpectations: Object.freeze({
-      total: workflow.outputExpectations.length,
-      required: workflow.outputExpectations.filter((output) => output.required).length,
-    }),
-    bindings: Object.freeze({
-      input: workflow.inputBindings.length,
-      output: workflow.outputBindings.length,
-    }),
-    backendTranslation: Object.freeze({
-      translatorId: workflow.backendTranslation.translatorId,
-      templateId: workflow.backendTranslation.templateId,
-      contractVersion: workflow.backendTranslation.contractVersion,
-      inputBindings: workflow.backendTranslation.inputBindings.length,
-      parameterBindings: workflow.backendTranslation.parameterBindings.length,
-      outputBindings: workflow.backendTranslation.outputBindings.length,
-    }),
-  });
+  return readinessService.evaluateWorkflowReadiness(workflow, new Date().toISOString()).structure;
 }
 
 export function toImageWorkflowDefinitionListItem(
@@ -220,59 +178,13 @@ export function toImageSystemDefinitionReadinessSummary(
   system: ImageSystemDefinition,
   evaluatedAt: string,
 ): ImageSystemDefinitionReadinessSummary {
-  const issues = evaluateImageSystemReadiness(system);
-
-  if (isImageSystemRunnable(system)) {
-    return Object.freeze({
-      state: ImageSystemDefinitionReadinessStates.configurationRunnable,
-      ready: true,
-      runnable: true,
-      evaluatedAt,
-      issues,
-    });
-  }
-
-  if (issues.length === 0) {
-    return Object.freeze({
-      state: ImageSystemDefinitionReadinessStates.configurationReady,
-      ready: true,
-      runnable: false,
-      evaluatedAt,
-      issues,
-    });
-  }
-
-  return Object.freeze({
-    state: ImageSystemDefinitionReadinessStates.configurationIncomplete,
-    ready: false,
-    runnable: false,
-    evaluatedAt,
-    issues,
-  });
+  return readinessService.evaluateSystemReadiness(system, evaluatedAt).readiness;
 }
 
 export function toImageSystemDefinitionStructureSummary(
   system: ImageSystemDefinition,
 ): ImageSystemDefinitionStructureSummary {
-  return Object.freeze({
-    workflowBinding: Object.freeze({
-      workflowId: system.workflowBinding.workflowId,
-      workflowLineageId: system.workflowBinding.workflowLineageId,
-      workflowVersionTag: system.workflowBinding.workflowVersionTag,
-      workflowRevision: system.workflowBinding.workflowRevision,
-    }),
-    requirements: Object.freeze({
-      requiredInputs: system.workflowBinding.requiredInputIds.length,
-      requiredParameters: system.workflowBinding.requiredParameterIds.length,
-      requiredOutputs: system.workflowBinding.requiredOutputIds.length,
-    }),
-    configured: Object.freeze({
-      selectedInputs: system.inputAssetSelections.length,
-      outputTargets: system.outputTargetBindings.length,
-      parameterValues: Object.keys(system.parameterBaseline.values).length,
-      parameterProfiles: system.parameterBaseline.profileReferences.length,
-    }),
-  });
+  return readinessService.evaluateSystemReadiness(system, new Date().toISOString()).structure;
 }
 
 export function toImageSystemDefinitionListItem(

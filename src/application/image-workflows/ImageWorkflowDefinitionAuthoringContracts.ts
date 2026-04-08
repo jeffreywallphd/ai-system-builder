@@ -29,6 +29,8 @@ export type ImageWorkflowDefinitionReadinessState =
 export interface ImageWorkflowDefinitionReadinessSummary {
   readonly state: ImageWorkflowDefinitionReadinessState;
   readonly ready: boolean;
+  readonly classification: "draft" | "incomplete" | "valid" | "runnable";
+  readonly summary: string;
   readonly evaluatedAt: string;
   readonly completenessIssues: ReadonlyArray<ImageWorkflowCompletenessIssue>;
 }

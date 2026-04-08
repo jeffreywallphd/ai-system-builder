@@ -475,6 +475,7 @@ describe("image workflow/system query use cases", () => {
 
     expect(result.workflow.workflowId).toBe("workflow-alpha-v1");
     expect(result.readiness.ready).toBeTrue();
+    expect(result.readiness.summary.length).toBeGreaterThan(0);
     expect(result.structure.parameters.required).toBe(1);
   });
 
@@ -590,6 +591,7 @@ describe("image workflow/system query use cases", () => {
 
     expect(result.system.systemId).toBe("system-alpha");
     expect(result.readiness.state).toBe("configuration-runnable");
+    expect(result.readiness.classification).toBe("runnable");
     expect(result.structure.requirements.requiredOutputs).toBe(1);
   });
 
