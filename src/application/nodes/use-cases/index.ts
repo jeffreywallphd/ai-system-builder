@@ -19,3 +19,5 @@ export * from "./ExecutionNodeManagementUseCaseShared";
 export * from "./RegisterExecutionNodeUseCase";
 export * from "./ActivateExecutionNodeUseCase";
 export * from "./RefreshExecutionNodeBackendStateUseCase";
+export * from "./GetExecutionNodeDetailUseCase";
+export * from "./ListExecutionNodesUseCase";

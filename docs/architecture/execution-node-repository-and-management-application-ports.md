@@ -9,6 +9,7 @@
 - Story 5.2.1: Implement node registration and activation use cases for image execution backends
 - Story 5.2.2: Implement concrete persistence for execution-node records and status history
 - Story 5.2.3: Implement adapter-backed health/capability refresh services for execution nodes
+- Story 5.2.4: Implement execution-node query and listing use cases for operational and readiness surfaces
 
 ## Purpose
 
@@ -22,9 +23,12 @@ Define application-layer port seams so execution nodes are registered, queried, 
 - `src/application/nodes/use-cases/RegisterExecutionNodeUseCase.ts`
 - `src/application/nodes/use-cases/ActivateExecutionNodeUseCase.ts`
 - `src/application/nodes/use-cases/RefreshExecutionNodeBackendStateUseCase.ts`
+- `src/application/nodes/use-cases/GetExecutionNodeDetailUseCase.ts`
+- `src/application/nodes/use-cases/ListExecutionNodesUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 - `src/application/nodes/tests/RefreshExecutionNodeBackendStateUseCase.test.ts`
+- `src/application/nodes/tests/ExecutionNodeQueryUseCases.test.ts`
 
 ## Repository port responsibilities
 
@@ -125,3 +129,24 @@ Concrete SQLite persistence for `IExecutionNodeRepository` now lives in:
 - `src/infrastructure/persistence/nodes/ExecutionNodePersistenceMapper.ts`
 
 Durable operational history for health/capability/availability updates is recorded in `execution_node_status_history` and documented in `docs/architecture/execution-node-persistence-and-status-history.md`.
+
+## Story 5.2.4 query and listing behavior
+
+`GetExecutionNodeDetailUseCase` and `ListExecutionNodesUseCase` now provide authoritative execution-node read surfaces for operational inventory and studio readiness messaging consumers.
+
+Query/list behavior:
+
+- backed by persisted execution-node metadata through `IExecutionNodeRepository` (no ad hoc adapter probing)
+- optional authorization hooks for visibility policy integration:
+  - `assertCanGetExecutionNodeDetail(...)`
+  - `assertCanQueryExecutionNodes(...)`
+- list filtering supports:
+  - backend families and execution targets
+  - approval/trust/activation/health status filters
+  - capability presence (`requiredCapabilitiesAnyOf`)
+  - remote-scheduling and certificate requirements
+  - deployment-tag and recent-activity windows (`lastSeenAfter`/`lastSeenBefore`)
+  - practical enabled/disabled selector (`enabled`) derived from activation posture
+  - practical availability selector (`available`) derived from activation + health posture
+  - backend readiness state filter (`backendReadinessStates`)
+- outputs are projected into internal DTO-ready summary/detail models that can feed later admin-lite/admin and readiness UI/API surfaces.
