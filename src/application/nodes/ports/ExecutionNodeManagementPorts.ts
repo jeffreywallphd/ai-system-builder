@@ -230,6 +230,54 @@ export interface IImageRunNodeEligibilityEvaluationServicePort {
   }): Promise<ReadonlyArray<ImageRunNodeEligibilityResult>>;
 }
 
+export const ImageRunExecutionNodeSelectionOutcomes = Object.freeze({
+  selected: "selected",
+  noEligibleNode: "no-eligible-node",
+  noCandidateNodes: "no-candidate-nodes",
+});
+
+export type ImageRunExecutionNodeSelectionOutcome =
+  typeof ImageRunExecutionNodeSelectionOutcomes[keyof typeof ImageRunExecutionNodeSelectionOutcomes];
+
+export interface ImageRunExecutionNodeSelectionReason {
+  readonly code: string;
+  readonly message: string;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export interface ImageRunExecutionNodeSelectionCandidate {
+  readonly nodeId: string;
+  readonly rank: number;
+  readonly decision: ExecutionNodeEligibilityDecisionKind;
+  readonly eligible: boolean;
+  readonly matchedBackendFamily?: string;
+  readonly matchedExecutionTarget?: string;
+  readonly blockingReasonCodes: ReadonlyArray<string>;
+  readonly advisoryReasonCodes: ReadonlyArray<string>;
+  readonly transientAvailabilityReasonCodes: ReadonlyArray<string>;
+}
+
+export interface ImageRunExecutionNodeSelectionDecision {
+  readonly run: ImageRunNodeEligibilityRunContext;
+  readonly asOf: string;
+  readonly strategyId: string;
+  readonly outcome: ImageRunExecutionNodeSelectionOutcome;
+  readonly selectedNodeId?: string;
+  readonly selectedCandidate?: ImageRunExecutionNodeSelectionCandidate;
+  readonly reasons: ReadonlyArray<ImageRunExecutionNodeSelectionReason>;
+  readonly candidates: ReadonlyArray<ImageRunExecutionNodeSelectionCandidate>;
+}
+
+export interface IImageRunExecutionNodeSelectionServicePort {
+  selectExecutionNodeForRun(input: {
+    readonly asOf: string;
+    readonly run: ImageRunNodeEligibilityRunContext;
+    readonly requirements?: ImageRunNodeEligibilityRequirements;
+    readonly candidateNodeIds?: ReadonlyArray<string>;
+    readonly query?: ExecutionNodeListQuery;
+  }): Promise<ImageRunExecutionNodeSelectionDecision>;
+}
+
 export interface ExecutionNodeAvailabilityChangeResult {
   readonly changed: boolean;
   readonly record: ExecutionNodeRecord;
@@ -274,4 +322,5 @@ export interface ExecutionNodeManagementServicePorts {
   readonly eligibility: IExecutionNodeEligibilityEvaluationServicePort;
   readonly availability: IExecutionNodeAvailabilityManagementServicePort;
   readonly selectionHints: IExecutionNodeSelectionHintsServicePort;
+  readonly runSelection?: IImageRunExecutionNodeSelectionServicePort;
 }
