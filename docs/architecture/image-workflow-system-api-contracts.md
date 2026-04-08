@@ -1,10 +1,11 @@
 # Image Workflow and System API Contracts
 
-This note documents Story 2.2.1 through Story 2.2.4 for Feature 2 / Epic 2.2:
+This note documents Story 2.2.1 through Story 2.2.5 for Feature 2 / Epic 2.2:
 - shared request/response DTO and schema validation contracts for authoritative image workflow and image system APIs
 - application-layer repository/service ports for authoritative persistence, authorization-aware access, validation, compatibility checks, and version resolution
 - application-layer create/update authoring use cases for authoritative image workflow definitions (Story 2.2.3)
 - application-layer create/update authoring use cases for authoritative image system definitions (Story 2.2.4)
+- application-layer query/list use cases for authoritative workflow/system discovery and reopen flows (Story 2.2.5)
 
 ## Purpose
 
@@ -35,9 +36,17 @@ The contract layer in this story focuses on:
 - `src/application/image-workflows/UpdateImageSystemDefinitionUseCase.ts`
 - `src/application/image-workflows/ImageSystemDefinitionAuthoringContracts.ts`
 - `src/application/image-workflows/ImageSystemDefinitionAuthoringErrors.ts`
+- `src/application/image-workflows/GetImageWorkflowDefinitionUseCase.ts`
+- `src/application/image-workflows/ListImageWorkflowDefinitionsUseCase.ts`
+- `src/application/image-workflows/GetImageSystemDefinitionUseCase.ts`
+- `src/application/image-workflows/ListImageSystemDefinitionsUseCase.ts`
+- `src/application/image-workflows/ImageWorkflowSystemQueryContracts.ts`
+- `src/application/image-workflows/ImageWorkflowSystemQueryErrors.ts`
+- `src/application/image-workflows/ImageWorkflowSystemQueryShared.ts`
 - `src/application/image-workflows/tests/ImageWorkflowSystemDefinitionPorts.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
 - `src/application/image-workflows/tests/ImageSystemDefinitionAuthoringUseCases.test.ts`
+- `src/application/image-workflows/tests/ImageWorkflowSystemQueryUseCases.test.ts`
 
 ## Scope and boundary rules
 
@@ -155,6 +164,27 @@ On success, system authoring returns a stable result shape that includes:
 - structural metadata (workflow binding metadata plus required/configured counts)
 
 This preserves clean architecture boundaries while making system authoring reusable by desktop and thin-client surfaces without coupling to run submission/execution internals.
+
+## Story 2.2.5 workflow/system query use cases
+
+Story 2.2.5 introduces authoritative read/list application use cases for workflow/system discovery and reopen behavior:
+
+- `GetImageWorkflowDefinitionUseCase`
+- `ListImageWorkflowDefinitionsUseCase`
+- `GetImageSystemDefinitionUseCase`
+- `ListImageSystemDefinitionsUseCase`
+
+These use cases enforce query-time guardrails:
+
+- required workspace and actor context normalization
+- explicit authorization for list and detail actions (`image-workflow.list`, `image-workflow.read`, `image-system.list`, `image-system.read`)
+- per-item authorization filtering for list results so mixed-visibility resources do not leak
+- repository-driven metadata retrieval (no studio-local state assumptions)
+- typed readiness/detail projections for editor/picker/reopen surfaces
+
+List queries support workspace-scoped filters for ownership, visibility, lifecycle/runtime status, operation kinds, workflow lineage/version selectors, sharing policy, and tags, with bounded pagination and optional search matching over stable definition metadata.
+
+This keeps discovery and reopen paths anchored to authoritative API/application metadata instead of cached studio-only assumptions.
 
 ## Downstream integration guidance
 

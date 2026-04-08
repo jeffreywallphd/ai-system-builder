@@ -13,6 +13,8 @@ The image manipulation vertical slice defines how user intent is represented bef
 
 This note is the reference implementation baseline for later AI capabilities that need the same workflow -> system -> execution contract posture.
 
+Story 2.2.5 extends this baseline with authoritative query/list use cases so workflow/system discovery and reopen flows are driven by persisted platform metadata, not studio-local cache state.
+
 ## Canonical implementation seams
 
 Domain resources:
@@ -133,6 +135,13 @@ Later capabilities should reuse this pattern:
 - define runnable system definitions separately from workflow authoring
 - keep parameter and binding validation in shared contract layers with stable issue codes
 - keep backend/runtime payloads adapter-bounded and derived from authoritative definitions
+
+For discovery/reopen experiences specifically:
+
+- use application read/list use cases as the metadata source for picker/detail surfaces
+- keep workspace + actor scope explicit in every query request
+- treat list results as authorization-filtered, authoritative summaries for reopen targets
+- do not restore systems/workflows from UI-local snapshots when authoritative definitions are available
 
 Do not add new AI capability surfaces that bypass workflow/system contracts via direct runtime payload editing.
 
