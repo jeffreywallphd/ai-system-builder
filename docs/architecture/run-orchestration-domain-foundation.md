@@ -1,110 +1,85 @@
 # Run Orchestration Domain Foundation
 
 ## Scope
-Story 16.1.1 defines the canonical run domain model for authoritative submission and orchestration in AI Loom. This is a domain-and-boundary foundation slice; it does not add queue workers, scheduler infrastructure, or UI workflow changes.
+Story 16.1.1 defines the canonical run domain model for authoritative submission and orchestration in AI Loom.
+Story 4.1.1 extends the domain foundation with a dedicated image-manipulation run model that captures ownership, scope, logical references, lifecycle invariants, execution linkage metadata, and status history for durable orchestration.
 
-Implemented core domain file:
+Implemented core domain files:
 - `src/domain/runs/RunDomain.ts`
+- `src/domain/runs/ImageRunDomain.ts`
 
 Implemented test coverage:
 - `src/domain/runs/tests/RunDomain.test.ts`
+- `src/domain/runs/tests/ImageRunDomain.test.ts`
 
 ## Canonical run concepts
 
-### Identity and submission
-A run is identified by:
-- `runId`
-- `workflowId`
-- optional `workspaceId`
+### Generic authoritative orchestration model
+`RunDomain` remains the cross-vertical orchestration lifecycle model consumed by run submission, queueing, assignment, dispatch, and execution update use cases.
 
-Submission captures authoritative origin metadata:
-- `source`: `ui-manual`, `ui-rerun`, `api`, `schedule-trigger`, `event-trigger`, `internal-orchestrator`
-- `submittedAt`
-- optional actor/request correlation (`submittedByActorId`, `clientRequestId`, `correlationId`)
+### Image run authoritative model
+`ImageRunDomain` defines a vertical-specific authoritative run record for image manipulation:
+- identity: `runId`, `workspaceId`, `ownerUserId`
+- composition references: `systemId`, `workflowId`, optional `workflowTemplateId`
+- logical input asset bindings (`asset:*` canonical IDs)
+- immutable parameter snapshot
+- lifecycle status + status timestamps + status history
+- execution linkage metadata (queue, dispatch, node, adapter)
+- failure summary for failed/degraded/partial outcomes
+- result lineage hooks through output logical asset IDs
+- actor attribution (`createdBy`, `lastModifiedBy`)
 
-### Lifecycle state
-Canonical lifecycle states:
-- `submitted`
+This model keeps domain boundaries clean by avoiding UI state, HTTP/persistence structures, raw backend payloads, and adapter-specific command schemas.
+
+## Image run lifecycle states
+Canonical image run states:
+- `draft`
+- `requested`
+- `validating`
 - `queued`
-- `assignment-pending`
-- `assigned`
 - `dispatching`
 - `running`
-- `cancelling`
-- `retry-pending`
+- `degraded`
+- `partially-completed`
 - `completed`
 - `failed`
 - `cancelled`
 
-Allowed transitions are explicit in `RunLifecycleTransitions` and enforced by:
-- `isRunLifecycleTransitionAllowed(...)`
-- `transitionCanonicalRunRecord(...)`
+Allowed transitions are explicit in `ImageRunLifecycleTransitions` and enforced by:
+- `isImageRunLifecycleTransitionAllowed(...)`
+- `transitionImageRunRecord(...)`
 
-### Queue position semantics
-Queue state uses one bounded model:
-- `queueId`
-- `enteredAt`
-- `position` (`number | null`, where `null` means queued but exact position is undisclosed)
-- `positionAsOf`
-- optional `dequeuedAt`
+## Image run lifecycle invariants
 
-Invariants:
-- `queued` and `assignment-pending` require queue state and must not include `dequeuedAt`.
-- Non-queue-owned states can include queue history only if `dequeuedAt` exists.
-- Position must be positive when present.
+### Ownership and scope invariants
+- Runs require authoritative scope (`workspaceId`) and accountable ownership (`ownerUserId`).
+- Authoring actors are explicit (`createdBy`, `lastModifiedBy`).
 
-### Assignment state
-Assignment status is separate from lifecycle state:
-- `unassigned`
-- `pending`
-- `assigned`
-- `released`
+### Logical reference invariants
+- Input bindings must reference canonical logical assets (`asset:*`) with unique binding IDs.
+- Composition references are system/workflow anchored (`systemId`, `workflowId`) and template-aware (`workflowTemplateId?`).
 
-Invariants enforce required node/timestamp fields per status and state coherence:
-- `assignment-pending` requires assignment status `pending`.
-- `assigned`, `dispatching`, and `running` require assignment status `assigned`.
+### Lifecycle and timestamp invariants
+- Timestamp requirements are status-aware (`requestedAt`, `validatedAt`, `queuedAt`, `dispatchingAt`, `startedAt`, `completedAt`, `failedAt`, `cancelledAt`, `degradedAt`, `partiallyCompletedAt`).
+- Status histories are chronological and must end at the current status.
+- Invalid lifecycle transitions are rejected by domain transition guards.
 
-### Execution outcomes
-Execution outcome is explicit and normalized:
-- `none`
-- `succeeded`
-- `failed`
-- `cancelled`
+### Execution linkage invariants
+- Pre-dispatch states cannot carry adapter/dispatch linkage.
+- Dispatching and execution states require dispatch linkage.
+- Running/degraded/partial/completed states require adapter linkage.
 
-Invariants:
-- Terminal lifecycle states require matching outcomes:
-  - `completed` -> `succeeded`
-  - `failed` -> `failed`
-  - `cancelled` -> `cancelled`
-- Non-terminal states require `none`.
-- Failed outcomes require `errorMessage`.
-
-### Cancellation and retry
-Cancellation has explicit request/acknowledgement metadata:
-- `requestedAt`
-- optional `requestedByActorId`, `reason`, `acknowledgedAt`
-
-Cancellation is only valid in lifecycle states:
-- `cancelling`
-- `cancelled`
-
-Retry has explicit budget state:
-- `attempt`
-- `maxAttempts`
-- optional `previousRunId`, `retryReason`, `queuedAt`
-
-Retry invariants:
-- `attempt <= maxAttempts`
-- `queuedAt` only valid in `retry-pending`
-- `retry-pending` requires remaining budget (`attempt < maxAttempts`)
+### Failure and partial/degraded invariants
+- `failed`, `degraded`, and `partially-completed` states require a failure summary.
+- Failure timestamps and failure summary timing must be coherent.
 
 ## Authoritative orchestration boundary
 
 ### Domain layer (`src/domain/runs`)
 Owns:
-- canonical run vocabulary and invariants
+- canonical lifecycle vocabulary and invariants
 - legal lifecycle transitions
-- queue/assignment/execution/cancel/retry state coherence
+- ownership/scope/reference constraints for authoritative run records
 
 Must not own:
 - scheduling policy selection
@@ -112,18 +87,12 @@ Must not own:
 - transport calls to execution runtimes
 - persistence I/O
 
-### Application layer (future orchestration services/use cases)
+### Application layer (orchestration services/use cases)
 Owns:
-- submission validation orchestration and idempotency checks
+- submission validation and idempotency checks
 - queue admission/dequeue sequencing and assignment decisions
 - dispatch intent creation and lifecycle command sequencing
-- calling domain transition helpers before persistence commits
-
-Must depend on ports for:
-- durable run repositories
-- queue coordination primitives
-- execution adapter invocation
-- authorization/audit services
+- invoking domain transition helpers before persistence commits
 
 ### Infrastructure layer
 Owns:
@@ -147,10 +116,3 @@ Must not own:
 - lifecycle mutation rules
 - queue/assignment truth derivation
 - adapter-specific runtime orchestration logic
-
-## Relationship to existing execution/run history slices
-This foundation does not replace current execution history or workflow run detail slices. It introduces a canonical run orchestration model that future stories can map to:
-- execution-run records (`src/domain/execution/ExecutionRun.ts`)
-- workflow run history records (`src/domain/workflow-studio/WorkflowRunHistoryDomain.ts`)
-
-The canonical run model is the authoritative lifecycle and orchestration-state contract; projection and history models remain valid consumer-oriented views.
