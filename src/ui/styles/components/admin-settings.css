@@ -97,6 +97,33 @@
   border-color: var(--color-border-soft);
 }
 
+.ui-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.ui-checkbox-field input[type="checkbox"] {
+  margin-top: 0.15rem;
+}
+
+.ui-deployment-policy-admin-page__issue-list {
+  margin: 0;
+  padding-left: var(--space-md);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.ui-deployment-policy-admin-page__result {
+  margin: 0;
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  border-radius: var(--radius-md);
+  background: rgba(34, 197, 94, 0.08);
+  padding: var(--space-sm);
+}
+
 @media (max-width: 960px) {
   .ui-security-policy-page__grid,
   .ui-security-policy-page__property-grid,

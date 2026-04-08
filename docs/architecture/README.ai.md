@@ -318,3 +318,6 @@ Use this file as the shortest reliable orientation before reading the human arch
 
 
 
+
+
+- Feature 20.3.2 production-safe admin update workflows for supported profile and override controls with explicit confirmation/validation/result handling and editable vs inspect-only vs unsupported control separation: docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md.

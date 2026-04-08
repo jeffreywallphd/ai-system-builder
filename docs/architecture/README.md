@@ -394,3 +394,6 @@ The runtime is not a single path. The system currently supports multiple executi
 
 
 
+
+
+- Feature 20.3.2 production-safe admin update workflows for supported profile and override controls with explicit confirmation/validation/result handling and editable vs inspect-only vs unsupported control separation: docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md.

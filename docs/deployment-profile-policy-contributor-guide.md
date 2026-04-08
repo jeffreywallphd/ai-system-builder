@@ -15,6 +15,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-authoritative-read-apis.md`
 - `docs/architecture/deployment-profile-policy-authoritative-write-apis.md`
 - `docs/architecture/deployment-profile-policy-admin-ui-read-models.md`
+- `docs/architecture/deployment-profile-policy-admin-safe-update-workflows.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 
@@ -37,9 +38,10 @@ Provide a practical implementation workflow for extending deployment-profile pol
    - `src/shared/dto/deployment/DeploymentPolicyAdministrationDtos.ts`
    - `src/shared/schemas/deployment/DeploymentPolicyAdministrationSchemaContracts.ts`
    - `src/shared/schemas/deployment/DeploymentPolicyWriteSchemaContracts.ts`
-5. Keep admin policy-inspection UI surfaces read-only and projection-driven:
+5. Keep admin policy-inspection and safe-update UI surfaces aligned with shared admin foundations and authoritative API contracts:
    - `src/ui/shared/admin/DeploymentPolicyAdministrationReadModel.ts`
    - `src/ui/services/DeploymentPolicyAdministrationReadService.ts`
+   - `src/ui/services/DeploymentPolicyAdministrationWriteService.ts`
    - `src/ui/pages/DeploymentPolicyAdministrationPage.tsx`
 6. Update `.md` and `.ai.md` docs together and keep architecture discoverability entries current.
 

@@ -38,6 +38,8 @@ export interface DeploymentPolicyEffectiveSettingReadModel {
   readonly effectiveSource: DeploymentPolicyResolutionSource;
   readonly sourceLabel: string;
   readonly provenanceSummary: string;
+  readonly administrationStatus: "editable" | "inspect-only" | "unsupported";
+  readonly administrationStatusReason: string;
   readonly overrideRecord?: DeploymentPolicyOverridePersistenceRecord;
   readonly validationRuleSummary?: string;
 }
@@ -156,6 +158,7 @@ function toEffectiveSettingReadModel(input: {
 }): DeploymentPolicyEffectiveSettingReadModel {
   const settingMetadata = input.metadata?.settings?.[input.settingKey];
   const sourceLabel = toSourceLabel(input.setting.source);
+  const administrationStatus = resolveAdministrationStatus(input.setting.controlMode, input.setting.valueType);
   const provenanceSummary = describeSettingProvenance({
     source: input.setting.source,
     requestedProfileId: input.requestedProfileId,
@@ -175,6 +178,8 @@ function toEffectiveSettingReadModel(input: {
     effectiveSource: input.setting.source,
     sourceLabel,
     provenanceSummary,
+    administrationStatus: administrationStatus.status,
+    administrationStatusReason: administrationStatus.reason,
     overrideRecord: input.overrideRecord,
     validationRuleSummary: summarizeValidationRules(settingMetadata?.validationRules),
   });
@@ -299,4 +304,38 @@ export function toControlModeLabel(controlMode: DeploymentPolicyResolvedSetting[
     return "Profile default (admin overridable)";
   }
   return "Runtime admin";
+}
+
+export function toAdministrationStatusLabel(status: DeploymentPolicyEffectiveSettingReadModel["administrationStatus"]): string {
+  if (status === "editable") {
+    return "Editable";
+  }
+  if (status === "inspect-only") {
+    return "Inspect only";
+  }
+  return "Unsupported";
+}
+
+function resolveAdministrationStatus(
+  controlMode: DeploymentPolicyResolvedSetting["controlMode"],
+  valueType: DeploymentPolicyResolvedSetting["valueType"],
+): { readonly status: DeploymentPolicyEffectiveSettingReadModel["administrationStatus"]; readonly reason: string } {
+  if (controlMode === DeploymentPolicyControlModes.profileFixed) {
+    return Object.freeze({
+      status: "inspect-only",
+      reason: "Profile-fixed policy settings are inspect-only and cannot be changed by admin override operations.",
+    });
+  }
+
+  if (valueType === "string" || valueType === "number" || valueType === "boolean") {
+    return Object.freeze({
+      status: "editable",
+      reason: "Supported setting type and control mode can be updated through authoritative policy-write workflows.",
+    });
+  }
+
+  return Object.freeze({
+    status: "unsupported",
+    reason: "This policy setting type is not supported by current admin-write workflows.",
+  });
 }
