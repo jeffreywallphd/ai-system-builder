@@ -172,3 +172,49 @@ export interface OpenImageAssetOriginalContentStreamApiResponse {
   readonly contentDispositionFileName: string;
   readonly stream: AsyncIterable<Uint8Array>;
 }
+
+export interface RequestImageAssetPreviewApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly representation?: "original" | "gallery" | "thumbnail";
+  readonly preferredMediaTypes?: ReadonlyArray<ImageAssetDetailDto["mediaType"]>;
+  readonly expiresInSeconds?: number;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface RequestImageAssetPreviewApiResponse {
+  readonly preview: {
+    readonly assetId: string;
+    readonly workspaceId: string;
+    readonly representation: "original" | "gallery" | "thumbnail";
+    readonly status: "available" | "pending-generation" | "unavailable";
+    readonly mediaType?: ImageAssetDetailDto["mediaType"];
+    readonly resolvedFrom: "original-fallback" | "derived-preview";
+    readonly access?: {
+      readonly previewToken: string;
+      readonly expiresAt: string;
+      readonly contentEndpoint: string;
+    };
+  };
+}
+
+export interface OpenImageAssetPreviewContentStreamApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly assetId: string;
+  readonly previewToken: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface OpenImageAssetPreviewContentStreamApiResponse {
+  readonly assetId: string;
+  readonly workspaceId: string;
+  readonly mimeType: ImageAssetDetailDto["mediaType"];
+  readonly sizeBytes: number;
+  readonly contentDisposition: "inline";
+  readonly contentDispositionFileName: string;
+  readonly stream: AsyncIterable<Uint8Array>;
+}

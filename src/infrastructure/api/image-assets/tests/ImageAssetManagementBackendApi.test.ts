@@ -134,6 +134,43 @@ describe("ImageAssetManagementBackendApi", () => {
           };
         },
       },
+      requestImageAssetPreviewContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              representation: "gallery" as const,
+              status: "available" as const,
+              mediaType: "image/png" as const,
+              resolvedFrom: "original-fallback" as const,
+              access: Object.freeze({
+                previewToken: "preview-token-001",
+                expiresAt: "2026-04-08T10:10:00.000Z",
+              }),
+            }),
+          };
+        },
+      },
+      openImageAssetPreviewContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              mediaType: "image/png" as const,
+              sizeBytes: 4,
+              contentDisposition: "inline" as const,
+              contentDispositionFileName: "image.png",
+              stream: (async function* bytes() {
+                yield new Uint8Array([5, 6, 7, 8]);
+              })(),
+            }),
+          };
+        },
+      },
       imageAssetStoragePort: {
         async reserveStorageLocation() {
           throw new Error("not used");
@@ -248,6 +285,8 @@ describe("ImageAssetManagementBackendApi", () => {
       getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
       imageAssetStoragePort: {
         async reserveStorageLocation() { throw new Error("not used"); },
         async writeObject() { throw new Error("not used"); },
@@ -301,6 +340,8 @@ describe("ImageAssetManagementBackendApi", () => {
       getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
       getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
       imageAssetStoragePort: {
         async reserveStorageLocation() { throw new Error("not used"); },
         async writeObject() { throw new Error("not used"); },
@@ -369,6 +410,8 @@ describe("ImageAssetManagementBackendApi", () => {
           };
         },
       },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
       imageAssetStoragePort: {
         async reserveStorageLocation() { throw new Error("not used"); },
         async writeObject() { throw new Error("not used"); },
@@ -397,5 +440,94 @@ describe("ImageAssetManagementBackendApi", () => {
       chunks.push(...chunk);
     }
     expect(chunks).toEqual([1, 2, 3, 4]);
+  });
+
+  it("issues preview contracts and opens protected preview content streams", async () => {
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      initiateImageAssetCreationUseCase: { async execute() { throw new Error("not used"); } },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              representation: "thumbnail" as const,
+              status: "available" as const,
+              mediaType: "image/png" as const,
+              resolvedFrom: "original-fallback" as const,
+              access: Object.freeze({
+                previewToken: "preview-token-123",
+                expiresAt: "2026-04-08T10:10:00.000Z",
+              }),
+            }),
+          };
+        },
+      },
+      openImageAssetPreviewContentUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              assetId: "image-asset:001",
+              workspaceId: "workspace-alpha",
+              mediaType: "image/png" as const,
+              sizeBytes: 4,
+              contentDisposition: "inline" as const,
+              contentDispositionFileName: "image.png",
+              stream: (async function* bytes() {
+                yield new Uint8Array([9, 8, 7, 6]);
+              })(),
+            }),
+          };
+        },
+      },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const preview = await backend.requestImageAssetPreview({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      representation: "thumbnail",
+      preferredMediaTypes: ["image/png"],
+    });
+    expect(preview.ok).toBeTrue();
+    if (!preview.ok || !preview.data) {
+      return;
+    }
+    expect(preview.data.preview.status).toBe("available");
+    expect(preview.data.preview.access?.previewToken).toBe("preview-token-123");
+    expect(preview.data.preview.access?.contentEndpoint).toBe("/api/v1/image-assets/image-asset%3A001/preview/content");
+
+    const opened = await backend.openImageAssetPreviewContentStream({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      previewToken: "preview-token-123",
+    });
+    expect(opened.ok).toBeTrue();
+    if (!opened.ok || !opened.data) {
+      return;
+    }
+    expect(opened.data.contentDisposition).toBe("inline");
+
+    const chunks: number[] = [];
+    for await (const chunk of opened.data.stream) {
+      chunks.push(...chunk);
+    }
+    expect(chunks).toEqual([9, 8, 7, 6]);
   });
 });

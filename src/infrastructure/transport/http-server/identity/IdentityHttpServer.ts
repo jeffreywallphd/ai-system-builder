@@ -134,7 +134,9 @@ import {
   type ImageAssetManagementApiResponse,
   type IngestImageAssetUploadContentApiRequest,
   type ListImageAssetMetadataApiRequest,
+  type OpenImageAssetPreviewContentStreamApiRequest,
   type OpenImageAssetOriginalContentStreamApiRequest,
+  type RequestImageAssetPreviewApiRequest,
 } from "../../../api/image-assets/sdk/PublicImageAssetManagementApiContract";
 import {
   RuntimeQueueItemStatuses,
@@ -4047,6 +4049,148 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapImageAssetManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, parsedRequest.data, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/image-assets/")
+        && path.endsWith("/preview/content")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId, assetId, and previewToken are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview/content");
+            const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+            if (!assetId || assetId.includes("/") || !previewToken) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse(
+                "workspaceId, assetId, and previewToken are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const streamRequest: OpenImageAssetPreviewContentStreamApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              assetId,
+              previewToken,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.imageAssetManagementBackendApi.openImageAssetPreviewContentStream(streamRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            if (!apiResponse.ok || !apiResponse.data) {
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+              return;
+            }
+
+            const contentDisposition = buildContentDispositionHeader(
+              apiResponse.data.contentDisposition,
+              apiResponse.data.contentDispositionFileName,
+            );
+            response.statusCode = 200;
+            response.setHeader("content-type", apiResponse.data.mimeType);
+            response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+            response.setHeader("content-disposition", contentDisposition);
+            response.setHeader("x-content-type-options", "nosniff");
+            response.setHeader("cache-control", "private, no-store");
+
+            try {
+              for await (const chunk of apiResponse.data.stream) {
+                const encoded = Buffer.from(chunk);
+                if (!response.write(encoded)) {
+                  await once(response, "drain");
+                }
+              }
+              response.end();
+              logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
+                ok: true,
+                data: Object.freeze({
+                  assetId: apiResponse.data.assetId,
+                  workspaceId: apiResponse.data.workspaceId,
+                  mimeType: apiResponse.data.mimeType,
+                  sizeBytes: apiResponse.data.sizeBytes,
+                }),
+              }));
+            } catch (error) {
+              if (!response.headersSent) {
+                const failed = buildImageAssetManagementInternalErrorResponse(
+                  "Image asset preview stream could not be completed.",
+                );
+                writeJson(response, 500, failed);
+                logResponse(logger, requestId, request, 500, streamRequest, failed);
+                return;
+              }
+              response.destroy(error instanceof Error ? error : undefined);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.imageAssetManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/image-assets/")
+        && path.endsWith("/preview")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and assetId are required.",
+            buildInvalidResponse: buildImageAssetManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const assetId = decodePathTail(path, "/api/v1/image-assets/", "/preview");
+            if (!assetId || assetId.includes("/")) {
+              const invalid = buildImageAssetManagementInvalidRequestResponse("workspaceId and assetId are required.");
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const parsedRequest = parseAndValidateImageAssetPreviewRequest(
+              context.actor.userIdentityId,
+              context.workspace.workspaceId,
+              assetId,
+              searchParams,
+            );
+            if (!parsedRequest.ok) {
+              writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+              logResponse(
+                logger,
+                requestId,
+                request,
+                parsedRequest.statusCode,
+                Object.freeze({ workspaceId: context.workspace.workspaceId, assetId }),
+                parsedRequest.body,
+              );
+              return;
+            }
+
+            const previewRequest: RequestImageAssetPreviewApiRequest = parsedRequest.data;
+            const apiResponse = await options.imageAssetManagementBackendApi.requestImageAssetPreview(previewRequest);
+            const statusCode = mapImageAssetManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, previewRequest, apiResponse);
           },
         );
         return;
@@ -10371,6 +10515,66 @@ async function parseAndValidateImageAssetCompleteRequest(
       assetId,
       uploadSessionId,
     }) as CompleteImageAssetUploadApiRequest,
+  };
+}
+
+function parseAndValidateImageAssetPreviewRequest(
+  actorUserIdentityId: string,
+  workspaceId: string,
+  assetId: string,
+  searchParams: URLSearchParams,
+):
+  | { readonly ok: true; readonly data: RequestImageAssetPreviewApiRequest }
+  | { readonly ok: false; readonly statusCode: number; readonly body: ImageAssetManagementApiResponse<never> } {
+  const representationRaw = normalizeOptionalString(searchParams.get("representation"));
+  const representation = parseOptionalEnum(representationRaw ?? null, [
+    "original",
+    "gallery",
+    "thumbnail",
+  ] as const);
+  if (representationRaw && !representation) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("representation is invalid."),
+    };
+  }
+
+  const preferredMediaTypes = parseOptionalMultiEnumList(
+    searchParams,
+    "preferredMediaType",
+    "preferredMediaTypes",
+    ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif", "image/heic", "image/heif"] as const,
+  );
+  if (!preferredMediaTypes.ok) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("preferredMediaType values are invalid."),
+    };
+  }
+
+  const expiresInSeconds = parseOptionalInteger(searchParams.get("expiresInSeconds"));
+  if (expiresInSeconds !== undefined && expiresInSeconds < 1) {
+    return {
+      ok: false,
+      statusCode: 400,
+      body: buildImageAssetManagementInvalidRequestResponse("expiresInSeconds must be an integer >= 1."),
+    };
+  }
+
+  return {
+    ok: true,
+    data: Object.freeze({
+      actorUserIdentityId,
+      workspaceId,
+      assetId,
+      representation,
+      preferredMediaTypes: preferredMediaTypes.value,
+      expiresInSeconds,
+      correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+      occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+    }),
   };
 }
 

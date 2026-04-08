@@ -14,6 +14,9 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/use-cases/GetImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCase.ts`
+- `src/application/image-assets/use-cases/GetImageAssetPreviewContentUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/RequestImageAssetPreviewContentUseCase.ts`
+- `src/application/image-assets/use-cases/OpenImageAssetPreviewContentUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/ListImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
@@ -23,6 +26,7 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
+- `src/application/image-assets/tests/ImageAssetPreviewContentUseCases.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
@@ -184,3 +188,29 @@ This story adds the authoritative original-content retrieval path for image asse
 - Retrieval uses the managed storage abstraction (`IImageAssetStoragePort.openReadStream`) with `purpose=download-original`; no raw filesystem paths or direct public object URLs are exposed.
 - Upload finalization now persists the authoritative latest original-object reference in repository storage metadata (`latest_object_key`/`latest_object_version_id`) so retrieval resolves through managed storage coordinates instead of host-path shortcuts.
 - HTTP/API transport now streams original content through protected server endpoints with safe headers (`content-type`, `content-length`, `content-disposition`, `x-content-type-options`, `cache-control`) and no storage-layout leakage in API payloads.
+
+## Story 1.3.3: preview-safe request/open contracts and API behavior
+
+This story adds the initial protected preview retrieval contracts and server behavior:
+
+- New preview contracts define request and open operations with:
+  - logical asset identity
+  - requested representation (`original`, `gallery`, `thumbnail`)
+  - preferred media types
+  - preview availability status (`available`, `pending-generation`, `unavailable`)
+- `RequestImageAssetPreviewContentUseCase` now:
+  - validates preview request input
+  - enforces active workspace membership and `request-preview` policy checks before resolution
+  - resolves logical asset existence/lifecycle before issuing preview access
+  - returns original-as-preview fallback when compatible
+  - returns pending-generation when requested representation/media is not yet derivable
+  - mints opaque preview tokens through managed storage access-handle seams
+- `OpenImageAssetPreviewContentUseCase` now:
+  - validates tokenized preview-open requests
+  - rechecks workspace membership + preview authorization
+  - resolves logical asset prior to read
+  - opens content only through managed storage read seams with `purpose=inline-preview`
+- Server API now exposes:
+  - `GET /api/v1/image-assets/:assetId/preview`
+  - `GET /api/v1/image-assets/:assetId/preview/content`
+- Responses avoid raw storage layout leakage and keep preview retrieval server-authoritative and token-mediated.

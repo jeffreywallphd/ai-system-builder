@@ -6,6 +6,11 @@ import type { IFinalizeImageAssetUploadUseCase } from "@application/image-assets
 import { ImageAssetUploadFinalizationErrorCodes } from "@application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts";
 import type { IGetImageAssetOriginalContentUseCase } from "@application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts";
 import { ImageAssetOriginalContentReadErrorCodes } from "@application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts";
+import type {
+  IOpenImageAssetPreviewContentUseCase,
+  IRequestImageAssetPreviewContentUseCase,
+} from "@application/image-assets/use-cases/GetImageAssetPreviewContentUseCaseContracts";
+import { ImageAssetPreviewContentReadErrorCodes } from "@application/image-assets/use-cases/GetImageAssetPreviewContentUseCaseContracts";
 import type { IGetImageAssetMetadataUseCase, IListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ImageAssetMetadataReadUseCaseContracts";
 import { ImageAssetMetadataReadErrorCodes } from "@application/image-assets/use-cases/ImageAssetMetadataReadUseCaseContracts";
 import type { IInitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/ImageAssetCreationUseCaseContracts";
@@ -33,8 +38,12 @@ import {
   type IngestImageAssetUploadContentApiResponse,
   type ListImageAssetMetadataApiRequest,
   type ListImageAssetMetadataApiResponse,
+  type OpenImageAssetPreviewContentStreamApiRequest,
+  type OpenImageAssetPreviewContentStreamApiResponse,
   type OpenImageAssetOriginalContentStreamApiRequest,
   type OpenImageAssetOriginalContentStreamApiResponse,
+  type RequestImageAssetPreviewApiRequest,
+  type RequestImageAssetPreviewApiResponse,
 } from "./sdk/PublicImageAssetManagementApiContract";
 
 interface ImageAssetUploadSessionTokenPayload {
@@ -52,6 +61,8 @@ export interface ImageAssetManagementBackendApiDependencies {
   readonly getImageAssetMetadataUseCase: IGetImageAssetMetadataUseCase;
   readonly listImageAssetMetadataUseCase: IListImageAssetMetadataUseCase;
   readonly getImageAssetOriginalContentUseCase: IGetImageAssetOriginalContentUseCase;
+  readonly requestImageAssetPreviewContentUseCase: IRequestImageAssetPreviewContentUseCase;
+  readonly openImageAssetPreviewContentUseCase: IOpenImageAssetPreviewContentUseCase;
   readonly imageAssetStoragePort: IImageAssetStoragePort;
   readonly uploadSessionTokenSecret: string;
   readonly clock?: {
@@ -346,6 +357,84 @@ export class ImageAssetManagementBackendApi {
     };
   }
 
+  public async requestImageAssetPreview(
+    request: RequestImageAssetPreviewApiRequest,
+  ): Promise<ImageAssetManagementApiResponse<RequestImageAssetPreviewApiResponse>> {
+    const actorUserId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserId) {
+      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const outcome = await this.dependencies.requestImageAssetPreviewContentUseCase.execute({
+      actorUserId,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      representation: request.representation,
+      preferredMediaTypes: request.preferredMediaTypes,
+      expiresInSeconds: request.expiresInSeconds,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        preview: Object.freeze({
+          assetId: outcome.value.assetId,
+          workspaceId: outcome.value.workspaceId,
+          representation: outcome.value.representation,
+          status: outcome.value.status,
+          mediaType: outcome.value.mediaType,
+          resolvedFrom: outcome.value.resolvedFrom,
+          access: outcome.value.access
+            ? Object.freeze({
+              previewToken: outcome.value.access.previewToken,
+              expiresAt: outcome.value.access.expiresAt,
+              contentEndpoint: `/api/v1/image-assets/${encodeURIComponent(outcome.value.assetId)}/preview/content`,
+            })
+            : undefined,
+        }),
+      }),
+    };
+  }
+
+  public async openImageAssetPreviewContentStream(
+    request: OpenImageAssetPreviewContentStreamApiRequest,
+  ): Promise<ImageAssetManagementApiResponse<OpenImageAssetPreviewContentStreamApiResponse>> {
+    const actorUserId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserId) {
+      return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, "actorUserIdentityId is required.");
+    }
+
+    const outcome = await this.dependencies.openImageAssetPreviewContentUseCase.execute({
+      actorUserId,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      previewToken: request.previewToken,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromPreviewContentReadError(outcome.error.code, outcome.error.message, outcome.error.details);
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        assetId: outcome.value.assetId,
+        workspaceId: outcome.value.workspaceId,
+        mimeType: outcome.value.mediaType,
+        sizeBytes: outcome.value.sizeBytes,
+        contentDisposition: outcome.value.contentDisposition,
+        contentDispositionFileName: outcome.value.contentDispositionFileName,
+        stream: outcome.value.stream,
+      }),
+    };
+  }
+
   private createUploadSessionToken(payload: ImageAssetUploadSessionTokenPayload): string {
     const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
     const signature = createHmac("sha256", this.uploadSessionTokenSecret)
@@ -463,6 +552,26 @@ export class ImageAssetManagementBackendApi {
         return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
       case ImageAssetOriginalContentReadErrorCodes.invalidState:
       case ImageAssetOriginalContentReadErrorCodes.contentUnavailable:
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
+      default:
+        return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);
+    }
+  }
+
+  private failedFromPreviewContentReadError(
+    code: typeof ImageAssetPreviewContentReadErrorCodes[keyof typeof ImageAssetPreviewContentReadErrorCodes],
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): ImageAssetManagementApiResponse<never> {
+    switch (code) {
+      case ImageAssetPreviewContentReadErrorCodes.invalidRequest:
+        return this.failed(ImageAssetManagementApiErrorCodes.invalidRequest, message, details);
+      case ImageAssetPreviewContentReadErrorCodes.accessDenied:
+        return this.failed(ImageAssetManagementApiErrorCodes.forbidden, message, details);
+      case ImageAssetPreviewContentReadErrorCodes.notFound:
+        return this.failed(ImageAssetManagementApiErrorCodes.notFound, message, details);
+      case ImageAssetPreviewContentReadErrorCodes.invalidState:
+      case ImageAssetPreviewContentReadErrorCodes.contentUnavailable:
         return this.failed(ImageAssetManagementApiErrorCodes.invalidState, message, details);
       default:
         return this.failed(ImageAssetManagementApiErrorCodes.internal, message, details);

@@ -16,6 +16,9 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/use-cases/GetImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCaseContracts.ts`
 - `src/application/image-assets/use-cases/GetImageAssetOriginalContentUseCase.ts`
+- `src/application/image-assets/use-cases/GetImageAssetPreviewContentUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/RequestImageAssetPreviewContentUseCase.ts`
+- `src/application/image-assets/use-cases/OpenImageAssetPreviewContentUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/ListImageAssetMetadataUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
@@ -25,6 +28,7 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
+- `src/application/image-assets/tests/ImageAssetPreviewContentUseCases.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
@@ -187,3 +191,29 @@ Protected original-content retrieval is now implemented through authoritative ap
 - Retrieval opens content only through `IImageAssetStoragePort.openReadStream` with `purpose=download-original` and logical storage references.
 - Upload finalization now persists authoritative original-object pointers (`latest_object_key`, `latest_object_version_id`) through repository seams so later reads do not rely on path reconstruction shortcuts.
 - HTTP/API transport now streams original bytes through protected server routes with safe content headers and private/no-store cache semantics, without exposing raw filesystem paths or direct storage URLs.
+
+## Story 1.3.3 implementation scope
+
+Preview-safe retrieval now has authoritative request/open contracts and initial API behavior:
+
+- Added `GetImageAssetPreviewContentUseCaseContracts` with preview request/open DTOs that identify:
+  - logical asset id
+  - desired preview representation (`original`, `gallery`, `thumbnail`)
+  - preferred media types
+  - preview availability status (`available`, `pending-generation`, `unavailable`)
+- Added `RequestImageAssetPreviewContentUseCase`:
+  - validates request contracts
+  - enforces active workspace membership and policy (`request-preview`) before preview resolution
+  - resolves image asset and lifecycle state before issuing any preview access
+  - uses original-content fallback as the initial preview representation when compatible
+  - returns pending-generation status when preferred representation/media is not yet available
+  - issues opaque preview access tokens through `IImageAssetStoragePort.createAccessHandle`
+- Added `OpenImageAssetPreviewContentUseCase`:
+  - validates preview token request contracts
+  - revalidates workspace membership and preview authorization
+  - resolves logical asset before opening content
+  - opens content only through `IImageAssetStoragePort.openReadStream` with `purpose=inline-preview`
+- API/transport behavior now includes:
+  - `GET /api/v1/image-assets/:assetId/preview` (request preview contract + availability/access response)
+  - `GET /api/v1/image-assets/:assetId/preview/content` (tokenized preview stream open)
+- Preview API responses expose only contract-safe fields (representation/status/media/token/expiry/endpoint) and do not expose raw storage object layout.

@@ -99,6 +99,13 @@ Story 1.3.2 extension:
 - authorization checks execute before any content stream open/read call
 - upload finalization persists managed-storage original object references for retrieval; no raw filesystem paths or direct storage URLs are exposed
 
+Story 1.3.3 extension:
+
+- preview retrieval now has dedicated request/open application seams with representation-aware request contracts and tokenized preview-stream access
+- preview authorization and logical asset resolution execute before preview bytes are served
+- initial preview behavior uses original-as-preview fallback where appropriate, and emits `pending-generation`/`unavailable` statuses for future derivation without API breakage
+- server routing now includes `GET /api/v1/image-assets/:assetId/preview` and `GET /api/v1/image-assets/:assetId/preview/content`
+
 ## Decision 6: preview-safe access and generated outputs are first-class
 
 The architecture treats preview and generated outputs as normal protected asset flows:
@@ -132,6 +139,7 @@ When extending image ingestion/retrieval:
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
+- `src/application/image-assets/tests/ImageAssetPreviewContentUseCases.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`

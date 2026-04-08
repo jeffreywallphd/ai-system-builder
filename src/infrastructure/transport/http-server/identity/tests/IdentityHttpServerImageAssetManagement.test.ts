@@ -154,6 +154,43 @@ async function startServer(): Promise<string> {
         };
       },
     },
+    requestImageAssetPreviewContentUseCase: {
+      async execute() {
+        return {
+          ok: true as const,
+          value: Object.freeze({
+            assetId: "image-asset:001",
+            workspaceId: "workspace-alpha",
+            representation: "gallery" as const,
+            status: "available" as const,
+            mediaType: "image/png" as const,
+            resolvedFrom: "original-fallback" as const,
+            access: Object.freeze({
+              previewToken: "preview-token-http-001",
+              expiresAt: "2026-04-08T12:10:00.000Z",
+            }),
+          }),
+        };
+      },
+    },
+    openImageAssetPreviewContentUseCase: {
+      async execute() {
+        return {
+          ok: true as const,
+          value: Object.freeze({
+            assetId: "image-asset:001",
+            workspaceId: "workspace-alpha",
+            mediaType: "image/png" as const,
+            sizeBytes: 5,
+            contentDisposition: "inline" as const,
+            contentDispositionFileName: "image.png",
+            stream: (async function* stream() {
+              yield Buffer.from("hello", "utf8");
+            })(),
+          }),
+        };
+      },
+    },
     imageAssetStoragePort: {
       async reserveStorageLocation() {
         throw new Error("not used");
@@ -320,5 +357,26 @@ describe("IdentityHttpServer image asset management routes", () => {
     expect(original.headers.get("content-type")).toBe("image/png");
     expect(original.headers.get("content-disposition")).toContain("attachment");
     expect(await original.text()).toBe("hello");
+
+    const preview = await fetch(`${baseUrl}/api/v1/image-assets/image-asset%3A001/preview?workspaceId=workspace-alpha&representation=gallery&preferredMediaType=image%2Fpng`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json();
+    expect(previewBody.ok).toBe(true);
+    expect(previewBody.data.preview.status).toBe("available");
+    expect(previewBody.data.preview.access.previewToken).toBe("preview-token-http-001");
+
+    const previewContent = await fetch(`${baseUrl}/api/v1/image-assets/image-asset%3A001/preview/content?workspaceId=workspace-alpha&previewToken=preview-token-http-001`, {
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+    expect(previewContent.status).toBe(200);
+    expect(previewContent.headers.get("content-type")).toBe("image/png");
+    expect(previewContent.headers.get("content-disposition")).toContain("inline");
+    expect(await previewContent.text()).toBe("hello");
   });
 });

@@ -41,6 +41,13 @@ Story 1.3.2 addition:
 - Authorization checks execute before storage stream reads.
 - Finalization now persists authoritative original object references for later managed retrieval without exposing raw filesystem/object-layout details.
 
+Story 1.3.3 addition:
+
+- Preview retrieval now uses explicit request/open contracts (`RequestImageAssetPreviewContentUseCase`, `OpenImageAssetPreviewContentUseCase`) with representation-aware request shapes and tokenized preview stream access.
+- Preview authorization and logical asset resolution execute before any preview stream is opened.
+- Initial preview behavior uses original-as-preview fallback when compatible and returns `pending-generation`/`unavailable` statuses for future derivation workflows without changing API contracts.
+- Identity HTTP routes now include `GET /api/v1/image-assets/:assetId/preview` and `GET /api/v1/image-assets/:assetId/preview/content`, both server-mediated and storage-layout safe.
+
 ## Extension guardrails
 
 - Do not introduce path-based local bypasses for upload, preview, or retrieval.
@@ -59,6 +66,7 @@ Story 1.3.2 addition:
 - `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetMetadataUseCase.test.ts`
 - `src/application/image-assets/tests/GetImageAssetOriginalContentUseCase.test.ts`
+- `src/application/image-assets/tests/ImageAssetPreviewContentUseCases.test.ts`
 - `src/application/image-assets/tests/ListImageAssetMetadataUseCase.test.ts`
 - `src/infrastructure/storage/image-assets/tests/ManagedImageAssetStorageAdapter.test.ts`
 - `src/infrastructure/api/image-assets/tests/ImageAssetManagementBackendApi.test.ts`

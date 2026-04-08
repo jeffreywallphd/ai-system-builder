@@ -1,0 +1,241 @@
+import {
+  ResourceOwnershipScopes,
+  ResourceVisibilities,
+} from "@domain/authorization/AuthorizationDomain";
+import { ImageAssetStatuses, type ImageAsset } from "@domain/image-assets/ImageAssetDomain";
+import { WorkspaceMembershipStatuses, WorkspaceRoles } from "@domain/workspaces/WorkspaceDomain";
+import type { IAuthorizationPolicyDecisionEvaluator } from "@application/authorization/ports/IAuthorizationPolicyDecisionEvaluator";
+import type { IWorkspaceAuthorizationReadRepository } from "@application/workspaces/ports/IWorkspaceAuthorizationReadRepository";
+import {
+  ImageAssetAccessActions,
+  createImageAssetAuthorizationResourceContext,
+  toImageAssetPolicyDecisionEvaluationRequest,
+} from "@shared/contracts/assets/ImageAssetAuthorizationContracts";
+import type { IImageAssetRepository } from "../ports/IImageAssetRepository";
+import {
+  ImageAssetStorageAccessPurposes,
+  isImageAssetStorageError,
+  type IImageAssetStoragePort,
+} from "../ports/ImageAssetStoragePort";
+import {
+  ImageAssetPreviewContentReadErrorCodes,
+  validateOpenImageAssetPreviewContentRequest,
+  type IOpenImageAssetPreviewContentUseCase,
+  type ImageAssetPreviewContentReadResult,
+  type OpenImageAssetPreviewContentRequest,
+  type OpenImageAssetPreviewContentSuccess,
+} from "./GetImageAssetPreviewContentUseCaseContracts";
+
+export interface OpenImageAssetPreviewContentUseCaseDependencies {
+  readonly imageAssetRepository: IImageAssetRepository;
+  readonly imageAssetStoragePort: IImageAssetStoragePort;
+  readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
+  readonly authorizationPolicyDecisionEvaluator?: IAuthorizationPolicyDecisionEvaluator;
+  readonly clock?: {
+    now(): Date;
+  };
+}
+
+export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPreviewContentUseCase {
+  private readonly clock: { now(): Date };
+
+  public constructor(
+    private readonly dependencies: OpenImageAssetPreviewContentUseCaseDependencies,
+  ) {
+    this.clock = dependencies.clock ?? {
+      now: () => new Date(),
+    };
+  }
+
+  public async execute(
+    input: OpenImageAssetPreviewContentRequest,
+  ): Promise<ImageAssetPreviewContentReadResult<OpenImageAssetPreviewContentSuccess>> {
+    let request: OpenImageAssetPreviewContentRequest;
+    try {
+      request = validateOpenImageAssetPreviewContentRequest(input);
+    } catch (error) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.invalidRequest,
+        error instanceof Error ? error.message : "Invalid image asset preview content request.",
+      );
+    }
+
+    const occurredAt = request.occurredAt ?? this.clock.now().toISOString();
+    const authorization = await this.resolveWorkspaceAuthorization(
+      request.workspaceId,
+      request.actorUserId,
+      occurredAt,
+    );
+    if (!authorization.isAuthorized) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.accessDenied,
+        "Image asset preview retrieval requires active workspace membership.",
+      );
+    }
+
+    const imageAsset = await this.dependencies.imageAssetRepository.findImageAssetById(request.assetId, {
+      includeDeleted: true,
+    });
+    if (!imageAsset || imageAsset.workspaceId !== request.workspaceId || imageAsset.lifecycle.status === ImageAssetStatuses.deleted) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.notFound,
+        "Image asset was not found for the workspace.",
+      );
+    }
+
+    if (imageAsset.lifecycle.status !== ImageAssetStatuses.available && imageAsset.lifecycle.status !== ImageAssetStatuses.archived) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.invalidState,
+        `Image asset '${imageAsset.assetId}' is not available for preview retrieval.`,
+      );
+    }
+
+    const allowed = await this.canRequestPreview(imageAsset, request.actorUserId, occurredAt, authorization.isWorkspaceAdmin);
+    if (!allowed) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.notFound,
+        "Image asset was not found for the workspace.",
+      );
+    }
+
+    const claims = await this.dependencies.imageAssetStoragePort.resolveAccessHandle({
+      handleToken: request.previewToken,
+      workspaceId: request.workspaceId,
+      assetId: request.assetId,
+      actorUserId: request.actorUserId,
+      occurredAt,
+    });
+    if (!claims || claims.purpose !== ImageAssetStorageAccessPurposes.inlinePreview) {
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.notFound,
+        "Image asset preview was not found.",
+      );
+    }
+
+    try {
+      const opened = await this.dependencies.imageAssetStoragePort.openReadStream({
+        workspaceId: request.workspaceId,
+        assetId: request.assetId,
+        actorUserId: request.actorUserId,
+        purpose: ImageAssetStorageAccessPurposes.inlinePreview,
+        reference: claims.reference,
+      });
+
+      return {
+        ok: true,
+        value: Object.freeze({
+          assetId: imageAsset.assetId,
+          workspaceId: imageAsset.workspaceId,
+          mediaType: imageAsset.mediaType,
+          sizeBytes: opened.sizeBytes,
+          contentDisposition: "inline",
+          contentDispositionFileName: imageAsset.originalFilename,
+          stream: opened.stream,
+        }),
+      };
+    } catch (error) {
+      if (isImageAssetStorageError(error)) {
+        return this.failure(
+          ImageAssetPreviewContentReadErrorCodes.contentUnavailable,
+          "Image asset preview is not currently available.",
+        );
+      }
+      return this.failure(
+        ImageAssetPreviewContentReadErrorCodes.internal,
+        error instanceof Error ? error.message : "Image asset preview retrieval failed.",
+      );
+    }
+  }
+
+  private async canRequestPreview(
+    imageAsset: ImageAsset,
+    actorUserId: string,
+    occurredAt: string,
+    isWorkspaceAdmin: boolean,
+  ): Promise<boolean> {
+    const evaluator = this.dependencies.authorizationPolicyDecisionEvaluator;
+    if (!evaluator) {
+      if (imageAsset.visibility === ResourceVisibilities.private) {
+        return imageAsset.ownerUserId === actorUserId || isWorkspaceAdmin;
+      }
+      return true;
+    }
+
+    const ownershipScope = imageAsset.ownerUserId
+      ? ResourceOwnershipScopes.userPrivate
+      : ResourceOwnershipScopes.workspace;
+    const publishedAt = imageAsset.visibility === ResourceVisibilities.published
+      ? imageAsset.lifecycle.ingestedAt ?? imageAsset.updatedAt
+      : undefined;
+
+    const resource = createImageAssetAuthorizationResourceContext({
+      assetId: imageAsset.assetId,
+      workspaceId: imageAsset.workspaceId,
+      ownershipScope,
+      ownerUserIdentityId: imageAsset.ownerUserId,
+      visibility: imageAsset.visibility,
+      sharingPolicyMode: imageAsset.sharingPolicy.mode,
+      sharingPolicyId: imageAsset.sharingPolicy.policyId,
+      sharingPolicyVersion: imageAsset.sharingPolicy.policyVersion,
+      allowResharing: false,
+      isPublishedCapable: imageAsset.visibility === ResourceVisibilities.published,
+      publishedAt,
+    });
+
+    const decision = await evaluator.evaluateDecision(
+      toImageAssetPolicyDecisionEvaluationRequest({
+        action: ImageAssetAccessActions.requestPreview,
+        actor: {
+          actorUserIdentityId: actorUserId,
+          activeWorkspaceId: imageAsset.workspaceId,
+        },
+        workspaceId: imageAsset.workspaceId,
+        resource,
+        asOf: occurredAt,
+      }),
+    );
+
+    return decision.decision.isAllowed;
+  }
+
+  private async resolveWorkspaceAuthorization(
+    workspaceId: string,
+    actorUserIdentityId: string,
+    occurredAt?: string,
+  ): Promise<{ readonly isAuthorized: boolean; readonly isWorkspaceAdmin: boolean }> {
+    const snapshot = await this.dependencies.workspaceAuthorizationReadRepository.getWorkspaceAuthorizationSnapshot({
+      workspaceId,
+      userIdentityId: actorUserIdentityId,
+      asOf: occurredAt,
+    });
+    if (!snapshot) {
+      return Object.freeze({ isAuthorized: false, isWorkspaceAdmin: false });
+    }
+
+    const isActiveMember = snapshot.isWorkspaceOwner
+      || snapshot.membership?.status === WorkspaceMembershipStatuses.active;
+    const isWorkspaceAdmin = snapshot.isWorkspaceOwner
+      || snapshot.effectiveRoles.includes(WorkspaceRoles.owner)
+      || snapshot.effectiveRoles.includes(WorkspaceRoles.admin);
+
+    return Object.freeze({
+      isAuthorized: isActiveMember,
+      isWorkspaceAdmin,
+    });
+  }
+
+  private failure(
+    code: typeof ImageAssetPreviewContentReadErrorCodes[keyof typeof ImageAssetPreviewContentReadErrorCodes],
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): ImageAssetPreviewContentReadResult<never> {
+    return {
+      ok: false,
+      error: Object.freeze({
+        code,
+        message,
+        details,
+      }),
+    };
+  }
+}
