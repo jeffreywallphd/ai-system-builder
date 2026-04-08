@@ -17,6 +17,7 @@ import { createBrowserImageUploadIngestionAdapter } from "../assets/image-system
 import { ImageUploadPanel } from "../assets/image-system/ImageUploadPanel";
 import { ImageGallerySlider } from "../assets/image-system/ImageGallerySlider";
 import { ImagePreviewPanel } from "../assets/image-system/ImagePreviewPanel";
+import { ImageRenderFrame } from "../assets/image-system/ImageRenderFrame";
 import { ImageStatusNotice } from "../assets/image-system/ImageStatusNotice";
 import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/ImageOutputGalleryDataAdapter";
 import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
@@ -60,6 +61,7 @@ import type {
   HydratedRuntimeDatasetBinding,
   SystemRuntimeHydratedState,
 } from "../../runtime/SystemRuntimeWindowHydrationService";
+import type { ImageRunHistoryRecord } from "@application/system-runtime/ImageRunHistoryDataContract";
 import {
   ImageManipulationRuntimeDatasetBindingService,
   type ImageManipulationSelectionSnapshot,
@@ -317,6 +319,53 @@ function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["stat
 
 function resolveRunStatusMessage(runLifecycle: ImageManipulationRunLifecycleSnapshot, fallbackStatusMessage?: string): string {
   return runLifecycle.message ?? fallbackStatusMessage ?? "Adjust your settings, then create a new image.";
+}
+
+function resolveHistoryRunBadgeTone(
+  status: ImageRunHistoryRecord["status"] | undefined,
+): "neutral" | "success" | "warning" | "danger" {
+  if (!status) {
+    return "neutral";
+  }
+  if (status === "completed") {
+    return "success";
+  }
+  if (status === "failed") {
+    return "danger";
+  }
+  if (status === "partial" || status === "running" || status === "queued") {
+    return "warning";
+  }
+  return "neutral";
+}
+
+export function resolveLinkedRunForSelectedOutput(input: {
+  readonly selectedOutputItem?: OutputGalleryItem;
+  readonly runHistory: ReadonlyArray<ImageRunHistoryRecord>;
+  readonly activeRunId?: string;
+}): ImageRunHistoryRecord | undefined {
+  const workflowRunId = input.selectedOutputItem?.workflow?.workflowRunId?.trim();
+  if (workflowRunId) {
+    const byRunId = input.runHistory.find((run) => run.runId === workflowRunId);
+    if (byRunId) {
+      return byRunId;
+    }
+    const byExecutionId = input.runHistory.find((run) => run.workflowExecutionId === workflowRunId);
+    if (byExecutionId) {
+      return byExecutionId;
+    }
+  }
+
+  if (input.activeRunId?.trim()) {
+    const byActiveRunId = input.runHistory.find((run) => (
+      run.runId === input.activeRunId || run.workflowExecutionId === input.activeRunId
+    ));
+    if (byActiveRunId) {
+      return byActiveRunId;
+    }
+  }
+
+  return undefined;
 }
 
 function toFriendlyValidationMessage(path: string): string {
@@ -645,6 +694,10 @@ export function ImageManipulationRuntimeEditorPanel({
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
   const [activeRunStatus, setActiveRunStatus] = useState<RuntimeSdkExecutionStatusResponse | undefined>();
+  const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
+  const [isLoadingRunHistory, setIsLoadingRunHistory] = useState(false);
+  const [runHistoryError, setRunHistoryError] = useState<string | undefined>();
+  const [isResultQuickActionPending, setIsResultQuickActionPending] = useState<"source" | "reference" | undefined>();
   const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
   const [isCheckingExecutionReadiness, setIsCheckingExecutionReadiness] = useState(false);
@@ -1136,9 +1189,39 @@ export function ImageManipulationRuntimeEditorPanel({
     });
   };
 
+  const loadRunHistory = (): Promise<ReadonlyArray<ImageRunHistoryRecord>> => {
+    if (!draft?.draftId) {
+      setRunHistory(Object.freeze([]));
+      setRunHistoryError(undefined);
+      return Promise.resolve(Object.freeze([]));
+    }
+    setIsLoadingRunHistory(true);
+    setRunHistoryError(undefined);
+    return studioShell.listReferenceImageRunHistory({
+      studioId: context.studioId,
+      draftId: draft.draftId,
+      limit: 20,
+      offset: 0,
+    }).then((response) => {
+      if (!response.ok || !response.data) {
+        setRunHistory(Object.freeze([]));
+        setRunHistoryError(response.error?.message ?? "We couldn't load run history.");
+        return Object.freeze([]);
+      }
+      setRunHistory(response.data.runs);
+      return response.data.runs;
+    }).finally(() => {
+      setIsLoadingRunHistory(false);
+    });
+  };
+
   useEffect(() => {
     void loadCollections({ hydration: true });
   }, [draft?.draftId, roleBindings.sourceBindingId, roleBindings.outputBindingId, roleBindings.referenceBindingId]);
+
+  useEffect(() => {
+    void loadRunHistory();
+  }, [draft?.draftId]);
 
   useEffect(() => {
     void loadRecentAssets();
@@ -1327,6 +1410,79 @@ export function ImageManipulationRuntimeEditorPanel({
   const runDisabled = isRunInProgress
     || isCheckingExecutionReadiness
     || hasLaunchBlockingIssues;
+  const selectedOutputViewModel = selectedOutputItem
+    ? mapItemsToDisplayViewModels([selectedOutputItem], "output")[0]
+    : undefined;
+  const selectedSourceViewModel = selectedSourceItem
+    ? mapItemsToDisplayViewModels([selectedSourceItem], "source")[0]
+    : undefined;
+  const linkedRun = resolveLinkedRunForSelectedOutput({
+    selectedOutputItem,
+    runHistory,
+    activeRunId,
+  });
+  const linkedRunStatusTone = resolveHistoryRunBadgeTone(linkedRun?.status);
+  const runStatusBadgeClassName = linkedRunStatusTone === "success"
+    ? "ui-badge ui-badge--success"
+    : linkedRunStatusTone === "warning"
+      ? "ui-badge ui-badge--warning"
+      : linkedRunStatusTone === "danger"
+        ? "ui-badge ui-badge--danger"
+        : "ui-badge ui-badge--neutral";
+  const quickActionDisabled = !selectedOutputItem || isResultQuickActionPending !== undefined;
+
+  const chainOutputForReuse = async (
+    targetDatasetBindingId: Extract<ReferenceImageDatasetBindingId, "input-image-dataset" | "reference-image-dataset">,
+  ): Promise<void> => {
+    if (!selectedOutputItem || !draft?.draftId) {
+      return;
+    }
+    setStatusMessage(undefined);
+    setIsResultQuickActionPending(targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
+    try {
+      const chained = await studioShell.chainReferenceImageDatasetItemToInput({
+        studioId: context.studioId,
+        draftId: draft.draftId,
+        sourceDatasetBindingId: "output-image-dataset",
+        sourceRecordId: selectedOutputItem.image.recordId,
+        targetDatasetBindingId,
+      });
+      if (!chained.ok || !chained.data) {
+        setStatusMessage(chained.error?.message ?? "Couldn't reuse this result.");
+        return;
+      }
+
+      if (targetDatasetBindingId === "input-image-dataset") {
+        setDatasetInstanceId(chained.data.target.datasetInstanceId);
+        setSelection((current) => setRoleSelection(current, {
+          role: "source",
+          recordId: chained.data.target.recordId,
+          syncPreviewRole: true,
+        }));
+      } else {
+        setSelection((current) => setRoleSelection(current, {
+          role: "reference",
+          recordId: chained.data.target.recordId,
+          syncPreviewRole: true,
+        }));
+      }
+
+      await loadCollections({
+        preferredSourceRecordId: targetDatasetBindingId === "input-image-dataset"
+          ? chained.data.target.recordId
+          : undefined,
+        preferredReferenceRecordId: targetDatasetBindingId === "reference-image-dataset"
+          ? chained.data.target.recordId
+          : undefined,
+      });
+
+      setStatusMessage(targetDatasetBindingId === "input-image-dataset"
+        ? "Result prepared as your next source photo."
+        : "Result prepared as your face reference photo.");
+    } finally {
+      setIsResultQuickActionPending(undefined);
+    }
+  };
 
   return (
     <section className="ui-image-editor-page ui-stack ui-stack--sm">
@@ -2045,7 +2201,10 @@ export function ImageManipulationRuntimeEditorPanel({
                       userLabel: "Refreshing",
                     }),
                   ]));
-                  await loadCollections({ preferLatestOutput: true });
+                  await Promise.all([
+                    loadCollections({ preferLatestOutput: true }),
+                    loadRunHistory(),
+                  ]);
                   setSelection((current) => setActivePreviewRole(current, "output"));
                   setFlowSteps((current) => Object.freeze(current.map((step) => (
                     step.stepId === "refresh"
@@ -2200,6 +2359,134 @@ export function ImageManipulationRuntimeEditorPanel({
             emptyMessage="Select a source, result, or face reference image to preview it here."
             unavailableMessage="This image is currently unavailable."
           />
+          <section className="ui-image-surface ui-image-editor-page__result-review-panel" data-testid="image-result-review-panel">
+            <header className="ui-image-surface__header ui-image-editor-page__result-review-header">
+              <div className="ui-stack ui-stack--2xs">
+                <h3 className="ui-image-surface__title">Result review</h3>
+                <span className="ui-text-small ui-text-secondary">Before and after</span>
+              </div>
+              <div className="ui-row ui-row--xs ui-image-editor-page__result-review-badges">
+                <span className={`ui-badge ${selectedOutputItem ? "ui-badge--success" : "ui-badge--neutral"}`}>
+                  {selectedOutputItem ? "Result selected" : "No result yet"}
+                </span>
+                <span className={runStatusBadgeClassName}>
+                  {linkedRun?.status ?? "run link unavailable"}
+                </span>
+              </div>
+            </header>
+            {!selectedOutputItem ? (
+              <ImageStatusNotice
+                title="No result selected"
+                message="Create an image to review it here with before/after context."
+              />
+            ) : (
+              <div className="ui-stack ui-stack--xs">
+                <div className="ui-image-editor-page__before-after-grid">
+                  <article className="ui-stack ui-stack--2xs">
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>Before (source)</p>
+                    {selectedSourceViewModel ? (
+                      <ImageRenderFrame
+                        image={selectedSourceViewModel}
+                        renderOptions={Object.freeze({
+                          fitMode: "cover",
+                          zoomCapability: "disabled",
+                          placeholderBehavior: "show-placeholder",
+                          lazyLoad: true,
+                          allowSelectionHighlight: true,
+                        })}
+                        className="ui-image-editor-page__before-after-frame"
+                        fallbackLabel="Source preview unavailable."
+                      />
+                    ) : (
+                      <ImageStatusNotice
+                        title="Source unavailable"
+                        message="Choose a source photo to compare against this result."
+                        tone="warning"
+                      />
+                    )}
+                  </article>
+                  <article className="ui-stack ui-stack--2xs">
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>After (result)</p>
+                    {selectedOutputViewModel ? (
+                      <ImageRenderFrame
+                        image={selectedOutputViewModel}
+                        renderOptions={Object.freeze({
+                          fitMode: "cover",
+                          zoomCapability: "disabled",
+                          placeholderBehavior: "show-placeholder",
+                          lazyLoad: true,
+                          allowSelectionHighlight: true,
+                        })}
+                        className="ui-image-editor-page__before-after-frame"
+                        fallbackLabel="Result preview unavailable."
+                      />
+                    ) : null}
+                  </article>
+                </div>
+                <div className="ui-row ui-row--xs">
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={quickActionDisabled}
+                    onClick={() => {
+                      void chainOutputForReuse("input-image-dataset");
+                    }}
+                  >
+                    {isResultQuickActionPending === "source" ? "Preparing..." : "Use result as source"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={quickActionDisabled || !roleBindings.referenceBindingId}
+                    onClick={() => {
+                      void chainOutputForReuse("reference-image-dataset");
+                    }}
+                  >
+                    {isResultQuickActionPending === "reference" ? "Preparing..." : "Use result as face reference"}
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={!selectedOutputItem}
+                    onClick={() => {
+                      setSelection((current) => setActivePreviewRole(current, "source"));
+                      setStatusMessage("Adjust settings, then select Create image to run again.");
+                    }}
+                  >
+                    Rerun with changes
+                  </button>
+                  <button
+                    type="button"
+                    className="ui-button ui-button--ghost ui-button--sm"
+                    disabled={isLoadingOutputs || isLoadingRunHistory}
+                    onClick={() => {
+                      void Promise.all([
+                        loadCollections(),
+                        loadRunHistory(),
+                      ]);
+                    }}
+                  >
+                    Refresh review
+                  </button>
+                </div>
+                <details>
+                  <summary className="ui-text-small ui-text-secondary">Lineage and settings</summary>
+                  <div className="ui-stack ui-stack--2xs" style={{ marginTop: "0.5rem" }}>
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      Run ID: {selectedOutputItem.workflow?.workflowRunId ?? activeRunId ?? "Unavailable"}
+                    </p>
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      Source: {selectedOutputItem.sourceImage?.stableId ?? selectedOutputItem.sourceImage?.assetId ?? "Unavailable"}
+                    </p>
+                    <pre className="ui-code-block">{JSON.stringify(selectedOutputItem.generationParametersSummary, null, 2)}</pre>
+                  </div>
+                </details>
+              </div>
+            )}
+            {runHistoryError ? (
+              <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>{runHistoryError}</p>
+            ) : null}
+          </section>
           <section className="ui-image-surface ui-image-editor-page__gallery-panel">
             <header className="ui-image-surface__header ui-image-editor-page__gallery-header">
               <h3 className="ui-image-surface__title">Image browser</h3>
