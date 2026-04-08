@@ -10,11 +10,14 @@ Story 1.1.4 defines the application-layer persistence and managed-storage seams 
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
 - `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/FinalizeImageAssetUploadUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
+- `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
@@ -122,3 +125,23 @@ Schema posture for current and near-future image flows:
 - maps logical-access/object-port failures into stable image-asset storage error codes
 
 `ManagedImageAssetStorageAdapter.test.ts` verifies reserve/write/read/access/delete behavior, claim scoping, expiry handling, and failure mapping.
+
+## Story 1.2.4 implementation scope
+
+Authoritative upload finalization now exists through `FinalizeImageAssetUploadUseCase` + typed contracts:
+
+- validates finalize-upload request payloads at use-case boundary
+- verifies active workspace membership before finalization mutation work
+- loads pending image asset metadata and enforces explicit `ingesting -> available` transition rules
+- confirms stored content via managed storage read stream and observed size/checksum computation
+- applies consistency checks between pending metadata and stored object details before status promotion
+- persists normalized metadata and lifecycle transition to `available` only after verification succeeds
+- executes failure path durability on errors:
+  - best-effort managed object cleanup with lifecycle reason `ingest-failure`
+  - explicit transition to `failed` with normalized failure reason metadata
+
+`FinalizeImageAssetUploadUseCase.test.ts` verifies:
+
+- availability transition only after successful storage verification
+- invalid-state rejection when finalizing non-pending assets
+- failure handling that avoids silent partial registration through cleanup + explicit failed status persistence

@@ -8,11 +8,14 @@ This note documents Story 1.1.4 for the image manipulation vertical slice: appli
 - `src/application/image-assets/ports/ImageAssetStoragePort.ts`
 - `src/application/image-assets/ports/index.ts`
 - `src/application/image-assets/use-cases/ImageAssetCreationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/ImageAssetUploadFinalizationUseCaseContracts.ts`
+- `src/application/image-assets/use-cases/FinalizeImageAssetUploadUseCase.ts`
 - `src/application/image-assets/use-cases/InitiateImageAssetCreationUseCase.ts`
 - `src/application/image-assets/use-cases/index.ts`
 - `src/application/image-assets/index.ts`
 - `src/application/image-assets/tests/ImageAssetPortsContracts.test.ts`
 - `src/application/image-assets/tests/InitiateImageAssetCreationUseCase.test.ts`
+- `src/application/image-assets/tests/FinalizeImageAssetUploadUseCase.test.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceMigrations.ts`
 - `src/infrastructure/persistence/image-assets/ImageAssetPersistenceMapper.ts`
 - `src/infrastructure/persistence/image-assets/SqliteImageAssetPersistenceAdapter.ts`
@@ -117,3 +120,25 @@ This story adds the first production-grade infrastructure adapter implementing `
 - reservation claim scoping (workspace/asset/actor/reference)
 - opaque access-handle issue/resolve and expiry behavior
 - logical-access and storage-object error mapping into image-asset storage error contracts
+
+## Story 1.2.4: upload finalization and lifecycle transition flow
+
+This story adds authoritative upload finalization after managed binary write completion:
+
+- `FinalizeImageAssetUploadUseCase` validates finalization requests, verifies active workspace membership, and loads the pending image asset record.
+- Finalization is explicit-state-only: assets must be in `ingesting` before they can transition to `available`.
+- The use case confirms stored content through managed storage read streams and computes canonical checksums (`sha256`, `sha512`) and observed size.
+- Finalization consistency checks validate:
+  - storage instance identity matches the pending asset record
+  - expected size/checksum hints (when provided) match stored content
+  - pending metadata fingerprint/size consistency for deterministic status transition
+- On successful verification, metadata is normalized and persisted, then lifecycle transitions to `available` through domain transition rules.
+- On verification or persistence failure, the use case executes failure handling:
+  - best-effort managed object cleanup (`ingest-failure` delete reason)
+  - explicit lifecycle transition to `failed` with a normalized failure reason
+
+`FinalizeImageAssetUploadUseCase.test.ts` verifies:
+
+- no availability transition until storage verification succeeds
+- explicit invalid-state rejection for non-pending assets
+- failure path durability (cleanup attempt plus persisted `failed` status)
