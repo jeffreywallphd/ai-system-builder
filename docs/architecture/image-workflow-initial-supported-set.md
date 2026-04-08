@@ -1,6 +1,7 @@
 # Initial Supported Image Workflow Set
 
 This note documents Story 2.3.1 for Feature 2 / Epic 2.3: the initial production-ready workflow set for the image manipulation vertical slice.
+Story 2.3.2 extends this set with translation-ready template metadata for adapter consumption.
 
 ## Purpose
 
@@ -13,6 +14,11 @@ Lock down a concrete, typed, user-facing workflow set so downstream translation 
 - `src/application/image-workflows/CreateImageWorkflowDefinitionUseCase.ts`
 - `src/application/image-workflows/tests/InitialSupportedImageWorkflowTemplateRegistry.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
+
+Story 2.3.2 metadata seam:
+
+- `InitialImageWorkflowTemplateDefinition.display` for user-facing labels and rationale.
+- `InitialImageWorkflowTemplateDefinition.translation` for internal translation keys, capability hints, and mapping descriptors.
 
 ## Initial supported workflow template families
 
@@ -69,6 +75,15 @@ Minimum required shape:
 - lookup by operation kind,
 - explicit `isOperationSupported(...)` guard for authoring validation.
 
+For Story 2.3.2 it also enforces translation readiness by validating:
+
+- non-empty translation identifiers (`translationKey`, `adapterFamily`, `operationTypeKey`),
+- consistency between translation mappings and required input/parameter/output requirements,
+- required asset role hints derived from required typed input slots,
+- stable separation between display metadata and backend translation metadata.
+
+These checks prevent silent drift between authoring templates and future adapter translation logic.
+
 ## Authoring boundary enforcement
 
 `CreateImageWorkflowDefinitionUseCase` now enforces initial-set scope:
@@ -91,6 +106,15 @@ Out of scope:
 - ComfyUI graph-level template payloads,
 - run orchestration or execution adapter implementation,
 - broad operation expansion beyond initial constrained set.
+
+## Adapter consumption pattern (Story 2.3.2)
+
+Downstream ComfyUI adapter implementation should:
+
+1. Resolve a supported template from `InitialSupportedImageWorkflowTemplateRegistry`.
+2. Use `translation` metadata + typed workflow/system definitions to build adapter-bound requests.
+3. Resolve backend graph JSON/prompt payloads internally inside the adapter using translation keys.
+4. Keep backend graph structure out of domain models, shared API contracts, and Studio-facing configuration.
 
 ## Related architecture notes
 

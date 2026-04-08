@@ -3,6 +3,7 @@
 ## What this slice adds
 
 Story 2.3.1 defines the initial supported workflow template set for authoritative image-workflow definition authoring.
+Story 2.3.2 adds translation-ready internal metadata for those template families so later adapter execution can map typed definitions into backend requests without treating backend graphs as product truth.
 
 ## Canonical files
 
@@ -12,6 +13,11 @@ Story 2.3.1 defines the initial supported workflow template set for authoritativ
 - `src/application/image-workflows/tests/InitialSupportedImageWorkflowTemplateRegistry.test.ts`
 - `src/application/image-workflows/tests/ImageWorkflowDefinitionAuthoringUseCases.test.ts`
 - `docs/architecture/image-workflow-initial-supported-set.md`
+
+Story 2.3.2 metadata shape lives in:
+
+- `InitialImageWorkflowTemplateDefinition.display` (user-facing text)
+- `InitialImageWorkflowTemplateDefinition.translation` (internal translation metadata)
 
 ## Initial supported operation set
 
@@ -33,6 +39,24 @@ Story 2.3.1 defines the initial supported workflow template set for authoritativ
 - resolve template by family id,
 - resolve template by operation kind,
 - validate whether an operation is in-scope for initial authoring.
+
+For Story 2.3.2 it also ensures each template stays translation-ready by validating:
+
+- translation key presence and stable adapter operation identifiers,
+- mapping descriptor consistency with required inputs/parameters/outputs,
+- required asset-role hints derived from typed required inputs,
+- separation between display metadata and translation identifiers.
+
+This keeps authoring metadata and execution-translation metadata aligned without exposing runtime graph payloads.
+
+## Translation metadata consumption guidance
+
+Later ComfyUI adapter work should consume only the `translation` metadata plus typed workflow definitions:
+
+1. Resolve template family/operation from `InitialSupportedImageWorkflowTemplateRegistry`.
+2. Use `translation.translationKey`, `translation.operationTypeKey`, and mapping descriptors to build adapter-bound request payloads.
+3. Resolve concrete backend graph JSON strictly inside the adapter layer from internal adapter templates keyed by those identifiers.
+4. Keep UI/API contracts on `display` + typed workflow/system models; never project adapter graph structure into user-facing contracts.
 
 ## Authoring enforcement
 
