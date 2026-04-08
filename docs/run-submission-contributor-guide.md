@@ -23,6 +23,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 2. Add/update application validation and canonical command behavior:
    - `src/application/runs/use-cases/RunSubmissionValidationRules.ts`
    - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
+   - `src/application/runs/use-cases/SubmitImageRunUseCase.ts`
 3. Add/update authoritative creation mapping/persistence:
    - `src/application/runs/use-cases/CreateAuthoritativeRunUseCase.ts`
    - `src/application/runs/use-cases/RunCreationPersistenceMapper.ts`
@@ -56,6 +57,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 - Accepted runs must persist canonical run snapshot plus submission/orchestration metadata.
 - Initial orchestration intent must be recorded (`queue-admission-requested`) for queue-aware follow-up orchestration.
 - Audit hooks must prefer redacted summary data (counts/flags/codes) rather than raw sensitive payload values.
+- Application-level submission orchestration (`SubmitImageRunUseCase`) is the canonical seam for validation + readiness + authoritative creation; infrastructure APIs should delegate to it.
 
 ## Prohibited patterns
 

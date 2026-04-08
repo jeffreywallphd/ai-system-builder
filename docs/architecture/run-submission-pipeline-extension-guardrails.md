@@ -18,6 +18,7 @@ Document the production authoritative run-submission pipeline as implemented tod
   - `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
   - `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
 - Application validation and creation orchestration
+  - `src/application/runs/use-cases/SubmitImageRunUseCase.ts`
   - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
   - `src/application/runs/use-cases/CreateAuthoritativeRunUseCase.ts`
   - `src/application/runs/use-cases/RunSubmissionValidationRules.ts`
@@ -39,8 +40,8 @@ Document the production authoritative run-submission pipeline as implemented tod
 
 1. Client submits `POST /api/v1/runtime/runs/start` using `RunSubmissionRequest` contracts.
 2. `IdentityHttpServer` parses/validates payload with shared schema contracts and enforces authenticated workspace/actor context.
-3. `AuthoritativeRunSubmissionBackendApi` invokes `ValidateRunSubmissionUseCase`.
-4. Validation normalizes structure (`RunSubmissionValidationRules`) and applies policy/eligibility checks:
+3. `AuthoritativeRunSubmissionBackendApi` invokes `SubmitImageRunUseCase`.
+4. Submission orchestration validates structure/policy (`ValidateRunSubmissionUseCase` + `RunSubmissionValidationRules`) and applies optional image readiness checks:
    - workspace existence/status
    - permission checks (`system.execute`, optional `workflow.run`, optional `template.instantiate`, plus extra resource references)
    - runtime target resolution (`IRunSubmissionTargetResolverPort`)

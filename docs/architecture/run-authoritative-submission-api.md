@@ -12,6 +12,7 @@ Expose production run submission as an authoritative server operation so desktop
 
 ## Canonical implementation files
 
+- `src/application/runs/use-cases/SubmitImageRunUseCase.ts`
 - `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`
 - `src/infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
@@ -29,7 +30,10 @@ Expose production run submission as an authoritative server operation so desktop
 2. Parse canonical run submission payload (legacy start-run payload compatibility remains at the transport parser level).
 3. Reject context spoofing when payload `workspaceId` or `submittedByActorId` does not match authenticated session context.
 4. Enforce authoritative context by setting submission actor/workspace from authenticated session.
-5. Execute submission validation (`ValidateRunSubmissionUseCase`) and authoritative run creation (`CreateAuthoritativeRunUseCase`).
+5. Delegate to `SubmitImageRunUseCase` for authoritative submission orchestration:
+   - validation (`ValidateRunSubmissionUseCase`)
+   - image submission readiness evaluation (blocking vs advisory findings)
+   - authoritative creation (`CreateAuthoritativeRunUseCase`)
 6. Return canonical run detail + shared mutation metadata on acceptance.
 
 ## Failure semantics

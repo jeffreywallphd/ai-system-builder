@@ -4,6 +4,7 @@
 Story 16.1.5 wires the authoritative run submission API surface so converged clients submit runs through authenticated server orchestration instead of local/mock start-run paths.
 
 ## Implemented files
+- `src/application/runs/use-cases/SubmitImageRunUseCase.ts`
 - `src/infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi.ts`
 - `src/infrastructure/api/runs/AssetBackedRunSubmissionTargetResolver.ts`
 - `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
@@ -20,8 +21,8 @@ Story 16.1.5 wires the authoritative run submission API surface so converged cli
   - payload `workspaceId` and `submittedByActorId` must match session context when provided
   - server overwrites submission context with authenticated actor/workspace before backend execution
 - Backend orchestration sequence:
-  - validate submission via `ValidateRunSubmissionUseCase`
-  - create canonical authoritative run via `CreateAuthoritativeRunUseCase`
+  - delegate submission orchestration to `SubmitImageRunUseCase`
+  - inside the use case: validate submission, evaluate image submission readiness, and create canonical authoritative run
   - return canonical `RunSubmissionAcceptedResponse` with shared mutation metadata
 
 ## Error mapping posture

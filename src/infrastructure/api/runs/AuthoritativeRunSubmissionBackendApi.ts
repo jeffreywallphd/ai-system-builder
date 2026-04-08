@@ -12,10 +12,8 @@ import type {
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import {
   RunSubmissionValidationErrorCodes,
-  type ValidateRunSubmissionResult,
 } from "@application/runs/use-cases/RunSubmissionValidationContracts";
-import type { ValidateRunSubmissionUseCase } from "@application/runs/use-cases/ValidateRunSubmissionUseCase";
-import type { CreateAuthoritativeRunUseCase } from "@application/runs/use-cases/CreateAuthoritativeRunUseCase";
+import type { SubmitImageRunUseCase } from "@application/runs/use-cases/SubmitImageRunUseCase";
 import {
   buildQueueMovementPayload,
   buildRunStatusPayload,
@@ -35,8 +33,7 @@ export interface AuthoritativeRunSubmissionRequest {
 }
 
 export interface AuthoritativeRunSubmissionBackendApiDependencies {
-  readonly validateRunSubmissionUseCase: ValidateRunSubmissionUseCase;
-  readonly createAuthoritativeRunUseCase: CreateAuthoritativeRunUseCase;
+  readonly submitImageRunUseCase: SubmitImageRunUseCase;
   readonly realtimePublisher?: RunOrchestrationRealtimePublisher;
   readonly observability?: RunOrchestrationObservability;
 }
@@ -48,33 +45,30 @@ export class AuthoritativeRunSubmissionBackendApi {
     request: AuthoritativeRunSubmissionRequest,
   ): Promise<SharedApiResponseEnvelope<RunSubmissionAcceptedResponse>> {
     try {
-      const validation = await this.dependencies.validateRunSubmissionUseCase.execute({
+      const submission = await this.dependencies.submitImageRunUseCase.execute({
         actor: Object.freeze({
           actorUserIdentityId: request.actorUserIdentityId,
           activeWorkspaceId: request.workspaceId,
         }),
-        submission: Object.freeze({
-          ...request.submission,
-          workspaceId: request.workspaceId,
-          submittedByActorId: request.actorUserIdentityId,
-        }),
+        workspaceId: request.workspaceId,
+        submission: request.submission,
         occurredAt: request.occurredAt,
       });
 
-      if (!validation.ok) {
+      if (!submission.ok) {
         await this.recordObservability({
           event: "run.orchestration.submission.completed",
           operation: "submission",
           outcome: "failure",
-          severity: validation.error.code === RunSubmissionValidationErrorCodes.invalidRequest ? "warn" : "error",
+          severity: submission.error.code === RunSubmissionValidationErrorCodes.invalidRequest ? "warn" : "error",
           requestId: request.submission.clientRequestId,
           correlationId: request.submission.correlationId,
           workspaceId: request.workspaceId,
           markers: Object.freeze(["submission-validation-failed"]),
           details: Object.freeze({
-            code: validation.error.code,
-            message: validation.error.message,
-            issueCount: validation.error.validationIssues.length,
+            code: submission.error.code,
+            message: submission.error.message,
+            issueCount: submission.error.validationIssues.length,
             request: Object.freeze({
               source: request.submission.source,
               runtimeTarget: request.submission.runtimeTarget,
@@ -84,29 +78,26 @@ export class AuthoritativeRunSubmissionBackendApi {
             }),
           }),
         });
-        return this.buildValidationFailure(validation);
+        return this.buildValidationFailure(submission);
       }
 
-      const created = await this.dependencies.createAuthoritativeRunUseCase.execute({
-        command: validation.command,
-      });
       await publishRunOrchestrationRealtimeEventsBestEffort(async () => {
         this.dependencies.realtimePublisher?.publishRunStatus({
           actorUserIdentityId: request.actorUserIdentityId,
-          workspaceId: created.run.workspaceId ?? request.workspaceId,
+          workspaceId: submission.response.run.workspaceId ?? request.workspaceId,
           payload: buildRunStatusPayload({
-            run: created.run,
+            run: submission.response.run,
             eventKind: "submission-accepted",
-            changedAt: validation.command.occurredAt,
+            changedAt: submission.response.mutation.occurredAt,
           }),
         });
         this.dependencies.realtimePublisher?.publishQueueMovement({
           actorUserIdentityId: request.actorUserIdentityId,
-          workspaceId: created.run.workspaceId ?? request.workspaceId,
+          workspaceId: submission.response.run.workspaceId ?? request.workspaceId,
           payload: buildQueueMovementPayload({
-            run: created.run,
+            run: submission.response.run,
             eventKind: "queue-enqueued",
-            changedAt: validation.command.occurredAt,
+            changedAt: submission.response.mutation.occurredAt,
           }),
         });
       });
@@ -116,26 +107,19 @@ export class AuthoritativeRunSubmissionBackendApi {
         outcome: "success",
         severity: "info",
         requestId: request.submission.clientRequestId,
-        correlationId: created.run.submission.correlationId ?? request.submission.correlationId,
-        runId: created.run.runId,
-        workspaceId: created.run.workspaceId ?? request.workspaceId,
-        lifecycleState: created.run.state,
+        correlationId: submission.response.run.submission.correlationId ?? request.submission.correlationId,
+        runId: submission.response.run.runId,
+        workspaceId: submission.response.run.workspaceId ?? request.workspaceId,
+        lifecycleState: submission.response.run.state,
         markers: Object.freeze(["submission-accepted", "queue-enqueued"]),
         counters: Object.freeze({
-          queue_position: created.run.queue?.position ?? -1,
+          queue_position: submission.response.run.queue?.position ?? -1,
         }),
       });
 
       return Object.freeze({
         ok: true,
-        data: Object.freeze({
-          run: created.run,
-          mutation: Object.freeze({
-            changed: true,
-            mutationId: created.orchestrationIntentEventId,
-            occurredAt: validation.command.occurredAt,
-          }),
-        }),
+        data: submission.response,
       });
     } catch (error) {
       if (isConflictError(error)) {
@@ -199,7 +183,17 @@ export class AuthoritativeRunSubmissionBackendApi {
   }
 
   private buildValidationFailure(
-    validation: Exclude<ValidateRunSubmissionResult, { readonly ok: true }>,
+    validation: {
+      readonly error: {
+        readonly code: typeof RunSubmissionValidationErrorCodes[keyof typeof RunSubmissionValidationErrorCodes];
+        readonly message: string;
+        readonly validationIssues: ReadonlyArray<{
+          readonly path: string;
+          readonly code: string;
+          readonly message: string;
+        }>;
+      };
+    },
   ): SharedApiResponseEnvelope<RunSubmissionAcceptedResponse> {
     const code = mapValidationCodeToSharedCode(validation.error.code);
     return Object.freeze({

@@ -10,6 +10,7 @@ Story 16.1.8 documents the authoritative run-submission pipeline, extension seam
 - `src/domain/runs/RunDomain.ts`
 - `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
 - `src/shared/schemas/runtime/RunOrchestrationTransportSchemaContracts.ts`
+- `src/application/runs/use-cases/SubmitImageRunUseCase.ts`
 - `src/application/runs/use-cases/ValidateRunSubmissionUseCase.ts`
 - `src/application/runs/use-cases/CreateAuthoritativeRunUseCase.ts`
 - `src/application/runs/use-cases/RunCreationPersistenceMapper.ts`
@@ -23,6 +24,7 @@ Story 16.1.8 documents the authoritative run-submission pipeline, extension seam
 
 ## Pipeline summary
 - Transport parses canonical run submission payloads and enforces authenticated workspace/actor context.
+- Application submission orchestration (`SubmitImageRunUseCase`) coordinates validation, readiness findings, and accepted-response shaping.
 - Validation use case normalizes structure and evaluates authorization/availability/policy prerequisites.
 - Authoritative creation use case persists canonical run + queue-admission orchestration intent under transaction boundary support.
 - Read-after-write returns canonical run detail and emits best-effort redacted audit hooks.
