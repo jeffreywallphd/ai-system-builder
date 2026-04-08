@@ -21,3 +21,4 @@ export * from "./ActivateExecutionNodeUseCase";
 export * from "./RefreshExecutionNodeBackendStateUseCase";
 export * from "./GetExecutionNodeDetailUseCase";
 export * from "./ListExecutionNodesUseCase";
+export * from "./SetExecutionNodeAvailabilityOverrideUseCase";

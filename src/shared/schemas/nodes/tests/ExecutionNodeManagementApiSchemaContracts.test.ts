@@ -51,6 +51,8 @@ describe("ExecutionNodeManagementApiSchemaContracts", () => {
           supportsRemoteScheduling: true,
           deploymentTags: ["prod"],
           certificateAssigned: true,
+          availabilityOverrideMode: "enabled",
+          availabilityOverrideUpdatedAt: "2026-04-08T19:59:00.000Z",
         },
         backendFamilies: ["comfyui"],
       }],
@@ -80,6 +82,8 @@ describe("ExecutionNodeManagementApiSchemaContracts", () => {
           supportsRemoteScheduling: true,
           deploymentTags: ["hybrid"],
           certificateAssigned: true,
+          availabilityOverrideMode: "enabled",
+          availabilityOverrideUpdatedAt: "2026-04-08T20:04:00.000Z",
         },
         backendFamilies: ["comfyui"],
         backendCapabilities: [{

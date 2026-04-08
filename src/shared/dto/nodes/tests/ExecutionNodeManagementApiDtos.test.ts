@@ -36,6 +36,8 @@ describe("ExecutionNodeManagementApiDtos", () => {
           supportsRemoteScheduling: true,
           deploymentTags: ["prod"],
           certificateAssigned: false,
+          availabilityOverrideMode: "enabled",
+          availabilityOverrideUpdatedAt: "2026-04-08T20:19:00.000Z",
         },
         backendFamilies: ["comfyui"],
         endpointRef: "https://internal.example/node/1",
@@ -69,6 +71,8 @@ describe("ExecutionNodeManagementApiDtos", () => {
           supportsRemoteScheduling: true,
           deploymentTags: ["hybrid"],
           certificateAssigned: true,
+          availabilityOverrideMode: "enabled",
+          availabilityOverrideUpdatedAt: "2026-04-08T20:20:00.000Z",
         },
         backendFamilies: ["comfyui"],
         backendCapabilities: [{

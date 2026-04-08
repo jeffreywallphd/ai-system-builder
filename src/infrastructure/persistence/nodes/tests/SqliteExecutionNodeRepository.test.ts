@@ -6,6 +6,7 @@ import {
   createExecutionNodeRecord,
   ExecutionNodeActivationStatuses,
   ExecutionNodeHealthStatuses,
+  ExecutionNodeOperationalAvailabilityModes,
   ExecutionNodeTargetKinds,
 } from "@domain/nodes/ExecutionNodeDomain";
 import {
@@ -82,7 +83,7 @@ describe("SqliteExecutionNodeRepository", () => {
     const database = openSqliteCompatDatabase(databasePath);
     const versionRow = database.prepare("SELECT MAX(version) AS version FROM execution_node_repository_migrations")
       .get() as { version?: number };
-    expect(versionRow.version).toBe(1);
+    expect(versionRow.version).toBe(2);
 
     const tables = database.prepare(`
       SELECT name
@@ -109,6 +110,14 @@ describe("SqliteExecutionNodeRepository", () => {
       "execution_node_records",
       "execution_node_status_history",
     ]);
+
+    const columns = database.prepare("PRAGMA table_info('execution_node_records')")
+      .all() as Array<{ name: string }>;
+    const columnNames = new Set(columns.map((column) => column.name));
+    expect(columnNames.has("availability_override_mode")).toBeTrue();
+    expect(columnNames.has("availability_override_suppressed_until")).toBeTrue();
+    expect(columnNames.has("availability_override_reason")).toBeTrue();
+    expect(columnNames.has("availability_override_updated_at")).toBeTrue();
 
     database.close();
   });
@@ -259,5 +268,52 @@ describe("SqliteExecutionNodeRepository", () => {
     expect(availabilityEntry?.details_json).toContain("maintenance-window");
 
     database.close();
+  });
+
+  it("persists durable operational availability overrides separately from probe health", async () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-execution-node-override-"));
+    createdRoots.push(root);
+    const databasePath = path.join(root, "execution-node.sqlite");
+    const repository = new SqliteExecutionNodeRepository(databasePath);
+
+    await repository.registerExecutionNode({
+      record: createSampleNode("node:execution:override"),
+      mutation: {
+        operationKey: "op:execution-node:override:register",
+        actorId: "admin:operator",
+      },
+    });
+
+    await repository.updateExecutionNodeOperationalAvailability({
+      nodeId: "node:execution:override",
+      mode: ExecutionNodeOperationalAvailabilityModes.suppressed,
+      suppressedUntil: "2026-04-08T16:00:00.000Z",
+      changedAt: "2026-04-08T15:00:00.000Z",
+      mutation: {
+        operationKey: "op:execution-node:override:suppress",
+        actorId: "admin:operator",
+        reason: "temporary maintenance hold",
+      },
+      details: {
+        reasonCode: "maintenance-hold",
+      },
+    });
+
+    await repository.updateExecutionNodeHealth({
+      nodeId: "node:execution:override",
+      healthStatus: ExecutionNodeHealthStatuses.ready,
+      observedAt: "2026-04-08T15:05:00.000Z",
+      mutation: {
+        operationKey: "op:execution-node:override:health",
+        actorId: "system:health-probe",
+      },
+    });
+
+    const persisted = await repository.findExecutionNodeById("node:execution:override");
+    expect(persisted?.healthStatus).toBe(ExecutionNodeHealthStatuses.ready);
+    expect(persisted?.availabilityOverride.mode).toBe(ExecutionNodeOperationalAvailabilityModes.suppressed);
+    expect(persisted?.availabilityOverride.suppressedUntil).toBe("2026-04-08T16:00:00.000Z");
+
+    repository.dispose();
   });
 });

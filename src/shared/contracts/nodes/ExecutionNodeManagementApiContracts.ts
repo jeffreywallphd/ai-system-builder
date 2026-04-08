@@ -3,6 +3,7 @@ import type {
   ExecutionNodeActivationStatus,
   ExecutionNodeBackendReadinessState,
   ExecutionNodeHealthStatus,
+  ExecutionNodeOperationalAvailabilityMode,
   ImageExecutionNodeCompatibilityFindingKind,
 } from "@domain/nodes/ExecutionNodeDomain";
 import type {
@@ -100,6 +101,10 @@ export interface ExecutionNodeOperationalSummaryDto {
   readonly deploymentTags: ReadonlyArray<string>;
   readonly certificateAssigned: boolean;
   readonly enrollmentRequestId?: string;
+  readonly availabilityOverrideMode: ExecutionNodeOperationalAvailabilityMode;
+  readonly availabilitySuppressedUntil?: string;
+  readonly availabilityOverrideReason?: string;
+  readonly availabilityOverrideUpdatedAt: string;
 }
 
 export interface ExecutionNodeSummaryDto {
@@ -173,6 +178,7 @@ export interface ExecutionNodeListRequestDto {
   readonly trustStates?: ReadonlyArray<NodeTrustState>;
   readonly activationStatuses?: ReadonlyArray<ExecutionNodeActivationStatus>;
   readonly healthStatuses?: ReadonlyArray<ExecutionNodeHealthStatus>;
+  readonly operationalAvailabilityModes?: ReadonlyArray<ExecutionNodeOperationalAvailabilityMode>;
   readonly backendFamilies?: ReadonlyArray<string>;
   readonly executionTargets?: ReadonlyArray<string>;
   readonly requiredCapabilitiesAnyOf?: ReadonlyArray<NodeRoleCapability>;
@@ -320,6 +326,10 @@ export function toExecutionNodeSummaryDto(value: ExecutionNodeInternalSummaryDto
       deploymentTags: cloneArray(value.operational.deploymentTags),
       certificateAssigned: value.operational.certificateAssigned || Boolean(value.certificateRef),
       enrollmentRequestId: value.operational.enrollmentRequestId,
+      availabilityOverrideMode: value.operational.availabilityOverrideMode,
+      availabilitySuppressedUntil: value.operational.availabilitySuppressedUntil,
+      availabilityOverrideReason: value.operational.availabilityOverrideReason,
+      availabilityOverrideUpdatedAt: value.operational.availabilityOverrideUpdatedAt,
     }),
     backendFamilies: cloneArray(value.backendFamilies),
   });

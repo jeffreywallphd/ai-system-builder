@@ -7,6 +7,7 @@ Story 5.2.1 adds authoritative application use cases for registering and activat
 Story 5.2.2 adds concrete SQLite persistence + status-history recording for execution-node records.
 Story 5.2.3 adds adapter-backed execution-node health/capability refresh orchestration through existing image execution adapter seams.
 Story 5.2.4 adds authoritative execution-node query/list use cases for operational inventory and studio readiness consumers.
+Story 5.2.5 adds authoritative execution-node availability override controls (enable/disable/suppress) that remain separate from backend probe observations.
 
 ## Implemented files
 
@@ -18,10 +19,12 @@ Story 5.2.4 adds authoritative execution-node query/list use cases for operation
 - `src/application/nodes/use-cases/RefreshExecutionNodeBackendStateUseCase.ts`
 - `src/application/nodes/use-cases/GetExecutionNodeDetailUseCase.ts`
 - `src/application/nodes/use-cases/ListExecutionNodesUseCase.ts`
+- `src/application/nodes/use-cases/SetExecutionNodeAvailabilityOverrideUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 - `src/application/nodes/tests/RefreshExecutionNodeBackendStateUseCase.test.ts`
 - `src/application/nodes/tests/ExecutionNodeQueryUseCases.test.ts`
+- `src/application/nodes/tests/SetExecutionNodeAvailabilityOverrideUseCase.test.ts`
 - Human doc: `docs/architecture/execution-node-repository-and-management-application-ports.md`
 
 ## Core delivery
@@ -85,8 +88,18 @@ These ports are intended for authoritative run orchestration, scheduling, node-a
   - deployment tags
   - freshness windows (`lastSeenAfter`, `lastSeenBefore`)
   - practical enabled/disabled and availability selectors
+  - explicit operational availability override-mode selectors (`enabled|disabled|suppressed`)
   - backend readiness-state selectors (`ready|degraded|unavailable|unknown`)
 - Both query use cases enforce optional authorization seams through
   `ExecutionNodeManagementAuthorizationHook.assertCanQueryExecutionNodes(...)` and
   `ExecutionNodeManagementAuthorizationHook.assertCanGetExecutionNodeDetail(...)`.
 - Responses are projected into internal DTO-ready summaries/details suitable for admin/operational inventory and execution-readiness surfaces.
+
+## Story 5.2.5 override notes
+
+- New use case: `SetExecutionNodeAvailabilityOverrideUseCase`.
+- Supports authoritative actions: `enable`, `disable`, `suppress` (temporary with `suppressedUntil`).
+- Persisted separately from probe-observed backend state on execution-node records (`availabilityOverride*` fields).
+- Optional authorization seam: `assertCanOverrideExecutionNodeAvailability(...)`.
+- Revoked nodes are rejected for override updates.
+- Eligibility/readiness consumers can now honor both backend observations and operational policy overrides without conflating them.

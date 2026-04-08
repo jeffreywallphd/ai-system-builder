@@ -3,6 +3,7 @@ import {
   ExecutionNodeActivationStatuses,
   ExecutionNodeBackendReadinessStates,
   ExecutionNodeHealthStatuses,
+  ExecutionNodeOperationalAvailabilityModes,
   ImageExecutionNodeCompatibilityFindingKinds,
 } from "@domain/nodes/ExecutionNodeDomain";
 import {
@@ -101,6 +102,12 @@ const HealthStatusSchema = z.enum([
   ExecutionNodeHealthStatuses.unavailable,
 ]);
 
+const OperationalAvailabilityModeSchema = z.enum([
+  ExecutionNodeOperationalAvailabilityModes.enabled,
+  ExecutionNodeOperationalAvailabilityModes.disabled,
+  ExecutionNodeOperationalAvailabilityModes.suppressed,
+]);
+
 const BackendReadinessStateSchema = z.enum([
   ExecutionNodeBackendReadinessStates.ready,
   ExecutionNodeBackendReadinessStates.degraded,
@@ -179,6 +186,10 @@ const OperationalSummarySchema = z.object({
   deploymentTags: z.array(IdentifierSchema).max(64),
   certificateAssigned: z.boolean(),
   enrollmentRequestId: IdentifierSchema.optional(),
+  availabilityOverrideMode: OperationalAvailabilityModeSchema,
+  availabilitySuppressedUntil: TimestampSchema.optional(),
+  availabilityOverrideReason: z.string().trim().min(1).max(2000).optional(),
+  availabilityOverrideUpdatedAt: TimestampSchema,
 }).strict().superRefine((value, context) => {
   const unique = new Set(value.enabledCapabilities);
   if (unique.size !== value.enabledCapabilities.length) {
@@ -186,6 +197,31 @@ const OperationalSummarySchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["enabledCapabilities"],
       message: "enabledCapabilities must not include duplicates.",
+    });
+  }
+
+  if (value.availabilityOverrideMode !== ExecutionNodeOperationalAvailabilityModes.suppressed && value.availabilitySuppressedUntil) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["availabilitySuppressedUntil"],
+      message: "availabilitySuppressedUntil is only allowed for suppressed override mode.",
+    });
+  }
+  if (value.availabilityOverrideMode === ExecutionNodeOperationalAvailabilityModes.suppressed && !value.availabilitySuppressedUntil) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["availabilitySuppressedUntil"],
+      message: "suppressed override mode requires availabilitySuppressedUntil.",
+    });
+  }
+  if (
+    value.availabilitySuppressedUntil
+    && Date.parse(value.availabilityOverrideUpdatedAt) >= Date.parse(value.availabilitySuppressedUntil)
+  ) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["availabilityOverrideUpdatedAt"],
+      message: "availabilityOverrideUpdatedAt must be earlier than availabilitySuppressedUntil when suppression is active.",
     });
   }
 });
@@ -318,6 +354,7 @@ export const ExecutionNodeListRequestDtoSchema = z.object({
   trustStates: z.array(NodeTrustStateSchema).max(16).optional(),
   activationStatuses: z.array(ActivationStatusSchema).max(16).optional(),
   healthStatuses: z.array(HealthStatusSchema).max(16).optional(),
+  operationalAvailabilityModes: z.array(OperationalAvailabilityModeSchema).max(16).optional(),
   backendFamilies: z.array(IdentifierSchema).max(64).optional(),
   executionTargets: z.array(IdentifierSchema).max(64).optional(),
   requiredCapabilitiesAnyOf: z.array(NodeRoleCapabilitySchema).max(16).optional(),

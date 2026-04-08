@@ -1,9 +1,12 @@
 import {
   ExecutionNodeActivationStatuses,
   ExecutionNodeHealthStatuses,
+  ExecutionNodeOperationalAvailabilityModes,
+  resolveExecutionNodeOperationalAvailabilityMode,
   type ExecutionNodeActivationStatus,
   type ExecutionNodeBackendReadinessState,
   type ExecutionNodeHealthStatus,
+  type ExecutionNodeOperationalAvailabilityMode,
   type ExecutionNodeRecord,
 } from "@domain/nodes/ExecutionNodeDomain";
 import type {
@@ -54,6 +57,7 @@ export interface ListExecutionNodesUseCaseRequest {
   readonly trustStates?: ReadonlyArray<NodeTrustState>;
   readonly activationStatuses?: ReadonlyArray<ExecutionNodeActivationStatus>;
   readonly healthStatuses?: ReadonlyArray<ExecutionNodeHealthStatus>;
+  readonly operationalAvailabilityModes?: ReadonlyArray<ExecutionNodeOperationalAvailabilityMode>;
   readonly backendFamilies?: ReadonlyArray<string>;
   readonly executionTargets?: ReadonlyArray<string>;
   readonly requiredCapabilitiesAnyOf?: ReadonlyArray<NodeRoleCapability>;
@@ -113,7 +117,12 @@ function normalizePaging(input: {
   };
 }
 
-function isNodeAvailable(record: ExecutionNodeRecord): boolean {
+function isNodeAvailable(record: ExecutionNodeRecord, now: Date): boolean {
+  const operationalAvailability = resolveExecutionNodeOperationalAvailabilityMode(record, now);
+  if (operationalAvailability !== ExecutionNodeOperationalAvailabilityModes.enabled) {
+    return false;
+  }
+
   return AvailableExecutionNodeActivationStatuses.has(record.activationStatus)
     && AvailableExecutionNodeHealthStatuses.has(record.healthStatus);
 }
@@ -197,6 +206,7 @@ export class ListExecutionNodesUseCase {
       executionTargets: request.executionTargets,
       activationStatuses,
       healthStatuses: request.healthStatuses,
+      operationalAvailabilityModes: request.operationalAvailabilityModes,
       approvalStatuses: request.approvalStatuses,
       trustStates: request.trustStates,
       requiredCapabilitiesAnyOf: request.requiredCapabilitiesAnyOf,
@@ -230,7 +240,7 @@ export class ListExecutionNodesUseCase {
       }
 
       if (typeof request.available === "boolean") {
-        const available = isNodeAvailable(record);
+        const available = isNodeAvailable(record, this.clock.now());
         if (available !== request.available) {
           return false;
         }

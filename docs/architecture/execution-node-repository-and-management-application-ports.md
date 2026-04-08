@@ -10,6 +10,7 @@
 - Story 5.2.2: Implement concrete persistence for execution-node records and status history
 - Story 5.2.3: Implement adapter-backed health/capability refresh services for execution nodes
 - Story 5.2.4: Implement execution-node query and listing use cases for operational and readiness surfaces
+- Story 5.2.5: Implement node enable/disable and availability override use cases
 
 ## Purpose
 
@@ -25,10 +26,12 @@ Define application-layer port seams so execution nodes are registered, queried, 
 - `src/application/nodes/use-cases/RefreshExecutionNodeBackendStateUseCase.ts`
 - `src/application/nodes/use-cases/GetExecutionNodeDetailUseCase.ts`
 - `src/application/nodes/use-cases/ListExecutionNodesUseCase.ts`
+- `src/application/nodes/use-cases/SetExecutionNodeAvailabilityOverrideUseCase.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementPorts.test.ts`
 - `src/application/nodes/tests/ExecutionNodeManagementUseCases.test.ts`
 - `src/application/nodes/tests/RefreshExecutionNodeBackendStateUseCase.test.ts`
 - `src/application/nodes/tests/ExecutionNodeQueryUseCases.test.ts`
+- `src/application/nodes/tests/SetExecutionNodeAvailabilityOverrideUseCase.test.ts`
 
 ## Repository port responsibilities
 
@@ -40,6 +43,7 @@ Define application-layer port seams so execution nodes are registered, queried, 
   - `updateExecutionNodeHealth`
   - `updateExecutionNodeCapabilities`
   - `updateExecutionNodeAvailability`
+  - `updateExecutionNodeOperationalAvailability`
 
 `ExecutionNodeListQuery` supports filters needed by orchestration and admin contexts (capability, backend family, target support, activation/health posture, trust posture, deployment tags, and freshness windows) without coupling to any concrete storage engine.
 
@@ -148,5 +152,24 @@ Query/list behavior:
   - deployment-tag and recent-activity windows (`lastSeenAfter`/`lastSeenBefore`)
   - practical enabled/disabled selector (`enabled`) derived from activation posture
   - practical availability selector (`available`) derived from activation + health posture
+  - explicit administrative availability-override mode filter (`operationalAvailabilityModes`)
   - backend readiness state filter (`backendReadinessStates`)
 - outputs are projected into internal DTO-ready summary/detail models that can feed later admin-lite/admin and readiness UI/API surfaces.
+
+## Story 5.2.5 availability override behavior
+
+`SetExecutionNodeAvailabilityOverrideUseCase` adds authoritative operational controls that are distinct from probe-observed backend health/readiness:
+
+- supported actions: `enable`, `disable`, `suppress`
+- `suppress` requires `suppressedUntil` and is intended for temporary routing suppression windows
+- durability: override mode/timestamps are persisted on execution-node records and exposed via query/detail read models
+- authorization: optional `assertCanOverrideExecutionNodeAvailability(...)` hook enforces policy boundaries
+- state validation: revoked nodes cannot be overridden; malformed suppress windows are rejected
+
+Separation from probe behavior:
+
+- backend probe refresh (`RefreshExecutionNodeBackendStateUseCase`) continues to update observed health/readiness posture
+- administrative override state is stored separately and is not cleared or rewritten by probe refreshes
+- eligibility and practical availability checks now honor both:
+  - observed backend/node state (activation + health + readiness)
+  - administrative operational override (`enabled|disabled|suppressed`)

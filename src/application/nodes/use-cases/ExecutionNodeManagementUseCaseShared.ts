@@ -146,6 +146,10 @@ function toOperationalSummary(record: ExecutionNodeRecord): ExecutionNodeOperati
     maxConcurrentWorkloads: record.capabilityProfile.maxConcurrentWorkloads,
     deploymentTags: Object.freeze([...record.deploymentTags]),
     certificateAssigned: Boolean(record.certificateRef),
+    availabilityOverrideMode: record.availabilityOverride.mode,
+    availabilitySuppressedUntil: record.availabilityOverride.suppressedUntil,
+    availabilityOverrideReason: record.availabilityOverride.reason,
+    availabilityOverrideUpdatedAt: record.availabilityOverride.updatedAt,
   });
 }
 
