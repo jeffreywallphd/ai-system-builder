@@ -43,3 +43,9 @@ Story 4.1.5 documents the authoritative orchestration posture for image manipula
 - Node-assignment and scheduler features extend queue/claim/dispatch seams without changing submission authority.
 - Result persistence extends output-handoff and logical-reference seams without redesigning run lifecycle contracts.
 - Monitoring/replay extends canonical run status/event contracts across desktop and thin-client surfaces.
+
+## Story 4.4.2 studio integration update
+- Image Manipulation Studio run launch now uses authoritative runtime run APIs through `RuntimeOperationsService` (shared runtime control client) rather than direct `startSystemExecution` launch calls.
+- Studio runtime UX state now follows normalized run lifecycle labels: `validating`, `queued`, `running`, `failed`, `completed`, `cancelled`.
+- Monitoring and cancellation in the image editor now operate on authoritative run identifiers from submission responses.
+- Persistence handoff remains after authoritative terminal status, preserving downstream result integration seams without reworking studio launch/monitoring architecture.
