@@ -21,6 +21,8 @@ import type {
 } from "../ports/IImageAssetRepository";
 import {
   ImageAssetStorageAccessPurposes,
+  ImageAssetStorageError,
+  ImageAssetStorageErrorCodes,
   ImageAssetStorageObjectAreas,
   type IImageAssetStoragePort,
 } from "../ports/ImageAssetStoragePort";
@@ -125,6 +127,7 @@ class WorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationRea
 
 class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   public openReadCallCount = 0;
+  public throwNotFoundOnOpen = false;
 
   async reserveStorageLocation(
     _request: Parameters<IImageAssetStoragePort["reserveStorageLocation"]>[0],
@@ -142,6 +145,15 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
     request: Parameters<IImageAssetStoragePort["openReadStream"]>[0],
   ): Promise<Awaited<ReturnType<IImageAssetStoragePort["openReadStream"]>>> {
     this.openReadCallCount += 1;
+    if (this.throwNotFoundOnOpen) {
+      throw new ImageAssetStorageError(
+        ImageAssetStorageErrorCodes.notFound,
+        "object missing",
+        {
+          retryable: true,
+        },
+      );
+    }
     expect(request.purpose).toBe(ImageAssetStorageAccessPurposes.downloadOriginal);
     expect(request.reference.area).toBe(ImageAssetStorageObjectAreas.original);
     return {
@@ -308,5 +320,39 @@ describe("GetImageAssetOriginalContentUseCase", () => {
     expect(outcome.error.details).toEqual(expect.objectContaining({
       imageManipulationFailure: expect.any(Object),
     }));
+  });
+
+  it("surfaces protected retrieval unavailability as a normalized temporarily-unavailable state", async () => {
+    const repository = new InMemoryImageAssetRepository();
+    const storagePort = new InMemoryImageAssetStoragePort();
+    storagePort.throwNotFoundOnOpen = true;
+    repository.assets.set("image-asset:001", createAvailableAsset());
+    repository.originalReferences.set("image-asset:001", Object.freeze({
+      storageInstanceId: "storage-alpha",
+      objectKey: "workspaces/workspace-alpha/image-assets/image-asset:001/original/image.png",
+      objectVersionId: "v1",
+    }));
+
+    const useCase = new GetImageAssetOriginalContentUseCase({
+      imageAssetRepository: repository,
+      imageAssetStoragePort: storagePort,
+      workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+    });
+
+    const outcome = await useCase.execute({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe(ImageAssetOriginalContentReadErrorCodes.contentUnavailable);
+    expect((outcome.error.details as { imageManipulationFailure?: { code?: string; resilience?: { state?: string } } } | undefined)
+      ?.imageManipulationFailure?.code).toBe("asset-retrieval-temporarily-unavailable");
+    expect((outcome.error.details as { imageManipulationFailure?: { resilience?: { state?: string } } } | undefined)
+      ?.imageManipulationFailure?.resilience?.state).toBe("temporarily-unavailable");
   });
 });

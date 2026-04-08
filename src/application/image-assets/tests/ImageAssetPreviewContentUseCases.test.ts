@@ -21,6 +21,8 @@ import type {
 } from "../ports/IImageAssetRepository";
 import {
   ImageAssetStorageAccessPurposes,
+  ImageAssetStorageError,
+  ImageAssetStorageErrorCodes,
   ImageAssetStorageObjectAreas,
   type IImageAssetStoragePort,
 } from "../ports/ImageAssetStoragePort";
@@ -127,6 +129,7 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   public openReadCallCount = 0;
 
   public allowResolvedPreviewHandle = true;
+  public throwCreateHandleNotFound = false;
 
   async reserveStorageLocation(
     _request: Parameters<IImageAssetStoragePort["reserveStorageLocation"]>[0],
@@ -158,6 +161,15 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   async createAccessHandle(
     _request: Parameters<IImageAssetStoragePort["createAccessHandle"]>[0],
   ): Promise<Awaited<ReturnType<IImageAssetStoragePort["createAccessHandle"]>>> {
+    if (this.throwCreateHandleNotFound) {
+      throw new ImageAssetStorageError(
+        ImageAssetStorageErrorCodes.notFound,
+        "preview source not found",
+        {
+          retryable: true,
+        },
+      );
+    }
     return Object.freeze({
       handleToken: "preview-token",
       expiresAt: "2026-04-08T10:05:00.000Z",
@@ -405,5 +417,39 @@ describe("Image asset preview use cases", () => {
       staleRequest: true,
       imageManipulationFailure: expect.any(Object),
     }));
+  });
+
+  it("reports preview-generation failure as temporarily unavailable with retry guidance", async () => {
+    const repository = new InMemoryImageAssetRepository();
+    const storagePort = new InMemoryImageAssetStoragePort();
+    storagePort.throwCreateHandleNotFound = true;
+    repository.assets.set("image-asset:001", createAvailableAsset());
+    repository.originalReferences.set("image-asset:001", Object.freeze({
+      storageInstanceId: "storage-alpha",
+      objectKey: "workspaces/workspace-alpha/image-assets/image-asset:001/original/image.png",
+    }));
+
+    const useCase = new RequestImageAssetPreviewContentUseCase({
+      imageAssetRepository: repository,
+      imageAssetStoragePort: storagePort,
+      workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+    });
+
+    const outcome = await useCase.execute({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      representation: "gallery",
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe("image-asset-preview-unavailable");
+    expect((outcome.error.details as { imageManipulationFailure?: { code?: string; resilience?: { state?: string } } } | undefined)
+      ?.imageManipulationFailure?.code).toBe("preview-temporarily-unavailable");
+    expect((outcome.error.details as { imageManipulationFailure?: { resilience?: { state?: string } } } | undefined)
+      ?.imageManipulationFailure?.resilience?.state).toBe("temporarily-unavailable");
   });
 });
