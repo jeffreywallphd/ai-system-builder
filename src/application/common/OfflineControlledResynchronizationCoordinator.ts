@@ -59,6 +59,36 @@ export interface AuthoritativeReplayExecutionResult {
   readonly nextEligibleReplayAt?: string;
 }
 
+export const OfflinePendingOperationCleanupClassifications = Object.freeze({
+  successful: "successful",
+  failed: "failed",
+  conflicted: "conflicted",
+  abandoned: "abandoned",
+});
+
+export type OfflinePendingOperationCleanupClassification =
+  typeof OfflinePendingOperationCleanupClassifications[keyof typeof OfflinePendingOperationCleanupClassifications];
+
+export const OfflinePendingOperationCleanupActions = Object.freeze({
+  removedFromQueue: "removed-from-queue",
+  retainedForReview: "retained-for-review",
+});
+
+export type OfflinePendingOperationCleanupAction =
+  typeof OfflinePendingOperationCleanupActions[keyof typeof OfflinePendingOperationCleanupActions];
+
+export interface OfflinePendingOperationCleanupRecord {
+  readonly operationId: string;
+  readonly resourceClass: OfflineResourceClass;
+  readonly resourceId: string;
+  readonly previousStatus: string;
+  readonly nextStatus: string;
+  readonly classification: OfflinePendingOperationCleanupClassification;
+  readonly cleanupAction: OfflinePendingOperationCleanupAction;
+  readonly reason: string;
+  readonly resolvedAt: string;
+}
+
 export interface OfflineAuthoritativeSnapshotFetchResponse
   extends Omit<CacheOfflineAuthoritativeSnapshotRequest, "cachedByActorUserIdentityId"> {}
 
@@ -96,6 +126,8 @@ export interface OfflineControlledResynchronizationResult {
   readonly replayedOperationIds: ReadonlyArray<string>;
   readonly appliedOperationIds: ReadonlyArray<string>;
   readonly refreshedSnapshotKeys: ReadonlyArray<string>;
+  readonly invalidatedSnapshotKeys: ReadonlyArray<string>;
+  readonly pendingOperationCleanupRecords: ReadonlyArray<OfflinePendingOperationCleanupRecord>;
   readonly outcomes: ReadonlyArray<OfflineReconciliationOutcomeDto>;
 }
 
@@ -137,6 +169,8 @@ export class OfflineControlledResynchronizationCoordinator {
         replayedOperationIds: Object.freeze([]),
         appliedOperationIds: Object.freeze([]),
         refreshedSnapshotKeys: Object.freeze([]),
+        invalidatedSnapshotKeys: Object.freeze([]),
+        pendingOperationCleanupRecords: Object.freeze([]),
         outcomes: Object.freeze([]),
       });
     }
@@ -172,39 +206,58 @@ export class OfflineControlledResynchronizationCoordinator {
     for (const revision of authoritativeRevisions) {
       revisionByResource.set(makeResourceKey(revision.resourceClass, revision.resourceId), revision);
     }
+    const refreshTargets = new Map<string, { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }>();
+    const invalidateTargets = new Map<string, { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }>();
+    const refreshedSnapshotKeys = new Set<string>();
+    const invalidatedSnapshotKeys = new Set<string>();
+    const pendingOperationCleanupRecords: OfflinePendingOperationCleanupRecord[] = [];
 
-    const staleCachedTargets = cachedSnapshots
-      .filter((cached) => {
-        const revision = revisionByResource.get(makeResourceKey(cached.resourceClass, cached.resourceId));
-        if (!revision) {
-          return false;
-        }
-        if (revision.authoritativeRevision !== cached.authoritativeRevision) {
-          return true;
-        }
-        if (
+    const queueRefreshTarget = (target: { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }) => {
+      if (!isServerAuthoritativeResourceClass(target.resourceClass)) {
+        return;
+      }
+
+      const key = makeResourceKey(target.resourceClass, target.resourceId);
+      if (!invalidateTargets.has(key)) {
+        refreshTargets.set(key, target);
+      }
+    };
+
+    const queueInvalidationTarget = (target: { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }) => {
+      if (!isServerAuthoritativeResourceClass(target.resourceClass)) {
+        return;
+      }
+
+      const key = makeResourceKey(target.resourceClass, target.resourceId);
+      invalidateTargets.set(key, target);
+      refreshTargets.delete(key);
+    };
+
+    for (const cached of cachedSnapshots) {
+      const revision = revisionByResource.get(makeResourceKey(cached.resourceClass, cached.resourceId));
+      if (!revision) {
+        continue;
+      }
+
+      if (shouldInvalidateCachedSnapshotFromRevision(revision)) {
+        queueInvalidationTarget({
+          resourceClass: cached.resourceClass,
+          resourceId: cached.resourceId,
+        });
+        continue;
+      }
+
+      if (
+        revision.authoritativeRevision !== cached.authoritativeRevision
+        || (
           revision.authoritativeSnapshotRevision
           && revision.authoritativeSnapshotRevision !== cached.authoritativeSnapshotRevision
-        ) {
-          return true;
-        }
-        return false;
-      })
-      .map((cached) => ({
-        resourceClass: cached.resourceClass,
-        resourceId: cached.resourceId,
-      }));
-
-    const refreshedSnapshotKeys = new Set<string>();
-    for (const target of staleCachedTargets) {
-      const refreshed = await this.refreshSnapshot({
-        workspaceId,
-        actorUserIdentityId,
-        resourceClass: target.resourceClass,
-        resourceId: target.resourceId,
-      });
-      if (refreshed) {
-        refreshedSnapshotKeys.add(makeResourceKey(target.resourceClass, target.resourceId));
+        )
+      ) {
+        queueRefreshTarget({
+          resourceClass: cached.resourceClass,
+          resourceId: cached.resourceId,
+        });
       }
     }
 
@@ -220,15 +273,28 @@ export class OfflineControlledResynchronizationCoordinator {
     const appliedOperationIds: string[] = [];
 
     for (const blockedOperation of blockedOperations) {
-      if (blockedOperation.reasonCode === "operation-not-pending") {
-        continue;
-      }
-
       const blockedRecord = await this.pendingOperationService.findQueuedOperation(
         workspaceId,
         blockedOperation.operationId,
       );
       if (!blockedRecord) {
+        continue;
+      }
+
+      if (blockedOperation.reasonCode === "operation-not-pending") {
+        pendingOperationCleanupRecords.push(Object.freeze({
+          operationId: blockedOperation.operationId,
+          resourceClass: blockedRecord.operation.targetResourceClass,
+          resourceId: blockedRecord.operation.targetResourceId,
+          previousStatus: blockedRecord.operation.userVisibleSyncStatus,
+          nextStatus: blockedRecord.operation.userVisibleSyncStatus,
+          classification: blockedRecord.operation.userVisibleSyncStatus === OfflineQueuedMutationStatuses.syncConflict
+            ? OfflinePendingOperationCleanupClassifications.conflicted
+            : OfflinePendingOperationCleanupClassifications.abandoned,
+          cleanupAction: OfflinePendingOperationCleanupActions.retainedForReview,
+          reason: blockedOperation.message,
+          resolvedAt: attemptedAt,
+        }));
         continue;
       }
 
@@ -245,6 +311,17 @@ export class OfflineControlledResynchronizationCoordinator {
           retryable: false,
           nonRetryableReasonCode: blockedOperation.reasonCode,
         });
+        pendingOperationCleanupRecords.push(Object.freeze({
+          operationId: blockedOperation.operationId,
+          resourceClass: blockedRecord.operation.targetResourceClass,
+          resourceId: blockedRecord.operation.targetResourceId,
+          previousStatus: blockedRecord.operation.userVisibleSyncStatus,
+          nextStatus: OfflineQueuedMutationStatuses.syncRejected,
+          classification: OfflinePendingOperationCleanupClassifications.abandoned,
+          cleanupAction: OfflinePendingOperationCleanupActions.retainedForReview,
+          reason: blockedOperation.message,
+          resolvedAt: attemptedAt,
+        }));
       }
 
       const blockedDecision = deriveDecisionFromBlockedReplayPreparation({
@@ -276,14 +353,34 @@ export class OfflineControlledResynchronizationCoordinator {
         makeResourceKey(preparedOperation.targetResourceClass, preparedOperation.targetResourceId),
       );
       if (decision.action !== OfflineResynchronizationActions.applyToAuthoritative) {
+        const nextStatus = decision.action === OfflineResynchronizationActions.conflictRequiresReview
+          ? OfflineQueuedMutationStatuses.syncConflict
+          : OfflineQueuedMutationStatuses.syncRejected;
         await this.pendingOperationService.markOperationReplayOutcome({
           workspaceId,
           operationId,
-          nextStatus: decision.action === OfflineResynchronizationActions.conflictRequiresReview
-            ? OfflineQueuedMutationStatuses.syncConflict
-            : OfflineQueuedMutationStatuses.syncRejected,
+          nextStatus,
           attemptedAt,
           incrementRetryCount: false,
+        });
+        pendingOperationCleanupRecords.push(Object.freeze({
+          operationId,
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+          previousStatus: preparedOperation.operationEnvelope.userVisibleSyncStatus,
+          nextStatus,
+          classification: decision.action === OfflineResynchronizationActions.conflictRequiresReview
+            ? OfflinePendingOperationCleanupClassifications.conflicted
+            : OfflinePendingOperationCleanupClassifications.abandoned,
+          cleanupAction: OfflinePendingOperationCleanupActions.retainedForReview,
+          reason: decision.reason,
+          resolvedAt: attemptedAt,
+        }));
+        schedulePostOutcomeSnapshotMaintenance(decision, {
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+          queueRefreshTarget,
+          queueInvalidationTarget,
         });
         outcomes.push(toOfflineReconciliationOutcomeDto(decision, {
           resolvedAt: attemptedAt,
@@ -308,6 +405,17 @@ export class OfflineControlledResynchronizationCoordinator {
       if (replayResult.kind === AuthoritativeReplayExecutionResultKinds.applied) {
         await this.pendingOperationService.markOperationAsApplied(workspaceId, operationId);
         appliedOperationIds.push(operationId);
+        pendingOperationCleanupRecords.push(Object.freeze({
+          operationId,
+          resourceClass: preparedOperation.targetResourceClass,
+          resourceId: preparedOperation.targetResourceId,
+          previousStatus: preparedOperation.operationEnvelope.userVisibleSyncStatus,
+          nextStatus: OfflineQueuedMutationStatuses.syncApplied,
+          classification: OfflinePendingOperationCleanupClassifications.successful,
+          cleanupAction: OfflinePendingOperationCleanupActions.removedFromQueue,
+          reason: normalizeOptional(replayResult.reason) ?? decision.reason,
+          resolvedAt: attemptedAt,
+        }));
         const appliedDecision = Object.freeze({
           ...decision,
           reason: normalizeOptional(replayResult.reason) ?? decision.reason,
@@ -319,16 +427,10 @@ export class OfflineControlledResynchronizationCoordinator {
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         }));
-
-        const refreshed = await this.refreshSnapshot({
-          workspaceId,
-          actorUserIdentityId,
+        queueRefreshTarget({
           resourceClass: preparedOperation.targetResourceClass,
           resourceId: preparedOperation.targetResourceId,
         });
-        if (refreshed) {
-          refreshedSnapshotKeys.add(makeResourceKey(preparedOperation.targetResourceClass, preparedOperation.targetResourceId));
-        }
         continue;
       }
 
@@ -347,6 +449,29 @@ export class OfflineControlledResynchronizationCoordinator {
         retryable: replayResult.retryable,
         nextEligibleReplayAt: replayResult.nextEligibleReplayAt,
       });
+      pendingOperationCleanupRecords.push(Object.freeze({
+        operationId,
+        resourceClass: preparedOperation.targetResourceClass,
+        resourceId: preparedOperation.targetResourceId,
+        previousStatus: preparedOperation.operationEnvelope.userVisibleSyncStatus,
+        nextStatus: replayDecision.action === OfflineResynchronizationActions.rejectNotAllowed
+          ? OfflineQueuedMutationStatuses.syncRejected
+          : OfflineQueuedMutationStatuses.syncConflict,
+        classification: replayResult.kind === AuthoritativeReplayExecutionResultKinds.failed
+          ? OfflinePendingOperationCleanupClassifications.failed
+          : replayDecision.action === OfflineResynchronizationActions.conflictRequiresReview
+            ? OfflinePendingOperationCleanupClassifications.conflicted
+            : OfflinePendingOperationCleanupClassifications.abandoned,
+        cleanupAction: OfflinePendingOperationCleanupActions.retainedForReview,
+        reason: replayDecision.reason,
+        resolvedAt: attemptedAt,
+      }));
+      schedulePostOutcomeSnapshotMaintenance(replayDecision, {
+        resourceClass: preparedOperation.targetResourceClass,
+        resourceId: preparedOperation.targetResourceId,
+        queueRefreshTarget,
+        queueInvalidationTarget,
+      });
       outcomes.push(toOfflineReconciliationOutcomeDto(replayDecision, {
         resolvedAt: attemptedAt,
         conflictCode: replayDecision.conflictClass,
@@ -359,6 +484,53 @@ export class OfflineControlledResynchronizationCoordinator {
       }));
     }
 
+    for (const key of [...invalidateTargets.keys()].sort((left, right) => left.localeCompare(right))) {
+      const target = invalidateTargets.get(key);
+      if (!target) {
+        continue;
+      }
+
+      const invalidated = await this.snapshotCacheService.deleteSnapshot({
+        workspaceId,
+        resourceClass: target.resourceClass,
+        resourceId: target.resourceId,
+      });
+      if (invalidated) {
+        invalidatedSnapshotKeys.add(key);
+      }
+    }
+
+    for (const key of [...refreshTargets.keys()].sort((left, right) => left.localeCompare(right))) {
+      if (invalidateTargets.has(key)) {
+        continue;
+      }
+
+      const target = refreshTargets.get(key);
+      if (!target) {
+        continue;
+      }
+
+      const refreshed = await this.refreshSnapshot({
+        workspaceId,
+        actorUserIdentityId,
+        resourceClass: target.resourceClass,
+        resourceId: target.resourceId,
+      });
+      if (refreshed) {
+        refreshedSnapshotKeys.add(key);
+        continue;
+      }
+
+      const invalidated = await this.snapshotCacheService.deleteSnapshot({
+        workspaceId,
+        resourceClass: target.resourceClass,
+        resourceId: target.resourceId,
+      });
+      if (invalidated) {
+        invalidatedSnapshotKeys.add(key);
+      }
+    }
+
     return Object.freeze({
       workspaceId,
       attemptedAt,
@@ -369,6 +541,10 @@ export class OfflineControlledResynchronizationCoordinator {
       replayedOperationIds: Object.freeze(replayedOperationIds),
       appliedOperationIds: Object.freeze(appliedOperationIds),
       refreshedSnapshotKeys: Object.freeze([...refreshedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
+      invalidatedSnapshotKeys: Object.freeze([...invalidatedSnapshotKeys.values()].sort((left, right) => left.localeCompare(right))),
+      pendingOperationCleanupRecords: Object.freeze(
+        [...pendingOperationCleanupRecords].sort((left, right) => left.operationId.localeCompare(right.operationId)),
+      ),
       outcomes: Object.freeze(outcomes),
     });
   }
@@ -411,6 +587,59 @@ function dedupeResourceTargets(
   }
 
   return Object.freeze([...map.values()]);
+}
+
+function shouldInvalidateCachedSnapshotFromRevision(revision: AuthoritativeResourceRevisionSnapshot): boolean {
+  return revision.resourceExists === false || revision.accessRevoked === true || revision.permissionAllowsReplay === false;
+}
+
+function schedulePostOutcomeSnapshotMaintenance(
+  decision: {
+    readonly action: typeof OfflineResynchronizationActions[keyof typeof OfflineResynchronizationActions];
+    readonly conflictClass?: OfflineResynchronizationConflictClass;
+  },
+  input: {
+    readonly resourceClass: OfflineResourceClass;
+    readonly resourceId: string;
+    readonly queueRefreshTarget: (target: { readonly resourceClass: OfflineResourceClass; readonly resourceId: string }) => void;
+    readonly queueInvalidationTarget: (
+      target: { readonly resourceClass: OfflineResourceClass; readonly resourceId: string },
+    ) => void;
+  },
+): void {
+  if (!isServerAuthoritativeResourceClass(input.resourceClass)) {
+    return;
+  }
+
+  if (decision.action === OfflineResynchronizationActions.applyToAuthoritative) {
+    input.queueRefreshTarget({
+      resourceClass: input.resourceClass,
+      resourceId: input.resourceId,
+    });
+    return;
+  }
+
+  if (
+    decision.conflictClass === OfflineResynchronizationConflictClasses.deletedOrRevokedResource
+    || decision.conflictClass === OfflineResynchronizationConflictClasses.permissionChangedDuringDisconnection
+    || decision.conflictClass === OfflineResynchronizationConflictClasses.invalidatedRunSubmission
+  ) {
+    input.queueInvalidationTarget({
+      resourceClass: input.resourceClass,
+      resourceId: input.resourceId,
+    });
+    return;
+  }
+
+  input.queueRefreshTarget({
+    resourceClass: input.resourceClass,
+    resourceId: input.resourceId,
+  });
+}
+
+function isServerAuthoritativeResourceClass(resourceClass: OfflineResourceClass): boolean {
+  return resolveOfflineResourceAuthorityBoundary(resourceClass).authoritativeStateScope
+    === OfflineAuthorityScopes.authoritativeServer;
 }
 
 function deriveDecisionFromAuthoritativeReplayResult(input: {

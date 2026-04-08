@@ -132,8 +132,11 @@ Reconnect decisions are explicit and bounded:
 4. replay only eligible operations through authoritative API ports in deterministic dependency order.
 5. persist explicit replay outcomes (`sync-conflict`/`sync-rejected`) and remove queue entries only after authoritative apply confirmation.
 6. refresh local authoritative snapshot cache for stale cached resources and successfully replayed targets.
+   - invalidate cached snapshots when authoritative revisions indicate resource deletion/revocation, replay-permission loss, or invalidated run submissions.
+   - if stale cached resources cannot be refreshed after reconnect, invalidate them to avoid stale-authoritative appearance.
 7. surface blocked replay operations with structured reason metadata (reason code/message/dependency blockers) instead of opaque id-only reporting.
 8. treat terminal blocked replay states (`retry-exhausted`, `non-retryable`) as explicit rejected outcomes and preserve the local unsynced record for manual intervention.
+9. emit explicit pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with remove-vs-retain actions so post-sync local-state transitions are queryable.
 
 Enforced by:
 - `planOfflineResynchronization(...)`
