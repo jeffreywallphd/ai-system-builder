@@ -3,6 +3,7 @@ import {
   type ExecutionNodeActivationStatus,
   type ExecutionNodeBackendFamilyCapability,
   type ExecutionNodeHealthStatus,
+  type ExecutionNodeOperationalAvailabilityMode,
   type ExecutionNodeRecord,
 } from "@domain/nodes/ExecutionNodeDomain";
 import {
@@ -35,6 +36,10 @@ export interface ExecutionNodeRow {
   readonly trust_state: NodeTrustState;
   readonly activation_status: ExecutionNodeActivationStatus;
   readonly health_status: ExecutionNodeHealthStatus;
+  readonly availability_override_mode: ExecutionNodeOperationalAvailabilityMode;
+  readonly availability_override_suppressed_until: string | null;
+  readonly availability_override_reason: string | null;
+  readonly availability_override_updated_at: string;
   readonly deployment_tags_json: string;
   readonly endpoint_ref: string;
   readonly configuration_ref: string | null;
@@ -80,6 +85,12 @@ export function mapExecutionNodeRowToRecord(row: ExecutionNodeRow): ExecutionNod
     trustState: assertNodeTrustState(row.trust_state),
     activationStatus: assertActivationStatus(row.activation_status),
     healthStatus: assertHealthStatus(row.health_status),
+    availabilityOverride: {
+      mode: assertOperationalAvailabilityMode(row.availability_override_mode),
+      suppressedUntil: normalizePersistenceLookup(row.availability_override_suppressed_until),
+      reason: normalizePersistenceLookup(row.availability_override_reason),
+      updatedAt: row.availability_override_updated_at,
+    },
     deploymentTags: parseStringArray(row.deployment_tags_json),
     endpoint: {
       endpointRef: row.endpoint_ref,
@@ -114,6 +125,10 @@ export function mapExecutionNodeRecordToRowValues(input: {
     input.record.trustState,
     input.record.activationStatus,
     input.record.healthStatus,
+    input.record.availabilityOverride.mode,
+    input.record.availabilityOverride.suppressedUntil ?? null,
+    input.record.availabilityOverride.reason ?? null,
+    input.record.availabilityOverride.updatedAt,
     JSON.stringify(input.record.deploymentTags),
     input.record.endpoint.endpointRef,
     input.record.endpoint.configurationRef ?? null,
@@ -325,4 +340,13 @@ function assertHealthStatus(value: string): ExecutionNodeHealthStatus {
   }
 
   throw new Error(`Persisted execution node health status '${value}' is invalid.`);
+}
+
+function assertOperationalAvailabilityMode(value: string): ExecutionNodeOperationalAvailabilityMode {
+  const allowed: ExecutionNodeOperationalAvailabilityMode[] = ["enabled", "disabled", "suppressed"];
+  if (allowed.includes(value as ExecutionNodeOperationalAvailabilityMode)) {
+    return value as ExecutionNodeOperationalAvailabilityMode;
+  }
+
+  throw new Error(`Persisted execution node operational availability mode '${value}' is invalid.`);
 }

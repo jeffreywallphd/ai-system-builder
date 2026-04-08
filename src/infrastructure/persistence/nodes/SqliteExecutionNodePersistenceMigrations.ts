@@ -1,4 +1,4 @@
-export const EXECUTION_NODE_PERSISTENCE_SCHEMA_VERSION = 1;
+export const EXECUTION_NODE_PERSISTENCE_SCHEMA_VERSION = 2;
 
 export const EXECUTION_NODE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [number, string]> = Object.freeze([
   [1, `
@@ -145,5 +145,23 @@ export const EXECUTION_NODE_PERSISTENCE_MIGRATIONS: ReadonlyArray<readonly [numb
       ON execution_node_status_history(history_kind, changed_at DESC, history_entry_id DESC);
     CREATE INDEX IF NOT EXISTS execution_node_status_history_operation_idx
       ON execution_node_status_history(operation_key, node_id, changed_at DESC);
+  `],
+  [2, `
+    ALTER TABLE execution_node_records
+      ADD COLUMN availability_override_mode TEXT NOT NULL DEFAULT 'enabled'
+      CHECK (availability_override_mode IN ('enabled', 'disabled', 'suppressed'));
+    ALTER TABLE execution_node_records
+      ADD COLUMN availability_override_suppressed_until TEXT;
+    ALTER TABLE execution_node_records
+      ADD COLUMN availability_override_reason TEXT;
+    ALTER TABLE execution_node_records
+      ADD COLUMN availability_override_updated_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z';
+
+    UPDATE execution_node_records
+      SET availability_override_updated_at = last_modified_at
+      WHERE availability_override_updated_at = '1970-01-01T00:00:00.000Z';
+
+    CREATE INDEX IF NOT EXISTS execution_node_records_availability_override_idx
+      ON execution_node_records(availability_override_mode, availability_override_suppressed_until, last_modified_at DESC);
   `],
 ]);

@@ -33,7 +33,7 @@ describe("execution node persistence documentation", () => {
     expect(doc).toContain("execution_node_status_history");
     expect(doc).toContain("execution_node_mutation_replays");
     expect(doc).toContain("SqliteExecutionNodeRepository.ts");
-    expect(doc).toContain("schema version is `1`");
+    expect(doc).toContain("schema version is `2`");
   });
 
   it("keeps architecture indexes discoverable for execution-node persistence docs", () => {

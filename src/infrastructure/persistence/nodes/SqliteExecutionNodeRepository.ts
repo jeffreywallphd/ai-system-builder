@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   recordExecutionNodeHealth,
+  setExecutionNodeOperationalAvailabilityOverride,
   setExecutionNodeBackendFamilyCapabilities,
   transitionExecutionNodeActivationStatus,
   type ExecutionNodeRecord,
@@ -12,6 +13,7 @@ import type {
   IExecutionNodeRepository,
   RegisterExecutionNodeInput,
   UpdateExecutionNodeAvailabilityInput,
+  UpdateExecutionNodeOperationalAvailabilityInput,
   UpdateExecutionNodeCapabilitiesInput,
   UpdateExecutionNodeHealthInput,
 } from "@application/nodes/ports/ExecutionNodeManagementPorts";
@@ -103,6 +105,7 @@ export class SqliteExecutionNodeRepository
 
     whereBuilder.addIn("n.activation_status", query.activationStatuses);
     whereBuilder.addIn("n.health_status", query.healthStatuses);
+    whereBuilder.addIn("n.availability_override_mode", query.operationalAvailabilityModes);
     whereBuilder.addIn("n.approval_status", query.approvalStatuses);
     whereBuilder.addIn("n.trust_state", query.trustStates);
 
@@ -198,6 +201,10 @@ export class SqliteExecutionNodeRepository
         n.trust_state,
         n.activation_status,
         n.health_status,
+        n.availability_override_mode,
+        n.availability_override_suppressed_until,
+        n.availability_override_reason,
+        n.availability_override_updated_at,
         n.deployment_tags_json,
         n.endpoint_ref,
         n.configuration_ref,
@@ -323,6 +330,33 @@ export class SqliteExecutionNodeRepository
     });
   }
 
+  public async updateExecutionNodeOperationalAvailability(
+    input: UpdateExecutionNodeOperationalAvailabilityInput,
+  ): Promise<ExecutionNodeMutationResult> {
+    const existing = await this.findExecutionNodeById(input.nodeId);
+    if (!existing) {
+      throw new Error(`Execution node '${input.nodeId}' was not found.`);
+    }
+
+    const record = setExecutionNodeOperationalAvailabilityOverride(existing, {
+      mode: input.mode,
+      updatedAt: input.changedAt,
+      suppressedUntil: input.suppressedUntil,
+      reason: input.mutation.reason,
+    });
+
+    return this.persistExecutionNode({
+      mutationKind: "update-availability",
+      historyKind: "availability-change",
+      input: {
+        record,
+        mutation: input.mutation,
+      },
+      observedAt: input.changedAt,
+      details: input.details,
+    });
+  }
+
   public async runInTransaction<TValue>(operation: () => Promise<TValue>): Promise<TValue> {
     return this.transactionCoordinator.runInTransaction(operation);
   }
@@ -409,6 +443,10 @@ export class SqliteExecutionNodeRepository
               trust_state,
               activation_status,
               health_status,
+              availability_override_mode,
+              availability_override_suppressed_until,
+              availability_override_reason,
+              availability_override_updated_at,
               deployment_tags_json,
               endpoint_ref,
               configuration_ref,
@@ -420,7 +458,7 @@ export class SqliteExecutionNodeRepository
               last_modified_at,
               last_modified_by,
               revision
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(node_id) DO UPDATE SET
               display_name = excluded.display_name,
               node_type = excluded.node_type,
@@ -433,6 +471,10 @@ export class SqliteExecutionNodeRepository
               trust_state = excluded.trust_state,
               activation_status = excluded.activation_status,
               health_status = excluded.health_status,
+              availability_override_mode = excluded.availability_override_mode,
+              availability_override_suppressed_until = excluded.availability_override_suppressed_until,
+              availability_override_reason = excluded.availability_override_reason,
+              availability_override_updated_at = excluded.availability_override_updated_at,
               deployment_tags_json = excluded.deployment_tags_json,
               endpoint_ref = excluded.endpoint_ref,
               configuration_ref = excluded.configuration_ref,
@@ -622,6 +664,10 @@ export class SqliteExecutionNodeRepository
         trust_state,
         activation_status,
         health_status,
+        availability_override_mode,
+        availability_override_suppressed_until,
+        availability_override_reason,
+        availability_override_updated_at,
         deployment_tags_json,
         endpoint_ref,
         configuration_ref,
@@ -697,6 +743,10 @@ export class SqliteExecutionNodeRepository
       trust_state: record.trustState,
       activation_status: record.activationStatus,
       health_status: record.healthStatus,
+      availability_override_mode: record.availabilityOverride.mode,
+      availability_override_suppressed_until: record.availabilityOverride.suppressedUntil ?? null,
+      availability_override_reason: record.availabilityOverride.reason ?? null,
+      availability_override_updated_at: record.availabilityOverride.updatedAt,
       deployment_tags_json: JSON.stringify(record.deploymentTags),
       endpoint_ref: record.endpoint.endpointRef,
       configuration_ref: record.endpoint.configurationRef ?? null,

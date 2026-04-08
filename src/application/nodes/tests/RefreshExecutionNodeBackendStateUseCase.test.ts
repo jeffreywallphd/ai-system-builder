@@ -104,6 +104,43 @@ class InMemoryExecutionNodeRepository implements IExecutionNodeRepository {
       mutation: input.mutation,
     });
   }
+
+  public async updateExecutionNodeOperationalAvailability(input: {
+    readonly nodeId: string;
+    readonly mode: "enabled" | "disabled" | "suppressed";
+    readonly suppressedUntil?: string;
+    readonly changedAt: string;
+    readonly mutation: {
+      readonly operationKey: string;
+      readonly actorId: string;
+      readonly occurredAt?: string;
+      readonly correlationId?: string;
+      readonly expectedRevision?: number;
+      readonly reason?: string;
+    };
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<ExecutionNodeMutationResult> {
+    const existing = this.records.get(input.nodeId);
+    if (!existing) {
+      throw new Error(`Execution node '${input.nodeId}' was not found.`);
+    }
+
+    const next = createExecutionNodeRecord({
+      ...existing,
+      availabilityOverride: {
+        mode: input.mode,
+        suppressedUntil: input.suppressedUntil,
+        reason: input.mutation.reason,
+        updatedAt: input.changedAt,
+      },
+      updatedAt: input.changedAt,
+    });
+
+    return this.saveExecutionNode({
+      record: next,
+      mutation: input.mutation,
+    });
+  }
 }
 
 class StaticCapabilityProbePort implements IImageManipulationExecutionCapabilityPort {

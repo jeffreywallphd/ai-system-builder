@@ -47,6 +47,13 @@ class InMemoryExecutionNodeRepository implements IExecutionNodeRepository {
       if (query.healthStatuses && query.healthStatuses.length > 0 && !query.healthStatuses.includes(record.healthStatus)) {
         return false;
       }
+      if (
+        query.operationalAvailabilityModes
+        && query.operationalAvailabilityModes.length > 0
+        && !query.operationalAvailabilityModes.includes(record.availabilityOverride.mode)
+      ) {
+        return false;
+      }
       if (query.approvalStatuses && query.approvalStatuses.length > 0 && !query.approvalStatuses.includes(record.approvalStatus)) {
         return false;
       }
@@ -176,6 +183,41 @@ class InMemoryExecutionNodeRepository implements IExecutionNodeRepository {
       healthStatus: input.healthStatus ?? existing.healthStatus,
       updatedAt: input.changedAt,
       lastSeenAt: input.changedAt,
+    });
+    return this.saveExecutionNode({
+      record: next,
+      mutation: input.mutation,
+    });
+  }
+
+  public async updateExecutionNodeOperationalAvailability(input: {
+    readonly nodeId: string;
+    readonly mode: "enabled" | "disabled" | "suppressed";
+    readonly suppressedUntil?: string;
+    readonly changedAt: string;
+    readonly mutation: {
+      readonly operationKey: string;
+      readonly actorId: string;
+      readonly occurredAt?: string;
+      readonly correlationId?: string;
+      readonly expectedRevision?: number;
+      readonly reason?: string;
+    };
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<ExecutionNodeMutationResult> {
+    const existing = this.records.get(input.nodeId);
+    if (!existing) {
+      throw new Error(`Execution node '${input.nodeId}' was not found.`);
+    }
+    const next = createExecutionNodeRecord({
+      ...existing,
+      availabilityOverride: {
+        mode: input.mode,
+        suppressedUntil: input.suppressedUntil,
+        reason: input.mutation.reason,
+        updatedAt: input.changedAt,
+      },
+      updatedAt: input.changedAt,
     });
     return this.saveExecutionNode({
       record: next,

@@ -45,6 +45,8 @@ describe("ExecutionNodeManagementApiContracts", () => {
         supportsRemoteScheduling: true,
         deploymentTags: ["gpu", "prod"],
         certificateAssigned: false,
+        availabilityOverrideMode: "enabled",
+        availabilityOverrideUpdatedAt: "2026-04-08T19:29:00.000Z",
       },
       backendFamilies: ["comfyui"],
       endpointRef: "https://internal.example/node/1",
@@ -74,6 +76,8 @@ describe("ExecutionNodeManagementApiContracts", () => {
         supportsRemoteScheduling: true,
         deploymentTags: ["hybrid"],
         certificateAssigned: true,
+        availabilityOverrideMode: "enabled",
+        availabilityOverrideUpdatedAt: "2026-04-08T19:25:00.000Z",
       },
       backendFamilies: ["comfyui"],
       backendCapabilities: [{

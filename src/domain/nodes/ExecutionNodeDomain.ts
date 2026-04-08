@@ -42,6 +42,22 @@ export const ExecutionNodeActivationStatuses = Object.freeze({
 export type ExecutionNodeActivationStatus =
   typeof ExecutionNodeActivationStatuses[keyof typeof ExecutionNodeActivationStatuses];
 
+export const ExecutionNodeOperationalAvailabilityModes = Object.freeze({
+  enabled: "enabled",
+  disabled: "disabled",
+  suppressed: "suppressed",
+});
+
+export type ExecutionNodeOperationalAvailabilityMode =
+  typeof ExecutionNodeOperationalAvailabilityModes[keyof typeof ExecutionNodeOperationalAvailabilityModes];
+
+export interface ExecutionNodeOperationalAvailabilityOverride {
+  readonly mode: ExecutionNodeOperationalAvailabilityMode;
+  readonly suppressedUntil?: string;
+  readonly reason?: string;
+  readonly updatedAt: string;
+}
+
 export const ExecutionNodeHealthStatuses = Object.freeze({
   unknown: "unknown",
   ready: "ready",
@@ -114,6 +130,7 @@ export interface ExecutionNodeRecord {
   readonly trustState: NodeTrustState;
   readonly activationStatus: ExecutionNodeActivationStatus;
   readonly healthStatus: ExecutionNodeHealthStatus;
+  readonly availabilityOverride: ExecutionNodeOperationalAvailabilityOverride;
   readonly deploymentTags: ReadonlyArray<string>;
   readonly endpoint: ExecutionNodeEndpointReference;
   readonly certificateRef?: string;
@@ -221,6 +238,40 @@ function normalizeHealthStatus(value?: ExecutionNodeHealthStatus): ExecutionNode
     throw new ExecutionNodeDomainError(`Execution node health status '${String(value)}' is invalid.`);
   }
   return normalized;
+}
+
+function normalizeOperationalAvailabilityOverride(
+  value: ExecutionNodeOperationalAvailabilityOverride | undefined,
+  fallbackUpdatedAt: string,
+): ExecutionNodeOperationalAvailabilityOverride {
+  const mode = value?.mode ?? ExecutionNodeOperationalAvailabilityModes.enabled;
+  if (!Object.values(ExecutionNodeOperationalAvailabilityModes).includes(mode)) {
+    throw new ExecutionNodeDomainError(`Execution node availability override mode '${String(value?.mode)}' is invalid.`);
+  }
+
+  const updatedAt = normalizeIsoTimestamp(value?.updatedAt ?? fallbackUpdatedAt, "Execution node availability override updatedAt");
+  const suppressedUntil = value?.suppressedUntil
+    ? normalizeIsoTimestamp(value.suppressedUntil, "Execution node availability override suppressedUntil")
+    : undefined;
+  const reason = normalizeOptional(value?.reason);
+
+  if (mode === ExecutionNodeOperationalAvailabilityModes.suppressed) {
+    if (!suppressedUntil) {
+      throw new ExecutionNodeDomainError("Execution node suppressed availability override requires suppressedUntil.");
+    }
+    if (Date.parse(suppressedUntil) <= Date.parse(updatedAt)) {
+      throw new ExecutionNodeDomainError("Execution node suppressedUntil must be later than availability override updatedAt.");
+    }
+  } else if (suppressedUntil) {
+    throw new ExecutionNodeDomainError("Execution node suppressedUntil is only allowed for suppressed availability override mode.");
+  }
+
+  return Object.freeze({
+    mode,
+    suppressedUntil,
+    reason,
+    updatedAt,
+  });
 }
 
 function normalizeBackendReadinessProfile(
@@ -445,6 +496,7 @@ export function createExecutionNodeRecord(input: {
   readonly trustState?: NodeTrustState;
   readonly activationStatus?: ExecutionNodeActivationStatus;
   readonly healthStatus?: ExecutionNodeHealthStatus;
+  readonly availabilityOverride?: ExecutionNodeOperationalAvailabilityOverride;
   readonly deploymentTags?: ReadonlyArray<string>;
   readonly endpoint: ExecutionNodeEndpointReference;
   readonly certificateRef?: string;
@@ -471,6 +523,7 @@ export function createExecutionNodeRecord(input: {
     trustState: input.trustState ?? NodeTrustStates.pendingEnrollment,
     activationStatus: normalizeActivationStatus(input.activationStatus),
     healthStatus: normalizeHealthStatus(input.healthStatus),
+    availabilityOverride: normalizeOperationalAvailabilityOverride(input.availabilityOverride, updatedAt),
     deploymentTags: normalizeStringSet(input.deploymentTags),
     endpoint: normalizeEndpoint(input.endpoint),
     certificateRef: normalizeOptional(input.certificateRef),
@@ -484,6 +537,25 @@ export function createExecutionNodeRecord(input: {
 
   assertExecutionNodeState(record);
   return record;
+}
+
+export function resolveExecutionNodeOperationalAvailabilityMode(
+  node: ExecutionNodeRecord,
+  now: Date | string = new Date(),
+): ExecutionNodeOperationalAvailabilityMode {
+  if (node.availabilityOverride.mode !== ExecutionNodeOperationalAvailabilityModes.suppressed) {
+    return node.availabilityOverride.mode;
+  }
+
+  const nowIso = normalizeIsoTimestamp(now, "Execution node availability evaluation now");
+  const suppressedUntil = node.availabilityOverride.suppressedUntil;
+  if (!suppressedUntil) {
+    return ExecutionNodeOperationalAvailabilityModes.enabled;
+  }
+
+  return Date.parse(nowIso) < Date.parse(suppressedUntil)
+    ? ExecutionNodeOperationalAvailabilityModes.suppressed
+    : ExecutionNodeOperationalAvailabilityModes.enabled;
 }
 
 export function transitionExecutionNodeActivationStatus(
@@ -541,6 +613,35 @@ export function setExecutionNodeBackendFamilyCapabilities(
   return updated;
 }
 
+export function setExecutionNodeOperationalAvailabilityOverride(
+  node: ExecutionNodeRecord,
+  input: {
+    readonly mode: ExecutionNodeOperationalAvailabilityMode;
+    readonly updatedAt?: Date | string;
+    readonly suppressedUntil?: Date | string;
+    readonly reason?: string;
+  },
+): ExecutionNodeRecord {
+  const updatedAt = normalizeIsoTimestamp(input.updatedAt ?? new Date(), "Execution node availability override updatedAt");
+  const nextOverride = normalizeOperationalAvailabilityOverride({
+    mode: input.mode,
+    suppressedUntil: input.suppressedUntil
+      ? normalizeIsoTimestamp(input.suppressedUntil, "Execution node availability override suppressedUntil")
+      : undefined,
+    reason: normalizeOptional(input.reason),
+    updatedAt,
+  }, updatedAt);
+
+  const updated: ExecutionNodeRecord = Object.freeze({
+    ...node,
+    availabilityOverride: nextOverride,
+    updatedAt,
+  });
+
+  assertExecutionNodeState(updated);
+  return updated;
+}
+
 function hasCapabilities(
   profile: NodeCapabilityProfile,
   required: ReadonlyArray<NodeRoleCapability>,
@@ -583,6 +684,14 @@ export function evaluateImageExecutionNodeEligibility(
   }
   if (node.activationStatus === ExecutionNodeActivationStatuses.revoked || node.trustState === NodeTrustStates.revoked) {
     reasons.push("node-revoked");
+  }
+
+  const availabilityMode = resolveExecutionNodeOperationalAvailabilityMode(node, input?.now ?? new Date());
+  if (availabilityMode === ExecutionNodeOperationalAvailabilityModes.disabled) {
+    reasons.push("node-disabled-by-policy");
+  }
+  if (availabilityMode === ExecutionNodeOperationalAvailabilityModes.suppressed) {
+    reasons.push("node-suppressed-by-policy");
   }
 
   const allowedActivationStatuses = allowDegraded
@@ -798,7 +907,10 @@ function evaluateBackendFamilyCompatibility(
 }
 
 function classifyEligibilityReason(reason: string): ImageExecutionNodeCompatibilityFinding {
-  const kind = reason === "node-health-not-routable" || reason === "node-last-seen-missing" || reason === "node-last-seen-stale"
+  const kind = reason === "node-health-not-routable"
+      || reason === "node-last-seen-missing"
+      || reason === "node-last-seen-stale"
+      || reason === "node-suppressed-by-policy"
     ? ImageExecutionNodeCompatibilityFindingKinds.transientAvailability
     : ImageExecutionNodeCompatibilityFindingKinds.hardIncompatibility;
 
@@ -815,6 +927,8 @@ function classifyEligibilityReason(reason: string): ImageExecutionNodeCompatibil
     "node-backend-family-unsupported": "Node does not support the required backend family.",
     "node-last-seen-missing": "Node freshness cannot be verified because last-seen is missing.",
     "node-last-seen-stale": "Node freshness is stale for current routing policy.",
+    "node-disabled-by-policy": "Node is administratively disabled for execution routing.",
+    "node-suppressed-by-policy": "Node execution eligibility is temporarily suppressed by operational policy.",
   });
 
   return Object.freeze({

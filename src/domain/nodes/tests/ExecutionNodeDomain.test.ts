@@ -18,6 +18,7 @@ import {
   evaluateImageExecutionNodeEligibility,
   isExecutionNodeActivationTransitionAllowed,
   recordExecutionNodeHealth,
+  setExecutionNodeOperationalAvailabilityOverride,
   transitionExecutionNodeActivationStatus,
 } from "../ExecutionNodeDomain";
 
@@ -187,6 +188,42 @@ describe("ExecutionNodeDomain", () => {
     });
     expect(unsupportedBackend.isEligible).toBeFalse();
     expect(unsupportedBackend.reasons).toContain("node-backend-family-unsupported");
+  });
+
+  it("treats operational availability overrides independently from backend health probes", () => {
+    const node = createTrustedExecutionNode();
+    const disabled = setExecutionNodeOperationalAvailabilityOverride(node, {
+      mode: "disabled",
+      updatedAt: "2026-04-08T12:05:00.000Z",
+      reason: "manual admin gate",
+    });
+
+    const disabledEligibility = evaluateImageExecutionNodeEligibility(disabled, {
+      requiredBackendFamily: "adapter.comfyui.image-manipulation",
+      requiredExecutionTarget: ExecutionNodeTargetKinds.imageManipulation,
+      now: "2026-04-08T12:06:00.000Z",
+    });
+    expect(disabledEligibility.isEligible).toBeFalse();
+    expect(disabledEligibility.reasons).toContain("node-disabled-by-policy");
+
+    const suppressed = setExecutionNodeOperationalAvailabilityOverride(node, {
+      mode: "suppressed",
+      updatedAt: "2026-04-08T12:05:00.000Z",
+      suppressedUntil: "2026-04-08T12:15:00.000Z",
+      reason: "temporary suppression",
+    });
+    const suppressedEligibility = evaluateImageExecutionNodeEligibility(suppressed, {
+      requiredBackendFamily: "adapter.comfyui.image-manipulation",
+      now: "2026-04-08T12:06:00.000Z",
+    });
+    expect(suppressedEligibility.isEligible).toBeFalse();
+    expect(suppressedEligibility.reasons).toContain("node-suppressed-by-policy");
+
+    const suppressionExpired = evaluateImageExecutionNodeEligibility(suppressed, {
+      requiredBackendFamily: "adapter.comfyui.image-manipulation",
+      now: "2026-04-08T12:16:00.000Z",
+    });
+    expect(suppressionExpired.isEligible).toBeTrue();
   });
 
   it("distinguishes hard incompatibilities and soft advisories for workflow-to-node compatibility", () => {

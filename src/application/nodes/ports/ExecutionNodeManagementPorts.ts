@@ -3,6 +3,7 @@ import type {
   ExecutionNodeActivationStatus,
   ExecutionNodeBackendFamilyCapability,
   ExecutionNodeHealthStatus,
+  ExecutionNodeOperationalAvailabilityMode,
   ExecutionNodeRecord,
   ImageExecutionNodeCompatibilityRequirements,
   ImageExecutionNodeCompatibilityResult,
@@ -30,6 +31,7 @@ export interface ExecutionNodeListQuery {
   readonly executionTargets?: ReadonlyArray<string>;
   readonly activationStatuses?: ReadonlyArray<ExecutionNodeActivationStatus>;
   readonly healthStatuses?: ReadonlyArray<ExecutionNodeHealthStatus>;
+  readonly operationalAvailabilityModes?: ReadonlyArray<ExecutionNodeOperationalAvailabilityMode>;
   readonly approvalStatuses?: ReadonlyArray<NodeApprovalStatus>;
   readonly trustStates?: ReadonlyArray<NodeTrustState>;
   readonly requiredCapabilitiesAnyOf?: ReadonlyArray<NodeRoleCapability>;
@@ -71,6 +73,15 @@ export interface UpdateExecutionNodeAvailabilityInput {
   readonly details?: Readonly<Record<string, unknown>>;
 }
 
+export interface UpdateExecutionNodeOperationalAvailabilityInput {
+  readonly nodeId: string;
+  readonly mode: ExecutionNodeOperationalAvailabilityMode;
+  readonly suppressedUntil?: string;
+  readonly changedAt: string;
+  readonly mutation: ExecutionNodeMutationContext;
+  readonly details?: Readonly<Record<string, unknown>>;
+}
+
 export interface IExecutionNodeRepository {
   findExecutionNodeById(nodeId: string): Promise<ExecutionNodeRecord | undefined>;
   listExecutionNodes(query: ExecutionNodeListQuery): Promise<ReadonlyArray<ExecutionNodeRecord>>;
@@ -79,6 +90,9 @@ export interface IExecutionNodeRepository {
   updateExecutionNodeHealth(input: UpdateExecutionNodeHealthInput): Promise<ExecutionNodeMutationResult>;
   updateExecutionNodeCapabilities(input: UpdateExecutionNodeCapabilitiesInput): Promise<ExecutionNodeMutationResult>;
   updateExecutionNodeAvailability(input: UpdateExecutionNodeAvailabilityInput): Promise<ExecutionNodeMutationResult>;
+  updateExecutionNodeOperationalAvailability(
+    input: UpdateExecutionNodeOperationalAvailabilityInput,
+  ): Promise<ExecutionNodeMutationResult>;
 }
 
 export interface ExecutionNodeHealthRefreshObservation {

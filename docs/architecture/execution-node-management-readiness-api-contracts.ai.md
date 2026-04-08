@@ -21,12 +21,14 @@ Story 5.1.4 defines shared DTO/schema contracts for authoritative execution-node
   - execution-readiness checks,
   - node eligibility checks,
   - backend availability/readiness summaries.
+- Extended operational summary DTOs with explicit administrative availability override metadata (`enabled|disabled|suppressed`, optional suppression expiry/reason, override timestamp) so admin policy controls are queryable independently from probe health.
 - Added explicit public vs internal DTO separation:
   - public DTOs (`ExecutionNodeSummaryDto`, `ExecutionNodeDetailDto`, backend availability summaries),
   - internal DTOs (`ExecutionNodeInternalSummaryDto`, `ExecutionNodeInternalDetailDto`, backend internal summaries),
   - explicit safe projection helpers that remove internal transport references.
 - Added strict schema parse/validation helpers with typed failure surfaces via:
   - `ExecutionNodeManagementApiSchemaValidationError`.
+- Added schema invariants for operational availability override coherence (suppression mode and suppression-expiry requirements).
 
 ## Boundary posture
 

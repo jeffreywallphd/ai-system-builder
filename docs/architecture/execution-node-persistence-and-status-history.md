@@ -5,6 +5,7 @@
 - Feature 5: Node-Based Execution and Backend Management
 - Epic 5.2: Node Registration, Persistence, Health, and Capability Management
 - Story 5.2.2: Implement concrete persistence for execution-node records and status history
+- Story 5.2.5: Persist authoritative execution-node availability overrides (enable/disable/suppress)
 
 ## Purpose
 
@@ -30,7 +31,7 @@ Provide an authoritative, durable persistence layer for execution-node metadata 
 The execution-node schema introduces durable record, lookup, replay, and history surfaces:
 
 - `execution_node_records`
-  - canonical execution-node record with normalized activation/health/trust/approval posture, capability profile metadata, backend-family capability metadata, endpoint metadata, deployment tags, and metadata map.
+  - canonical execution-node record with normalized activation/health/trust/approval posture, capability profile metadata, backend-family capability metadata, endpoint metadata, deployment tags, metadata map, and administrative availability override fields (`availability_override_mode`, `availability_override_suppressed_until`, `availability_override_reason`, `availability_override_updated_at`).
 - `execution_node_capabilities_lookup`
   - normalized node-capability lookup for `requiredCapabilitiesAnyOf` filtering.
 - `execution_node_deployment_tags_lookup`
@@ -59,16 +60,23 @@ The execution-node schema introduces durable record, lookup, replay, and history
   - `updateExecutionNodeHealth`
   - `updateExecutionNodeCapabilities`
   - `updateExecutionNodeAvailability`
+  - `updateExecutionNodeOperationalAvailability`
 - optimistic-concurrency checks using `expectedRevision` against persisted revisions.
 - history append semantics that preserve activation/health/backend-summary/availability snapshots for later admin and scheduling analysis.
 
 Persistence mapping remains isolated in `ExecutionNodePersistenceMapper.ts` so persistence rows do not leak into domain/application API contracts.
 
+Probe interaction posture:
+
+- backend probe refresh paths continue updating observed health/readiness fields
+- administrative availability overrides are persisted separately on node records
+- probe refresh updates do not clear/overwrite administrative override state
+
 ## Migration impact
 
-Execution-node persistence schema version is `1`.
+Execution-node persistence schema version is `2`.
 
-This migration adds execution-node durability without modifying existing node-trust tables. Execution-node migration hooks are registered in authoritative startup composition as domain `execution-nodes` with migration table `execution_node_repository_migrations`.
+Migration `v2` extends `execution_node_records` with durable operational availability override columns and supporting index coverage for admin/query filtering. Execution-node migration hooks are registered in authoritative startup composition as domain `execution-nodes` with migration table `execution_node_repository_migrations`.
 
 ## Boundary posture
 

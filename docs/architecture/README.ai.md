@@ -222,6 +222,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 5 / Epic 5.1 Story 5.1.4 shared execution-node management/readiness API DTOs and schema contracts for authoritative node inventory, eligibility, and backend availability surfaces: `docs/architecture/execution-node-management-readiness-api-contracts.md`
 - Feature 5 / Epic 5.1 Story 5.1.5 node-based execution posture for the image manipulation slice, including authoritative eligibility/readiness ownership, orchestration routing seams, and ComfyUI adapter boundary rules: `docs/architecture/image-manipulation-node-based-execution-posture.md`
 - Feature 5 / Epic 5.2 Story 5.2.2 concrete persistence for execution-node records and durable operational status/capability history: `docs/architecture/execution-node-persistence-and-status-history.md`
+- Feature 5 / Epic 5.2 Story 5.2.5 authoritative execution-node availability override controls (`enable|disable|suppress`) and probe-independent operational availability behavior: `docs/architecture/execution-node-repository-and-management-application-ports.md`
 - Feature 4 / Epic 4.2 Story 4.2.5 concrete persistence implementation for image runs and durable status history recording/query seams: `docs/architecture/run-orchestration-image-run-persistence-and-status-history.md`
 - Feature 4 / Epic 4.4 Story 4.4.4 final completion verification and follow-on integration guidance for authoritative image run orchestration: `docs/architecture/image-run-feature-4-final-baseline.md`
 

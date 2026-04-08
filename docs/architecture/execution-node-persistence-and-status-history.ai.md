@@ -3,6 +3,7 @@
 ## Story scope
 
 Story 5.2.2 delivers concrete SQLite persistence for execution-node inventory records and durable operational status/capability history.
+Story 5.2.5 extends persistence with durable operational availability override fields (`enabled|disabled|suppressed`) that are stored separately from backend probe observations.
 
 ## Human doc
 
@@ -24,6 +25,13 @@ Story 5.2.2 delivers concrete SQLite persistence for execution-node inventory re
 - Adds lookup-table normalization for backend family, execution target, deployment tags, and enabled node capabilities.
 - Adds replay-safe mutation handling in `execution_node_mutation_replays`.
 - Adds append-oriented operational history in `execution_node_status_history` for registration/state save/health refresh/capability refresh/availability transitions.
+- Adds durable administrative availability override columns on `execution_node_records`:
+  - `availability_override_mode`
+  - `availability_override_suppressed_until`
+  - `availability_override_reason`
+  - `availability_override_updated_at`
+- Adds repository mutation seam `updateExecutionNodeOperationalAvailability(...)` for authoritative enable/disable/suppress updates.
+- Keeps backend probe health/readiness refresh independent from administrative availability override persistence.
 - Wires migration hooks and service composition through authoritative persistence bootstrap.
 
 ## Boundary posture

@@ -24,7 +24,7 @@ Define shared, authoritative DTO and schema contracts for execution-node managem
 The shared execution-node transport contracts now include:
 
 - node management list/get request and response DTOs
-- node health and operational summaries suitable for operational UX and admin inventory views
+- node health and operational summaries suitable for operational UX and admin inventory views, including explicit administrative availability override metadata (`availabilityOverrideMode`, optional suppression window/reason, override update timestamp)
 - backend capability and backend-readiness summaries without raw adapter probe payloads
 - execution-readiness check request/response DTOs for run launch/readiness UX
 - node-eligibility check request/response DTOs for schedulability and routing previews
@@ -47,6 +47,7 @@ Validation includes:
 
 - strict unknown-field rejection for public payloads
 - enum/value constraints for lifecycle, health, trust, and readiness states
+- operational availability override invariants (`suppressed` mode requires suppression expiry; non-suppressed modes reject suppression expiry)
 - timestamp and identifier normalization rules
 - readiness and eligibility coherence rules (for example, `eligible` requires `compatible=true` and `routable=true`)
 - backend availability bucket totals (`totalNodeCount` must match readiness bucket sums)

@@ -11,6 +11,11 @@ export interface AssertCanActivateExecutionNodeInput {
   readonly node: ExecutionNodeRecord;
 }
 
+export interface AssertCanOverrideExecutionNodeAvailabilityInput {
+  readonly actorUserIdentityId: string;
+  readonly node: ExecutionNodeRecord;
+}
+
 export interface AssertCanQueryExecutionNodesInput {
   readonly actorUserIdentityId: string;
   readonly query: ExecutionNodeListQuery;
@@ -24,6 +29,7 @@ export interface AssertCanGetExecutionNodeDetailInput {
 export interface ExecutionNodeManagementAuthorizationHook {
   assertCanRegisterExecutionNode?(input: AssertCanRegisterExecutionNodeInput): Promise<void>;
   assertCanActivateExecutionNode?(input: AssertCanActivateExecutionNodeInput): Promise<void>;
+  assertCanOverrideExecutionNodeAvailability?(input: AssertCanOverrideExecutionNodeAvailabilityInput): Promise<void>;
   assertCanQueryExecutionNodes?(input: AssertCanQueryExecutionNodesInput): Promise<void>;
   assertCanGetExecutionNodeDetail?(input: AssertCanGetExecutionNodeDetailInput): Promise<void>;
 }
