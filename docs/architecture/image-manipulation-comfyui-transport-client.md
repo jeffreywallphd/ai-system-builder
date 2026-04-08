@@ -124,10 +124,30 @@ Added controlled integration coverage for the concrete translation and dispatch 
 - Confirms failed translation does not dispatch to transport.
 
 3. Backend unavailable behavior
-- Confirms dispatch normalizes unavailable backend failures as typed `ComfyUiTransportClientError` with `transport-unavailable`.
+- Confirms transport failures are normalized by the client as `transport-unavailable`, then projected by dispatch adapter as `ComfyUiRunExecutionDispatchError` (`dispatch-connectivity-failed`).
 
 4. Malformed backend response behavior
-- Confirms malformed prompt-submission responses normalize as `invalid-response`.
+- Confirms malformed prompt-submission responses normalize as transport `invalid-response`, then dispatch-level `dispatch-invalid-request-data`.
 
 These checks are implemented in:
 - `src/infrastructure/execution/tests/ComfyUiTranslationDispatch.integration.test.ts`
+
+## Story 3.3.2 dispatch failure normalization extension
+
+Dispatch now maps transport and translation failures into one normalized adapter error:
+
+1. Typed dispatch error boundary
+- `ComfyUiRunExecutionDispatchError` is raised by `ComfyUiRunExecutionDispatchAdapter`.
+- Carries normalized failure payload (`code`, `category`, `retryable`, safe summary/message, sanitized diagnostics).
+
+2. Normalized failure categories on dispatch path
+- connectivity/unreachable backend
+- timeout
+- translation mismatch / invalid graph binding
+- invalid request/data failures
+- missing-model dependency failures
+
+3. Leak-prevention posture
+- Raw transport exceptions are not passed directly upward from dispatch adapter.
+- User-facing summary fields remain safe and backend-agnostic.
+- Developer diagnostics preserve actionable context while redacting sensitive path/token-like content.

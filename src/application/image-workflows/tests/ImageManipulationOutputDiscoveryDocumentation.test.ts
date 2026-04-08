@@ -18,6 +18,7 @@ describe("image manipulation output discovery and collection documentation", () 
     expect(doc).toContain("temporary backend references");
     expect(doc).toContain("discovered output descriptors");
     expect(doc).toContain("collected execution result");
+    expect(doc).toContain("collectionFailure");
     expect(doc).toContain("Temporary references are separate from final logical asset records.");
     expect(doc).toContain("No backend filesystem path assumptions are exposed");
   });

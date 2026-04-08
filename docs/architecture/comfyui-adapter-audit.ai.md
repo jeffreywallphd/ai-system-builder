@@ -170,3 +170,10 @@
   - Produces inspectable submission output for debugging and runtime handoff.
 - Added focused tests in
   `src/application/system-studio/tests/ComfyImageManipulationGraphRequestBuilder.test.ts` for default runnable graph output, logical-reference safety (no path leakage), and version-contract enforcement.
+
+## Story 3.3.2 update
+- Added shared failure categorization + normalization utility for image-manipulation execution:
+  - `src/application/image-workflows/ports/ImageManipulationFailureNormalization.ts`
+- Dispatch failures now normalize through `ComfyUiRunExecutionDispatchAdapter` into typed `ComfyUiRunExecutionDispatchError` with stable machine codes/categories, user-safe summaries, and sanitized diagnostics.
+- Progress polling failures in `ComfyUiExecutionStatusNormalizer` now use the same normalization utility, including explicit missing-model/dependency and translation-mismatch categorization.
+- Output-collection contracts now support normalized collection anomaly payloads (`collectionFailure`) with integrity rules for `partially-collected` / `failed` statuses.

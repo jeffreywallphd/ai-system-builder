@@ -32,6 +32,7 @@ Define one backend-agnostic seam for output discovery and collection so downstre
 
 3. Collected execution result (`ImageManipulationCollectedExecutionResult`)
 - binds to one discovery snapshot and run
+- can carry optional normalized `collectionFailure` for partial/failed collection outcomes
 - reports per-output collection records
 - reports per-output persistence state (`not-persisted`, `persisted`, `failed`)
 - reports summary counts for discovered/collected/persisted/not-persisted/failed
@@ -58,7 +59,16 @@ Temporary references are separate from final logical asset records.
 - Local `file://` URIs are rejected in temporary backend references.
 - Output discovery and collection summary counts are validated for consistency.
 - Collected records must point to discovered descriptors by id.
+- `partially-collected` and `failed` statuses must include a normalized `collectionFailure`.
+- `collected` status must not include `collectionFailure`.
+- `collectionFailure.partialOutputCount` cannot exceed discovered output count.
 - No backend filesystem path assumptions are exposed beyond the adapter/application seam.
+
+## Story 3.3.2 failure normalization alignment
+- Added `createImageManipulationOutputCollectionFailure(...)` so output-collection anomaly mapping reuses the same normalized failure posture as dispatch and progress polling:
+  - machine-readable failure code/category/retryability
+  - user-safe summary/message
+  - sanitized diagnostics for developers/admins
 
 ## Relationship to adjacent architecture notes
 

@@ -1,4 +1,11 @@
 import { z } from "zod";
+import {
+  ImageManipulationExecutionFailureCategories,
+} from "./ImageManipulationExecutionStatusContracts";
+import {
+  ImageManipulationFailureNormalizationSources,
+  normalizeImageManipulationExecutionFailure,
+} from "./ImageManipulationFailureNormalization";
 
 export const ImageManipulationOutputDiscoveryContractsSchemaVersion = "1.0.0" as const;
 
@@ -67,6 +74,21 @@ const jsonValueSchema: z.ZodType<unknown> = z.lazy(() => z.union([
   z.array(jsonValueSchema),
   z.record(z.string(), jsonValueSchema),
 ]));
+
+const outputCollectionFailureSchema = z.object({
+  code: z.string().trim().min(1),
+  category: z.nativeEnum(ImageManipulationExecutionFailureCategories),
+  summary: z.string().trim().min(1),
+  userMessage: z.string().trim().min(1).optional(),
+  retryable: z.boolean(),
+  failedAt: z.string().trim().min(1),
+  stageCode: z.string().trim().min(1).optional(),
+  partialProgressObserved: z.boolean(),
+  partialOutputCount: z.number().int().nonnegative(),
+  diagnostics: z.record(z.string(), jsonValueSchema).optional(),
+}).strict();
+
+export type ImageManipulationOutputCollectionFailure = z.infer<typeof outputCollectionFailureSchema>;
 
 function looksLikeFilesystemPath(value: string): boolean {
   return value.startsWith("/")
@@ -251,6 +273,7 @@ const collectedExecutionResultSchema = z.object({
   workspaceId: z.string().trim().min(1),
   collectedAt: z.string().trim().min(1),
   status: z.nativeEnum(ImageManipulationCollectedExecutionStatuses),
+  collectionFailure: outputCollectionFailureSchema.optional(),
   discoveredOutputs: z.array(discoveredOutputDescriptorSchema).default([]),
   records: z.array(collectedOutputRecordSchema).default([]),
   summary: collectedExecutionSummarySchema,
@@ -332,6 +355,22 @@ function assertCollectionIntegrity(result: ImageManipulationCollectedExecutionRe
   if (result.summary.failedCount !== failedCount) {
     throw new Error("Collection summary.failedCount must equal failed record count.");
   }
+
+  if (result.status === ImageManipulationCollectedExecutionStatuses.collected && result.collectionFailure) {
+    throw new Error("Collected execution result cannot include collectionFailure when status is collected.");
+  }
+  if (result.status === ImageManipulationCollectedExecutionStatuses.partiallyCollected && !result.collectionFailure) {
+    throw new Error("Partially collected execution result requires collectionFailure.");
+  }
+  if (result.status === ImageManipulationCollectedExecutionStatuses.failed && !result.collectionFailure) {
+    throw new Error("Failed collected execution result requires collectionFailure.");
+  }
+  if (
+    result.collectionFailure
+    && result.collectionFailure.partialOutputCount > result.summary.discoveredCount
+  ) {
+    throw new Error("collectionFailure.partialOutputCount cannot exceed discovered output count.");
+  }
 }
 
 export function validateImageManipulationOutputDiscoverySnapshot(input: unknown): ImageManipulationOutputDiscoverySnapshot {
@@ -366,4 +405,40 @@ export function parseImageManipulationCollectedExecutionResult(input: unknown): 
     throw new Error(`unsupported-image-manipulation-collected-result-schema-version:${String(schemaVersion)}`);
   }
   return validateImageManipulationCollectedExecutionResult(input);
+}
+
+export function createImageManipulationOutputCollectionFailure(input: {
+  readonly failedAt: string;
+  readonly backendStatusCode?: string;
+  readonly backendErrorCode?: string;
+  readonly rawMessage?: string;
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
+  readonly stageCode?: string;
+  readonly partialProgressObserved?: boolean;
+  readonly partialOutputCount?: number;
+}): ImageManipulationOutputCollectionFailure {
+  const normalized = normalizeImageManipulationExecutionFailure({
+    source: ImageManipulationFailureNormalizationSources.outputCollection,
+    failedAt: input.failedAt,
+    backendStatusCode: input.backendStatusCode,
+    backendErrorCode: input.backendErrorCode,
+    rawMessage: input.rawMessage,
+    diagnostics: input.diagnostics,
+    stageCode: input.stageCode ?? "output-collection",
+    state: "failed",
+    partialProgressObserved: input.partialProgressObserved,
+    partialOutputCount: input.partialOutputCount,
+  });
+  return Object.freeze({
+    code: normalized.code,
+    category: normalized.category,
+    summary: normalized.summary,
+    userMessage: normalized.userMessage,
+    retryable: normalized.retryable,
+    failedAt: normalized.failedAt,
+    stageCode: normalized.stageCode,
+    partialProgressObserved: normalized.partialProgressObserved,
+    partialOutputCount: normalized.partialOutputCount,
+    diagnostics: normalized.diagnostics,
+  });
 }

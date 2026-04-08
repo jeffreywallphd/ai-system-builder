@@ -282,3 +282,10 @@ This audit reviews current ComfyUI integration touchpoints and aligns them with 
   - Produces inspectable submission output for debugging and runtime handoff.
 - Added focused tests in
   `src/application/system-studio/tests/ComfyImageManipulationGraphRequestBuilder.test.ts` for default runnable graph output, logical-reference safety (no path leakage), and version-contract enforcement.
+
+## Story 3.3.2 update
+- Added shared image-manipulation failure-normalization utility:
+  - `src/application/image-workflows/ports/ImageManipulationFailureNormalization.ts`
+- Dispatch adapter now normalizes failures into typed `ComfyUiRunExecutionDispatchError` payloads instead of leaking raw transport exceptions.
+- Progress normalizer (`ComfyUiExecutionStatusNormalizer`) now uses the same category/code mapping as dispatch.
+- Output discovery/collection contracts now support normalized collection anomalies through optional `collectionFailure` with status-integrity rules.

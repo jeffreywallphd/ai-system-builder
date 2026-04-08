@@ -13,8 +13,8 @@ import {
   type CanonicalRunExecutionCommand,
 } from "@application/runs/ports/RunExecutionDispatchPorts";
 import { ComfyImageManipulationTemplateTranslationAdapter } from "@infrastructure/comfyui/execution/mappers/ComfyImageManipulationTemplateTranslationAdapter";
-import { ComfyUiTransportClient, ComfyUiTransportClientError } from "../comfyui/ComfyUiTransportClient";
-import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
+import { ComfyUiTransportClient } from "../comfyui/ComfyUiTransportClient";
+import { ComfyUiRunExecutionDispatchAdapter, ComfyUiRunExecutionDispatchError } from "../runs/ComfyUiRunExecutionDispatchAdapter";
 import { ComfyUiRunExecutionTransportGateway } from "../runs/ComfyUiRunExecutionTransportGateway";
 
 function buildRequestFromTemplate(
@@ -314,12 +314,11 @@ describe("ComfyUI translation and dispatch integration", () => {
       }));
       throw new Error("Expected backend-unavailable dispatch failure.");
     } catch (error) {
-      const typed = error as ComfyUiTransportClientError;
-      expect(typed).toBeInstanceOf(ComfyUiTransportClientError);
-      expect(typed.code).toBe("transport-unavailable");
-      expect(typed.retryable).toBeTrue();
-      expect(typed.diagnostics.operation).toBe("submit-prompt");
-      expect(typed.diagnostics.path).toBe("/prompt");
+      const typed = error as ComfyUiRunExecutionDispatchError;
+      expect(typed).toBeInstanceOf(ComfyUiRunExecutionDispatchError);
+      expect(typed.failure.category).toBe("connectivity");
+      expect(typed.failure.code).toBe("dispatch-connectivity-failed");
+      expect(typed.failure.retryable).toBeTrue();
     }
   });
 
@@ -352,12 +351,11 @@ describe("ComfyUI translation and dispatch integration", () => {
       }));
       throw new Error("Expected invalid-response dispatch failure.");
     } catch (error) {
-      const typed = error as ComfyUiTransportClientError;
-      expect(typed).toBeInstanceOf(ComfyUiTransportClientError);
-      expect(typed.code).toBe("invalid-response");
-      expect(typed.retryable).toBeFalse();
-      expect(typed.diagnostics.operation).toBe("submit-prompt");
-      expect(typed.diagnostics.path).toBe("/prompt");
+      const typed = error as ComfyUiRunExecutionDispatchError;
+      expect(typed).toBeInstanceOf(ComfyUiRunExecutionDispatchError);
+      expect(typed.failure.category).toBe("validation");
+      expect(typed.failure.code).toBe("dispatch-invalid-request-data");
+      expect(typed.failure.retryable).toBeFalse();
     }
   });
 });

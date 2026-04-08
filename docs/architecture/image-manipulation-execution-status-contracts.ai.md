@@ -37,3 +37,16 @@
 - Unknown/degraded handling:
   - unknown raw backend state -> safe `preparing` + `backend-state-unknown` warning,
   - degraded backend hints -> `backend-state-degraded` warning with non-breaking progress semantics.
+
+## Story 3.3.2 failure-normalization update
+- Added shared failure-normalization helper:
+  - `src/application/image-workflows/ports/ImageManipulationFailureNormalization.ts`
+- Failure mapping now classifies backend failures into stable categories/codes for:
+  - connectivity (`dispatch-connectivity-failed`, `execution-connectivity-failed`)
+  - translation mismatches (`dispatch-translation-mismatch`, `execution-translation-mismatch`)
+  - invalid request/data (`dispatch-invalid-request-data`, `execution-invalid-request-data`)
+  - dependency/missing-model failures (`execution-missing-model-dependency`)
+  - timeout/cancellation (`dispatch-timeout`/`execution-timeout`, `execution-cancelled`)
+  - output anomalies (`output-collection-failed`, `output-collection-partial-anomaly`)
+- `ComfyUiExecutionStatusNormalizer` now uses that shared helper so progress-polling failure normalization stays consistent with dispatch/output collection semantics.
+- User-safe summaries/messages are preserved separately from developer diagnostics; diagnostics are sanitized to avoid local path/token leakage.

@@ -98,6 +98,32 @@ describe("ComfyUiExecutionStatusNormalizer", () => {
     expect(snapshot.backendDiagnostics?.rawStatusCode).toBe("E_TIMEOUT");
   });
 
+  it("maps missing-model failures into dependency category with safe messaging", () => {
+    const snapshot = normalizeComfyUiExecutionState({
+      executionJobId: "job-missing-model",
+      runId: "run-missing-model",
+      workspaceId: "workspace-1",
+      backendExecutionId: "prompt-mm-1",
+      backendSnapshot: Object.freeze({
+        state: "failed",
+        checkedAt: "2026-04-08T11:04:30.000Z",
+        statusMessage: "missing-model checkpoint not found",
+      }),
+      backendStatusCode: "prompt-rejected",
+      backendDetails: Object.freeze({
+        path: "C:\\comfy\\models\\secret\\checkpoint.safetensors",
+      }),
+    });
+
+    expect(snapshot.state).toBe(ImageManipulationExecutionStates.failed);
+    expect(snapshot.error?.category).toBe("dependency");
+    expect(snapshot.error?.code).toBe("execution-missing-model-dependency");
+    expect(snapshot.error?.retryable).toBeFalse();
+    expect(snapshot.error?.userMessage).toContain("required model");
+    const details = snapshot.error?.diagnostics?.details as Readonly<Record<string, unknown>>;
+    expect(String(details.path)).toContain("[redacted-path]");
+  });
+
   it("maps cancelled snapshots into non-retryable cancellation failures", () => {
     const snapshot = normalizeComfyUiExecutionState({
       executionJobId: "job-5",

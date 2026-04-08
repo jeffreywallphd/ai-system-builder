@@ -40,6 +40,18 @@ Story 3.2.2 adds a concrete infrastructure transport client for ComfyUI dispatch
   - `invalid-response`
 - Emits bounded structured transport logs without exposing raw prompt payload content.
 
+## Story 3.3.2 dispatch failure normalization update
+- `ComfyUiRunExecutionDispatchAdapter` now maps transport/translation failures into normalized dispatch errors:
+  - `ComfyUiRunExecutionDispatchError`
+  - normalized `failure` payload aligned to image-manipulation execution failure contracts
+- Dispatch normalization now distinguishes:
+  - backend connectivity/unreachable
+  - timeout
+  - translation mismatch / invalid graph binding (`comfy.request` mapping failures)
+  - invalid request/data failures
+  - missing-model dependency failures surfaced through transport diagnostics
+- User-safe summaries/messages are separated from sanitized developer diagnostics before errors cross the adapter boundary.
+
 ## Extension points
 
 - Add WebSocket progress streaming within `ComfyUiTransportClient` without changing application contracts.
@@ -121,6 +133,7 @@ These states are infrastructure-normalized and avoid leaking raw response payloa
 - Invalid translation mapping emits blocking diagnostics and short-circuits dispatch.
 - Backend unavailable submission normalizes to `ComfyUiTransportClientError` (`transport-unavailable`).
 - Malformed backend submission response normalizes to `ComfyUiTransportClientError` (`invalid-response`).
+ - Dispatch adapter projects those transport failures into normalized `ComfyUiRunExecutionDispatchError` categories/codes (`dispatch-connectivity-failed`, `dispatch-invalid-request-data`) for orchestration-facing behavior.
 
 ### Boundary posture preserved
 

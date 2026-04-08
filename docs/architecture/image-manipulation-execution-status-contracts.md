@@ -75,3 +75,19 @@ This keeps user-facing messaging safe while preserving diagnostic detail for log
   - unknown backend states degrade safely to `preparing` and emit warning `backend-state-unknown`,
   - degraded backend status hints emit warning `backend-state-degraded`,
   - missing/invalid queue/progress fields are tolerated with bounded defaults and clamped percent values.
+
+## Story 3.3.2 failure categorization and normalization
+- Added shared failure normalization utility:
+  - `src/application/image-workflows/ports/ImageManipulationFailureNormalization.ts`
+- Canonical failure categorization now covers the primary ComfyUI execution failure modes:
+  - connectivity/unreachable backend
+  - translation mismatch / invalid graph binding
+  - invalid request/data payloads
+  - missing model dependencies
+  - timeout and cancellation
+  - output collection anomalies (including partial-output situations)
+- `ComfyUiExecutionStatusNormalizer` now delegates terminal failure mapping to the shared utility so progress polling emits the same category/code semantics used by dispatch and output-collection paths.
+- Failure payload posture remains split:
+  - machine-readable: `code`, `category`, `retryable`
+  - user-safe: `summary`, `userMessage`
+  - developer diagnostics: sanitized `diagnostics` payload with path/token redaction

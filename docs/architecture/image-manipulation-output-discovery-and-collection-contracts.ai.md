@@ -28,6 +28,7 @@ This keeps ComfyUI (and future backends) behind adapter boundaries and prepares 
 
 `ImageManipulationCollectedExecutionResult` includes:
 - discovery linkage (`discoveryId`) and execution/run identity
+- optional normalized `collectionFailure` for partial/failed collection outcomes
 - per-output collected records keyed by discovered descriptor id
 - per-output persistence state:
   - `not-persisted`
@@ -49,6 +50,18 @@ This keeps ComfyUI (and future backends) behind adapter boundaries and prepares 
 - raw filesystem path leakage is rejected in logical references and backend handles
 - local `file://` URIs are rejected for temporary backend references
 - summary counts and descriptor mapping integrity are validated
+- `partially-collected` / `failed` statuses require `collectionFailure`
+- `collected` status rejects `collectionFailure`
+- `collectionFailure.partialOutputCount` is bounded by discovered output count
+
+## Story 3.3.2 failure-normalization update
+- Added helper for output-collection anomaly normalization:
+  - `createImageManipulationOutputCollectionFailure(...)`
+  - backed by shared failure utility in `ImageManipulationFailureNormalization.ts`
+- Output collection failures now reuse the same normalized model as dispatch/progress paths:
+  - machine code/category/retryability
+  - user-safe summary/message
+  - sanitized developer diagnostics
 
 ## Architectural boundary posture
 
