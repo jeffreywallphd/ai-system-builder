@@ -2,12 +2,13 @@ import type { ResourceVisibility } from "@domain/authorization/AuthorizationDoma
 import type {
   ImageAsset,
   ImageAssetFingerprint,
+  ImageAssetFingerprintAlgorithm,
   ImageAssetLineageMetadata,
   ImageAssetOriginKind,
   ImageAssetSharingPolicy,
   SupportedImageMediaType,
 } from "@domain/image-assets/ImageAssetDomain";
-import { SupportedImageMediaTypes } from "@domain/image-assets/ImageAssetDomain";
+import { ImageAssetFingerprintAlgorithms, SupportedImageMediaTypes } from "@domain/image-assets/ImageAssetDomain";
 import type {
   ImageAssetStorageObjectArea,
   ReserveImageAssetStorageLocationResult,
@@ -139,6 +140,29 @@ function normalizeSizeBytes(value: number): number {
   return value;
 }
 
+function normalizeFingerprint(input: ImageAssetFingerprint): ImageAssetFingerprint {
+  const digest = normalizeRequired(input.digest, "fingerprint.digest").toLowerCase();
+  const algorithm = input.algorithm as ImageAssetFingerprintAlgorithm;
+  if (!Object.values(ImageAssetFingerprintAlgorithms).includes(algorithm)) {
+    throw new ImageAssetCreationContractError("fingerprint.algorithm is invalid.");
+  }
+  if (!/^[a-f0-9]+$/.test(digest)) {
+    throw new ImageAssetCreationContractError("fingerprint.digest must be lowercase hexadecimal.");
+  }
+
+  const expectedLength = algorithm === ImageAssetFingerprintAlgorithms.sha512 ? 128 : 64;
+  if (digest.length !== expectedLength) {
+    throw new ImageAssetCreationContractError(
+      `fingerprint.digest must be ${String(expectedLength)} hex characters for algorithm '${algorithm}'.`,
+    );
+  }
+
+  return Object.freeze({
+    algorithm,
+    digest,
+  });
+}
+
 function normalizeFilename(value: string, field: string): string {
   const normalized = normalizeRequired(value, field).normalize("NFKC").replace(/\s+/g, " ");
   if (normalized.length > 255) {
@@ -211,10 +235,7 @@ export function validateInitiateImageAssetCreationRequest(
     originalFilename,
     normalizedFilename,
     sizeBytes: normalizeSizeBytes(input.sizeBytes),
-    fingerprint: Object.freeze({
-      algorithm: input.fingerprint.algorithm,
-      digest: normalizeRequired(input.fingerprint.digest, "fingerprint.digest").toLowerCase(),
-    }),
+    fingerprint: normalizeFingerprint(input.fingerprint),
     lineage: input.lineage,
     uploadArea: input.uploadArea,
     correlationId: normalizeOptional(input.correlationId),

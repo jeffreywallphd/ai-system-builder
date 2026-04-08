@@ -619,4 +619,32 @@ describe("InitiateImageAssetCreationUseCase", () => {
       }),
     });
   });
+
+  it("rejects malformed fingerprint digests at the boundary", async () => {
+    const fixture = buildFixture();
+
+    const result = await fixture.useCase.execute({
+      actorUserId: "user-actor",
+      workspaceId: "workspace-alpha",
+      operationKey: "image-asset:create:fingerprint-invalid",
+      mediaType: "image/png",
+      originalFilename: "photo.png",
+      sizeBytes: 64,
+      fingerprint: {
+        algorithm: ImageAssetFingerprintAlgorithms.sha256,
+        digest: "not-hex",
+      },
+      visibility: ResourceVisibilities.private,
+      sharingPolicy: {
+        mode: SharingPolicyModes.ownerOnly,
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.objectContaining({
+        code: ImageAssetCreationErrorCodes.invalidRequest,
+      }),
+    });
+  });
 });

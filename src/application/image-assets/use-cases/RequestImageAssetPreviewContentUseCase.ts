@@ -33,6 +33,17 @@ import {
   type RequestImageAssetPreviewContentRequest,
   type RequestImageAssetPreviewContentSuccess,
 } from "./GetImageAssetPreviewContentUseCaseContracts";
+import {
+  ImageAssetFailureDefaults,
+  createImageAssetNormalizedFailure,
+  withImageAssetNormalizedFailureDetails,
+} from "./ImageAssetFailureNormalization";
+import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceRecoveryKinds,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
 
 const DefaultPreviewAccessExpirySeconds = 5 * 60;
 const MaxPreviewAccessExpirySeconds = 60 * 60;
@@ -69,6 +80,13 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.invalidRequest,
         error instanceof Error ? error.message : "Invalid image asset preview request.",
+        undefined,
+        {
+          reason: "preview-request-invalid",
+          kind: ImageAssetFailureDefaults.kind.validation,
+          summaryCategory: ImageAssetFailureDefaults.summary.validation,
+          userFixable: true,
+        },
       );
     }
 
@@ -88,6 +106,12 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.accessDenied,
         "Image asset preview access requires active workspace membership.",
+        undefined,
+        {
+          reason: "workspace-membership-required",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -98,6 +122,12 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
+        undefined,
+        {
+          reason: "asset-not-found",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -113,6 +143,12 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
+        undefined,
+        {
+          reason: "authorization-denied",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -194,6 +230,12 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.invalidState,
         "Image asset preview reference does not match current storage instance binding.",
+        undefined,
+        {
+          reason: "preview-reference-storage-mismatch",
+          kind: ImageAssetFailureDefaults.kind.validation,
+          summaryCategory: ImageAssetFailureDefaults.summary.validation,
+        },
       );
     }
 
@@ -253,6 +295,23 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
         return this.failure(
           ImageAssetPreviewContentReadErrorCodes.contentUnavailable,
           "Image asset preview is not currently available.",
+          undefined,
+          {
+            reason: "preview-content-unavailable",
+            kind: ImageAssetFailureDefaults.kind.operational,
+            summaryCategory: ImageAssetFailureDefaults.summary.output,
+            retryable: true,
+            resilience: {
+              code: "preview-temporarily-unavailable",
+              scope: ImageManipulationResilienceScopes.previewReadiness,
+              state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+              summary: "Preview content is temporarily unavailable.",
+              durability: ImageManipulationResilienceDurabilityClasses.temporary,
+              recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+              recoveryRetryable: true,
+              recoveryRetryAfterMs: 3000,
+            },
+          },
         );
       }
       await this.publishPreviewRequestAuditEvent({
@@ -265,6 +324,23 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset preview request failed.",
+        undefined,
+        {
+          reason: "preview-request-failed",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.internal,
+          resilience: {
+            code: "preview-readiness-degraded",
+            scope: ImageManipulationResilienceScopes.previewReadiness,
+            state: ImageManipulationResilienceStateKinds.degraded,
+            summary: "Preview readiness degraded by backend failure.",
+            durability: ImageManipulationResilienceDurabilityClasses.unknown,
+            recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+            recoveryRetryable: isImageAssetStorageError(error) ? error.retryable : false,
+            recoveryRetryAfterMs: 3000,
+          },
+          retryable: isImageAssetStorageError(error) ? error.retryable : false,
+        },
       );
     }
   }
@@ -350,13 +426,45 @@ export class RequestImageAssetPreviewContentUseCase implements IRequestImageAsse
     code: typeof ImageAssetPreviewContentReadErrorCodes[keyof typeof ImageAssetPreviewContentReadErrorCodes],
     message: string,
     details?: Readonly<Record<string, unknown>>,
+    normalization?: {
+      readonly reason: string;
+      readonly kind: typeof ImageAssetFailureDefaults.kind[keyof typeof ImageAssetFailureDefaults.kind];
+      readonly summaryCategory: typeof ImageAssetFailureDefaults.summary[keyof typeof ImageAssetFailureDefaults.summary];
+      readonly userFixable?: boolean;
+      readonly retryable?: boolean;
+      readonly resilience?: {
+        readonly code: string;
+        readonly scope: typeof ImageManipulationResilienceScopes[keyof typeof ImageManipulationResilienceScopes];
+        readonly state: typeof ImageManipulationResilienceStateKinds[keyof typeof ImageManipulationResilienceStateKinds];
+        readonly summary: string;
+        readonly durability?: typeof ImageManipulationResilienceDurabilityClasses[keyof typeof ImageManipulationResilienceDurabilityClasses];
+        readonly recoveryKind?: typeof ImageManipulationResilienceRecoveryKinds[keyof typeof ImageManipulationResilienceRecoveryKinds];
+        readonly recoveryRetryable?: boolean;
+        readonly recoveryRetryAfterMs?: number;
+      };
+    },
   ): ImageAssetPreviewContentReadResult<never> {
+    const normalizedDetails = normalization
+      ? withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.preview,
+          kind: normalization.kind,
+          reason: normalization.reason,
+          summaryCategory: normalization.summaryCategory,
+          userFixable: normalization.userFixable,
+          retryable: normalization.retryable,
+          resilience: normalization.resilience,
+          degraded: Boolean(normalization.resilience),
+        }),
+      )
+      : details;
     return {
       ok: false,
       error: Object.freeze({
         code,
         message,
-        details,
+        details: normalizedDetails,
       }),
     };
   }

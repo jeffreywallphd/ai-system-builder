@@ -126,6 +126,8 @@ class WorkspaceAuthorizationReadRepository implements IWorkspaceAuthorizationRea
 class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   public openReadCallCount = 0;
 
+  public allowResolvedPreviewHandle = true;
+
   async reserveStorageLocation(
     _request: Parameters<IImageAssetStoragePort["reserveStorageLocation"]>[0],
   ): Promise<Awaited<ReturnType<IImageAssetStoragePort["reserveStorageLocation"]>>> {
@@ -165,6 +167,9 @@ class InMemoryImageAssetStoragePort implements IImageAssetStoragePort {
   async resolveAccessHandle(
     request: Parameters<IImageAssetStoragePort["resolveAccessHandle"]>[0],
   ): Promise<Awaited<ReturnType<IImageAssetStoragePort["resolveAccessHandle"]>>> {
+    if (!this.allowResolvedPreviewHandle) {
+      return undefined;
+    }
     return Object.freeze({
       workspaceId: request.workspaceId,
       assetId: request.assetId,
@@ -345,5 +350,60 @@ describe("Image asset preview use cases", () => {
 
     expect(outcome.ok).toBeFalse();
     expect(storagePort.openReadCallCount).toBe(0);
+  });
+
+  it("rejects unsupported preferred preview media-types at the request boundary", async () => {
+    const repository = new InMemoryImageAssetRepository();
+    const storagePort = new InMemoryImageAssetStoragePort();
+    repository.assets.set("image-asset:001", createAvailableAsset());
+
+    const useCase = new RequestImageAssetPreviewContentUseCase({
+      imageAssetRepository: repository,
+      imageAssetStoragePort: storagePort,
+      workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+    });
+
+    const outcome = await useCase.execute({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      preferredMediaTypes: ["text/plain" as "image/png"],
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe("image-asset-preview-invalid-request");
+  });
+
+  it("treats stale preview tokens as invalid-state with explicit stale-request details", async () => {
+    const repository = new InMemoryImageAssetRepository();
+    const storagePort = new InMemoryImageAssetStoragePort();
+    storagePort.allowResolvedPreviewHandle = false;
+    repository.assets.set("image-asset:001", createAvailableAsset());
+
+    const useCase = new OpenImageAssetPreviewContentUseCase({
+      imageAssetRepository: repository,
+      imageAssetStoragePort: storagePort,
+      workspaceAuthorizationReadRepository: new WorkspaceAuthorizationReadRepository(),
+    });
+
+    const outcome = await useCase.execute({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      previewToken: "stale-token",
+    });
+
+    expect(outcome.ok).toBeFalse();
+    if (outcome.ok) {
+      return;
+    }
+    expect(outcome.error.code).toBe("image-asset-preview-invalid-state");
+    expect(outcome.error.details).toEqual(expect.objectContaining({
+      staleRequest: true,
+      imageManipulationFailure: expect.any(Object),
+    }));
   });
 });

@@ -358,6 +358,9 @@ describe("FinalizeImageAssetUploadUseCase", () => {
       ok: false,
       error: expect.objectContaining({
         code: ImageAssetUploadFinalizationErrorCodes.conflict,
+        details: expect.objectContaining({
+          imageManipulationFailure: expect.any(Object),
+        }),
       }),
     });
 

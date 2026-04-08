@@ -305,5 +305,8 @@ describe("GetImageAssetOriginalContentUseCase", () => {
       return;
     }
     expect(outcome.error.code).toBe(ImageAssetOriginalContentReadErrorCodes.contentUnavailable);
+    expect(outcome.error.details).toEqual(expect.objectContaining({
+      imageManipulationFailure: expect.any(Object),
+    }));
   });
 });

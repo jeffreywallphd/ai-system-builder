@@ -31,6 +31,17 @@ import {
   type OpenImageAssetPreviewContentRequest,
   type OpenImageAssetPreviewContentSuccess,
 } from "./GetImageAssetPreviewContentUseCaseContracts";
+import {
+  ImageAssetFailureDefaults,
+  createImageAssetNormalizedFailure,
+  withImageAssetNormalizedFailureDetails,
+} from "./ImageAssetFailureNormalization";
+import {
+  ImageManipulationResilienceDurabilityClasses,
+  ImageManipulationResilienceRecoveryKinds,
+  ImageManipulationResilienceScopes,
+  ImageManipulationResilienceStateKinds,
+} from "@shared/contracts/image-workflows/ImageManipulationResilienceStateContracts";
 
 export interface OpenImageAssetPreviewContentUseCaseDependencies {
   readonly imageAssetRepository: IImageAssetRepository;
@@ -64,6 +75,13 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.invalidRequest,
         error instanceof Error ? error.message : "Invalid image asset preview content request.",
+        undefined,
+        {
+          reason: "preview-open-request-invalid",
+          kind: ImageAssetFailureDefaults.kind.validation,
+          summaryCategory: ImageAssetFailureDefaults.summary.validation,
+          userFixable: true,
+        },
       );
     }
 
@@ -83,6 +101,12 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.accessDenied,
         "Image asset preview retrieval requires active workspace membership.",
+        undefined,
+        {
+          reason: "workspace-membership-required",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -93,6 +117,12 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
+        undefined,
+        {
+          reason: "asset-not-found",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -100,6 +130,12 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.invalidState,
         `Image asset '${imageAsset.assetId}' is not available for preview retrieval.`,
+        undefined,
+        {
+          reason: "asset-lifecycle-not-previewable",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.output,
+        },
       );
     }
 
@@ -115,6 +151,12 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.notFound,
         "Image asset was not found for the workspace.",
+        undefined,
+        {
+          reason: "authorization-denied",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.unknown,
+        },
       );
     }
 
@@ -131,11 +173,29 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
         occurredAt,
         imageAsset,
         outcome: ImageAssetAuditOutcomes.rejected,
-        reasonCode: "preview-token-invalid",
+        reasonCode: "preview-token-stale-or-invalid",
       });
       return this.failure(
-        ImageAssetPreviewContentReadErrorCodes.notFound,
-        "Image asset preview was not found.",
+        ImageAssetPreviewContentReadErrorCodes.invalidState,
+        "Image asset preview token is stale or invalid. Request a new preview token.",
+        Object.freeze({
+          staleRequest: true,
+        }),
+        {
+          reason: "preview-token-stale-or-invalid",
+          kind: ImageAssetFailureDefaults.kind.validation,
+          summaryCategory: ImageAssetFailureDefaults.summary.validation,
+          userFixable: true,
+          resilience: {
+            code: "preview-request-stale",
+            scope: ImageManipulationResilienceScopes.previewReadiness,
+            state: ImageManipulationResilienceStateKinds.blocked,
+            summary: "Preview token is stale and must be reissued.",
+            durability: ImageManipulationResilienceDurabilityClasses.temporary,
+            recoveryKind: ImageManipulationResilienceRecoveryKinds.userAction,
+            recoveryRetryable: false,
+          },
+        },
       );
     }
 
@@ -182,6 +242,23 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
         return this.failure(
           ImageAssetPreviewContentReadErrorCodes.contentUnavailable,
           "Image asset preview is not currently available.",
+          undefined,
+          {
+            reason: "preview-content-unavailable",
+            kind: ImageAssetFailureDefaults.kind.operational,
+            summaryCategory: ImageAssetFailureDefaults.summary.output,
+            retryable: true,
+            resilience: {
+              code: "preview-content-temporarily-unavailable",
+              scope: ImageManipulationResilienceScopes.previewReadiness,
+              state: ImageManipulationResilienceStateKinds.temporarilyUnavailable,
+              summary: "Preview content is temporarily unavailable.",
+              durability: ImageManipulationResilienceDurabilityClasses.temporary,
+              recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+              recoveryRetryable: true,
+              recoveryRetryAfterMs: 3000,
+            },
+          },
         );
       }
       await this.publishPreviewOpenAuditEvent({
@@ -194,6 +271,23 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
       return this.failure(
         ImageAssetPreviewContentReadErrorCodes.internal,
         error instanceof Error ? error.message : "Image asset preview retrieval failed.",
+        undefined,
+        {
+          reason: "preview-open-failed",
+          kind: ImageAssetFailureDefaults.kind.operational,
+          summaryCategory: ImageAssetFailureDefaults.summary.internal,
+          retryable: isImageAssetStorageError(error) ? error.retryable : false,
+          resilience: {
+            code: "preview-open-degraded",
+            scope: ImageManipulationResilienceScopes.previewReadiness,
+            state: ImageManipulationResilienceStateKinds.degraded,
+            summary: "Preview retrieval degraded due to backend failure.",
+            durability: ImageManipulationResilienceDurabilityClasses.unknown,
+            recoveryKind: ImageManipulationResilienceRecoveryKinds.retry,
+            recoveryRetryable: isImageAssetStorageError(error) ? error.retryable : false,
+            recoveryRetryAfterMs: 3000,
+          },
+        },
       );
     }
   }
@@ -279,13 +373,45 @@ export class OpenImageAssetPreviewContentUseCase implements IOpenImageAssetPrevi
     code: typeof ImageAssetPreviewContentReadErrorCodes[keyof typeof ImageAssetPreviewContentReadErrorCodes],
     message: string,
     details?: Readonly<Record<string, unknown>>,
+    normalization?: {
+      readonly reason: string;
+      readonly kind: typeof ImageAssetFailureDefaults.kind[keyof typeof ImageAssetFailureDefaults.kind];
+      readonly summaryCategory: typeof ImageAssetFailureDefaults.summary[keyof typeof ImageAssetFailureDefaults.summary];
+      readonly userFixable?: boolean;
+      readonly retryable?: boolean;
+      readonly resilience?: {
+        readonly code: string;
+        readonly scope: typeof ImageManipulationResilienceScopes[keyof typeof ImageManipulationResilienceScopes];
+        readonly state: typeof ImageManipulationResilienceStateKinds[keyof typeof ImageManipulationResilienceStateKinds];
+        readonly summary: string;
+        readonly durability?: typeof ImageManipulationResilienceDurabilityClasses[keyof typeof ImageManipulationResilienceDurabilityClasses];
+        readonly recoveryKind?: typeof ImageManipulationResilienceRecoveryKinds[keyof typeof ImageManipulationResilienceRecoveryKinds];
+        readonly recoveryRetryable?: boolean;
+        readonly recoveryRetryAfterMs?: number;
+      };
+    },
   ): ImageAssetPreviewContentReadResult<never> {
+    const normalizedDetails = normalization
+      ? withImageAssetNormalizedFailureDetails(
+        details,
+        createImageAssetNormalizedFailure({
+          layer: ImageAssetFailureDefaults.layer.preview,
+          kind: normalization.kind,
+          reason: normalization.reason,
+          summaryCategory: normalization.summaryCategory,
+          userFixable: normalization.userFixable,
+          retryable: normalization.retryable,
+          resilience: normalization.resilience,
+          degraded: Boolean(normalization.resilience),
+        }),
+      )
+      : details;
     return {
       ok: false,
       error: Object.freeze({
         code,
         message,
-        details,
+        details: normalizedDetails,
       }),
     };
   }

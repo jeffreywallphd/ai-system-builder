@@ -670,6 +670,122 @@ describe("ImageAssetManagementBackendApi", () => {
     expect(chunks).toEqual([9, 8, 7, 6]);
   });
 
+  it("includes normalized failure taxonomy details for malformed retrieval requests", async () => {
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      initiateImageAssetCreationUseCase: { async execute() { throw new Error("not used"); } },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const response = await backend.openImageAssetOriginalContentStream({
+      actorUserIdentityId: "   ",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+    });
+
+    expect(response.ok).toBeFalse();
+    if (response.ok || !response.error) {
+      return;
+    }
+    expect(response.error.code).toBe("invalid-request");
+    expect(response.error.details).toEqual(expect.objectContaining({
+      validationCode: "actor-user-identity-required",
+      imageManipulationFailure: expect.any(Object),
+    }));
+  });
+
+  it("rejects stale upload session ids during finalize with invalid-state", async () => {
+    const backend = new ImageAssetManagementBackendApi({
+      uploadSessionTokenSecret: "test-secret",
+      clock: {
+        now: () => new Date("2026-04-08T10:30:00.000Z"),
+      },
+      initiateImageAssetCreationUseCase: {
+        async execute() {
+          return {
+            ok: true as const,
+            value: Object.freeze({
+              imageAsset: baseAsset,
+              upload: Object.freeze({
+                status: "upload-pending" as const,
+                reservation: Object.freeze({
+                  reservationId: "reservation-001",
+                  reference: Object.freeze({
+                    storageInstanceId: "storage-alpha",
+                    objectKey: "workspaces/workspace-alpha/image-assets/image-asset-001/original/image.png",
+                    area: ImageAssetStorageObjectAreas.original,
+                  }),
+                  expiresAt: "2026-04-08T10:20:00.000Z",
+                }),
+              }),
+            }),
+          };
+        },
+      },
+      finalizeImageAssetUploadUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      listImageAssetMetadataUseCase: { async execute() { throw new Error("not used"); } },
+      getImageAssetOriginalContentUseCase: { async execute() { throw new Error("not used"); } },
+      requestImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      openImageAssetPreviewContentUseCase: { async execute() { throw new Error("not used"); } },
+      imageAssetStoragePort: {
+        async reserveStorageLocation() { throw new Error("not used"); },
+        async writeObject() { throw new Error("not used"); },
+        async openReadStream() { throw new Error("not used"); },
+        async createAccessHandle() { throw new Error("not used"); },
+        async resolveAccessHandle() { throw new Error("not used"); },
+        async deleteObject() { throw new Error("not used"); },
+      },
+    });
+
+    const created = await backend.createImageAsset({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      mediaType: "image/png",
+      originalFilename: "image.png",
+      sizeBytes: 4,
+      fingerprint: {
+        algorithm: "sha256",
+        digest: "a".repeat(64),
+      },
+    });
+    expect(created.ok).toBeTrue();
+    if (!created.ok || !created.data) {
+      return;
+    }
+
+    const completed = await backend.completeImageAssetUpload({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      assetId: "image-asset:001",
+      uploadSessionId: created.data.upload.uploadSessionId,
+    });
+
+    expect(completed.ok).toBeFalse();
+    if (completed.ok || !completed.error) {
+      return;
+    }
+    expect(completed.error.code).toBe("invalid-state");
+    expect(completed.error.details).toEqual(expect.objectContaining({
+      validationCode: "upload-session-expired",
+      staleRequest: true,
+      imageManipulationFailure: expect.any(Object),
+    }));
+  });
+
   it("emits observability with request-to-asset trace metadata", async () => {
     const logger = new CapturingLogger();
     const backend = new ImageAssetManagementBackendApi({
