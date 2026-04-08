@@ -5,6 +5,9 @@
 - Feature 16: Run Submission and Orchestration Core
 - Epic 16.2: Build Queueing, Assignment, and Execution Dispatch Through the Authoritative Control Plane
 - Story 16.2.6: Implement execution heartbeat/progress ingestion and live run-state updates
+- Feature 8: Validation, Error Handling, and Operational Resilience
+- Epic 8.2: Application and Infrastructure Hardening for Validation and Recovery
+- Story 8.2.3: Implement resilient run-dispatch and execution recovery behavior
 
 ## Purpose
 
@@ -34,14 +37,19 @@ Add an authoritative ingestion path for execution heartbeat/progress/lifecycle s
 7. Synchronization logic applies monotonic merge rules so stale or repeated progress/heartbeat/state updates do not regress authoritative run truth.
 8. Run lifecycle update audit record is appended with non-sensitive ingestion metadata only when authoritative state changes.
 
+Story 8.2.3 resilience extension:
+
+- duplicate/late terminal lifecycle updates are now treated as safe no-op mutations instead of hard conflicts,
+- terminal internal diagnostics can still be persisted (without lifecycle regression) so interrupted monitoring streams can deliver late recovery context.
+
 ## Validation and rejection posture
 
 - Rejects malformed ingestion payloads at schema boundary.
 - Rejects stale/invalid sender identity (node mismatch).
-- Rejects updates for terminal runs.
 - Rejects adapter identity drift (`adapterKind`/`adapterRunId` mismatch).
 - Defensively treats stale/duplicate execution snapshots as no-op mutations (`changed=false`) so imperfect streams do not churn revisions.
 - Defensively ignores stale lifecycle transitions and retains current authoritative lifecycle state.
+- Defensively accepts terminal duplicate updates as idempotent no-op responses and accepts terminal diagnostics updates as metadata-only persistence.
 
 ## Status visibility additions
 
@@ -64,5 +72,6 @@ Add an authoritative ingestion path for execution heartbeat/progress/lifecycle s
 - Schema/contract coverage for lifecycle update progress/heartbeat fields.
 - Use-case coverage for accepted updates and sender-mismatch rejection.
 - Use-case coverage for stale progress no-op behavior and repeated-update idempotency-like behavior.
+- Use-case coverage for terminal duplicate-update no-op behavior and terminal diagnostics persistence without state regression.
 - Backend API error mapping coverage.
 - HTTP route coverage for node-authenticated ingestion and invalid sender rejection.

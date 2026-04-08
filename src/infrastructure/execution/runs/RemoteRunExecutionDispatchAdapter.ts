@@ -4,6 +4,7 @@ import {
   type IRunExecutionBackendAdapter,
   type RunExecutionDispatchReceipt,
 } from "@application/runs/ports/RunExecutionDispatchPorts";
+import { normalizeRunExecutionDispatchAdapterError } from "./RunExecutionDispatchFailure";
 
 export interface RemoteRunDispatchPayload {
   readonly runRef: {
@@ -61,15 +62,19 @@ export class RemoteRunExecutionDispatchAdapter implements IRunExecutionBackendAd
       references: command.references,
     });
 
-    const dispatched = await this.dependencies.gateway.submitRemoteDispatch(payload);
-    return Object.freeze({
-      dispatchId: `dispatch:${command.dispatchAttemptId}`,
-      backendKind: this.backendKind,
-      acceptedAt: dispatched.acceptedAt?.trim() || this.now().toISOString(),
-      status: "accepted",
-      backendRunId: dispatched.backendRunId,
-      metadata: dispatched.metadata,
-    });
+    try {
+      const dispatched = await this.dependencies.gateway.submitRemoteDispatch(payload);
+      return Object.freeze({
+        dispatchId: `dispatch:${command.dispatchAttemptId}`,
+        backendKind: this.backendKind,
+        acceptedAt: dispatched.acceptedAt?.trim() || this.now().toISOString(),
+        status: "accepted",
+        backendRunId: dispatched.backendRunId,
+        metadata: dispatched.metadata,
+      });
+    } catch (error) {
+      throw normalizeRunExecutionDispatchAdapterError(error);
+    }
   }
 }
 

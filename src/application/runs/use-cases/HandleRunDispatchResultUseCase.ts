@@ -33,6 +33,14 @@ import {
 } from "./RunDispatchResultStateTransitions";
 import type { CanonicalRunExecutionCommand, RunExecutionDispatchReceipt } from "@application/runs/ports/RunExecutionDispatchPorts";
 import { AuditActorKinds, AuditEventOutcomes, AuditScopeKinds } from "@domain/audit/AuditDomain";
+import {
+  ImageManipulationFailureNormalizationSources,
+  normalizeImageManipulationExecutionFailure,
+} from "@application/image-workflows/ports/ImageManipulationFailureNormalization";
+import {
+  ImageManipulationRetryModes,
+  type ImageManipulationRetryRecoveryContract,
+} from "@shared/contracts/image-workflows/ImageManipulationRetryRecoveryContracts";
 
 export interface HandleRunDispatchResultRequest {
   readonly command: CanonicalRunExecutionCommand;
@@ -127,13 +135,43 @@ function shouldRequeueAfterFailedStart(input: {
   if (input.outcome.status !== "failed-to-start") {
     return false;
   }
-  if (input.outcome.failure.retryable !== true) {
+  if (!isAutomaticDispatchRetryEligible(input.outcome.failure)) {
     return false;
   }
   if (!input.queueRepository.requeueAssignedRunForRecovery) {
     return false;
   }
   return input.run.retry.attempt < input.run.retry.maxAttempts;
+}
+
+function isAutomaticDispatchRetryEligible(input: {
+  readonly retryable?: boolean;
+  readonly details?: Readonly<Record<string, unknown>>;
+}): boolean {
+  const recovery = extractRecoveryContract(input.details);
+  if (recovery) {
+    return recovery.retry.retryEligible
+      && recovery.retry.retrySafe
+      && recovery.retry.retryMode === ImageManipulationRetryModes.automatic;
+  }
+  return input.retryable === true;
+}
+
+function extractRecoveryContract(
+  details: Readonly<Record<string, unknown>> | undefined,
+): ImageManipulationRetryRecoveryContract | undefined {
+  if (!details) {
+    return undefined;
+  }
+  const candidate = details.recovery;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return undefined;
+  }
+  const recovery = candidate as ImageManipulationRetryRecoveryContract;
+  if (!recovery.retry || !recovery.recoveryAction || !recovery.escalation) {
+    return undefined;
+  }
+  return recovery;
 }
 
 function transitionDispatchingRunToRequeuedState(input: {
@@ -605,32 +643,22 @@ export function createDispatchFailureOutcome(input: {
   readonly failedAt: string;
   readonly error: unknown;
 }): RunDispatchOutcome {
+  const normalizedFailure = normalizeDispatchFailure(input.error, input.failedAt);
   const error = input.error;
-  const objectMessage = typeof (error as { message?: unknown } | undefined)?.message === "string"
-    ? String((error as { message: string }).message)
-    : undefined;
-  const internalMessage = error instanceof Error
-    ? error.message
-    : typeof error === "string"
-      ? error
-      : objectMessage
-        ?? "Dispatch failed with an unknown backend adapter error.";
   const internalCode = typeof (error as { code?: unknown } | undefined)?.code === "string"
     ? String((error as { code: string }).code)
-    : undefined;
-  const retryable = typeof (error as { retryable?: unknown } | undefined)?.retryable === "boolean"
-    ? Boolean((error as { retryable: boolean }).retryable)
-    : undefined;
+    : normalizedFailure.internalCode;
 
   return Object.freeze({
     status: "failed-to-start",
     failedAt: input.failedAt,
     failure: Object.freeze({
-      safeCode: "dispatch-failed-to-start",
-      safeMessage: "Run failed to start on the selected execution backend.",
+      safeCode: normalizedFailure.safeCode,
+      safeMessage: normalizedFailure.safeMessage,
       internalCode,
-      internalMessage,
-      retryable,
+      internalMessage: normalizedFailure.internalMessage,
+      retryable: normalizedFailure.retryable,
+      details: normalizedFailure.details,
     }),
   });
 }
@@ -640,4 +668,110 @@ export function createDispatchAcceptedOutcome(receipt: RunExecutionDispatchRecei
     status: "accepted",
     receipt,
   });
+}
+
+function normalizeDispatchFailure(
+  error: unknown,
+  failedAt: string,
+): {
+  readonly safeCode: string;
+  readonly safeMessage: string;
+  readonly internalCode?: string;
+  readonly internalMessage: string;
+  readonly retryable: boolean;
+  readonly details: Readonly<Record<string, unknown>>;
+} {
+  const adapterFailure = (error as { failure?: unknown } | undefined)?.failure;
+  if (adapterFailure && typeof adapterFailure === "object" && !Array.isArray(adapterFailure)) {
+    const typedFailure = adapterFailure as {
+      code?: string;
+      summary?: string;
+      userMessage?: string;
+      category?: string;
+      stageCode?: string;
+      retryable?: boolean;
+      recovery?: ImageManipulationRetryRecoveryContract;
+      diagnostics?: Readonly<Record<string, unknown>>;
+      classification?: unknown;
+    };
+
+    const safeCode = normalizeOptional(typedFailure.code) ?? "dispatch-failed-to-start";
+    const safeMessage = normalizeOptional(typedFailure.userMessage)
+      ?? normalizeOptional(typedFailure.summary)
+      ?? "Run failed to start on the selected execution backend.";
+    const internalMessage = normalizeDispatchInternalMessage(error);
+    const retryable = resolveRetryableFromRecovery(typedFailure.recovery, typedFailure.retryable);
+
+    return Object.freeze({
+      safeCode,
+      safeMessage,
+      internalCode: normalizeOptional((error as { code?: string } | undefined)?.code),
+      internalMessage,
+      retryable,
+      details: Object.freeze({
+        category: normalizeOptional(typedFailure.category),
+        stageCode: normalizeOptional(typedFailure.stageCode),
+        recovery: typedFailure.recovery,
+        classification: typedFailure.classification,
+        diagnostics: typedFailure.diagnostics,
+      }),
+    });
+  }
+
+  const normalized = normalizeImageManipulationExecutionFailure({
+    source: ImageManipulationFailureNormalizationSources.dispatch,
+    failedAt,
+    backendErrorCode: normalizeOptional((error as { code?: string } | undefined)?.code),
+    rawMessage: normalizeDispatchInternalMessage(error),
+    diagnostics: error instanceof Error
+      ? Object.freeze({
+        name: error.name,
+      })
+      : undefined,
+    stageCode: "dispatch",
+    state: "failed",
+    partialOutputCount: 0,
+    partialProgressObserved: false,
+  });
+  const explicitRetryable = typeof (error as { retryable?: unknown } | undefined)?.retryable === "boolean"
+    ? Boolean((error as { retryable: boolean }).retryable)
+    : undefined;
+
+  return Object.freeze({
+    safeCode: normalized.code,
+    safeMessage: normalized.userMessage ?? normalized.summary,
+    internalCode: normalizeOptional((error as { code?: string } | undefined)?.code) ?? normalized.code,
+    internalMessage: normalizeDispatchInternalMessage(error),
+    retryable: explicitRetryable ?? resolveRetryableFromRecovery(normalized.recovery, normalized.retryable),
+    details: Object.freeze({
+      category: normalized.category,
+      stageCode: normalized.stageCode,
+      recovery: normalized.recovery,
+      classification: normalized.classification,
+      diagnostics: normalized.diagnostics,
+    }),
+  });
+}
+
+function resolveRetryableFromRecovery(
+  recovery: ImageManipulationRetryRecoveryContract | undefined,
+  fallback: boolean | undefined,
+): boolean {
+  if (!recovery) {
+    return fallback === true;
+  }
+  return recovery.retry.retryEligible && recovery.retry.retrySafe;
+}
+
+function normalizeDispatchInternalMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  const objectMessage = typeof (error as { message?: unknown } | undefined)?.message === "string"
+    ? String((error as { message: string }).message)
+    : undefined;
+  return objectMessage ?? "Dispatch failed with an unknown backend adapter error.";
 }

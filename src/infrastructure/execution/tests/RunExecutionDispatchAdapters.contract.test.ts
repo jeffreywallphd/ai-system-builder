@@ -4,6 +4,7 @@ import { RunExecutionDispatchRouter } from "../runs/RunExecutionDispatchRouter";
 import { LocalWorkerRunExecutionDispatchAdapter } from "../runs/LocalWorkerRunExecutionDispatchAdapter";
 import { RemoteRunExecutionDispatchAdapter } from "../runs/RemoteRunExecutionDispatchAdapter";
 import { ComfyUiRunExecutionDispatchAdapter } from "../runs/ComfyUiRunExecutionDispatchAdapter";
+import { RunExecutionDispatchAdapterError } from "../runs/RunExecutionDispatchFailure";
 
 function createCommand(kind: CanonicalRunExecutionCommand["backend"]["kind"]): CanonicalRunExecutionCommand {
   return Object.freeze({
@@ -125,6 +126,30 @@ describe("run execution dispatch adapter contracts", () => {
     await expect(router.dispatch(createCommand(RunExecutionBackendKinds.remoteDispatch)))
       .rejects
       .toThrow("No run execution dispatch adapter");
+  });
+
+  it("normalizes timeout failures for remote dispatch adapters as retryable", async () => {
+    const adapter = new RemoteRunExecutionDispatchAdapter({
+      gateway: {
+        submitRemoteDispatch: async () => {
+          throw Object.assign(new Error("gateway timeout while submitting dispatch"), {
+            code: "ETIMEDOUT",
+          });
+        },
+      },
+    });
+
+    await expect(adapter.dispatch(createCommand(RunExecutionBackendKinds.remoteDispatch))).rejects.toBeInstanceOf(
+      RunExecutionDispatchAdapterError,
+    );
+
+    try {
+      await adapter.dispatch(createCommand(RunExecutionBackendKinds.remoteDispatch));
+    } catch (error) {
+      const typed = error as RunExecutionDispatchAdapterError;
+      expect(typed.code).toBe("ETIMEDOUT");
+      expect(typed.retryable).toBeTrue();
+    }
   });
 });
 
