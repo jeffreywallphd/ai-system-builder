@@ -11,6 +11,7 @@ Provide a practical implementation workflow for extending deployment-profile pol
 - `docs/architecture/deployment-profile-policy-preset-definitions.md`
 - `docs/architecture/deployment-profile-policy-effective-resolution-and-overrides.md`
 - `docs/architecture/deployment-profile-policy-persistence-and-repositories.md`
+- `docs/architecture/deployment-profile-policy-persistence-api-integration-baseline.md`
 - `docs/architecture/deployment-profile-policy-authoritative-write-apis.md`
 - `docs/architecture/deployment-profile-policy-evaluation-seams.md`
 - `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
@@ -75,6 +76,18 @@ Provide a practical implementation workflow for extending deployment-profile pol
 5. Persist only validated operations through `IDeploymentPolicyPersistenceRepository`.
 6. Keep runtime feature behavior enforcement separate from write-time validation.
 
+## Server/bootstrap and API integration expectations
+
+1. Treat `DeploymentPolicyBootstrapResolutionService.ts` as the authoritative startup policy resolver.
+2. Do not add feature-specific fallback profile logic in host route handlers; use bootstrap-provided context/evaluation seams.
+3. Keep read APIs (`ReadDeploymentPolicyAdministrationUseCase.ts`, `DeploymentPolicyReadBackendApi.ts`) inspection-only.
+4. Keep write APIs (`DeploymentPolicyAdministrationAuthoritativeUpdateUseCase.ts`, `DeploymentPolicyWriteBackendApi.ts`) authoritative for mutation validation and persistence.
+5. Keep audit/operational governance hook publication in policy-administration workflows:
+   - `DeploymentPolicyGovernanceEventPorts.ts`
+   - `PlatformDeploymentPolicyGovernanceEventSink.ts`
+   - `AuthoritativeDeploymentPolicyGovernanceEventSink.ts`
+6. Keep shared read/write contracts and schema validation in `src/shared/contracts/deployment/*` and `src/shared/schemas/deployment/*`.
+
 ## Adding a new policy family
 
 1. Add the family in `createCanonicalDeploymentPolicyFamilyCatalog(...)`.
@@ -124,6 +137,12 @@ Current intentional deferrals:
 - audit-governance query/export runtime controls,
 - admin-controls delegation gates in workspace/member administration,
 - scheduling queue-policy overlays beyond run-submission approval prerequisites.
+
+Current limits that should remain explicit in feature work:
+
+- policy-governance events publish safe summaries and avoid raw override value payloads,
+- mutation scope kind is currently `deployment-policy-scope`,
+- default startup scope is `platform:default` unless host composition config intentionally changes it.
 
 ## Effective-resolution invariants checklist
 

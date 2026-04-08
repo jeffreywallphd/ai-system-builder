@@ -150,6 +150,8 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 20.2 startup/bootstrap deployment-policy resolution baseline for authoritative host composition and deterministic policy seam initialization: `docs/architecture/deployment-profile-policy-startup-bootstrap-resolution.md`
 - Feature 20.2 authoritative policy-read API baseline for active profile/effective state visibility, canonical catalog metadata discovery, and override provenance inspection: `docs/architecture/deployment-profile-policy-authoritative-read-apis.md`
 - Feature 20.2 authoritative policy-write API baseline for active profile mutation, typed override administration, and canonical write-response semantics: `docs/architecture/deployment-profile-policy-authoritative-write-apis.md`
+- Feature 20.2 integrated bootstrap/read/write/validation/audit/consumption baseline plus explicit deferred-integration limits: `docs/architecture/deployment-profile-policy-persistence-api-integration-baseline.md`
+- Feature 20.2 deployment-policy governance hook baseline for audit/operational event capture and sink boundaries: `docs/architecture/deployment-profile-policy-audit-operational-governance-hooks.md`
 - Feature 20 deployment-profile philosophy, policy-family invariants, preset-vs-override rules, and prohibited branching patterns: `docs/architecture/deployment-profile-policy-invariants-and-extension-rules.md`
 - Feature 20 contributor extension workflow for new policy families and feature evaluation seams: `docs/deployment-profile-policy-contributor-guide.md`
 - Authorization protected-resource visibility + explicit-sharing contracts: `docs/architecture/authorization-visibility-sharing-contracts.md`
