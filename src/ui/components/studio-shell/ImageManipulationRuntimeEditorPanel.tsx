@@ -42,7 +42,9 @@ import {
   type RuntimeWindowSessionState,
 } from "../../runtime/SystemRuntimeWindowSessionPersistenceService";
 import {
+  buildRunProgressSnapshot,
   createIdleImageManipulationRunLifecycleState,
+  mapExecutionReadinessToRunLifecycleState,
   mapRuntimeStatusToRunLifecycleState,
   type ImageManipulationRunLifecycleSnapshot,
 } from "./image-manipulation/ImageManipulationRunLifecycleState";
@@ -67,6 +69,7 @@ import { RuntimeOperationsService } from "../../services/RuntimeOperationsServic
 import type {
   RuntimeExecutionReadinessResponse,
   RuntimeSdkExecutionResultResponse,
+  RuntimeSdkExecutionStatusResponse,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
@@ -91,7 +94,9 @@ const runStateLabels: Record<ImageManipulationRunLifecycleSnapshot["state"], str
   idle: "Ready",
   validating: "Checking settings",
   queued: "Queued",
+  preparing: "Preparing",
   running: "Creating",
+  degraded: "Degraded",
   completed: "Finished",
   failed: "Needs attention",
   cancelled: "Cancelled",
@@ -298,7 +303,13 @@ function resolveRunStatusTone(state: ImageManipulationRunLifecycleSnapshot["stat
   if (state === "failed") {
     return "danger";
   }
-  if (state === "validating" || state === "queued" || state === "running") {
+  if (
+    state === "validating"
+    || state === "queued"
+    || state === "preparing"
+    || state === "running"
+    || state === "degraded"
+  ) {
     return "warning";
   }
   return "neutral";
@@ -633,6 +644,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [runLifecycle, setRunLifecycle] = useState<ImageManipulationRunLifecycleSnapshot>(() => createIdleImageManipulationRunLifecycleState());
   const [activeRunId, setActiveRunId] = useState<string | undefined>();
+  const [activeRunStatus, setActiveRunStatus] = useState<RuntimeSdkExecutionStatusResponse | undefined>();
   const [executionReadiness, setExecutionReadiness] = useState<RuntimeExecutionReadinessResponse | undefined>();
   const [executionReadinessError, setExecutionReadinessError] = useState<string | undefined>();
   const [isCheckingExecutionReadiness, setIsCheckingExecutionReadiness] = useState(false);
@@ -784,6 +796,7 @@ export function ImageManipulationRuntimeEditorPanel({
       : outputLoadError;
   const hasCollectionLoadError = Boolean(sourceLoadError || outputLoadError || referenceLoadError);
   const runStatusMessage = resolveRunStatusMessage(runLifecycle, statusMessage);
+  const runProgress = useMemo(() => buildRunProgressSnapshot(activeRunStatus), [activeRunStatus]);
   const selectionConfirmationMessage = useMemo(() => resolveSelectionConfirmationMessage({
     selectedSourceItem,
     selectedReferenceItem,
@@ -1143,6 +1156,18 @@ export function ImageManipulationRuntimeEditorPanel({
   }, [runtimeWorkflowAssetId, sessionToken]);
 
   useEffect(() => {
+    if (activeRunId) {
+      return;
+    }
+    setRunLifecycle((current) => {
+      if (current.state !== "idle" && current.state !== "degraded" && current.state !== "validating") {
+        return current;
+      }
+      return mapExecutionReadinessToRunLifecycleState(executionReadiness);
+    });
+  }, [activeRunId, executionReadiness]);
+
+  useEffect(() => {
     if (!draft?.draftId) {
       setSelectionSnapshot(datasetBindingService.createEmptySelectionSnapshot(roleBindings));
       return;
@@ -1235,7 +1260,8 @@ export function ImageManipulationRuntimeEditorPanel({
         });
       }
 
-      setRunLifecycle(mapRuntimeStatusToRunLifecycleState(statusResponse.data.status));
+      setRunLifecycle(mapRuntimeStatusToRunLifecycleState(statusResponse.data.status, statusResponse.data.progress));
+      setActiveRunStatus(statusResponse.data);
       setFlowSteps(Object.freeze([
         Object.freeze({
           stepId: "trigger",
@@ -1285,6 +1311,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
   const isRunInProgress = runLifecycle.state === "validating"
     || runLifecycle.state === "queued"
+    || runLifecycle.state === "preparing"
     || runLifecycle.state === "running";
   const launchPrecheck = buildImageRunLaunchPrecheckState({
     selectedSourceRecordId,
@@ -1806,6 +1833,7 @@ export function ImageManipulationRuntimeEditorPanel({
               onClick={() => {
                 setRunLifecycle(Object.freeze({ state: "validating", message: "Checking your setup" }));
                 setActiveRunId(undefined);
+                setActiveRunStatus(undefined);
                 setIntegrityIssues([]);
                 setFlowSteps([]);
                 setFlowIssues([]);
@@ -2056,6 +2084,10 @@ export function ImageManipulationRuntimeEditorPanel({
                       return;
                     }
                     setStatusMessage("Cancellation requested.");
+                    setRunLifecycle(Object.freeze({
+                      state: "running",
+                      message: "Cancellation requested. Waiting for run status confirmation.",
+                    }));
                   });
                 }}
               >
@@ -2074,6 +2106,56 @@ export function ImageManipulationRuntimeEditorPanel({
               message={runStatusMessage}
               tone={resolveRunStatusTone(runLifecycle.state)}
             />
+            {(runLifecycle.state === "degraded" || launchPrecheck.backendAdvisories.length > 0) ? (
+              <ImageStatusNotice
+                title="Execution warnings"
+                message={launchPrecheck.backendAdvisories[0]?.message
+                  ?? runLifecycle.message
+                  ?? "Execution environment is available with warnings."}
+                tone="warning"
+              />
+            ) : null}
+            <section className="ui-stack ui-stack--2xs" aria-live="polite">
+              <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>Run progress</p>
+              <div
+                aria-hidden="true"
+                style={{
+                  width: "100%",
+                  height: "0.5rem",
+                  borderRadius: "999px",
+                  background: "var(--ui-color-surface-muted, #e8ebf1)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${runProgress.percentComplete}%`,
+                    height: "100%",
+                    background: runLifecycle.state === "failed"
+                      ? "var(--ui-color-danger-500, #c53b3b)"
+                      : runLifecycle.state === "completed"
+                        ? "var(--ui-color-success-500, #24804a)"
+                        : "var(--ui-color-primary-500, #2b6cb0)",
+                    transition: "width 150ms ease-out",
+                  }}
+                />
+              </div>
+              <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                {runProgress.available ? `${runProgress.percentComplete}% · ${runProgress.summary}` : runProgress.summary}
+              </p>
+              {activeRunStatus ? (
+                <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  Last update {toFriendlyTimestamp(activeRunStatus.updatedAt) ?? activeRunStatus.updatedAt}
+                </p>
+              ) : null}
+            </section>
+            {flowIssues.length > 0 && runLifecycle.state === "failed" ? (
+              <ImageStatusNotice
+                title="Failure details"
+                message={flowIssues[0]?.userMessage ?? "The run failed before completion."}
+                tone="danger"
+              />
+            ) : null}
             <details
               open={isRunAdvancedDetailsOpen}
               onToggle={(event) => {
@@ -2083,6 +2165,11 @@ export function ImageManipulationRuntimeEditorPanel({
               <summary className="ui-text-small ui-text-secondary">Advanced details</summary>
               {activeRunId ? (
                 <p className="ui-text-small ui-text-secondary">Run ID: {activeRunId}</p>
+              ) : null}
+              {activeRunStatus ? (
+                <p className="ui-text-small ui-text-secondary">
+                  Authoritative status: {activeRunStatus.status} ({activeRunStatus.progress.completedNodeCount}/{activeRunStatus.progress.totalNodeCount})
+                </p>
               ) : null}
               {flowSteps.map((step) => (
                 <p key={step.stepId} className="ui-text-small ui-text-secondary">
