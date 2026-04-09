@@ -82,6 +82,12 @@ Story 1.3.1 introduces a startup status model at the same orchestrator seam. `cr
 
 This status snapshot is available programmatically during and after staged startup execution.
 
+Story 1.3.2 adds startup summary emission. Every authoritative startup attempt now logs one structured `authoritative-server.startup.summary` event (success or failure) including:
+- total startup duration
+- shared pipeline stage durations and failed stage diagnostics
+- authoritative orchestrator stage durations and failed stage diagnostics
+- top-level startup failure details when startup fails
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `services`
 - `security`

@@ -47,6 +47,24 @@ class CapturingStartupSpanLogger implements StartupSpanLogger {
   }
 }
 
+class CapturingHostLogger {
+  public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly warnEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly errorEvents: Array<Readonly<Record<string, unknown>>> = [];
+
+  public info(event: Readonly<Record<string, unknown>>): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: Readonly<Record<string, unknown>>): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: Readonly<Record<string, unknown>>): void {
+    this.errorEvents.push(event);
+  }
+}
+
 function createDeploymentPolicyBootstrapResolutionStub(
   profileId = HostDeploymentProfileIds.home,
 ): DeploymentPolicyBootstrapResolutionResult {
@@ -935,6 +953,83 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(migrationSpan?.durationMs).toBe(5_200);
     expect(migrationSpan?.slow).toBe(true);
     expect(startupLogger.errorEvents).toHaveLength(0);
+  });
+
+  it("emits structured startup summary on successful startup", async () => {
+    const hostLogger = new CapturingHostLogger();
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+        logger: hostLogger,
+      },
+      startHost: async () => ({
+        port: 5900,
+        address: "127.0.0.1:5900",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-summary-success-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    await runtime.stop();
+
+    const summary = hostLogger.infoEvents.find((event) => event.event === "authoritative-server.startup.summary");
+    expect(summary).toBeDefined();
+    expect(summary?.outcome).toBe("succeeded");
+    expect(summary?.durationMs).toBeTypeOf("number");
+    expect((summary?.pipeline as Record<string, unknown> | undefined)?.stageCount).toBe(6);
+    expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(4);
+    expect(hostLogger.errorEvents).toHaveLength(0);
+  });
+
+  it("emits structured startup summary on startup failure with failed stage diagnostics", async () => {
+    const hostLogger = new CapturingHostLogger();
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+        logger: hostLogger,
+      },
+      startHost: async () => ({
+        port: 5901,
+        address: "127.0.0.1:5901",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.security]: () => {
+            throw new Error("security-stage-failed");
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-summary-failure-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    await expect(root.compose(boot)).rejects.toThrow("security-stage-failed");
+    const summary = hostLogger.errorEvents.find((event) => event.event === "authoritative-server.startup.summary");
+    expect(summary).toBeDefined();
+    expect(summary?.outcome).toBe("failed");
+    const pipeline = summary?.pipeline as Record<string, unknown> | undefined;
+    expect(pipeline?.failedStageCount).toBe(1);
+    expect(summary?.startupFailure).toEqual({
+      name: "Error",
+      message: "security-stage-failed",
+    });
   });
 });
 

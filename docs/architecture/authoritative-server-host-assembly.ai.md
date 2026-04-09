@@ -31,6 +31,11 @@
   - `success`
   - `failed`
 - This startup status snapshot is available programmatically during and after staged startup execution.
+- Story 1.3.2 adds startup summary emission. Every authoritative startup attempt now logs one structured `authoritative-server.startup.summary` event (success or failure) with:
+  - total startup duration
+  - shared pipeline stage durations and failed stage diagnostics
+  - authoritative orchestrator stage durations and failed stage diagnostics
+  - top-level startup failure details when startup fails
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `services`
   - `security`

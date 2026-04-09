@@ -17,6 +17,20 @@ interface AuthoritativeServerBootstrapStageOrchestratorStageState {
   readonly totalStages: number;
 }
 
+interface AuthoritativeServerStartupStageFailureSummary {
+  readonly name: string;
+  readonly message: string;
+}
+
+interface AuthoritativeServerStartupStageRuntimeStatus {
+  readonly state: AuthoritativeServerStartupStageState;
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+  readonly failedAt?: string;
+  readonly durationMs?: number;
+  readonly failure?: AuthoritativeServerStartupStageFailureSummary;
+}
+
 export const AuthoritativeServerStartupStageStates = Object.freeze({
   pending: "pending",
   running: "running",
@@ -31,6 +45,11 @@ export interface AuthoritativeServerStartupStageStatus {
   readonly stageId: AuthoritativeServerBootstrapStageId;
   readonly sequence: number;
   readonly state: AuthoritativeServerStartupStageState;
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+  readonly failedAt?: string;
+  readonly durationMs?: number;
+  readonly failure?: AuthoritativeServerStartupStageFailureSummary;
 }
 
 export interface AuthoritativeServerBootstrapStatus {
@@ -93,11 +112,15 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
   readonly tracer: StartupTracer;
   readonly parentSpan?: StartupSpan;
   readonly stageOrder?: ReadonlyArray<AuthoritativeServerBootstrapStageId>;
+  readonly clock?: () => number;
 }): AuthoritativeServerBootstrapStageOrchestrator {
   const orderedStages = normalizeStartupStageOrder(input.stageOrder);
-  const stageStates = new Map<AuthoritativeServerBootstrapStageId, AuthoritativeServerStartupStageState>();
+  const clock = input.clock ?? (() => Date.now());
+  const stageStates = new Map<AuthoritativeServerBootstrapStageId, AuthoritativeServerStartupStageRuntimeStatus>();
   for (const stageId of orderedStages) {
-    stageStates.set(stageId, AuthoritativeServerStartupStageStates.pending);
+    stageStates.set(stageId, Object.freeze({
+      state: AuthoritativeServerStartupStageStates.pending,
+    }));
   }
   let nextStageIndex = 0;
 
@@ -107,7 +130,12 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
         stages: Object.freeze(orderedStages.map((stageId, index) => Object.freeze({
           stageId,
           sequence: index + 1,
-          state: stageStates.get(stageId) ?? AuthoritativeServerStartupStageStates.pending,
+          state: stageStates.get(stageId)?.state ?? AuthoritativeServerStartupStageStates.pending,
+          startedAt: stageStates.get(stageId)?.startedAt,
+          completedAt: stageStates.get(stageId)?.completedAt,
+          failedAt: stageStates.get(stageId)?.failedAt,
+          durationMs: stageStates.get(stageId)?.durationMs,
+          failure: stageStates.get(stageId)?.failure,
         }))),
       });
     },
@@ -138,7 +166,12 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
         sequence: nextStageIndex,
         totalStages: orderedStages.length,
       });
-      stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.running);
+      const startedAtMs = clock();
+      const startedAt = new Date(startedAtMs).toISOString();
+      stageStates.set(stageInput.stageId, Object.freeze({
+        state: AuthoritativeServerStartupStageStates.running,
+        startedAt,
+      }));
       const span = input.parentSpan?.startChild(stageInput.stageId, {
         metadata: createStageMetadata(stageState, stageInput.metadata),
       }) ?? input.tracer.startSpan(stageInput.stageId, {
@@ -152,13 +185,39 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
           totalStages: stageState.totalStages,
         });
         span.complete();
-        stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.success);
+        const completedAtMs = clock();
+        stageStates.set(stageInput.stageId, Object.freeze({
+          state: AuthoritativeServerStartupStageStates.success,
+          startedAt,
+          completedAt: new Date(completedAtMs).toISOString(),
+          durationMs: Math.max(0, completedAtMs - startedAtMs),
+        }));
         return result;
       } catch (error) {
         span.fail(error);
-        stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.failed);
+        const failedAtMs = clock();
+        stageStates.set(stageInput.stageId, Object.freeze({
+          state: AuthoritativeServerStartupStageStates.failed,
+          startedAt,
+          failedAt: new Date(failedAtMs).toISOString(),
+          durationMs: Math.max(0, failedAtMs - startedAtMs),
+          failure: summarizeStageFailure(error),
+        }));
         throw error;
       }
     },
+  });
+}
+
+function summarizeStageFailure(error: unknown): AuthoritativeServerStartupStageFailureSummary {
+  if (error instanceof Error) {
+    return Object.freeze({
+      name: error.name || "Error",
+      message: error.message || "Authoritative startup stage failed.",
+    });
+  }
+  return Object.freeze({
+    name: "Error",
+    message: String(error),
   });
 }
