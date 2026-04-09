@@ -11,6 +11,9 @@ import type {
   RunCollectedResultPersistenceRequest,
   RunCollectedResultPersistenceResult,
 } from "@application/runs/ports/RunOrchestrationPersistencePorts";
+import type { AuditLedgerAppendResult } from "@application/audit/AuditApplicationContracts";
+import type { AuthoritativeAuditRecordEventInput } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
+import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 import { FinalizeRunExecutionOutcomeUseCase } from "../use-cases/FinalizeRunExecutionOutcomeUseCase";
 import {
   RunAssignmentStatuses,
@@ -125,6 +128,20 @@ class CapturingResultCollectionPersistencePort implements IRunCollectedResultPer
       throw new Error("simulated-storage-write-failure");
     }
     return this.result;
+  }
+}
+
+class CapturingAuthoritativeAuditRecorder {
+  public readonly events: AuthoritativeAuditRecordEventInput[] = [];
+
+  public async recordRunsEvent(input: AuthoritativeAuditRecordEventInput): Promise<AuditLedgerAppendResult> {
+    this.events.push(input);
+    return Object.freeze({
+      changed: true,
+      wasReplay: false,
+      sequence: this.events.length,
+      event: {} as CanonicalAuditEvent,
+    });
   }
 }
 
@@ -321,10 +338,12 @@ describe("FinalizeRunExecutionOutcomeUseCase", () => {
   it("finalizes safely with degraded hints when result persistence throws", async () => {
     const queueRepository = new CapturingQueueRepository();
     const persistencePort = new CapturingResultCollectionPersistencePort();
+    const authoritativeAuditRecorder = new CapturingAuthoritativeAuditRecorder();
     persistencePort.shouldThrow = true;
     const useCase = new FinalizeRunExecutionOutcomeUseCase({
       queueRepository,
       resultCollectionPersistencePort: persistencePort,
+      authoritativeAuditRecorder,
     });
     const completedRun = createRun(RunLifecycleStates.completed);
     const result = await useCase.execute({
@@ -358,5 +377,8 @@ describe("FinalizeRunExecutionOutcomeUseCase", () => {
     expect(result.finalization?.terminalQuality).toBe("degraded");
     const telemetry = (result.runRecord.metadata as { executionTelemetry?: { finalizationInternal?: { resultPersistenceDiagnostics?: { reasonCode?: string } } } }).executionTelemetry;
     expect(telemetry?.finalizationInternal?.resultPersistenceDiagnostics?.reasonCode).toBe("result-persistence-port-failed");
+    expect(authoritativeAuditRecorder.events).toHaveLength(1);
+    expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.result.collection.failed");
+    expect((authoritativeAuditRecorder.events[0]?.payload?.userSafeDetails as { issueCategory?: string } | undefined)?.issueCategory).toBe("result-collection-failure");
   });
 });

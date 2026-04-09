@@ -252,6 +252,7 @@ export class HandleRunDispatchResultUseCase {
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
       resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
+      authoritativeAuditRecorder: dependencies.authoritativeAuditRecorder,
     });
   }
 

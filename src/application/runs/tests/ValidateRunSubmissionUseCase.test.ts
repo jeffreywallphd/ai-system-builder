@@ -644,7 +644,46 @@ describe("ValidateRunSubmissionUseCase", () => {
     expect(auditSink.events[0]?.workspaceId).toBe("workspace-alpha");
     expect(auditSink.events[0]?.actorUserIdentityId).toBe("user:owner");
     expect((auditSink.events[0]?.details as { validationCode?: string } | undefined)?.validationCode).toBe("forbidden");
+    expect((auditSink.events[0]?.details as { issueCategory?: string } | undefined)?.issueCategory).toBe("authorization-denial");
     expect((auditSink.events[0]?.details as { submission?: { parameterCount?: number } } | undefined)?.submission?.parameterCount).toBe(1);
     expect((auditSink.events[0]?.details as { submission?: Record<string, unknown> } | undefined)?.submission?.parameters).toBeUndefined();
+  });
+
+  it("emits a focused denial-pattern audit event after repeated invalid attempts", async () => {
+    const workspaceRepository = new InMemoryWorkspaceRepository();
+    await workspaceRepository.saveWorkspace(createWorkspaceRecord("workspace-beta"));
+
+    const authorization = new StubAuthorizationDecisionEvaluator();
+    authorization.deniedPermissions.add("system.execute");
+    const auditSink = new InMemoryRunSubmissionAuditSink();
+    const useCase = new ValidateRunSubmissionUseCase({
+      workspaceRepository,
+      authorizationDecisionEvaluator: authorization,
+      targetResolver: new StubTargetResolver(),
+      auditSink,
+    });
+
+    const baseRequest = createBaseRequest();
+    const repeatedRequest = Object.freeze({
+      ...baseRequest,
+      actor: Object.freeze({
+        actorUserIdentityId: "user:repeat-denial",
+        activeWorkspaceId: "workspace-beta",
+      }),
+      submission: Object.freeze({
+        ...baseRequest.submission,
+        workspaceId: "workspace-beta",
+      }),
+    });
+
+    await useCase.execute(repeatedRequest);
+    await useCase.execute(repeatedRequest);
+    await useCase.execute(repeatedRequest);
+
+    const patternEvents = auditSink.events.filter(
+      (event) => event.type === RunSubmissionAuditEventTypes.submissionDenialPatternDetected,
+    );
+    expect(patternEvents).toHaveLength(1);
+    expect((patternEvents[0]?.details as { attemptsInWindow?: number } | undefined)?.attemptsInWindow).toBe(3);
   });
 });

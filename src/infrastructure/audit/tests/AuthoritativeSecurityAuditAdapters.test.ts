@@ -113,13 +113,26 @@ describe("Authoritative security audit adapters", () => {
         trustMaterialRef: "raw-material:abc123",
       }),
     });
+    await sink.recordNodeTrustAuditEvent({
+      type: "node-availability-transitioned",
+      actorUserIdentityId: "service:node-trust",
+      occurredAt: "2026-04-07T18:10:01.000Z",
+      workspaceId: "workspace:primary",
+      nodeId: "node:gpu-west-1",
+      outcome: "success",
+      details: Object.freeze({
+        previousHeartbeatStatus: "online",
+        heartbeatStatus: "offline",
+      }),
+    });
 
-    const event = repository.events[0];
-    expect(event).toBeDefined();
-    expect(event?.action).toBe("node.revoked");
-    expect(event?.scope.workspaceId).toBe("workspace:primary");
-    expect(event?.protectedResource?.resourceRef).toBe("node:gpu-west-1");
-    expect(event?.payload.adminOnlyDetails?.trustMaterialRef).toBe("[REDACTED]");
+    const revokedEvent = repository.events[0];
+    expect(revokedEvent).toBeDefined();
+    expect(revokedEvent?.action).toBe("node.revoked");
+    expect(revokedEvent?.scope.workspaceId).toBe("workspace:primary");
+    expect(revokedEvent?.protectedResource?.resourceRef).toBe("node:gpu-west-1");
+    expect(revokedEvent?.payload.adminOnlyDetails?.trustMaterialRef).toBe("[REDACTED]");
+    expect(repository.events[1]?.action).toBe("node.availability.transitioned");
   });
 
   it("records authorization sharing/permission mutations through authoritative audit with metadata redaction", async () => {
@@ -393,13 +406,24 @@ describe("Authoritative security audit adapters", () => {
         reasonCode: "policy-ineligible",
       }),
     }));
+    await sink.recordRunSubmissionEvent(Object.freeze({
+      type: "run-submission-denial-pattern-detected",
+      occurredAt: "2026-04-07T19:00:02.000Z",
+      workspaceId: "workspace:primary",
+      actorServiceId: "service:run-validation",
+      details: Object.freeze({
+        attemptsInWindow: 3,
+      }),
+    }));
 
-    expect(repository.events).toHaveLength(2);
+    expect(repository.events).toHaveLength(3);
     expect(repository.events[0]?.action).toBe("run.submission.accepted");
     expect(repository.events[0]?.category).toBe("orchestration");
     expect(repository.events[0]?.protectedResource?.resourceRef).toBe("run:submitted-1");
     expect(repository.events[1]?.action).toBe("run.submission.denied");
     expect(repository.events[1]?.outcome).toBe("denied");
+    expect(repository.events[2]?.action).toBe("run.submission.denial-pattern.detected");
+    expect(repository.events[2]?.outcome).toBe("denied");
   });
 
   it("records scheduling governance audit-channel events through authoritative orchestration records", async () => {

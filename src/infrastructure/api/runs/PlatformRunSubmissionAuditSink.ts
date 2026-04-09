@@ -12,6 +12,7 @@ import type {
 const RunAuditActionsByType = Object.freeze({
   "run-submission-accepted": "run.submission.accepted",
   "run-submission-denied": "run.submission.denied",
+  "run-submission-denial-pattern-detected": "run.submission.denial-pattern.detected",
   "run-lifecycle-transitioned": "run.lifecycle.transitioned",
 } as const satisfies Record<RunSubmissionAuditEvent["type"], string>);
 
@@ -46,7 +47,7 @@ export class PlatformRunSubmissionAuditSink implements RunSubmissionAuditSink {
   }
 
   private resolveOutcome(type: RunSubmissionAuditEvent["type"]): PlatformAuditEventRecord["outcome"] {
-    if (type === "run-submission-denied") {
+    if (type === "run-submission-denied" || type === "run-submission-denial-pattern-detected") {
       return "denied";
     }
     return "succeeded";

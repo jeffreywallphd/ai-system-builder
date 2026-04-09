@@ -145,6 +145,7 @@ export class IngestRunExecutionUpdateUseCase {
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
       resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
+      authoritativeAuditRecorder: dependencies.authoritativeAuditRecorder,
     });
   }
 

@@ -1,4 +1,5 @@
 import type { PlatformRunRecord } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
+import type { AuthoritativeAuditRecordingPort } from "@application/audit/ports/AuthoritativeAuditRecordingPorts";
 import {
   parseImageManipulationCollectedExecutionResult,
   type ImageManipulationCollectedExecutionResult,
@@ -20,6 +21,11 @@ import {
   transitionCanonicalRunRecord,
   type CanonicalRunRecord,
 } from "@domain/runs/RunDomain";
+import {
+  AuditActorKinds,
+  AuditEventOutcomes,
+  AuditScopeKinds,
+} from "@domain/audit/AuditDomain";
 import type { RunLifecycleUpdateRequest, RunResultOutputReference } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import { updatePlatformRunRecordCanonicalState } from "./RunCreationPersistenceMapper";
 
@@ -43,6 +49,7 @@ interface FinalizeRunExecutionOutcomeUseCaseDependencies {
   readonly queueRepository: IRunOrchestrationQueuePersistenceRepository;
   readonly resultRegistrationPort?: IRunFinalizationResultRegistrationPort;
   readonly resultCollectionPersistencePort?: IRunCollectedResultPersistencePort;
+  readonly authoritativeAuditRecorder?: Pick<AuthoritativeAuditRecordingPort, "recordRunsEvent">;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -148,6 +155,13 @@ export class FinalizeRunExecutionOutcomeUseCase {
       senderNodeId: request.senderNodeId,
       collectedResult,
       terminalResult: request.lifecycleUpdate?.result,
+    });
+    await this.appendResultCollectionAuditEvent({
+      run: runWithQueueHistory,
+      senderNodeId: request.senderNodeId,
+      occurredAt: finalizedAt,
+      persistenceOutcome,
+      collectedResult,
     });
     const normalizedResult = mergeTerminalResultWithPersistence(
       request.lifecycleUpdate?.result,
@@ -315,6 +329,111 @@ export class FinalizeRunExecutionOutcomeUseCase {
       });
     }
   }
+
+  private async appendResultCollectionAuditEvent(input: {
+    readonly run: CanonicalRunRecord;
+    readonly senderNodeId?: string;
+    readonly occurredAt: string;
+    readonly persistenceOutcome: RunCollectedResultPersistenceResult | undefined;
+    readonly collectedResult: ImageManipulationCollectedExecutionResult | undefined;
+  }): Promise<void> {
+    if (!this.dependencies.authoritativeAuditRecorder || !input.persistenceOutcome) {
+      return;
+    }
+
+    const status = input.persistenceOutcome.status;
+    if (
+      status !== RunCollectedResultPersistenceStatuses.failed
+      && status !== RunCollectedResultPersistenceStatuses.partiallyPersisted
+    ) {
+      return;
+    }
+
+    const actorId = normalizeOptional(input.senderNodeId) ?? "system:run-finalization";
+    const eventType = status === RunCollectedResultPersistenceStatuses.failed
+      ? "run-result-collection-failed"
+      : "run-result-collection-degraded";
+    const action = status === RunCollectedResultPersistenceStatuses.failed
+      ? "run.result.collection.failed"
+      : "run.result.collection.degraded";
+    const issueCategory = status === RunCollectedResultPersistenceStatuses.failed
+      ? "result-collection-failure"
+      : "result-collection-degraded";
+    const diagnostics = asStringRecord(input.persistenceOutcome.internalDiagnostics);
+
+    try {
+      await this.dependencies.authoritativeAuditRecorder.recordRunsEvent({
+        operationKey: `run:result-collection:${input.run.identity.runId}:${input.occurredAt}:${status}`,
+        eventType,
+        action,
+        outcome: status === RunCollectedResultPersistenceStatuses.failed
+          ? AuditEventOutcomes.failed
+          : AuditEventOutcomes.rejected,
+        occurredAt: input.occurredAt,
+        actor: Object.freeze({
+          actorId,
+          actorKind: actorId.startsWith("user:")
+            ? AuditActorKinds.user
+            : AuditActorKinds.service,
+          actorUserIdentityId: actorId.startsWith("user:") ? actorId : undefined,
+          actorServiceId: actorId.startsWith("user:") ? undefined : actorId,
+        }),
+        scope: Object.freeze({
+          kind: AuditScopeKinds.workspace,
+          workspaceId: input.run.identity.workspaceId,
+        }),
+        protectedResource: Object.freeze({
+          resourceType: "run",
+          resourceId: input.run.identity.runId,
+          resourceRef: input.run.identity.runId.startsWith("run:")
+            ? input.run.identity.runId
+            : `run:${input.run.identity.runId}`,
+          sensitivityClass: "sensitive",
+          workspaceId: input.run.identity.workspaceId,
+        }),
+        payload: Object.freeze({
+          userSafeDetails: Object.freeze({
+            issueCategory,
+            persistenceStatus: status,
+            collectedOutputCount: input.collectedResult?.summary?.collectedCount ?? 0,
+            persistedOutputCount: input.persistenceOutcome.outputs.length,
+            outputAvailabilityHint: input.persistenceOutcome.outputAvailabilityHint,
+            terminalQualityHint: input.persistenceOutcome.terminalQualityHint,
+            reasonCode: diagnostics?.reasonCode,
+          }),
+          adminOnlyDetails: Object.freeze({
+            diagnosticsCode: diagnostics?.code,
+            diagnosticsStatus: diagnostics?.status,
+            diagnosticsMessage: diagnostics?.message,
+          }),
+        }),
+      });
+    } catch {
+      // Authoritative audit recording is best-effort and must not fail finalization behavior.
+    }
+  }
+}
+
+function asStringRecord(
+  value: Readonly<Record<string, unknown>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const output: Record<string, string> = {};
+  const keys: ReadonlyArray<"code" | "reasonCode" | "status" | "message"> = Object.freeze([
+    "code",
+    "reasonCode",
+    "status",
+    "message",
+  ]);
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      output[key] = candidate.trim().slice(0, 160);
+    }
+  }
+  return Object.keys(output).length > 0 ? Object.freeze(output) : undefined;
 }
 
 function normalizeOutputReferences(

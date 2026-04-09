@@ -51,6 +51,15 @@ const HighRiskRunTags = Object.freeze([
   "risk:critical",
 ]);
 
+const RepeatedDenialAuditWindowMs = 5 * 60 * 1000;
+const RepeatedDenialAuditThreshold = 3;
+const RepeatedDenialAuditCooldownMs = 10 * 60 * 1000;
+
+interface RepeatedDenialTrackingState {
+  readonly attempts: number[];
+  readonly lastEscalatedAtMs?: number;
+}
+
 export interface ValidateRunSubmissionUseCaseDependencies {
   readonly workspaceRepository: IWorkspaceRepository;
   readonly authorizationDecisionEvaluator: IAuthorizationPolicyDecisionEvaluator;
@@ -80,6 +89,8 @@ const ResourceTypes = Object.freeze({
 });
 
 export class ValidateRunSubmissionUseCase {
+  private static readonly denialTrackingByPrincipal = new Map<string, RepeatedDenialTrackingState>();
+
   public constructor(private readonly dependencies: ValidateRunSubmissionUseCaseDependencies) {}
 
   public async execute(input: ValidateRunSubmissionRequest): Promise<ValidateRunSubmissionResult> {
@@ -554,6 +565,10 @@ export class ValidateRunSubmissionUseCase {
   ): Promise<void> {
     const event = this.createDeniedAuditEvent(input, code, issues);
     await publishRunSubmissionAuditEventBestEffort(this.dependencies.auditSink, event);
+    const repeatedDenialEvent = this.createRepeatedDenialPatternAuditEvent(input, code, issues);
+    if (repeatedDenialEvent) {
+      await publishRunSubmissionAuditEventBestEffort(this.dependencies.auditSink, repeatedDenialEvent);
+    }
   }
 
   private createDeniedAuditEvent(
@@ -574,11 +589,65 @@ export class ValidateRunSubmissionUseCase {
       actorUserIdentityId: this.normalizeOptional(input.actor.actorUserIdentityId),
       actorServiceId: this.normalizeOptional(input.actor.actorServiceId),
       details: Object.freeze({
+        issueCategory: this.resolveIssueCategory(code),
         validationCode: code,
         issueCount: issues.length,
         issueKindCounts: Object.freeze(issueKindCounts),
         issueCodes: Object.freeze(uniqueIssueCodes),
         submission: this.createSubmissionSummary(input),
+      }),
+    });
+  }
+
+  private createRepeatedDenialPatternAuditEvent(
+    input: ValidateRunSubmissionRequest,
+    code: typeof RunSubmissionValidationErrorCodes[keyof typeof RunSubmissionValidationErrorCodes],
+    issues: ReadonlyArray<RunSubmissionValidationIssue>,
+  ): RunSubmissionAuditEvent | undefined {
+    const trackingKey = this.resolveDenialTrackingKey(input);
+    if (!trackingKey) {
+      return undefined;
+    }
+
+    const occurredAtIso = this.resolveOccurredAt(input.occurredAt);
+    const occurredAtMs = Date.parse(occurredAtIso);
+    if (!Number.isFinite(occurredAtMs)) {
+      return undefined;
+    }
+
+    const previous = ValidateRunSubmissionUseCase.denialTrackingByPrincipal.get(trackingKey);
+    const windowStartMs = occurredAtMs - RepeatedDenialAuditWindowMs;
+    const attempts = (previous?.attempts ?? []).filter((value) => value >= windowStartMs);
+    attempts.push(occurredAtMs);
+
+    const reachedThreshold = attempts.length >= RepeatedDenialAuditThreshold;
+    const withinCooldown = previous?.lastEscalatedAtMs !== undefined
+      && (occurredAtMs - previous.lastEscalatedAtMs) < RepeatedDenialAuditCooldownMs;
+    const shouldEscalate = reachedThreshold && !withinCooldown;
+
+    ValidateRunSubmissionUseCase.denialTrackingByPrincipal.set(trackingKey, Object.freeze({
+      attempts: Object.freeze(attempts),
+      lastEscalatedAtMs: shouldEscalate ? occurredAtMs : previous?.lastEscalatedAtMs,
+    }));
+
+    if (!shouldEscalate) {
+      return undefined;
+    }
+
+    return Object.freeze({
+      type: RunSubmissionAuditEventTypes.submissionDenialPatternDetected,
+      occurredAt: occurredAtIso,
+      workspaceId: this.normalizeOptional(input.submission.workspaceId),
+      actorUserIdentityId: this.normalizeOptional(input.actor.actorUserIdentityId),
+      actorServiceId: this.normalizeOptional(input.actor.actorServiceId),
+      details: Object.freeze({
+        issueCategory: this.resolveIssueCategory(code),
+        validationCode: code,
+        issueCodes: Object.freeze([...new Set(issues.map((issue) => issue.code))].slice(0, 10)),
+        attemptsInWindow: attempts.length,
+        threshold: RepeatedDenialAuditThreshold,
+        windowSeconds: RepeatedDenialAuditWindowMs / 1000,
+        cooldownSeconds: RepeatedDenialAuditCooldownMs / 1000,
       }),
     });
   }
@@ -618,6 +687,32 @@ export class ValidateRunSubmissionUseCase {
     }
     const now = this.dependencies.clock?.now() ?? new Date();
     return now.toISOString();
+  }
+
+  private resolveDenialTrackingKey(input: ValidateRunSubmissionRequest): string | undefined {
+    const workspaceId = this.normalizeOptional(input.submission.workspaceId);
+    const actorUserIdentityId = this.normalizeOptional(input.actor.actorUserIdentityId);
+    const actorServiceId = this.normalizeOptional(input.actor.actorServiceId);
+    const actorId = actorUserIdentityId ?? actorServiceId;
+    if (!workspaceId || !actorId) {
+      return undefined;
+    }
+    return `${workspaceId}::${actorId}`;
+  }
+
+  private resolveIssueCategory(
+    code: typeof RunSubmissionValidationErrorCodes[keyof typeof RunSubmissionValidationErrorCodes],
+  ): "validation-denial" | "authorization-denial" | "availability-denial" | "policy-denial" {
+    if (code === RunSubmissionValidationErrorCodes.forbidden) {
+      return "authorization-denial";
+    }
+    if (code === RunSubmissionValidationErrorCodes.notFound) {
+      return "availability-denial";
+    }
+    if (code === RunSubmissionValidationErrorCodes.policyIneligible) {
+      return "policy-denial";
+    }
+    return "validation-denial";
   }
 
   private normalizeOptional(value: string | undefined): string | undefined {

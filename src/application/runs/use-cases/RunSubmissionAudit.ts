@@ -1,6 +1,7 @@
 export const RunSubmissionAuditEventTypes = Object.freeze({
   submissionAccepted: "run-submission-accepted",
   submissionDenied: "run-submission-denied",
+  submissionDenialPatternDetected: "run-submission-denial-pattern-detected",
   lifecycleTransitioned: "run-lifecycle-transitioned",
 });
 
