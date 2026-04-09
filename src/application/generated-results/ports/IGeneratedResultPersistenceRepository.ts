@@ -19,6 +19,7 @@ export interface GeneratedResultRecordListQuery {
   readonly createdBefore?: string;
   readonly updatedAfter?: string;
   readonly updatedBefore?: string;
+  readonly lineageInputAssetIds?: ReadonlyArray<string>;
   readonly includeArchived?: boolean;
   readonly limit?: number;
   readonly offset?: number;

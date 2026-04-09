@@ -346,3 +346,32 @@ Generated-result lineage retrieval now has explicit application and transport se
   - upstream input assets,
   - deterministic lineage graph nodes/edges connecting result, run, workflow, system, optional execution node, and inputs.
 
+## Story 6.3.4 result reuse metadata and source-selection seams (implemented)
+
+Generated-result metadata/read seams now explicitly prepare result assets for future workflow input reuse flows rather than terminal-only history display.
+
+### Reuse metadata projection posture
+
+Generated-result summary/detail metadata now includes:
+
+- `reuse.reusableAsWorkflowInput`
+- `reuse.logicalAssetReference`
+- `reuse.supportedInputPurposes`
+- `reuse.assetClasses`
+- `reuse.mediaClasses`
+- `reuse.sourceContext` (run/workflow/system/execution-node/output/input-count lineage summary)
+
+This keeps generated results inside the same logical asset + binding compatibility model used by workflow/system contracts.
+
+### Reuse/source-selection query posture
+
+List query seams now support reuse-aware and lineage-aware candidate selection:
+
+- `lineageInputAssetIds`
+- `requiredInputPurposes`
+- `requiredAssetClasses`
+- `requiredMediaClasses`
+- `reuseReadyOnly`
+
+Repository/persistence filtering now supports lineage-input constraints so source-selection flows can request compatible reusable outputs without introducing result-model forks.
+

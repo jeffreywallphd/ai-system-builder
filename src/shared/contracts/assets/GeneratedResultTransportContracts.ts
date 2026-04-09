@@ -92,6 +92,24 @@ export interface GeneratedResultLineageSummaryDto {
   readonly hasSelectedNode: boolean;
 }
 
+export interface GeneratedResultReuseSourceContextDto {
+  readonly runId: string;
+  readonly workflowId: string;
+  readonly systemId: string;
+  readonly executionNodeId?: string;
+  readonly outputSlot: string;
+  readonly inputAssetCount: number;
+}
+
+export interface GeneratedResultReuseCompatibilityDto {
+  readonly reusableAsWorkflowInput: boolean;
+  readonly logicalAssetReference: string;
+  readonly supportedInputPurposes: ReadonlyArray<string>;
+  readonly assetClasses: ReadonlyArray<string>;
+  readonly mediaClasses: ReadonlyArray<string>;
+  readonly sourceContext: GeneratedResultReuseSourceContextDto;
+}
+
 export interface GeneratedResultLineageDetailDto {
   readonly summary: GeneratedResultLineageSummaryDto;
   readonly source: {
@@ -154,6 +172,7 @@ export interface GeneratedResultSummaryDto {
     readonly retryable?: boolean;
   };
   readonly lineage: GeneratedResultLineageSummaryDto;
+  readonly reuse: GeneratedResultReuseCompatibilityDto;
 }
 
 export interface GeneratedResultDetailDto extends GeneratedResultSummaryDto {
@@ -196,6 +215,11 @@ export interface ListGeneratedResultsRequestDto {
   readonly search?: string;
   readonly createdAfter?: string;
   readonly createdBefore?: string;
+  readonly lineageInputAssetIds?: ReadonlyArray<string>;
+  readonly requiredInputPurposes?: ReadonlyArray<string>;
+  readonly requiredAssetClasses?: ReadonlyArray<string>;
+  readonly requiredMediaClasses?: ReadonlyArray<string>;
+  readonly reuseReadyOnly?: boolean;
   readonly limit?: number;
   readonly offset?: number;
   readonly sortBy?: "createdAt" | "updatedAt" | "status";
@@ -351,6 +375,13 @@ export function toListGeneratedResultsQueryParams(input: ListGeneratedResultsReq
   appendOptional(query, "search", input.search);
   appendOptional(query, "createdAfter", input.createdAfter);
   appendOptional(query, "createdBefore", input.createdBefore);
+  appendOptionalList(query, "lineageInputAssetId", input.lineageInputAssetIds);
+  appendOptionalList(query, "requiredInputPurpose", input.requiredInputPurposes);
+  appendOptionalList(query, "requiredAssetClass", input.requiredAssetClasses);
+  appendOptionalList(query, "requiredMediaClass", input.requiredMediaClasses);
+  if (typeof input.reuseReadyOnly === "boolean") {
+    query.set("reuseReadyOnly", input.reuseReadyOnly ? "true" : "false");
+  }
   appendOptional(query, "sortBy", input.sortBy);
   appendOptional(query, "sortDirection", input.sortDirection);
   if (typeof input.limit === "number") {

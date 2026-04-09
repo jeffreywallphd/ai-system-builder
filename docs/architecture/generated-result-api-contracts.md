@@ -139,3 +139,30 @@ Contract posture:
 - Summary responses provide lightweight provenance for gallery/history cards.
 - Detail responses provide run/workflow/system/node/source snapshot context plus upstream inputs and deterministic lineage graph projection for inspection UIs.
 - Lineage response payloads remain logical-id based and avoid backend/storage internals.
+
+## Story 6.3.4 result reuse metadata and source-selection seams (implemented)
+
+Generated-result list/detail contracts now include explicit reuse compatibility metadata so prior outputs can be selected as authoritative workflow inputs without introducing a parallel asset model.
+
+### Reuse metadata added to result summary/detail contracts
+
+- `reuse.reusableAsWorkflowInput`
+- `reuse.logicalAssetReference`
+- `reuse.supportedInputPurposes`
+- `reuse.assetClasses`
+- `reuse.mediaClasses`
+- `reuse.sourceContext` (`runId`, `workflowId`, `systemId`, optional `executionNodeId`, `outputSlot`, `inputAssetCount`)
+
+This keeps reuse selection aligned with existing workflow binding compatibility dimensions (purpose, asset class, media class) while preserving lineage-aware context in list/detail flows.
+
+### Reuse-oriented list query seams
+
+List query contracts now include optional filters for reuse/source selection:
+
+- `lineageInputAssetIds`
+- `requiredInputPurposes`
+- `requiredAssetClasses`
+- `requiredMediaClasses`
+- `reuseReadyOnly`
+
+These filters are generic and workflow-binding compatible, so clients can request candidates for different image workflow slots without hardcoding one workflow template.

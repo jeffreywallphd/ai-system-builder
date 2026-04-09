@@ -214,6 +214,14 @@ describe("SqliteGeneratedResultPersistenceAdapter", () => {
     expect(lineage?.runId).toBe("run:alpha:001");
     expect(lineage?.inputAssetIds).toEqual(["input-asset-001", "input-asset-002"]);
 
+    const listedByLineageInput = await adapter.listResults({
+      workspaceId: "workspace-alpha",
+      lineageInputAssetIds: ["input-asset-010"],
+      includeArchived: true,
+    });
+    expect(listedByLineageInput).toHaveLength(1);
+    expect(listedByLineageInput[0]?.resultAssetId).toBe("gr-asset-002");
+
     adapter.dispose();
   });
 

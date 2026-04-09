@@ -135,3 +135,30 @@ Output posture:
 - Summary responses stay compact for list/history contexts.
 - Detail responses expose source snapshot/version references, execution provenance, upstream input assets, and deterministic graph topology for inspection experiences.
 - Contracts remain storage-path-opaque and backend-internal-payload-opaque.
+
+## Story 6.3.4 result reuse metadata and source-selection seams (implemented)
+
+Generated-result list/detail contracts now expose explicit reuse compatibility metadata so prior outputs can participate in future workflow input selection flows as authoritative assets.
+
+### Added reuse metadata on summary/detail contracts
+
+- `reuse.reusableAsWorkflowInput`
+- `reuse.logicalAssetReference`
+- `reuse.supportedInputPurposes`
+- `reuse.assetClasses`
+- `reuse.mediaClasses`
+- `reuse.sourceContext` (`runId`, `workflowId`, `systemId`, optional `executionNodeId`, `outputSlot`, `inputAssetCount`)
+
+This shape aligns generated-result reuse with the existing workflow binding compatibility dimensions (input purpose, allowed asset classes, allowed media classes) while keeping lineage context inspectable.
+
+### Added reuse/source selection query filters
+
+List contracts now include optional reusable-candidate query seams:
+
+- `lineageInputAssetIds`
+- `requiredInputPurposes`
+- `requiredAssetClasses`
+- `requiredMediaClasses`
+- `reuseReadyOnly`
+
+These are intentionally generic and avoid workflow-template hardcoding so future UI/source selectors can expand without asset-model redesign.

@@ -246,6 +246,9 @@ describe("GetGeneratedResultMetadataUseCase", () => {
     expect(outcome.value.result.retrieval.state).toBe("retrieval-available");
     expect(outcome.value.result.lineage.inputAssetCount).toBe(2);
     expect(outcome.value.result.lineageDetail.inputAssetIds).toEqual(["input-asset-1", "input-asset-2"]);
+    expect(outcome.value.result.reuse.reusableAsWorkflowInput).toBeTrue();
+    expect(outcome.value.result.reuse.sourceContext.workflowId).toBe("workflow:alpha");
+    expect(outcome.value.result.reuse.sourceContext.inputAssetCount).toBe(1);
   });
 
   it("returns access denied when membership is missing", async () => {

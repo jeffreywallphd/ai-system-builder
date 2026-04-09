@@ -234,6 +234,24 @@ const GeneratedResultLineageSummaryDtoSchema = z.object({
   hasSelectedNode: z.boolean(),
 }).strict();
 
+const GeneratedResultReuseSourceContextDtoSchema = z.object({
+  runId: IdentifierSchema,
+  workflowId: IdentifierSchema,
+  systemId: IdentifierSchema,
+  executionNodeId: IdentifierSchema.optional(),
+  outputSlot: z.string().trim().min(1).max(128).regex(/^[a-z0-9][a-z0-9._:-]{0,127}$/),
+  inputAssetCount: z.number().int().min(0),
+}).strict();
+
+const GeneratedResultReuseCompatibilityDtoSchema = z.object({
+  reusableAsWorkflowInput: z.boolean(),
+  logicalAssetReference: IdentifierSchema,
+  supportedInputPurposes: z.array(IdentifierSchema).min(1).max(32),
+  assetClasses: z.array(IdentifierSchema).min(1).max(32),
+  mediaClasses: z.array(IdentifierSchema).min(1).max(32),
+  sourceContext: GeneratedResultReuseSourceContextDtoSchema,
+}).strict();
+
 const GeneratedResultLineageDetailDtoSchema = z.object({
   summary: GeneratedResultLineageSummaryDtoSchema,
   source: z.object({
@@ -320,6 +338,7 @@ const GeneratedResultSummaryDtoSchema = z.object({
     retryable: z.boolean().optional(),
   }).strict(),
   lineage: GeneratedResultLineageSummaryDtoSchema,
+  reuse: GeneratedResultReuseCompatibilityDtoSchema,
 }).strict();
 
 const StorageBindingReferenceSchema = z.string().trim()
@@ -465,6 +484,11 @@ export const ListGeneratedResultsRequestDtoSchema: z.ZodType<ListGeneratedResult
   search: z.string().trim().min(1).max(256).optional(),
   createdAfter: TimestampSchema.optional(),
   createdBefore: TimestampSchema.optional(),
+  lineageInputAssetIds: z.array(IdentifierSchema).max(128).optional(),
+  requiredInputPurposes: z.array(IdentifierSchema).max(32).optional(),
+  requiredAssetClasses: z.array(IdentifierSchema).max(32).optional(),
+  requiredMediaClasses: z.array(IdentifierSchema).max(32).optional(),
+  reuseReadyOnly: z.boolean().optional(),
   limit: z.number().int().min(1).max(500).optional(),
   offset: z.number().int().min(0).optional(),
   sortBy: z.enum(["createdAt", "updatedAt", "status"]).optional(),

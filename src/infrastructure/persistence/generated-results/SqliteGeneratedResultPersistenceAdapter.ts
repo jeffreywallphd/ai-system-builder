@@ -116,6 +116,22 @@ export class SqliteGeneratedResultPersistenceAdapter
       clauses.push("last_modified_at <= ?");
       params.push(query.updatedBefore);
     }
+    if (query.lineageInputAssetIds && query.lineageInputAssetIds.length > 0) {
+      const lineageInputAssetIds = [...new Set(query.lineageInputAssetIds
+        .map((value) => normalizeGeneratedResultLookup(value))
+        .filter((value): value is string => Boolean(value)))];
+      if (lineageInputAssetIds.length > 0) {
+        clauses.push(`
+          EXISTS (
+            SELECT 1
+            FROM generated_result_lineage_inputs
+            WHERE generated_result_lineage_inputs.result_asset_id = generated_result_records.result_asset_id
+              AND generated_result_lineage_inputs.input_asset_id IN (${lineageInputAssetIds.map(() => "?").join(", ")})
+          )
+        `);
+        params.push(...lineageInputAssetIds);
+      }
+    }
 
     const paging = this.buildPagingClause(query.limit, query.offset);
 
