@@ -16,11 +16,17 @@ const staticExternalModules = new Set([
 ]);
 
 function isSharpRuntimeModule(id: string): boolean {
+  const normalizedId = id.replace(/\\/g, "/");
+  const sanitizedId = normalizedId.split("?")[0];
+
   return (
-    id === "sharp" ||
-    id.startsWith("sharp/") ||
-    id.startsWith("@img/sharp-") ||
-    id.startsWith("@img/sharp-libvips-")
+    sanitizedId === "sharp" ||
+    sanitizedId.startsWith("sharp/") ||
+    sanitizedId.includes("/node_modules/sharp/") ||
+    sanitizedId.startsWith("@img/sharp-") ||
+    sanitizedId.startsWith("@img/sharp-libvips-") ||
+    sanitizedId.includes("/node_modules/@img/sharp-") ||
+    sanitizedId.includes("/node_modules/@img/sharp-libvips-")
   );
 }
 

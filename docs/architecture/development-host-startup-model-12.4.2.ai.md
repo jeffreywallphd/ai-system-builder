@@ -21,7 +21,7 @@
   - `dev:desktop:start` -> `node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start`
   - `dev:desktop` chains `prepare` then `start`.
 - Electron main-process Vite bundling now treats native image-processing runtime dependencies as external:
-  - `vite.main.config.ts` externalizes `sharp` and `@img/sharp-*` packages so Electron resolves native binaries from `node_modules` at runtime.
+  - `vite.main.config.ts` externalizes `sharp` and `@img/sharp-*` packages, including resolved `node_modules` path variants, so Electron resolves native binaries from `node_modules` at runtime.
 
 ## Test harness updates
 - Server integration harness in `src/hosts/server/tests/IdentityServerHost.test.ts` now boots through `startAuthoritativeServerHostAssembly(...)`.
