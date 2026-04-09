@@ -166,3 +166,19 @@ Result collection and preview provisioning are now hardened so degraded storage 
 - Temporary availability issues are counted separately from terminal failures to support operational triage and delayed-recovery flows.
 - Result persistence remains non-blocking for run terminalization while preserving explicit recovery signals for follow-on reprocessing.
 
+## Story 6.2.3 protected original retrieval baseline (implemented)
+
+Protected original-content retrieval for generated-result assets is now implemented as a server-mediated authoritative flow:
+
+- `src/application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase.ts` enforces request validation, workspace membership checks, workspace-scoped existence checks, private-visibility ownership rules, retrievable lifecycle checks, and media-type presence before opening any stream.
+- Storage access is resolved through `IStorageLogicalAccessResolutionService` + `IStorageObjectPort` using logical references (`storageBindingReference` / `logicalAssetVersionId`) and never exposing raw backend-local paths.
+- `src/infrastructure/api/generated-results/GeneratedResultManagementBackendApi.ts` maps use-case outcomes into stable API error semantics (`invalid-request`, `forbidden`, `not-found`, `invalid-state`, `internal`).
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts` adds `GET /api/v1/generated-results/:resultAssetId/original` under authenticated workspace session mediation, streaming bytes with controlled headers:
+  - `content-type`
+  - `content-length`
+  - `content-disposition` (`attachment`)
+  - `x-content-type-options: nosniff`
+  - `cache-control: private, no-store`
+
+This keeps retrieval policy-gated, storage-abstracted, and non-guessable while preserving compatibility with future protected-handle export/share policy flows.
+
