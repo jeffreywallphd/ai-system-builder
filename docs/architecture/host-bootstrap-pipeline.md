@@ -86,6 +86,9 @@ This keeps the common startup sequence stable while preserving host-level extens
 `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now uses the shared bootstrap pipeline:
 
 - builds a startup context from boot configuration + deployment profile + environment
+- resolves authoritative `config` and `security` stage implementations through:
+  - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 - composes canonical stages and optional host-specific customization stages
 - starts the production identity server during `feature-registration`
 - records host lifecycle transitions around pipeline execution (`composing -> starting -> ready`)

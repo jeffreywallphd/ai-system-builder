@@ -64,6 +64,12 @@ Bootstrap stage contracts for controlled decomposition are now defined in `src/h
 - `services`
 - `transport`
 
+Story 1.2.2 extracts the first authoritative bootstrap stage implementations into dedicated modules:
+- `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
+- `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+
+`AuthoritativeServerCompositionRoot.ts` now composes those modules and executes their stage contracts independently from the host file's remaining persistence/service/transport orchestration.
+
 The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
 
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps, including:

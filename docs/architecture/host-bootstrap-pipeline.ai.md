@@ -70,6 +70,9 @@
 ## Authoritative server adoption
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now composes startup through the shared pipeline.
 - Startup context is built from boot + deployment profile + environment.
+- Initial staged bootstrap extraction now lives in:
+  - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
+  - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 - Bootstrap `dependencies` now composes host-aware service registration plans and `feature-registration` enforces authoritative service coverage before runtime host start.
 - Identity server runtime start happens in `feature-registration` stage.
 - Existing lifecycle transition semantics are preserved (`composing -> starting -> ready -> stopping -> stopped`) with fail-safe failure transition handling.

@@ -19,6 +19,7 @@ import {
   AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+  AuthoritativeServerSecurityBootstrapArtifactKey,
   AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "../AuthoritativeServerCompositionRoot";
 import { AuthoritativeServerApiRouteRegistrationPlanArtifactKey } from "../AuthoritativeServerApiRouteComposition";
@@ -31,6 +32,7 @@ import type { AuthoritativePersistentPlatformServices } from "@infrastructure/pe
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
 import { createStartupTracer, type StartupSpanLogger } from "../../bootstrap/startupTracer";
+import type { AuthoritativeServerSecurityStageOutput } from "../AuthoritativeServerBootstrapStageContracts";
 
 class CapturingStartupSpanLogger implements StartupSpanLogger {
   public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
@@ -214,6 +216,46 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(runtime.phase).toBe("ready");
     await runtime.stop();
     expect(runtime.phase).toBe("stopped");
+  });
+
+  it("composes default security readiness before custom security stage handlers", async () => {
+    let observedSecurity: AuthoritativeServerSecurityStageOutput | undefined;
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5210,
+        address: "127.0.0.1:5210",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        stageHandlers: {
+          [HostBootstrapStageIds.security]: (context) => {
+            observedSecurity = context.getArtifact<AuthoritativeServerSecurityStageOutput>(
+              AuthoritativeServerSecurityBootstrapArtifactKey,
+            );
+          },
+        },
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-security-stage-artifact-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    expect(observedSecurity).toEqual({
+      transportTrustReady: true,
+      certificateAuthorityReady: true,
+      requiredSecretsValidated: true,
+    });
+    await runtime.stop();
   });
 
   it("runs default dependencies composition before custom dependency-stage handlers", async () => {

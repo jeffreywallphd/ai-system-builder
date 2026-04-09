@@ -5,6 +5,7 @@
   type ExecutableHostCompositionRoot,
   type HostBootConfiguration,
   type HostLifecycleTransition,
+  type HostRuntimeMetadata,
   type HostRuntimeHandle,
 } from "@application/common/HostCompositionContracts";
 import { AuthoritativeServerHostRuntime } from "../HostRuntimeCatalog";
@@ -20,7 +21,6 @@ import {
   type HostStartupLifecycleHooks,
 } from "../bootstrap/HostBootstrapPipeline";
 import {
-  createStartupTracer,
   type StartupSpan,
   type StartupTracer,
 } from "../bootstrap/startupTracer";
@@ -30,7 +30,6 @@ import {
   composeHostServiceRegistrationPlan,
 } from "@infrastructure/config/HostServiceRegistrationCatalog";
 import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
-import { resolveHostStartupConfiguration } from "@infrastructure/config/HostStartupConfiguration";
 import {
   startIdentityServerHost,
   type IdentityServerHost,
@@ -42,7 +41,7 @@ import {
   composeAuthoritativeServerApiRouteRegistrationPlan,
 } from "./AuthoritativeServerApiRouteComposition";
 import { createHostLifecycleCoordinator } from "../lifecycle/HostLifecycleCoordinator";
-import { HostRuntimeMetadataArtifactKey, advertiseHostRuntimeMetadata } from "../HostRuntimeMetadataCatalog";
+import { HostRuntimeMetadataArtifactKey } from "../HostRuntimeMetadataCatalog";
 import {
   createSqlitePersistenceRuntime,
   resolveSqlitePersistenceRuntimeConfiguration,
@@ -67,6 +66,14 @@ import {
   createAuthoritativeRunExecutionAdapterRegistration,
   type AuthoritativeRunExecutionAdapterRegistration,
 } from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
+import {
+  createAuthoritativeServerConfigBootstrapStage,
+  type AuthoritativeServerConfigBootstrapStage,
+} from "./AuthoritativeServerConfigBootstrapStage";
+import {
+  createAuthoritativeServerSecurityBootstrapStage,
+  type AuthoritativeServerSecurityBootstrapStage,
+} from "./AuthoritativeServerSecurityBootstrapStage";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -124,6 +131,8 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly boot: HostBootConfiguration;
       readonly hostConfiguration: IdentityServerHostOptions;
     }) => StartupTracer;
+    readonly createConfigStage?: () => AuthoritativeServerConfigBootstrapStage;
+    readonly createSecurityStage?: () => AuthoritativeServerSecurityBootstrapStage;
   };
 }
 
@@ -139,6 +148,8 @@ export const AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey =
   "artifact:host:server:authoritative:run-execution-adapter-registration";
 export const AuthoritativeServerDeploymentPolicyBootstrapArtifactKey =
   "artifact:host:server:authoritative:deployment-policy-bootstrap";
+export const AuthoritativeServerSecurityBootstrapArtifactKey =
+  "artifact:host:server:authoritative:security-bootstrap";
 
 function combineStartupLifecycleHooks(
   primary: HostStartupLifecycleHooks | undefined,
@@ -220,51 +231,43 @@ export function createAuthoritativeServerCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
-      const runtimeMetadata = advertiseHostRuntimeMetadata({
-        host: boot.host,
-        metadata: Object.freeze({
-          compositionRootId: "composition-root:host:server:authoritative",
-          startupReason: boot.startupReason,
-          controlPlaneSource: "local-authoritative-server",
-          transportHost: input.hostOptions.host,
-          transportPort: input.hostOptions.port !== undefined ? String(input.hostOptions.port) : undefined,
-        }),
-      });
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
+      let startupTracer: StartupTracer | undefined;
+      let runtimeMetadata: HostRuntimeMetadata | undefined;
+      let startupRootSpan: StartupSpan | undefined;
       await lifecycle.markComposing("compose-authoritative-server-host");
-      const startupTracer = (
-        input.bootstrap?.createStartupTracer
-        ?? ((tracerInput) => createStartupTracer({
-          startupReason: tracerInput.boot.startupReason,
+      const configStage = (
+        input.bootstrap?.createConfigStage
+        ?? (() => createAuthoritativeServerConfigBootstrapStage({
+          startup: {
+            deploymentProfile: input.bootstrap?.deploymentProfile,
+            enabledCapabilities: input.bootstrap?.enabledCapabilities,
+          },
+          createStartupTracer: input.bootstrap?.createStartupTracer,
         }))
-      )({
-        boot,
-        hostConfiguration: input.hostOptions,
-      });
-      const startupRootSpan = startupTracer.startSpan("authoritative-server-bootstrap", {
-        metadata: Object.freeze({
-          hostId: boot.host.hostId,
-          startupReason: boot.startupReason,
-        }),
-      });
+      )();
+      const securityStage = (
+        input.bootstrap?.createSecurityStage
+        ?? (() => createAuthoritativeServerSecurityBootstrapStage())
+      )();
 
       try {
-        const startupConfiguration = await runStartupStepSpan({
-          parentSpan: startupRootSpan,
-          tracer: startupTracer,
-          name: "config-load",
+        const startupConfiguration = await configStage.execute({
+          boot,
+          hostConfiguration: input.hostOptions,
+          startupReason: boot.startupReason,
+          environment: input.bootstrap?.environment ?? input.hostOptions.env ?? process.env,
+        });
+        startupTracer = startupConfiguration.startupTracer;
+        runtimeMetadata = startupConfiguration.runtimeMetadata;
+        const resolvedStartupTracer = startupTracer;
+        const resolvedRuntimeMetadata = runtimeMetadata;
+        startupRootSpan = startupTracer.startSpan("authoritative-server-bootstrap", {
           metadata: Object.freeze({
-            component: "authoritative-server-composition-root",
-          }),
-          run: () => resolveHostStartupConfiguration({
-            boot,
-            startup: {
-              deploymentProfile: input.bootstrap?.deploymentProfile,
-              environment: input.bootstrap?.environment ?? input.hostOptions.env ?? process.env,
-              enabledCapabilities: input.bootstrap?.enabledCapabilities,
-            },
+            hostId: boot.host.hostId,
+            startupReason: boot.startupReason,
           }),
         });
 
@@ -274,7 +277,7 @@ export function createAuthoritativeServerCompositionRoot(
               "artifact:host:server:authoritative:host-options",
               context.hostConfiguration as IdentityServerHostOptions,
             );
-            context.setArtifact(HostRuntimeMetadataArtifactKey, runtimeMetadata);
+            context.setArtifact(HostRuntimeMetadataArtifactKey, resolvedRuntimeMetadata);
           },
           [HostBootstrapStageIds.dependencies]: (context) => {
             const composePlan = input.bootstrap?.composeServiceRegistrationPlan
@@ -326,10 +329,21 @@ export function createAuthoritativeServerCompositionRoot(
               );
             }
           },
+          [HostBootstrapStageIds.security]: async (context) => {
+            const security = await securityStage.execute({
+              deploymentProfile: context.deploymentProfile,
+              environment: context.environment,
+              enabledCapabilities: context.enabledCapabilities,
+              runtimeMetadata: resolvedRuntimeMetadata,
+              startupTracer: resolvedStartupTracer,
+              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+            });
+            context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
+          },
           [HostBootstrapStageIds.persistence]: async (context) => {
             await runStartupStepSpan({
               parentSpan: startupRootSpan,
-              tracer: startupTracer,
+              tracer: resolvedStartupTracer,
               name: "persistence-setup",
               run: async (persistenceSetupSpan) => {
                 persistenceRuntime = (
@@ -347,7 +361,7 @@ export function createAuthoritativeServerCompositionRoot(
                 });
                 await runStartupStepSpan({
                   parentSpan: persistenceSetupSpan,
-                  tracer: startupTracer,
+                  tracer: resolvedStartupTracer,
                   name: "migrations",
                   run: async () => {
                     await persistenceRuntime?.start();
@@ -432,7 +446,7 @@ export function createAuthoritativeServerCompositionRoot(
             );
             const composedHost = await startHost({
               ...(context.hostConfiguration as IdentityServerHostOptions),
-              startupTracer,
+              startupTracer: resolvedStartupTracer,
               deploymentProfile: context.deploymentProfile,
               deploymentPolicyBootstrap,
               persistentPlatformServices: composedPersistentServices,
@@ -513,7 +527,7 @@ export function createAuthoritativeServerCompositionRoot(
 
         return Object.freeze({
           host: boot.host,
-          runtimeMetadata,
+          runtimeMetadata: resolvedRuntimeMetadata,
           get phase() {
             return lifecycle.phase;
           },
@@ -531,7 +545,7 @@ export function createAuthoritativeServerCompositionRoot(
           stop,
         });
       } catch (error) {
-        startupRootSpan.fail(error);
+        startupRootSpan?.fail(error);
         let failure: unknown = error;
         if (startedHost) {
           try {
@@ -568,7 +582,7 @@ export function createAuthoritativeServerCompositionRoot(
         await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
         throw failure;
       } finally {
-        startupRootSpan.complete();
+        startupRootSpan?.complete();
       }
     },
   });
