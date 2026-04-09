@@ -118,7 +118,8 @@ When adding resilience-sensitive behavior for this slice:
 
 1. Update the relevant feature doc and this cross-feature guide in the same change.
 2. Keep `.md` and `.ai.md` versions aligned.
-3. Add or update verification coverage in the resilience matrix where a new failure class is introduced.
-4. Confirm contributor guides still point to the current authoritative seams.
-5. Confirm architecture README index entries remain discoverable.
+3. Keep `docs/architecture/image-manipulation-feature-8-final-vertical-slice-completion.md` aligned when scope, limits, or extension posture changes.
+4. Add or update verification coverage in the resilience matrix where a new failure class is introduced.
+5. Confirm contributor guides still point to the current authoritative seams.
+6. Confirm architecture README index entries remain discoverable.
 
