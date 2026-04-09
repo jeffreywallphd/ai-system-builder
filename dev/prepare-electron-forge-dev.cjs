@@ -76,9 +76,32 @@ function canLoadBetterSqlite3() {
   try {
     const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
     const BetterSqlite3 = moduleRequire("better-sqlite3");
-    return Boolean(resolveBetterSqlite3Constructor(BetterSqlite3));
+    return verifyBetterSqlite3Runtime(BetterSqlite3);
   } catch {
     return false;
+  }
+}
+
+function verifyBetterSqlite3Runtime(moduleExport) {
+  const BetterSqlite3 = resolveBetterSqlite3Constructor(moduleExport);
+  if (!BetterSqlite3) {
+    return false;
+  }
+
+  let database;
+  try {
+    database = new BetterSqlite3(":memory:");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (database && typeof database.close === "function") {
+      try {
+        database.close();
+      } catch {
+        // Ignore best-effort cleanup failure.
+      }
+    }
   }
 }
 
@@ -129,7 +152,26 @@ function canLoadBetterSqlite3InElectronRuntime() {
       "    }",
       "    return undefined;",
       "  };",
-      "  if (!resolveBetterSqlite3Constructor(BetterSqlite3)) {",
+      "  const verifyBetterSqlite3Runtime = (moduleExport) => {",
+      "    const BetterSqlite3Constructor = resolveBetterSqlite3Constructor(moduleExport);",
+      "    if (!BetterSqlite3Constructor) return false;",
+      "    let database;",
+      "    try {",
+      "      database = new BetterSqlite3Constructor(':memory:');",
+      "      return true;",
+      "    } catch {",
+      "      return false;",
+      "    } finally {",
+      "      if (database && typeof database.close === 'function') {",
+      "        try {",
+      "          database.close();",
+      "        } catch {",
+      "          // Ignore best-effort cleanup failure.",
+      "        }",
+      "      }",
+      "    }",
+      "  };",
+      "  if (!verifyBetterSqlite3Runtime(BetterSqlite3)) {",
       "    process.exit(1);",
       "  }",
       "  process.exit(0);",
