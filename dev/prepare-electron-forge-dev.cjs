@@ -76,10 +76,34 @@ function canLoadBetterSqlite3() {
   try {
     const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
     const BetterSqlite3 = moduleRequire("better-sqlite3");
-    return typeof BetterSqlite3 === "function";
+    return Boolean(resolveBetterSqlite3Constructor(BetterSqlite3));
   } catch {
     return false;
   }
+}
+
+function resolveBetterSqlite3Constructor(moduleExport) {
+  let candidate = moduleExport;
+  const visitedCandidates = new Set();
+
+  while (candidate && (typeof candidate === "function" || typeof candidate === "object")) {
+    if (typeof candidate === "function") {
+      return candidate;
+    }
+
+    if (visitedCandidates.has(candidate)) {
+      break;
+    }
+    visitedCandidates.add(candidate);
+
+    if (!Object.prototype.hasOwnProperty.call(candidate, "default")) {
+      break;
+    }
+
+    candidate = candidate.default;
+  }
+
+  return undefined;
 }
 
 function canLoadBetterSqlite3InElectronRuntime() {
@@ -93,7 +117,19 @@ function canLoadBetterSqlite3InElectronRuntime() {
     const script = [
       "try {",
       "  const BetterSqlite3 = require('better-sqlite3');",
-      "  if (typeof BetterSqlite3 !== 'function') {",
+      "  const resolveBetterSqlite3Constructor = (moduleExport) => {",
+      "    let candidate = moduleExport;",
+      "    const visitedCandidates = new Set();",
+      "    while (candidate && (typeof candidate === 'function' || typeof candidate === 'object')) {",
+      "      if (typeof candidate === 'function') return candidate;",
+      "      if (visitedCandidates.has(candidate)) break;",
+      "      visitedCandidates.add(candidate);",
+      "      if (!Object.prototype.hasOwnProperty.call(candidate, 'default')) break;",
+      "      candidate = candidate.default;",
+      "    }",
+      "    return undefined;",
+      "  };",
+      "  if (!resolveBetterSqlite3Constructor(BetterSqlite3)) {",
       "    process.exit(1);",
       "  }",
       "  process.exit(0);",

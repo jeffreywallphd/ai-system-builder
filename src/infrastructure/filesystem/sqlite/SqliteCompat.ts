@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import path from "node:path";
 
 export interface SqliteCompatRunResult {
   readonly changes: number;
@@ -37,13 +38,9 @@ export function openSqliteCompatDatabase(
   databasePath: string,
   moduleRequire: ModuleRequire = require,
 ): SqliteCompatDatabase {
-  try {
-    const BetterSqlite3 = resolveBetterSqlite3Constructor(moduleRequire("better-sqlite3"));
-    if (BetterSqlite3) {
-      return BetterSqlite3Factory(databasePath, BetterSqlite3);
-    }
-  } catch {
-    // Continue through compatible fallbacks.
+  const betterSqlite3Resolution = resolveBetterSqlite3ForRuntime(moduleRequire);
+  if (betterSqlite3Resolution.constructor) {
+    return BetterSqlite3Factory(databasePath, betterSqlite3Resolution.constructor);
   }
 
   const nodeSqlite = openNodeSqliteDatabase(databasePath, moduleRequire);
@@ -56,7 +53,7 @@ export function openSqliteCompatDatabase(
   }
 
   throw new Error(
-    `Unable to initialize SQLite database '${databasePath}'. Could not load 'better-sqlite3' and Bun SQLite is unavailable in Node/Electron runtime.`,
+    `Unable to initialize SQLite database '${databasePath}'. Could not load 'better-sqlite3' and Bun SQLite is unavailable in Node/Electron runtime. ${betterSqlite3Resolution.diagnostics.join(" ")}`,
   );
 }
 
@@ -91,6 +88,59 @@ function resolveBetterSqlite3Constructor(
   }
 
   return undefined;
+}
+
+function resolveBetterSqlite3ForRuntime(moduleRequire: ModuleRequire): {
+  readonly constructor: (new (path: string) => BetterSqlite3Database) | undefined;
+  readonly diagnostics: ReadonlyArray<string>;
+} {
+  const diagnostics: string[] = [];
+  const moduleRequireResolution = loadBetterSqlite3Constructor(moduleRequire, "module require");
+  diagnostics.push(moduleRequireResolution.diagnostic);
+  if (moduleRequireResolution.constructor) {
+    return { constructor: moduleRequireResolution.constructor, diagnostics };
+  }
+
+  const cwdRequire = createRequire(path.join(process.cwd(), "package.json"));
+  if (cwdRequire !== moduleRequire) {
+    const cwdResolution = loadBetterSqlite3Constructor(cwdRequire, "cwd package.json require");
+    diagnostics.push(cwdResolution.diagnostic);
+    if (cwdResolution.constructor) {
+      return { constructor: cwdResolution.constructor, diagnostics };
+    }
+  }
+
+  return { constructor: undefined, diagnostics };
+}
+
+function loadBetterSqlite3Constructor(
+  moduleRequire: ModuleRequire,
+  label: string,
+): {
+  readonly constructor: (new (path: string) => BetterSqlite3Database) | undefined;
+  readonly diagnostic: string;
+} {
+  try {
+    const moduleExport = moduleRequire("better-sqlite3");
+    const resolvedConstructor = resolveBetterSqlite3Constructor(moduleExport);
+    if (resolvedConstructor) {
+      return {
+        constructor: resolvedConstructor,
+        diagnostic: `${label}: loaded better-sqlite3.`,
+      };
+    }
+
+    return {
+      constructor: undefined,
+      diagnostic: `${label}: better-sqlite3 loaded but no constructor export was found.`,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      constructor: undefined,
+      diagnostic: `${label}: ${message}`,
+    };
+  }
 }
 
 function openBunSqliteDatabase(databasePath: string, moduleRequire: ModuleRequire = require): SqliteCompatDatabase {
