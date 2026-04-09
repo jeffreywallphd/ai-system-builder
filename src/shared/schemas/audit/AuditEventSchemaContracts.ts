@@ -11,7 +11,8 @@ import {
   AuditRetentionPostures,
   AuditScopeKinds,
 } from "@domain/audit/AuditDomain";
-import { SharedApiQueryParamKeys, SharedApiSortDirections } from "../../contracts/api/SharedApiQueryConventions";
+import { SharedApiSortDirections } from "../../contracts/api/SharedApiContractPrimitives";
+import { SharedApiQueryParamKeys } from "../../contracts/api/SharedApiQueryConventions";
 import {
   AuditEventContractVersions,
   AuditEventSortFields,
