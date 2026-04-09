@@ -73,11 +73,17 @@ export class IdentityAuthSessionCoordinator {
 
   public async bootstrap(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
     const startedAt = Date.now();
-    console.info("[ai-loom][init] renderer-session-bootstrap:start");
+    logInitDiagnostic("renderer-session-bootstrap:start", Object.freeze({
+      startedAt: new Date(startedAt).toISOString(),
+    }));
     try {
       return await this.resolveActiveSession(options);
     } finally {
-      console.info(`[ai-loom][init] renderer-session-bootstrap:end durationMs=${Date.now() - startedAt}`);
+      logInitDiagnostic("renderer-session-bootstrap:end", Object.freeze({
+        durationMs: Date.now() - startedAt,
+        startedAt: new Date(startedAt).toISOString(),
+        endedAt: new Date().toISOString(),
+      }));
     }
   }
 
@@ -254,13 +260,27 @@ export class IdentityAuthSessionCoordinator {
     options?: IdentitySessionBootstrapOptions,
   ): Promise<Awaited<ReturnType<IdentityAuthService["resolveAuthenticatedSession"]>>> {
     const startedAt = Date.now();
+    const timeoutMs = normalizeTimeoutMs(options?.sessionValidationTimeoutMs, DefaultSessionValidationTimeoutMs);
+    logInitDiagnostic("resolveAuthenticatedSession:start", Object.freeze({
+      timeoutMs,
+      startedAt: new Date(startedAt).toISOString(),
+    }));
     try {
-      return await this.authService.resolveAuthenticatedSession(request, {
-        timeoutMs: normalizeTimeoutMs(options?.sessionValidationTimeoutMs, DefaultSessionValidationTimeoutMs),
+      const result = await this.authService.resolveAuthenticatedSession(request, {
+        timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
       });
+      logInitDiagnostic("resolveAuthenticatedSession:result", Object.freeze({
+        ok: result.ok,
+        errorCode: result.error?.code,
+        durationMs: Date.now() - startedAt,
+      }));
+      return result;
     } finally {
-      console.info(`[ai-loom][init] resolveAuthenticatedSession:end durationMs=${Date.now() - startedAt}`);
+      logInitDiagnostic("resolveAuthenticatedSession:end", Object.freeze({
+        durationMs: Date.now() - startedAt,
+        endedAt: new Date().toISOString(),
+      }));
     }
   }
 
@@ -272,15 +292,37 @@ export class IdentityAuthSessionCoordinator {
     options?: IdentitySessionBootstrapOptions,
   ): Promise<Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>>> {
     const startedAt = Date.now();
+    const timeoutMs = normalizeTimeoutMs(options?.actorContextTimeoutMs, DefaultActorContextTimeoutMs);
+    logInitDiagnostic("resolveSessionActorContext:start", Object.freeze({
+      timeoutMs,
+      startedAt: new Date(startedAt).toISOString(),
+      requestedWorkspaceId: request.workspaceId,
+    }));
     try {
-      return await this.authService.resolveSessionActorContext(request, {
-        timeoutMs: normalizeTimeoutMs(options?.actorContextTimeoutMs, DefaultActorContextTimeoutMs),
+      const result = await this.authService.resolveSessionActorContext(request, {
+        timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
       });
+      logInitDiagnostic("resolveSessionActorContext:result", Object.freeze({
+        ok: result.ok,
+        errorCode: result.error?.code,
+        resolvedWorkspaceId: result.data?.workspaceContext.resolvedWorkspaceId,
+        workspaceCount: result.data?.workspaceContext.workspaces.length,
+        durationMs: Date.now() - startedAt,
+      }));
+      return result;
     } finally {
-      console.info(`[ai-loom][init] resolveSessionActorContext:end durationMs=${Date.now() - startedAt}`);
+      logInitDiagnostic("resolveSessionActorContext:end", Object.freeze({
+        durationMs: Date.now() - startedAt,
+        endedAt: new Date().toISOString(),
+      }));
     }
   }
+}
+
+function logInitDiagnostic(event: string, details?: Readonly<Record<string, unknown>>): void {
+  const payload = details ? ` ${JSON.stringify(details)}` : "";
+  console.info(`\n[ai-loom][init] ${event}${payload}\n`);
 }
 
 function normalizeWorkspaceId(value: string | undefined): string | undefined {

@@ -1110,6 +1110,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
 
   let hasLoggedRootReadinessProbe = false;
   const server = serverFactory(async (request, response) => {
+    const requestStartedAt = Date.now();
     const requestId = randomUUID();
     const correlationId = resolveRequestCorrelationId(request, requestId);
     setResponseCorrelationHeaders(response, requestId, correlationId);
@@ -1123,6 +1124,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         correlationId,
         method: request.method,
         path,
+        details: Object.freeze({
+          startedAt: new Date(requestStartedAt).toISOString(),
+        }),
       }));
     }
 
@@ -8826,6 +8830,23 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           error: normalizeError(error),
         },
       }));
+    } finally {
+      if (!rootReadinessProbe) {
+        const requestCompletedAt = Date.now();
+        logger.info(Object.freeze({
+          event: "identity-http.request.timing",
+          requestId,
+          correlationId,
+          method: request.method,
+          path,
+          statusCode: response.statusCode,
+          details: Object.freeze({
+            startedAt: new Date(requestStartedAt).toISOString(),
+            completedAt: new Date(requestCompletedAt).toISOString(),
+            durationMs: requestCompletedAt - requestStartedAt,
+          }),
+        }));
+      }
     }
   });
 
@@ -10171,6 +10192,14 @@ async function handleDevLogin(
   logger: IdentityHttpServerLogger,
   maxBodyBytes: number,
 ): Promise<void> {
+  const handlerStartedAt = Date.now();
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.flow.started",
+    requestId,
+    details: Object.freeze({
+      startedAt: new Date(handlerStartedAt).toISOString(),
+    }),
+  }));
   const parsedRequest = await parseAndValidateRequest(
     request,
     DevLoginRequestSchema,
@@ -10180,9 +10209,19 @@ async function handleDevLogin(
   );
   if (!parsedRequest.ok) {
     writeJson(response, parsedRequest.statusCode, parsedRequest.body);
+    logger.warn(Object.freeze({
+      event: "identity-auth.dev-login.flow.failed",
+      requestId,
+      statusCode: parsedRequest.statusCode,
+      details: Object.freeze({
+        stage: "request-validation",
+        totalDurationMs: Date.now() - handlerStartedAt,
+      }),
+    }));
     return;
   }
 
+  const registerStartedAt = Date.now();
   const registerResponse = await backendApi.registerLocalAccount({
     username: DEV_LOGIN_DEFAULT_USERNAME,
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
@@ -10191,6 +10230,17 @@ async function handleDevLogin(
       candidate: DEV_LOGIN_DEFAULT_PASSWORD,
     },
   });
+  const registerDurationMs = Date.now() - registerStartedAt;
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.register.completed",
+    requestId,
+    statusCode: mapStatusCode(registerResponse),
+    details: Object.freeze({
+      ok: registerResponse.ok,
+      errorCode: registerResponse.error?.code,
+      durationMs: registerDurationMs,
+    }),
+  }));
 
   if (!registerResponse.ok && registerResponse.error?.code !== IdentityAuthApiErrorCodes.conflict) {
     const statusCode = mapStatusCode(registerResponse);
@@ -10198,9 +10248,20 @@ async function handleDevLogin(
     logResponse(logger, requestId, request, statusCode, Object.freeze({
       providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
     }), registerResponse);
+    logger.warn(Object.freeze({
+      event: "identity-auth.dev-login.flow.failed",
+      requestId,
+      statusCode,
+      details: Object.freeze({
+        stage: "register-local-account",
+        errorCode: registerResponse.error?.code,
+        totalDurationMs: Date.now() - handlerStartedAt,
+      }),
+    }));
     return;
   }
 
+  const loginStartedAt = Date.now();
   const loginResponse = await backendApi.loginLocalAccount({
     providerId: DEV_LOGIN_DEFAULT_PROVIDER_ID,
     providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
@@ -10211,11 +10272,33 @@ async function handleDevLogin(
       candidate: DEV_LOGIN_DEFAULT_PASSWORD,
     },
   });
+  const loginDurationMs = Date.now() - loginStartedAt;
   const statusCode = mapStatusCode(loginResponse);
   writeJson(response, statusCode, loginResponse);
   logResponse(logger, requestId, request, statusCode, Object.freeze({
     providerSubject: DEV_LOGIN_DEFAULT_USERNAME,
   }), loginResponse);
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.login.completed",
+    requestId,
+    statusCode,
+    details: Object.freeze({
+      ok: loginResponse.ok,
+      errorCode: loginResponse.error?.code,
+      durationMs: loginDurationMs,
+    }),
+  }));
+  logger.info(Object.freeze({
+    event: "identity-auth.dev-login.flow.completed",
+    requestId,
+    statusCode,
+    details: Object.freeze({
+      outcome: loginResponse.ok ? "success" : "failure",
+      totalDurationMs: Date.now() - handlerStartedAt,
+      registerDurationMs,
+      loginDurationMs,
+    }),
+  }));
 }
 
 function shouldBypassTransportTrustValidation(
@@ -14443,14 +14526,14 @@ function resolveSessionActorContextWorkspaceId(
 
 class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
   public info(event: IdentityHttpServerLogEvent): void {
-    console.info(JSON.stringify(event));
+    console.info(`${JSON.stringify(event)}\n`);
   }
 
   public warn(event: IdentityHttpServerLogEvent): void {
-    console.warn(JSON.stringify(event));
+    console.warn(`${JSON.stringify(event)}\n`);
   }
 
   public error(event: IdentityHttpServerLogEvent): void {
-    console.error(JSON.stringify(event));
+    console.error(`${JSON.stringify(event)}\n`);
   }
 }

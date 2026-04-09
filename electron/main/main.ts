@@ -476,12 +476,26 @@ async function probeTransportReachability(identityApiBaseUrl: string): Promise<{
 
 function logInitializationStart(phase: string): number {
   const startedAt = Date.now();
-  console.info(`[ai-loom][init] ${phase}:start`);
+  console.info(`\n[ai-loom][init] ${phase}:start startedAt=${new Date(startedAt).toISOString()}\n`);
   return startedAt;
 }
 
 function logInitializationEnd(phase: string, startedAt: number): void {
-  console.info(`[ai-loom][init] ${phase}:end durationMs=${Date.now() - startedAt}`);
+  const endedAt = Date.now();
+  console.info(
+    `\n[ai-loom][init] ${phase}:end durationMs=${endedAt - startedAt} startedAt=${new Date(startedAt).toISOString()} endedAt=${new Date(endedAt).toISOString()}\n`,
+  );
+}
+
+function logInitializationCheckpoint(
+  phase: string,
+  checkpoint: string,
+  startedAt: number,
+): void {
+  const now = Date.now();
+  console.info(
+    `\n[ai-loom][init] ${phase}:checkpoint name=${checkpoint} elapsedMs=${now - startedAt} at=${new Date(now).toISOString()}\n`,
+  );
 }
 
 function createDesktopAgentRunner(params: {
@@ -632,6 +646,7 @@ async function launchRuntimeWindowFromContract(
 async function bootstrapDesktopRuntime(): Promise<void> {
   const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
   try {
+  const storageInitializationStartedAt = logInitializationStart("desktop-storage-initialize");
   const storagePaths = resolveDesktopStoragePaths({
     userDataPath: app.getPath("userData"),
     logsPath: app.getPath("logs"),
@@ -639,13 +654,18 @@ async function bootstrapDesktopRuntime(): Promise<void> {
 
   storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
   await new InitializeProductionStorageUseCase(storageDatabase).execute();
+  logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "storage-ready", bootstrapStartedAt);
 
+  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
   const pythonRuntime = resolveDesktopPythonRuntime({
     isPackaged,
     repoRoot,
     resourcesPath: process.resourcesPath,
     storagePaths,
   });
+  logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "python-runtime-resolved", bootstrapStartedAt);
 
   serviceSupervisor = new DesktopServiceSupervisor({
     repoRoot,
@@ -657,6 +677,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
   await serviceSupervisor.start();
   logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "local-service-supervisor-ready", bootstrapStartedAt);
 
   const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -689,6 +710,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     },
   });
   logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "authoritative-server-ready", bootstrapStartedAt);
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://${authoritativeServerRuntime.address}`,
     resolveHostSecureTransportConfig({
