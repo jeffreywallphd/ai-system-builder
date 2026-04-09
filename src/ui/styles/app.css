@@ -593,6 +593,20 @@ body {
   min-height: 0;
 }
 
+
+.ui-command-palette--nonblocking {
+  pointer-events: none;
+}
+
+.ui-command-palette--nonblocking .ui-overlay-panel__surface {
+  pointer-events: auto;
+}
+
+.ui-command-palette--nonblocking .ui-overlay-panel__scrim {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .ui-command-palette .ui-overlay-panel__surface {
   top: calc(4rem + var(--space-sm));
   bottom: auto;
