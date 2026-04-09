@@ -70,17 +70,24 @@ function BetterSqlite3Factory(
 function resolveBetterSqlite3Constructor(
   moduleExport: unknown,
 ): (new (path: string) => BetterSqlite3Database) | undefined {
-  if (typeof moduleExport === "function") {
-    return moduleExport as new (path: string) => BetterSqlite3Database;
-  }
+  let candidate: unknown = moduleExport;
+  const visitedCandidates = new Set<unknown>();
 
-  if (
-    moduleExport &&
-    typeof moduleExport === "object" &&
-    "default" in moduleExport &&
-    typeof (moduleExport as { default?: unknown }).default === "function"
-  ) {
-    return (moduleExport as { default: new (path: string) => BetterSqlite3Database }).default;
+  while (candidate && (typeof candidate === "function" || typeof candidate === "object")) {
+    if (typeof candidate === "function") {
+      return candidate as new (path: string) => BetterSqlite3Database;
+    }
+
+    if (visitedCandidates.has(candidate)) {
+      break;
+    }
+    visitedCandidates.add(candidate);
+
+    if (!("default" in candidate)) {
+      break;
+    }
+
+    candidate = (candidate as { default?: unknown }).default;
   }
 
   return undefined;
