@@ -1,7 +1,7 @@
 import process from "node:process";
 import path from "node:path";
 import net from "node:net";
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import type { Plugin } from "vite";
 import {
   HostSecureTransportKinds,
@@ -23,6 +23,8 @@ const BROWSER_IDENTITY_DATABASE_PATH = path.resolve(
 const BrowserDevelopmentAuthoritativeStartupReason = "browser-development-vite-authoritative-host-startup";
 const AUTHORITATIVE_SERVER_READY_TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 100;
+const AUTHORITATIVE_BUN_MISSING_WARNING =
+  "[ai-loom] bun is not available on PATH; starting browser-development authoritative host in-process.";
 
 export interface BrowserDevelopmentAuthoritativeServerHostEntrypointOptions {
   readonly hostOptions: {
@@ -84,9 +86,14 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
   });
   let identityApiBaseUrl: string | undefined;
   let authoritativeServerProcess: ChildProcess | undefined;
+  let authoritativeServerStopInProcess: (() => void) | undefined;
   let cleanupRegistered = false;
 
   const stopAll = () => {
+    if (authoritativeServerStopInProcess) {
+      authoritativeServerStopInProcess();
+      authoritativeServerStopInProcess = undefined;
+    }
     if (authoritativeServerProcess && !authoritativeServerProcess.killed) {
       authoritativeServerProcess.kill("SIGTERM");
       authoritativeServerProcess = undefined;
@@ -114,12 +121,17 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
 
       const serverAlreadyRunning = await canConnectToPort(requestedIdentityHostPort, identityHostAddress);
       if (!serverAlreadyRunning) {
-        authoritativeServerProcess = startBrowserDevelopmentAuthoritativeServerHost(authoritativeHostOptions);
+        const authoritativeServerHandle = await startBrowserDevelopmentAuthoritativeServerHost(
+          authoritativeHostOptions,
+          (message) => server.config.logger.warn(message),
+        );
+        authoritativeServerProcess = authoritativeServerHandle.process;
+        authoritativeServerStopInProcess = authoritativeServerHandle.stopInProcess;
         await waitForPort(
           requestedIdentityHostPort,
           identityHostAddress,
           AUTHORITATIVE_SERVER_READY_TIMEOUT_MS,
-          () => assertProcessAlive(authoritativeServerProcess),
+          authoritativeServerHandle.assertAlive,
         );
       }
 
@@ -161,7 +173,13 @@ function parseOptionalPort(value: string | undefined): number | undefined {
 
 function startBrowserDevelopmentAuthoritativeServerHost(
   options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
-): ChildProcess {
+  logWarning?: (message: string) => void,
+): Promise<BrowserDevelopmentAuthoritativeServerHostHandle> {
+  if (!canExecuteBun()) {
+    logWarning?.(AUTHORITATIVE_BUN_MISSING_WARNING);
+    return startBrowserDevelopmentAuthoritativeServerHostInProcess(options);
+  }
+
   const env = normalizeChildProcessEnvironment({
     ...process.env,
     ...options.hostOptions.env,
@@ -172,13 +190,75 @@ function startBrowserDevelopmentAuthoritativeServerHost(
   });
 
   const command = resolveNpmCommand();
-
-  return spawn(command.executable, command.args, {
+  const processHandle = spawn(command.executable, command.args, {
     cwd: REPOSITORY_ROOT,
     env,
     stdio: "inherit",
     windowsHide: true,
   });
+
+  return Promise.resolve({
+    process: processHandle,
+    assertAlive: () => assertProcessAlive(processHandle),
+    stopInProcess: undefined,
+  });
+}
+
+interface BrowserDevelopmentAuthoritativeServerHostHandle {
+  readonly process: ChildProcess | undefined;
+  readonly assertAlive: () => void;
+  readonly stopInProcess: (() => void) | undefined;
+}
+
+interface BrowserDevelopmentAuthoritativeServerEntrypointModule {
+  startAuthoritativeServerHostAssembly(
+    options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
+  ): Promise<unknown>;
+}
+
+async function startBrowserDevelopmentAuthoritativeServerHostInProcess(
+  options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
+): Promise<BrowserDevelopmentAuthoritativeServerHostHandle> {
+  let runtimeHandle: unknown;
+  let startupError: Error | undefined;
+  let stopping = false;
+
+  void import("../../../hosts/server/AuthoritativeServerHostEntrypoint")
+    .then((module) => {
+      const entrypoint = module as BrowserDevelopmentAuthoritativeServerEntrypointModule;
+      return entrypoint.startAuthoritativeServerHostAssembly(options);
+    })
+    .then((runtime) => {
+      runtimeHandle = runtime;
+    })
+    .catch((error: unknown) => {
+      startupError = error instanceof Error ? error : new Error(String(error));
+    });
+
+  return {
+    process: undefined,
+    assertAlive: () => {
+      if (startupError) {
+        throw new Error(
+          `Authoritative browser-development host failed to start in-process: ${startupError.message}`,
+        );
+      }
+    },
+    stopInProcess: () => {
+      if (stopping) {
+        return;
+      }
+      stopping = true;
+      const runtime = runtimeHandle;
+      runtimeHandle = undefined;
+      if (runtime && typeof runtime === "object" && "stop" in runtime && typeof runtime.stop === "function") {
+        const stopResult = runtime.stop();
+        if (stopResult && typeof stopResult === "object" && "then" in stopResult && typeof stopResult.then === "function") {
+          void stopResult;
+        }
+      }
+    },
+  };
 }
 
 interface NpmCommand {
@@ -199,6 +279,21 @@ function resolveNpmCommand(): NpmCommand {
     executable: process.platform === "win32" ? "npm.cmd" : "npm",
     args: ["run", "start:authoritative-server"],
   };
+}
+
+function canExecuteBun(): boolean {
+  const candidates = process.platform === "win32" ? ["bun.exe", "bun.cmd", "bun"] : ["bun"];
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ["--version"], {
+      cwd: REPOSITORY_ROOT,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    if (probe.status === 0) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function normalizeChildProcessEnvironment(
