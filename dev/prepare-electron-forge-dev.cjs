@@ -82,6 +82,44 @@ function canLoadBetterSqlite3() {
   }
 }
 
+function canLoadBetterSqlite3InElectronRuntime() {
+  try {
+    const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
+    const electronBinaryPath = moduleRequire("electron");
+    if (typeof electronBinaryPath !== "string" || electronBinaryPath.length === 0) {
+      return false;
+    }
+
+    const script = [
+      "try {",
+      "  const BetterSqlite3 = require('better-sqlite3');",
+      "  if (typeof BetterSqlite3 !== 'function') {",
+      "    process.exit(1);",
+      "  }",
+      "  process.exit(0);",
+      "} catch (error) {",
+      "  const message = error && error.message ? error.message : String(error);",
+      "  console.error(message);",
+      "  process.exit(1);",
+      "}",
+    ].join("\n");
+
+    const result = spawnSync(electronBinaryPath, ["-e", script], {
+      cwd: process.cwd(),
+      stdio: "ignore",
+      shell: false,
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+      },
+    });
+
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
+
 function resolveInstalledElectronVersion() {
   const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
   const electronPackageJson = moduleRequire("electron/package.json");
@@ -94,15 +132,22 @@ function resolveInstalledElectronVersion() {
 
 function rebuildBetterSqlite3ForElectron() {
   const electronVersion = resolveInstalledElectronVersion();
+  const electronRebuildBinary = path.resolve(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "electron-rebuild.cmd" : "electron-rebuild");
   const result = spawnSync(
-    process.platform === "win32" ? "npm.cmd" : "npm",
-    ["rebuild", "better-sqlite3", `--target=${electronVersion}`, "--runtime=electron"],
+    electronRebuildBinary,
+    ["--force", "--only", "better-sqlite3", "--version", electronVersion],
     {
       stdio: "inherit",
       shell: false,
       env: process.env,
     },
   );
+
+  if (result.error) {
+    throw new Error(
+      `[dev-preflight] Unable to execute electron-rebuild (${result.error.message}). Ensure dependencies are installed.`,
+    );
+  }
 
   if (result.status !== 0) {
     throw new Error(
@@ -113,14 +158,16 @@ function rebuildBetterSqlite3ForElectron() {
 }
 
 async function ensureElectronNativeModuleCompatibility() {
-  if (canLoadBetterSqlite3()) {
+  if (canLoadBetterSqlite3() && canLoadBetterSqlite3InElectronRuntime()) {
     return;
   }
 
-  console.warn("[dev-preflight] better-sqlite3 is not loadable. Rebuilding for the local Electron runtime...");
+  console.warn(
+    "[dev-preflight] better-sqlite3 is unavailable for the active Electron runtime. Rebuilding native bindings...",
+  );
   rebuildBetterSqlite3ForElectron();
 
-  if (!canLoadBetterSqlite3()) {
+  if (!canLoadBetterSqlite3() || !canLoadBetterSqlite3InElectronRuntime()) {
     throw new Error(
       "[dev-preflight] better-sqlite3 remains unavailable after rebuild. " +
         "Delete node_modules, reinstall dependencies, and ensure native build prerequisites are installed.",
