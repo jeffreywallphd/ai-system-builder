@@ -18,6 +18,14 @@
 
 ## Startup expectations
 - Shared bootstrap pipeline order remains authoritative: `configuration`, `dependencies`, `logging`, `security`, `persistence`, `feature-registration`.
+- Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
+  - `config-load`
+  - `migrations`
+  - `persistence-setup`
+  - `ca-init`
+  - `orchestration-recovery`
+  - `server-start`
+- Span events include `durationMs`; steps longer than 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000`.
 - Entrypoint default startup reason: `authoritative-server-entrypoint-startup`.
 - Entrypoint default required dependencies: full authoritative dependency boundary from `src/hosts/HostRuntimeCatalog.ts`.
 - Environment keys:

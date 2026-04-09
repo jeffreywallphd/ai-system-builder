@@ -70,6 +70,7 @@ describe("startupTracer", () => {
       descriptor: "ok",
     });
     expect(grandChildEvent?.durationMs).toBe(20);
+    expect(grandChildEvent?.slow).toBe(false);
 
     const childEvent = logger.infoEvents[1];
     expect(childEvent?.event).toBe("startup.span.completed");
@@ -79,6 +80,7 @@ describe("startupTracer", () => {
     expect(childEvent?.spanHierarchy).toEqual(["authoritative-startup", "dependencies"]);
     expect(childEvent?.spanHierarchyPath).toBe("authoritative-startup > dependencies");
     expect(childEvent?.durationMs).toBe(80);
+    expect(childEvent?.slow).toBe(false);
     expect((childEvent?.metadata as Record<string, unknown>)?.phase).toBe("service-plan");
     expect((childEvent?.metadata as Record<string, unknown>)?.authToken).toBe("[REDACTED]");
     expect((childEvent?.metadata as Record<string, unknown>)?.routeFamilies).toBe(12);
@@ -87,6 +89,7 @@ describe("startupTracer", () => {
     expect(rootEvent?.spanName).toBe("authoritative-startup");
     expect(rootEvent?.spanDepth).toBe(0);
     expect(rootEvent?.durationMs).toBe(150);
+    expect(rootEvent?.slow).toBe(false);
   });
 
   it("tags failed spans with redacted error details and metadata", () => {
@@ -118,6 +121,7 @@ describe("startupTracer", () => {
     expect(event?.event).toBe("startup.span.failed");
     expect(event?.errorTagged).toBeTrue();
     expect(event?.durationMs).toBe(60);
+    expect(event?.slow).toBe(false);
     expect((event?.metadata as Record<string, unknown>)?.privateKeyRef).toBe("[REDACTED]");
     expect((event?.metadata as Record<string, unknown>)?.apiKey).toBe("[REDACTED]");
     expect(error?.message).toBe("bootstrap failed token=[REDACTED] password=[REDACTED]");
@@ -141,5 +145,24 @@ describe("startupTracer", () => {
     expect(logger.errorEvents).toHaveLength(1);
     expect(logger.errorEvents[0]?.event).toBe("startup.span.failed");
     expect((logger.errorEvents[0]?.error as Record<string, unknown>)?.message).toBe("database secret=[REDACTED]");
+  });
+
+  it("flags long-running spans using the default 5-second threshold", () => {
+    const logger = new CapturingLogger();
+    let now = 1_000;
+    const tracer = createStartupTracer({
+      logger,
+      traceId: "trace-startup-4",
+      clock: () => now,
+    });
+
+    const span = tracer.startSpan("persistence");
+    now = 6_200;
+    span.complete();
+
+    expect(logger.infoEvents).toHaveLength(1);
+    expect(logger.infoEvents[0]?.durationMs).toBe(5_200);
+    expect(logger.infoEvents[0]?.slow).toBe(true);
+    expect(logger.infoEvents[0]?.slowSpanThresholdMs).toBe(5_000);
   });
 });

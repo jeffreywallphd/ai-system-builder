@@ -57,6 +57,16 @@ The dependencies stage additionally composes authoritative run-execution adapter
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
 
+Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps, including:
+- `config-load`
+- `migrations`
+- `persistence-setup`
+- `ca-init`
+- `orchestration-recovery`
+- `server-start`
+
+Each span event includes `durationMs`. Steps exceeding 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000` for direct diagnostics filtering.
+
 ### Environment keys
 
 - `AI_LOOM_SERVER_DATABASE_PATH`: SQLite path for authoritative server persistence.
