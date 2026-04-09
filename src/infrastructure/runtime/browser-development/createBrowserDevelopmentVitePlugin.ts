@@ -162,24 +162,56 @@ function parseOptionalPort(value: string | undefined): number | undefined {
 function startBrowserDevelopmentAuthoritativeServerHost(
   options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
 ): ChildProcess {
-  const env = {
+  const env = normalizeChildProcessEnvironment({
     ...process.env,
     ...options.hostOptions.env,
     ...options.boot?.environment,
     AI_LOOM_SERVER_DATABASE_PATH: options.hostOptions.databasePath,
     AI_LOOM_SERVER_HOST: options.hostOptions.host,
     AI_LOOM_SERVER_PORT: String(options.hostOptions.port ?? 8788),
-  };
+  });
 
-  return spawn(resolveNpmExecutable(), ["run", "start:authoritative-server"], {
+  const command = resolveNpmCommand();
+
+  return spawn(command.executable, command.args, {
     cwd: REPOSITORY_ROOT,
     env,
     stdio: "inherit",
+    windowsHide: true,
   });
 }
 
-function resolveNpmExecutable(): string {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+interface NpmCommand {
+  readonly executable: string;
+  readonly args: readonly string[];
+}
+
+function resolveNpmCommand(): NpmCommand {
+  const npmExecPath = process.env.npm_execpath?.trim();
+  if (npmExecPath) {
+    return {
+      executable: process.execPath,
+      args: [npmExecPath, "run", "start:authoritative-server"],
+    };
+  }
+
+  return {
+    executable: process.platform === "win32" ? "npm.cmd" : "npm",
+    args: ["run", "start:authoritative-server"],
+  };
+}
+
+function normalizeChildProcessEnvironment(
+  env: Readonly<Record<string, string | undefined>>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).flatMap(([key, value]) => {
+      if (value === undefined || value === null) {
+        return [];
+      }
+      return [[key, String(value)]];
+    }),
+  );
 }
 
 function assertProcessAlive(processHandle: ChildProcess | undefined): void {
