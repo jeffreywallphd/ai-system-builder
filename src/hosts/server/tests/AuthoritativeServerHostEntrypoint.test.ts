@@ -13,6 +13,24 @@ import {
 } from "../AuthoritativeServerHostEntrypoint";
 import { DefaultAuthoritativeServerStartupBaselineFileName } from "../AuthoritativeServerStartupBaselineRecorder";
 
+class CapturingHostLogger {
+  public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly warnEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly errorEvents: Array<Readonly<Record<string, unknown>>> = [];
+
+  public info(event: Readonly<Record<string, unknown>>): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: Readonly<Record<string, unknown>>): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: Readonly<Record<string, unknown>>): void {
+    this.errorEvents.push(event);
+  }
+}
+
 describe("AuthoritativeServerHostEntrypoint", () => {
   it("constructs a boot configuration with authoritative defaults", () => {
     const boot = createAuthoritativeServerHostBootConfiguration({
@@ -200,6 +218,76 @@ describe("AuthoritativeServerHostEntrypoint", () => {
       expect(secondBaseline.sampleCount).toBe(2);
       expect(secondBaseline.samples[1]?.startupReason).toBe("authoritative-server-baseline-recording-test-second-run");
       expect((secondBaseline.samples[1]?.durationMs ?? 0)).toBeGreaterThanOrEqual(0);
+    } finally {
+      await rm(tempRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("emits regression warning when startup duration exceeds configured threshold", async () => {
+    const tempRoot = await mkdtemp(path.join(os.tmpdir(), "ai-loom-authoritative-baseline-warning-test-"));
+    const databasePath = path.join(tempRoot, "authoritative-server.sqlite");
+    const logger = new CapturingHostLogger();
+
+    try {
+      const firstRuntime = await startAuthoritativeServerHostAssembly({
+        hostOptions: {
+          databasePath,
+          logger,
+        },
+        startHost: async () => ({
+          port: 6212,
+          address: "127.0.0.1:6212",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        }),
+        boot: {
+          startupReason: "authoritative-server-baseline-warning-test-first-run",
+          environment: {
+            NODE_ENV: "development",
+            [AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs]: "0",
+          },
+        },
+      });
+      await firstRuntime.stop();
+
+      const secondRuntime = await startAuthoritativeServerHostAssembly({
+        hostOptions: {
+          databasePath,
+          logger,
+        },
+        startHost: async () => ({
+          port: 6213,
+          address: "127.0.0.1:6213",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {},
+        }),
+        bootstrap: {
+          stageHandlers: {
+            [HostBootstrapStageIds.logging]: async () => {
+              await new Promise((resolve) => {
+                setTimeout(resolve, 15);
+              });
+            },
+          },
+        },
+        boot: {
+          startupReason: "authoritative-server-baseline-warning-test-second-run",
+          environment: {
+            NODE_ENV: "development",
+            [AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs]: "0",
+          },
+        },
+      });
+      await secondRuntime.stop();
+
+      const regressionWarning = logger.warnEvents.find(
+        (event) => event.event === "authoritative-server.startup.baseline-regression.detected",
+      );
+      expect(regressionWarning).toBeDefined();
+      expect(regressionWarning?.thresholdMs).toBe(0);
+      expect(regressionWarning?.regressionDurationMs).toBeTypeOf("number");
     } finally {
       await rm(tempRoot, { recursive: true, force: true });
     }

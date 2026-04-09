@@ -103,6 +103,13 @@ Story 1.4.2 adds local startup performance baseline recording for authoritative 
 - each successful startup appends a sample containing total startup duration and per-stage durations (shared pipeline + authoritative staged decomposition)
 - baseline recording is best-effort and does not fail startup when persistence errors occur
 
+Story 1.4.3 adds startup regression alerts against those baselines:
+- each successful startup compares current total startup duration with the mean duration of previously recorded successful baseline samples
+- when the regression delta exceeds a configured warning threshold, startup emits a structured warning event:
+  - `authoritative-server.startup.baseline-regression.detected`
+- warning payload includes baseline duration, current duration, regression delta, threshold, and baseline sample counts
+- baseline comparison and warning publication are best-effort and never block startup completion
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `services`
 - `security`
@@ -124,6 +131,7 @@ Startup tracing also emits `startup.span.slow` warning events for spans exceedin
 - `AI_LOOM_SERVER_DATABASE_PATH`: SQLite path for authoritative server persistence.
 - `AI_LOOM_SERVER_HOST`: bind address (for example `127.0.0.1`).
 - `AI_LOOM_SERVER_PORT`: bind port.
+- `AI_LOOM_SERVER_STARTUP_REGRESSION_WARNING_THRESHOLD_MS`: optional non-negative integer threshold (milliseconds) for startup regression warning emission.
 - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`: optional SQLite bootstrap fallback path.
 - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`: optional SQLite journal mode override for bootstrap/runtime initialization.
 - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`: optional SQLite foreign-key enforcement toggle for bootstrap/runtime initialization.
@@ -175,6 +183,6 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
-- `src/hosts/server/AuthoritativeServerStartupBaselineRecorder.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

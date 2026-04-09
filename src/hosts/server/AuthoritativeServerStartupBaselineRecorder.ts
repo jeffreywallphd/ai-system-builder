@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 export const DefaultAuthoritativeServerStartupBaselineFileName = "authoritative-server-startup-baseline.json";
 const StartupBaselineSchemaVersion = 1;
 const DefaultMaximumSamples = 50;
+const DefaultRegressionWarningThresholdMs = 1_000;
 
 export interface AuthoritativeServerStartupBaselineMeasurement {
   readonly hostId: string;
@@ -38,15 +39,30 @@ interface AuthoritativeServerStartupBaselineDocument {
   readonly samples: ReadonlyArray<AuthoritativeServerStartupBaselineSample>;
 }
 
+export interface AuthoritativeServerStartupRegressionWarning {
+  readonly thresholdMs: number;
+  readonly baselineDurationMs: number;
+  readonly currentDurationMs: number;
+  readonly regressionDurationMs: number;
+  readonly previousSampleCount: number;
+}
+
+export interface AuthoritativeServerStartupBaselineRecordResult {
+  readonly baselinePath: string;
+  readonly sampleCount: number;
+  readonly regressionWarning?: AuthoritativeServerStartupRegressionWarning;
+}
+
 export async function recordAuthoritativeServerStartupBaseline(input: {
   readonly databasePath: string;
   readonly measurement: AuthoritativeServerStartupBaselineMeasurement;
   readonly filePath?: string;
   readonly maximumSamples?: number;
+  readonly regressionWarningThresholdMs?: number;
   readonly now?: () => Date;
-}): Promise<void> {
+}): Promise<AuthoritativeServerStartupBaselineRecordResult | undefined> {
   if (input.measurement.outcome !== "succeeded") {
-    return;
+    return undefined;
   }
 
   const baselinePath = input.filePath
@@ -54,6 +70,7 @@ export async function recordAuthoritativeServerStartupBaseline(input: {
     : path.resolve(path.dirname(path.resolve(input.databasePath)), DefaultAuthoritativeServerStartupBaselineFileName);
   const now = input.now ?? (() => new Date());
   const maximumSamples = resolveMaximumSamples(input.maximumSamples);
+  const regressionWarningThresholdMs = resolveRegressionWarningThresholdMs(input.regressionWarningThresholdMs);
   const recordedAt = now().toISOString();
   const sample = Object.freeze({
     recordedAt,
@@ -68,6 +85,19 @@ export async function recordAuthoritativeServerStartupBaseline(input: {
   } satisfies AuthoritativeServerStartupBaselineSample);
 
   const existingDocument = await loadBaselineDocument(baselinePath);
+  const previousSamples = existingDocument?.samples ?? [];
+  const baselineDurationMs = averageDuration(previousSamples);
+  const regressionDurationMs = sample.durationMs - baselineDurationMs;
+  const regressionWarning = previousSamples.length > 0
+    && regressionDurationMs > regressionWarningThresholdMs
+    ? Object.freeze({
+      thresholdMs: regressionWarningThresholdMs,
+      baselineDurationMs,
+      currentDurationMs: sample.durationMs,
+      regressionDurationMs,
+      previousSampleCount: previousSamples.length,
+    } satisfies AuthoritativeServerStartupRegressionWarning)
+    : undefined;
   const hostId = existingDocument?.hostId ?? input.measurement.hostId;
   const trimmedSamples = [
     ...(existingDocument?.samples ?? []),
@@ -83,6 +113,11 @@ export async function recordAuthoritativeServerStartupBaseline(input: {
 
   await mkdir(path.dirname(baselinePath), { recursive: true });
   await writeFile(baselinePath, `${JSON.stringify(nextDocument, undefined, 2)}\n`, "utf8");
+  return Object.freeze({
+    baselinePath,
+    sampleCount: nextDocument.sampleCount,
+    regressionWarning,
+  });
 }
 
 async function loadBaselineDocument(
@@ -190,6 +225,24 @@ function resolveMaximumSamples(maximumSamples: number | undefined): number {
     return DefaultMaximumSamples;
   }
   return maximumSamples;
+}
+
+function resolveRegressionWarningThresholdMs(thresholdMs: number | undefined): number {
+  if (thresholdMs === undefined) {
+    return DefaultRegressionWarningThresholdMs;
+  }
+  if (!Number.isFinite(thresholdMs) || thresholdMs < 0) {
+    return DefaultRegressionWarningThresholdMs;
+  }
+  return Math.floor(thresholdMs);
+}
+
+function averageDuration(samples: ReadonlyArray<AuthoritativeServerStartupBaselineSample>): number {
+  if (samples.length === 0) {
+    return 0;
+  }
+  const total = samples.reduce((sum, sample) => sum + sanitizeDuration(sample.durationMs), 0);
+  return Math.floor(total / samples.length);
 }
 
 function isFileNotFoundError(error: unknown): boolean {

@@ -82,6 +82,7 @@ import {
   createAuthoritativeServerBootstrapStageOrchestrator,
   type AuthoritativeServerBootstrapStageOrchestrator,
 } from "./AuthoritativeServerBootstrapStageOrchestrator";
+import type { AuthoritativeServerStartupBaselineRecordResult } from "./AuthoritativeServerStartupBaselineRecorder";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -153,7 +154,7 @@ export interface AuthoritativeServerCompositionRootOptions {
       readonly startupCorrelationId?: string;
       readonly pipelineStageDurations: Readonly<Record<string, number>>;
       readonly authoritativeStageDurations: Readonly<Record<string, number>>;
-    }) => Promise<void> | void;
+    }) => Promise<AuthoritativeServerStartupBaselineRecordResult | void> | AuthoritativeServerStartupBaselineRecordResult | void;
   };
 }
 
@@ -786,7 +787,29 @@ export function createAuthoritativeServerCompositionRoot(
         });
         if (input.bootstrap?.recordStartupBaseline) {
           try {
-            await input.bootstrap.recordStartupBaseline(startupBaselineMeasurement);
+            const baselineRecord = await input.bootstrap.recordStartupBaseline(startupBaselineMeasurement);
+            const regressionWarning = baselineRecord?.regressionWarning;
+            if (regressionWarning) {
+              const regressionEvent = Object.freeze({
+                event: "authoritative-server.startup.baseline-regression.detected",
+                hostId: boot.host.hostId,
+                startupReason: boot.startupReason,
+                traceId: startupSummary.traceId,
+                startupCorrelationId: startupSummary.startupCorrelationId,
+                baselinePath: baselineRecord?.baselinePath,
+                sampleCount: baselineRecord?.sampleCount,
+                thresholdMs: regressionWarning.thresholdMs,
+                baselineDurationMs: regressionWarning.baselineDurationMs,
+                currentDurationMs: regressionWarning.currentDurationMs,
+                regressionDurationMs: regressionWarning.regressionDurationMs,
+                previousSampleCount: regressionWarning.previousSampleCount,
+              });
+              if (input.hostOptions.logger) {
+                input.hostOptions.logger.warn(regressionEvent);
+              } else {
+                console.warn(regressionEvent);
+              }
+            }
           } catch (baselineError) {
             const baselineErrorSummary = Object.freeze({
               event: "authoritative-server.startup.baseline-recording.failed",
