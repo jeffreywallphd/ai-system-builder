@@ -71,6 +71,6 @@
     "vite": "^5.4.11",
     "wait-on": "^8.0.1"
   },
-  "main": ".vite/build/main.mjs"
+  "main": ".vite/build/main.cjs"
 }
 
