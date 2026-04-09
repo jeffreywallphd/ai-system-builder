@@ -383,19 +383,30 @@ describe("IdentityHttpServer", () => {
     expect(body.data.status).toBe("ready");
   });
 
-  it("logs canonical request paths for readiness probes that include query suffixes", async () => {
+  it("logs root readiness confirmation once and suppresses per-request lifecycle noise", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(logger);
 
-    const response = await fetch(`${baseUrl}/?probe=desktop-startup`, {
+    const firstResponse = await fetch(`${baseUrl}/?probe=desktop-startup`, {
+      method: "GET",
+    });
+    const secondResponse = await fetch(`${baseUrl}/?probe=desktop-startup`, {
       method: "GET",
     });
 
-    expect(response.status).toBe(200);
-    const receivedEvent = logger.events.find((entry) => entry.event === "identity-http.request.received");
-    const completedEvent = logger.events.find((entry) => entry.event === "identity-http.request.completed");
-    expect(receivedEvent?.path).toBe("/");
-    expect(completedEvent?.path).toBe("/");
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    const readinessEvents = logger.events.filter((entry) => entry.event === "identity-http.readiness.confirmed");
+    const readinessReceivedEvents = logger.events.filter(
+      (entry) => entry.event === "identity-http.request.received" && entry.path === "/",
+    );
+    const readinessCompletedEvents = logger.events.filter(
+      (entry) => entry.event === "identity-http.request.completed" && entry.path === "/",
+    );
+    expect(readinessEvents.length).toBe(1);
+    expect(readinessEvents[0]?.path).toBe("/");
+    expect(readinessReceivedEvents.length).toBe(0);
+    expect(readinessCompletedEvents.length).toBe(0);
   });
 
   it("sanitizes unhandled internal errors before sending responses", async () => {

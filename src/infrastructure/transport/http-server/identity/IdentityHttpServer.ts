@@ -1108,19 +1108,23 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     }),
   }));
 
+  let hasLoggedRootReadinessProbe = false;
   const server = serverFactory(async (request, response) => {
     const requestId = randomUUID();
     const correlationId = resolveRequestCorrelationId(request, requestId);
     setResponseCorrelationHeaders(response, requestId, correlationId);
     const path = resolveCanonicalRequestPath(request.url);
     const transportState = resolveInboundHttpTransportConnectionState(request);
-    logger.info(Object.freeze({
-      event: "identity-http.request.received",
-      requestId,
-      correlationId,
-      method: request.method,
-      path,
-    }));
+    const rootReadinessProbe = isRootReadinessProbeRequest(request.method, path);
+    if (!rootReadinessProbe) {
+      logger.info(Object.freeze({
+        event: "identity-http.request.received",
+        requestId,
+        correlationId,
+        method: request.method,
+        path,
+      }));
+    }
 
     try {
       if (path.startsWith("/api/")) {
@@ -8771,7 +8775,20 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
           }),
         });
         writeJson(response, 200, apiResponse);
-        logResponse(logger, requestId, request, 200, Object.freeze({}), apiResponse);
+        if (!hasLoggedRootReadinessProbe) {
+          hasLoggedRootReadinessProbe = true;
+          logger.info(Object.freeze({
+            event: "identity-http.readiness.confirmed",
+            requestId,
+            correlationId,
+            method: request.method,
+            path,
+            statusCode: 200,
+            details: {
+              response: redactSensitiveAuthPayload(apiResponse),
+            },
+          }));
+        }
         return;
       }
 
@@ -14269,6 +14286,10 @@ function logResponse<TRequest extends Record<string, unknown>>(
   logger.info(event);
 }
 
+function isRootReadinessProbeRequest(method: string | undefined, path: string): boolean {
+  return method === "GET" && path === "/";
+}
+
 function resolveCanonicalRequestPath(requestUrl: string | undefined): string {
   const normalizedUrl = requestUrl?.trim() || "/";
   try {
@@ -14433,5 +14454,3 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(JSON.stringify(event));
   }
 }
-
-
