@@ -157,10 +157,131 @@ const AddColumnStatementPattern = /^\s*ALTER\s+TABLE\b[\s\S]*\bADD\s+COLUMN\b/i;
 const DuplicateColumnErrorPattern = /duplicate column name:/i;
 
 function splitSqlStatements(sql: string): ReadonlyArray<string> {
-  return sql
-    .split(";")
-    .map((statement) => statement.trim())
-    .filter((statement) => statement.length > 0);
+  const statements: string[] = [];
+  let buffer = "";
+  let insideSingleQuote = false;
+  let insideDoubleQuote = false;
+  let insideLineComment = false;
+  let insideBlockComment = false;
+  let insideTriggerBody = false;
+  let pendingCreateKeyword = false;
+  let pendingTriggerBodyBegin = false;
+  let currentWord = "";
+
+  const commitWord = (): void => {
+    if (currentWord.length === 0) {
+      return;
+    }
+    const word = currentWord.toUpperCase();
+    if (word === "CREATE") {
+      pendingCreateKeyword = true;
+      pendingTriggerBodyBegin = false;
+    } else if (word === "TRIGGER" && pendingCreateKeyword) {
+      pendingTriggerBodyBegin = true;
+    } else if (word === "BEGIN" && pendingTriggerBodyBegin) {
+      insideTriggerBody = true;
+      pendingTriggerBodyBegin = false;
+    } else if (word === "END" && insideTriggerBody) {
+      insideTriggerBody = false;
+    }
+    currentWord = "";
+  };
+
+  for (let index = 0; index < sql.length; index += 1) {
+    const current = sql[index] ?? "";
+    const next = sql[index + 1] ?? "";
+    const previous = sql[index - 1] ?? "";
+    buffer += current;
+
+    if (insideLineComment) {
+      if (current === "\n") {
+        insideLineComment = false;
+      }
+      continue;
+    }
+
+    if (insideBlockComment) {
+      if (previous === "*" && current === "/") {
+        insideBlockComment = false;
+      }
+      continue;
+    }
+
+    if (!insideSingleQuote && !insideDoubleQuote) {
+      if (current === "-" && next === "-") {
+        commitWord();
+        insideLineComment = true;
+        continue;
+      }
+      if (current === "/" && next === "*") {
+        commitWord();
+        insideBlockComment = true;
+        continue;
+      }
+    }
+
+    if (insideSingleQuote) {
+      if (current === "'" && next === "'") {
+        buffer += next;
+        index += 1;
+        continue;
+      }
+      if (current === "'" && previous !== "\\") {
+        insideSingleQuote = false;
+      }
+      continue;
+    }
+
+    if (insideDoubleQuote) {
+      if (current === "\"" && next === "\"") {
+        buffer += next;
+        index += 1;
+        continue;
+      }
+      if (current === "\"" && previous !== "\\") {
+        insideDoubleQuote = false;
+      }
+      continue;
+    }
+
+    if (current === "'") {
+      commitWord();
+      insideSingleQuote = true;
+      continue;
+    }
+    if (current === "\"") {
+      commitWord();
+      insideDoubleQuote = true;
+      continue;
+    }
+
+    if (/[A-Za-z0-9_]/.test(current)) {
+      currentWord += current;
+      continue;
+    }
+    commitWord();
+
+    if (!/\s/.test(current) && current !== "(") {
+      pendingCreateKeyword = false;
+    }
+
+    if (current === ";" && !insideTriggerBody) {
+      const statement = buffer.trim();
+      if (statement.length > 1) {
+        statements.push(statement);
+      }
+      buffer = "";
+      pendingCreateKeyword = false;
+      pendingTriggerBodyBegin = false;
+    }
+  }
+
+  commitWord();
+  const trailing = buffer.trim();
+  if (trailing.length > 0) {
+    statements.push(trailing);
+  }
+  return statements;
 }
 
 function isIgnorableDuplicateAddColumnError(error: unknown, statement: string): boolean {
