@@ -73,3 +73,18 @@ Generated-result transport contracts now expose explicit preview and retrieval a
 - External transport contracts are separated from persistence records (`GeneratedResultPersistenceDtos`).
 - DTO adapters project immutable response envelopes for API-facing payloads.
 - Schema parsers enforce strict shape and invariants for converged client/server usage.
+
+## Story 6.2.3 retrieval handler baseline (implemented)
+
+Protected generated-result original retrieval now has a concrete API/transport implementation aligned to this contract posture:
+
+- Backend API contract: `src/infrastructure/api/generated-results/sdk/PublicGeneratedResultManagementApiContract.ts`
+  - `OpenGeneratedResultOriginalContentStreamApiRequest`
+  - `OpenGeneratedResultOriginalContentStreamApiResponse`
+  - stable API error envelope (`invalid-request`, `forbidden`, `not-found`, `invalid-state`, `internal`)
+- Backend handler: `src/infrastructure/api/generated-results/GeneratedResultManagementBackendApi.ts`
+  - maps application-layer original-content retrieval outcomes into stable API error semantics
+- Identity HTTP transport route: `GET /api/v1/generated-results/:resultAssetId/original`
+  - authenticated workspace session mediation
+  - protected stream forwarding without raw storage/backend path exposure
+  - retrieval-safe headers (`content-disposition` attachment, `x-content-type-options: nosniff`, `cache-control: private, no-store`)

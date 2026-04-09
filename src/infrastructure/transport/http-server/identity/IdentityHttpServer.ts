@@ -20,6 +20,7 @@ import type { SecretMetadataBackendApi } from "../../../api/security/SecretMetad
 import type { StorageManagementBackendApi } from "../../../api/storage/StorageManagementBackendApi";
 import type { AssetManagementBackendApi } from "../../../api/assets/AssetManagementBackendApi";
 import type { ImageAssetManagementBackendApi } from "../../../api/image-assets/ImageAssetManagementBackendApi";
+import type { GeneratedResultManagementBackendApi } from "../../../api/generated-results/GeneratedResultManagementBackendApi";
 import type { DeploymentPolicyReadBackendApi } from "../../../api/deployment/DeploymentPolicyReadBackendApi";
 import type { DeploymentPolicyWriteBackendApi } from "../../../api/deployment/DeploymentPolicyWriteBackendApi";
 import type { WorkspaceInvitationBackendApi } from "../../../api/workspaces/WorkspaceInvitationBackendApi";
@@ -149,6 +150,11 @@ import {
   type OpenImageAssetOriginalContentStreamApiRequest,
   type RequestImageAssetPreviewApiRequest,
 } from "../../../api/image-assets/sdk/PublicImageAssetManagementApiContract";
+import {
+  GeneratedResultManagementApiErrorCodes,
+  type GeneratedResultManagementApiResponse,
+  type OpenGeneratedResultOriginalContentStreamApiRequest,
+} from "../../../api/generated-results/sdk/PublicGeneratedResultManagementApiContract";
 import {
   RuntimeQueueItemStatuses,
   SystemRuntimeTransportRoutes,
@@ -950,6 +956,7 @@ export interface IdentityHttpServerOptions {
   readonly storageManagementBackendApi?: StorageManagementBackendApi;
   readonly assetManagementBackendApi?: AssetManagementBackendApi;
   readonly imageAssetManagementBackendApi?: ImageAssetManagementBackendApi;
+  readonly generatedResultManagementBackendApi?: GeneratedResultManagementBackendApi;
   readonly auditLedgerBackendApi?: AuditLedgerBackendApi;
   readonly systemRuntimeBackendApi?: SystemRuntimeBackendApi;
   readonly authoritativeRunSubmissionBackendApi?: AuthoritativeRunSubmissionBackendApi;
@@ -4354,6 +4361,94 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && path.endsWith("/original")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/original");
+            if (!resultAssetId || resultAssetId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and resultAssetId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const streamRequest: OpenGeneratedResultOriginalContentStreamApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.openGeneratedResultOriginalContentStream(
+              streamRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            if (!apiResponse.ok || !apiResponse.data) {
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+              return;
+            }
+
+            const contentDisposition = buildContentDispositionHeader(
+              apiResponse.data.contentDisposition,
+              apiResponse.data.contentDispositionFileName,
+            );
+            response.statusCode = 200;
+            response.setHeader("content-type", apiResponse.data.mimeType);
+            response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+            response.setHeader("content-disposition", contentDisposition);
+            response.setHeader("x-content-type-options", "nosniff");
+            response.setHeader("cache-control", "private, no-store");
+
+            try {
+              for await (const chunk of apiResponse.data.stream) {
+                const encoded = Buffer.from(chunk);
+                if (!response.write(encoded)) {
+                  await once(response, "drain");
+                }
+              }
+              response.end();
+              logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
+                ok: true,
+                data: Object.freeze({
+                  resultAssetId: apiResponse.data.resultAssetId,
+                  workspaceId: apiResponse.data.workspaceId,
+                  mimeType: apiResponse.data.mimeType,
+                  sizeBytes: apiResponse.data.sizeBytes,
+                }),
+              }));
+            } catch (error) {
+              if (!response.headersSent) {
+                const failed = buildGeneratedResultManagementInternalErrorResponse(
+                  "Generated-result original-content stream could not be completed.",
+                );
+                writeJson(response, 500, failed);
+                logResponse(logger, requestId, request, 500, streamRequest, failed);
+                return;
+              }
+              response.destroy(error instanceof Error ? error : undefined);
+            }
           },
         );
         return;
@@ -12792,6 +12887,27 @@ function mapImageAssetManagementStatusCode(response: ImageAssetManagementApiResp
   }
 }
 
+function mapGeneratedResultManagementStatusCode(response: GeneratedResultManagementApiResponse<unknown>): number {
+  if (response.ok) {
+    return 200;
+  }
+
+  switch (response.error?.code) {
+    case GeneratedResultManagementApiErrorCodes.invalidRequest:
+      return 400;
+    case GeneratedResultManagementApiErrorCodes.authenticationFailed:
+      return 401;
+    case GeneratedResultManagementApiErrorCodes.forbidden:
+      return 403;
+    case GeneratedResultManagementApiErrorCodes.notFound:
+      return 404;
+    case GeneratedResultManagementApiErrorCodes.invalidState:
+      return 422;
+    default:
+      return mapSharedApiErrorCodeToStatusCode(mapToSharedApiErrorCode(response.error?.code));
+  }
+}
+
 function mapAuditLedgerStatusCode(response: AuditLedgerApiResponse<unknown>): number {
   if (response.ok) {
     return 200;
@@ -13355,6 +13471,16 @@ function buildImageAssetManagementInvalidRequestResponse(message: string): Image
   });
 }
 
+function buildGeneratedResultManagementInvalidRequestResponse(message: string): GeneratedResultManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: GeneratedResultManagementApiErrorCodes.invalidRequest,
+      message,
+    },
+  });
+}
+
 function buildAuditLedgerInvalidRequestResponse(message: string): AuditLedgerApiResponse<never> {
   return Object.freeze({
     ok: false,
@@ -13396,6 +13522,18 @@ function buildImageAssetManagementInternalErrorResponse(message: string): ImageA
     ok: false,
     error: {
       code: ImageAssetManagementApiErrorCodes.internal,
+      message,
+    },
+  });
+}
+
+function buildGeneratedResultManagementInternalErrorResponse(
+  message: string,
+): GeneratedResultManagementApiResponse<never> {
+  return Object.freeze({
+    ok: false,
+    error: {
+      code: GeneratedResultManagementApiErrorCodes.internal,
       message,
     },
   });

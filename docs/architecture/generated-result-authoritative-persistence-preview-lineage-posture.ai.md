@@ -170,3 +170,14 @@ Result collection and preview provisioning now handle degraded and partial-failu
 - Temporary storage unavailability is tracked distinctly from terminal failure to support explicit retry and recovery paths.
 - Terminal run lifecycle finalization remains non-blocking while preserving durable evidence for follow-on reprocessing or operator investigation.
 
+## Story 6.2.3 protected original retrieval baseline (implemented)
+
+Generated-result original-content retrieval is now implemented as an authenticated, server-mediated, storage-abstracted flow.
+
+- `GetGeneratedResultOriginalContentUseCase` validates request shape, verifies active workspace membership, enforces workspace-scoped existence and private-visibility policy, and requires retrievable lifecycle state + media type before streaming.
+- Storage resolution is mediated through `IStorageLogicalAccessResolutionService` and `IStorageObjectPort` using logical storage references only; backend-local/raw filesystem exposure is avoided.
+- `GeneratedResultManagementBackendApi` maps use-case outcomes into stable API errors (`invalid-request`, `forbidden`, `not-found`, `invalid-state`, `internal`).
+- `IdentityHttpServer` now serves `GET /api/v1/generated-results/:resultAssetId/original` behind authenticated workspace session mediation, with hardened response headers (`x-content-type-options: nosniff`, `cache-control: private, no-store`, attachment disposition).
+
+Posture impact: original generated outputs are retrieved only through authoritative APIs without exposing storage topology or guessable direct-storage URLs.
+
