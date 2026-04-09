@@ -14,6 +14,7 @@ import {
 } from "@application/common/ports/PlatformPersistenceBoundaryPorts";
 import type { CanonicalRunSubmissionCommand } from "./RunSubmissionValidationContracts";
 import {
+  RunResultAvailabilityStates,
   RunResultOutputAvailabilityHints,
   RunResultTerminalQualityHints,
   toRunDetail,
@@ -263,6 +264,10 @@ function toFinalizationSnapshot(value: unknown): RunAuthoritativeFinalizationSna
     externalResultId: typeof value.externalResultId === "string" ? value.externalResultId : undefined,
     outputs: Object.freeze(outputs.map((entry) => Object.freeze({ ...(entry as Record<string, unknown>) }))),
     metrics: isObject(value.metrics) ? Object.freeze({ ...value.metrics }) : undefined,
+    resultAvailabilityState: Object.values(RunResultAvailabilityStates)
+      .includes(value.resultAvailabilityState as typeof RunResultAvailabilityStates[keyof typeof RunResultAvailabilityStates])
+      ? value.resultAvailabilityState as typeof RunResultAvailabilityStates[keyof typeof RunResultAvailabilityStates]
+      : undefined,
     outputAvailability: Object.values(RunResultOutputAvailabilityHints)
       .includes(value.outputAvailability as typeof RunResultOutputAvailabilityHints[keyof typeof RunResultOutputAvailabilityHints])
       ? value.outputAvailability as typeof RunResultOutputAvailabilityHints[keyof typeof RunResultOutputAvailabilityHints]

@@ -344,6 +344,17 @@ export const RunResultTerminalQualityHints = Object.freeze({
 export type RunResultTerminalQualityHint =
   typeof RunResultTerminalQualityHints[keyof typeof RunResultTerminalQualityHints];
 
+export const RunResultAvailabilityStates = Object.freeze({
+  pendingResult: "pending-result",
+  partiallyCollected: "partially-collected",
+  available: "available",
+  previewPending: "preview-pending",
+  failedCollection: "failed-collection",
+} as const);
+
+export type RunResultAvailabilityState =
+  typeof RunResultAvailabilityStates[keyof typeof RunResultAvailabilityStates];
+
 export interface RunResultOutputReference {
   readonly outputId: string;
   readonly kind: RunResultOutputReferenceKind;
@@ -361,6 +372,7 @@ export interface RunResultRegistrationInput {
   readonly externalResultId?: string;
   readonly outputs?: ReadonlyArray<RunResultOutputReference>;
   readonly metrics?: Readonly<Record<string, unknown>>;
+  readonly resultAvailabilityState?: RunResultAvailabilityState;
   readonly outputAvailabilityHint?: RunResultOutputAvailabilityHint;
   readonly terminalQualityHint?: RunResultTerminalQualityHint;
 }
@@ -370,6 +382,7 @@ export interface RunResultSummary {
   readonly externalResultId?: string;
   readonly outputs: ReadonlyArray<RunResultOutputReference>;
   readonly metrics?: Readonly<Record<string, unknown>>;
+  readonly resultAvailabilityState?: RunResultAvailabilityState;
   readonly outputAvailability?: RunResultOutputAvailabilityHint;
   readonly terminalQuality?: RunResultTerminalQualityHint;
 }

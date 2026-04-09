@@ -215,3 +215,41 @@ Generated-result discovery now has authoritative metadata query/list use cases f
 - Responses include lineage summary hints and run linkage (`runId/systemId/workflowId/outputSlot`, plus snapshot/version presence booleans).
 - Detail response adds persisted lifecycle metadata, preview descriptors, and lineage detail pointers (input assets + snapshot/execution refs).
 
+## Story 6.2.5 result availability and collection-failure state handling (implemented)
+
+Run finalization now persists an explicit result-availability state so API/UI consumers can distinguish no-result-yet, preview-delayed, partial-persistence, and collection-failure outcomes without inferring from ambiguous hints.
+
+### Finalization state contract
+
+- `RunResultSummary`/`RunResultRegistrationInput` now include `resultAvailabilityState`.
+- Canonical states:
+  - `pending-result`
+  - `partially-collected`
+  - `available`
+  - `preview-pending`
+  - `failed-collection`
+
+### Finalization orchestration behavior
+
+- `FinalizeRunExecutionOutcomeUseCase` derives `resultAvailabilityState` from `IRunCollectedResultPersistencePort` outcomes and diagnostics:
+  - persistence `failed` -> `failed-collection`
+  - persistence `partially-persisted` -> `partially-collected`
+  - persistence `persisted` + pending preview diagnostics -> `preview-pending`
+  - persistence `persisted` + persisted outputs -> `available`
+  - no persisted outputs yet -> `pending-result`
+- Derived state is written into durable finalization metadata alongside existing output availability/terminal quality hints.
+
+### API/query clarity posture
+
+- Run detail/status projections now carry durable finalization `resultAvailabilityState` through transport contracts and schema validation.
+- Consumers can explicitly differentiate:
+  - no result yet (`pending-result`)
+  - result exists but preview pending (`preview-pending`)
+  - result collection failed (`failed-collection`)
+
+### Retry/recovery assumptions
+
+- Run terminalization remains non-blocking even when collection/persistence fails.
+- Recovery is modeled as follow-on retry/recovery over explicit durable states, not implicit retries hidden inside terminal finalization.
+- Partial states are intentionally retained for operator triage and future reprocessing orchestration.
+

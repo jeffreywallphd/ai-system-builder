@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  RunResultAvailabilityStates,
   RunResultOutputAvailabilityHints,
   RunResultTerminalQualityHints,
   RunOrchestrationTransportContractVersions,
@@ -40,6 +41,9 @@ describe("RunOrchestrationTransportContracts", () => {
     expect(RunResultOutputAvailabilityHints.degraded).toBe("degraded");
     expect(RunResultTerminalQualityHints.standard).toBe("standard");
     expect(RunResultTerminalQualityHints.partial).toBe("partial");
+    expect(RunResultAvailabilityStates.pendingResult).toBe("pending-result");
+    expect(RunResultAvailabilityStates.previewPending).toBe("preview-pending");
+    expect(RunResultAvailabilityStates.failedCollection).toBe("failed-collection");
   });
 
   it("projects canonical run records to summary detail and status envelopes", () => {

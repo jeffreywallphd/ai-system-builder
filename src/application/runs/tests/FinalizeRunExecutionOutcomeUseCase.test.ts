@@ -331,6 +331,7 @@ describe("FinalizeRunExecutionOutcomeUseCase", () => {
 
     expect(persistencePort.calls).toHaveLength(1);
     expect(result.finalization?.outputs[0]?.assetId).toBe("asset:generated:primary");
+    expect(result.finalization?.resultAvailabilityState).toBe("available");
     const telemetry = (result.runRecord.metadata as { executionTelemetry?: { finalizationInternal?: { resultPersistenceDiagnostics?: { persistedCount?: number } } } }).executionTelemetry;
     expect(telemetry?.finalizationInternal?.resultPersistenceDiagnostics?.persistedCount).toBe(1);
   });
@@ -375,10 +376,111 @@ describe("FinalizeRunExecutionOutcomeUseCase", () => {
 
     expect(result.finalization?.outputAvailability).toBe("degraded");
     expect(result.finalization?.terminalQuality).toBe("degraded");
+    expect(result.finalization?.resultAvailabilityState).toBe("failed-collection");
     const telemetry = (result.runRecord.metadata as { executionTelemetry?: { finalizationInternal?: { resultPersistenceDiagnostics?: { reasonCode?: string } } } }).executionTelemetry;
     expect(telemetry?.finalizationInternal?.resultPersistenceDiagnostics?.reasonCode).toBe("result-persistence-port-failed");
     expect(authoritativeAuditRecorder.events).toHaveLength(1);
     expect(authoritativeAuditRecorder.events[0]?.action).toBe("run.result.collection.failed");
     expect((authoritativeAuditRecorder.events[0]?.payload?.userSafeDetails as { issueCategory?: string } | undefined)?.issueCategory).toBe("result-collection-failure");
+  });
+
+  it("reports preview-pending availability when persisted outputs have pending previews", async () => {
+    const queueRepository = new CapturingQueueRepository();
+    const persistencePort = new CapturingResultCollectionPersistencePort(Object.freeze({
+      status: "persisted",
+      outputs: Object.freeze([Object.freeze({
+        outputId: "generated:primary",
+        kind: "asset",
+        assetId: "asset:generated:primary",
+      })]),
+      outputAvailabilityHint: "available",
+      terminalQualityHint: "standard",
+      internalDiagnostics: Object.freeze({
+        persistedCount: 1,
+        previewPendingCount: 1,
+      }),
+    }));
+    const useCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository,
+      resultCollectionPersistencePort: persistencePort,
+    });
+    const completedRun = createRun(RunLifecycleStates.completed);
+
+    const result = await useCase.execute({
+      run: completedRun,
+      runRecord: createRunRecord(completedRun),
+      occurredAt: "2026-04-07T12:03:00.000Z",
+      internalDiagnostics: Object.freeze({
+        collectedExecutionResult: Object.freeze({
+          schemaVersion: "1.0.0",
+          collectionId: "collection:run:completed",
+          discoveryId: "discovery:run:completed",
+          executionJobId: "job:1",
+          runId: completedRun.identity.runId,
+          workspaceId: "workspace-alpha",
+          collectedAt: "2026-04-07T12:02:00.000Z",
+          status: "collected",
+          discoveredOutputs: Object.freeze([]),
+          records: Object.freeze([]),
+          summary: Object.freeze({
+            discoveredCount: 0,
+            collectedCount: 0,
+            persistedCount: 0,
+            notPersistedCount: 0,
+            failedCount: 0,
+          }),
+        }),
+      }),
+    });
+
+    expect(result.finalization?.resultAvailabilityState).toBe("preview-pending");
+  });
+
+  it("reports partially-collected availability when persistence is partial", async () => {
+    const queueRepository = new CapturingQueueRepository();
+    const persistencePort = new CapturingResultCollectionPersistencePort(Object.freeze({
+      status: "partially-persisted",
+      outputs: Object.freeze([Object.freeze({
+        outputId: "generated:primary",
+        kind: "asset",
+        assetId: "asset:generated:primary",
+      })]),
+      outputAvailabilityHint: "partial",
+      terminalQualityHint: "partial",
+    }));
+    const useCase = new FinalizeRunExecutionOutcomeUseCase({
+      queueRepository,
+      resultCollectionPersistencePort: persistencePort,
+    });
+    const completedRun = createRun(RunLifecycleStates.completed);
+
+    const result = await useCase.execute({
+      run: completedRun,
+      runRecord: createRunRecord(completedRun),
+      occurredAt: "2026-04-07T12:03:00.000Z",
+      internalDiagnostics: Object.freeze({
+        collectedExecutionResult: Object.freeze({
+          schemaVersion: "1.0.0",
+          collectionId: "collection:run:completed",
+          discoveryId: "discovery:run:completed",
+          executionJobId: "job:1",
+          runId: completedRun.identity.runId,
+          workspaceId: "workspace-alpha",
+          collectedAt: "2026-04-07T12:02:00.000Z",
+          status: "collected",
+          discoveredOutputs: Object.freeze([]),
+          records: Object.freeze([]),
+          summary: Object.freeze({
+            discoveredCount: 0,
+            collectedCount: 0,
+            persistedCount: 0,
+            notPersistedCount: 0,
+            failedCount: 0,
+          }),
+        }),
+      }),
+    });
+
+    expect(result.finalization?.resultAvailabilityState).toBe("partially-collected");
   });
 });
