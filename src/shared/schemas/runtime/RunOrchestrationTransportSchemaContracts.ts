@@ -7,6 +7,7 @@ import {
   RunOrchestrationTransportContractVersions,
   RunSchedulingPriorityBands,
   RunResultOutputAvailabilityHints,
+  RunResultAvailabilityStates,
   RunResultOutputReferenceKinds,
   RunResultTerminalQualityHints,
   resolveRunSubmissionSource,
@@ -315,6 +316,13 @@ const RunResultSummarySchema = z.object({
   externalResultId: IdentifierSchema.optional(),
   outputs: z.array(RunResultOutputReferenceSchema),
   metrics: z.record(z.string(), z.unknown()).optional(),
+  resultAvailabilityState: z.enum([
+    RunResultAvailabilityStates.pendingResult,
+    RunResultAvailabilityStates.partiallyCollected,
+    RunResultAvailabilityStates.available,
+    RunResultAvailabilityStates.previewPending,
+    RunResultAvailabilityStates.failedCollection,
+  ]).optional(),
   outputAvailability: z.enum([
     RunResultOutputAvailabilityHints.none,
     RunResultOutputAvailabilityHints.partial,
@@ -620,6 +628,13 @@ export const RunLifecycleUpdateRequestSchema = z.object({
     externalResultId: IdentifierSchema.optional(),
     outputs: z.array(RunResultOutputReferenceSchema).max(512).optional(),
     metrics: z.record(z.string(), z.unknown()).optional(),
+    resultAvailabilityState: z.enum([
+      RunResultAvailabilityStates.pendingResult,
+      RunResultAvailabilityStates.partiallyCollected,
+      RunResultAvailabilityStates.available,
+      RunResultAvailabilityStates.previewPending,
+      RunResultAvailabilityStates.failedCollection,
+    ]).optional(),
     outputAvailabilityHint: z.enum([
       RunResultOutputAvailabilityHints.none,
       RunResultOutputAvailabilityHints.partial,

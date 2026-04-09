@@ -214,3 +214,41 @@ Generated-result discovery now has authoritative metadata query/list use cases f
 - Responses include lineage summary hints and run linkage (`runId/systemId/workflowId/outputSlot`, plus snapshot/version presence booleans).
 - Detail response adds persisted lifecycle metadata, preview descriptors, and lineage detail pointers (input assets + snapshot/execution refs).
 
+## Story 6.2.5 result availability and collection-failure state handling (implemented)
+
+Run finalization now records an explicit, durable result-availability state so downstream APIs/UI can separate no-result-yet, preview-delayed, partial-persistence, and failed-collection outcomes without ambiguous interpretation.
+
+### Finalization state contract additions
+
+- `RunResultSummary` and `RunResultRegistrationInput` now include `resultAvailabilityState`.
+- Canonical values:
+  - `pending-result`
+  - `partially-collected`
+  - `available`
+  - `preview-pending`
+  - `failed-collection`
+
+### Orchestration derivation behavior
+
+- `FinalizeRunExecutionOutcomeUseCase` derives `resultAvailabilityState` from persistence outcomes + diagnostics:
+  - `failed` persistence -> `failed-collection`
+  - `partially-persisted` persistence -> `partially-collected`
+  - `persisted` + preview pending diagnostics -> `preview-pending`
+  - `persisted` + persisted outputs -> `available`
+  - no persisted outputs yet -> `pending-result`
+- Derived state is persisted in finalization metadata alongside existing terminal output/quality hints.
+
+### API clarity posture
+
+- Run detail/status transport contracts + schema validation now carry finalization `resultAvailabilityState`.
+- Consumers can explicitly distinguish:
+  - `pending-result` (no result yet)
+  - `preview-pending` (result exists; derivative not ready)
+  - `failed-collection` (collection/persistence failure)
+
+### Retry/recovery assumptions
+
+- Terminal run finalization remains non-blocking for persistence/collection faults.
+- Retry/recovery is an explicit follow-on workflow over durable states, not hidden in-band retry behavior.
+- Partial/degraded states are intentionally retained for operator diagnostics and future reprocessing.
+

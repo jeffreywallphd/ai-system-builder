@@ -26,7 +26,12 @@ import {
   AuditEventOutcomes,
   AuditScopeKinds,
 } from "@domain/audit/AuditDomain";
-import type { RunLifecycleUpdateRequest, RunResultOutputReference } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
+import {
+  RunResultAvailabilityStates,
+  type RunLifecycleUpdateRequest,
+  type RunResultAvailabilityState,
+  type RunResultOutputReference,
+} from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 import { updatePlatformRunRecordCanonicalState } from "./RunCreationPersistenceMapper";
 
 export interface FinalizeRunExecutionOutcomeRequest {
@@ -94,6 +99,8 @@ export class DefaultRunFinalizationResultRegistrationPort implements IRunFinaliz
           ? "Run cancelled."
           : "Run completed.");
     const outputReferences = normalizeOutputReferences(request.result?.outputs);
+    const resultAvailabilityState = request.result?.resultAvailabilityState
+      ?? resolveDefaultResultAvailabilityState(request.outcome, outputReferences);
     const outputAvailability = request.result?.outputAvailabilityHint
       ?? resolveOutputAvailabilityHint(request.outcome, outputReferences);
     const terminalQuality = request.result?.terminalQualityHint
@@ -107,6 +114,7 @@ export class DefaultRunFinalizationResultRegistrationPort implements IRunFinaliz
         outputs: outputReferences,
         metrics: request.result?.metrics,
         externalResultId: normalizeOptional(request.result?.externalResultId),
+        resultAvailabilityState,
         outputAvailability,
         terminalQuality,
       }),
@@ -489,6 +497,8 @@ function mergeTerminalResultWithPersistence(
   return Object.freeze({
     ...(result ?? {}),
     outputs: mergedOutputs,
+    resultAvailabilityState: result?.resultAvailabilityState
+      ?? deriveResultAvailabilityStateFromPersistence(persistence, mergedOutputs.length),
     outputAvailabilityHint: result?.outputAvailabilityHint
       ?? persistence.outputAvailabilityHint
       ?? deriveOutputAvailabilityFromPersistence(persistence, mergedOutputs.length),
@@ -496,6 +506,40 @@ function mergeTerminalResultWithPersistence(
       ?? persistence.terminalQualityHint
       ?? deriveTerminalQualityFromPersistence(persistence, mergedOutputs.length),
   });
+}
+
+function deriveResultAvailabilityStateFromPersistence(
+  persistence: RunCollectedResultPersistenceResult,
+  outputCount: number,
+): RunResultAvailabilityState {
+  if (persistence.status === RunCollectedResultPersistenceStatuses.failed) {
+    return RunResultAvailabilityStates.failedCollection;
+  }
+  if (persistence.status === RunCollectedResultPersistenceStatuses.partiallyPersisted) {
+    return RunResultAvailabilityStates.partiallyCollected;
+  }
+  if (persistence.status === RunCollectedResultPersistenceStatuses.persisted) {
+    const previewPendingCount = readDiagnosticCount(persistence.internalDiagnostics, "previewPendingCount");
+    if (previewPendingCount > 0) {
+      return RunResultAvailabilityStates.previewPending;
+    }
+    return outputCount > 0
+      ? RunResultAvailabilityStates.available
+      : RunResultAvailabilityStates.pendingResult;
+  }
+  return outputCount > 0
+    ? RunResultAvailabilityStates.available
+    : RunResultAvailabilityStates.pendingResult;
+}
+
+function readDiagnosticCount(
+  diagnostics: Readonly<Record<string, unknown>> | undefined,
+  key: string,
+): number {
+  const value = diagnostics?.[key];
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : 0;
 }
 
 function mergeOutputReferences(
@@ -571,6 +615,15 @@ function resolveOutputAvailabilityHint(
     return "partial";
   }
   return "partial";
+}
+
+function resolveDefaultResultAvailabilityState(
+  _outcome: RunFinalizationRegistrationRequest["outcome"],
+  outputs: ReadonlyArray<RunResultOutputReference>,
+): RunResultAvailabilityState {
+  return outputs.length > 0
+    ? RunResultAvailabilityStates.available
+    : RunResultAvailabilityStates.pendingResult;
 }
 
 function resolveTerminalQualityHint(

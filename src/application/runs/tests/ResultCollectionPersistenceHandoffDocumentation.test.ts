@@ -55,4 +55,23 @@ describe("result collection persistence handoff documentation", () => {
     expect(aiDoc).toContain("SqliteGeneratedResultPersistenceAdapter.ts");
     expect(aiDoc).toContain("SqliteRunCollectedResultPersistenceAdapter.ts");
   });
+
+  it("documents Story 6.2.5 result availability states and recovery assumptions", () => {
+    const doc = readFileSync(architectureDocPath, "utf8");
+    const aiDoc = readFileSync(architectureAiDocPath, "utf8");
+
+    expect(doc).toContain("Story 6.2.5 result availability and collection-failure state handling (implemented)");
+    expect(doc).toContain("pending-result");
+    expect(doc).toContain("partially-collected");
+    expect(doc).toContain("preview-pending");
+    expect(doc).toContain("failed-collection");
+    expect(doc).toContain("retry/recovery");
+
+    expect(aiDoc).toContain("Story 6.2.5 result availability and collection-failure state handling (implemented)");
+    expect(aiDoc).toContain("pending-result");
+    expect(aiDoc).toContain("partially-collected");
+    expect(aiDoc).toContain("preview-pending");
+    expect(aiDoc).toContain("failed-collection");
+    expect(aiDoc).toContain("retry/recovery");
+  });
 });
