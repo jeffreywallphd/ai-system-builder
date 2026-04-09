@@ -8,6 +8,7 @@ import { ROUTE_PATHS } from "../routes/RouteConfig";
 import { IdentityAuthService } from "../services/IdentityAuthService";
 import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "@shared/identity/IdentityAuthEnvironment";
 import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
+import { guardAuthenticationInitialization } from "../shared/identity/AuthenticationInitializationGuard";
 
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
@@ -57,8 +58,11 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
 
-      const initialized = await onAuthenticated(response.data);
-      if (!initialized) {
+      const initialization = await guardAuthenticationInitialization(onAuthenticated, response.data);
+      if (!initialization.initialized) {
+        setErrorMessage(initialization.timedOut
+          ? "Sign-in finished but session initialization took too long. Please try again."
+          : "Sign-in finished but session setup could not be completed. Please try again.");
         return;
       }
       navigate(fromPath, { replace: true });
@@ -82,8 +86,11 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
 
-      const initialized = await onAuthenticated(response.data);
-      if (!initialized) {
+      const initialization = await guardAuthenticationInitialization(onAuthenticated, response.data);
+      if (!initialization.initialized) {
+        setErrorMessage(initialization.timedOut
+          ? "Dev sign-in finished but session initialization took too long. Please try again."
+          : "Dev sign-in finished but session setup could not be completed. Please try again.");
         return;
       }
       navigate(fromPath, { replace: true });
@@ -193,4 +200,3 @@ function renderApiError(error: IdentityAuthApiError | undefined): string {
   const details = validationErrors.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
   return `${error?.message || "Login failed."} ${details}`;
 }
-
