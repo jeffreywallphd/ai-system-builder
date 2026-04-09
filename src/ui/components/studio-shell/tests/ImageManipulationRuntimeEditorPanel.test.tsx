@@ -351,6 +351,114 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(precheck.backendOperationalStatus.summary).toContain("no eligible execution node");
   });
 
+  it("classifies backend compatibility readiness failures separately from outage messaging", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "unavailable",
+        readyForExecution: false,
+        message: "No compatible translation contract is configured.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["2.0.0"]),
+        }),
+        nodeAvailability: Object.freeze({
+          state: "unknown",
+          checkedAt: "2026-04-08T18:00:00.000Z",
+          candidateNodeCount: 0,
+          eligibleNodeCount: 0,
+          unavailableNodeCount: 0,
+          incompatibleNodeCount: 0,
+          topBlockingReasonCodes: Object.freeze([]),
+          topTransientAvailabilityReasonCodes: Object.freeze([]),
+          reasonCode: "node-availability-evaluation-skipped-backend-blocking",
+        }),
+        issues: Object.freeze([{
+          code: "translation-contract-version-unsupported",
+          severity: "error",
+          message: "Translation contract version is unsupported.",
+        }]),
+      }),
+    });
+
+    expect(precheck.launchReady).toBeFalse();
+    expect(precheck.backendOperationalStatus.category).toBe("no-compatible-backend");
+    expect(precheck.backendOperationalStatus.summary).toContain("No compatible execution backend");
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: { state: "idle" },
+      flowIssues: Object.freeze([]),
+      launchPrecheck: precheck,
+    });
+    expect(guidance?.kind).toBe("operator-action");
+    expect(guidance?.title).toContain("No compatible execution backend");
+  });
+
+  it("classifies disabled-node policy blockers distinctly from generic no-eligible messaging", () => {
+    const precheck = buildImageRunLaunchPrecheckState({
+      selectedSourceRecordId: "record:source:1",
+      selectedSourceAssetId: "asset:source:1",
+      selectedSourceDatasetInstanceId: "dataset:source:1",
+      prompt: "Relight scene",
+      validationIssues: Object.freeze([]),
+      executionReadiness: Object.freeze({
+        backendFamily: "adapter.comfyui.image-manipulation",
+        checkedAt: "2026-04-08T18:00:00.000Z",
+        readiness: "degraded",
+        readyForExecution: false,
+        message: "Node policy currently blocks execution.",
+        capabilities: Object.freeze({
+          backendFamily: "adapter.comfyui.image-manipulation",
+          supportsProgressPolling: true,
+          supportsProgressStreaming: false,
+          supportsCancellation: true,
+          supportsOutputDiscovery: true,
+          supportedOperationKinds: Object.freeze(["image-to-image"]),
+          supportedTranslationContractVersions: Object.freeze(["1.0.0"]),
+        }),
+        nodeAvailability: Object.freeze({
+          state: "constrained",
+          checkedAt: "2026-04-08T18:00:00.000Z",
+          candidateNodeCount: 1,
+          eligibleNodeCount: 0,
+          unavailableNodeCount: 0,
+          incompatibleNodeCount: 1,
+          topBlockingReasonCodes: Object.freeze(["node-disabled-by-policy", "execution-node-no-eligible-match"]),
+          topTransientAvailabilityReasonCodes: Object.freeze([]),
+          reasonCode: "execution-node-no-eligible-match",
+        }),
+        issues: Object.freeze([{
+          code: "execution-node-no-eligible-match",
+          severity: "error",
+          message: "No eligible node.",
+        }]),
+      }),
+    });
+
+    expect(precheck.launchReady).toBeFalse();
+    expect(precheck.backendOperationalStatus.category).toBe("node-disabled");
+    expect(precheck.backendOperationalStatus.summary).toContain("disabled by policy");
+
+    const guidance = buildImageRunFailureRecoveryGuidance({
+      runLifecycle: { state: "idle" },
+      flowIssues: Object.freeze([]),
+      launchPrecheck: precheck,
+    });
+    expect(guidance?.kind).toBe("operator-action");
+    expect(guidance?.title).toContain("Execution node access is disabled");
+  });
+
   it("builds user-fixable recovery guidance when launch is blocked by setup issues", () => {
     const precheck = buildImageRunLaunchPrecheckState({
       selectedSourceRecordId: undefined,

@@ -73,6 +73,7 @@ import {
 import { IdentityAuthSessionStore } from "../../shared/identity/IdentityAuthSessionStore";
 import { RuntimeOperationsService } from "../../services/RuntimeOperationsService";
 import type {
+  RuntimeExecutionReadinessNodeAvailabilitySummary,
   RuntimeExecutionReadinessResponse,
   RuntimeSdkExecutionResultResponse,
   RuntimeSdkExecutionStatusResponse,
@@ -673,7 +674,7 @@ export interface ImageRunLaunchPrecheckState {
 }
 
 export interface ImageRunBackendOperationalStatus {
-  readonly category: "healthy" | "degraded" | "no-eligible-node" | "outage" | "unknown";
+  readonly category: "healthy" | "degraded" | "no-compatible-backend" | "node-disabled" | "no-eligible-node" | "outage" | "unknown";
   readonly summary: string;
   readonly temporary: boolean;
   readonly suggestedActions: ReadonlyArray<string>;
@@ -797,17 +798,6 @@ export function buildImageRunLaunchPrecheckState(input: {
   });
 }
 
-interface RuntimeExecutionReadinessNodeAvailabilitySummary {
-  readonly state?: "available" | "constrained" | "unavailable" | "unknown";
-  readonly candidateNodeCount?: number;
-  readonly eligibleNodeCount?: number;
-  readonly unavailableNodeCount?: number;
-  readonly incompatibleNodeCount?: number;
-  readonly topBlockingReasonCodes?: ReadonlyArray<string>;
-  readonly topTransientAvailabilityReasonCodes?: ReadonlyArray<string>;
-  readonly reasonCode?: string;
-}
-
 function deriveBackendOperationalStatus(input: {
   readonly executionReadiness?: RuntimeExecutionReadinessResponse;
   readonly executionReadinessError?: string;
@@ -859,15 +849,65 @@ function deriveBackendOperationalStatus(input: {
   const nodeAvailability = resolveNodeAvailabilitySummary(input.executionReadiness);
   const topBlockingCodes = nodeAvailability?.topBlockingReasonCodes ?? [];
   const topTransientCodes = nodeAvailability?.topTransientAvailabilityReasonCodes ?? [];
+  const hasNodeDisabledByPolicy = topBlockingCodes.includes("node-disabled-by-policy");
+  const hasNodeSuppressedByPolicy = topTransientCodes.includes("node-suppressed-by-policy")
+    || topBlockingCodes.includes("node-suppressed-by-policy");
+  const hasCompatibilityConfigurationIssue = input.executionReadiness.issues.some((issue) => (
+    issue.code === "operation-kind-unsupported"
+    || issue.code === "translation-contract-version-unsupported"
+    || issue.code === "execution-adapter-not-configured"
+    || issue.code === "node-selection-not-configured"
+  ));
   const hasNoEligibleNode = nodeAvailability?.reasonCode === "execution-node-no-eligible-match"
     || topBlockingCodes.includes("execution-node-no-eligible-match")
     || input.executionReadiness.issues.some((issue) => issue.code === "execution-node-no-eligible-match");
-  const isOutage = input.executionReadiness.readiness === "unavailable"
-    || nodeAvailability?.state === "unavailable"
+  const isOutage = nodeAvailability?.state === "unavailable"
     || input.executionReadiness.issues.some((issue) => (
       issue.code.includes("backend-unavailable")
       || issue.code.includes("execution-node-candidates-unavailable")
     ));
+
+  if (hasNodeDisabledByPolicy || hasNodeSuppressedByPolicy) {
+    const nodeOperationalMode = hasNodeDisabledByPolicy ? "disabled" : "suppressed";
+    return Object.freeze({
+      category: "node-disabled",
+      summary: hasNodeDisabledByPolicy
+        ? "A required execution node is disabled by policy."
+        : "A required execution node is temporarily suppressed by policy.",
+      temporary: hasNodeSuppressedByPolicy && !hasNodeDisabledByPolicy,
+      suggestedActions: Object.freeze(hasNodeDisabledByPolicy
+        ? [
+          "Contact an operator to re-enable eligible execution nodes.",
+          "Refresh readiness after policy updates are applied.",
+        ]
+        : [
+          "Wait for suppression windows to clear, then refresh readiness.",
+          "Contact an operator if suppression persists.",
+        ]),
+      advancedDetails: Object.freeze([
+        `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+        `nodePolicyState=${nodeOperationalMode}`,
+        `blockingCodes=${topBlockingCodes.join(",") || "none"}`,
+        `transientCodes=${topTransientCodes.join(",") || "none"}`,
+      ]),
+    });
+  }
+
+  if (hasCompatibilityConfigurationIssue) {
+    return Object.freeze({
+      category: "no-compatible-backend",
+      summary: "No compatible execution backend is currently configured for this workflow.",
+      temporary: false,
+      suggestedActions: Object.freeze([
+        "Review workflow/backend compatibility settings.",
+        "Contact an operator if backend compatibility cannot be updated from this studio.",
+      ]),
+      advancedDetails: Object.freeze([
+        `backendReadiness=${input.executionReadiness.readiness}`,
+        `readinessIssues=${input.executionReadiness.issues.map((issue) => issue.code).join(",") || "none"}`,
+      ]),
+    });
+  }
 
   if (hasNoEligibleNode) {
     return Object.freeze({
@@ -900,6 +940,23 @@ function deriveBackendOperationalStatus(input: {
         `backendReadiness=${input.executionReadiness.readiness}`,
         `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
         `transientCodes=${topTransientCodes.join(",") || "none"}`,
+      ]),
+    });
+  }
+
+  if (input.executionReadiness.readiness === "unavailable") {
+    return Object.freeze({
+      category: "unknown",
+      summary: input.executionReadiness.message?.trim() || "Execution environment is currently unavailable.",
+      temporary: true,
+      suggestedActions: Object.freeze([
+        "Refresh readiness to confirm current backend status.",
+        "Retry after availability conditions are resolved.",
+      ]),
+      advancedDetails: Object.freeze([
+        `backendReadiness=${input.executionReadiness.readiness}`,
+        `nodeAvailability=${nodeAvailability?.state ?? "unknown"}`,
+        `readinessIssues=${input.executionReadiness.issues.map((issue) => issue.code).join(",") || "none"}`,
       ]),
     });
   }
@@ -938,9 +995,7 @@ function deriveBackendOperationalStatus(input: {
 function resolveNodeAvailabilitySummary(
   readiness: RuntimeExecutionReadinessResponse,
 ): RuntimeExecutionReadinessNodeAvailabilitySummary | undefined {
-  const candidate = (readiness as RuntimeExecutionReadinessResponse & {
-    readonly nodeAvailability?: RuntimeExecutionReadinessNodeAvailabilitySummary;
-  }).nodeAvailability;
+  const candidate = readiness.nodeAvailability;
   if (!candidate || typeof candidate !== "object") {
     return undefined;
   }
@@ -1142,16 +1197,25 @@ export function buildImageRunFailureRecoveryGuidance(input: {
     const summary = hasSetupIssues
       ? input.launchPrecheck.setupBlockingIssues[0]?.message
       : backendStatus.summary;
-    return Object.freeze({
-      mode: "launch-blocked",
-      kind: hasSetupIssues ? "user-fixable" : "retry-later",
-      title: hasSetupIssues
-        ? "Fix setup issues before starting"
+    const backendRecoveryKind: ImageRunRecoveryKind = backendStatus.category === "no-compatible-backend"
+      || backendStatus.category === "node-disabled"
+      ? "operator-action"
+      : "retry-later";
+    const backendBlockedTitle = backendStatus.category === "no-compatible-backend"
+      ? "No compatible execution backend is configured"
+      : backendStatus.category === "node-disabled"
+        ? "Execution node access is disabled"
         : backendStatus.category === "no-eligible-node"
           ? "No eligible execution node is available"
           : backendStatus.category === "outage"
             ? "Execution backend is temporarily unavailable"
-            : "Execution environment is not ready",
+            : "Execution environment is not ready";
+    return Object.freeze({
+      mode: "launch-blocked",
+      kind: hasSetupIssues ? "user-fixable" : backendRecoveryKind,
+      title: hasSetupIssues
+        ? "Fix setup issues before starting"
+        : backendBlockedTitle,
       summary: summary ?? "Resolve blocking issues before launching.",
       recommendedActions: Object.freeze(hasSetupIssues
         ? [

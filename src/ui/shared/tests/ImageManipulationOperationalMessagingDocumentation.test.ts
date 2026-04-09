@@ -16,6 +16,8 @@ describe("image manipulation operational messaging documentation", () => {
   it("documents backend outage, degraded node, and preview-delay messaging posture", () => {
     const doc = readFileSync(docPath, "utf8");
     expect(doc).toContain("no eligible node");
+    expect(doc).toContain("no compatible backend");
+    expect(doc).toContain("node disabled");
     expect(doc).toContain("temporary backend outage");
     expect(doc).toContain("degraded-but-runnable backend");
     expect(doc).toContain("Preview-delay scenarios");
