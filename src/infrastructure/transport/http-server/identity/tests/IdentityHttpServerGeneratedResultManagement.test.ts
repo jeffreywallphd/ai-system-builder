@@ -5,6 +5,8 @@ import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/Te
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import type { GeneratedResultManagementBackendApi } from "../../../../api/generated-results/GeneratedResultManagementBackendApi";
 import type {
+  GetGeneratedResultLineageDetailApiRequest,
+  GetGeneratedResultLineageSummaryApiRequest,
   OpenGeneratedResultPreviewContentStreamApiRequest,
   OpenGeneratedResultOriginalContentStreamApiRequest,
   RequestGeneratedResultPreviewApiRequest,
@@ -28,6 +30,8 @@ class StubGeneratedResultManagementBackendApi {
   public lastRequest: OpenGeneratedResultOriginalContentStreamApiRequest | undefined;
   public lastPreviewRequest: RequestGeneratedResultPreviewApiRequest | undefined;
   public lastPreviewOpenRequest: OpenGeneratedResultPreviewContentStreamApiRequest | undefined;
+  public lastLineageSummaryRequest: GetGeneratedResultLineageSummaryApiRequest | undefined;
+  public lastLineageDetailRequest: GetGeneratedResultLineageDetailApiRequest | undefined;
   public denyAccess = false;
 
   public async openGeneratedResultOriginalContentStream(request: OpenGeneratedResultOriginalContentStreamApiRequest) {
@@ -118,6 +122,84 @@ class StubGeneratedResultManagementBackendApi {
         stream: (async function* stream() {
           yield Buffer.from("hello", "utf8");
         })(),
+      }),
+    };
+  }
+
+  public async getGeneratedResultLineageSummary(request: GetGeneratedResultLineageSummaryApiRequest) {
+    this.lastLineageSummaryRequest = request;
+    if (this.denyAccess) {
+      return {
+        ok: false as const,
+        error: Object.freeze({
+          code: "forbidden" as const,
+          message: "Forbidden.",
+        }),
+      };
+    }
+
+    return {
+      ok: true as const,
+      data: Object.freeze({
+        lineage: Object.freeze({
+          resultAssetId: request.resultAssetId,
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          inputAssetCount: 2,
+          hasWorkflowTemplateVersion: true,
+          hasSystemSnapshot: true,
+          hasParameterSnapshot: true,
+          hasSelectedNode: true,
+        }),
+      }),
+    };
+  }
+
+  public async getGeneratedResultLineageDetail(request: GetGeneratedResultLineageDetailApiRequest) {
+    this.lastLineageDetailRequest = request;
+    if (this.denyAccess) {
+      return {
+        ok: false as const,
+        error: Object.freeze({
+          code: "not-found" as const,
+          message: "Not found.",
+        }),
+      };
+    }
+
+    return {
+      ok: true as const,
+      data: Object.freeze({
+        lineage: Object.freeze({
+          summary: Object.freeze({
+            resultAssetId: request.resultAssetId,
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 1,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          source: Object.freeze({
+            workflowTemplateVersionId: "wf-version-1",
+            executionAdapterKind: "comfyui",
+            executionBackendFamily: "comfyui",
+          }),
+          upstreamInputs: Object.freeze([Object.freeze({ assetId: "input-asset-001" })]),
+          graph: Object.freeze({
+            nodes: Object.freeze([Object.freeze({
+              nodeId: "lineage-node:result:gr-asset-001",
+              nodeType: "result",
+              referenceId: "gr-asset-001",
+            })]),
+            edges: Object.freeze([]),
+          }),
+        }),
       }),
     };
   }
@@ -292,5 +374,42 @@ describe("IdentityHttpServer generated-result protected original retrieval", () 
     expect(payload.ok).toBe(false);
     expect(payload.error.code).toBe("invalid-state");
     expect(JSON.stringify(payload)).not.toContain("storage-instance://");
+  });
+
+  it("returns lineage summary and lineage detail for authorized callers", async () => {
+    const backend = new StubGeneratedResultManagementBackendApi();
+    const baseUrl = await startServer(backend);
+    const token = await registerAndLogin(baseUrl, "generated.result.route.lineage.success.1");
+
+    const summaryResponse = await fetch(
+      `${baseUrl}/api/v1/generated-results/${encodeURIComponent("gr-asset-001")}/lineage/summary?workspaceId=workspace-alpha`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(summaryResponse.status).toBe(200);
+    const summaryPayload = await summaryResponse.json();
+    expect(summaryPayload.ok).toBe(true);
+    expect(summaryPayload.data.lineage.resultAssetId).toBe("gr-asset-001");
+    expect(summaryPayload.data.lineage.inputAssetCount).toBe(2);
+
+    const detailResponse = await fetch(
+      `${baseUrl}/api/v1/generated-results/${encodeURIComponent("gr-asset-001")}/lineage?workspaceId=workspace-alpha`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+    expect(detailResponse.status).toBe(200);
+    const detailPayload = await detailResponse.json();
+    expect(detailPayload.ok).toBe(true);
+    expect(detailPayload.data.lineage.summary.resultAssetId).toBe("gr-asset-001");
+    expect(detailPayload.data.lineage.source.executionBackendFamily).toBe("comfyui");
+
+    expect(backend.lastLineageSummaryRequest?.workspaceId).toBe("workspace-alpha");
+    expect(backend.lastLineageDetailRequest?.resultAssetId).toBe("gr-asset-001");
   });
 });

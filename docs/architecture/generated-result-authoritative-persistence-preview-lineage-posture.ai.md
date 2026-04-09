@@ -317,3 +317,32 @@ Generated-result previews now have authenticated request/open retrieval flows co
 - Pending/missing/failed conditions are returned as structured responses without leaking raw storage object layout.
 - Stale/invalid preview tokens return explicit invalid-state failures requiring a new preview request.
 
+## Story 6.3.3 lineage retrieval and inspection use cases (implemented)
+
+Generated-result lineage retrieval now has explicit application and transport seams so provenance is explainable for result detail/reuse/debug/governance flows without coupling to backend execution internals.
+
+- new application use cases:
+  - `GetGeneratedResultLineageSummaryUseCase`
+  - `GetGeneratedResultLineageDetailUseCase`
+  - `GeneratedResultLineageReadUseCaseContracts`
+- new projection helper:
+  - `GeneratedResultLineageProjection`
+- new authenticated routes:
+  - `GET /api/v1/generated-results/:resultAssetId/lineage/summary`
+  - `GET /api/v1/generated-results/:resultAssetId/lineage`
+
+### Retrieval posture
+
+- Requires active workspace membership and enforces private-result owner/admin visibility with safe not-found responses.
+- Builds lineage from authoritative generated-result persistence records and lineage pointers, not adapter-local/runtime payload introspection.
+- Falls back to persisted generated-result fields when separate lineage row projection is unavailable.
+
+### Output shape posture
+
+- Summary output provides run/workflow/system/execution-node linkage, output slot, input-asset count, and explainability booleans (`hasWorkflowTemplateVersion`, `hasSystemSnapshot`, `hasParameterSnapshot`, `hasSelectedNode`).
+- Detail output includes:
+  - immutable snapshot/version provenance refs (workflow template, system snapshot/version, parameter snapshot),
+  - execution provenance (`selectedNodeId`, `executionAdapterKind`, `executionBackendFamily`),
+  - upstream input assets,
+  - deterministic lineage graph nodes/edges connecting result, run, workflow, system, optional execution node, and inputs.
+

@@ -117,3 +117,21 @@ Contract posture:
 - Preview request responses expose stateful availability (`preview-available`, `preview-pending`, `preview-failed`, `preview-unavailable`) with tokenized access metadata only.
 - Preview content open requires a preview token and never exposes raw derivative object paths or storage-instance internals.
 - Pending/missing/failed preview outcomes remain structured and explicit for gallery/history/detail clients.
+
+## Story 6.3.3 lineage inspection contract integration (implemented)
+
+Generated-result lineage summary/detail retrieval now has concrete backend API + authenticated HTTP transport behavior wired to shared lineage DTO/schema contracts.
+
+- Added backend API request/response shapes in `PublicGeneratedResultManagementApiContract.ts`:
+  - `GetGeneratedResultLineageSummaryApiRequest/Response`
+  - `GetGeneratedResultLineageDetailApiRequest/Response`
+- `GeneratedResultManagementBackendApi` now maps lineage-read use-case failures to stable public errors (`invalid-request`, `forbidden`, `not-found`, `internal`).
+- Identity HTTP routes now include:
+  - `GET /api/v1/generated-results/:resultAssetId/lineage/summary`
+  - `GET /api/v1/generated-results/:resultAssetId/lineage`
+
+Output posture:
+
+- Summary responses stay compact for list/history contexts.
+- Detail responses expose source snapshot/version references, execution provenance, upstream input assets, and deterministic graph topology for inspection experiences.
+- Contracts remain storage-path-opaque and backend-internal-payload-opaque.
