@@ -3,14 +3,14 @@ import { existsSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
 import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
 } from "../../config/HostSecureTransportConfig";
+import { BROWSER_DEVELOPMENT_REPOSITORY_ROOT } from "./BrowserDevelopmentPaths";
 
-const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPOSITORY_ROOT = BROWSER_DEVELOPMENT_REPOSITORY_ROOT;
 const SUPERVISOR_ENTRYPOINT = path.resolve(REPOSITORY_ROOT, "src/infrastructure/runtime/service-supervisor.js");
 const PYTHON_RUNTIME_WORKDIR = path.resolve(REPOSITORY_ROOT, "python-runtime");
 const MCP_WORKSPACE_ROOT = path.resolve(REPOSITORY_ROOT, "user", "workflow-data", "mcp");
