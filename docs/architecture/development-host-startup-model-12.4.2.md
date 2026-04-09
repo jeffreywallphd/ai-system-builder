@@ -30,6 +30,8 @@ Desktop development startup also separates Electron Forge launch into `dev:deskt
 
 This keeps the default `npm run dev` workflow stable on Windows hosts where parent-directory realpath resolution can fail under restricted ACLs.
 
+Electron main-process bundling now also preserves native dependency runtime loading by externalizing `sharp` and `@img/sharp-*` modules in `vite.main.config.ts`, so native binaries are resolved from installed `node_modules` packages at runtime instead of being inlined into the Vite bundle.
+
 ### Server integration harness startup now runs through host assembly entrypoint
 
 `src/hosts/server/tests/IdentityServerHost.test.ts` now starts runtime hosts via a dedicated helper that composes startup through `startAuthoritativeServerHostAssembly(...)`.

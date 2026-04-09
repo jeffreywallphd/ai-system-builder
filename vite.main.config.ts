@@ -13,6 +13,23 @@ const srcAliases = [
   { find: "@shared", replacement: path.resolve(REPOSITORY_ROOT, "src/shared") },
   { find: "@ui", replacement: path.resolve(REPOSITORY_ROOT, "src/ui") },
 ];
+const staticExternalModules = new Set([
+  "electron",
+  "better-sqlite3",
+  "electron-squirrel-startup",
+  "sharp",
+  ...builtinModules,
+  ...builtinModules.map((module) => `node:${module}`),
+]);
+
+function isSharpRuntimeModule(id: string): boolean {
+  return (
+    id === "sharp" ||
+    id.startsWith("sharp/") ||
+    id.startsWith("@img/sharp-") ||
+    id.startsWith("@img/sharp-libvips-")
+  );
+}
 
 export default defineConfig({
   resolve: {
@@ -26,13 +43,7 @@ export default defineConfig({
       fileName: () => "main.mjs",
     },
     rollupOptions: {
-      external: [
-        "electron",
-        "better-sqlite3",
-        "electron-squirrel-startup",
-        ...builtinModules,
-        ...builtinModules.map((module) => `node:${module}`),
-      ],
+      external: (id) => staticExternalModules.has(id) || isSharpRuntimeModule(id),
     },
   },
 });
