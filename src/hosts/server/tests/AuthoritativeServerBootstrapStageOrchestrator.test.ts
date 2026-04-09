@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AuthoritativeServerStartupStageStates,
   createAuthoritativeServerBootstrapStageOrchestrator,
   AuthoritativeServerBootstrapStageOrchestratorError,
 } from "../AuthoritativeServerBootstrapStageOrchestrator";
@@ -35,35 +36,61 @@ describe("AuthoritativeServerBootstrapStageOrchestrator", () => {
       parentSpan: rootSpan,
     });
     const observedStageIds: string[] = [];
+    const initialStatus = orchestrator.getStatus();
+    expect(initialStatus.stages.map((stage) => stage.state)).toEqual([
+      AuthoritativeServerStartupStageStates.pending,
+      AuthoritativeServerStartupStageStates.pending,
+      AuthoritativeServerStartupStageStates.pending,
+      AuthoritativeServerStartupStageStates.pending,
+    ]);
+    expect(initialStatus.stages.map((stage) => stage.stageId)).toEqual([
+      AuthoritativeServerBootstrapStageIds.services,
+      AuthoritativeServerBootstrapStageIds.security,
+      AuthoritativeServerBootstrapStageIds.persistence,
+      AuthoritativeServerBootstrapStageIds.transport,
+    ]);
 
     await orchestrator.runStage({
       stageId: AuthoritativeServerBootstrapStageIds.services,
       run: () => {
         observedStageIds.push(AuthoritativeServerBootstrapStageIds.services);
+        const status = orchestrator.getStatus();
+        expect(status.stages[0]?.state).toBe(AuthoritativeServerStartupStageStates.running);
+        expect(status.stages[1]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
         now += 5;
       },
     });
+    expect(orchestrator.getStatus().stages[0]?.state).toBe(AuthoritativeServerStartupStageStates.success);
     await orchestrator.runStage({
       stageId: AuthoritativeServerBootstrapStageIds.security,
       run: () => {
         observedStageIds.push(AuthoritativeServerBootstrapStageIds.security);
+        const status = orchestrator.getStatus();
+        expect(status.stages[1]?.state).toBe(AuthoritativeServerStartupStageStates.running);
         now += 5;
       },
     });
+    expect(orchestrator.getStatus().stages[1]?.state).toBe(AuthoritativeServerStartupStageStates.success);
     await orchestrator.runStage({
       stageId: AuthoritativeServerBootstrapStageIds.persistence,
       run: () => {
         observedStageIds.push(AuthoritativeServerBootstrapStageIds.persistence);
+        const status = orchestrator.getStatus();
+        expect(status.stages[2]?.state).toBe(AuthoritativeServerStartupStageStates.running);
         now += 5;
       },
     });
+    expect(orchestrator.getStatus().stages[2]?.state).toBe(AuthoritativeServerStartupStageStates.success);
     await orchestrator.runStage({
       stageId: AuthoritativeServerBootstrapStageIds.transport,
       run: () => {
         observedStageIds.push(AuthoritativeServerBootstrapStageIds.transport);
+        const status = orchestrator.getStatus();
+        expect(status.stages[3]?.state).toBe(AuthoritativeServerStartupStageStates.running);
         now += 5;
       },
     });
+    expect(orchestrator.getStatus().stages[3]?.state).toBe(AuthoritativeServerStartupStageStates.success);
     rootSpan.complete();
 
     expect(observedStageIds).toEqual([
@@ -107,5 +134,28 @@ describe("AuthoritativeServerBootstrapStageOrchestrator", () => {
       stageId: AuthoritativeServerBootstrapStageIds.security,
       run: () => {},
     })).rejects.toThrow(AuthoritativeServerBootstrapStageOrchestratorError);
+  });
+
+  it("marks stage as failed and leaves later stages pending when execution errors", async () => {
+    const tracer = createStartupTracer({
+      traceId: "stage-orchestrator-stage-failure-trace",
+      startupReason: "stage-orchestrator-stage-failure",
+    });
+    const orchestrator = createAuthoritativeServerBootstrapStageOrchestrator({
+      tracer,
+    });
+
+    await expect(orchestrator.runStage({
+      stageId: AuthoritativeServerBootstrapStageIds.services,
+      run: () => {
+        throw new Error("services failed");
+      },
+    })).rejects.toThrow("services failed");
+
+    const status = orchestrator.getStatus();
+    expect(status.stages[0]?.state).toBe(AuthoritativeServerStartupStageStates.failed);
+    expect(status.stages[1]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
+    expect(status.stages[2]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
+    expect(status.stages[3]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
   });
 });

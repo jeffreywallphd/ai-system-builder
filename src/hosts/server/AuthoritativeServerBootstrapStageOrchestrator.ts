@@ -17,7 +17,28 @@ interface AuthoritativeServerBootstrapStageOrchestratorStageState {
   readonly totalStages: number;
 }
 
+export const AuthoritativeServerStartupStageStates = Object.freeze({
+  pending: "pending",
+  running: "running",
+  success: "success",
+  failed: "failed",
+});
+
+export type AuthoritativeServerStartupStageState =
+  typeof AuthoritativeServerStartupStageStates[keyof typeof AuthoritativeServerStartupStageStates];
+
+export interface AuthoritativeServerStartupStageStatus {
+  readonly stageId: AuthoritativeServerBootstrapStageId;
+  readonly sequence: number;
+  readonly state: AuthoritativeServerStartupStageState;
+}
+
+export interface AuthoritativeServerBootstrapStatus {
+  readonly stages: ReadonlyArray<AuthoritativeServerStartupStageStatus>;
+}
+
 export interface AuthoritativeServerBootstrapStageOrchestrator {
+  getStatus(): AuthoritativeServerBootstrapStatus;
   runStage<TResult>(input: {
     readonly stageId: AuthoritativeServerBootstrapStageId;
     readonly metadata?: Readonly<Record<string, unknown>>;
@@ -74,9 +95,22 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
   readonly stageOrder?: ReadonlyArray<AuthoritativeServerBootstrapStageId>;
 }): AuthoritativeServerBootstrapStageOrchestrator {
   const orderedStages = normalizeStartupStageOrder(input.stageOrder);
+  const stageStates = new Map<AuthoritativeServerBootstrapStageId, AuthoritativeServerStartupStageState>();
+  for (const stageId of orderedStages) {
+    stageStates.set(stageId, AuthoritativeServerStartupStageStates.pending);
+  }
   let nextStageIndex = 0;
 
   return Object.freeze({
+    getStatus(): AuthoritativeServerBootstrapStatus {
+      return Object.freeze({
+        stages: Object.freeze(orderedStages.map((stageId, index) => Object.freeze({
+          stageId,
+          sequence: index + 1,
+          state: stageStates.get(stageId) ?? AuthoritativeServerStartupStageStates.pending,
+        }))),
+      });
+    },
     async runStage<TResult>(stageInput: {
       readonly stageId: AuthoritativeServerBootstrapStageId;
       readonly metadata?: Readonly<Record<string, unknown>>;
@@ -104,6 +138,7 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
         sequence: nextStageIndex,
         totalStages: orderedStages.length,
       });
+      stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.running);
       const span = input.parentSpan?.startChild(stageInput.stageId, {
         metadata: createStageMetadata(stageState, stageInput.metadata),
       }) ?? input.tracer.startSpan(stageInput.stageId, {
@@ -117,9 +152,11 @@ export function createAuthoritativeServerBootstrapStageOrchestrator(input: {
           totalStages: stageState.totalStages,
         });
         span.complete();
+        stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.success);
         return result;
       } catch (error) {
         span.fail(error);
+        stageStates.set(stageInput.stageId, AuthoritativeServerStartupStageStates.failed);
         throw error;
       }
     },

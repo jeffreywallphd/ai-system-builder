@@ -74,6 +74,14 @@ Story 1.2.3 adds a dedicated stage orchestrator in `src/hosts/server/Authoritati
 
 The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
 
+Story 1.3.1 introduces a startup status model at the same orchestrator seam. `createAuthoritativeServerBootstrapStageOrchestrator(...)` now exposes `getStatus()` with ordered stage entries whose state is one of:
+- `pending`
+- `running`
+- `success`
+- `failed`
+
+This status snapshot is available programmatically during and after staged startup execution.
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `services`
 - `security`
