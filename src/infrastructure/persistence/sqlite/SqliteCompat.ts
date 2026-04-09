@@ -35,10 +35,25 @@ type BetterSqlite3Database = {
 export function openSqliteCompatDatabase(databasePath: string): SqliteCompatDatabase {
   try {
     const BetterSqlite3 = require("better-sqlite3") as new (path: string) => BetterSqlite3Database;
-    return BetterSqlite3 ? createBetterSqlite3Database(databasePath, BetterSqlite3) : openBunSqliteDatabase(databasePath);
+    if (BetterSqlite3) {
+      return createBetterSqlite3Database(databasePath, BetterSqlite3);
+    }
   } catch {
+    // Continue through compatible fallbacks.
+  }
+
+  const nodeSqlite = openNodeSqliteDatabase(databasePath);
+  if (nodeSqlite) {
+    return nodeSqlite;
+  }
+
+  if (isBunRuntime()) {
     return openBunSqliteDatabase(databasePath);
   }
+
+  throw new Error(
+    `Unable to initialize SQLite database '${databasePath}'. Could not load 'better-sqlite3' and Bun SQLite is unavailable in Node/Electron runtime.`,
+  );
 }
 
 function createBetterSqlite3Database(
@@ -69,6 +84,32 @@ function openBunSqliteDatabase(databasePath: string): SqliteCompatDatabase {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to initialize SQLite database '${databasePath}'. ${message}`);
+  }
+}
+
+function isBunRuntime(): boolean {
+  return typeof process !== "undefined" && typeof process.versions?.bun === "string";
+}
+
+function openNodeSqliteDatabase(databasePath: string): SqliteCompatDatabase | undefined {
+  try {
+    type NodeSqliteModule = {
+      readonly DatabaseSync: new (path: string) => {
+        exec(sql: string): void;
+        prepare(sql: string): {
+          run(...params: ReadonlyArray<unknown>): { changes?: number };
+          get(...params: ReadonlyArray<unknown>): unknown;
+          all(...params: ReadonlyArray<unknown>): ReadonlyArray<unknown>;
+        };
+        close(): void;
+      };
+    };
+
+    const sqlite = require("node:sqlite") as NodeSqliteModule;
+    const database = new sqlite.DatabaseSync(databasePath);
+    return new NodeSqliteCompatDatabase(database);
+  } catch {
+    return undefined;
   }
 }
 
@@ -128,6 +169,78 @@ class BunSqliteCompatDatabase implements SqliteCompatDatabase {
 
   public transaction<T>(operation: () => T): () => T {
     return this.database.transaction(operation);
+  }
+
+  public close(): void {
+    this.database.close();
+  }
+}
+
+class NodeSqliteCompatDatabase implements SqliteCompatDatabase {
+  public constructor(
+    private readonly database: {
+      exec(sql: string): void;
+      prepare(sql: string): {
+        run(...params: ReadonlyArray<unknown>): { changes?: number };
+        get(...params: ReadonlyArray<unknown>): unknown;
+        all(...params: ReadonlyArray<unknown>): ReadonlyArray<unknown>;
+      };
+      close(): void;
+    },
+  ) {}
+
+  private isNamedParameterRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
+  public pragma(value: string): void {
+    this.database.exec(`PRAGMA ${value};`);
+  }
+
+  public exec(sql: string): void {
+    this.database.exec(sql);
+  }
+
+  public prepare(sql: string): SqliteCompatStatement {
+    const statement = this.database.prepare(sql);
+    return {
+      run: (...params: ReadonlyArray<unknown>) => {
+        const result = params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.run(params[0])
+          : params.length > 0
+            ? statement.run(...params)
+            : statement.run();
+        return Object.freeze({ changes: result.changes ?? 0 });
+      },
+      get: (...params: ReadonlyArray<unknown>) => (
+        params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.get(params[0])
+          : params.length > 0
+            ? statement.get(...params)
+            : statement.get()
+      ),
+      all: (...params: ReadonlyArray<unknown>) => (
+        params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.all(params[0])
+          : params.length > 0
+            ? statement.all(...params)
+            : statement.all()
+      ),
+    };
+  }
+
+  public transaction<T>(operation: () => T): () => T {
+    return () => {
+      this.database.exec("BEGIN IMMEDIATE;");
+      try {
+        const result = operation();
+        this.database.exec("COMMIT;");
+        return result;
+      } catch (error) {
+        this.database.exec("ROLLBACK;");
+        throw error;
+      }
+    };
   }
 
   public close(): void {
