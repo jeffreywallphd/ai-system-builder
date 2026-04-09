@@ -171,7 +171,7 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
             <p className="ui-auth-page__error" role="status">Session context could not be initialized from the server. Verify API connectivity and sign in again.</p>
           ) : null}
           {authNotice === "session-bootstrap-timeout" ? (
-            <p className="ui-auth-page__error" role="status">Saved sign-in verification took too long. Sign in again to continue.</p>
+            <p className="ui-auth-page__error" role="status">Previous session verification took too long. Sign in again to continue.</p>
           ) : null}
 
           <div className="ui-page__actions">

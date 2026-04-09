@@ -16,6 +16,11 @@ import {
 type AppAuthNotice = "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
 
 const StillWorkingThresholdMs = 6_000;
+const InitializationProgressLogMaxEntries = 40;
+
+interface InitializationProgressLogEntry extends AppInitializationProgressUpdate {
+  readonly occurredAt: number;
+}
 
 export interface AppProps {
   readonly isAuthenticated?: boolean;
@@ -45,6 +50,7 @@ export default function App({
     }
     return Object.freeze({ stageId: AppInitializationStageIds.loadingSavedSession });
   });
+  const [initializationProgressLog, setInitializationProgressLog] = useState<ReadonlyArray<InitializationProgressLogEntry>>(() => []);
   const [initializationProgressUpdatedAt, setInitializationProgressUpdatedAt] = useState<number>(() => Date.now());
   const [isInitializationStillWorking, setIsInitializationStillWorking] = useState<boolean>(false);
   const [isAuthBootstrapPending, setIsAuthBootstrapPending] = useState<boolean>(() => {
@@ -62,6 +68,13 @@ export default function App({
       setInitializationProgress(Object.freeze({
         stageId: isAuthenticated ? AppInitializationStageIds.ready : AppInitializationStageIds.readyForSignIn,
       }));
+      setInitializationProgressLog((current) => appendInitializationProgressLog(
+        current,
+        Object.freeze({
+          stageId: isAuthenticated ? AppInitializationStageIds.ready : AppInitializationStageIds.readyForSignIn,
+          occurredAt: Date.now(),
+        }),
+      ));
       setInitializationProgressUpdatedAt(Date.now());
       setIsInitializationStillWorking(false);
     }
@@ -91,15 +104,24 @@ export default function App({
       if (cancelled) {
         return;
       }
+      const timestamp = Date.now();
       setInitializationProgress(progress);
-      setInitializationProgressUpdatedAt(Date.now());
+      setInitializationProgressLog((current) => appendInitializationProgressLog(
+        current,
+        Object.freeze({
+          stageId: progress.stageId,
+          detail: progress.detail,
+          occurredAt: timestamp,
+        }),
+      ));
+      setInitializationProgressUpdatedAt(timestamp);
       setIsInitializationStillWorking(false);
     };
 
     if (!sessionStore.hasSession()) {
       publishInitializationProgress({
         stageId: AppInitializationStageIds.readyForSignIn,
-        detail: "No saved sign-in was found on this device.",
+        detail: "No previous session was found on this device.",
       });
       setIsAuthBootstrapPending(false);
       return () => {
@@ -135,7 +157,7 @@ export default function App({
         publishInitializationProgress({
           stageId: AppInitializationStageIds.readyForSignIn,
           detail: result.reason === IdentitySessionUnauthenticatedReason.missingSession
-            ? "No saved sign-in was found on this device."
+            ? "No previous session was found on this device."
             : result.error?.message,
         });
       }
@@ -235,36 +257,66 @@ export default function App({
   if (isAuthBootstrapPending) {
     const stagePresentation = getAppInitializationStagePresentation(initializationProgress.stageId);
     const currentStageIndex = AppInitializationStageOrder.indexOf(initializationProgress.stageId);
+    const terminalEntries = initializationProgressLog.map((entry, index) => {
+      const stage = getAppInitializationStagePresentation(entry.stageId);
+      const stageIndex = AppInitializationStageOrder.indexOf(entry.stageId);
+      const status = stageIndex < currentStageIndex
+        ? "complete"
+        : entry.stageId === initializationProgress.stageId
+          ? "current"
+          : "pending";
+      return Object.freeze({
+        id: `${entry.stageId}-${entry.occurredAt}-${index}`,
+        timestamp: new Date(entry.occurredAt).toLocaleTimeString([], { hour12: false }),
+        message: entry.detail ?? stage.subtitle,
+        status,
+      });
+    });
     return (
       <section className="ui-page ui-auth-page">
         <div className="ui-auth-card ui-card">
           <div className="ui-card__header">
             <h1 className="ui-card__title">{stagePresentation.title}</h1>
             <p className="ui-card__subtitle">{stagePresentation.subtitle}</p>
-            {initializationProgress.detail ? (
-              <p className="ui-auth-page__progress-detail" role="status" aria-live="polite">{initializationProgress.detail}</p>
-            ) : null}
-            {isInitializationStillWorking ? (
-              <p className="ui-auth-page__progress-still-working" role="status" aria-live="polite">Still working on setup...</p>
-            ) : null}
           </div>
-          <ol className="ui-auth-page__progress-steps" aria-label="Initialization progress">
-            {AppInitializationStageOrder.slice(0, 7).map((stageId, index) => {
-              const stage = getAppInitializationStagePresentation(stageId);
-              const isCurrent = stageId === initializationProgress.stageId;
-              const isComplete = index < currentStageIndex;
-              const className = isCurrent
-                ? "ui-auth-page__progress-step ui-auth-page__progress-step--current"
-                : isComplete
-                  ? "ui-auth-page__progress-step ui-auth-page__progress-step--complete"
-                  : "ui-auth-page__progress-step";
-              return (
-                <li key={stageId} className={className}>
-                  {stage.title}
-                </li>
-              );
-            })}
-          </ol>
+          <div className="ui-auth-page__progress-layout">
+            <div>
+              {initializationProgress.detail ? (
+                <p className="ui-auth-page__progress-detail" role="status" aria-live="polite">{initializationProgress.detail}</p>
+              ) : null}
+              {isInitializationStillWorking ? (
+                <p className="ui-auth-page__progress-still-working" role="status" aria-live="polite">Still working on setup...</p>
+              ) : null}
+              <ol className="ui-auth-page__progress-steps" aria-label="Initialization progress">
+                {AppInitializationStageOrder.slice(0, 7).map((stageId, index) => {
+                  const stage = getAppInitializationStagePresentation(stageId);
+                  const isCurrent = stageId === initializationProgress.stageId;
+                  const isComplete = index < currentStageIndex;
+                  const className = isCurrent
+                    ? "ui-auth-page__progress-step ui-auth-page__progress-step--current"
+                    : isComplete
+                      ? "ui-auth-page__progress-step ui-auth-page__progress-step--complete"
+                      : "ui-auth-page__progress-step";
+                  return (
+                    <li key={stageId} className={className}>
+                      {stage.title}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+            <aside className="ui-auth-page__progress-terminal" aria-live="polite" aria-label="Initialization activity log">
+              <p className="ui-auth-page__progress-terminal-title">$ startup-log</p>
+              <ul className="ui-auth-page__progress-terminal-lines">
+                {terminalEntries.map((entry) => (
+                  <li key={entry.id} className={`ui-auth-page__progress-terminal-line ui-auth-page__progress-terminal-line--${entry.status}`}>
+                    <span className="ui-auth-page__progress-terminal-time">[{entry.timestamp}]</span>
+                    <span className="ui-auth-page__progress-terminal-message">{entry.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          </div>
         </div>
       </section>
     );
@@ -279,4 +331,16 @@ export default function App({
       {router}
     </AppProviders>
   );
+}
+
+function appendInitializationProgressLog(
+  current: ReadonlyArray<InitializationProgressLogEntry>,
+  entry: InitializationProgressLogEntry,
+): ReadonlyArray<InitializationProgressLogEntry> {
+  const previous = current[current.length - 1];
+  if (previous && previous.stageId === entry.stageId && previous.detail === entry.detail) {
+    return current;
+  }
+  const next = [...current, Object.freeze(entry)];
+  return Object.freeze(next.slice(Math.max(0, next.length - InitializationProgressLogMaxEntries)));
 }
