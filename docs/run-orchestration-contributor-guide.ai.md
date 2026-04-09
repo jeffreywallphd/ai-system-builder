@@ -30,6 +30,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 - `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`
+- `docs/architecture/image-manipulation-feature-5-final-baseline.md`
 
 ## Required workflow
 - Update shared run contracts/schemas first.

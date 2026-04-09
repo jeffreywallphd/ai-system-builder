@@ -43,6 +43,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 - `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`
+- `docs/architecture/image-manipulation-feature-5-final-baseline.md`
 
 ## Required implementation path
 
