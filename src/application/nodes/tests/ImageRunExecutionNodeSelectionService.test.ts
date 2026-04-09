@@ -16,6 +16,11 @@ import {
 } from "@domain/nodes/NodeTrustDomain";
 import { ImageRunExecutionNodeSelectionOutcomes } from "@application/nodes/ports/ExecutionNodeManagementPorts";
 import type { ExecutionNodeListQuery } from "@application/nodes/ports/ExecutionNodeManagementPorts";
+import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditEvent,
+  type ExecutionNodeManagementAuditSink,
+} from "@application/nodes/ports/ExecutionNodeManagementAuditPorts";
 import { ImageRunNodeEligibilityEvaluationService } from "@application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService";
 import { ImageRunExecutionNodeSelectionService } from "@application/nodes/use-cases/ImageRunExecutionNodeSelectionService";
 
@@ -28,6 +33,14 @@ class InMemoryNodeRepository {
 
   public async listExecutionNodes(_query: ExecutionNodeListQuery): Promise<ReadonlyArray<ExecutionNodeRecord>> {
     return Object.freeze([...this.records.values()]);
+  }
+}
+
+class CapturingExecutionNodeManagementAuditSink implements ExecutionNodeManagementAuditSink {
+  public readonly events: ExecutionNodeManagementAuditEvent[] = [];
+
+  public async recordExecutionNodeManagementAuditEvent(event: ExecutionNodeManagementAuditEvent): Promise<void> {
+    this.events.push(event);
   }
 }
 
@@ -96,6 +109,7 @@ function createExecutionNode(input: {
 describe("ImageRunExecutionNodeSelectionService", () => {
   it("selects deterministically from multiple eligible nodes by advisory and finding weight", async () => {
     const repository = new InMemoryNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     repository.records.set("node-beta", createExecutionNode({
       nodeId: "node-beta",
       backendReadinessState: ExecutionNodeBackendReadinessStates.degraded,
@@ -111,6 +125,7 @@ describe("ImageRunExecutionNodeSelectionService", () => {
     });
     const selectionService = new ImageRunExecutionNodeSelectionService({
       eligibilityService,
+      auditSink,
     });
 
     const decision = await selectionService.selectExecutionNodeForRun({
@@ -129,6 +144,9 @@ describe("ImageRunExecutionNodeSelectionService", () => {
     expect(decision.candidates).toHaveLength(2);
     expect(decision.candidates[0]?.nodeId).toBe("node-alpha");
     expect(decision.candidates[1]?.nodeId).toBe("node-beta");
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.type).toBe(ExecutionNodeManagementAuditEventTypes.executionNodeSelectionEvaluated);
+    expect(auditSink.events[0]?.outcome).toBe("success");
   });
 
   it("uses nodeId tie-break ordering when eligible candidates have identical findings", async () => {
@@ -196,6 +214,7 @@ describe("ImageRunExecutionNodeSelectionService", () => {
 
   it("returns no-candidate-nodes when candidate filters resolve to no known nodes", async () => {
     const repository = new InMemoryNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     repository.records.set("node-available", createExecutionNode({
       nodeId: "node-available",
     }));
@@ -205,6 +224,7 @@ describe("ImageRunExecutionNodeSelectionService", () => {
     });
     const selectionService = new ImageRunExecutionNodeSelectionService({
       eligibilityService,
+      auditSink,
     });
 
     const decision = await selectionService.selectExecutionNodeForRun({
@@ -216,5 +236,7 @@ describe("ImageRunExecutionNodeSelectionService", () => {
     expect(decision.outcome).toBe(ImageRunExecutionNodeSelectionOutcomes.noCandidateNodes);
     expect(decision.selectedNodeId).toBeUndefined();
     expect(decision.candidates).toEqual([]);
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.outcome).toBe("rejected");
   });
 });

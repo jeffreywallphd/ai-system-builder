@@ -57,6 +57,7 @@ import {
 } from "@infrastructure/audit/AuditFanoutPublishers";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "@infrastructure/audit/AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "@infrastructure/audit/AuthoritativeNodeTrustAuditSink";
+import { AuthoritativeExecutionNodeManagementAuditSink } from "@infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/audit/AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
@@ -497,6 +498,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       nodeTrustAuditRecorder,
       new AuthoritativeNodeTrustAuditSink(authoritativeAuditRecorder),
     ]);
+    const executionNodeManagementAuditSink = new AuthoritativeExecutionNodeManagementAuditSink(authoritativeAuditRecorder);
     const sessionTrustService = new TrustedDeviceSessionTrustService({
       trustedDeviceRepository,
       policies: sessionTrustPolicies,
@@ -928,6 +930,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     setExecutionNodeAvailabilityOverrideUseCase: new SetExecutionNodeAvailabilityOverrideUseCase({
       nodeRepository: executionNodeRepository,
+      auditSink: executionNodeManagementAuditSink,
     }),
     eligibilityService: new ImageRunNodeEligibilityEvaluationService({
       nodeRepository: executionNodeRepository,
@@ -1160,6 +1163,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   });
   const imageRunExecutionNodeSelectionService = new ImageRunExecutionNodeSelectionService({
     eligibilityService: imageRunNodeEligibilityEvaluationService,
+    auditSink: executionNodeManagementAuditSink,
   });
   const getImageManipulationExecutionReadinessUseCase = new GetImageManipulationExecutionReadinessUseCase({
     capabilityPort: options.runExecutionAdapters?.capabilityProbePort,

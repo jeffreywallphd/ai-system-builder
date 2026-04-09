@@ -7,6 +7,7 @@ Story 18.1.5 wires this service into baseline high-risk security flows.
 Story 18.1.6 expands baseline governance capture for storage, protected asset access, and secret configuration events.
 Story 18.1.7 extends baseline orchestration/sharing governance capture for run launch/mutation and publication-related policy events.
 Story 18.3.4 adds interrupted-write outcome resolution and startup reconciliation seams for append-path reliability.
+Story 5.4.3 extends authoritative audit adapter usage to execution-node management and node-selection assignment/readiness actions.
 
 ## Canonical files
 
@@ -22,6 +23,7 @@ Story 18.3.4 adds interrupted-write outcome resolution and startup reconciliatio
 - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
 - `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
+- `src/infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -76,6 +78,13 @@ Story 18.1.7 composition/wiring now:
 - adds authoritative adapter seam for audit-channel scheduling governance events
 - maps published resource-policy mutations to publication-oriented sharing action (`share.resource.publication.updated`)
 
+Story 5.4.3 composition/wiring now:
+
+- execution-node management use-cases emit best-effort sanitized audit events (registration, activation, availability override, backend refresh).
+- node-selection service emits assignment/readiness selection outcome audit events with run/workspace context.
+- `AuthoritativeExecutionNodeManagementAuditSink` maps node-management events to `node.*` actions and selection events to `run.*` actions through the authoritative recorder.
+- execution-node audit payloads redact endpoint/configuration/connection-sensitive keys before authoritative emission.
+
 ## Why this matters
 
 - Audit recording is now a reusable application capability.
@@ -93,4 +102,5 @@ Story 18.1.7 composition/wiring now:
 - adapter integration tests for protected asset download access events
 - adapter integration tests for secret access-decision and operation event mapping
 - adapter integration tests for run submission and scheduling governance authoritative mapping
+- adapter integration tests for execution-node management + node-selection authoritative mapping
 - run-use-case tests validating authoritative run cancellation/retry/scheduling-admin emission

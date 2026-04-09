@@ -1,6 +1,6 @@
 # Authoritative Audit Recording Service and Ports
 
-This note captures Story 18.1.3, Story 18.1.5, Story 18.1.6, Story 18.1.7, and Story 18.3.4 for Feature 18.
+This note captures Story 18.1.3, Story 18.1.5, Story 18.1.6, Story 18.1.7, Story 18.3.4, and Story 5.4.3 for Feature 18/Feature 5 audit integration seams.
 
 ## Scope
 
@@ -37,6 +37,11 @@ Story 18.1.7 extends baseline orchestration and governance capture for run and s
 - scheduling governance audit-channel events have an authoritative adapter seam
 - resource-policy sharing mutations emit publication-oriented actions when published posture is involved
 
+Story 5.4.3 extends execution-node governance capture:
+
+- execution-node management lifecycle actions (register, activate, availability override, backend-state refresh) emit authoritative audit events from application use-case boundaries
+- run/readiness node-selection evaluation emits assignment-governance audit events through the same authoritative service
+
 ## Canonical files
 
 - `src/application/audit/ports/AuthoritativeAuditRecordingPorts.ts`
@@ -51,6 +56,7 @@ Story 18.1.7 extends baseline orchestration and governance capture for run and s
 - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
 - `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`
 - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
+- `src/infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink.ts`
 - `src/infrastructure/audit/AuditFanoutPublishers.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
 - `src/hosts/server/IdentityServerHost.ts`
@@ -135,6 +141,13 @@ Story 18.1.7 integration adds baseline run orchestration and governance wiring:
 - `AuthoritativeSchedulingGovernanceEventSink` maps audit-channel scheduler events into canonical run/scheduling orchestration actions.
 - `AuthoritativeAuthorizationPolicyEventRecorder` maps published resource-policy posture to `share.resource.publication.updated` for publication-related governance visibility.
 
+Story 5.4.3 integration adds execution-node governance wiring:
+
+- `ExecutionNodeManagementAuditPorts` defines sanitized best-effort application audit emission contracts for node-management and selection outcomes.
+- `AuthoritativeExecutionNodeManagementAuditSink` maps execution-node management events to canonical `node.*` actions and node-selection outcomes to canonical `run.*` actions.
+- `IdentityServerHost` wires execution-node management and node-selection services to this authoritative sink so API/use-case actions participate in durable governance recording.
+- execution-node audit payload redaction drops sensitive endpoint/configuration/connection fields before authoritative append.
+
 ## Tests
 
 `src/application/audit/tests/AuthoritativeAuditRecordingService.test.ts` covers:
@@ -155,3 +168,4 @@ Story 18.1.7 integration adds baseline run orchestration and governance wiring:
 - secret audit-hook adapter emission for secret access-decision and operation events
 - run submission adapter emission for canonical orchestration run lifecycle actions
 - scheduling governance adapter emission for canonical orchestration scheduling actions
+- execution-node management and node-selection adapter emission for canonical node/run governance actions with redaction-safe details

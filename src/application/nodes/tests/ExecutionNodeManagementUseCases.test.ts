@@ -27,6 +27,11 @@ import type {
   UpdateExecutionNodeHealthInput,
 } from "../ports/ExecutionNodeManagementPorts";
 import type { ExecutionNodeManagementAuthorizationHook } from "../ports/ExecutionNodeManagementAuthorizationPorts";
+import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditEvent,
+  type ExecutionNodeManagementAuditSink,
+} from "../ports/ExecutionNodeManagementAuditPorts";
 import { ActivateExecutionNodeUseCase } from "../use-cases/ActivateExecutionNodeUseCase";
 import { RegisterExecutionNodeUseCase } from "../use-cases/RegisterExecutionNodeUseCase";
 import { ExecutionNodeManagementUseCaseErrorCodes } from "../use-cases/ExecutionNodeManagementUseCaseShared";
@@ -195,6 +200,14 @@ class InMemoryExecutionNodeRepository implements IExecutionNodeRepository {
   }
 }
 
+class CapturingExecutionNodeManagementAuditSink implements ExecutionNodeManagementAuditSink {
+  public readonly events: ExecutionNodeManagementAuditEvent[] = [];
+
+  public async recordExecutionNodeManagementAuditEvent(event: ExecutionNodeManagementAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createRegistrationRequest(input?: {
   readonly nodeId?: string;
   readonly displayName?: string;
@@ -252,8 +265,10 @@ function createDenyingAuthorizationHook(input: {
 describe("execution node management application use-cases", () => {
   it("registers execution nodes durably and returns dto-ready summaries", async () => {
     const repository = new InMemoryExecutionNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     const useCase = new RegisterExecutionNodeUseCase({
       nodeRepository: repository,
+      auditSink,
     });
 
     const result = await useCase.execute(createRegistrationRequest());
@@ -266,6 +281,9 @@ describe("execution node management application use-cases", () => {
     expect(result.value.node.backendFamilies).toEqual(["comfyui"]);
     expect(result.value.node.endpointRef).toBe("node://comfy-001");
     expect(repository.records.has("node-comfy-001")).toBeTrue();
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.type).toBe(ExecutionNodeManagementAuditEventTypes.executionNodeRegistered);
+    expect(auditSink.events[0]?.outcome).toBe("success");
   });
 
   it("rejects duplicate execution node registration", async () => {
@@ -306,11 +324,14 @@ describe("execution node management application use-cases", () => {
 
   it("activates approved and trusted execution nodes", async () => {
     const repository = new InMemoryExecutionNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     const register = new RegisterExecutionNodeUseCase({
       nodeRepository: repository,
+      auditSink,
     });
     const activate = new ActivateExecutionNodeUseCase({
       nodeRepository: repository,
+      auditSink,
     });
 
     await register.execute(createRegistrationRequest({
@@ -337,6 +358,7 @@ describe("execution node management application use-cases", () => {
     expect(activated.value.node.health.healthStatus).toBe(ExecutionNodeHealthStatuses.ready);
     const stored = await repository.findExecutionNodeById("node-activation-1");
     expect(stored?.activationStatus).toBe(ExecutionNodeActivationStatuses.active);
+    expect(auditSink.events.some((event) => event.type === ExecutionNodeManagementAuditEventTypes.executionNodeActivated)).toBeTrue();
   });
 
   it("rejects activation when trust posture is not eligible", async () => {

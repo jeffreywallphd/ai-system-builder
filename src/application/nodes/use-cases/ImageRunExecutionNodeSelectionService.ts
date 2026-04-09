@@ -11,9 +11,15 @@ import {
   type ImageRunNodeEligibilityResult,
   type ImageRunNodeEligibilityRunContext,
 } from "@application/nodes/ports/ExecutionNodeManagementPorts";
+import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditSink,
+  publishExecutionNodeManagementAuditEventBestEffort,
+} from "../ports/ExecutionNodeManagementAuditPorts";
 
 interface ImageRunExecutionNodeSelectionServiceDependencies {
   readonly eligibilityService: Pick<IImageRunNodeEligibilityEvaluationServicePort, "evaluateRunToCandidateNodes">;
+  readonly auditSink?: ExecutionNodeManagementAuditSink;
 }
 
 const StrategyId = "image-run-node-selection.v1.deterministic-eligible-first";
@@ -119,10 +125,15 @@ export class ImageRunExecutionNodeSelectionService implements IImageRunExecution
     });
 
     if (evaluations.length === 0) {
-      return buildNoCandidatesDecision({
+      const decision = buildNoCandidatesDecision({
         asOf,
         run,
       });
+      await this.publishSelectionAuditEvent({
+        run,
+        decision,
+      });
+      return decision;
     }
 
     const orderedEvaluations = evaluations
@@ -150,12 +161,17 @@ export class ImageRunExecutionNodeSelectionService implements IImageRunExecution
     const candidates = rankedEvaluations.map((evaluation, index) => toCandidate(evaluation, index + 1));
     const selectedEvaluation = rankedEvaluations.find((evaluation) => evaluation.eligible);
     if (!selectedEvaluation) {
-      return buildNoEligibleDecision({
+      const decision = buildNoEligibleDecision({
         asOf,
         run,
         candidates,
         evaluations: rankedEvaluations,
       });
+      await this.publishSelectionAuditEvent({
+        run,
+        decision,
+      });
+      return decision;
     }
 
     const selectedCandidate = candidates.find((candidate) => candidate.nodeId === selectedEvaluation.nodeId);
@@ -171,7 +187,7 @@ export class ImageRunExecutionNodeSelectionService implements IImageRunExecution
       }),
     ]);
 
-    return Object.freeze({
+    const decision = Object.freeze({
       run,
       asOf,
       strategyId: StrategyId,
@@ -180,6 +196,35 @@ export class ImageRunExecutionNodeSelectionService implements IImageRunExecution
       selectedCandidate,
       reasons,
       candidates: Object.freeze(candidates),
+    });
+    await this.publishSelectionAuditEvent({
+      run,
+      decision,
+    });
+    return decision;
+  }
+
+  private async publishSelectionAuditEvent(input: {
+    readonly run: ImageRunNodeEligibilityRunContext;
+    readonly decision: ImageRunExecutionNodeSelectionDecision;
+  }): Promise<void> {
+    await publishExecutionNodeManagementAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ExecutionNodeManagementAuditEventTypes.executionNodeSelectionEvaluated,
+      actorUserIdentityId: "service:run-node-selection",
+      occurredAt: input.decision.asOf,
+      runId: input.run.runId,
+      workspaceId: input.run.workspaceId,
+      nodeId: input.decision.selectedNodeId,
+      outcome: input.decision.outcome === ImageRunExecutionNodeSelectionOutcomes.selected
+        ? "success"
+        : "rejected",
+      details: Object.freeze({
+        strategyId: input.decision.strategyId,
+        outcome: input.decision.outcome,
+        selectedNodeId: input.decision.selectedNodeId,
+        candidateCount: input.decision.candidates.length,
+        reasonCodes: Object.freeze(input.decision.reasons.map((reason) => reason.code)),
+      }),
     });
   }
 }

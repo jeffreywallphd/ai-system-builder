@@ -27,6 +27,11 @@ import type {
   UpdateExecutionNodeHealthInput,
 } from "../ports/ExecutionNodeManagementPorts";
 import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditEvent,
+  type ExecutionNodeManagementAuditSink,
+} from "../ports/ExecutionNodeManagementAuditPorts";
+import {
   ExecutionNodeBackendRefreshClassifications,
   RefreshExecutionNodeBackendStateUseCase,
 } from "../use-cases/RefreshExecutionNodeBackendStateUseCase";
@@ -153,6 +158,14 @@ class StaticCapabilityProbePort implements IImageManipulationExecutionCapability
   }
 }
 
+class CapturingExecutionNodeManagementAuditSink implements ExecutionNodeManagementAuditSink {
+  public readonly events: ExecutionNodeManagementAuditEvent[] = [];
+
+  public async recordExecutionNodeManagementAuditEvent(event: ExecutionNodeManagementAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createExecutionNodeRecordFixture(input?: Partial<ExecutionNodeRecord>): ExecutionNodeRecord {
   return createExecutionNodeRecord({
     nodeId: input?.nodeId ?? "node-comfy-refresh-001",
@@ -215,6 +228,7 @@ function createProbeStatus(input: {
 describe("RefreshExecutionNodeBackendStateUseCase", () => {
   it("refreshes healthy backend probe results into ready node health and ready backend readiness", async () => {
     const repository = new InMemoryExecutionNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     await repository.registerExecutionNode({
       record: createExecutionNodeRecordFixture(),
       mutation: {
@@ -235,6 +249,7 @@ describe("RefreshExecutionNodeBackendStateUseCase", () => {
       idGenerator: {
         nextId: () => "mutation-id",
       },
+      auditSink,
     });
 
     const refreshed = await useCase.execute({
@@ -251,6 +266,9 @@ describe("RefreshExecutionNodeBackendStateUseCase", () => {
     expect(refreshed.value.classification).toBe(ExecutionNodeBackendRefreshClassifications.healthy);
     expect(refreshed.value.healthRefresh.record.healthStatus).toBe(ExecutionNodeHealthStatuses.ready);
     expect(refreshed.value.capabilityRefresh.record.backendFamilyCapabilities[0]?.executionReadiness?.state).toBe("ready");
+    expect(auditSink.events).toHaveLength(1);
+    expect(auditSink.events[0]?.type).toBe(ExecutionNodeManagementAuditEventTypes.executionNodeBackendStateRefreshed);
+    expect(auditSink.events[0]?.workspaceId).toBe("workspace-alpha");
   });
 
   it("refreshes degraded backend probe results into degraded node health and backend readiness", async () => {

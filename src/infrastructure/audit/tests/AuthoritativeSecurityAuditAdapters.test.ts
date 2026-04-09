@@ -14,6 +14,7 @@ import { AuthoritativeAuditRecordingService } from "@application/audit/use-cases
 import type { CanonicalAuditEvent } from "@domain/audit/AuditDomain";
 import { AuthoritativeIdentityLifecycleEventPublisher } from "../AuthoritativeIdentityLifecycleEventPublisher";
 import { AuthoritativeNodeTrustAuditSink } from "../AuthoritativeNodeTrustAuditSink";
+import { AuthoritativeExecutionNodeManagementAuditSink } from "../AuthoritativeExecutionNodeManagementAuditSink";
 import { AuthoritativeAuthorizationPolicyEventRecorder } from "../AuthoritativeAuthorizationPolicyEventRecorder";
 import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
@@ -133,6 +134,50 @@ describe("Authoritative security audit adapters", () => {
     expect(revokedEvent?.protectedResource?.resourceRef).toBe("node:gpu-west-1");
     expect(revokedEvent?.payload.adminOnlyDetails?.trustMaterialRef).toBe("[REDACTED]");
     expect(repository.events[1]?.action).toBe("node.availability.transitioned");
+  });
+
+  it("records execution-node management and run-assignment selection events through authoritative audit", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-08T09:10:00.000Z"),
+      idGenerator: () => "execution-node-management-1",
+    });
+    const sink = new AuthoritativeExecutionNodeManagementAuditSink(recorder);
+
+    await sink.recordExecutionNodeManagementAuditEvent({
+      type: "execution-node-availability-override-updated",
+      actorUserIdentityId: "user:ops-admin",
+      occurredAt: "2026-04-08T09:10:00.000Z",
+      workspaceId: "workspace:primary",
+      nodeId: "node:render-east-1",
+      outcome: "success",
+      details: Object.freeze({
+        action: "disable",
+        endpointRef: "node://render-east-1",
+      }),
+    });
+    await sink.recordExecutionNodeManagementAuditEvent({
+      type: "execution-node-selection-evaluated",
+      actorUserIdentityId: "service:run-node-selection",
+      occurredAt: "2026-04-08T09:10:01.000Z",
+      workspaceId: "workspace:primary",
+      runId: "run:image:001",
+      nodeId: "node:render-east-1",
+      outcome: "rejected",
+      details: Object.freeze({
+        reasonCodes: Object.freeze(["execution-node-no-eligible-match"]),
+      }),
+    });
+
+    expect(repository.events).toHaveLength(2);
+    expect(repository.events[0]?.action).toBe("node.execution.availability.override-updated");
+    expect(repository.events[0]?.scope.workspaceId).toBe("workspace:primary");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("node:render-east-1");
+    expect(repository.events[0]?.payload.adminOnlyDetails?.endpointRef).toBe("[REDACTED]");
+    expect(repository.events[1]?.action).toBe("run.node-assignment.selection.evaluated");
+    expect(repository.events[1]?.outcome).toBe("rejected");
+    expect(repository.events[1]?.protectedResource?.resourceRef).toBe("run:image:001");
   });
 
   it("records authorization sharing/permission mutations through authoritative audit with metadata redaction", async () => {

@@ -13,6 +13,11 @@ import type {
 import type { ExecutionNodeMutationResult, IExecutionNodeRepository } from "../ports/ExecutionNodeManagementPorts";
 import type { ExecutionNodeManagementAuthorizationHook } from "../ports/ExecutionNodeManagementAuthorizationPorts";
 import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditSink,
+  publishExecutionNodeManagementAuditEventBestEffort,
+} from "../ports/ExecutionNodeManagementAuditPorts";
+import {
   DefaultExecutionNodeManagementUseCaseIdGenerator,
   ExecutionNodeManagementUseCaseErrorCodes,
   type ExecutionNodeManagementUseCaseClock,
@@ -62,6 +67,7 @@ export interface RegisterExecutionNodeUseCaseResponse {
 interface RegisterExecutionNodeUseCaseDependencies {
   readonly nodeRepository: IExecutionNodeRepository;
   readonly authorizationHook?: ExecutionNodeManagementAuthorizationHook;
+  readonly auditSink?: ExecutionNodeManagementAuditSink;
   readonly idGenerator?: ExecutionNodeManagementUseCaseIdGenerator;
   readonly clock?: ExecutionNodeManagementUseCaseClock;
 }
@@ -160,6 +166,20 @@ export class RegisterExecutionNodeUseCase {
         expectedRevision: request.expectedRevision,
         reason: request.reason,
         correlationId: request.correlationId,
+      }),
+    });
+
+    await publishExecutionNodeManagementAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ExecutionNodeManagementAuditEventTypes.executionNodeRegistered,
+      actorUserIdentityId,
+      occurredAt: mutation.record.updatedAt,
+      nodeId: mutation.record.nodeId,
+      outcome: mutation.wasReplay ? "already-applied" : "success",
+      details: Object.freeze({
+        backendFamilies: Object.freeze(mutation.record.backendFamilyCapabilities.map((entry) => entry.backendFamily)),
+        activationStatus: mutation.record.activationStatus,
+        healthStatus: mutation.record.healthStatus,
+        nodeType: mutation.record.nodeType,
       }),
     });
 

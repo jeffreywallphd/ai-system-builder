@@ -17,6 +17,11 @@ import type {
   IExecutionNodeRepository,
 } from "../ports/ExecutionNodeManagementPorts";
 import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditSink,
+  publishExecutionNodeManagementAuditEventBestEffort,
+} from "../ports/ExecutionNodeManagementAuditPorts";
+import {
   DefaultExecutionNodeManagementUseCaseIdGenerator,
   ExecutionNodeManagementUseCaseErrorCodes,
   type ExecutionNodeManagementUseCaseClock,
@@ -65,6 +70,7 @@ export interface RefreshExecutionNodeBackendStateUseCaseResponse {
 interface RefreshExecutionNodeBackendStateUseCaseDependencies {
   readonly nodeRepository: IExecutionNodeRepository;
   readonly capabilityProbePort: IImageManipulationExecutionCapabilityPort;
+  readonly auditSink?: ExecutionNodeManagementAuditSink;
   readonly idGenerator?: ExecutionNodeManagementUseCaseIdGenerator;
   readonly clock?: ExecutionNodeManagementUseCaseClock;
 }
@@ -194,6 +200,21 @@ export class RefreshExecutionNodeBackendStateUseCase {
       nodeId,
       mutation: healthMutation,
       normalizedObservation,
+    });
+
+    await publishExecutionNodeManagementAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ExecutionNodeManagementAuditEventTypes.executionNodeBackendStateRefreshed,
+      actorUserIdentityId,
+      occurredAt: normalizedObservation.checkedAt,
+      nodeId,
+      workspaceId,
+      outcome: "success",
+      details: Object.freeze({
+        classification: normalizedObservation.classification,
+        healthStatus: normalizedObservation.healthStatus,
+        backendReadiness: normalizedObservation.backendReadiness,
+        reasonCode: normalizedObservation.details["reasonCode"],
+      }),
     });
 
     return {

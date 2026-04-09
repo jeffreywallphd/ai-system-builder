@@ -5,6 +5,7 @@
 - Feature 5: Node-Based Execution and Backend Management
 - Epic 5.4: API, Operational UX, Audit, and Feature-Readiness Verification
 - Story 5.4.1: Implement authoritative API endpoints for execution-node management and readiness
+- Story 5.4.3: Integrate audit events for execution-node management and assignment actions
 
 ## Purpose
 
@@ -23,6 +24,8 @@ Expose authoritative HTTP endpoints for execution-node inventory, availability c
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 - `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 - `src/hosts/server/IdentityServerHost.ts`
+- `src/application/nodes/ports/ExecutionNodeManagementAuditPorts.ts`
+- `src/infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink.ts`
 
 ## Authoritative endpoint surface
 
@@ -39,6 +42,9 @@ Expose authoritative HTTP endpoints for execution-node inventory, availability c
 - Business behavior delegates to application-layer use cases and eligibility services through `ExecutionNodeManagementBackendApi`.
 - Responses use stable DTO projections from shared contracts and avoid leaking adapter internals or protected references.
 - Actor identity is always sourced from authenticated session context at the transport boundary (payload spoofing is ignored).
+- Execution-node management and run-node-selection services now emit best-effort audit events at application boundaries.
+- Audit detail redaction removes sensitive connection/configuration fields (endpoint/config/URL/URI/token/credential style keys) before sink publication.
+- Audited management/readiness actions include node registration, node activation, availability override updates, backend-state refresh, and node-selection evaluation outcomes.
 
 ## Route-family and host integration
 
@@ -52,3 +58,6 @@ Expose authoritative HTTP endpoints for execution-node inventory, availability c
 - Backend API tests for list/get, availability override, readiness/eligibility, backend availability, and validation error mapping.
 - HTTP integration tests for authentication guards, query/body parsing, normalized request delegation, mutation behavior, and not-found mapping.
 - Route-registration catalog tests for execution-node-management route-family availability.
+- Node management audit port tests for redaction and best-effort behavior.
+- Use-case tests validating audit emission for registration/activation, availability override, backend refresh, and selection decisions.
+- Authoritative audit adapter integration tests validating canonical action mapping and redacted execution-node details.

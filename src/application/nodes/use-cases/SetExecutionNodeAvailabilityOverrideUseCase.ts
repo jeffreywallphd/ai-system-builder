@@ -7,6 +7,11 @@ import { NodeTrustStates } from "@domain/nodes/NodeTrustDomain";
 import type { ExecutionNodeMutationResult, IExecutionNodeRepository } from "../ports/ExecutionNodeManagementPorts";
 import type { ExecutionNodeManagementAuthorizationHook } from "../ports/ExecutionNodeManagementAuthorizationPorts";
 import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditSink,
+  publishExecutionNodeManagementAuditEventBestEffort,
+} from "../ports/ExecutionNodeManagementAuditPorts";
+import {
   DefaultExecutionNodeManagementUseCaseIdGenerator,
   ExecutionNodeManagementUseCaseErrorCodes,
   type ExecutionNodeManagementUseCaseClock,
@@ -49,6 +54,7 @@ export interface SetExecutionNodeAvailabilityOverrideUseCaseResponse {
 interface SetExecutionNodeAvailabilityOverrideUseCaseDependencies {
   readonly nodeRepository: IExecutionNodeRepository;
   readonly authorizationHook?: ExecutionNodeManagementAuthorizationHook;
+  readonly auditSink?: ExecutionNodeManagementAuditSink;
   readonly idGenerator?: ExecutionNodeManagementUseCaseIdGenerator;
   readonly clock?: ExecutionNodeManagementUseCaseClock;
 }
@@ -179,6 +185,19 @@ export class SetExecutionNodeAvailabilityOverrideUseCase {
       details: Object.freeze({
         action: request.action,
         ...(request.details ?? {}),
+      }),
+    });
+
+    await publishExecutionNodeManagementAuditEventBestEffort(this.dependencies.auditSink, {
+      type: ExecutionNodeManagementAuditEventTypes.executionNodeAvailabilityOverrideUpdated,
+      actorUserIdentityId,
+      occurredAt: normalizedChangedAt,
+      nodeId: mutation.record.nodeId,
+      outcome: mutation.wasReplay ? "already-applied" : "success",
+      details: Object.freeze({
+        action: request.action,
+        mode,
+        suppressedUntil,
       }),
     });
 
