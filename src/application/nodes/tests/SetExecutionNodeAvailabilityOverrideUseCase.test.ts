@@ -26,6 +26,11 @@ import type {
   UpdateExecutionNodeOperationalAvailabilityInput,
 } from "../ports/ExecutionNodeManagementPorts";
 import type { ExecutionNodeManagementAuthorizationHook } from "../ports/ExecutionNodeManagementAuthorizationPorts";
+import {
+  ExecutionNodeManagementAuditEventTypes,
+  type ExecutionNodeManagementAuditEvent,
+  type ExecutionNodeManagementAuditSink,
+} from "../ports/ExecutionNodeManagementAuditPorts";
 import { ListExecutionNodesUseCase } from "../use-cases/ListExecutionNodesUseCase";
 import {
   ExecutionNodeAvailabilityOverrideActions,
@@ -110,6 +115,14 @@ class InMemoryExecutionNodeRepository implements IExecutionNodeRepository {
   }
 }
 
+class CapturingExecutionNodeManagementAuditSink implements ExecutionNodeManagementAuditSink {
+  public readonly events: ExecutionNodeManagementAuditEvent[] = [];
+
+  public async recordExecutionNodeManagementAuditEvent(event: ExecutionNodeManagementAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createNode(nodeId: string): ExecutionNodeRecord {
   return createExecutionNodeRecord({
     nodeId,
@@ -151,6 +164,7 @@ function createAuthorizationHook(deny = false): ExecutionNodeManagementAuthoriza
 describe("SetExecutionNodeAvailabilityOverrideUseCase", () => {
   it("supports disable, enable, and temporary suppress availability overrides", async () => {
     const repository = new InMemoryExecutionNodeRepository();
+    const auditSink = new CapturingExecutionNodeManagementAuditSink();
     await repository.registerExecutionNode({
       record: createNode("node-override-1"),
       mutation: { operationKey: "seed:1", actorId: "system:test" },
@@ -164,6 +178,7 @@ describe("SetExecutionNodeAvailabilityOverrideUseCase", () => {
       idGenerator: {
         nextId: () => "override-mutation-id",
       },
+      auditSink,
     });
 
     const disabled = await useCase.execute({
@@ -205,6 +220,9 @@ describe("SetExecutionNodeAvailabilityOverrideUseCase", () => {
     }
     expect(enabled.value.node.operational.availabilityOverrideMode).toBe(ExecutionNodeOperationalAvailabilityModes.enabled);
     expect(enabled.value.node.operational.availabilitySuppressedUntil).toBeUndefined();
+    expect(auditSink.events.filter((event) => (
+      event.type === ExecutionNodeManagementAuditEventTypes.executionNodeAvailabilityOverrideUpdated
+    ))).toHaveLength(3);
   });
 
   it("requires suppressedUntil for suppress action and enforces authorization", async () => {

@@ -3,12 +3,15 @@
 ## Story scope
 
 Story 5.3.4 upgrades execution-readiness answers from backend-only health to authoritative run-aware readiness that includes actual node eligibility and availability.
+Story 5.4.3 adds audit capture for node-selection outcomes used by readiness and assignment workflows.
 
 ## Implemented files
 
 - `src/application/image-workflows/GetImageManipulationExecutionReadinessUseCase.ts`
 - `src/application/nodes/use-cases/ImageRunNodeEligibilityEvaluationService.ts`
 - `src/application/nodes/use-cases/ImageRunExecutionNodeSelectionService.ts`
+- `src/application/nodes/ports/ExecutionNodeManagementAuditPorts.ts`
+- `src/infrastructure/audit/AuthoritativeExecutionNodeManagementAuditSink.ts`
 - `src/hosts/server/IdentityServerHost.ts`
 - `src/infrastructure/api/runs/AuthoritativeRunQueryBackendApi.ts`
 - `src/shared/contracts/runtime/RunOrchestrationTransportContracts.ts`
@@ -34,3 +37,5 @@ Story 5.3.4 upgrades execution-readiness answers from backend-only health to aut
 - Eligibility truth stays in node-domain/application services.
 - Readiness composition stays in application layer.
 - API/schema surfaces expose normalized contracts only.
+- Node-selection decisions now emit audit events from application services with run/workspace context and selected-node outcome.
+- Sensitive connection/configuration details are redacted by the execution-node audit port before authoritative recording.
