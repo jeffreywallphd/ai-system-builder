@@ -43,6 +43,19 @@
 - Stage execution: `executeHostBootstrapPipeline(...)`
 - Execution history is deterministic (`sequence`, stage id, status, timestamps).
 
+## Startup span tracer utility (story 1.1.1)
+- Implemented in `src/hosts/bootstrap/startupTracer.ts`.
+- Provides reusable startup tracing with:
+  - nested spans and explicit hierarchy metadata
+  - start/stop timing and duration capture
+  - metadata capture and merge semantics
+  - failure/error tagging for failed spans
+  - sensitive field/value redaction safeguards for metadata and error payloads
+- Uses pino structured logging through `createStartupSpanPinoLogger(...)`.
+- Emits startup span events:
+  - `startup.span.completed`
+  - `startup.span.failed`
+
 ## Host customization boundary
 - Hosts extend startup by:
   - overriding canonical stage handlers, and/or
@@ -101,6 +114,7 @@
 
 ## Test coverage
 - `src/hosts/bootstrap/tests/HostBootstrapPipeline.test.ts`
+- `src/hosts/bootstrap/tests/startupTracer.test.ts`
 - `src/hosts/lifecycle/tests/HostLifecycleCoordinator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/desktop/tests/DesktopHostCompositionRoot.test.ts`
