@@ -24,7 +24,7 @@ const BrowserDevelopmentAuthoritativeStartupReason = "browser-development-vite-a
 const AUTHORITATIVE_SERVER_READY_TIMEOUT_MS = 10_000;
 const POLL_INTERVAL_MS = 100;
 const AUTHORITATIVE_BUN_MISSING_WARNING =
-  "[ai-loom] bun is not available on PATH; starting browser-development authoritative host in-process.";
+  "[ai-loom] bun is not available on PATH; install bun or start the authoritative host manually before running dev:browser.";
 
 export interface BrowserDevelopmentAuthoritativeServerHostEntrypointOptions {
   readonly hostOptions: {
@@ -86,14 +86,9 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
   });
   let identityApiBaseUrl: string | undefined;
   let authoritativeServerProcess: ChildProcess | undefined;
-  let authoritativeServerStopInProcess: (() => void) | undefined;
   let cleanupRegistered = false;
 
   const stopAll = () => {
-    if (authoritativeServerStopInProcess) {
-      authoritativeServerStopInProcess();
-      authoritativeServerStopInProcess = undefined;
-    }
     if (authoritativeServerProcess && !authoritativeServerProcess.killed) {
       authoritativeServerProcess.kill("SIGTERM");
       authoritativeServerProcess = undefined;
@@ -126,7 +121,6 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
           (message) => server.config.logger.warn(message),
         );
         authoritativeServerProcess = authoritativeServerHandle.process;
-        authoritativeServerStopInProcess = authoritativeServerHandle.stopInProcess;
         await waitForPort(
           requestedIdentityHostPort,
           identityHostAddress,
@@ -177,7 +171,9 @@ function startBrowserDevelopmentAuthoritativeServerHost(
 ): Promise<BrowserDevelopmentAuthoritativeServerHostHandle> {
   if (!canExecuteBun()) {
     logWarning?.(AUTHORITATIVE_BUN_MISSING_WARNING);
-    return startBrowserDevelopmentAuthoritativeServerHostInProcess(options);
+    throw new Error(
+      "bun is required to auto-start the authoritative browser-development host. Install bun, or run an authoritative host manually before starting dev:browser.",
+    );
   }
 
   const env = normalizeChildProcessEnvironment({
@@ -200,65 +196,12 @@ function startBrowserDevelopmentAuthoritativeServerHost(
   return Promise.resolve({
     process: processHandle,
     assertAlive: () => assertProcessAlive(processHandle),
-    stopInProcess: undefined,
   });
 }
 
 interface BrowserDevelopmentAuthoritativeServerHostHandle {
   readonly process: ChildProcess | undefined;
   readonly assertAlive: () => void;
-  readonly stopInProcess: (() => void) | undefined;
-}
-
-interface BrowserDevelopmentAuthoritativeServerEntrypointModule {
-  startAuthoritativeServerHostAssembly(
-    options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
-  ): Promise<unknown>;
-}
-
-async function startBrowserDevelopmentAuthoritativeServerHostInProcess(
-  options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
-): Promise<BrowserDevelopmentAuthoritativeServerHostHandle> {
-  let runtimeHandle: unknown;
-  let startupError: Error | undefined;
-  let stopping = false;
-
-  void import("../../../hosts/server/AuthoritativeServerHostEntrypoint")
-    .then((module) => {
-      const entrypoint = module as BrowserDevelopmentAuthoritativeServerEntrypointModule;
-      return entrypoint.startAuthoritativeServerHostAssembly(options);
-    })
-    .then((runtime) => {
-      runtimeHandle = runtime;
-    })
-    .catch((error: unknown) => {
-      startupError = error instanceof Error ? error : new Error(String(error));
-    });
-
-  return {
-    process: undefined,
-    assertAlive: () => {
-      if (startupError) {
-        throw new Error(
-          `Authoritative browser-development host failed to start in-process: ${startupError.message}`,
-        );
-      }
-    },
-    stopInProcess: () => {
-      if (stopping) {
-        return;
-      }
-      stopping = true;
-      const runtime = runtimeHandle;
-      runtimeHandle = undefined;
-      if (runtime && typeof runtime === "object" && "stop" in runtime && typeof runtime.stop === "function") {
-        const stopResult = runtime.stop();
-        if (stopResult && typeof stopResult === "object" && "then" in stopResult && typeof stopResult.then === "function") {
-          void stopResult;
-        }
-      }
-    },
-  };
 }
 
 interface NpmCommand {
