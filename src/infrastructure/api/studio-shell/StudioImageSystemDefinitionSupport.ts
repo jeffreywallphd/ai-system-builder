@@ -35,6 +35,8 @@ import {
   type ImageWorkflowDefinition,
 } from "@domain/image-workflows/ImageWorkflowDomain";
 import {
+  ImageWorkflowParameterUiControlKinds,
+  ImageWorkflowParameterSensitivityLevels,
   normalizeImageWorkflowParameterSpecification,
   type ImageWorkflowParameterSpecification,
 } from "@domain/image-workflows/ImageWorkflowParameterSpecification";
@@ -300,6 +302,24 @@ function toWorkflowDefinition(template: InitialImageWorkflowTemplateDefinition):
   const parameterSpecifications: ReadonlyArray<ImageWorkflowParameterSpecification> = Object.freeze(
     template.minimumRequirements.parameterSpecifications.map((parameter, index) => {
       const guidance = parameterGuidanceById.get(parameter.parameterId);
+      const isNumeric = parameter.valueKind === "integer" || parameter.valueKind === "float";
+      const control = parameter.valueKind === "boolean"
+        ? ImageWorkflowParameterUiControlKinds.switch
+        : parameter.valueKind === "text"
+          ? parameter.semanticMeaning === "prompt"
+            ? ImageWorkflowParameterUiControlKinds.textArea
+            : ImageWorkflowParameterUiControlKinds.textInput
+          : parameter.valueKind === "integer" || parameter.valueKind === "float"
+            ? guidance?.recommendedRange?.minimum !== undefined || guidance?.recommendedRange?.maximum !== undefined
+              ? ImageWorkflowParameterUiControlKinds.slider
+              : ImageWorkflowParameterUiControlKinds.numberInput
+            : parameter.valueKind === "select"
+              ? ImageWorkflowParameterUiControlKinds.select
+              : parameter.valueKind === "mask-asset-reference"
+                ? ImageWorkflowParameterUiControlKinds.maskSlot
+                : parameter.valueKind === "reference-asset-reference"
+                  ? ImageWorkflowParameterUiControlKinds.referenceSlot
+                  : ImageWorkflowParameterUiControlKinds.assetPicker;
       return normalizeImageWorkflowParameterSpecification({
         parameterId: parameter.parameterId,
         label: guidance?.label ?? parameter.parameterId,
@@ -308,15 +328,20 @@ function toWorkflowDefinition(template: InitialImageWorkflowTemplateDefinition):
         semanticMeaning: parameter.semanticMeaning,
         required: parameter.required,
         defaultValue: template.configuration.defaults.parameterValues[parameter.parameterId],
+        sensitivity: ImageWorkflowParameterSensitivityLevels.normal,
         validation: {
-          minimum: guidance?.guardrails?.minimum ?? guidance?.recommendedRange?.minimum,
-          maximum: guidance?.guardrails?.maximum ?? guidance?.recommendedRange?.maximum,
-          step: guidance?.recommendedRange?.step,
-          minLength: guidance?.guardrails?.minLength ?? guidance?.recommendedRange?.minLength,
-          maxLength: guidance?.guardrails?.maxLength ?? guidance?.recommendedRange?.maxLength,
+          minimum: isNumeric ? guidance?.guardrails?.minimum ?? guidance?.recommendedRange?.minimum : undefined,
+          maximum: isNumeric ? guidance?.guardrails?.maximum ?? guidance?.recommendedRange?.maximum : undefined,
+          step: isNumeric ? guidance?.recommendedRange?.step : undefined,
+          minLength: parameter.valueKind === "text"
+            ? guidance?.guardrails?.minLength ?? guidance?.recommendedRange?.minLength
+            : undefined,
+          maxLength: parameter.valueKind === "text"
+            ? guidance?.guardrails?.maxLength ?? guidance?.recommendedRange?.maxLength
+            : undefined,
         },
         ui: {
-          control: "text-input",
+          control,
           order: index,
           helpText: guidance?.helperText,
         },
