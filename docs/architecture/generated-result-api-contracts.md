@@ -88,3 +88,14 @@ Protected generated-result original retrieval now has a concrete API/transport i
   - authenticated workspace session mediation
   - protected stream forwarding without raw storage/backend path exposure
   - retrieval-safe headers (`content-disposition` attachment, `x-content-type-options: nosniff`, `cache-control: private, no-store`)
+
+## Story 6.2.4 query/list use-case baseline (implemented)
+
+Application query/list use cases now project authoritative generated-result metadata suitable for gallery and run-history APIs:
+
+- `GetGeneratedResultMetadataUseCase` for result-by-id metadata retrieval.
+- `ListGeneratedResultMetadataUseCase` for paged metadata discovery.
+
+Supported listing filters include workspace/owner/source linkage (`runId/systemId/workflowId/workflowTemplateId/executionNodeId`), lifecycle + visibility, created/updated activity windows, and preview availability (`previewStates`, `hasPreview`).
+
+Response projection includes DTO-ready preview state hints, retrieval state hints, and lineage summary/run linkage metadata sourced from persisted generated-result records and lineage/previews repositories.
