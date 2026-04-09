@@ -162,3 +162,19 @@ List contracts now include optional reusable-candidate query seams:
 - `reuseReadyOnly`
 
 These are intentionally generic and avoid workflow-template hardcoding so future UI/source selectors can expand without asset-model redesign.
+
+## Story 6.4.1 authoritative gallery/history API integration (implemented)
+
+Generated-result management APIs now include authoritative list/get/by-run retrieval for studio gallery and run-history surfaces.
+
+- Added backend API contract request/response shapes:
+  - `ListGeneratedResultsApiRequest/Response`
+  - `GetGeneratedResultApiRequest/Response`
+  - `ListGeneratedResultsByRunApiRequest/Response`
+- `GeneratedResultManagementBackendApi` now maps metadata list/get use-case failures to stable public API errors (`invalid-request`, `forbidden`, `not-found`, `internal`).
+- Identity transport now serves:
+  - `GET /api/v1/generated-results`
+  - `GET /api/v1/generated-results/:resultAssetId`
+  - `GET /api/v1/image-runs/:runId/generated-results`
+
+This completes authoritative API coverage for production-backed result gallery/history clients while keeping storage/backend internals opaque.

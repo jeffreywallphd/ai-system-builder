@@ -135,8 +135,10 @@ import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { GenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase";
 import { GetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase";
+import { GetGeneratedResultMetadataUseCase } from "@application/generated-results/use-cases/GetGeneratedResultMetadataUseCase";
 import { GetGeneratedResultLineageDetailUseCase } from "@application/generated-results/use-cases/GetGeneratedResultLineageDetailUseCase";
 import { GetGeneratedResultLineageSummaryUseCase } from "@application/generated-results/use-cases/GetGeneratedResultLineageSummaryUseCase";
+import { ListGeneratedResultMetadataUseCase } from "@application/generated-results/use-cases/ListGeneratedResultMetadataUseCase";
 import { OpenGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/OpenGeneratedResultPreviewContentUseCase";
 import { RequestGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/RequestGeneratedResultPreviewContentUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
@@ -1292,6 +1294,14 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     clock: workspaceClock,
   });
   const generatedResultManagementBackendApi = new GeneratedResultManagementBackendApi({
+    listGeneratedResultMetadataUseCase: new ListGeneratedResultMetadataUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      workspaceAuthorizationReadRepository: workspaceAuthorizationRepository,
+    }),
+    getGeneratedResultMetadataUseCase: new GetGeneratedResultMetadataUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      workspaceAuthorizationReadRepository: workspaceAuthorizationRepository,
+    }),
     getGeneratedResultOriginalContentUseCase: new GetGeneratedResultOriginalContentUseCase({
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
       storageLogicalAccessResolutionService,

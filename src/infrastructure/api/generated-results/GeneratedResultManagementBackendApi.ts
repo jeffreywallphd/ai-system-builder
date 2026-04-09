@@ -1,6 +1,11 @@
 import type { IGetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
 import { GeneratedResultOriginalContentReadErrorCodes } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
 import type {
+  IGetGeneratedResultMetadataUseCase,
+  IListGeneratedResultMetadataUseCase,
+} from "@application/generated-results/use-cases/GeneratedResultMetadataReadUseCaseContracts";
+import { GeneratedResultMetadataReadErrorCodes } from "@application/generated-results/use-cases/GeneratedResultMetadataReadUseCaseContracts";
+import type {
   IGetGeneratedResultLineageDetailUseCase,
   IGetGeneratedResultLineageSummaryUseCase,
 } from "@application/generated-results/use-cases/GeneratedResultLineageReadUseCaseContracts";
@@ -12,8 +17,14 @@ import type {
 import { GeneratedResultPreviewContentReadErrorCodes } from "@application/generated-results/use-cases/GetGeneratedResultPreviewContentUseCaseContracts";
 import {
   GeneratedResultManagementApiErrorCodes,
+  type GetGeneratedResultApiRequest,
+  type GetGeneratedResultApiResponse,
   type GeneratedResultManagementApiError,
   type GeneratedResultManagementApiResponse,
+  type ListGeneratedResultsApiRequest,
+  type ListGeneratedResultsApiResponse,
+  type ListGeneratedResultsByRunApiRequest,
+  type ListGeneratedResultsByRunApiResponse,
   type OpenGeneratedResultPreviewContentStreamApiRequest,
   type OpenGeneratedResultPreviewContentStreamApiResponse,
   type OpenGeneratedResultOriginalContentStreamApiRequest,
@@ -27,6 +38,8 @@ import {
 } from "./sdk/PublicGeneratedResultManagementApiContract";
 
 export interface GeneratedResultManagementBackendApiDependencies {
+  readonly listGeneratedResultMetadataUseCase: IListGeneratedResultMetadataUseCase;
+  readonly getGeneratedResultMetadataUseCase: IGetGeneratedResultMetadataUseCase;
   readonly getGeneratedResultOriginalContentUseCase: IGetGeneratedResultOriginalContentUseCase;
   readonly requestGeneratedResultPreviewContentUseCase: IRequestGeneratedResultPreviewContentUseCase;
   readonly openGeneratedResultPreviewContentUseCase: IOpenGeneratedResultPreviewContentUseCase;
@@ -36,6 +49,149 @@ export interface GeneratedResultManagementBackendApiDependencies {
 
 export class GeneratedResultManagementBackendApi {
   public constructor(private readonly dependencies: GeneratedResultManagementBackendApiDependencies) {}
+
+  public async listGeneratedResults(
+    request: ListGeneratedResultsApiRequest,
+  ): Promise<GeneratedResultManagementApiResponse<ListGeneratedResultsApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        GeneratedResultManagementApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const outcome = await this.dependencies.listGeneratedResultMetadataUseCase.execute({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      ownerUserIds: request.ownerUserIds,
+      runId: request.runId,
+      systemId: request.systemId,
+      workflowId: request.workflowId,
+      workflowTemplateId: request.workflowTemplateId,
+      executionNodeId: request.executionNodeId,
+      statuses: request.statuses,
+      visibilities: request.visibilities,
+      mediaTypes: request.mediaTypes,
+      createdAfter: request.createdAfter,
+      createdBefore: request.createdBefore,
+      updatedAfter: request.updatedAfter,
+      updatedBefore: request.updatedBefore,
+      previewStates: request.previewStates,
+      hasPreview: request.hasPreview,
+      lineageInputAssetIds: request.lineageInputAssetIds,
+      requiredInputPurposes: request.requiredInputPurposes,
+      requiredAssetClasses: request.requiredAssetClasses,
+      requiredMediaClasses: request.requiredMediaClasses,
+      reuseReadyOnly: request.reuseReadyOnly,
+      includeArchived: request.includeArchived,
+      limit: request.limit,
+      offset: request.offset,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+
+    if (!outcome.ok) {
+      return this.failedFromMetadataReadError(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        items: Object.freeze(outcome.value.items.map((item) => Object.freeze({
+          ...item,
+        }))),
+        pagination: Object.freeze({
+          ...outcome.value.pagination,
+        }),
+      }),
+    };
+  }
+
+  public async getGeneratedResult(
+    request: GetGeneratedResultApiRequest,
+  ): Promise<GeneratedResultManagementApiResponse<GetGeneratedResultApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        GeneratedResultManagementApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const outcome = await this.dependencies.getGeneratedResultMetadataUseCase.execute({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      resultAssetId: request.resultAssetId,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+
+    if (!outcome.ok) {
+      return this.failedFromMetadataReadError(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        result: Object.freeze({
+          ...outcome.value.result,
+        }),
+      }),
+    };
+  }
+
+  public async listGeneratedResultsByRun(
+    request: ListGeneratedResultsByRunApiRequest,
+  ): Promise<GeneratedResultManagementApiResponse<ListGeneratedResultsByRunApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        GeneratedResultManagementApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const outcome = await this.dependencies.listGeneratedResultMetadataUseCase.execute({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      runId: request.runId,
+      includeArchived: false,
+      limit: request.limit,
+      offset: request.offset,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+
+    if (!outcome.ok) {
+      return this.failedFromMetadataReadError(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        runId: request.runId,
+        items: Object.freeze(outcome.value.items.map((item) => Object.freeze({
+          ...item,
+        }))),
+        pagination: Object.freeze({
+          ...outcome.value.pagination,
+        }),
+      }),
+    };
+  }
 
   public async openGeneratedResultOriginalContentStream(
     request: OpenGeneratedResultOriginalContentStreamApiRequest,
@@ -288,6 +444,23 @@ export class GeneratedResultManagementBackendApi {
       case GeneratedResultPreviewContentReadErrorCodes.invalidState:
       case GeneratedResultPreviewContentReadErrorCodes.contentUnavailable:
         return this.failed(GeneratedResultManagementApiErrorCodes.invalidState, message, details);
+      default:
+        return this.failed(GeneratedResultManagementApiErrorCodes.internal, message, details);
+    }
+  }
+
+  private failedFromMetadataReadError(
+    code: typeof GeneratedResultMetadataReadErrorCodes[keyof typeof GeneratedResultMetadataReadErrorCodes],
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): GeneratedResultManagementApiResponse<never> {
+    switch (code) {
+      case GeneratedResultMetadataReadErrorCodes.invalidRequest:
+        return this.failed(GeneratedResultManagementApiErrorCodes.invalidRequest, message, details);
+      case GeneratedResultMetadataReadErrorCodes.accessDenied:
+        return this.failed(GeneratedResultManagementApiErrorCodes.forbidden, message, details);
+      case GeneratedResultMetadataReadErrorCodes.notFound:
+        return this.failed(GeneratedResultManagementApiErrorCodes.notFound, message, details);
       default:
         return this.failed(GeneratedResultManagementApiErrorCodes.internal, message, details);
     }

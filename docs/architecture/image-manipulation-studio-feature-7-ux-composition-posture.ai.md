@@ -339,3 +339,30 @@ Known limits and intentional non-goals at Feature 7 completion:
 - no promotion of backend filesystem paths/provider-local IDs to canonical/user-facing identity,
 - no collapse of clean architecture by moving orchestration/persistence truth into renderer-local component state.
 
+## Epic 6.4 Story 6.4.1 implementation update
+
+Story 6.4.1 upgrades runtime-editor result gallery/history integration to consume authoritative generated-result APIs rather than dataset-local/transient output assumptions.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/image-manipulation/GeneratedResultGalleryHistoryAdapter.ts`
+- `src/ui/services/GeneratedResultStudioService.ts`
+- `src/infrastructure/api/generated-results/GeneratedResultManagementBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+
+Studio behavior changes:
+
+- Created-image gallery now loads from authoritative generated-result list APIs (`GET /api/v1/generated-results`) filtered to the active workflow context.
+- Preview rendering now requests protected generated-result preview metadata and uses preview-content endpoints with workspace-scoped preview tokens.
+- Run history panel now derives run-linked history from authoritative generated-result records instead of transient/local run-output collections.
+- "Open context" for prior runs now uses authoritative by-run result discovery (`GET /api/v1/image-runs/:runId/generated-results`) to reopen older outputs.
+- Result-detail inspection now fetches authoritative generated-result detail + lineage detail (`get` + `lineage`) for selected outputs.
+- Reuse actions pull protected original generated-result content (`/original`) and re-ingest into input/reference dataset bindings, preserving continuation UX without filesystem coupling.
+
+Posture impact:
+
+- output identity in UI state is now authoritative `resultAssetId`,
+- preview/reopen/reuse flows are API-mediated and policy-safe,
+- run-linked result history is reconstructable from durable generated-result records.
+
