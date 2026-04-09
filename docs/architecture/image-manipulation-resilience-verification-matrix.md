@@ -36,6 +36,7 @@ This matrix catches regressions that would otherwise make the slice fragile unde
 
 ## Cross-feature maintenance
 - Keep this matrix aligned with `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md` when resilience-sensitive operational behavior changes.
+- Keep this matrix aligned with `docs/architecture/image-manipulation-feature-8-final-vertical-slice-completion.md` when final scope, deferred limits, or extension posture changes.
 - If a story adds a new failure class or recovery branch, update:
   - the matrix row(s),
   - the corresponding contract/operational guidance docs,

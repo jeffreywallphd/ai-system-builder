@@ -38,4 +38,4 @@
 ## Maintenance requirements
 - Update this guide whenever resilience-sensitive behavior changes.
 - Keep `.md` and `.ai.md` versions aligned.
-- Keep resilience verification matrix and contributor guides cross-referenced.
+- Keep resilience verification matrix, final completion note, and contributor guides cross-referenced.

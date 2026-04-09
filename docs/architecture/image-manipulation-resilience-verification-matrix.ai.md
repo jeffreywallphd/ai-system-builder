@@ -32,4 +32,4 @@
 - Avoid hidden local fallback behavior.
 
 ## Maintenance rule
-- When new resilience-sensitive failure classes are added, update this matrix and `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md` together.
+- When new resilience-sensitive failure classes are added, update this matrix, `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`, and `docs/architecture/image-manipulation-feature-8-final-vertical-slice-completion.md` together.
