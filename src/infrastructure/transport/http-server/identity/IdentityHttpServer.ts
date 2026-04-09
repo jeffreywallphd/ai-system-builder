@@ -8762,6 +8762,19 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
         return;
       }
 
+      if (request.method === "GET" && path === "/") {
+        const apiResponse = Object.freeze({
+          ok: true,
+          data: Object.freeze({
+            service: "identity-http",
+            status: "ready",
+          }),
+        });
+        writeJson(response, 200, apiResponse);
+        logResponse(logger, requestId, request, 200, Object.freeze({}), apiResponse);
+        return;
+      }
+
       writeJson(response, 404, {
         ok: false,
         error: {
@@ -14411,7 +14424,6 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(JSON.stringify(event));
   }
 }
-
 
 
 

@@ -368,6 +368,21 @@ describe("IdentityHttpServer", () => {
     expect(typeof body.error.userMessage).toBe("string");
   });
 
+  it("serves a root readiness route for local desktop transport probes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const response = await fetch(`${baseUrl}/`, {
+      method: "GET",
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.service).toBe("identity-http");
+    expect(body.data.status).toBe("ready");
+  });
+
   it("sanitizes unhandled internal errors before sending responses", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(
@@ -1688,4 +1703,3 @@ describe("IdentityHttpServer", () => {
     expect(revokeBody.data.revoked).toBe(true);
   });
 });
-
