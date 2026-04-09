@@ -10,6 +10,8 @@ import { resolveIdentityAccessChannel, resolveIdentityClientContext } from "@sha
 import { validateLoginForm } from "@shared/identity/IdentityAuthValidation";
 import { guardAuthenticationInitialization } from "../shared/identity/AuthenticationInitializationGuard";
 
+const LoginRequestTimeoutMs = 10_000;
+
 export interface LoginPageProps {
   readonly onAuthenticated: (session: LoginLocalIdentityApiResponse) => boolean | Promise<boolean>;
   readonly authNotice?: "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
@@ -45,13 +47,16 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
 
     setIsSubmitting(true);
     try {
-      const response = await authService.loginLocalAccount({
-        providerId: providerId.trim() || undefined,
-        providerSubject: providerSubject.trim(),
-        accessChannel: resolveIdentityAccessChannel(),
-        client: resolveIdentityClientContext(),
-        credential: { candidate: password },
-      });
+      const response = await withTimeout(
+        authService.loginLocalAccount({
+          providerId: providerId.trim() || undefined,
+          providerSubject: providerSubject.trim(),
+          accessChannel: resolveIdentityAccessChannel(),
+          client: resolveIdentityClientContext(),
+          credential: { candidate: password },
+        }),
+        LoginRequestTimeoutMs,
+      );
 
       if (!response.ok || !response.data) {
         setErrorMessage(renderApiError(response.error));
@@ -66,8 +71,10 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
       navigate(fromPath, { replace: true });
-    } catch {
-      setErrorMessage("Login request failed. Verify the identity API is reachable and try again.");
+    } catch (error) {
+      setErrorMessage(isTimeoutError(error)
+        ? "Login request timed out. Verify the identity API is reachable and try again."
+        : "Login request failed. Verify the identity API is reachable and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -77,10 +84,13 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
     setErrorMessage(undefined);
     setIsSubmitting(true);
     try {
-      const response = await authService.loginDevelopmentAccount({
-        accessChannel: resolveIdentityAccessChannel(),
-        client: resolveIdentityClientContext(),
-      });
+      const response = await withTimeout(
+        authService.loginDevelopmentAccount({
+          accessChannel: resolveIdentityAccessChannel(),
+          client: resolveIdentityClientContext(),
+        }),
+        LoginRequestTimeoutMs,
+      );
       if (!response.ok || !response.data) {
         setErrorMessage(renderApiError(response.error));
         return;
@@ -94,8 +104,10 @@ export default function LoginPage({ onAuthenticated, authNotice, devLoginEnabled
         return;
       }
       navigate(fromPath, { replace: true });
-    } catch {
-      setErrorMessage("Dev login request failed. Verify the identity API is reachable and try again.");
+    } catch (error) {
+      setErrorMessage(isTimeoutError(error)
+        ? "Dev login request timed out. Verify the identity API is reachable and try again."
+        : "Dev login request failed. Verify the identity API is reachable and try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -199,4 +211,28 @@ function renderApiError(error: IdentityAuthApiError | undefined): string {
   }
   const details = validationErrors.map((entry) => `${entry.path}: ${entry.message}`).join("; ");
   return `${error?.message || "Login failed."} ${details}`;
+}
+
+function withTimeout<TValue>(promise: Promise<TValue>, timeoutMs: number): Promise<TValue> {
+  const normalizedTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.floor(timeoutMs) : LoginRequestTimeoutMs;
+  return new Promise<TValue>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error("request-timeout"));
+    }, normalizedTimeoutMs);
+
+    promise.then(
+      (value) => {
+        clearTimeout(timeoutHandle);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timeoutHandle);
+        reject(error);
+      },
+    );
+  });
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && error.message === "request-timeout";
 }
