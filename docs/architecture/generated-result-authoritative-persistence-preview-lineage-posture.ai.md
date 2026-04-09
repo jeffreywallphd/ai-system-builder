@@ -463,3 +463,15 @@ Generated-result persistence and protected retrieval flows now participate in au
 - sensitive keys/values (credentials/tokens, raw content payloads/bytes, filesystem or storage paths/object keys, backend handles) are redacted.
 - only bounded reason/status/linkage summaries are emitted; raw backend/storage internals are excluded.
 
+## Story 6.4.4 feature-completion verification and follow-on integration guidance (implemented)
+
+Feature 6 completion and follow-on integration posture is now locked in a dedicated final baseline:
+
+- `docs/architecture/image-manipulation-feature-6-final-baseline.md`
+
+This baseline documents:
+
+- complete feature verification for result-asset authority, lineage, collection handoff, protected retrieval, preview generation/retrieval, gallery/history integration, reuse seams, and audit posture,
+- explicit architectural boundaries and assumptions so later sharing/export/admin features do not regress to backend-local output handling,
+- known limits, intentional non-goals, and verification anchors (tests + related docs) for stable downstream integration.
+
