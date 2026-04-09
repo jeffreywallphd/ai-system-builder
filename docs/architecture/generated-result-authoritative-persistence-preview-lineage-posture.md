@@ -253,3 +253,37 @@ Run finalization now persists an explicit result-availability state so API/UI co
 - Recovery is modeled as follow-on retry/recovery over explicit durable states, not implicit retries hidden inside terminal finalization.
 - Partial states are intentionally retained for operator triage and future reprocessing orchestration.
 
+## Story 6.3.1 preview-generation pipeline baseline (implemented)
+
+Generated-result preview generation now has a concrete platform-service pipeline that materializes protected preview derivatives from authoritative result assets.
+
+- Application use case: `src/application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase.ts`
+- Preview generation ports: `src/application/generated-results/ports/GeneratedResultPreviewGenerationPorts.ts`
+- Logical storage-reference resolver reused by retrieval + generation:
+  - `src/application/generated-results/use-cases/GeneratedResultStorageObjectReference.ts`
+  - `src/application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase.ts`
+- Infrastructure media adapters:
+  - `src/infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor.ts`
+  - `src/infrastructure/media/generated-results/TokenizedGeneratedResultPreviewAccessPort.ts`
+
+### Generation flow posture
+
+- Source lookup uses logical result references (`storageBindingReference` / `logicalAssetVersionId`) and validates storage-instance alignment.
+- Source reads and derivative writes are mediated through `IStorageLogicalAccessResolutionService` + `IStorageObjectPort` intents (`openObjectReadStream`, `createObjectKey`, `writeObject`).
+- The default derivative profile for this image slice is `display-safe` (`image/webp`) with bounded dimensions/quality, while preview-kind profiles remain explicit and extensible (`thumbnail`, `display-safe`, `history-safe`).
+- Preview descriptor persistence writes protected-access metadata (`protectedResourceId`, `accessHandle`) and never emits raw storage paths outside infrastructure.
+- Successful generation upgrades result lifecycle from `available` to `preview-ready` when appropriate.
+- Generation failures persist explicit failed preview descriptors (`availabilityStatus=failed`) for diagnosable retry/recovery state.
+
+### Run finalization integration posture
+
+- `SqliteRunCollectedResultPersistenceAdapter` now accepts an optional preview-generation use case dependency.
+- Authoritative server host composition wires this dependency so persisted run outputs can generate protected previews during result finalization when possible.
+- If no generator dependency is provided, existing pending-preview fallback behavior remains unchanged.
+
+### Extension seams
+
+- Preview dimensions/media profile mapping is centralized in the generation use case for future derivative expansion.
+- Access-handle minting is ported (`IGeneratedResultPreviewAccessPort`) so future policy-aware, expiring, or revocation-capable handle systems can replace tokenization without changing use-case contracts.
+- Image transformation remains ported (`IGeneratedResultPreviewImageProcessorPort`) so alternate media processors/backends can be introduced without altering orchestration logic.
+
