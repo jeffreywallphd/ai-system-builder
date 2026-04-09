@@ -47,12 +47,12 @@ const AppInitializationStagePresentationMap: Record<AppInitializationStageId, Ap
     subtitle: "Connecting sign-in services for this desktop session.",
   }),
   [AppInitializationStageIds.loadingSavedSession]: Object.freeze({
-    title: "Checking your saved sign-in",
-    subtitle: "Looking for an existing sign-in on this device.",
+    title: "Checking for previous session",
+    subtitle: "Looking for an existing session on this device.",
   }),
   [AppInitializationStageIds.validatingSession]: Object.freeze({
-    title: "Checking your saved sign-in",
-    subtitle: "Verifying your saved sign-in with the identity service.",
+    title: "Validating previous session",
+    subtitle: "Verifying your existing session with the identity service.",
   }),
   [AppInitializationStageIds.loadingWorkspaceContext]: Object.freeze({
     title: "Loading your workspace access",

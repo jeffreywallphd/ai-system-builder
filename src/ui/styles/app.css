@@ -1675,7 +1675,7 @@ body {
 }
 
 .ui-auth-card {
-  width: min(560px, 100%);
+  width: min(860px, 100%);
 }
 
 .ui-auth-page__error {
@@ -1707,7 +1707,7 @@ body {
 .ui-auth-page__progress-steps {
   list-style: none;
   margin: 0;
-  padding: 0 var(--space-lg) var(--space-lg);
+  padding: 0 0 var(--space-lg);
   display: grid;
   gap: 0.35rem;
 }
@@ -1724,6 +1724,63 @@ body {
 .ui-auth-page__progress-step--current {
   color: var(--color-text-primary);
   font-weight: 600;
+}
+
+.ui-auth-page__progress-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: var(--space-md);
+  padding: 0 var(--space-lg) var(--space-lg);
+}
+
+.ui-auth-page__progress-terminal {
+  margin: 0;
+  border-left: 1px solid rgba(148, 163, 184, 0.28);
+  padding-left: var(--space-md);
+}
+
+.ui-auth-page__progress-terminal-title {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+}
+
+.ui-auth-page__progress-terminal-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.ui-auth-page__progress-terminal-line {
+  margin: 0;
+  display: flex;
+  gap: var(--space-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-monospace);
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
+.ui-auth-page__progress-terminal-line--complete {
+  color: var(--color-success);
+}
+
+.ui-auth-page__progress-terminal-line--current {
+  color: var(--color-text-primary);
+}
+
+.ui-auth-page__progress-terminal-time {
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.ui-auth-page__progress-terminal-message {
+  overflow-wrap: anywhere;
 }
 
 .ui-identity-admin-page__grid {
@@ -1865,7 +1922,6 @@ body {
     grid-template-columns: 1fr;
   }
 }
-
 
 
 

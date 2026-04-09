@@ -105,7 +105,7 @@ export class IdentityAuthSessionCoordinator {
     if (!session) {
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.readyForSignIn,
-        detail: "No saved sign-in was found on this device.",
+        detail: "No previous session was found on this device.",
       });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
@@ -117,7 +117,7 @@ export class IdentityAuthSessionCoordinator {
       this.sessionStore.clearSession();
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.readyForSignIn,
-        detail: "Your saved sign-in has expired.",
+        detail: "Your previous session has expired.",
       });
       return Object.freeze({
         status: IdentitySessionBootstrapStatus.unauthenticated,
@@ -138,8 +138,8 @@ export class IdentityAuthSessionCoordinator {
         this.publishProgress(options, {
           stageId: AppInitializationStageIds.readyForSignIn,
           detail: resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
-            ? "Your saved sign-in is no longer valid."
-            : "Saved sign-in could not be verified.",
+            ? "Your previous session is no longer valid."
+            : "Previous session could not be verified.",
         });
         return Object.freeze({
           status: IdentitySessionBootstrapStatus.unauthenticated,
@@ -166,7 +166,7 @@ export class IdentityAuthSessionCoordinator {
           this.sessionStore.clearSession();
           this.publishProgress(options, {
             stageId: AppInitializationStageIds.readyForSignIn,
-            detail: "Your saved sign-in is no longer valid.",
+            detail: "Your previous session is no longer valid.",
           });
           return Object.freeze({
             status: IdentitySessionBootstrapStatus.unauthenticated,
