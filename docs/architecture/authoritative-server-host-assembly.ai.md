@@ -25,6 +25,12 @@
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 - Story 1.2.3 adds one stage orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
 - `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now consumes config/security stage modules and routes `services`, `security`, `persistence`, and `transport` through that orchestrator for centralized sequential stage execution.
+- Story 1.3.1 adds a startup status model at that orchestrator seam. `createAuthoritativeServerBootstrapStageOrchestrator(...)` now exposes `getStatus()` with ordered stage entries and states:
+  - `pending`
+  - `running`
+  - `success`
+  - `failed`
+- This startup status snapshot is available programmatically during and after staged startup execution.
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `services`
   - `security`
