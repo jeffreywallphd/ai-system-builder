@@ -68,11 +68,17 @@ Story 1.2.2 extracts the first authoritative bootstrap stage implementations int
 - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
 - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
 
-`AuthoritativeServerCompositionRoot.ts` now composes those modules and executes their stage contracts independently from the host file's remaining persistence/service/transport orchestration.
+Story 1.2.3 adds a dedicated stage orchestrator in `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
+
+`AuthoritativeServerCompositionRoot.ts` now composes config/security stage modules and routes remaining startup stages (`services`, `security`, `persistence`, `transport`) through that orchestrator so stage execution stays sequential and centralized.
 
 The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
 
-Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps, including:
+Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
+- `services`
+- `security`
+- `persistence`
+- `transport`
 - `config-load`
 - `migrations`
 - `persistence-setup`
@@ -137,6 +143,7 @@ In addition to the direct server script entrypoint above, runtime startup consum
 
 Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

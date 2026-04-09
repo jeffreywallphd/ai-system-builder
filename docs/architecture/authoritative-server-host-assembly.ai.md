@@ -23,8 +23,13 @@
 - Story 1.2.2 extracts initial authoritative bootstrap stage implementations into:
   - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
-- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now consumes those modules so config/security stage logic can be executed independently of the remaining host orchestration.
+- Story 1.2.3 adds one stage orchestrator seam at `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts`.
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now consumes config/security stage modules and routes `services`, `security`, `persistence`, and `transport` through that orchestrator for centralized sequential stage execution.
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
+  - `services`
+  - `security`
+  - `persistence`
+  - `transport`
   - `config-load`
   - `migrations`
   - `persistence-setup`
@@ -82,6 +87,7 @@
 
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

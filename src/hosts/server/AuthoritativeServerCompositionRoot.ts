@@ -67,6 +67,10 @@ import {
   type AuthoritativeRunExecutionAdapterRegistration,
 } from "@infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration";
 import {
+  AuthoritativeServerBootstrapStageIds,
+  type AuthoritativeServerBootstrapStageId,
+} from "./AuthoritativeServerBootstrapStageContracts";
+import {
   createAuthoritativeServerConfigBootstrapStage,
   type AuthoritativeServerConfigBootstrapStage,
 } from "./AuthoritativeServerConfigBootstrapStage";
@@ -74,6 +78,7 @@ import {
   createAuthoritativeServerSecurityBootstrapStage,
   type AuthoritativeServerSecurityBootstrapStage,
 } from "./AuthoritativeServerSecurityBootstrapStage";
+import { createAuthoritativeServerBootstrapStageOrchestrator } from "./AuthoritativeServerBootstrapStageOrchestrator";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -194,15 +199,13 @@ function combineStageHandlers(
   return Object.freeze(combined);
 }
 
-async function runStartupStepSpan<TResult>(input: {
-  readonly parentSpan: StartupSpan | undefined;
-  readonly tracer: StartupTracer;
+async function runStartupChildStepSpan<TResult>(input: {
+  readonly parentSpan: StartupSpan;
   readonly name: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
   readonly run: (span: StartupSpan) => Promise<TResult> | TResult;
 }): Promise<TResult> {
-  const span = input.parentSpan?.startChild(input.name, { metadata: input.metadata })
-    ?? input.tracer.startSpan(input.name, { metadata: input.metadata });
+  const span = input.parentSpan.startChild(input.name, { metadata: input.metadata });
   try {
     const result = await input.run(span);
     span.complete();
@@ -270,6 +273,17 @@ export function createAuthoritativeServerCompositionRoot(
             startupReason: boot.startupReason,
           }),
         });
+        const startupStageOrder: ReadonlyArray<AuthoritativeServerBootstrapStageId> = Object.freeze([
+          AuthoritativeServerBootstrapStageIds.services,
+          AuthoritativeServerBootstrapStageIds.security,
+          AuthoritativeServerBootstrapStageIds.persistence,
+          AuthoritativeServerBootstrapStageIds.transport,
+        ]);
+        const resolvedStartupStageOrchestrator = createAuthoritativeServerBootstrapStageOrchestrator({
+          tracer: resolvedStartupTracer,
+          parentSpan: startupRootSpan,
+          stageOrder: startupStageOrder,
+        });
 
         const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
           [HostBootstrapStageIds.configuration]: (context) => {
@@ -279,181 +293,211 @@ export function createAuthoritativeServerCompositionRoot(
             );
             context.setArtifact(HostRuntimeMetadataArtifactKey, resolvedRuntimeMetadata);
           },
-          [HostBootstrapStageIds.dependencies]: (context) => {
-            const composePlan = input.bootstrap?.composeServiceRegistrationPlan
-              ?? ((composedBoot: HostBootConfiguration) => composeHostServiceRegistrationPlan({
-                host: composedBoot.host,
-                requiredStartupDependencyIds: composedBoot.requiredDependencyIds,
-              }));
-            const plan = composePlan(context.boot);
-            const apiRouteRegistrationPlan = (
-              input.bootstrap?.composeApiRouteRegistrationPlan
-              ?? composeAuthoritativeServerApiRouteRegistrationPlan
-            )();
-            context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
-            context.setArtifact(
-              AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
-              apiRouteRegistrationPlan,
-            );
-            const comfyUiExecutionAdapter = (
-              input.bootstrap?.composeComfyUiExecutionAdapter
-              ?? ((adapterInput) => createComfyUiExecutionAdapterInfrastructure({
-                env: adapterInput.environment,
-              }))
-            )({
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-              environment: context.environment,
-              deploymentProfile: context.deploymentProfile,
-            });
-            if (comfyUiExecutionAdapter) {
-              context.setArtifact(
-                AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
-                comfyUiExecutionAdapter,
-              );
-            }
-            const runExecutionAdapterRegistration = (
-              input.bootstrap?.composeRunExecutionAdapterRegistration
-              ?? ((registrationInput) => createAuthoritativeRunExecutionAdapterRegistration({
-                comfyUiExecutionAdapter: registrationInput.comfyUiExecutionAdapter,
-              }))
-            )({
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-              environment: context.environment,
-              deploymentProfile: context.deploymentProfile,
-              comfyUiExecutionAdapter,
-            });
-            if (runExecutionAdapterRegistration) {
-              context.setArtifact(
-                AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
-                runExecutionAdapterRegistration,
-              );
-            }
-          },
-          [HostBootstrapStageIds.security]: async (context) => {
-            const security = await securityStage.execute({
-              deploymentProfile: context.deploymentProfile,
-              environment: context.environment,
-              enabledCapabilities: context.enabledCapabilities,
-              runtimeMetadata: resolvedRuntimeMetadata,
-              startupTracer: resolvedStartupTracer,
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-            });
-            context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
-          },
-          [HostBootstrapStageIds.persistence]: async (context) => {
-            await runStartupStepSpan({
-              parentSpan: startupRootSpan,
-              tracer: resolvedStartupTracer,
-              name: "persistence-setup",
-              run: async (persistenceSetupSpan) => {
-                persistenceRuntime = (
-                  input.bootstrap?.createPersistenceRuntime
-                  ?? ((runtimeInput) => createSqlitePersistenceRuntime({
-                    configuration: resolveSqlitePersistenceRuntimeConfiguration({
-                      databasePath: runtimeInput.hostConfiguration.databasePath,
-                      environment: runtimeInput.environment,
-                    }),
-                    migrationHooks: createAuthoritativePersistenceMigrationHooks(),
+          [HostBootstrapStageIds.dependencies]: async (context) => {
+            await resolvedStartupStageOrchestrator.runStage({
+              stageId: AuthoritativeServerBootstrapStageIds.services,
+              metadata: Object.freeze({
+                hostBootstrapStageId: HostBootstrapStageIds.dependencies,
+              }),
+              run: () => {
+                const composePlan = input.bootstrap?.composeServiceRegistrationPlan
+                  ?? ((composedBoot: HostBootConfiguration) => composeHostServiceRegistrationPlan({
+                    host: composedBoot.host,
+                    requiredStartupDependencyIds: composedBoot.requiredDependencyIds,
+                  }));
+                const plan = composePlan(context.boot);
+                const apiRouteRegistrationPlan = (
+                  input.bootstrap?.composeApiRouteRegistrationPlan
+                  ?? composeAuthoritativeServerApiRouteRegistrationPlan
+                )();
+                context.setArtifact(AuthoritativeServerServiceRegistrationPlanArtifactKey, plan);
+                context.setArtifact(
+                  AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+                  apiRouteRegistrationPlan,
+                );
+                const comfyUiExecutionAdapter = (
+                  input.bootstrap?.composeComfyUiExecutionAdapter
+                  ?? ((adapterInput) => createComfyUiExecutionAdapterInfrastructure({
+                    env: adapterInput.environment,
                   }))
                 )({
                   hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
                   environment: context.environment,
+                  deploymentProfile: context.deploymentProfile,
                 });
-                await runStartupStepSpan({
-                  parentSpan: persistenceSetupSpan,
-                  tracer: resolvedStartupTracer,
-                  name: "migrations",
-                  run: async () => {
-                    await persistenceRuntime?.start();
-                  },
-                });
-                persistentPlatformServices = (
-                  input.bootstrap?.composePersistentPlatformServices
-                  ?? ((servicesInput) => createAuthoritativePersistentPlatformServices({
-                    databasePath: servicesInput.persistenceRuntime.configuration.databasePath,
+                if (comfyUiExecutionAdapter) {
+                  context.setArtifact(
+                    AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+                    comfyUiExecutionAdapter,
+                  );
+                }
+                const runExecutionAdapterRegistration = (
+                  input.bootstrap?.composeRunExecutionAdapterRegistration
+                  ?? ((registrationInput) => createAuthoritativeRunExecutionAdapterRegistration({
+                    comfyUiExecutionAdapter: registrationInput.comfyUiExecutionAdapter,
                   }))
                 )({
-                  persistenceRuntime,
                   hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
                   environment: context.environment,
+                  deploymentProfile: context.deploymentProfile,
+                  comfyUiExecutionAdapter,
                 });
+                if (runExecutionAdapterRegistration) {
+                  context.setArtifact(
+                    AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+                    runExecutionAdapterRegistration,
+                  );
+                }
               },
             });
-            context.setArtifact(AuthoritativeServerPersistenceRuntimeArtifactKey, persistenceRuntime);
-            context.setArtifact(
-              AuthoritativeServerPersistentPlatformServicesArtifactKey,
-              persistentPlatformServices,
-            );
-            const deploymentPolicyBootstrap = await (
-              input.bootstrap?.resolveDeploymentPolicyBootstrap
-              ?? (async (bootstrapInput) => new DeploymentPolicyBootstrapResolutionService({
-                deploymentPolicyRepository: bootstrapInput.persistentPlatformServices.deploymentPolicyRepository,
-                observabilityPort: new PlatformDeploymentPolicyAdministrationObservabilityPort({
-                  logger: bootstrapInput.hostConfiguration.logger
-                    ? {
-                      info: (event) => bootstrapInput.hostConfiguration.logger?.info(event),
-                      warn: (event) => bootstrapInput.hostConfiguration.logger?.warn(event),
-                      error: (event) => bootstrapInput.hostConfiguration.logger?.error(event),
-                    }
-                    : undefined,
-                }),
-              }).execute())
-            )({
-              persistentPlatformServices,
-              hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
-              deploymentProfile: context.deploymentProfile,
-              environment: context.environment,
+          },
+          [HostBootstrapStageIds.security]: async (context) => {
+            await resolvedStartupStageOrchestrator.runStage({
+              stageId: AuthoritativeServerBootstrapStageIds.security,
+              metadata: Object.freeze({
+                hostBootstrapStageId: HostBootstrapStageIds.security,
+              }),
+              run: async () => {
+                const security = await securityStage.execute({
+                  deploymentProfile: context.deploymentProfile,
+                  environment: context.environment,
+                  enabledCapabilities: context.enabledCapabilities,
+                  runtimeMetadata: resolvedRuntimeMetadata,
+                  startupTracer: resolvedStartupTracer,
+                  hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+                });
+                context.setArtifact(AuthoritativeServerSecurityBootstrapArtifactKey, security);
+              },
             });
-            context.setArtifact(
-              AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
-              deploymentPolicyBootstrap,
-            );
+          },
+          [HostBootstrapStageIds.persistence]: async (context) => {
+            await resolvedStartupStageOrchestrator.runStage({
+              stageId: AuthoritativeServerBootstrapStageIds.persistence,
+              metadata: Object.freeze({
+                hostBootstrapStageId: HostBootstrapStageIds.persistence,
+              }),
+              run: async ({ span: stageSpan }) => {
+                await runStartupChildStepSpan({
+                  parentSpan: stageSpan,
+                  name: "persistence-setup",
+                  run: async (persistenceSetupSpan) => {
+                    persistenceRuntime = (
+                      input.bootstrap?.createPersistenceRuntime
+                      ?? ((runtimeInput) => createSqlitePersistenceRuntime({
+                        configuration: resolveSqlitePersistenceRuntimeConfiguration({
+                          databasePath: runtimeInput.hostConfiguration.databasePath,
+                          environment: runtimeInput.environment,
+                        }),
+                        migrationHooks: createAuthoritativePersistenceMigrationHooks(),
+                      }))
+                    )({
+                      hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+                      environment: context.environment,
+                    });
+                    await runStartupChildStepSpan({
+                      parentSpan: persistenceSetupSpan,
+                      name: "migrations",
+                      run: async () => {
+                        await persistenceRuntime?.start();
+                      },
+                    });
+                    persistentPlatformServices = (
+                      input.bootstrap?.composePersistentPlatformServices
+                      ?? ((servicesInput) => createAuthoritativePersistentPlatformServices({
+                        databasePath: servicesInput.persistenceRuntime.configuration.databasePath,
+                      }))
+                    )({
+                      persistenceRuntime,
+                      hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+                      environment: context.environment,
+                    });
+                  },
+                });
+                context.setArtifact(AuthoritativeServerPersistenceRuntimeArtifactKey, persistenceRuntime);
+                context.setArtifact(
+                  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+                  persistentPlatformServices,
+                );
+                const deploymentPolicyBootstrap = await (
+                  input.bootstrap?.resolveDeploymentPolicyBootstrap
+                  ?? (async (bootstrapInput) => new DeploymentPolicyBootstrapResolutionService({
+                    deploymentPolicyRepository: bootstrapInput.persistentPlatformServices.deploymentPolicyRepository,
+                    observabilityPort: new PlatformDeploymentPolicyAdministrationObservabilityPort({
+                      logger: bootstrapInput.hostConfiguration.logger
+                        ? {
+                          info: (event) => bootstrapInput.hostConfiguration.logger?.info(event),
+                          warn: (event) => bootstrapInput.hostConfiguration.logger?.warn(event),
+                          error: (event) => bootstrapInput.hostConfiguration.logger?.error(event),
+                        }
+                        : undefined,
+                    }),
+                  }).execute())
+                )({
+                  persistentPlatformServices,
+                  hostConfiguration: context.hostConfiguration as IdentityServerHostOptions,
+                  deploymentProfile: context.deploymentProfile,
+                  environment: context.environment,
+                });
+                context.setArtifact(
+                  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+                  deploymentPolicyBootstrap,
+                );
+              },
+            });
           },
           [HostBootstrapStageIds.featureRegistration]: async (context) => {
-            const plan = context.getArtifact<HostServiceRegistrationPlan>(
-              AuthoritativeServerServiceRegistrationPlanArtifactKey,
-            );
-            if (!plan) {
-              throw new Error("Authoritative server startup requires a composed host service registration plan.");
-            }
-            const composedPersistentServices = context.getArtifact<AuthoritativePersistentPlatformServices>(
-              AuthoritativeServerPersistentPlatformServicesArtifactKey,
-            );
-            if (!composedPersistentServices) {
-              throw new Error(
-                "Authoritative server startup requires composed persistent platform services before runtime feature registration.",
-              );
-            }
-            const apiRouteRegistrationPlan = context.getArtifact<AuthoritativeApiRouteRegistrationPlan>(
-              AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
-            );
-            if (!apiRouteRegistrationPlan) {
-              throw new Error("Authoritative server startup requires a composed API route registration plan.");
-            }
-            const deploymentPolicyBootstrap = context.getArtifact<DeploymentPolicyBootstrapResolutionResult>(
-              AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
-            );
-            if (!deploymentPolicyBootstrap) {
-              throw new Error(
-                "Authoritative server startup requires deployment policy bootstrap resolution before runtime feature registration.",
-              );
-            }
-            (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
-            (input.bootstrap?.assertApiRouteRegistrationCoverage
-              ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
-            const runExecutionAdapterRegistration = context.getArtifact<AuthoritativeRunExecutionAdapterRegistration>(
-              AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
-            );
-            const composedHost = await startHost({
-              ...(context.hostConfiguration as IdentityServerHostOptions),
-              startupTracer: resolvedStartupTracer,
-              deploymentProfile: context.deploymentProfile,
-              deploymentPolicyBootstrap,
-              persistentPlatformServices: composedPersistentServices,
-              routeRegistrationPlan: apiRouteRegistrationPlan,
-              runExecutionAdapters: runExecutionAdapterRegistration,
+            await resolvedStartupStageOrchestrator.runStage({
+              stageId: AuthoritativeServerBootstrapStageIds.transport,
+              metadata: Object.freeze({
+                hostBootstrapStageId: HostBootstrapStageIds.featureRegistration,
+              }),
+              run: async () => {
+                const plan = context.getArtifact<HostServiceRegistrationPlan>(
+                  AuthoritativeServerServiceRegistrationPlanArtifactKey,
+                );
+                if (!plan) {
+                  throw new Error("Authoritative server startup requires a composed host service registration plan.");
+                }
+                const composedPersistentServices = context.getArtifact<AuthoritativePersistentPlatformServices>(
+                  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+                );
+                if (!composedPersistentServices) {
+                  throw new Error(
+                    "Authoritative server startup requires composed persistent platform services before runtime feature registration.",
+                  );
+                }
+                const apiRouteRegistrationPlan = context.getArtifact<AuthoritativeApiRouteRegistrationPlan>(
+                  AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
+                );
+                if (!apiRouteRegistrationPlan) {
+                  throw new Error("Authoritative server startup requires a composed API route registration plan.");
+                }
+                const deploymentPolicyBootstrap = context.getArtifact<DeploymentPolicyBootstrapResolutionResult>(
+                  AuthoritativeServerDeploymentPolicyBootstrapArtifactKey,
+                );
+                if (!deploymentPolicyBootstrap) {
+                  throw new Error(
+                    "Authoritative server startup requires deployment policy bootstrap resolution before runtime feature registration.",
+                  );
+                }
+                (input.bootstrap?.assertServiceCoverage ?? assertAuthoritativeControlPlaneServiceCoverage)(plan);
+                (input.bootstrap?.assertApiRouteRegistrationCoverage
+                  ?? assertAuthoritativeServerApiRouteRegistrationCoverage)(apiRouteRegistrationPlan);
+                const runExecutionAdapterRegistration = context.getArtifact<AuthoritativeRunExecutionAdapterRegistration>(
+                  AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+                );
+                const composedHost = await startHost({
+                  ...(context.hostConfiguration as IdentityServerHostOptions),
+                  startupTracer: resolvedStartupTracer,
+                  deploymentProfile: context.deploymentProfile,
+                  deploymentPolicyBootstrap,
+                  persistentPlatformServices: composedPersistentServices,
+                  routeRegistrationPlan: apiRouteRegistrationPlan,
+                  runExecutionAdapters: runExecutionAdapterRegistration,
+                });
+                context.setArtifact(StartedHostArtifactKey, composedHost);
+              },
             });
-            context.setArtifact(StartedHostArtifactKey, composedHost);
           },
         };
         const stageHandlers = combineStageHandlers(defaultStageHandlers, input.bootstrap?.stageHandlers);
