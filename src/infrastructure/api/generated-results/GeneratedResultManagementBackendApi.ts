@@ -1,6 +1,11 @@
 import type { IGetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
 import { GeneratedResultOriginalContentReadErrorCodes } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
 import type {
+  IGetGeneratedResultLineageDetailUseCase,
+  IGetGeneratedResultLineageSummaryUseCase,
+} from "@application/generated-results/use-cases/GeneratedResultLineageReadUseCaseContracts";
+import { GeneratedResultLineageReadErrorCodes } from "@application/generated-results/use-cases/GeneratedResultLineageReadUseCaseContracts";
+import type {
   IOpenGeneratedResultPreviewContentUseCase,
   IRequestGeneratedResultPreviewContentUseCase,
 } from "@application/generated-results/use-cases/GetGeneratedResultPreviewContentUseCaseContracts";
@@ -13,6 +18,10 @@ import {
   type OpenGeneratedResultPreviewContentStreamApiResponse,
   type OpenGeneratedResultOriginalContentStreamApiRequest,
   type OpenGeneratedResultOriginalContentStreamApiResponse,
+  type GetGeneratedResultLineageSummaryApiRequest,
+  type GetGeneratedResultLineageSummaryApiResponse,
+  type GetGeneratedResultLineageDetailApiRequest,
+  type GetGeneratedResultLineageDetailApiResponse,
   type RequestGeneratedResultPreviewApiRequest,
   type RequestGeneratedResultPreviewApiResponse,
 } from "./sdk/PublicGeneratedResultManagementApiContract";
@@ -21,6 +30,8 @@ export interface GeneratedResultManagementBackendApiDependencies {
   readonly getGeneratedResultOriginalContentUseCase: IGetGeneratedResultOriginalContentUseCase;
   readonly requestGeneratedResultPreviewContentUseCase: IRequestGeneratedResultPreviewContentUseCase;
   readonly openGeneratedResultPreviewContentUseCase: IOpenGeneratedResultPreviewContentUseCase;
+  readonly getGeneratedResultLineageSummaryUseCase: IGetGeneratedResultLineageSummaryUseCase;
+  readonly getGeneratedResultLineageDetailUseCase: IGetGeneratedResultLineageDetailUseCase;
 }
 
 export class GeneratedResultManagementBackendApi {
@@ -174,6 +185,74 @@ export class GeneratedResultManagementBackendApi {
     };
   }
 
+  public async getGeneratedResultLineageSummary(
+    request: GetGeneratedResultLineageSummaryApiRequest,
+  ): Promise<GeneratedResultManagementApiResponse<GetGeneratedResultLineageSummaryApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        GeneratedResultManagementApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const outcome = await this.dependencies.getGeneratedResultLineageSummaryUseCase.execute({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      resultAssetId: request.resultAssetId,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromLineageReadError(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        lineage: outcome.value.lineage,
+      }),
+    };
+  }
+
+  public async getGeneratedResultLineageDetail(
+    request: GetGeneratedResultLineageDetailApiRequest,
+  ): Promise<GeneratedResultManagementApiResponse<GetGeneratedResultLineageDetailApiResponse>> {
+    const actorUserIdentityId = normalizeRequired(request.actorUserIdentityId);
+    if (!actorUserIdentityId) {
+      return this.failed(
+        GeneratedResultManagementApiErrorCodes.invalidRequest,
+        "actorUserIdentityId is required.",
+      );
+    }
+
+    const outcome = await this.dependencies.getGeneratedResultLineageDetailUseCase.execute({
+      actorUserId: actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      resultAssetId: request.resultAssetId,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!outcome.ok) {
+      return this.failedFromLineageReadError(
+        outcome.error.code,
+        outcome.error.message,
+        outcome.error.details,
+      );
+    }
+
+    return {
+      ok: true,
+      data: Object.freeze({
+        lineage: outcome.value.lineage,
+      }),
+    };
+  }
+
   private failedFromOriginalContentReadError(
     code: typeof GeneratedResultOriginalContentReadErrorCodes[keyof typeof GeneratedResultOriginalContentReadErrorCodes],
     message: string,
@@ -209,6 +288,23 @@ export class GeneratedResultManagementBackendApi {
       case GeneratedResultPreviewContentReadErrorCodes.invalidState:
       case GeneratedResultPreviewContentReadErrorCodes.contentUnavailable:
         return this.failed(GeneratedResultManagementApiErrorCodes.invalidState, message, details);
+      default:
+        return this.failed(GeneratedResultManagementApiErrorCodes.internal, message, details);
+    }
+  }
+
+  private failedFromLineageReadError(
+    code: typeof GeneratedResultLineageReadErrorCodes[keyof typeof GeneratedResultLineageReadErrorCodes],
+    message: string,
+    details?: Readonly<Record<string, unknown>>,
+  ): GeneratedResultManagementApiResponse<never> {
+    switch (code) {
+      case GeneratedResultLineageReadErrorCodes.invalidRequest:
+        return this.failed(GeneratedResultManagementApiErrorCodes.invalidRequest, message, details);
+      case GeneratedResultLineageReadErrorCodes.accessDenied:
+        return this.failed(GeneratedResultManagementApiErrorCodes.forbidden, message, details);
+      case GeneratedResultLineageReadErrorCodes.notFound:
+        return this.failed(GeneratedResultManagementApiErrorCodes.notFound, message, details);
       default:
         return this.failed(GeneratedResultManagementApiErrorCodes.internal, message, details);
     }

@@ -7,6 +7,15 @@ import {
   type IGetGeneratedResultOriginalContentUseCase,
 } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
 import {
+  GeneratedResultLineageReadErrorCodes,
+  type GeneratedResultLineageReadResult,
+  type GetGeneratedResultLineageDetailSuccess,
+  type GetGeneratedResultLineageRequest,
+  type GetGeneratedResultLineageSummarySuccess,
+  type IGetGeneratedResultLineageDetailUseCase,
+  type IGetGeneratedResultLineageSummaryUseCase,
+} from "@application/generated-results/use-cases/GeneratedResultLineageReadUseCaseContracts";
+import {
   GeneratedResultPreviewContentReadErrorCodes,
   type GeneratedResultPreviewContentReadResult,
   type IOpenGeneratedResultPreviewContentUseCase,
@@ -141,15 +150,107 @@ class StubOpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedResu
   }
 }
 
+class StubGetGeneratedResultLineageSummaryUseCase implements IGetGeneratedResultLineageSummaryUseCase {
+  public mode: "success" | "access-denied" = "success";
+
+  public async execute(
+    _request: GetGeneratedResultLineageRequest,
+  ): Promise<GeneratedResultLineageReadResult<GetGeneratedResultLineageSummarySuccess>> {
+    if (this.mode === "access-denied") {
+      return {
+        ok: false,
+        error: Object.freeze({
+          code: GeneratedResultLineageReadErrorCodes.accessDenied,
+          message: "Forbidden.",
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      value: Object.freeze({
+        lineage: Object.freeze({
+          resultAssetId: "gr-asset-001",
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          inputAssetCount: 2,
+          hasWorkflowTemplateVersion: true,
+          hasSystemSnapshot: true,
+          hasParameterSnapshot: true,
+          hasSelectedNode: true,
+        }),
+      }),
+    };
+  }
+}
+
+class StubGetGeneratedResultLineageDetailUseCase implements IGetGeneratedResultLineageDetailUseCase {
+  public mode: "success" | "not-found" = "success";
+
+  public async execute(
+    _request: GetGeneratedResultLineageRequest,
+  ): Promise<GeneratedResultLineageReadResult<GetGeneratedResultLineageDetailSuccess>> {
+    if (this.mode === "not-found") {
+      return {
+        ok: false,
+        error: Object.freeze({
+          code: GeneratedResultLineageReadErrorCodes.notFound,
+          message: "Not found.",
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      value: Object.freeze({
+        lineage: Object.freeze({
+          summary: Object.freeze({
+            resultAssetId: "gr-asset-001",
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 1,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          source: Object.freeze({
+            workflowTemplateVersionId: "wf-version-1",
+            executionAdapterKind: "comfyui",
+            executionBackendFamily: "comfyui",
+          }),
+          upstreamInputs: Object.freeze([Object.freeze({ assetId: "input-asset-001" })]),
+          graph: Object.freeze({
+            nodes: Object.freeze([Object.freeze({
+              nodeId: "lineage-node:result:gr-asset-001",
+              nodeType: "result",
+              referenceId: "gr-asset-001",
+            })]),
+            edges: Object.freeze([]),
+          }),
+        }),
+      }),
+    };
+  }
+}
+
 describe("GeneratedResultManagementBackendApi", () => {
   it("returns invalid-request when actor identity is missing", async () => {
     const useCase = new StubGetGeneratedResultOriginalContentUseCase();
     const previewRequestUseCase = new StubRequestGeneratedResultPreviewContentUseCase();
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
+    const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
+    const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
     const api = new GeneratedResultManagementBackendApi({
       getGeneratedResultOriginalContentUseCase: useCase,
       requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
       openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
+      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
+      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -167,11 +268,15 @@ describe("GeneratedResultManagementBackendApi", () => {
     const previewRequestUseCase = new StubRequestGeneratedResultPreviewContentUseCase();
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
     useCase.mode = "access-denied";
+    const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
+    const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
 
     const api = new GeneratedResultManagementBackendApi({
       getGeneratedResultOriginalContentUseCase: useCase,
       requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
       openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
+      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
+      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -189,11 +294,15 @@ describe("GeneratedResultManagementBackendApi", () => {
     const previewRequestUseCase = new StubRequestGeneratedResultPreviewContentUseCase();
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
     useCase.mode = "invalid-state";
+    const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
+    const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
 
     const api = new GeneratedResultManagementBackendApi({
       getGeneratedResultOriginalContentUseCase: useCase,
       requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
       openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
+      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
+      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -210,10 +319,14 @@ describe("GeneratedResultManagementBackendApi", () => {
     const useCase = new StubGetGeneratedResultOriginalContentUseCase();
     const previewRequestUseCase = new StubRequestGeneratedResultPreviewContentUseCase();
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
+    const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
+    const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
     const api = new GeneratedResultManagementBackendApi({
       getGeneratedResultOriginalContentUseCase: useCase,
       requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
       openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
+      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
+      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -242,6 +355,8 @@ describe("GeneratedResultManagementBackendApi", () => {
       getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
       requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
       openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
+      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
+      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
     });
 
     const response = await api.requestGeneratedResultPreview({
@@ -266,6 +381,8 @@ describe("GeneratedResultManagementBackendApi", () => {
       getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
       requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
       openGeneratedResultPreviewContentUseCase: openUseCase,
+      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
+      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
     });
 
     const response = await api.openGeneratedResultPreviewContentStream({
@@ -277,5 +394,49 @@ describe("GeneratedResultManagementBackendApi", () => {
 
     expect(response.ok).toBeFalse();
     expect(response.error?.code).toBe("invalid-state");
+  });
+
+  it("returns lineage summary for authorized callers", async () => {
+    const api = new GeneratedResultManagementBackendApi({
+      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
+      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
+      openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
+      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
+      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
+    });
+
+    const response = await api.getGeneratedResultLineageSummary({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      resultAssetId: "gr-asset-001",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+    expect(response.data.lineage.resultAssetId).toBe("gr-asset-001");
+    expect(response.data.lineage.inputAssetCount).toBe(2);
+  });
+
+  it("maps lineage-detail not-found to not-found API error", async () => {
+    const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
+    lineageDetailUseCase.mode = "not-found";
+    const api = new GeneratedResultManagementBackendApi({
+      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
+      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
+      openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
+      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
+      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    });
+
+    const response = await api.getGeneratedResultLineageDetail({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      resultAssetId: "missing-result",
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("not-found");
   });
 });

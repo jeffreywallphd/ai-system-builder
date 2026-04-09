@@ -98,3 +98,87 @@ export interface OpenGeneratedResultPreviewContentStreamApiResponse {
   readonly contentDispositionFileName: string;
   readonly stream: AsyncIterable<Uint8Array>;
 }
+
+export interface GetGeneratedResultLineageSummaryApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly resultAssetId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface GetGeneratedResultLineageSummaryApiResponse {
+  readonly lineage: {
+    readonly resultAssetId: string;
+    readonly runId: string;
+    readonly systemId: string;
+    readonly workflowId: string;
+    readonly workflowTemplateId?: string;
+    readonly executionNodeId?: string;
+    readonly outputSlot: string;
+    readonly inputAssetCount: number;
+    readonly hasWorkflowTemplateVersion: boolean;
+    readonly hasSystemSnapshot: boolean;
+    readonly hasParameterSnapshot: boolean;
+    readonly hasSelectedNode: boolean;
+  };
+}
+
+export interface GetGeneratedResultLineageDetailApiRequest {
+  readonly actorUserIdentityId: string;
+  readonly workspaceId: string;
+  readonly resultAssetId: string;
+  readonly correlationId?: string;
+  readonly occurredAt?: string;
+}
+
+export interface GetGeneratedResultLineageDetailApiResponse {
+  readonly lineage: {
+    readonly summary: {
+      readonly resultAssetId: string;
+      readonly runId: string;
+      readonly systemId: string;
+      readonly workflowId: string;
+      readonly workflowTemplateId?: string;
+      readonly executionNodeId?: string;
+      readonly outputSlot: string;
+      readonly inputAssetCount: number;
+      readonly hasWorkflowTemplateVersion: boolean;
+      readonly hasSystemSnapshot: boolean;
+      readonly hasParameterSnapshot: boolean;
+      readonly hasSelectedNode: boolean;
+    };
+    readonly source: {
+      readonly workflowTemplateVersionId?: string;
+      readonly workflowTemplateVersionTag?: string;
+      readonly systemSnapshotId?: string;
+      readonly systemVersionTag?: string;
+      readonly parameterSnapshotId?: string;
+      readonly selectedNodeId?: string;
+      readonly executionAdapterKind?: string;
+      readonly executionBackendFamily?: string;
+    };
+    readonly upstreamInputs: ReadonlyArray<{
+      readonly assetId: string;
+    }>;
+    readonly graph: {
+      readonly nodes: ReadonlyArray<{
+        readonly nodeId: string;
+        readonly nodeType: "result" | "run" | "workflow" | "system" | "execution-node" | "input-asset";
+        readonly referenceId: string;
+        readonly label?: string;
+      }>;
+      readonly edges: ReadonlyArray<{
+        readonly edgeId: string;
+        readonly fromNodeId: string;
+        readonly toNodeId: string;
+        readonly relation:
+        | "produced-by-run"
+        | "run-used-workflow"
+        | "run-targeted-system"
+        | "run-executed-on-node"
+        | "result-derived-from-input";
+      }>;
+    };
+  };
+}

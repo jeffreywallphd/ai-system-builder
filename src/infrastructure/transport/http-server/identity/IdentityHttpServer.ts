@@ -153,6 +153,8 @@ import {
 import {
   GeneratedResultManagementApiErrorCodes,
   type GeneratedResultManagementApiResponse,
+  type GetGeneratedResultLineageDetailApiRequest,
+  type GetGeneratedResultLineageSummaryApiRequest,
   type OpenGeneratedResultPreviewContentStreamApiRequest,
   type OpenGeneratedResultOriginalContentStreamApiRequest,
   type RequestGeneratedResultPreviewApiRequest,
@@ -4361,6 +4363,96 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             });
             const apiResponse = await options.storageManagementBackendApi.getStorageInstanceDetail(detailRequest);
             const statusCode = mapStorageManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && path.endsWith("/lineage/summary")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage/summary");
+            if (!resultAssetId || resultAssetId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and resultAssetId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const summaryRequest: GetGeneratedResultLineageSummaryApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.getGeneratedResultLineageSummary(
+              summaryRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, summaryRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && path.endsWith("/lineage")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/lineage");
+            if (!resultAssetId || resultAssetId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and resultAssetId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const detailRequest: GetGeneratedResultLineageDetailApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.getGeneratedResultLineageDetail(
+              detailRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
           },

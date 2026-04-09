@@ -135,6 +135,8 @@ import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { GenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase";
 import { GetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase";
+import { GetGeneratedResultLineageDetailUseCase } from "@application/generated-results/use-cases/GetGeneratedResultLineageDetailUseCase";
+import { GetGeneratedResultLineageSummaryUseCase } from "@application/generated-results/use-cases/GetGeneratedResultLineageSummaryUseCase";
 import { OpenGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/OpenGeneratedResultPreviewContentUseCase";
 import { RequestGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/RequestGeneratedResultPreviewContentUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
@@ -1306,6 +1308,16 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       storageLogicalAccessResolutionService,
       workspaceAuthorizationReadRepository: workspaceRepository,
       previewAccessPort: generatedResultPreviewAccessPort,
+      clock: workspaceClock,
+    }),
+    getGeneratedResultLineageSummaryUseCase: new GetGeneratedResultLineageSummaryUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    getGeneratedResultLineageDetailUseCase: new GetGeneratedResultLineageDetailUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
       clock: workspaceClock,
     }),
   });

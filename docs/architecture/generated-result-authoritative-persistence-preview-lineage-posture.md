@@ -318,3 +318,35 @@ Generated-result previews now have authenticated request/open retrieval flows co
 - Pending/missing/failed conditions are returned as structured responses without leaking raw storage object layout.
 - Stale/invalid preview tokens return explicit invalid-state failures requiring a new preview request.
 
+## Story 6.3.3 lineage retrieval and inspection use cases (implemented)
+
+Generated-result lineage retrieval is now implemented as dedicated application use cases and authenticated API routes so result provenance can be inspected without backend-internal coupling.
+
+- Application use cases:
+  - `GetGeneratedResultLineageSummaryUseCase`
+  - `GetGeneratedResultLineageDetailUseCase`
+  - `GeneratedResultLineageReadUseCaseContracts`
+- Projection helper:
+  - `GeneratedResultLineageProjection`
+- Backend and transport wiring:
+  - `GeneratedResultManagementBackendApi` lineage handlers
+  - `GET /api/v1/generated-results/:resultAssetId/lineage/summary`
+  - `GET /api/v1/generated-results/:resultAssetId/lineage`
+
+### Retrieval posture
+
+- Authorization mirrors existing generated-result visibility rules: active workspace membership is required and private results are owner/admin-gated with safe not-found behavior.
+- Lineage responses are assembled from authoritative generated-result persistence records (`generated_result_records` + lineage pointers), not backend execution adapter internals.
+- When dedicated lineage records are absent, lineage projection safely falls back to canonical persisted result metadata fields.
+
+### Inspection output shape
+
+- Summary output exposes run/workflow/system/node linkage plus explainability booleans (`hasWorkflowTemplateVersion`, `hasSystemSnapshot`, `hasParameterSnapshot`, `hasSelectedNode`) and `inputAssetCount`.
+- Detail output adds:
+  - immutable source snapshot references (workflow template version/tag, system snapshot/version tag, parameter snapshot),
+  - execution provenance (selected node, adapter kind, backend family),
+  - upstream input asset ids,
+  - deterministic lineage graph nodes/edges connecting result, run, workflow, system, optional execution node, and input assets.
+
+This establishes a stable lineage-inspection contract for future result detail panes, reuse flows, debugging tooling, and governance/admin review surfaces.
+
