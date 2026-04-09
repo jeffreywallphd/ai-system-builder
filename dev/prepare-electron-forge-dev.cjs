@@ -72,63 +72,6 @@ async function prepareDesktopDevStart() {
   }
 }
 
-function canLoadBetterSqlite3() {
-  try {
-    const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
-    const BetterSqlite3 = moduleRequire("better-sqlite3");
-    return verifyBetterSqlite3Runtime(BetterSqlite3);
-  } catch {
-    return false;
-  }
-}
-
-function verifyBetterSqlite3Runtime(moduleExport) {
-  const BetterSqlite3 = resolveBetterSqlite3Constructor(moduleExport);
-  if (!BetterSqlite3) {
-    return false;
-  }
-
-  let database;
-  try {
-    database = new BetterSqlite3(":memory:");
-    return true;
-  } catch {
-    return false;
-  } finally {
-    if (database && typeof database.close === "function") {
-      try {
-        database.close();
-      } catch {
-        // Ignore best-effort cleanup failure.
-      }
-    }
-  }
-}
-
-function resolveBetterSqlite3Constructor(moduleExport) {
-  let candidate = moduleExport;
-  const visitedCandidates = new Set();
-
-  while (candidate && (typeof candidate === "function" || typeof candidate === "object")) {
-    if (typeof candidate === "function") {
-      return candidate;
-    }
-
-    if (visitedCandidates.has(candidate)) {
-      break;
-    }
-    visitedCandidates.add(candidate);
-
-    if (!Object.prototype.hasOwnProperty.call(candidate, "default")) {
-      break;
-    }
-
-    candidate = candidate.default;
-  }
-
-  return undefined;
-}
-
 function canLoadBetterSqlite3InElectronRuntime() {
   try {
     const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
@@ -137,50 +80,7 @@ function canLoadBetterSqlite3InElectronRuntime() {
       return false;
     }
 
-    const script = [
-      "try {",
-      "  const BetterSqlite3 = require('better-sqlite3');",
-      "  const resolveBetterSqlite3Constructor = (moduleExport) => {",
-      "    let candidate = moduleExport;",
-      "    const visitedCandidates = new Set();",
-      "    while (candidate && (typeof candidate === 'function' || typeof candidate === 'object')) {",
-      "      if (typeof candidate === 'function') return candidate;",
-      "      if (visitedCandidates.has(candidate)) break;",
-      "      visitedCandidates.add(candidate);",
-      "      if (!Object.prototype.hasOwnProperty.call(candidate, 'default')) break;",
-      "      candidate = candidate.default;",
-      "    }",
-      "    return undefined;",
-      "  };",
-      "  const verifyBetterSqlite3Runtime = (moduleExport) => {",
-      "    const BetterSqlite3Constructor = resolveBetterSqlite3Constructor(moduleExport);",
-      "    if (!BetterSqlite3Constructor) return false;",
-      "    let database;",
-      "    try {",
-      "      database = new BetterSqlite3Constructor(':memory:');",
-      "      return true;",
-      "    } catch {",
-      "      return false;",
-      "    } finally {",
-      "      if (database && typeof database.close === 'function') {",
-      "        try {",
-      "          database.close();",
-      "        } catch {",
-      "          // Ignore best-effort cleanup failure.",
-      "        }",
-      "      }",
-      "    }",
-      "  };",
-      "  if (!verifyBetterSqlite3Runtime(BetterSqlite3)) {",
-      "    process.exit(1);",
-      "  }",
-      "  process.exit(0);",
-      "} catch (error) {",
-      "  const message = error && error.message ? error.message : String(error);",
-      "  console.error(message);",
-      "  process.exit(1);",
-      "}",
-    ].join("\n");
+    const script = createBetterSqlite3RuntimeProbeScript();
 
     const result = spawnSync(electronBinaryPath, ["-e", script], {
       cwd: process.cwd(),
@@ -196,6 +96,53 @@ function canLoadBetterSqlite3InElectronRuntime() {
   } catch {
     return false;
   }
+}
+
+function createBetterSqlite3RuntimeProbeScript() {
+  return [
+    "try {",
+    "  const BetterSqlite3 = require('better-sqlite3');",
+    "  const resolveBetterSqlite3Constructor = (moduleExport) => {",
+    "    let candidate = moduleExport;",
+    "    const visitedCandidates = new Set();",
+    "    while (candidate && (typeof candidate === 'function' || typeof candidate === 'object')) {",
+    "      if (typeof candidate === 'function') return candidate;",
+    "      if (visitedCandidates.has(candidate)) break;",
+    "      visitedCandidates.add(candidate);",
+    "      if (!Object.prototype.hasOwnProperty.call(candidate, 'default')) break;",
+    "      candidate = candidate.default;",
+    "    }",
+    "    return undefined;",
+    "  };",
+    "  const verifyBetterSqlite3Runtime = (moduleExport) => {",
+    "    const BetterSqlite3Constructor = resolveBetterSqlite3Constructor(moduleExport);",
+    "    if (!BetterSqlite3Constructor) return false;",
+    "    let database;",
+    "    try {",
+    "      database = new BetterSqlite3Constructor(':memory:');",
+    "      return true;",
+    "    } catch {",
+    "      return false;",
+    "    } finally {",
+    "      if (database && typeof database.close === 'function') {",
+    "        try {",
+    "          database.close();",
+    "        } catch {",
+    "          // Ignore best-effort cleanup failure.",
+    "        }",
+    "      }",
+    "    }",
+    "  };",
+    "  if (!verifyBetterSqlite3Runtime(BetterSqlite3)) {",
+    "    process.exit(1);",
+    "  }",
+    "  process.exit(0);",
+    "} catch (error) {",
+    "  const message = error && error.message ? error.message : String(error);",
+    "  console.error(message);",
+    "  process.exit(1);",
+    "}",
+  ].join("\n");
 }
 
 function resolveInstalledElectronVersion() {
@@ -277,7 +224,7 @@ function rebuildBetterSqlite3ForElectron() {
 }
 
 async function ensureElectronNativeModuleCompatibility() {
-  if (canLoadBetterSqlite3() && canLoadBetterSqlite3InElectronRuntime()) {
+  if (canLoadBetterSqlite3InElectronRuntime()) {
     return;
   }
 
@@ -286,7 +233,7 @@ async function ensureElectronNativeModuleCompatibility() {
   );
   rebuildBetterSqlite3ForElectron();
 
-  if (!canLoadBetterSqlite3() || !canLoadBetterSqlite3InElectronRuntime()) {
+  if (!canLoadBetterSqlite3InElectronRuntime()) {
     throw new Error(
       "[dev-preflight] better-sqlite3 remains unavailable after rebuild. " +
         "Delete node_modules, reinstall dependencies, and ensure native build prerequisites are installed.",
