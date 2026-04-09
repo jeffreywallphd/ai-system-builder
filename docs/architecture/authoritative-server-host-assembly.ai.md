@@ -45,6 +45,10 @@
 - Story 1.4.1 adds a startup harness regression test that simulates authoritative startup and enforces stage order contracts across:
   - shared host bootstrap stages (`configuration`, `dependencies`, `logging`, `security`, `persistence`, `feature-registration`)
   - authoritative staged decomposition (`services`, `security`, `persistence`, `transport`)
+- Story 1.4.2 adds local startup performance baseline recording for authoritative startup:
+  - successful startup runs append baseline samples to `authoritative-server-startup-baseline.json` in the authoritative database directory
+  - each baseline sample records total startup duration and per-stage durations across shared pipeline and authoritative staged decomposition
+  - baseline persistence is best-effort and cannot block startup completion
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `services`
   - `security`
@@ -110,5 +114,6 @@
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
+- `src/hosts/server/AuthoritativeServerStartupBaselineRecorder.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

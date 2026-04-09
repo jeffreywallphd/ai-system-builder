@@ -142,6 +142,18 @@ export interface AuthoritativeServerCompositionRootOptions {
     }) => StartupTracer;
     readonly createConfigStage?: () => AuthoritativeServerConfigBootstrapStage;
     readonly createSecurityStage?: () => AuthoritativeServerSecurityBootstrapStage;
+    readonly recordStartupBaseline?: (measurement: {
+      readonly hostId: string;
+      readonly startupReason: string;
+      readonly outcome: "succeeded" | "failed";
+      readonly durationMs: number;
+      readonly startedAt: string;
+      readonly completedAt: string;
+      readonly traceId?: string;
+      readonly startupCorrelationId?: string;
+      readonly pipelineStageDurations: Readonly<Record<string, number>>;
+      readonly authoritativeStageDurations: Readonly<Record<string, number>>;
+    }) => Promise<void> | void;
   };
 }
 
@@ -753,6 +765,43 @@ export function createAuthoritativeServerCompositionRoot(
           input.hostOptions.logger.info(startupSummary);
         } else {
           console.info(startupSummary);
+        }
+        const startupBaselineMeasurement = Object.freeze({
+          hostId: boot.host.hostId,
+          startupReason: boot.startupReason,
+          outcome: startupSummary.outcome,
+          durationMs: startupSummary.durationMs,
+          startedAt: startupSummary.startedAt,
+          completedAt: startupSummary.completedAt,
+          traceId: startupSummary.traceId,
+          startupCorrelationId: startupSummary.startupCorrelationId,
+          pipelineStageDurations: Object.freeze(Object.fromEntries(
+            pipelineStageSummaries.map((stage) => [stage.stageId, stage.durationMs] as const),
+          )),
+          authoritativeStageDurations: Object.freeze(Object.fromEntries(
+            stageStatus
+              .filter((stage) => typeof stage.durationMs === "number")
+              .map((stage) => [stage.stageId, stage.durationMs ?? 0] as const),
+          )),
+        });
+        if (input.bootstrap?.recordStartupBaseline) {
+          try {
+            await input.bootstrap.recordStartupBaseline(startupBaselineMeasurement);
+          } catch (baselineError) {
+            const baselineErrorSummary = Object.freeze({
+              event: "authoritative-server.startup.baseline-recording.failed",
+              hostId: boot.host.hostId,
+              startupReason: boot.startupReason,
+              traceId: startupSummary.traceId,
+              startupCorrelationId: startupSummary.startupCorrelationId,
+              error: summarizeStartupError(baselineError),
+            });
+            if (input.hostOptions.logger) {
+              input.hostOptions.logger.warn(baselineErrorSummary);
+            } else {
+              console.warn(baselineErrorSummary);
+            }
+          }
         }
       }
     },

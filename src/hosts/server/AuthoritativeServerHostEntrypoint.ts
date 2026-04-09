@@ -14,6 +14,7 @@ import {
   type AuthoritativeServerHostRuntimeHandle,
 } from "./AuthoritativeServerCompositionRoot";
 import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
+import { recordAuthoritativeServerStartupBaseline } from "./AuthoritativeServerStartupBaselineRecorder";
 
 export const AuthoritativeServerHostEnvironmentKeys = Object.freeze({
   databasePath: "AI_LOOM_SERVER_DATABASE_PATH",
@@ -81,10 +82,20 @@ export function createAuthoritativeServerHostBootConfiguration(
 export function constructAuthoritativeServerHostAssembly(
   options: AuthoritativeServerHostEntrypointOptions,
 ): ConstructedAuthoritativeServerHostAssembly {
+  const bootstrap = Object.freeze({
+    ...(options.bootstrap ?? {}),
+    recordStartupBaseline: options.bootstrap?.recordStartupBaseline
+      ?? (async (measurement) => {
+        await recordAuthoritativeServerStartupBaseline({
+          databasePath: options.hostOptions.databasePath,
+          measurement,
+        });
+      }),
+  } satisfies NonNullable<AuthoritativeServerCompositionRootOptions["bootstrap"]>);
   const compositionRoot = createAuthoritativeServerCompositionRoot({
     hostOptions: options.hostOptions,
     startHost: options.startHost,
-    bootstrap: options.bootstrap,
+    bootstrap,
   });
   const boot = createAuthoritativeServerHostBootConfiguration(options.boot);
 
