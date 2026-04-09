@@ -11,6 +11,7 @@ import type {
   IPersistenceDiagnosticsLogger,
   PersistenceDiagnosticsLogEvent,
 } from "@infrastructure/logging/PersistenceDiagnosticsLogger";
+import type { IGenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCaseContracts";
 import { SqliteRunCollectedResultPersistenceAdapter } from "../SqliteRunCollectedResultPersistenceAdapter";
 
 class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRepository {
@@ -108,6 +109,27 @@ class CapturingPersistenceDiagnosticsLogger implements IPersistenceDiagnosticsLo
 
   public error(event: PersistenceDiagnosticsLogEvent): void {
     this.errorEvents.push(event);
+  }
+}
+
+class StubGeneratedResultPreviewGenerationUseCase implements IGenerateGeneratedResultPreviewUseCase {
+  public async execute(): Promise<Awaited<ReturnType<IGenerateGeneratedResultPreviewUseCase["execute"]>>> {
+    return {
+      ok: true,
+      value: Object.freeze({
+        resultAssetId: "gr-result-authoritative-1",
+        workspaceId: "workspace-alpha",
+        derivativeId: "preview-display-safe-1",
+        previewKind: "display-safe",
+        mediaType: "image/webp",
+        width: 512,
+        height: 512,
+        byteSize: 1024,
+        protectedResourceId: "protected-resource://gr-preview-000000000000000000000000",
+        accessHandle: "preview-access://generated-results/token",
+        status: "generated",
+      }),
+    };
   }
 }
 
@@ -467,5 +489,85 @@ describe("SqliteRunCollectedResultPersistenceAdapter", () => {
     expect(previewFailureEvent?.correlation?.resultAssetId).toBe("gr-result-authoritative-1");
     expect(previewFailureEvent?.correlation?.previewDerivativeId).toBeDefined();
     expect(previewFailureEvent?.resilience?.[0]?.scope).toBe("preview-generation");
+  });
+
+  it("uses preview generation use case when configured", async () => {
+    const repository = new InMemoryGeneratedResultRepository();
+    const adapter = new SqliteRunCollectedResultPersistenceAdapter({
+      repository,
+      generateGeneratedResultPreviewUseCase: new StubGeneratedResultPreviewGenerationUseCase(),
+    });
+
+    const result = await adapter.persistCollectedResult({
+      runId: "run:delta:001",
+      workflowId: "workflow:delta",
+      systemId: "system:delta",
+      workspaceId: "workspace-alpha",
+      occurredAt: "2026-04-08T15:00:00.000Z",
+      actorId: "node:trusted-4",
+      operationKey: "op:result-persist:run-delta-001",
+      collectedResult: Object.freeze({
+        schemaVersion: "1.0.0",
+        collectionId: "collection:delta",
+        discoveryId: "discovery:delta",
+        executionJobId: "job:delta",
+        runId: "run:delta:001",
+        workspaceId: "workspace-alpha",
+        collectedAt: "2026-04-08T14:59:59.000Z",
+        status: "collected",
+        discoveredOutputs: Object.freeze([Object.freeze({
+          descriptorId: "descriptor:1",
+          discoveredAt: "2026-04-08T14:59:58.000Z",
+          outputRole: "primary",
+          outputIndex: 0,
+          media: Object.freeze({
+            mediaKind: "image",
+            mimeType: "image/png",
+          }),
+          temporaryReference: Object.freeze({
+            kind: "backend-object-handle",
+            backendFamily: "comfyui",
+            objectHandle: "output:1",
+          }),
+          slotMatch: Object.freeze({
+            status: "matched",
+            outputId: "output:1",
+          }),
+        })]),
+        records: Object.freeze([Object.freeze({
+          descriptorId: "descriptor:1",
+          temporaryReference: Object.freeze({
+            kind: "backend-object-handle",
+            backendFamily: "comfyui",
+            objectHandle: "output:1",
+          }),
+          persistence: Object.freeze({
+            status: "persisted",
+            logicalAsset: Object.freeze({
+              assetId: "gr-result-authoritative-1",
+              logicalAssetReference: "storage-instance://storage-default/generated-results/run-delta/output-1.png",
+              persistedAt: "2026-04-08T14:59:59.500Z",
+            }),
+          }),
+        })]),
+        summary: Object.freeze({
+          discoveredCount: 1,
+          collectedCount: 1,
+          persistedCount: 1,
+          notPersistedCount: 0,
+          failedCount: 0,
+        }),
+      }),
+      terminalResult: Object.freeze({
+        summary: "terminal",
+      }),
+    });
+
+    expect(result.status).toBe("persisted");
+    expect(result.internalDiagnostics).toMatchObject({
+      previewGeneratedCount: 1,
+      previewPendingCount: 0,
+      previewFailedCount: 0,
+    });
   });
 });

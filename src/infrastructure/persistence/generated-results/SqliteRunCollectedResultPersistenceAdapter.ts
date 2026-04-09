@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { IGeneratedResultPersistenceRepository } from "@application/generated-results/ports/IGeneratedResultPersistenceRepository";
+import type { IGenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCaseContracts";
 import {
   ImageManipulationOutputPersistenceStatuses,
   type ImageManipulationCollectedOutputRecord,
@@ -57,6 +58,7 @@ const KnownImageMediaTypes = new Set([
 
 interface SqliteRunCollectedResultPersistenceAdapterDependencies {
   readonly repository: IGeneratedResultPersistenceRepository;
+  readonly generateGeneratedResultPreviewUseCase?: IGenerateGeneratedResultPreviewUseCase;
   readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger;
   readonly now?: () => Date;
 }
@@ -334,6 +336,7 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
     let pendingCount = 0;
     let failedCount = 0;
     let previewPendingCount = 0;
+    let previewGeneratedCount = 0;
     let previewFailedCount = 0;
     let previewProvisioningUnavailableCount = 0;
     let storageUnavailableCount = 0;
@@ -594,98 +597,172 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
           label: normalizeOptional(discovered?.outputRole),
         }));
 
-        const pendingPreview = createPendingPreviewRecord({
-          result: saved.record,
-          workspaceId,
-          actorId,
-          occurredAt,
-        });
-        try {
-          await this.dependencies.repository.savePreview(pendingPreview, {
-            operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}`,
-            context: Object.freeze({
-              actorUserId: actorId,
-              occurredAt,
-              correlationId: request.operationKey,
-              reason: "run-collected-result-preview-pending",
-            }),
-          });
-          previewPendingCount += 1;
-          perRecordDiagnostics.push(Object.freeze({
-            descriptorId: record.descriptorId,
-            resultAssetId: saved.record.resultAssetId,
-            persisted: true,
-            previewProvisioned: true,
-            previewStatus: GeneratedResultDerivativeAvailabilityStatuses.pending,
-          }));
-        } catch (error) {
-          const retryable = isLikelyTemporaryStorageError(error);
-          const previewFailure = classifyOperationalFailure({
-            layer: ImageManipulationIssueLayers.previewGeneration,
-            reason: retryable ? "preview-persistence-temporarily-unavailable" : "preview-persistence-failed",
-            summaryCategory: retryable
-              ? ImageManipulationFailureSummaryCategories.connectivity
-              : ImageManipulationFailureSummaryCategories.output,
-            retryable,
-            degraded: true,
-          });
-          const failureCode = previewFailure.classification.issueCode;
-          const failureMessage = retryable
-            ? "Preview provisioning is temporarily unavailable."
-            : "Preview provisioning failed.";
-          const previewResilience = deriveImageManipulationResilienceDiagnostics({
-            diagnostics: [Object.freeze({
-              code: failureCode,
-              category: retryable ? "degraded" : "operational",
-              summary: failureMessage,
-              retryable: previewFailure.recovery.retryEligible,
-              degraded: previewFailure.classification.degraded,
-              recoveryKind: previewFailure.recovery.recoveryKind,
-              retryAfterMs: previewFailure.recovery.retryAfterMs,
-              scope: "preview-generation",
-              state: "preview-persistence-failed",
-            })],
-            defaultCode: failureCode,
-            defaultSummary: failureMessage,
-          });
-          this.recordPersistenceDiagnostic({
-            level: retryable ? "warn" : "error",
-            operation: "persist-collected-result.save-preview",
-            code: failureCode,
-            retryable,
+        if (!this.dependencies.generateGeneratedResultPreviewUseCase) {
+          const pendingPreview = createPendingPreviewRecord({
+            result: saved.record,
+            workspaceId,
+            actorId,
             occurredAt,
-            request,
-            resultAssetId: saved.record.resultAssetId,
-            previewDerivativeId: pendingPreview.derivativeId,
-            resilience: previewResilience,
-            details: Object.freeze({
-              message: failureMessage,
-              outputDescriptorId: record.descriptorId,
-              event: "preview-pending-save-failed",
-              errorSummary: toSafeErrorSummary(error),
-              classification: previewFailure.classification,
-              recovery: previewFailure.recovery,
-            }),
           });
           try {
-            await this.dependencies.repository.savePreview(createFailedPreviewRecord({
-              pendingRecord: pendingPreview,
-              actorId,
-              occurredAt,
-              failureCode,
-              failureMessage,
-            }), {
-              operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}:failed`,
+            await this.dependencies.repository.savePreview(pendingPreview, {
+              operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}`,
               context: Object.freeze({
                 actorUserId: actorId,
                 occurredAt,
                 correlationId: request.operationKey,
-                reason: "run-collected-result-preview-failed",
-                metadata: Object.freeze({
-                  originalError: error instanceof Error ? error.message : "Unknown error",
-                }),
+                reason: "run-collected-result-preview-pending",
               }),
             });
+            previewPendingCount += 1;
+            perRecordDiagnostics.push(Object.freeze({
+              descriptorId: record.descriptorId,
+              resultAssetId: saved.record.resultAssetId,
+              persisted: true,
+              previewProvisioned: true,
+              previewStatus: GeneratedResultDerivativeAvailabilityStatuses.pending,
+            }));
+          } catch (error) {
+            const retryable = isLikelyTemporaryStorageError(error);
+            const previewFailure = classifyOperationalFailure({
+              layer: ImageManipulationIssueLayers.previewGeneration,
+              reason: retryable ? "preview-persistence-temporarily-unavailable" : "preview-persistence-failed",
+              summaryCategory: retryable
+                ? ImageManipulationFailureSummaryCategories.connectivity
+                : ImageManipulationFailureSummaryCategories.output,
+              retryable,
+              degraded: true,
+            });
+            const failureCode = previewFailure.classification.issueCode;
+            const failureMessage = retryable
+              ? "Preview provisioning is temporarily unavailable."
+              : "Preview provisioning failed.";
+            const previewResilience = deriveImageManipulationResilienceDiagnostics({
+              diagnostics: [Object.freeze({
+                code: failureCode,
+                category: retryable ? "degraded" : "operational",
+                summary: failureMessage,
+                retryable: previewFailure.recovery.retryEligible,
+                degraded: previewFailure.classification.degraded,
+                recoveryKind: previewFailure.recovery.recoveryKind,
+                retryAfterMs: previewFailure.recovery.retryAfterMs,
+                scope: "preview-generation",
+                state: "preview-persistence-failed",
+              })],
+              defaultCode: failureCode,
+              defaultSummary: failureMessage,
+            });
+            this.recordPersistenceDiagnostic({
+              level: retryable ? "warn" : "error",
+              operation: "persist-collected-result.save-preview",
+              code: failureCode,
+              retryable,
+              occurredAt,
+              request,
+              resultAssetId: saved.record.resultAssetId,
+              previewDerivativeId: pendingPreview.derivativeId,
+              resilience: previewResilience,
+              details: Object.freeze({
+                message: failureMessage,
+                outputDescriptorId: record.descriptorId,
+                event: "preview-pending-save-failed",
+                errorSummary: toSafeErrorSummary(error),
+                classification: previewFailure.classification,
+                recovery: previewFailure.recovery,
+              }),
+            });
+            try {
+              await this.dependencies.repository.savePreview(createFailedPreviewRecord({
+                pendingRecord: pendingPreview,
+                actorId,
+                occurredAt,
+                failureCode,
+                failureMessage,
+              }), {
+                operationKey: `${request.operationKey}:preview:${pendingPreview.derivativeId}:failed`,
+                context: Object.freeze({
+                  actorUserId: actorId,
+                  occurredAt,
+                  correlationId: request.operationKey,
+                  reason: "run-collected-result-preview-failed",
+                  metadata: Object.freeze({
+                    originalError: error instanceof Error ? error.message : "Unknown error",
+                  }),
+                }),
+              });
+              previewFailedCount += 1;
+              perRecordDiagnostics.push(Object.freeze({
+                descriptorId: record.descriptorId,
+                resultAssetId: saved.record.resultAssetId,
+                persisted: true,
+                previewProvisioned: false,
+                previewStatus: GeneratedResultDerivativeAvailabilityStatuses.failed,
+                failure: Object.freeze({
+                  code: failureCode,
+                  message: failureMessage,
+                  classification: previewFailure.classification,
+                  recovery: previewFailure.recovery,
+                  originalError: error instanceof Error ? error.message : "Unknown error",
+                }),
+              }));
+            } catch {
+              this.recordPersistenceDiagnostic({
+                level: "error",
+                operation: "persist-collected-result.save-preview-fallback",
+                code: failureCode,
+                retryable: false,
+                occurredAt,
+                request,
+                resultAssetId: saved.record.resultAssetId,
+                previewDerivativeId: pendingPreview.derivativeId,
+                resilience: previewResilience,
+                details: Object.freeze({
+                  message: "Failed to persist preview failed state after pending preview save failure.",
+                  outputDescriptorId: record.descriptorId,
+                  event: "preview-failed-record-save-failed",
+                  failedPreviewRecordPersisted: false,
+                }),
+              });
+              previewProvisioningUnavailableCount += 1;
+              perRecordDiagnostics.push(Object.freeze({
+                descriptorId: record.descriptorId,
+                resultAssetId: saved.record.resultAssetId,
+                persisted: true,
+                previewProvisioned: false,
+                previewStatus: "untracked",
+                failure: Object.freeze({
+                  code: failureCode,
+                  message: failureMessage,
+                  classification: previewFailure.classification,
+                  recovery: previewFailure.recovery,
+                  originalError: error instanceof Error ? error.message : "Unknown error",
+                  failedPreviewRecordPersisted: false,
+                }),
+              }));
+            }
+          }
+        } else {
+          const previewOutcome = await this.dependencies.generateGeneratedResultPreviewUseCase.execute({
+            resultAssetId: saved.record.resultAssetId,
+            workspaceId,
+            actorUserId: actorId,
+            operationKey: `${request.operationKey}:preview-generation:${saved.record.resultAssetId}`,
+            previewKind: GeneratedResultPreviewKinds.displaySafe,
+            correlationId: request.operationKey,
+            occurredAt,
+          });
+          if (previewOutcome.ok) {
+            previewGeneratedCount += 1;
+            perRecordDiagnostics.push(Object.freeze({
+              descriptorId: record.descriptorId,
+              resultAssetId: saved.record.resultAssetId,
+              persisted: true,
+              previewProvisioned: true,
+              previewStatus: GeneratedResultDerivativeAvailabilityStatuses.available,
+              previewDerivativeId: previewOutcome.value.derivativeId,
+              previewKind: previewOutcome.value.previewKind,
+            }));
+          } else {
             previewFailedCount += 1;
             perRecordDiagnostics.push(Object.freeze({
               descriptorId: record.descriptorId,
@@ -694,47 +771,38 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
               previewProvisioned: false,
               previewStatus: GeneratedResultDerivativeAvailabilityStatuses.failed,
               failure: Object.freeze({
-                code: failureCode,
-                message: failureMessage,
-                classification: previewFailure.classification,
-                recovery: previewFailure.recovery,
-                originalError: error instanceof Error ? error.message : "Unknown error",
+                code: previewOutcome.error.code,
+                message: previewOutcome.error.message,
+                retryable: previewOutcome.error.retryable,
               }),
             }));
-          } catch {
             this.recordPersistenceDiagnostic({
-              level: "error",
-              operation: "persist-collected-result.save-preview-fallback",
-              code: failureCode,
-              retryable: false,
+              level: previewOutcome.error.retryable ? "warn" : "error",
+              operation: "persist-collected-result.generate-preview",
+              code: previewOutcome.error.code,
+              retryable: previewOutcome.error.retryable,
               occurredAt,
               request,
               resultAssetId: saved.record.resultAssetId,
-              previewDerivativeId: pendingPreview.derivativeId,
-              resilience: previewResilience,
+              resilience: deriveImageManipulationResilienceDiagnostics({
+                diagnostics: [Object.freeze({
+                  code: previewOutcome.error.code,
+                  category: previewOutcome.error.retryable ? "degraded" : "operational",
+                  summary: previewOutcome.error.message,
+                  retryable: previewOutcome.error.retryable,
+                  degraded: previewOutcome.error.retryable,
+                  scope: "preview-generation",
+                  state: "preview-generation-failed",
+                })],
+                defaultCode: previewOutcome.error.code,
+                defaultSummary: previewOutcome.error.message,
+              }),
               details: Object.freeze({
-                message: "Failed to persist preview failed state after pending preview save failure.",
+                message: previewOutcome.error.message,
                 outputDescriptorId: record.descriptorId,
-                event: "preview-failed-record-save-failed",
-                failedPreviewRecordPersisted: false,
+                event: "preview-generation-failed",
               }),
             });
-            previewProvisioningUnavailableCount += 1;
-            perRecordDiagnostics.push(Object.freeze({
-              descriptorId: record.descriptorId,
-              resultAssetId: saved.record.resultAssetId,
-              persisted: true,
-              previewProvisioned: false,
-              previewStatus: "untracked",
-              failure: Object.freeze({
-                code: failureCode,
-                message: failureMessage,
-                classification: previewFailure.classification,
-                recovery: previewFailure.recovery,
-                originalError: error instanceof Error ? error.message : "Unknown error",
-                failedPreviewRecordPersisted: false,
-              }),
-            }));
           }
         }
       } else if (saved.record.status === GeneratedResultAssetStatuses.failedCollection) {
@@ -797,6 +865,7 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         pendingCount,
         failedCount,
         previewPendingCount,
+        previewGeneratedCount,
         previewFailedCount,
         previewProvisioningUnavailableCount,
         storageUnavailableCount,

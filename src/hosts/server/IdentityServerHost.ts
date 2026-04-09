@@ -132,6 +132,7 @@ import { OpenImageAssetPreviewContentUseCase } from "@application/image-assets/u
 import { RequestImageAssetPreviewContentUseCase } from "@application/image-assets/use-cases/RequestImageAssetPreviewContentUseCase";
 import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/InitiateImageAssetCreationUseCase";
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
+import { GenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
@@ -143,6 +144,8 @@ import {
 } from "@infrastructure/storage/local";
 import { ServerManagedStorageSynchronizationAdapter } from "@infrastructure/storage/sync/ServerManagedStorageSynchronizationAdapter";
 import { ManagedImageAssetStorageAdapter } from "@infrastructure/storage/image-assets/ManagedImageAssetStorageAdapter";
+import { SharpGeneratedResultPreviewImageProcessor } from "@infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor";
+import { TokenizedGeneratedResultPreviewAccessPort } from "@infrastructure/media/generated-results/TokenizedGeneratedResultPreviewAccessPort";
 import { EncryptedAssetDownloadGrantAdapter } from "@infrastructure/security/assets/EncryptedAssetDownloadGrantAdapter";
 import { AesGcmAssetContentCipherPort } from "@infrastructure/security/encryption/AesGcmAssetContentCipherPort";
 import { DeterministicScopeEncryptionKeyPort } from "@infrastructure/security/encryption/DeterministicScopeEncryptionKeyPort";
@@ -1272,8 +1275,18 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     observability: auditLedgerObservability,
   });
+  const generatedResultPreviewGenerationUseCase = new GenerateGeneratedResultPreviewUseCase({
+    generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+    storageLogicalAccessResolutionService,
+    previewImageProcessorPort: new SharpGeneratedResultPreviewImageProcessor(),
+    previewAccessPort: new TokenizedGeneratedResultPreviewAccessPort(
+      resolveGeneratedResultPreviewAccessTokenSecret(env),
+    ),
+    clock: workspaceClock,
+  });
   const runCollectedResultPersistencePort = new SqliteRunCollectedResultPersistenceAdapter({
     repository: persistentPlatformServices.generatedResultRepository,
+    generateGeneratedResultPreviewUseCase: generatedResultPreviewGenerationUseCase,
     now: () => workspaceClock.now(),
   });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
@@ -1653,6 +1666,24 @@ function resolveImageAssetStorageTokenSecret(
 
   return createHash("sha256")
     .update(`image-asset-storage:${randomUUID()}`)
+    .digest("base64");
+}
+
+function resolveGeneratedResultPreviewAccessTokenSecret(
+  env: Readonly<Record<string, string | undefined>>,
+): string {
+  const configured = env.AI_LOOM_GENERATED_RESULT_PREVIEW_ACCESS_TOKEN_SECRET?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  const inheritedSecretKey = env.AI_LOOM_SECRET_MASTER_KEY?.trim();
+  if (inheritedSecretKey) {
+    return inheritedSecretKey;
+  }
+
+  return createHash("sha256")
+    .update(`generated-result-preview-access:${randomUUID()}`)
     .digest("base64");
 }
 
