@@ -107,4 +107,32 @@ describe("AuthoritativePersistenceComposition", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("applies trigger-based migrations without splitting trigger bodies into invalid fragments", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "loom-src-authoritative-audit-trigger-migration-"));
+    const databasePath = path.join(root, "audit-trigger-migration.sqlite");
+    const database = openSqliteCompatDatabase(databasePath);
+
+    try {
+      const hooks = createAuthoritativePersistenceMigrationHooks();
+      const v1 = hooks.find((migration) => migration.migrationId === "audit-ledger:v1");
+      const v2 = hooks.find((migration) => migration.migrationId === "audit-ledger:v2");
+      expect(v1).toBeDefined();
+      expect(v2).toBeDefined();
+
+      expect(() => v1?.apply(database)).not.toThrow();
+      expect(() => v2?.apply(database)).not.toThrow();
+
+      const trigger = database.prepare(`
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'trigger'
+          AND name = 'authoritative_audit_ledger_events_hash_chain_digest_required'
+      `).get() as { name?: string } | undefined;
+      expect(trigger?.name).toBe("authoritative_audit_ledger_events_hash_chain_digest_required");
+    } finally {
+      database.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
