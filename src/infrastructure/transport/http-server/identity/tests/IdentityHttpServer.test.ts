@@ -383,6 +383,21 @@ describe("IdentityHttpServer", () => {
     expect(body.data.status).toBe("ready");
   });
 
+  it("logs canonical request paths for readiness probes that include query suffixes", async () => {
+    const logger = new CapturingLogger();
+    const { baseUrl } = await startServer(logger);
+
+    const response = await fetch(`${baseUrl}/?probe=desktop-startup`, {
+      method: "GET",
+    });
+
+    expect(response.status).toBe(200);
+    const receivedEvent = logger.events.find((entry) => entry.event === "identity-http.request.received");
+    const completedEvent = logger.events.find((entry) => entry.event === "identity-http.request.completed");
+    expect(receivedEvent?.path).toBe("/");
+    expect(completedEvent?.path).toBe("/");
+  });
+
   it("sanitizes unhandled internal errors before sending responses", async () => {
     const logger = new CapturingLogger();
     const { baseUrl } = await startServer(
