@@ -182,3 +182,36 @@ Protected original-content retrieval for generated-result assets is now implemen
 
 This keeps retrieval policy-gated, storage-abstracted, and non-guessable while preserving compatibility with future protected-handle export/share policy flows.
 
+## Story 6.2.4 result query and listing baseline (implemented)
+
+Generated-result discovery now has authoritative metadata query/list use cases for gallery and run-history surfaces:
+
+- `src/application/generated-results/use-cases/GetGeneratedResultMetadataUseCase.ts`
+- `src/application/generated-results/use-cases/ListGeneratedResultMetadataUseCase.ts`
+- `src/application/generated-results/use-cases/GeneratedResultMetadataReadUseCaseContracts.ts`
+
+### Query/list behavior
+
+- `get` returns a single generated result by `resultAssetId` and `workspaceId` from persisted authoritative metadata.
+- `list` returns paged generated-result summaries from the same authoritative persistence records.
+- Supported filter dimensions in use-case contracts:
+  - workspace + actor scope
+  - owner (`ownerUserIds`)
+  - source linkage (`runId`, `systemId`, `workflowId`, `workflowTemplateId`, `executionNodeId`)
+  - lifecycle/visibility (`statuses`, `visibilities`, `includeArchived`)
+  - recent activity windows (`createdAfter/Before`, `updatedAfter/Before`)
+  - preview availability (`previewStates`, `hasPreview`)
+
+### Authorization posture
+
+- Both use cases require active workspace membership.
+- Private results are owner/admin constrained with safe not-found behavior for non-authorized users.
+- Listing applies visibility checks per record before projecting paged response items.
+
+### DTO-ready metadata posture
+
+- Responses include preview availability hints (`preview.state`, `hasPreview`, optional primary preview metadata).
+- Responses include retrieval availability hints (`retrieval.state` + optional reason/retryability).
+- Responses include lineage summary hints and run linkage (`runId/systemId/workflowId/outputSlot`, plus snapshot/version presence booleans).
+- Detail response adds persisted lifecycle metadata, preview descriptors, and lineage detail pointers (input assets + snapshot/execution refs).
+

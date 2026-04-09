@@ -88,3 +88,14 @@ Protected generated-result original retrieval now has concrete backend + HTTP tr
   - authenticated workspace-session mediation
   - stream mediation without storage/backend path leakage
   - hardened response headers (`attachment`, `nosniff`, `private, no-store`)
+
+## Story 6.2.4 query/list use-case baseline (implemented)
+
+Authoritative generated-result discovery now has concrete application use cases for result-by-id and gallery/history list retrieval:
+
+- `src/application/generated-results/use-cases/GetGeneratedResultMetadataUseCase.ts`
+- `src/application/generated-results/use-cases/ListGeneratedResultMetadataUseCase.ts`
+
+List filters cover workspace/owner/source lineage axes (`runId/systemId/workflowId/workflowTemplateId/executionNodeId`), status/visibility/media-type windows, recent activity windows, and preview availability state filters (`previewStates`, `hasPreview`).
+
+Projected responses now include DTO-ready preview/retrieval availability hints and lineage-summary/run linkage metadata derived from authoritative persisted records + preview/lineage repositories.
