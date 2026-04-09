@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
 import { DesktopOfflineSnapshotCacheRepository } from "../DesktopOfflineSnapshotCacheRepository";
+import { openSqliteCompatDatabase } from "@infrastructure/persistence/sqlite/SqliteCompat";
 import {
   computeOfflineSnapshotDigest,
   OfflineSnapshotCacheProtectionPostures,
@@ -128,7 +128,7 @@ describe("DesktopOfflineSnapshotCacheRepository", () => {
       cachedAt: "2026-04-07T19:10:00.000Z",
     }));
 
-    const db = new Database(databasePath, { readonly: true });
+    const db = openSqliteCompatDatabase(databasePath);
     const row = db.prepare(`
       SELECT snapshot_json, eligibility_markers_json, value_protection_posture
       FROM offline_authoritative_snapshot_cache

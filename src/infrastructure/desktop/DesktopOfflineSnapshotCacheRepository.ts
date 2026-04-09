@@ -131,6 +131,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
   }
 
   public async upsertSnapshot(record: OfflineAuthoritativeSnapshotRecord): Promise<void> {
+    const row = this.toRow(record);
     this.getDatabase()
       .prepare(`
         INSERT INTO offline_authoritative_snapshot_cache (
@@ -152,23 +153,23 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           eligibility_markers_json,
           snapshot_json
         ) VALUES (
-          @workspace_id,
-          @resource_class,
-          @resource_id,
-          @authoritative_revision,
-          @authoritative_snapshot_revision,
-          @authority_scope,
-          @storage_bucket,
-          @behavior_class,
-          @cached_at,
-          @last_synchronized_at,
-          @expires_at,
-          @cached_by_actor_user_identity_id,
-          @cache_protection_posture,
-          @value_protection_posture,
-          @snapshot_digest,
-          @eligibility_markers_json,
-          @snapshot_json
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?,
+          ?
         )
         ON CONFLICT(workspace_id, resource_class, resource_id) DO UPDATE SET
           authoritative_revision = excluded.authoritative_revision,
@@ -186,7 +187,25 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
           eligibility_markers_json = excluded.eligibility_markers_json,
           snapshot_json = excluded.snapshot_json
       `)
-      .run(this.toRow(record));
+      .run(
+        row.workspace_id,
+        row.resource_class,
+        row.resource_id,
+        row.authoritative_revision,
+        row.authoritative_snapshot_revision,
+        row.authority_scope,
+        row.storage_bucket,
+        row.behavior_class,
+        row.cached_at,
+        row.last_synchronized_at,
+        row.expires_at,
+        row.cached_by_actor_user_identity_id,
+        row.cache_protection_posture,
+        row.value_protection_posture,
+        row.snapshot_digest,
+        row.eligibility_markers_json,
+        row.snapshot_json,
+      );
 
     this.enforceRetentionBound();
   }
@@ -270,10 +289,9 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
   private initialize(): void {
     const db = this.getDatabase();
     this.ensureMigrationTable(db);
-    const appliedVersions = new Set(
-      (db.prepare("SELECT version FROM offline_snapshot_schema_migrations ORDER BY version ASC").all()
-        as ReadonlyArray<{ version: number }>).map((row) => row.version),
-    );
+    const migrationRows: ReadonlyArray<{ version: number }> =
+      db.prepare("SELECT version FROM offline_snapshot_schema_migrations ORDER BY version ASC").all();
+    const appliedVersions = new Set(migrationRows.map((row) => row.version));
 
     for (const migration of MIGRATIONS) {
       if (appliedVersions.has(migration.version)) {
@@ -403,7 +421,7 @@ export class DesktopOfflineSnapshotCacheRepository implements IOfflineAuthoritat
     });
   }
 
-  private toRow(record: OfflineAuthoritativeSnapshotRecord): Record<string, unknown> {
+  private toRow(record: OfflineAuthoritativeSnapshotRecord): SnapshotRow {
     const valueProtectionPosture = this.valueProtection.posture;
     const eligibilityMarkersJson = JSON.stringify(record.eligibilityMarkers);
     const snapshotJson = JSON.stringify(record.snapshot);

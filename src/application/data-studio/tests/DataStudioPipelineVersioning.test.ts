@@ -19,7 +19,7 @@ describe("DataStudioPipelineVersioning", () => {
     expect(metadata.summary.kind).toBe("data-studio-pipeline-version");
     expect(metadata.summary.pipelineRevision).toBeGreaterThan(0);
     expect(metadata.summary.currentStageId).toBe(PipelineStageIds.UnifiedIngestion);
-    expect(metadata.serializedPipelineState).toContain("\"kind\":\"data-studio-pipeline-state\"");
+    expect(metadata.serializedPipelineState).toContain("\"kind\": \"data-studio-pipeline-state\"");
   });
 
   it("parses valid version metadata and rejects unsupported metadata shapes", () => {
@@ -33,4 +33,3 @@ describe("DataStudioPipelineVersioning", () => {
     expect(parseDataStudioPipelineVersionMetadata({ kind: "unsupported" })).toBeUndefined();
   });
 });
-
