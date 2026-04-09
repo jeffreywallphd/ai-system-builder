@@ -55,6 +55,11 @@
 - Emits startup span events:
   - `startup.span.completed`
   - `startup.span.failed`
+  - `startup.span.slow` (warning-level event for spans exceeding warning threshold)
+- Slow warning thresholds are configurable with:
+  - `slowSpanThresholdMs` (baseline slow-tag threshold)
+  - `slowSpanWarnings.defaultThresholdMs` (default warning threshold)
+  - `slowSpanWarnings.thresholdsBySpanName` (per-span warning threshold overrides)
 
 ## Host customization boundary
 - Hosts extend startup by:

@@ -64,6 +64,13 @@ The tracer emits structured events:
 
 - `startup.span.completed`
 - `startup.span.failed`
+- `startup.span.slow` (warning-level event emitted when a span exceeds configured warning threshold)
+
+Slow-span warning thresholds are configurable through tracer options:
+
+- `slowSpanThresholdMs`: baseline slow-tag threshold (`slow: true`) on completion/failure events
+- `slowSpanWarnings.defaultThresholdMs`: default warning threshold for `startup.span.slow` emission
+- `slowSpanWarnings.thresholdsBySpanName`: per-span warning threshold overrides (by span name)
 
 ### Host-specific customization seam
 

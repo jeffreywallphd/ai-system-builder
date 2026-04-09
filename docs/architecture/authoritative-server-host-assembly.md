@@ -65,7 +65,9 @@ Authoritative startup now emits structured startup span events (`startup.span.co
 - `orchestration-recovery`
 - `server-start`
 
-Each span event includes `durationMs`. Steps exceeding 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000` for direct diagnostics filtering.
+Each span completion/failure event includes `durationMs`. Steps exceeding 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000` for direct diagnostics filtering.
+
+Startup tracing also emits `startup.span.slow` warning events for spans exceeding configured warning thresholds (`slowSpanWarnings.defaultThresholdMs` plus optional `slowSpanWarnings.thresholdsBySpanName` overrides), making slow startup operations explicit in warning streams.
 
 ### Environment keys
 

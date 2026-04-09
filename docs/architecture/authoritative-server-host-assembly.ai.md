@@ -25,7 +25,8 @@
   - `ca-init`
   - `orchestration-recovery`
   - `server-start`
-- Span events include `durationMs`; steps longer than 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000`.
+- Span completion/failure events include `durationMs`; steps longer than 5000 ms are tagged with `slow: true` and include `slowSpanThresholdMs: 5000`.
+- Slow spans also emit `startup.span.slow` warning events when they exceed configured warning thresholds (`slowSpanWarnings.defaultThresholdMs` with optional `slowSpanWarnings.thresholdsBySpanName` overrides).
 - Entrypoint default startup reason: `authoritative-server-entrypoint-startup`.
 - Entrypoint default required dependencies: full authoritative dependency boundary from `src/hosts/HostRuntimeCatalog.ts`.
 - Environment keys:
