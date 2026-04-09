@@ -94,6 +94,10 @@ Story 1.3.3 adds startup correlation ID propagation for startup observability. A
 - runtime handles expose `startupCorrelationId` so entrypoint lifecycle logs can include the same identifier
 - startup failures surfaced through the entrypoint include `startupCorrelationId` when available
 
+Story 1.4.1 introduces a dedicated startup harness regression test to simulate full authoritative startup and enforce stage ordering contracts across both startup models:
+- shared host bootstrap pipeline order (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`)
+- authoritative staged decomposition order (`services -> security -> persistence -> transport`)
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) aligned to logical bootstrap stages plus nested diagnostics:
 - `services`
 - `security`
@@ -164,6 +168,7 @@ In addition to the direct server script entrypoint above, runtime startup consum
 Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
