@@ -19,6 +19,7 @@ import { AuthoritativeAuthorizationPolicyEventRecorder } from "../AuthoritativeA
 import { AuthoritativeStorageManagementAuditSink } from "../AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "../AuthoritativeProtectedAssetAuditSink";
 import { AuthoritativeImageAssetAuditSink } from "../AuthoritativeImageAssetAuditSink";
+import { AuthoritativeGeneratedResultAuditSink } from "../AuthoritativeGeneratedResultAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "../AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeSchedulingGovernanceEventSink } from "../AuthoritativeSchedulingGovernanceEventSink";
 import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "../AuthoritativeDeploymentPolicyGovernanceEventSink";
@@ -371,6 +372,70 @@ describe("Authoritative security audit adapters", () => {
     expect(repository.events[1]?.outcome).toBe("rejected");
     expect(repository.events[2]?.category).toBe("protected-data");
     expect(repository.events[2]?.action).toBe("asset.protected.image.original.accessed");
+  });
+
+  it("records generated-result persistence/preview generation and protected retrieval actions through authoritative audit", async () => {
+    const repository = new InMemoryAuditLedgerRepository();
+    const recorder = new AuthoritativeAuditRecordingService({
+      repository,
+      now: () => new Date("2026-04-09T15:00:00.000Z"),
+      idGenerator: () => `generated-result-audit-${String(repository.events.length + 1)}`,
+    });
+    const sink = new AuthoritativeGeneratedResultAuditSink(recorder);
+
+    await sink.recordGeneratedResultEvent({
+      type: "generated-result-persisted",
+      occurredAt: "2026-04-09T15:00:00.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:runner",
+      operationKey: "run-result:persist:1",
+      outcome: "success",
+      result: Object.freeze({
+        resultAssetId: "gr:001",
+        runId: "run:001",
+        workflowId: "workflow:001",
+        systemId: "system:001",
+      }),
+      details: Object.freeze({
+        persistenceStatus: "available",
+      }),
+    });
+    await sink.recordGeneratedResultEvent({
+      type: "generated-result-preview-generation-recorded",
+      occurredAt: "2026-04-09T15:00:01.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:runner",
+      outcome: "failed",
+      result: Object.freeze({
+        resultAssetId: "gr:001",
+        runId: "run:001",
+      }),
+      details: Object.freeze({
+        reasonCode: "preview-processing-failed",
+      }),
+    });
+    await sink.recordGeneratedResultEvent({
+      type: "generated-result-original-content-accessed",
+      occurredAt: "2026-04-09T15:00:02.000Z",
+      workspaceId: "workspace:primary",
+      actorUserId: "user:viewer",
+      outcome: "rejected",
+      result: Object.freeze({
+        resultAssetId: "gr:001",
+      }),
+      details: Object.freeze({
+        reasonCode: "authorization-denied",
+      }),
+    });
+
+    expect(repository.events).toHaveLength(3);
+    expect(repository.events[0]?.action).toBe("run.result.persistence.recorded");
+    expect(repository.events[0]?.category).toBe("orchestration");
+    expect(repository.events[0]?.protectedResource?.resourceRef).toBe("generated-result-record:gr:001");
+    expect(repository.events[1]?.action).toBe("run.result.preview.generation.recorded");
+    expect(repository.events[1]?.outcome).toBe("failed");
+    expect(repository.events[2]?.action).toBe("asset.protected.generated-result.original.accessed");
+    expect(repository.events[2]?.category).toBe("protected-data");
   });
 
   it("records secret operation and access-decision events through authoritative secret hooks", async () => {

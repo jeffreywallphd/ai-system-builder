@@ -39,6 +39,7 @@ import { GeneratedResultDerivativeAvailabilityStatuses } from "@domain/image-ass
 import { RequestGeneratedResultPreviewContentUseCase } from "../use-cases/RequestGeneratedResultPreviewContentUseCase";
 import { OpenGeneratedResultPreviewContentUseCase } from "../use-cases/OpenGeneratedResultPreviewContentUseCase";
 import { GeneratedResultPreviewContentReadErrorCodes } from "../use-cases/GetGeneratedResultPreviewContentUseCaseContracts";
+import type { GeneratedResultAuditEvent, GeneratedResultAuditSink } from "../ports/GeneratedResultAuditPort";
 
 class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRepository {
   public readonly records = new Map<string, GeneratedResultPersistenceRecord>();
@@ -233,6 +234,14 @@ class StubGeneratedResultPreviewAccessPort {
   }
 }
 
+class InMemoryGeneratedResultAuditSink implements GeneratedResultAuditSink {
+  public readonly events: GeneratedResultAuditEvent[] = [];
+
+  public async recordGeneratedResultEvent(event: GeneratedResultAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function buildResultRecord(input?: Partial<GeneratedResultPersistenceRecord>): GeneratedResultPersistenceRecord {
   return Object.freeze({
     resultAssetId: "gr-asset-001",
@@ -324,12 +333,14 @@ function buildPreviewRecord(input?: Partial<GeneratedResultPreviewPersistenceRec
 describe("Generated result preview content use cases", () => {
   it("returns preview-available with tokenized protected access", async () => {
     const repository = new InMemoryGeneratedResultRepository();
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     repository.records.set("gr-asset-001", buildResultRecord());
     repository.previews.set("gr-asset-001", Object.freeze([buildPreviewRecord()]));
 
     const requestUseCase = new RequestGeneratedResultPreviewContentUseCase({
       generatedResultRepository: repository,
       workspaceAuthorizationReadRepository: new StaticWorkspaceAuthorizationReadRepository(true),
+      auditSink,
     });
 
     const outcome = await requestUseCase.execute({
@@ -345,6 +356,11 @@ describe("Generated result preview content use cases", () => {
     expect(outcome.value.state).toBe("preview-available");
     expect(outcome.value.available).toBeTrue();
     expect(outcome.value.selected?.previewToken).toBe("preview-token-001");
+    expect(auditSink.events.some((event) => (
+      event.type === "generated-result-preview-access-requested"
+      && event.outcome === "success"
+      && event.result.resultAssetId === "gr-asset-001"
+    ))).toBeTrue();
   });
 
   it("returns preview-pending when preview generation is still pending", async () => {
@@ -452,6 +468,7 @@ describe("Generated result preview content use cases", () => {
 
   it("opens preview content stream for valid preview tokens", async () => {
     const repository = new InMemoryGeneratedResultRepository();
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     repository.records.set("gr-asset-001", buildResultRecord());
     repository.previews.set("gr-asset-001", Object.freeze([buildPreviewRecord()]));
 
@@ -480,6 +497,7 @@ describe("Generated result preview content use cases", () => {
       storageLogicalAccessResolutionService: new StaticStorageLogicalAccessResolutionService(storageObjectPort),
       workspaceAuthorizationReadRepository: new StaticWorkspaceAuthorizationReadRepository(true),
       previewAccessPort: previewAccessPort as never,
+      auditSink,
     });
 
     const outcome = await openUseCase.execute({
@@ -500,6 +518,11 @@ describe("Generated result preview content use cases", () => {
       chunks.push(...chunk);
     }
     expect(Buffer.from(chunks).toString("utf8")).toBe("hello");
+    expect(auditSink.events.some((event) => (
+      event.type === "generated-result-preview-content-opened"
+      && event.outcome === "success"
+      && event.result.resultAssetId === "gr-asset-001"
+    ))).toBeTrue();
   });
 
   it("returns invalid-state for stale preview tokens", async () => {

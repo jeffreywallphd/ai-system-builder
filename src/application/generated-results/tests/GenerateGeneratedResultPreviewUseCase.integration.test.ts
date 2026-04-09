@@ -33,6 +33,7 @@ import { AssetVisibilities } from "@domain/assets/AssetDomain";
 import { GenerateGeneratedResultPreviewUseCase } from "../use-cases/GenerateGeneratedResultPreviewUseCase";
 import { SharpGeneratedResultPreviewImageProcessor } from "@infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor";
 import { TokenizedGeneratedResultPreviewAccessPort } from "@infrastructure/media/generated-results/TokenizedGeneratedResultPreviewAccessPort";
+import type { GeneratedResultAuditEvent, GeneratedResultAuditSink } from "../ports/GeneratedResultAuditPort";
 
 const TinyPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ioAAAAASUVORK5CYII=";
 
@@ -192,6 +193,14 @@ class StaticStorageLogicalAccessResolutionService implements IStorageLogicalAcce
   }
 }
 
+class InMemoryGeneratedResultAuditSink implements GeneratedResultAuditSink {
+  public readonly events: GeneratedResultAuditEvent[] = [];
+
+  public async recordGeneratedResultEvent(event: GeneratedResultAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function createResultRecord(overrides?: Partial<GeneratedResultPersistenceRecord>): GeneratedResultPersistenceRecord {
   return Object.freeze({
     resultAssetId: "gr-asset-001",
@@ -249,6 +258,7 @@ describe("GenerateGeneratedResultPreviewUseCase", () => {
   it("generates preview derivatives, persists protected descriptors, and updates preview-ready lifecycle", async () => {
     const repository = new InMemoryGeneratedResultRepository();
     const objectPort = new InMemoryStorageObjectPort();
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     const storageService = new StaticStorageLogicalAccessResolutionService(objectPort);
     const processor = new SharpGeneratedResultPreviewImageProcessor();
     const previewAccessPort = new TokenizedGeneratedResultPreviewAccessPort("preview-secret-alpha");
@@ -264,6 +274,7 @@ describe("GenerateGeneratedResultPreviewUseCase", () => {
       storageLogicalAccessResolutionService: storageService,
       previewImageProcessorPort: processor,
       previewAccessPort,
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -296,11 +307,17 @@ describe("GenerateGeneratedResultPreviewUseCase", () => {
       entry.startsWith("storage-alpha:workspaces/workspace-alpha/generated-results/gr-asset-001/previews/display-safe/"),
     );
     expect(writtenKeys.length).toBe(1);
+    expect(auditSink.events.some((event) => (
+      event.type === "generated-result-preview-generation-recorded"
+      && event.outcome === "success"
+      && event.result.resultAssetId === "gr-asset-001"
+    ))).toBeTrue();
   });
 
   it("persists failed preview descriptors when source references are unavailable", async () => {
     const repository = new InMemoryGeneratedResultRepository();
     const objectPort = new InMemoryStorageObjectPort();
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     const storageService = new StaticStorageLogicalAccessResolutionService(objectPort);
     const processor = new SharpGeneratedResultPreviewImageProcessor();
     const previewAccessPort = new TokenizedGeneratedResultPreviewAccessPort("preview-secret-alpha");
@@ -315,6 +332,7 @@ describe("GenerateGeneratedResultPreviewUseCase", () => {
       storageLogicalAccessResolutionService: storageService,
       previewImageProcessorPort: processor,
       previewAccessPort,
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -331,5 +349,10 @@ describe("GenerateGeneratedResultPreviewUseCase", () => {
     }
     expect(outcome.error.code).toBe("generated-result-preview-generation-source-unavailable");
     expect([...repository.previews.values()][0]?.availabilityStatus).toBe(GeneratedResultDerivativeAvailabilityStatuses.failed);
+    expect(auditSink.events.some((event) => (
+      event.type === "generated-result-preview-generation-recorded"
+      && event.outcome === "failed"
+      && event.result.resultAssetId === "gr-asset-001"
+    ))).toBeTrue();
   });
 });

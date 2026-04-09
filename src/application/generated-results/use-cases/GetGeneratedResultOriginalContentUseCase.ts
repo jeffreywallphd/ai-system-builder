@@ -19,11 +19,18 @@ import {
 import {
   resolveGeneratedResultStorageObjectLookup,
 } from "./GeneratedResultStorageObjectReference";
+import {
+  GeneratedResultAuditEventTypes,
+  GeneratedResultAuditOutcomes,
+  publishGeneratedResultAuditEventBestEffort,
+  type GeneratedResultAuditSink,
+} from "../ports/GeneratedResultAuditPort";
 
 export interface GetGeneratedResultOriginalContentUseCaseDependencies {
   readonly generatedResultRepository: IGeneratedResultPersistenceRepository;
   readonly storageLogicalAccessResolutionService: IStorageLogicalAccessResolutionService;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
+  readonly auditSink?: GeneratedResultAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -60,6 +67,12 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
       occurredAt,
     );
     if (!workspaceAuthorization.isAuthorized) {
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         GeneratedResultOriginalContentReadErrorCodes.accessDenied,
         "Generated-result original-content retrieval requires active workspace membership.",
@@ -78,6 +91,13 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
       && result.ownerUserId
       && result.ownerUserId !== request.actorUserId
       && !workspaceAuthorization.isWorkspaceAdmin) {
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         GeneratedResultOriginalContentReadErrorCodes.notFound,
         "Generated result was not found for the workspace.",
@@ -105,6 +125,13 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
 
     const storageLookup = resolveGeneratedResultStorageObjectLookup(result);
     if (!storageLookup) {
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "original-reference-missing",
+      });
       return this.failure(
         GeneratedResultOriginalContentReadErrorCodes.contentUnavailable,
         "Generated result original content is not currently available.",
@@ -119,6 +146,13 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
       occurredAt,
     });
     if (!resolution.ok) {
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: `storage-resolution-${resolution.error.code}`,
+      });
       return this.failure(
         mapResolutionErrorCode(resolution.error.code),
         resolution.error.message,
@@ -134,6 +168,15 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
         storageInstance: resolution.value.storageInstance,
         objectKey: storageLookup.objectKey,
       });
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        details: Object.freeze({
+          responseSizeBytes: metadata.sizeBytes,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -147,6 +190,13 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
         }),
       };
     } catch {
+      await this.publishOriginalAccessAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "original-content-open-unavailable",
+      });
       return this.failure(
         GeneratedResultOriginalContentReadErrorCodes.contentUnavailable,
         "Generated result original content is not currently available.",
@@ -193,6 +243,40 @@ export class GetGeneratedResultOriginalContentUseCase implements IGetGeneratedRe
         details,
       }),
     };
+  }
+
+  private async publishOriginalAccessAuditEvent(input: {
+    readonly request: GetGeneratedResultOriginalContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly result?: Awaited<ReturnType<IGeneratedResultPersistenceRepository["findResultById"]>>;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.originalContentAccessed,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.request.resultAssetId,
+        runId: input.result?.runId,
+        workflowId: input.result?.workflowId,
+        systemId: input.result?.systemId,
+        executionNodeId: input.result?.executionNodeId,
+        storageInstanceId: input.result?.storageInstanceId,
+        visibility: input.result?.visibility,
+        lifecycleStatus: input.result?.status,
+        mediaType: input.result?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

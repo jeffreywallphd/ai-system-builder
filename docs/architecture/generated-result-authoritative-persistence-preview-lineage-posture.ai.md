@@ -429,3 +429,37 @@ Image manipulation studio result review now includes a dedicated result-detail +
 - Provenance summaries rely on normalized generated-result DTOs and lineage summaries instead of re-deriving backend execution details in the UI.
 - Advanced detail focuses on stable lineage pointers (run/system/workflow/input assets, snapshot/version references, execution context hints) to support future admin/debug expansion without changing default user messaging.
 
+## Story 6.4.3 audit integration for generated-result persistence and protected access (implemented)
+
+Generated-result persistence and protected retrieval flows now participate in authoritative platform audit capture through reusable audit ports/services.
+
+### Canonical seams
+
+- `src/application/generated-results/ports/GeneratedResultAuditPort.ts`
+- `src/infrastructure/audit/AuthoritativeGeneratedResultAuditSink.ts`
+- `src/infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter.ts`
+- `src/application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase.ts`
+- `src/application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase.ts`
+- `src/application/generated-results/use-cases/RequestGeneratedResultPreviewContentUseCase.ts`
+- `src/application/generated-results/use-cases/OpenGeneratedResultPreviewContentUseCase.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+
+### Audited event coverage
+
+- result persistence emission: `generated-result-persisted`
+- preview-generation/provisioning outcomes: `generated-result-preview-generation-recorded`
+- protected original-result access: `generated-result-original-content-accessed`
+- protected preview request/open access: `generated-result-preview-access-requested`, `generated-result-preview-content-opened`
+
+### Governance posture
+
+- persistence/preview-generation events map to `run.result.*` actions through authoritative run-category recording.
+- protected retrieval events map to `asset.protected.generated-result.*` actions through authoritative protected-data recording.
+- emitted payloads include actor/workspace/result ids and lineage-sensitive linkage (`runId`, `workflowId`, `systemId`, optional `executionNodeId`) when present.
+
+### Redaction posture
+
+- generated-result audit payload details are sanitized in the generated-result audit port before sink dispatch.
+- sensitive keys/values (credentials/tokens, raw content payloads/bytes, filesystem or storage paths/object keys, backend handles) are redacted.
+- only bounded reason/status/linkage summaries are emitted; raw backend/storage internals are excluded.
+

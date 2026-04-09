@@ -10,6 +10,12 @@ import { GeneratedResultDerivativeAvailabilityStatuses } from "@domain/image-ass
 import type { IGeneratedResultPreviewAccessPort } from "../ports/GeneratedResultPreviewGenerationPorts";
 import type { IGeneratedResultPersistenceRepository } from "../ports/IGeneratedResultPersistenceRepository";
 import {
+  GeneratedResultAuditEventTypes,
+  GeneratedResultAuditOutcomes,
+  publishGeneratedResultAuditEventBestEffort,
+  type GeneratedResultAuditSink,
+} from "../ports/GeneratedResultAuditPort";
+import {
   GeneratedResultPreviewContentReadErrorCodes,
   validateOpenGeneratedResultPreviewContentRequest,
   type GeneratedResultPreviewContentReadResult,
@@ -23,6 +29,7 @@ export interface OpenGeneratedResultPreviewContentUseCaseDependencies {
   readonly storageLogicalAccessResolutionService: IStorageLogicalAccessResolutionService;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
   readonly previewAccessPort: IGeneratedResultPreviewAccessPort;
+  readonly auditSink?: GeneratedResultAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -59,6 +66,12 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       occurredAt,
     );
     if (!workspaceAuthorization.isAuthorized) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.accessDenied,
         "Generated-result preview retrieval requires active workspace membership.",
@@ -79,6 +92,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       && result.ownerUserId !== request.actorUserId
       && !workspaceAuthorization.isWorkspaceAdmin
     ) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.notFound,
         "Generated result was not found for the workspace.",
@@ -94,6 +114,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       || resolvedAccess.workspaceId !== request.workspaceId
       || resolvedAccess.resultAssetId !== request.resultAssetId
     ) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-token-stale-or-invalid",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.invalidState,
         "Generated-result preview token is stale or invalid. Request a new preview.",
@@ -109,6 +136,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       preview.derivativeId === resolvedAccess.derivativeId && preview.accessHandle === accessHandle
     );
     if (!descriptor) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-token-stale-or-invalid",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.invalidState,
         "Generated-result preview token is stale or invalid. Request a new preview.",
@@ -123,6 +157,15 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       descriptor.availabilityStatus !== GeneratedResultDerivativeAvailabilityStatuses.available
       && descriptor.availabilityStatus !== GeneratedResultDerivativeAvailabilityStatuses.stale
     ) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: descriptor.availabilityStatus === GeneratedResultDerivativeAvailabilityStatuses.pending
+          ? "preview-pending"
+          : descriptor.failureCode ?? "preview-failed",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.invalidState,
         "Generated-result preview is not available for retrieval.",
@@ -135,6 +178,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
     }
 
     if (!descriptor.mediaType) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-media-type-missing",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.invalidState,
         "Generated-result preview media type is unavailable.",
@@ -152,6 +202,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
       occurredAt,
     });
     if (!resolution.ok) {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: `storage-resolution-${resolution.error.code}`,
+      });
       return this.failure(
         mapResolutionErrorCode(resolution.error.code),
         resolution.error.message,
@@ -167,6 +224,17 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
         storageInstance: resolution.value.storageInstance,
         objectKey: resolvedAccess.objectKey,
       });
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        details: Object.freeze({
+          previewKind: descriptor.previewKind,
+          derivativeId: descriptor.derivativeId,
+          responseSizeBytes: metadata.sizeBytes,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -180,6 +248,13 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
         }),
       };
     } catch {
+      await this.publishPreviewOpenAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-content-open-unavailable",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.contentUnavailable,
         "Generated-result preview content is not currently available.",
@@ -226,6 +301,40 @@ export class OpenGeneratedResultPreviewContentUseCase implements IOpenGeneratedR
         details,
       }),
     };
+  }
+
+  private async publishPreviewOpenAuditEvent(input: {
+    readonly request: OpenGeneratedResultPreviewContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly result?: Awaited<ReturnType<IGeneratedResultPersistenceRepository["findResultById"]>>;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.previewContentOpened,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.request.resultAssetId,
+        runId: input.result?.runId,
+        workflowId: input.result?.workflowId,
+        systemId: input.result?.systemId,
+        executionNodeId: input.result?.executionNodeId,
+        storageInstanceId: input.result?.storageInstanceId,
+        visibility: input.result?.visibility,
+        lifecycleStatus: input.result?.status,
+        mediaType: input.result?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

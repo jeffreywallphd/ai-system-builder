@@ -1,5 +1,11 @@
 import { createHash } from "node:crypto";
 import type { IGeneratedResultPersistenceRepository } from "@application/generated-results/ports/IGeneratedResultPersistenceRepository";
+import {
+  GeneratedResultAuditEventTypes,
+  GeneratedResultAuditOutcomes,
+  publishGeneratedResultAuditEventBestEffort,
+  type GeneratedResultAuditSink,
+} from "@application/generated-results/ports/GeneratedResultAuditPort";
 import type { IGenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCaseContracts";
 import {
   ImageManipulationOutputPersistenceStatuses,
@@ -59,6 +65,7 @@ const KnownImageMediaTypes = new Set([
 interface SqliteRunCollectedResultPersistenceAdapterDependencies {
   readonly repository: IGeneratedResultPersistenceRepository;
   readonly generateGeneratedResultPreviewUseCase?: IGenerateGeneratedResultPreviewUseCase;
+  readonly auditSink?: GeneratedResultAuditSink;
   readonly diagnosticsLogger?: IPersistenceDiagnosticsLogger;
   readonly now?: () => Date;
 }
@@ -587,6 +594,15 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
         continue;
       }
 
+      await this.publishResultPersistenceAuditEvent({
+        request,
+        occurredAt,
+        result: saved.record,
+        outcome: saved.record.status === GeneratedResultAssetStatuses.failedCollection
+          ? GeneratedResultAuditOutcomes.failed
+          : GeneratedResultAuditOutcomes.success,
+      });
+
       if (saved.record.status === GeneratedResultAssetStatuses.available || saved.record.status === GeneratedResultAssetStatuses.previewReady) {
         persistedCount += 1;
         persistedResultAssetIds.push(saved.record.resultAssetId);
@@ -615,6 +631,17 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
               }),
             });
             previewPendingCount += 1;
+            await this.publishPreviewProvisioningAuditEvent({
+              request,
+              occurredAt,
+              result: saved.record,
+              outcome: GeneratedResultAuditOutcomes.success,
+              details: Object.freeze({
+                previewKind: pendingPreview.previewKind,
+                previewStatus: GeneratedResultDerivativeAvailabilityStatuses.pending,
+                derivativeId: pendingPreview.derivativeId,
+              }),
+            });
             perRecordDiagnostics.push(Object.freeze({
               descriptorId: record.descriptorId,
               resultAssetId: saved.record.resultAssetId,
@@ -691,6 +718,18 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
                 }),
               });
               previewFailedCount += 1;
+              await this.publishPreviewProvisioningAuditEvent({
+                request,
+                occurredAt,
+                result: saved.record,
+                outcome: GeneratedResultAuditOutcomes.failed,
+                reasonCode: failureCode,
+                details: Object.freeze({
+                  previewKind: pendingPreview.previewKind,
+                  previewStatus: GeneratedResultDerivativeAvailabilityStatuses.failed,
+                  derivativeId: pendingPreview.derivativeId,
+                }),
+              });
               perRecordDiagnostics.push(Object.freeze({
                 descriptorId: record.descriptorId,
                 resultAssetId: saved.record.resultAssetId,
@@ -724,6 +763,18 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
                 }),
               });
               previewProvisioningUnavailableCount += 1;
+              await this.publishPreviewProvisioningAuditEvent({
+                request,
+                occurredAt,
+                result: saved.record,
+                outcome: GeneratedResultAuditOutcomes.failed,
+                reasonCode: failureCode,
+                details: Object.freeze({
+                  previewKind: pendingPreview.previewKind,
+                  previewStatus: "untracked",
+                  derivativeId: pendingPreview.derivativeId,
+                }),
+              });
               perRecordDiagnostics.push(Object.freeze({
                 descriptorId: record.descriptorId,
                 resultAssetId: saved.record.resultAssetId,
@@ -926,6 +977,74 @@ export class SqliteRunCollectedResultPersistenceAdapter implements IRunCollected
       return;
     }
     this.diagnosticsLogger.info(event);
+  }
+
+  private async publishResultPersistenceAuditEvent(input: {
+    readonly request: RunCollectedResultPersistenceRequest;
+    readonly occurredAt: string;
+    readonly result: GeneratedResultPersistenceRecord;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.resultPersisted,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorId,
+      correlationId: input.request.operationKey,
+      operationKey: input.request.operationKey,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.result.resultAssetId,
+        runId: input.result.runId,
+        workflowId: input.result.workflowId,
+        systemId: input.result.systemId,
+        executionNodeId: input.result.executionNodeId,
+        storageInstanceId: input.result.storageInstanceId,
+        visibility: input.result.visibility,
+        lifecycleStatus: input.result.status,
+        mediaType: input.result.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
+  }
+
+  private async publishPreviewProvisioningAuditEvent(input: {
+    readonly request: RunCollectedResultPersistenceRequest;
+    readonly occurredAt: string;
+    readonly result: GeneratedResultPersistenceRecord;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.previewGenerationRecorded,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorId,
+      correlationId: input.request.operationKey,
+      operationKey: input.request.operationKey,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.result.resultAssetId,
+        runId: input.result.runId,
+        workflowId: input.result.workflowId,
+        systemId: input.result.systemId,
+        executionNodeId: input.result.executionNodeId,
+        storageInstanceId: input.result.storageInstanceId,
+        visibility: input.result.visibility,
+        lifecycleStatus: input.result.status,
+        mediaType: input.result.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

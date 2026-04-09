@@ -43,6 +43,7 @@ import { OpenGeneratedResultPreviewContentUseCase } from "../use-cases/OpenGener
 import { GetGeneratedResultLineageSummaryUseCase } from "../use-cases/GetGeneratedResultLineageSummaryUseCase";
 import { GetGeneratedResultLineageDetailUseCase } from "../use-cases/GetGeneratedResultLineageDetailUseCase";
 import { GenerateGeneratedResultPreviewUseCase } from "../use-cases/GenerateGeneratedResultPreviewUseCase";
+import type { GeneratedResultAuditEvent, GeneratedResultAuditSink } from "../ports/GeneratedResultAuditPort";
 
 const createdRoots: string[] = [];
 const TinyPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+X2ioAAAAASUVORK5CYII=";
@@ -197,11 +198,20 @@ class StaticStorageLogicalAccessResolutionService implements IStorageLogicalAcce
   }
 }
 
+class InMemoryGeneratedResultAuditSink implements GeneratedResultAuditSink {
+  public readonly events: GeneratedResultAuditEvent[] = [];
+
+  public async recordGeneratedResultEvent(event: GeneratedResultAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 describe("Generated-result service flows integration", () => {
   it("persists collected outputs and serves authoritative list/original/preview/lineage flows", async () => {
     const root = mkdtempSync(path.join(tmpdir(), "loom-generated-result-service-flows-"));
     createdRoots.push(root);
     const repository = new SqliteGeneratedResultPersistenceAdapter(path.join(root, "generated-results.sqlite"));
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     const objectPort = new InMemoryStorageObjectPort();
     const storageResolution = new StaticStorageLogicalAccessResolutionService(objectPort);
     const workspaceAuthorization = new StaticWorkspaceAuthorizationReadRepository();
@@ -215,6 +225,7 @@ describe("Generated-result service flows integration", () => {
 
       const persistenceAdapter = new SqliteRunCollectedResultPersistenceAdapter({
         repository,
+        auditSink,
       });
       const persistence = await persistenceAdapter.persistCollectedResult({
         runId: "run-int-001",
@@ -321,6 +332,10 @@ describe("Generated-result service flows integration", () => {
       expect(persistence.status).toBe("partially-persisted");
       expect(persistence.outputs).toHaveLength(1);
       expect(persistence.outputs[0]?.assetId).toBe("gr-result-int-001");
+      expect(auditSink.events.some((event) => (
+        event.type === "generated-result-persisted"
+        && event.result.resultAssetId === "gr-result-int-001"
+      ))).toBeTrue();
 
       const recordsByRun = await repository.listResultsByRun({
         workspaceId: "workspace-alpha",

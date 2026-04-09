@@ -8,6 +8,12 @@ import {
 import type { IGeneratedResultPersistenceRepository } from "../ports/IGeneratedResultPersistenceRepository";
 import type { GeneratedResultPreviewPersistenceRecord } from "@shared/dto/assets/GeneratedResultPersistenceDtos";
 import {
+  GeneratedResultAuditEventTypes,
+  GeneratedResultAuditOutcomes,
+  publishGeneratedResultAuditEventBestEffort,
+  type GeneratedResultAuditSink,
+} from "../ports/GeneratedResultAuditPort";
+import {
   GeneratedResultPreviewContentReadErrorCodes,
   validateRequestGeneratedResultPreviewContentRequest,
   type GeneratedResultPreviewContentReadResult,
@@ -19,6 +25,7 @@ import {
 export interface RequestGeneratedResultPreviewContentUseCaseDependencies {
   readonly generatedResultRepository: IGeneratedResultPersistenceRepository;
   readonly workspaceAuthorizationReadRepository: IWorkspaceAuthorizationReadRepository;
+  readonly auditSink?: GeneratedResultAuditSink;
   readonly clock?: {
     now(): Date;
   };
@@ -55,6 +62,12 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
       occurredAt,
     );
     if (!workspaceAuthorization.isAuthorized) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "workspace-membership-required",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.accessDenied,
         "Generated-result preview retrieval requires active workspace membership.",
@@ -75,6 +88,13 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
       && result.ownerUserId !== request.actorUserId
       && !workspaceAuthorization.isWorkspaceAdmin
     ) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "authorization-denied",
+      });
       return this.failure(
         GeneratedResultPreviewContentReadErrorCodes.notFound,
         "Generated result was not found for the workspace.",
@@ -96,6 +116,17 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
     const ordered = this.selectPreviewCandidates(previews, request.preferredPreviewKinds);
     const selected = ordered[0];
     if (!selected) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        reasonCode: request.preferredPreviewKinds?.length ? "preferred-preview-not-available" : "preview-missing",
+        details: Object.freeze({
+          previewState: GeneratedResultPreviewStates.unavailable,
+          available: false,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -111,6 +142,18 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
     }
 
     if (selected.availabilityStatus === GeneratedResultDerivativeAvailabilityStatuses.pending) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        reasonCode: "preview-pending",
+        details: Object.freeze({
+          previewState: GeneratedResultPreviewStates.pending,
+          available: false,
+          previewKind: selected.previewKind,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -126,6 +169,18 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
     }
 
     if (selected.availabilityStatus === GeneratedResultDerivativeAvailabilityStatuses.failed) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        reasonCode: selected.failureCode ?? "preview-failed",
+        details: Object.freeze({
+          previewState: GeneratedResultPreviewStates.failed,
+          available: false,
+          previewKind: selected.previewKind,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -141,6 +196,18 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
     }
 
     if (!selected.accessHandle || !selected.mediaType) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-access-unavailable",
+        details: Object.freeze({
+          previewState: GeneratedResultPreviewStates.unavailable,
+          available: false,
+          previewKind: selected.previewKind,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -157,6 +224,18 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
 
     const previewToken = extractPreviewToken(selected.accessHandle);
     if (!previewToken) {
+      await this.publishPreviewRequestAuditEvent({
+        request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "preview-access-unavailable",
+        details: Object.freeze({
+          previewState: GeneratedResultPreviewStates.unavailable,
+          available: false,
+          previewKind: selected.previewKind,
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -171,6 +250,18 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
       };
     }
 
+    await this.publishPreviewRequestAuditEvent({
+      request,
+      occurredAt,
+      result,
+      outcome: GeneratedResultAuditOutcomes.success,
+      details: Object.freeze({
+        previewState: GeneratedResultPreviewStates.available,
+        available: true,
+        previewKind: selected.previewKind,
+        derivativeId: selected.derivativeId,
+      }),
+    });
     return {
       ok: true,
       value: Object.freeze({
@@ -263,6 +354,41 @@ export class RequestGeneratedResultPreviewContentUseCase implements IRequestGene
         details,
       }),
     };
+  }
+
+  private async publishPreviewRequestAuditEvent(input: {
+    readonly request: RequestGeneratedResultPreviewContentRequest;
+    readonly occurredAt: string;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly result?: Awaited<ReturnType<IGeneratedResultPersistenceRepository["findResultById"]>>;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.previewAccessRequested,
+      occurredAt: input.occurredAt,
+      workspaceId: input.request.workspaceId,
+      actorUserId: input.request.actorUserId,
+      correlationId: input.request.correlationId,
+      operationKey: undefined,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.request.resultAssetId,
+        runId: input.result?.runId,
+        workflowId: input.result?.workflowId,
+        systemId: input.result?.systemId,
+        executionNodeId: input.result?.executionNodeId,
+        storageInstanceId: input.result?.storageInstanceId,
+        visibility: input.result?.visibility,
+        lifecycleStatus: input.result?.status,
+        mediaType: input.result?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        preferredPreviewKinds: input.request.preferredPreviewKinds,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 
