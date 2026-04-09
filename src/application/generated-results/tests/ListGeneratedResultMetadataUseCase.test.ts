@@ -58,6 +58,10 @@ class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRe
     if (query.updatedAfter) {
       records = records.filter((record) => record.lastModifiedAt >= query.updatedAfter!);
     }
+    if (query.lineageInputAssetIds && query.lineageInputAssetIds.length > 0) {
+      const lineageInputAssetIds = new Set(query.lineageInputAssetIds);
+      records = records.filter((record) => record.inputAssetIds.some((assetId) => lineageInputAssetIds.has(assetId)));
+    }
 
     const offset = query.offset ?? 0;
     const limit = query.limit ?? records.length;
@@ -288,10 +292,14 @@ describe("ListGeneratedResultMetadataUseCase", () => {
     }
     expect(outcome.value.items).toHaveLength(1);
     expect(outcome.value.items[0]?.resultAssetId).toBe("gr-result-a");
+    expect(outcome.value.items[0]?.reuse.reusableAsWorkflowInput).toBeTrue();
+    expect(outcome.value.items[0]?.reuse.supportedInputPurposes).toEqual(["source-image", "reference-image"]);
+    expect(outcome.value.items[0]?.reuse.assetClasses).toEqual(["image-asset", "reference-asset"]);
+    expect(outcome.value.items[0]?.reuse.mediaClasses).toEqual(["image"]);
     expect(outcome.value.pagination.hasMore).toBeFalse();
   });
 
-  it("passes run/system/status/recent filters to repository query", async () => {
+  it("passes run/system/status/recent and lineage filters to repository query", async () => {
     const fixture = buildFixture();
     fixture.repository.records.set("gr-result-a", buildResultRecord({
       resultAssetId: "gr-result-a",
@@ -311,6 +319,7 @@ describe("ListGeneratedResultMetadataUseCase", () => {
       systemId: "system:alpha",
       statuses: [GeneratedResultAssetStatuses.available],
       updatedAfter: "2026-04-08T12:04:00.000Z",
+      lineageInputAssetIds: ["input-asset-1"],
     });
 
     expect(outcome.ok).toBeTrue();
@@ -320,7 +329,47 @@ describe("ListGeneratedResultMetadataUseCase", () => {
       systemId: "system:alpha",
       statuses: [GeneratedResultAssetStatuses.available],
       updatedAfter: "2026-04-08T12:04:00.000Z",
+      lineageInputAssetIds: ["input-asset-1"],
     }));
+  });
+
+  it("supports reuse compatibility filters for later workflow source selection", async () => {
+    const fixture = buildFixture();
+    fixture.repository.records.set("gr-result-a", buildResultRecord({
+      resultAssetId: "gr-result-a",
+      ownerUserId: "user-owner",
+      runId: "run:alpha",
+      systemId: "system:alpha",
+      status: GeneratedResultAssetStatuses.previewReady,
+      createdAt: "2026-04-08T12:00:00.000Z",
+      updatedAt: "2026-04-08T12:05:00.000Z",
+      visibility: "workspace",
+    }));
+    fixture.repository.records.set("gr-result-b", buildResultRecord({
+      resultAssetId: "gr-result-b",
+      ownerUserId: "user-owner",
+      runId: "run:beta",
+      systemId: "system:beta",
+      status: GeneratedResultAssetStatuses.pendingCollection,
+      createdAt: "2026-04-08T11:58:00.000Z",
+      updatedAt: "2026-04-08T12:03:00.000Z",
+      visibility: "workspace",
+    }));
+
+    const outcome = await fixture.useCase.execute({
+      actorUserId: "user-owner",
+      workspaceId: "workspace-alpha",
+      requiredInputPurposes: ["source-image"],
+      requiredAssetClasses: ["image-asset"],
+      requiredMediaClasses: ["image"],
+      reuseReadyOnly: true,
+    });
+
+    expect(outcome.ok).toBeTrue();
+    if (!outcome.ok) {
+      return;
+    }
+    expect(outcome.value.items.map((entry) => entry.resultAssetId)).toEqual(["gr-result-a"]);
   });
 
   it("returns access denied when workspace membership is missing", async () => {

@@ -14,9 +14,22 @@ import type {
   GeneratedResultMetadataDetail,
   GeneratedResultMetadataLineageSummary,
   GeneratedResultMetadataPreviewSummary,
+  GeneratedResultMetadataReuseSummary,
   GeneratedResultMetadataRetrievalSummary,
   GeneratedResultMetadataSummary,
 } from "./GeneratedResultMetadataReadUseCaseContracts";
+
+const GeneratedResultReusableInputPurposes = Object.freeze([
+  "source-image",
+  "reference-image",
+]);
+const GeneratedResultReusableAssetClasses = Object.freeze([
+  "image-asset",
+  "reference-asset",
+]);
+const GeneratedResultReusableMediaClasses = Object.freeze([
+  "image",
+]);
 
 function toPreviewSummary(
   input: ReadonlyArray<GeneratedResultPreviewPersistenceRecord>,
@@ -53,6 +66,32 @@ function toPreviewSummary(
     hasPreview: state === GeneratedResultPreviewStates.available,
     primaryPreviewKind: primary.previewKind,
     availabilityStatus: primary.availabilityStatus,
+  });
+}
+
+function toReuseSummary(
+  record: GeneratedResultPersistenceRecord,
+): GeneratedResultMetadataReuseSummary {
+  const reusableAsWorkflowInput = Boolean(
+    record.logicalAssetVersionId
+    && record.mediaType
+    && (record.status === GeneratedResultAssetStatuses.available || record.status === GeneratedResultAssetStatuses.previewReady),
+  );
+
+  return Object.freeze({
+    reusableAsWorkflowInput,
+    logicalAssetReference: record.logicalAssetVersionId ?? record.resultAssetId,
+    supportedInputPurposes: Object.freeze([...GeneratedResultReusableInputPurposes]),
+    assetClasses: Object.freeze([...GeneratedResultReusableAssetClasses]),
+    mediaClasses: Object.freeze([...GeneratedResultReusableMediaClasses]),
+    sourceContext: Object.freeze({
+      runId: record.runId,
+      workflowId: record.workflowId,
+      systemId: record.systemId,
+      executionNodeId: record.executionNodeId ?? record.selectedNodeId,
+      outputSlot: record.outputSlot,
+      inputAssetCount: record.inputAssetIds.length,
+    }),
   });
 }
 
@@ -133,6 +172,7 @@ export function toGeneratedResultMetadataSummary(input: {
   const preview = toPreviewSummary(input.previews);
   const retrieval = toRetrievalSummary(input.record);
   const lineage = toLineageSummary(input.record);
+  const reuse = toReuseSummary(input.record);
 
   return Object.freeze({
     resultAssetId: input.record.resultAssetId,
@@ -152,6 +192,7 @@ export function toGeneratedResultMetadataSummary(input: {
     preview,
     retrieval,
     lineage,
+    reuse,
   });
 }
 
@@ -297,6 +338,52 @@ export function matchesPreviewStateFilter(
     return true;
   }
   return allowedStates.includes(preview.state);
+}
+
+export function matchesLineageInputAssetFilter(
+  record: Pick<GeneratedResultPersistenceRecord, "inputAssetIds">,
+  requiredInputAssetIds: ReadonlyArray<string> | undefined,
+): boolean {
+  if (!requiredInputAssetIds || requiredInputAssetIds.length < 1) {
+    return true;
+  }
+  const set = new Set(record.inputAssetIds);
+  return requiredInputAssetIds.some((assetId) => set.has(assetId));
+}
+
+function intersects(
+  left: ReadonlyArray<string> | undefined,
+  right: ReadonlyArray<string> | undefined,
+): boolean {
+  if (!left || left.length < 1 || !right || right.length < 1) {
+    return true;
+  }
+  const rightSet = new Set(right);
+  return left.some((entry) => rightSet.has(entry));
+}
+
+export function matchesReuseFilter(
+  reuse: GeneratedResultMetadataReuseSummary,
+  input: {
+    readonly requiredInputPurposes?: ReadonlyArray<string>;
+    readonly requiredAssetClasses?: ReadonlyArray<string>;
+    readonly requiredMediaClasses?: ReadonlyArray<string>;
+    readonly reuseReadyOnly?: boolean;
+  },
+): boolean {
+  if (input.reuseReadyOnly && !reuse.reusableAsWorkflowInput) {
+    return false;
+  }
+  if (!intersects(reuse.supportedInputPurposes, input.requiredInputPurposes)) {
+    return false;
+  }
+  if (!intersects(reuse.assetClasses, input.requiredAssetClasses)) {
+    return false;
+  }
+  if (!intersects(reuse.mediaClasses, input.requiredMediaClasses)) {
+    return false;
+  }
+  return true;
 }
 
 export function matchesStatus(recordStatus: GeneratedResultAssetStatus, statuses: ReadonlyArray<GeneratedResultAssetStatus> | undefined): boolean {

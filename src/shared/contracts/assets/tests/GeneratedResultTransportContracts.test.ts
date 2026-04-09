@@ -25,6 +25,11 @@ describe("GeneratedResultTransportContracts", () => {
       visibilities: ["workspace", "shared"],
       mediaTypes: ["image/webp", "image/png"],
       search: "portrait",
+      lineageInputAssetIds: ["asset:input:1", "asset:input:2"],
+      requiredInputPurposes: ["source-image", "reference-image"],
+      requiredAssetClasses: ["image-asset"],
+      requiredMediaClasses: ["image"],
+      reuseReadyOnly: true,
       limit: 25,
       offset: 10,
       sortBy: "updatedAt",
@@ -32,7 +37,7 @@ describe("GeneratedResultTransportContracts", () => {
     });
 
     expect(query.toString()).toBe(
-      "workspaceId=workspace%3Aimage&runId=run%3Aimage%3A1&status=available&status=preview-ready&visibility=workspace&visibility=shared&mediaType=image%2Fwebp&mediaType=image%2Fpng&search=portrait&sortBy=updatedAt&sortDirection=desc&limit=25&offset=10",
+      "workspaceId=workspace%3Aimage&runId=run%3Aimage%3A1&status=available&status=preview-ready&visibility=workspace&visibility=shared&mediaType=image%2Fwebp&mediaType=image%2Fpng&search=portrait&lineageInputAssetId=asset%3Ainput%3A1&lineageInputAssetId=asset%3Ainput%3A2&requiredInputPurpose=source-image&requiredInputPurpose=reference-image&requiredAssetClass=image-asset&requiredMediaClass=image&reuseReadyOnly=true&sortBy=updatedAt&sortDirection=desc&limit=25&offset=10",
     );
   });
 

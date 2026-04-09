@@ -71,6 +71,22 @@ export interface GeneratedResultMetadataLineageSummary {
   readonly hasSelectedNode: boolean;
 }
 
+export interface GeneratedResultMetadataReuseSummary {
+  readonly reusableAsWorkflowInput: boolean;
+  readonly logicalAssetReference: string;
+  readonly supportedInputPurposes: ReadonlyArray<string>;
+  readonly assetClasses: ReadonlyArray<string>;
+  readonly mediaClasses: ReadonlyArray<string>;
+  readonly sourceContext: {
+    readonly runId: string;
+    readonly workflowId: string;
+    readonly systemId: string;
+    readonly executionNodeId?: string;
+    readonly outputSlot: string;
+    readonly inputAssetCount: number;
+  };
+}
+
 export interface GeneratedResultMetadataSummary {
   readonly resultAssetId: string;
   readonly workspaceId: string;
@@ -89,6 +105,7 @@ export interface GeneratedResultMetadataSummary {
   readonly preview: GeneratedResultMetadataPreviewSummary;
   readonly retrieval: GeneratedResultMetadataRetrievalSummary;
   readonly lineage: GeneratedResultMetadataLineageSummary;
+  readonly reuse: GeneratedResultMetadataReuseSummary;
 }
 
 export interface GeneratedResultMetadataDetail extends GeneratedResultMetadataSummary {
@@ -179,6 +196,11 @@ export interface ListGeneratedResultMetadataRequest {
   readonly updatedBefore?: string;
   readonly previewStates?: ReadonlyArray<GeneratedResultPreviewState>;
   readonly hasPreview?: boolean;
+  readonly lineageInputAssetIds?: ReadonlyArray<string>;
+  readonly requiredInputPurposes?: ReadonlyArray<string>;
+  readonly requiredAssetClasses?: ReadonlyArray<string>;
+  readonly requiredMediaClasses?: ReadonlyArray<string>;
+  readonly reuseReadyOnly?: boolean;
   readonly includeArchived?: boolean;
   readonly limit?: number;
   readonly offset?: number;
@@ -309,6 +331,11 @@ export function validateListGeneratedResultMetadataRequest(
     updatedBefore,
     previewStates: input.previewStates,
     hasPreview: typeof input.hasPreview === "boolean" ? input.hasPreview : undefined,
+    lineageInputAssetIds: normalizeOptionalLookupList(input.lineageInputAssetIds),
+    requiredInputPurposes: normalizeOptionalLookupList(input.requiredInputPurposes),
+    requiredAssetClasses: normalizeOptionalLookupList(input.requiredAssetClasses),
+    requiredMediaClasses: normalizeOptionalLookupList(input.requiredMediaClasses),
+    reuseReadyOnly: typeof input.reuseReadyOnly === "boolean" ? input.reuseReadyOnly : undefined,
     includeArchived: input.includeArchived ?? false,
     limit: normalizeOptionalPositiveInteger(input.limit, "limit", 1),
     offset: normalizeOptionalPositiveInteger(input.offset, "offset", 0),

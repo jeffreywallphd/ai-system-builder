@@ -42,6 +42,21 @@ describe("GeneratedResultTransportDtos", () => {
           hasParameterSnapshot: true,
           hasSelectedNode: true,
         },
+        reuse: {
+          reusableAsWorkflowInput: true,
+          logicalAssetReference: "asset-version:1",
+          supportedInputPurposes: ["source-image", "reference-image"],
+          assetClasses: ["image-asset", "reference-asset"],
+          mediaClasses: ["image"],
+          sourceContext: {
+            runId: "run:image:1",
+            workflowId: "workflow:image",
+            systemId: "system:image",
+            executionNodeId: "node:image:1",
+            outputSlot: "output.main",
+            inputAssetCount: 2,
+          },
+        },
       }],
       pagination: {
         limit: 25,

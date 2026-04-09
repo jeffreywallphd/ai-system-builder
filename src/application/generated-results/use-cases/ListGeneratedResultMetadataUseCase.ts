@@ -3,7 +3,9 @@ import { WorkspaceMembershipStatuses, WorkspaceRoles } from "@domain/workspaces/
 import type { IGeneratedResultPersistenceRepository } from "../ports/IGeneratedResultPersistenceRepository";
 import {
   canViewGeneratedResultRecord,
+  matchesLineageInputAssetFilter,
   matchesPreviewStateFilter,
+  matchesReuseFilter,
   matchesStatus,
   toGeneratedResultMetadataSummary,
 } from "./GeneratedResultMetadataProjection";
@@ -86,6 +88,7 @@ export class ListGeneratedResultMetadataUseCase implements IListGeneratedResultM
         createdBefore: request.createdBefore,
         updatedAfter: request.updatedAfter,
         updatedBefore: request.updatedBefore,
+        lineageInputAssetIds: request.lineageInputAssetIds,
         includeArchived: request.includeArchived,
         limit: batchSize,
         offset: repositoryOffset,
@@ -107,6 +110,9 @@ export class ListGeneratedResultMetadataUseCase implements IListGeneratedResultM
           continue;
         }
         if (!matchesStatus(record.status, request.statuses)) {
+          continue;
+        }
+        if (!matchesLineageInputAssetFilter(record, request.lineageInputAssetIds)) {
           continue;
         }
         if (!canViewGeneratedResultRecord({
@@ -132,6 +138,14 @@ export class ListGeneratedResultMetadataUseCase implements IListGeneratedResultM
           continue;
         }
         if (typeof request.hasPreview === "boolean" && request.hasPreview !== summary.preview.hasPreview) {
+          continue;
+        }
+        if (!matchesReuseFilter(summary.reuse, {
+          requiredInputPurposes: request.requiredInputPurposes,
+          requiredAssetClasses: request.requiredAssetClasses,
+          requiredMediaClasses: request.requiredMediaClasses,
+          reuseReadyOnly: request.reuseReadyOnly,
+        })) {
           continue;
         }
         visible.push(summary);
