@@ -33,3 +33,10 @@ This matrix catches regressions that would otherwise make the slice fragile unde
 ## Notes
 - These tests complement existing contract-level tests (taxonomy/resilience/recovery contracts) by exercising cross-layer behavior at integration/high-level seams.
 - Additional scenarios should extend this matrix only when they introduce a materially different failure class.
+
+## Cross-feature maintenance
+- Keep this matrix aligned with `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md` when resilience-sensitive operational behavior changes.
+- If a story adds a new failure class or recovery branch, update:
+  - the matrix row(s),
+  - the corresponding contract/operational guidance docs,
+  - and the targeted integration/high-level tests that prove the new class.

@@ -27,6 +27,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - `docs/architecture/run-orchestration-scheduling-unschedulable-defer-backoff-and-no-placement-handling.md`
 - `docs/architecture/run-orchestration-scheduling-node-availability-and-eligibility-refresh.md`
 - `docs/architecture/run-orchestration-scheduling-dispatch-outcome-requeue-and-release.md`
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 - `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`
 
@@ -120,6 +121,7 @@ Quick workflow for extending queue selection, node assignment, dispatch, progres
 - Bypassing execution-update ingestion validation for lifecycle/progress writes is prohibited.
 - Bypassing authoritative submission validation + creation for retried runs is prohibited.
 - Emitting unsanitized prompts/secrets/raw paths/backend payloads in orchestration diagnostics is prohibited.
+- Route/component-local degraded-readiness or retry/recovery classification that bypasses shared resilience contracts is prohibited.
 
 ## Regression hardening check
 - Keep integrated lifecycle regression coverage healthy in `src/application/runs/tests/RunOrchestrationLifecycleRegression.integration.test.ts` to catch cross-seam drift across submission, queueing, assignment, dispatch, progress, completion, cancellation/retry checks, recovery, and visibility contracts.

@@ -40,6 +40,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - `docs/architecture/run-orchestration-authoritative-retry-rerun-workflow-and-lineage.md`
 - `docs/architecture/run-orchestration-startup-recovery-reconciliation.md`
 - `docs/architecture/run-orchestration-operational-visibility-projections.md`
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 - `docs/architecture/image-run-feature-4-epic-4.1-authoritative-orchestration-posture.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`
 
@@ -160,6 +161,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Transport handlers authenticate/validate/map requests but do not own orchestration decisions.
 - Completion/failure/cancellation terminal handling must preserve user-safe outputs and internal diagnostics separation.
 - Observability/redaction concerns must stay in dedicated infrastructure seams, not in domain transition logic.
+- Degraded readiness, retryability, and recovery posture must remain contract-driven (shared resilience/taxonomy/recovery seams), not adapter-local heuristics.
 
 ## Prohibited patterns
 
@@ -173,6 +175,7 @@ Provide an implementation checklist for contributors extending the authoritative
 - Persisting internal diagnostics directly into user-facing run contracts is prohibited.
 - Creating retried runs by bypassing authoritative validation + creation use cases is prohibited.
 - Logging raw prompts, secrets/tokens, backend payload blobs, or raw path-bearing fields from run orchestration operations is prohibited.
+- Introducing direct backend action paths from studio/runtime UX that bypass authoritative API or run application seams is prohibited.
 
 ## Review checklist
 

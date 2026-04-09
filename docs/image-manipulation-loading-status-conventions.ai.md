@@ -2,6 +2,12 @@
 
 Use this as the implementation contract for operational UX feedback in the image manipulation runtime editor.
 
+## Cross-feature references
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
+- `docs/architecture/image-manipulation-resilience-error-handling-architecture.md`
+- `docs/architecture/image-manipulation-resilience-state-contracts.md`
+- `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
+
 ## Required behavior
 - Use authoritative state for lifecycle updates.
 - Avoid stagnant generic loading indicators.
@@ -41,6 +47,7 @@ Use this as the implementation contract for operational UX feedback in the image
 - Keep primary copy non-technical; place codes/counts/reason details in optional advanced details.
 - Avoid UI-local outage guessing: use readiness issues, readiness state, and node-availability reason codes from authoritative contracts.
 - If loading settles with unresolved surface errors, show a refresh-needed/recovery-needed state with a direct recovery action.
+- Recovery actions remain authoritative (studio/runtime API paths) and must not depend on local filesystem path assumptions.
 
 ## Definition of done for this convention
 - Users can tell what the system is doing now.
