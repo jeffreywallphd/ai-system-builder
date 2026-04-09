@@ -208,16 +208,57 @@ function resolveInstalledElectronVersion() {
   return electronPackageJson.version;
 }
 
+function resolveElectronRebuildInvocation() {
+  const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
+  const electronRebuildPackageNames = ["@electron/rebuild", "electron-rebuild"];
+
+  for (const packageName of electronRebuildPackageNames) {
+    try {
+      const electronRebuildPackageJson = moduleRequire(`${packageName}/package.json`);
+      const binField = electronRebuildPackageJson && electronRebuildPackageJson.bin;
+      const binPath =
+        typeof binField === "string"
+          ? binField
+          : binField && typeof binField === "object" && typeof binField[packageName] === "string"
+            ? binField[packageName]
+            : binField && typeof binField === "object" && typeof binField["electron-rebuild"] === "string"
+              ? binField["electron-rebuild"]
+              : undefined;
+
+      if (!binPath) {
+        continue;
+      }
+
+      const electronRebuildCliPath = path.resolve(
+        process.cwd(),
+        "node_modules",
+        ...packageName.split("/"),
+        binPath,
+      );
+
+      return {
+        command: process.execPath,
+        args: [electronRebuildCliPath],
+      };
+    } catch {
+      // Fall through to the next package candidate.
+    }
+  }
+
+  throw new Error("[dev-preflight] Unable to resolve electron-rebuild CLI entrypoint.");
+}
+
 function rebuildBetterSqlite3ForElectron() {
   const electronVersion = resolveInstalledElectronVersion();
-  const electronRebuildBinary = path.resolve(process.cwd(), "node_modules", ".bin", process.platform === "win32" ? "electron-rebuild.cmd" : "electron-rebuild");
+  const electronRebuildInvocation = resolveElectronRebuildInvocation();
   const result = spawnSync(
-    electronRebuildBinary,
-    ["--force", "--only", "better-sqlite3", "--version", electronVersion],
+    electronRebuildInvocation.command,
+    [...electronRebuildInvocation.args, "--force", "--only", "better-sqlite3", "--version", electronVersion],
     {
       stdio: "inherit",
       shell: false,
       env: process.env,
+      cwd: process.cwd(),
     },
   );
 

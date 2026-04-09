@@ -30,6 +30,8 @@ Desktop development startup also separates Electron Forge launch into `dev:deskt
 
 This keeps the default `npm run dev` workflow stable on Windows hosts where parent-directory realpath resolution can fail under restricted ACLs.
 
+Desktop preflight native module repair now resolves the `electron-rebuild` package CLI entrypoint and executes it through the active Node runtime (`process.execPath`) instead of invoking platform wrapper binaries directly. This keeps `better-sqlite3` rebuild behavior consistent across environments (including Windows shells where `.cmd` spawn semantics can fail with `EINVAL`).
+
 Electron main-process bundling now also preserves native dependency runtime loading by externalizing `sharp` and `@img/sharp-*` modules in `vite.main.config.ts`, including resolved `node_modules` path variants and CommonJS virtual module IDs (`commonjs-external:*`, `/@id/*`) used by Rollup on Windows builds, so native binaries are resolved from installed `node_modules` packages at runtime instead of being inlined into the Vite bundle.
 
 Preview-derivative image processing now resolves the `sharp` factory at runtime via dynamic import (`src/infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor.ts`) to avoid direct static import bundling in Electron main while keeping the same processing behavior.
