@@ -297,6 +297,7 @@ export interface StudioImageSystemDefinitionSummaryReadModel {
   readonly workflowVersionTag: string;
   readonly readinessState: string;
   readonly readinessSummary: string;
+  readonly readiness: StudioImageSystemReadinessReadModel;
   readonly updatedAt: string;
 }
 
@@ -306,6 +307,22 @@ export interface StudioImageSystemDefinitionReadModel extends StudioImageSystemD
     readonly outputId: string;
     readonly targetReference: string;
   }>;
+}
+
+export interface StudioImageSystemReadinessIssueReadModel {
+  readonly code: string;
+  readonly path?: string;
+  readonly message: string;
+  readonly severity: "blocking" | "advisory";
+}
+
+export interface StudioImageSystemReadinessReadModel {
+  readonly state: string;
+  readonly summary: string;
+  readonly blockingIssueCount: number;
+  readonly advisoryIssueCount: number;
+  readonly blockingIssues: ReadonlyArray<StudioImageSystemReadinessIssueReadModel>;
+  readonly advisoryIssues: ReadonlyArray<StudioImageSystemReadinessIssueReadModel>;
 }
 
 export interface StudioImageSystemDefinitionListingReadModel {
@@ -1342,7 +1359,8 @@ export class StudioShellBackendApi {
       return this.toImageSystemDefinitionReadModel({
         system: saved.system,
         readiness: saved.readiness,
-        structure: saved.structure,
+        validation: saved.validation,
+        compatibility: saved.compatibility,
       });
     });
   }
@@ -4173,18 +4191,22 @@ export class StudioShellBackendApi {
     result: ListImageSystemDefinitionsResult,
   ): StudioImageSystemDefinitionListingReadModel {
     return Object.freeze({
-      items: Object.freeze(result.items.map((entry) => Object.freeze({
-        systemId: entry.systemId,
-        title: entry.title,
-        summary: entry.summary,
-        lifecycleState: entry.lifecycleState,
-        runtimeStatus: entry.runtimeStatus,
-        workflowId: entry.workflowBinding.workflowId,
-        workflowVersionTag: entry.workflowBinding.workflowVersionTag,
-        readinessState: entry.readiness.state,
-        readinessSummary: entry.readiness.summary,
-        updatedAt: entry.updatedAt,
-      }))),
+      items: Object.freeze(result.items.map((entry) => {
+        const readiness = this.toImageSystemReadinessReadModel(entry.readiness);
+        return Object.freeze({
+          systemId: entry.systemId,
+          title: entry.title,
+          summary: entry.summary,
+          lifecycleState: entry.lifecycleState,
+          runtimeStatus: entry.runtimeStatus,
+          workflowId: entry.workflowBinding.workflowId,
+          workflowVersionTag: entry.workflowBinding.workflowVersionTag,
+          readinessState: entry.readiness.state,
+          readinessSummary: entry.readiness.summary,
+          readiness,
+          updatedAt: entry.updatedAt,
+        });
+      })),
       pagination: Object.freeze({
         ...result.pagination,
       }),
@@ -4195,8 +4217,29 @@ export class StudioShellBackendApi {
     result: ImageSystemDefinitionDetailResult | {
       readonly system: ImageSystemDefinitionDetailResult["system"];
       readonly readiness: ImageSystemDefinitionDetailResult["readiness"];
+      readonly validation?: {
+        readonly issues: ReadonlyArray<{
+          readonly code: string;
+          readonly path: string;
+          readonly message: string;
+          readonly severity: "error" | "warning" | "info";
+        }>;
+      };
+      readonly compatibility?: {
+        readonly issues: ReadonlyArray<{
+          readonly code: string;
+          readonly path: string;
+          readonly message: string;
+          readonly severity: "error" | "warning" | "info";
+        }>;
+      };
     },
   ): StudioImageSystemDefinitionReadModel {
+    const readiness = this.toImageSystemReadinessReadModel(result.readiness, {
+      validationIssues: result.validation?.issues,
+      compatibilityIssues: result.compatibility?.issues,
+    });
+
     return Object.freeze({
       systemId: result.system.systemId,
       title: result.system.display.title,
@@ -4207,6 +4250,7 @@ export class StudioShellBackendApi {
       workflowVersionTag: result.system.workflowBinding.workflowVersionTag,
       readinessState: result.readiness.state,
       readinessSummary: result.readiness.summary,
+      readiness,
       updatedAt: result.system.updatedAt,
       parameterBaseline: Object.freeze({ ...result.system.parameterBaseline.values }),
       outputTargetBindings: Object.freeze(result.system.outputTargetBindings.map((entry) => Object.freeze({
@@ -4214,6 +4258,85 @@ export class StudioShellBackendApi {
         targetReference: entry.targetReference,
       }))),
     });
+  }
+
+  private toImageSystemReadinessReadModel(
+    readiness: {
+      readonly state: string;
+      readonly summary: string;
+      readonly runnable?: boolean;
+      readonly issues: ReadonlyArray<{
+        readonly code: string;
+        readonly path?: string;
+        readonly message: string;
+      }>;
+    },
+    input: {
+      readonly validationIssues?: ReadonlyArray<{
+        readonly code: string;
+        readonly path: string;
+        readonly message: string;
+        readonly severity: "error" | "warning" | "info";
+      }>;
+      readonly compatibilityIssues?: ReadonlyArray<{
+        readonly code: string;
+        readonly path: string;
+        readonly message: string;
+        readonly severity: "error" | "warning" | "info";
+      }>;
+    } = {},
+  ): StudioImageSystemReadinessReadModel {
+    const blockingIssues = readiness.state === "configuration-incomplete"
+      ? readiness.issues.map((issue) => Object.freeze({
+        code: issue.code,
+        path: issue.path,
+        message: issue.message,
+        severity: "blocking" as const,
+      }))
+      : [];
+
+    const advisoryIssues = [
+      ...this.toAdvisoryIssuesFromValidation(input.validationIssues),
+      ...this.toAdvisoryIssuesFromValidation(input.compatibilityIssues),
+      ...(readiness.state === "configuration-ready" && readiness.runnable !== true
+        ? [Object.freeze({
+          code: "system-ready-not-runnable-yet",
+          path: "runtimeStatus",
+          message: "This setup is complete, but it still needs runtime enablement before launch.",
+          severity: "advisory" as const,
+        })]
+        : []),
+    ];
+
+    return Object.freeze({
+      state: readiness.state,
+      summary: readiness.summary,
+      blockingIssueCount: blockingIssues.length,
+      advisoryIssueCount: advisoryIssues.length,
+      blockingIssues: Object.freeze(blockingIssues),
+      advisoryIssues: Object.freeze(advisoryIssues),
+    });
+  }
+
+  private toAdvisoryIssuesFromValidation(
+    issues: ReadonlyArray<{
+      readonly code: string;
+      readonly path: string;
+      readonly message: string;
+      readonly severity: "error" | "warning" | "info";
+    }> | undefined,
+  ): ReadonlyArray<StudioImageSystemReadinessIssueReadModel> {
+    if (!issues || issues.length < 1) {
+      return Object.freeze([]);
+    }
+    return Object.freeze(issues
+      .filter((issue) => issue.severity !== "error")
+      .map((issue) => Object.freeze({
+        code: issue.code,
+        path: issue.path,
+        message: issue.message,
+        severity: "advisory" as const,
+      })));
   }
 
   private readStudioImageSystemDraftState(content: string): {

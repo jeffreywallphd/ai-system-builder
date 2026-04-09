@@ -87,12 +87,16 @@ describe("StudioShellBackendApi", () => {
     expect(savedNew.data?.parameterBaseline).toEqual({
       scaleFactor: 2,
     });
+    expect(savedNew.data?.readiness).toBeDefined();
+    expect(savedNew.data?.readiness.advisoryIssueCount).toBeGreaterThanOrEqual(0);
     const systemId = savedNew.data?.systemId;
     expect(systemId).toBeDefined();
 
     const listed = await api.listImageSystemDefinitions({});
     expect(listed.ok).toBeTrue();
     expect(listed.data?.items.some((entry) => entry.systemId === systemId)).toBeTrue();
+    expect(typeof listed.data?.items[0]?.readiness.blockingIssueCount).toBe("number");
+    expect(typeof listed.data?.items[0]?.readiness.advisoryIssueCount).toBe("number");
 
     const detailAfterCreate = await api.getImageSystemDefinition({
       systemId: systemId!,
@@ -102,6 +106,7 @@ describe("StudioShellBackendApi", () => {
     expect(detailAfterCreate.data?.parameterBaseline).toEqual({
       scaleFactor: 2,
     });
+    expect(detailAfterCreate.data?.readiness).toBeDefined();
 
     const updatedDraftContent = JSON.stringify({
       systemSpec: {
@@ -157,6 +162,7 @@ describe("StudioShellBackendApi", () => {
     expect(detailAfterUpdate.data?.parameterBaseline).toEqual({
       scaleFactor: 3,
     });
+    expect(detailAfterUpdate.data?.readiness).toBeDefined();
   });
 
   it("lists workflow run summaries and projects structured run detail for workflow studio observability", async () => {

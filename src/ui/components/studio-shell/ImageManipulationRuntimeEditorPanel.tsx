@@ -3236,11 +3236,47 @@ export function ImageManipulationRuntimeEditorPanel({
                   <ul className="ui-text-small ui-text-secondary ui-stack ui-stack--2xs" style={{ margin: 0, paddingLeft: "1rem" }}>
                     {recentSystems.map((system) => (
                       <li key={system.systemId}>
+                        {(() => {
+                          const readinessTone = system.readiness.blockingIssueCount > 0
+                            ? "danger"
+                            : system.readiness.advisoryIssueCount > 0
+                              ? "warning"
+                              : system.readiness.state === "configuration-runnable"
+                                ? "success"
+                                : "neutral";
+                          const readinessBadgeClassName = readinessTone === "success"
+                            ? "ui-badge ui-badge--success"
+                            : readinessTone === "warning"
+                              ? "ui-badge ui-badge--warning"
+                              : readinessTone === "danger"
+                                ? "ui-badge ui-badge--danger"
+                                : "ui-badge ui-badge--neutral";
+                          const readinessLabel = system.readiness.blockingIssueCount > 0
+                            ? "Blocked"
+                            : system.readiness.advisoryIssueCount > 0
+                              ? "Advisory"
+                              : system.readiness.state === "configuration-runnable"
+                                ? "Runnable"
+                                : "Ready";
+                          return (
                         <div className="ui-stack ui-stack--2xs">
-                          <span>{system.title}</span>
+                          <div className="ui-row ui-row--xs ui-row--middle">
+                            <span>{system.title}</span>
+                            <span className={readinessBadgeClassName}>{readinessLabel}</span>
+                          </div>
                           <span className="ui-text-secondary">
                             {system.readinessSummary} - {toFriendlyTimestamp(system.updatedAt) ?? system.updatedAt}
                           </span>
+                          {system.readiness.blockingIssueCount > 0 ? (
+                            <span className="ui-text-secondary">
+                              {system.readiness.blockingIssueCount} blocking issue(s)
+                            </span>
+                          ) : null}
+                          {system.readiness.advisoryIssueCount > 0 ? (
+                            <span className="ui-text-secondary">
+                              {system.readiness.advisoryIssueCount} advisory issue(s)
+                            </span>
+                          ) : null}
                           <div className="ui-row ui-row--xs">
                             <button
                               type="button"
@@ -3254,6 +3290,8 @@ export function ImageManipulationRuntimeEditorPanel({
                             </button>
                           </div>
                         </div>
+                          );
+                        })()}
                       </li>
                     ))}
                   </ul>

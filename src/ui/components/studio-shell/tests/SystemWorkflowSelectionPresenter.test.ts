@@ -42,6 +42,14 @@ const savedSystems: ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel> =
   workflowVersionTag: "v1",
   readinessState: "ready",
   readinessSummary: "Ready to launch",
+  readiness: Object.freeze({
+    state: "configuration-runnable",
+    summary: "Ready to launch",
+    blockingIssueCount: 0,
+    advisoryIssueCount: 0,
+    blockingIssues: Object.freeze([]),
+    advisoryIssues: Object.freeze([]),
+  }),
   updatedAt: "2026-04-08T00:00:00.000Z",
 }), Object.freeze({
   systemId: "system:unknown-workflow",
@@ -53,6 +61,19 @@ const savedSystems: ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel> =
   workflowVersionTag: "v1",
   readinessState: "degraded",
   readinessSummary: "Missing model",
+  readiness: Object.freeze({
+    state: "configuration-incomplete",
+    summary: "Missing model",
+    blockingIssueCount: 1,
+    advisoryIssueCount: 0,
+    blockingIssues: Object.freeze([Object.freeze({
+      code: "model-missing",
+      path: "workflowBinding.workflowId",
+      message: "Bound workflow is unavailable.",
+      severity: "blocking" as const,
+    })]),
+    advisoryIssues: Object.freeze([]),
+  }),
   updatedAt: "2026-04-08T00:00:00.000Z",
 })]);
 
@@ -79,5 +100,7 @@ describe("SystemWorkflowSelectionPresenter", () => {
     expect(options[0]?.editTypeTitle).toBe("Restyle from image");
     expect(options[1]?.editTypeTitle).toBeUndefined();
     expect(options[1]?.selected).toBeTrue();
+    expect(options[0]?.readinessBadgeLabel).toBe("Runnable");
+    expect(options[1]?.readinessBadgeLabel).toBe("Blocked");
   });
 });
