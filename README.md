@@ -26,6 +26,7 @@ npm run dev
 
 That starts the renderer plus the Electron desktop host, which is the expected development path for durable `dev/` filesystem + SQLite persistence.
 The desktop dev command now runs a preflight cleanup that clears stale `.vite` build artifacts with retry/backoff handling so restarts recover more reliably after forced terminal stops.
+The desktop runtime also tolerates nested `default` wrappers around `better-sqlite3` exports (a shape emitted by some Electron/Vite CommonJS interop paths), reducing false startup failures where SQLite was available but not recognized.
 
 ### Explicit browser-only fallback
 

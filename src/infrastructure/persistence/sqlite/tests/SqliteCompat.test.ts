@@ -54,4 +54,18 @@ describe("SqliteCompat", () => {
     expect((database as FakeBetterSqlite3Database).databasePath).toBe(databasePath);
     expect(requestedModules).toEqual(["better-sqlite3"]);
   });
+
+  it("opens the database when better-sqlite3 is nested under repeated default exports", () => {
+    const databasePath = "/tmp/nested-default-export.sqlite";
+    const database = openSqliteCompatDatabase(databasePath, (moduleId) => {
+      if (moduleId === "better-sqlite3") {
+        return { default: { default: FakeBetterSqlite3Database } };
+      }
+
+      throw new Error(`Unexpected module request: ${moduleId}`);
+    });
+
+    expect(database).toBeInstanceOf(FakeBetterSqlite3Database);
+    expect((database as FakeBetterSqlite3Database).databasePath).toBe(databasePath);
+  });
 });
