@@ -13,6 +13,9 @@ import ImageManipulationRuntimeEditorPanel, {
   resolveCollectionLoadingMessage,
   resolveGalleryLoadingMessage,
   resolvePreviewLoadingMessage,
+  buildResultLineageInspectorModel,
+  resolveResultLineageCoverageChips,
+  resolveResultLineageSummaryMessage,
   resolveReusableRunOutputForRecovery,
   resolveRefreshNeededState,
   resolveResultReviewNotice,
@@ -102,6 +105,8 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
     expect(html).toContain("Rerun with changes");
     expect(html).toContain("No result selected");
     expect(html).toContain("Advanced details");
+    expect(html).toContain("Result details");
+    expect(html).toContain("Advanced provenance");
     expect(html).toContain("Results (0)");
     expect(html).toContain("Source (0)");
     expect(html).toContain("Face reference (0)");
@@ -827,5 +832,76 @@ describe("ImageManipulationRuntimeEditorPanel", () => {
 
     expect(snapshot?.presetId).toBe("portrait-clean-v1");
     expect(snapshot?.config.prompts.positivePrompt).toBe("Cinematic portrait relight");
+  });
+
+  it("builds layered result-lineage inspector summaries from authoritative detail and lineage payloads", () => {
+    const model = buildResultLineageInspectorModel({
+      selectedOutputItem: {
+        image: {
+          recordId: "result-1",
+        },
+        dataset: {
+          systemId: "system-1",
+        },
+        workflow: {
+          workflowRunId: "run-1",
+          workflowAssetId: "workflow-1",
+          generationRole: "primary",
+        },
+        sourceImage: {
+          stableId: "asset:input:1",
+        },
+        imageMetadataSummary: {
+          metadata: {
+            lineageInputAssetCount: 1,
+          },
+        },
+        generationParametersSummary: {
+          resultStatus: "preview-ready",
+        },
+      } as never,
+      detail: {
+        result: {
+          resultAssetId: "result-1",
+          runId: "run-1",
+          systemId: "system-1",
+          workflowId: "workflow-1",
+          outputSlot: "primary",
+          status: "preview-ready",
+          lineage: {
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+            inputAssetCount: 1,
+          },
+        },
+      } as never,
+      lineage: {
+        lineage: {
+          summary: {
+            resultAssetId: "result-1",
+            runId: "run-1",
+            systemId: "system-1",
+            workflowId: "workflow-1",
+            outputSlot: "primary",
+            inputAssetCount: 1,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          },
+          upstreamInputs: [{
+            assetId: "asset:input:1",
+          }],
+        },
+      } as never,
+    });
+
+    expect(model?.resultAssetId).toBe("result-1");
+    expect(model?.inputAssetCount).toBe(1);
+    expect(resolveResultLineageSummaryMessage(model)).toContain("run run-1");
+    expect(resolveResultLineageCoverageChips(model)).toContain("Workflow version captured");
+    expect(resolveResultLineageCoverageChips(model)).toContain("Execution node captured");
   });
 });

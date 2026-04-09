@@ -80,6 +80,10 @@ import type {
   RuntimeSdkExecutionStatusResponse,
 } from "@shared/contracts/runtime/SystemRuntimeTransportContracts";
 import type { StudioImageSystemDefinitionSummaryReadModel } from "@infrastructure/api/studio-shell/StudioShellBackendApi";
+import type {
+  GetGeneratedResultApiResponse,
+  GetGeneratedResultLineageDetailApiResponse,
+} from "@infrastructure/api/generated-results/sdk/PublicGeneratedResultManagementApiContract";
 import type { ImageManipulationIssueLayer } from "@shared/contracts/image-workflows/ImageManipulationValidationFailureTaxonomy";
 import {
   ImageStudioFailureMappingLayers,
@@ -505,6 +509,94 @@ export function resolveResultReviewNotice(input: {
   }
 
   return undefined;
+}
+
+export interface ResultLineageInspectorModel {
+  readonly resultAssetId: string;
+  readonly runId?: string;
+  readonly workflowId?: string;
+  readonly systemId?: string;
+  readonly outputSlot?: string;
+  readonly resultStatus?: string;
+  readonly primaryInputAssetId?: string;
+  readonly inputAssetCount?: number;
+  readonly explainabilityCoverage: Readonly<{
+    workflowTemplateVersion: boolean;
+    systemSnapshot: boolean;
+    parameterSnapshot: boolean;
+    selectedExecutionNode: boolean;
+  }>;
+}
+
+export function buildResultLineageInspectorModel(input: {
+  readonly selectedOutputItem?: OutputGalleryItem;
+  readonly activeRunId?: string;
+  readonly detail?: GetGeneratedResultApiResponse;
+  readonly lineage?: GetGeneratedResultLineageDetailApiResponse;
+}): ResultLineageInspectorModel | undefined {
+  const resultAssetId = input.selectedOutputItem?.image.recordId;
+  if (!resultAssetId) {
+    return undefined;
+  }
+
+  const summary = input.lineage?.lineage.summary;
+  const detailResult = input.detail?.result;
+  const lineageInputCountValue = input.selectedOutputItem.imageMetadataSummary.metadata.lineageInputAssetCount;
+  const lineageInputCount = typeof lineageInputCountValue === "number" ? lineageInputCountValue : undefined;
+
+  return Object.freeze({
+    resultAssetId,
+    runId: summary?.runId ?? detailResult?.runId ?? input.selectedOutputItem.workflow?.workflowRunId ?? input.activeRunId,
+    workflowId: summary?.workflowId ?? detailResult?.workflowId ?? input.selectedOutputItem.workflow?.workflowAssetId,
+    systemId: summary?.systemId ?? detailResult?.systemId ?? input.selectedOutputItem.dataset.systemId,
+    outputSlot: summary?.outputSlot ?? detailResult?.outputSlot ?? input.selectedOutputItem.workflow?.generationRole,
+    resultStatus: detailResult?.status ?? (
+      typeof input.selectedOutputItem.generationParametersSummary.resultStatus === "string"
+        ? input.selectedOutputItem.generationParametersSummary.resultStatus
+        : undefined
+    ),
+    primaryInputAssetId: input.lineage?.lineage.upstreamInputs[0]?.assetId
+      ?? input.selectedOutputItem.sourceImage?.stableId
+      ?? input.selectedOutputItem.sourceImage?.assetId,
+    inputAssetCount: summary?.inputAssetCount ?? detailResult?.lineage.inputAssetCount ?? lineageInputCount,
+    explainabilityCoverage: Object.freeze({
+      workflowTemplateVersion: summary?.hasWorkflowTemplateVersion ?? detailResult?.lineage.hasWorkflowTemplateVersion ?? false,
+      systemSnapshot: summary?.hasSystemSnapshot ?? detailResult?.lineage.hasSystemSnapshot ?? false,
+      parameterSnapshot: summary?.hasParameterSnapshot ?? detailResult?.lineage.hasParameterSnapshot ?? false,
+      selectedExecutionNode: summary?.hasSelectedNode ?? detailResult?.lineage.hasSelectedNode ?? false,
+    }),
+  });
+}
+
+export function resolveResultLineageSummaryMessage(model: ResultLineageInspectorModel | undefined): string {
+  if (!model) {
+    return "Select a result to inspect where it came from.";
+  }
+
+  const runLabel = model.runId ? `run ${model.runId}` : "an earlier run";
+  const workflowLabel = model.workflowId ? `workflow ${model.workflowId}` : "a saved workflow";
+  const inputCountLabel = typeof model.inputAssetCount === "number"
+    ? `${model.inputAssetCount} input asset${model.inputAssetCount === 1 ? "" : "s"}`
+    : "its source assets";
+
+  return `This result came from ${runLabel} using ${workflowLabel}, with lineage to ${inputCountLabel}.`;
+}
+
+export function resolveResultLineageCoverageChips(
+  model: ResultLineageInspectorModel | undefined,
+): ReadonlyArray<string> {
+  if (!model) {
+    return Object.freeze([]);
+  }
+
+  const coverage = model.explainabilityCoverage;
+  const chips = [
+    coverage.workflowTemplateVersion ? "Workflow version captured" : undefined,
+    coverage.systemSnapshot ? "System snapshot captured" : undefined,
+    coverage.parameterSnapshot ? "Settings snapshot captured" : undefined,
+    coverage.selectedExecutionNode ? "Execution node captured" : undefined,
+  ].filter((value): value is string => Boolean(value));
+  return Object.freeze(chips);
 }
 
 function resolveHistoryRunBadgeTone(
@@ -2480,6 +2572,22 @@ export function ImageManipulationRuntimeEditorPanel({
       : linkedRunStatusTone === "danger"
         ? "ui-badge ui-badge--danger"
         : "ui-badge ui-badge--neutral";
+  const resultLineageInspectorModel = buildResultLineageInspectorModel({
+    selectedOutputItem,
+    activeRunId,
+    detail: selectedGeneratedResultDetail,
+    lineage: selectedGeneratedResultLineage,
+  });
+  const resultLineageSummaryMessage = resolveResultLineageSummaryMessage(resultLineageInspectorModel);
+  const resultLineageCoverageChips = resolveResultLineageCoverageChips(resultLineageInspectorModel);
+  const resultLineageUpstreamInputIds = selectedGeneratedResultLineage?.lineage.upstreamInputs.map((entry) => entry.assetId) ?? [];
+  const hasResultLineageAdvancedDetail = resultLineageUpstreamInputIds.length > 0
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.workflowTemplateVersionId)
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.systemSnapshotId)
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.parameterSnapshotId)
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.selectedNodeId)
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.executionAdapterKind)
+    || Boolean(selectedGeneratedResultLineage?.lineage.source.executionBackendFamily);
   const quickActionDisabled = !selectedOutputItem || isResultQuickActionPending !== undefined;
   const failureRecoveryGuidance = buildImageRunFailureRecoveryGuidance({
     runLifecycle,
@@ -4158,37 +4266,113 @@ export function ImageManipulationRuntimeEditorPanel({
                     {isRefreshingReview ? "Refreshing review..." : "Refresh review"}
                   </button>
                 </div>
-                <details>
-                  <summary className="ui-text-small ui-text-secondary">Lineage and settings</summary>
-                  <div className="ui-stack ui-stack--2xs" style={{ marginTop: "0.5rem" }}>
-                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                      Run ID: {selectedOutputItem.workflow?.workflowRunId ?? activeRunId ?? "Unavailable"}
-                    </p>
-                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                      Result asset: {selectedOutputItem.image.recordId}
-                    </p>
-                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                      Result status: {selectedGeneratedResultDetail?.result.status ?? "Unavailable"}
-                    </p>
-                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                      Source: {selectedGeneratedResultLineage?.lineage.upstreamInputs[0]?.assetId
-                        ?? selectedOutputItem.sourceImage?.stableId
-                        ?? selectedOutputItem.sourceImage?.assetId
-                        ?? "Unavailable"}
-                    </p>
-                    {selectedGeneratedResultLoading ? (
-                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                        Loading authoritative lineage detail...
-                      </p>
+                <section className="ui-stack ui-stack--2xs" data-testid="result-lineage-inspector">
+                  <div className="ui-row ui-row--space-between ui-row--middle">
+                    <h4 className="ui-text-small" style={{ margin: 0 }}>Result details</h4>
+                    {linkedRun ? (
+                      <button
+                        type="button"
+                        className="ui-button ui-button--ghost ui-button--sm"
+                        disabled={Boolean(isContinuingFromRunId)}
+                        onClick={() => {
+                          void continueFromRunHistory(linkedRun);
+                        }}
+                      >
+                        Open run context
+                      </button>
                     ) : null}
-                    {selectedGeneratedResultError ? (
-                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                        {selectedGeneratedResultError}
-                      </p>
-                    ) : null}
-                    <pre className="ui-code-block">{JSON.stringify(selectedOutputItem.generationParametersSummary, null, 2)}</pre>
                   </div>
-                </details>
+                  <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                    {resultLineageSummaryMessage}
+                  </p>
+                  <div className="ui-row ui-row--xs ui-image-editor-page__result-review-badges">
+                    <span className="ui-badge ui-badge--neutral">
+                      Result {resultLineageInspectorModel?.resultAssetId ?? selectedOutputItem.image.recordId}
+                    </span>
+                    <span className="ui-badge ui-badge--neutral">
+                      Status {resultLineageInspectorModel?.resultStatus ?? "Unavailable"}
+                    </span>
+                    <span className="ui-badge ui-badge--neutral">
+                      Source {resultLineageInspectorModel?.primaryInputAssetId ?? "Unavailable"}
+                    </span>
+                  </div>
+                  {resultLineageCoverageChips.length > 0 ? (
+                    <div className="ui-row ui-row--xs ui-image-editor-page__result-review-badges">
+                      {resultLineageCoverageChips.map((chip) => (
+                        <span key={chip} className="ui-badge ui-badge--neutral">{chip}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {selectedGeneratedResultLoading ? (
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      Loading authoritative result detail and lineage...
+                    </p>
+                  ) : null}
+                  {selectedGeneratedResultError ? (
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      {selectedGeneratedResultError}
+                    </p>
+                  ) : null}
+                  <details>
+                    <summary className="ui-text-small ui-text-secondary">Advanced provenance</summary>
+                    <div className="ui-stack ui-stack--2xs" style={{ marginTop: "0.5rem" }}>
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        Run ID: {resultLineageInspectorModel?.runId ?? "Unavailable"}
+                      </p>
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        Workflow: {resultLineageInspectorModel?.workflowId ?? "Unavailable"}
+                      </p>
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        System: {resultLineageInspectorModel?.systemId ?? "Unavailable"}
+                      </p>
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        Output slot: {resultLineageInspectorModel?.outputSlot ?? "Unavailable"}
+                      </p>
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        Input assets: {typeof resultLineageInspectorModel?.inputAssetCount === "number"
+                          ? resultLineageInspectorModel.inputAssetCount
+                          : "Unavailable"}
+                      </p>
+                      {hasResultLineageAdvancedDetail ? (
+                        <>
+                          <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                            Workflow version: {selectedGeneratedResultLineage?.lineage.source.workflowTemplateVersionTag
+                              ?? selectedGeneratedResultLineage?.lineage.source.workflowTemplateVersionId
+                              ?? "Unavailable"}
+                          </p>
+                          <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                            System snapshot: {selectedGeneratedResultLineage?.lineage.source.systemVersionTag
+                              ?? selectedGeneratedResultLineage?.lineage.source.systemSnapshotId
+                              ?? "Unavailable"}
+                          </p>
+                          <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                            Settings snapshot: {selectedGeneratedResultLineage?.lineage.source.parameterSnapshotId ?? "Unavailable"}
+                          </p>
+                          <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                            Execution context: {selectedGeneratedResultLineage?.lineage.source.selectedNodeId
+                              ?? selectedGeneratedResultLineage?.lineage.source.executionAdapterKind
+                              ?? selectedGeneratedResultLineage?.lineage.source.executionBackendFamily
+                              ?? "Unavailable"}
+                          </p>
+                        </>
+                      ) : null}
+                      {resultLineageUpstreamInputIds.length > 0 ? (
+                        <div className="ui-stack ui-stack--3xs">
+                          <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>Upstream inputs</p>
+                          <ul className="ui-text-small ui-text-secondary" style={{ margin: 0, paddingLeft: "1rem" }}>
+                            {resultLineageUpstreamInputIds.map((assetId) => (
+                              <li key={assetId}>{assetId}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+                      <details>
+                        <summary className="ui-text-small ui-text-secondary">Parameter snapshot</summary>
+                        <pre className="ui-code-block">{JSON.stringify(selectedOutputItem.generationParametersSummary, null, 2)}</pre>
+                      </details>
+                    </div>
+                  </details>
+                </section>
               </div>
             )}
             <section className="ui-stack ui-stack--2xs" data-testid="image-run-history-panel">
