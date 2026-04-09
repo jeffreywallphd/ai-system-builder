@@ -15,7 +15,9 @@ const config: ForgeConfig = {
       "README.md",
     ],
   },
-  rebuildConfig: {},
+  rebuildConfig: {
+    onlyModules: [],
+  },
   makers: [
     new MakerSquirrel({
       name: "ai_loom_studio",
@@ -47,4 +49,3 @@ const config: ForgeConfig = {
 };
 
 export default config;
-
