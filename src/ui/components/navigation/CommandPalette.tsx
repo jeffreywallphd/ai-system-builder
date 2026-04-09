@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CommandPaletteService, type CommandPaletteEntry } from "../../routes/CommandPalette";
 import { useSurfaceDialogFocusTrap } from "../../shared/accessibility";
@@ -48,19 +48,45 @@ export default function CommandPalette({ isOpen, onClose }: CommandPaletteProps)
     void navigate(entry.action.launchPath);
   };
 
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const onPointerDown = (event: PointerEvent): void => {
+      const container = dialogRef.current;
+      if (!container) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (!container.contains(target)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div className="ui-overlay-panel ui-overlay-panel--right ui-overlay-panel--open ui-command-palette" aria-hidden={false}>
-      <button type="button" className="ui-overlay-panel__scrim" onClick={onClose} aria-label="Close navigation menu" />
+    <div className="ui-overlay-panel ui-overlay-panel--right ui-overlay-panel--open ui-command-palette ui-command-palette--nonblocking" aria-hidden={false}>
       <aside
         ref={dialogRef}
         id="global-navigation-menu"
         className="ui-overlay-panel__surface"
         role="dialog"
-        aria-modal="true"
+        aria-modal={false}
         aria-label="Navigation menu"
         tabIndex={-1}
       >
