@@ -17,7 +17,11 @@ const staticExternalModules = new Set([
 
 function isSharpRuntimeModule(id: string): boolean {
   const normalizedId = id.replace(/\\/g, "/");
-  const sanitizedId = normalizedId.split("?")[0];
+  const withoutQuery = normalizedId.split("?")[0];
+  const sanitizedId = withoutQuery
+    .replace(/^\0+/, "")
+    .replace(/^commonjs-external:/, "")
+    .replace(/^\/@id\//, "");
 
   return (
     sanitizedId === "sharp" ||

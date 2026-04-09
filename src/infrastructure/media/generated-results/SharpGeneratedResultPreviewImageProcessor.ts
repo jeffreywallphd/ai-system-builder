@@ -1,15 +1,50 @@
-import sharp from "sharp";
 import type {
   GenerateResultPreviewDerivativeRequest,
   GenerateResultPreviewDerivativeResult,
   IGeneratedResultPreviewImageProcessorPort,
 } from "@application/generated-results/ports/GeneratedResultPreviewGenerationPorts";
 
+type SharpFactory = typeof import("sharp").default;
+
+let cachedSharpFactory: SharpFactory | undefined;
+let sharpFactoryLoadPromise: Promise<SharpFactory | undefined> | undefined;
+
+async function resolveSharpFactory(): Promise<SharpFactory | undefined> {
+  if (cachedSharpFactory) {
+    return cachedSharpFactory;
+  }
+  if (sharpFactoryLoadPromise) {
+    return sharpFactoryLoadPromise;
+  }
+
+  sharpFactoryLoadPromise = (async () => {
+    try {
+      const sharpRecord = await import("sharp") as Readonly<Record<string, unknown>>;
+      const candidate = (sharpRecord.default ?? sharpRecord) as SharpFactory | undefined;
+      if (typeof candidate === "function") {
+        cachedSharpFactory = candidate;
+      }
+      return cachedSharpFactory;
+    } catch {
+      return undefined;
+    } finally {
+      sharpFactoryLoadPromise = undefined;
+    }
+  })();
+
+  return sharpFactoryLoadPromise;
+}
+
 export class SharpGeneratedResultPreviewImageProcessor implements IGeneratedResultPreviewImageProcessorPort {
   public async generatePreviewDerivative(
     request: GenerateResultPreviewDerivativeRequest,
   ): Promise<GenerateResultPreviewDerivativeResult> {
-    const transformed = sharp(request.sourceContent, {
+    const sharpFactory = await resolveSharpFactory();
+    if (!sharpFactory) {
+      throw new Error("Preview derivative generation is unavailable.");
+    }
+
+    const transformed = sharpFactory(request.sourceContent, {
       failOn: "error",
       limitInputPixels: false,
     })
