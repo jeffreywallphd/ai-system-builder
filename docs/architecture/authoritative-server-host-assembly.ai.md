@@ -63,7 +63,7 @@
 
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
-- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now delegates browser-development local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts browser-development local control-plane startup through `npm run start:authoritative-server` with `AI_LOOM_SERVER_*` env wiring.
 
 ## Tests
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`

@@ -1,5 +1,7 @@
-﻿import process from "node:process";
+import process from "node:process";
 import path from "node:path";
+import net from "node:net";
+import { spawn, type ChildProcess } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import {
@@ -7,11 +9,6 @@ import {
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
 } from "../../config/HostSecureTransportConfig";
-import {
-  startAuthoritativeServerHostAssembly,
-  type AuthoritativeServerHostEntrypointOptions,
-  type AuthoritativeServerHostRuntimeHandle,
-} from "@hosts/server/AuthoritativeServerHostEntrypoint";
 import {
   resolveBrowserDevelopmentManagedRuntimeFromEnvironment,
 } from "./BrowserDevelopmentManagedRuntime";
@@ -24,6 +21,24 @@ const BROWSER_IDENTITY_DATABASE_PATH = path.resolve(
   "identity.sqlite",
 );
 const BrowserDevelopmentAuthoritativeStartupReason = "browser-development-vite-authoritative-host-startup";
+const AUTHORITATIVE_SERVER_READY_TIMEOUT_MS = 10_000;
+const POLL_INTERVAL_MS = 100;
+
+export interface BrowserDevelopmentAuthoritativeServerHostEntrypointOptions {
+  readonly hostOptions: {
+    readonly databasePath: string;
+    readonly host: string;
+    readonly port?: number;
+    readonly cors?: {
+      readonly allowLoopbackOrigins?: boolean;
+    };
+    readonly env?: Readonly<Record<string, string | undefined>>;
+  };
+  readonly boot?: {
+    readonly startupReason?: string;
+    readonly environment?: Readonly<Record<string, string | undefined>>;
+  };
+}
 
 export interface BrowserDevelopmentAuthoritativeServerOptionsInput {
   readonly databasePath: string;
@@ -34,7 +49,7 @@ export interface BrowserDevelopmentAuthoritativeServerOptionsInput {
 
 export function createBrowserDevelopmentAuthoritativeServerHostOptions(
   input: BrowserDevelopmentAuthoritativeServerOptionsInput,
-): AuthoritativeServerHostEntrypointOptions {
+): BrowserDevelopmentAuthoritativeServerHostEntrypointOptions {
   const environment = input.environment ?? process.env;
   return Object.freeze({
     hostOptions: Object.freeze({
@@ -57,18 +72,24 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
   const managedRuntime = resolveBrowserDevelopmentManagedRuntimeFromEnvironment();
   const identityHostAddress = process.env.AI_LOOM_BROWSER_IDENTITY_HOST || "127.0.0.1";
   const requestedIdentityHostPort = parseOptionalPort(process.env.AI_LOOM_BROWSER_IDENTITY_PORT) ?? 8788;
+  const authoritativeHostOptions = createBrowserDevelopmentAuthoritativeServerHostOptions({
+    databasePath: BROWSER_IDENTITY_DATABASE_PATH,
+    host: identityHostAddress,
+    port: requestedIdentityHostPort,
+    environment: process.env,
+  });
   const identitySecureTransport = resolveHostSecureTransportConfig({
     hostKind: HostSecureTransportKinds.worker,
     hostAddress: identityHostAddress,
   });
   let identityApiBaseUrl: string | undefined;
-  let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
+  let authoritativeServerProcess: ChildProcess | undefined;
   let cleanupRegistered = false;
 
   const stopAll = () => {
-    if (authoritativeServerRuntime) {
-      void authoritativeServerRuntime.stop().catch(() => {});
-      authoritativeServerRuntime = undefined;
+    if (authoritativeServerProcess && !authoritativeServerProcess.killed) {
+      authoritativeServerProcess.kill("SIGTERM");
+      authoritativeServerProcess = undefined;
     }
     managedRuntime.stop();
   };
@@ -90,20 +111,22 @@ export function createBrowserDevelopmentVitePlugin(): Plugin {
     apply: "serve",
     async configureServer(server) {
       await managedRuntime.ensureStarted(server.config.logger);
-      if (!authoritativeServerRuntime) {
-        authoritativeServerRuntime = await startAuthoritativeServerHostAssembly(
-          createBrowserDevelopmentAuthoritativeServerHostOptions({
-            databasePath: BROWSER_IDENTITY_DATABASE_PATH,
-            host: identityHostAddress,
-            port: requestedIdentityHostPort,
-            environment: process.env,
-          }),
-        );
-        identityApiBaseUrl = assertSecureTransportEndpoint(
-          `http://${authoritativeServerRuntime.address}`,
-          identitySecureTransport,
+
+      const serverAlreadyRunning = await canConnectToPort(requestedIdentityHostPort, identityHostAddress);
+      if (!serverAlreadyRunning) {
+        authoritativeServerProcess = startBrowserDevelopmentAuthoritativeServerHost(authoritativeHostOptions);
+        await waitForPort(
+          requestedIdentityHostPort,
+          identityHostAddress,
+          AUTHORITATIVE_SERVER_READY_TIMEOUT_MS,
+          () => assertProcessAlive(authoritativeServerProcess),
         );
       }
+
+      identityApiBaseUrl = assertSecureTransportEndpoint(
+        `http://${identityHostAddress}:${requestedIdentityHostPort}`,
+        identitySecureTransport,
+      );
       registerCleanup(stopAll, server.httpServer);
     },
     transformIndexHtml(html) {
@@ -136,3 +159,71 @@ function parseOptionalPort(value: string | undefined): number | undefined {
   return parsed;
 }
 
+function startBrowserDevelopmentAuthoritativeServerHost(
+  options: BrowserDevelopmentAuthoritativeServerHostEntrypointOptions,
+): ChildProcess {
+  const env = {
+    ...process.env,
+    ...options.hostOptions.env,
+    ...options.boot?.environment,
+    AI_LOOM_SERVER_DATABASE_PATH: options.hostOptions.databasePath,
+    AI_LOOM_SERVER_HOST: options.hostOptions.host,
+    AI_LOOM_SERVER_PORT: String(options.hostOptions.port ?? 8788),
+  };
+
+  return spawn(resolveNpmExecutable(), ["run", "start:authoritative-server"], {
+    cwd: REPOSITORY_ROOT,
+    env,
+    stdio: "inherit",
+  });
+}
+
+function resolveNpmExecutable(): string {
+  return process.platform === "win32" ? "npm.cmd" : "npm";
+}
+
+function assertProcessAlive(processHandle: ChildProcess | undefined): void {
+  if (!processHandle) {
+    throw new Error("Authoritative browser-development host process did not start.");
+  }
+
+  if (processHandle.exitCode !== null || processHandle.signalCode !== null) {
+    throw new Error(
+      `Authoritative browser-development host exited before becoming ready (exitCode=${processHandle.exitCode}, signal=${processHandle.signalCode ?? "none"}).`,
+    );
+  }
+}
+
+async function waitForPort(
+  port: number,
+  host: string,
+  timeoutMs: number,
+  onPoll?: () => void,
+): Promise<void> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < timeoutMs) {
+    onPoll?.();
+    if (await canConnectToPort(port, host)) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+
+  throw new Error(`Timed out waiting for browser-development authoritative host on ${host}:${port} after ${timeoutMs}ms.`);
+}
+
+async function canConnectToPort(port: number, host = "127.0.0.1"): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host });
+
+    socket.once("connect", () => {
+      socket.end();
+      resolve(true);
+    });
+    socket.once("error", () => {
+      resolve(false);
+    });
+  });
+}
