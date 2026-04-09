@@ -403,7 +403,7 @@ describe("UnifiedIngestionOrchestrationService", () => {
     expect(capturedImageConfigs[0]).toEqual({
       extractExif: undefined,
       normalizeOrientation: undefined,
-      tags: [" hero ", "reviewed "],
+      tags: ["hero", "reviewed"],
       annotations: {
         caption: "Sample",
         labels: ["catalog"],
@@ -701,4 +701,3 @@ describe("UnifiedIngestionOrchestrationService", () => {
     }
   });
 });
-

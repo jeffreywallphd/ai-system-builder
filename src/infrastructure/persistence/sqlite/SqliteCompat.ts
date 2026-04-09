@@ -86,6 +86,10 @@ class BunSqliteCompatDatabase implements SqliteCompatDatabase {
     },
   ) {}
 
+  private isNamedParameterRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
   public pragma(value: string): void {
     this.database.exec(`PRAGMA ${value};`);
   }
@@ -98,11 +102,27 @@ class BunSqliteCompatDatabase implements SqliteCompatDatabase {
     const statement = this.database.query(sql);
     return {
       run: (...params: ReadonlyArray<unknown>) => {
-        const result = params.length > 0 ? statement.run(...params) : statement.run();
+        const result = params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.run(params[0])
+          : params.length > 0
+            ? statement.run(...params)
+            : statement.run();
         return Object.freeze({ changes: result.changes ?? 0 });
       },
-      get: (...params: ReadonlyArray<unknown>) => (params.length > 0 ? statement.get(...params) : statement.get()),
-      all: (...params: ReadonlyArray<unknown>) => (params.length > 0 ? statement.all(...params) : statement.all()),
+      get: (...params: ReadonlyArray<unknown>) => (
+        params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.get(params[0])
+          : params.length > 0
+            ? statement.get(...params)
+            : statement.get()
+      ),
+      all: (...params: ReadonlyArray<unknown>) => (
+        params.length === 1 && this.isNamedParameterRecord(params[0])
+          ? statement.all(params[0])
+          : params.length > 0
+            ? statement.all(...params)
+            : statement.all()
+      ),
     };
   }
 
