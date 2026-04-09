@@ -27,6 +27,7 @@ import { mapOutputGalleryItemToImageViewModel } from "../assets/image-system/Ima
 import type { ImageUiViewModel } from "../assets/image-system/ImageUiContracts";
 import type { StudioShellExtensionContext } from "../../studio-shell/StudioShellExtensions";
 import { StudioShellService } from "../../services/StudioShellService";
+import { GeneratedResultStudioService } from "../../services/GeneratedResultStudioService";
 import {
   ImageAssetManagementService,
   type ImageLibraryStudioImageAsset,
@@ -86,6 +87,11 @@ import {
   deriveImageStudioOperationalGuidance,
   mapImageStudioFailureCodeToClassification,
 } from "../../shared/images/ImageStudioOperationalMessaging";
+import {
+  buildGeneratedResultPreviewContentUrl,
+  mapGeneratedResultToOutputGalleryItem,
+  mapGeneratedResultsToRunHistory,
+} from "./image-manipulation/GeneratedResultGalleryHistoryAdapter";
 
 const uploadPolicy: FileIngestionPolicy = Object.freeze({
   acceptedExtensions: Object.freeze(["png", "jpg", "jpeg", "webp"]),
@@ -1382,6 +1388,7 @@ export function ImageManipulationRuntimeEditorPanel({
   const isImageRuntimeTarget = (hydratedRuntime?.resolvedPage.pageBindingId ?? runtimeLaunch?.launchTarget.pageBindingId)
     === ImageManipulationSystemTemplate.compositionBindings.pageBindingId;
   const studioShell = useMemo(() => new StudioShellService(), []);
+  const generatedResults = useMemo(() => new GeneratedResultStudioService(), []);
   const imageAssets = useMemo(() => new ImageAssetManagementService(), []);
   const runtimeOperations = useMemo(() => new RuntimeOperationsService(), []);
   const authSessionStore = useMemo(() => new IdentityAuthSessionStore(), []);
@@ -1513,6 +1520,10 @@ export function ImageManipulationRuntimeEditorPanel({
   const [runHistory, setRunHistory] = useState<ReadonlyArray<ImageRunHistoryRecord>>([]);
   const [isLoadingRunHistory, setIsLoadingRunHistory] = useState(false);
   const [runHistoryError, setRunHistoryError] = useState<string | undefined>();
+  const [selectedGeneratedResultDetail, setSelectedGeneratedResultDetail] = useState<Awaited<ReturnType<typeof generatedResults.getGeneratedResult>>["data"]>();
+  const [selectedGeneratedResultLineage, setSelectedGeneratedResultLineage] = useState<Awaited<ReturnType<typeof generatedResults.getGeneratedResultLineageDetail>>["data"]>();
+  const [selectedGeneratedResultLoading, setSelectedGeneratedResultLoading] = useState(false);
+  const [selectedGeneratedResultError, setSelectedGeneratedResultError] = useState<string | undefined>();
   const [isRefreshingReview, setIsRefreshingReview] = useState(false);
   const [selectedHistoryRunId, setSelectedHistoryRunId] = useState<string | undefined>();
   const [isContinuingFromRunId, setIsContinuingFromRunId] = useState<string | undefined>();
@@ -1787,12 +1798,59 @@ export function ImageManipulationRuntimeEditorPanel({
     setError(undefined);
 
     const request = datasetBindingId === "output-image-dataset"
-      ? studioShell.listReferenceImageOutputs({
-        studioId: context.studioId,
-        draftId: draft.draftId,
-        limit: 24,
-        offset: 0,
-      })
+      ? (async () => {
+        if (actorUserIdentityId && workspaceId && sessionToken) {
+          const listed = await generatedResults.listGeneratedResults({
+            actorUserIdentityId,
+            workspaceId,
+            workflowId: runtimeWorkflowAssetId,
+            limit: 24,
+            offset: 0,
+            sessionToken,
+          });
+          if (!listed.ok || !listed.data) {
+            return {
+              ok: false,
+              error: listed.error,
+            } as const;
+          }
+          const previewPayloadByAssetId = new Map<string, Awaited<ReturnType<typeof generatedResults.requestGeneratedResultPreview>>["data"]>();
+          await Promise.all(listed.data.items.map(async (item) => {
+            if (item.preview.state !== "preview-available") {
+              return;
+            }
+            const preview = await generatedResults.requestGeneratedResultPreview({
+              actorUserIdentityId,
+              workspaceId,
+              resultAssetId: item.resultAssetId,
+              sessionToken,
+            });
+            if (preview.ok && preview.data) {
+              previewPayloadByAssetId.set(item.resultAssetId, preview.data);
+            }
+          }));
+          const items = Object.freeze(listed.data.items.map((item) => mapGeneratedResultToOutputGalleryItem({
+            summary: item,
+            previewUrl: buildGeneratedResultPreviewContentUrl({
+              baseUrl: globalThis.location?.origin ?? "",
+              workspaceId,
+              preview: previewPayloadByAssetId.get(item.resultAssetId)?.preview,
+            }),
+          })));
+          return {
+            ok: true,
+            data: Object.freeze({
+              items,
+            }),
+          } as const;
+        }
+        return studioShell.listReferenceImageOutputs({
+          studioId: context.studioId,
+          draftId: draft.draftId,
+          limit: 24,
+          offset: 0,
+        });
+      })()
       : studioShell.listReferenceImageDatasetItems({
         studioId: context.studioId,
         draftId: draft.draftId,
@@ -1803,7 +1861,7 @@ export function ImageManipulationRuntimeEditorPanel({
 
     return request.then((response) => {
       if (!response.ok || !response.data) {
-        setError(getCollectionLoadErrorMessage(datasetBindingId));
+        setError(response.error?.message ?? getCollectionLoadErrorMessage(datasetBindingId));
         return Object.freeze([]);
       }
       return response.data.items;
@@ -2090,12 +2148,36 @@ export function ImageManipulationRuntimeEditorPanel({
     }
     setIsLoadingRunHistory(true);
     setRunHistoryError(undefined);
-    return studioShell.listReferenceImageRunHistory({
-      studioId: context.studioId,
-      draftId: draft.draftId,
-      limit: 20,
-      offset: 0,
-    }).then((response) => {
+    const request = actorUserIdentityId && workspaceId && sessionToken
+      ? generatedResults.listGeneratedResults({
+        actorUserIdentityId,
+        workspaceId,
+        workflowId: runtimeWorkflowAssetId,
+        limit: 100,
+        offset: 0,
+        sessionToken,
+      }).then((response) => {
+        if (!response.ok || !response.data) {
+          return {
+            ok: false,
+            error: response.error,
+          } as const;
+        }
+        return {
+          ok: true,
+          data: Object.freeze({
+            runs: mapGeneratedResultsToRunHistory(response.data.items),
+          }),
+        } as const;
+      })
+      : studioShell.listReferenceImageRunHistory({
+        studioId: context.studioId,
+        draftId: draft.draftId,
+        limit: 20,
+        offset: 0,
+      });
+
+    return request.then((response) => {
       if (!response.ok || !response.data) {
         setRunHistory(Object.freeze([]));
         setRunHistoryError(response.error?.message ?? "We couldn't load run history.");
@@ -2110,11 +2192,20 @@ export function ImageManipulationRuntimeEditorPanel({
 
   useEffect(() => {
     void loadCollections({ hydration: true });
-  }, [draft?.draftId, roleBindings.sourceBindingId, roleBindings.outputBindingId, roleBindings.referenceBindingId]);
+  }, [
+    draft?.draftId,
+    roleBindings.sourceBindingId,
+    roleBindings.outputBindingId,
+    roleBindings.referenceBindingId,
+    actorUserIdentityId,
+    workspaceId,
+    sessionToken,
+    runtimeWorkflowAssetId,
+  ]);
 
   useEffect(() => {
     void loadRunHistory();
-  }, [draft?.draftId]);
+  }, [draft?.draftId, actorUserIdentityId, workspaceId, sessionToken, runtimeWorkflowAssetId]);
 
   useEffect(() => {
     void loadRecentAssets();
@@ -2143,6 +2234,54 @@ export function ImageManipulationRuntimeEditorPanel({
       setSelectedHistoryRunId(undefined);
     }
   }, [runHistory, selectedHistoryRunId]);
+
+  useEffect(() => {
+    if (!selectedOutputItem || !actorUserIdentityId || !workspaceId || !sessionToken) {
+      setSelectedGeneratedResultDetail(undefined);
+      setSelectedGeneratedResultLineage(undefined);
+      setSelectedGeneratedResultError(undefined);
+      setSelectedGeneratedResultLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSelectedGeneratedResultLoading(true);
+    setSelectedGeneratedResultError(undefined);
+    void Promise.all([
+      generatedResults.getGeneratedResult({
+        actorUserIdentityId,
+        workspaceId,
+        resultAssetId: selectedOutputItem.image.recordId,
+        sessionToken,
+      }),
+      generatedResults.getGeneratedResultLineageDetail({
+        actorUserIdentityId,
+        workspaceId,
+        resultAssetId: selectedOutputItem.image.recordId,
+        sessionToken,
+      }),
+    ]).then(([detail, lineage]) => {
+      if (cancelled) {
+        return;
+      }
+      setSelectedGeneratedResultDetail(detail.ok ? detail.data : undefined);
+      setSelectedGeneratedResultLineage(lineage.ok ? lineage.data : undefined);
+      if (!detail.ok) {
+        setSelectedGeneratedResultError(detail.error?.message ?? "Result detail is unavailable.");
+      } else if (!lineage.ok) {
+        setSelectedGeneratedResultError(lineage.error?.message ?? "Lineage detail is unavailable.");
+      } else {
+        setSelectedGeneratedResultError(undefined);
+      }
+    }).finally(() => {
+      if (!cancelled) {
+        setSelectedGeneratedResultLoading(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [actorUserIdentityId, generatedResults, selectedOutputItem, sessionToken, workspaceId]);
 
   useEffect(() => {
     if (activeRunId) {
@@ -2415,6 +2554,67 @@ export function ImageManipulationRuntimeEditorPanel({
     if (!selectedOutputItem || !draft?.draftId) {
       return;
     }
+    if (actorUserIdentityId && workspaceId && sessionToken) {
+      setIsResultQuickActionPending(targetDatasetBindingId === "input-image-dataset" ? "source" : "reference");
+      try {
+        const [original, detail] = await Promise.all([
+          generatedResults.getGeneratedResultOriginalContent({
+            workspaceId,
+            resultAssetId: selectedOutputItem.image.recordId,
+            sessionToken,
+          }),
+          generatedResults.getGeneratedResult({
+            actorUserIdentityId,
+            workspaceId,
+            resultAssetId: selectedOutputItem.image.recordId,
+            sessionToken,
+          }),
+        ]);
+        if (!original.ok || !original.data) {
+          setStatusMessage(original.error?.message ?? "Couldn't reuse this result.");
+          return;
+        }
+        const ingested = await studioShell.ingestReferenceImageUpload({
+          studioId: context.studioId,
+          draftId: draft.draftId,
+          fileName: original.data.fileName,
+          mimeType: detail.ok && detail.data
+            ? detail.data.result.mediaType ?? original.data.mimeType
+            : original.data.mimeType,
+          payloadBase64: original.data.payloadBase64,
+          targetDatasetBindingId,
+        });
+        if (!ingested.ok || !ingested.data) {
+          setStatusMessage(ingested.error?.message ?? "Couldn't reuse this result.");
+          return;
+        }
+        if (targetDatasetBindingId === "input-image-dataset") {
+          setDatasetInstanceId(ingested.data.datasetInstanceId);
+          setSelection((current) => setRoleSelection(current, {
+            role: "source",
+            recordId: ingested.data.recordId,
+            syncPreviewRole: true,
+          }));
+        } else {
+          setSelection((current) => setRoleSelection(current, {
+            role: "reference",
+            recordId: ingested.data.recordId,
+            syncPreviewRole: true,
+          }));
+        }
+        await loadCollections({
+          preferredSourceRecordId: targetDatasetBindingId === "input-image-dataset" ? ingested.data.recordId : undefined,
+          preferredReferenceRecordId: targetDatasetBindingId === "reference-image-dataset" ? ingested.data.recordId : undefined,
+        });
+        setStatusMessage(targetDatasetBindingId === "input-image-dataset"
+          ? "Result prepared as your next source photo."
+          : "Result prepared as your face reference photo.");
+      } finally {
+        setIsResultQuickActionPending(undefined);
+      }
+      return;
+    }
+
     await chainRecordForReuse({
       sourceRecordId: selectedOutputItem.image.recordId,
       targetDatasetBindingId,
@@ -2437,9 +2637,48 @@ export function ImageManipulationRuntimeEditorPanel({
 
       const outputRecordId = resolveRunOutputRecordId(run);
       if (outputRecordId) {
-        await loadCollections({
-          preferredOutputRecordId: outputRecordId,
-        });
+        let loadedRunOutputs = false;
+        if (actorUserIdentityId && workspaceId && sessionToken) {
+          const byRun = await generatedResults.listGeneratedResultsByRun({
+            actorUserIdentityId,
+            workspaceId,
+            runId,
+            limit: 24,
+            offset: 0,
+            sessionToken,
+          });
+          if (byRun.ok && byRun.data) {
+            const previewPayloadByAssetId = new Map<string, Awaited<ReturnType<typeof generatedResults.requestGeneratedResultPreview>>["data"]>();
+            await Promise.all(byRun.data.items.map(async (item) => {
+              if (item.preview.state !== "preview-available") {
+                return;
+              }
+              const preview = await generatedResults.requestGeneratedResultPreview({
+                actorUserIdentityId,
+                workspaceId,
+                resultAssetId: item.resultAssetId,
+                sessionToken,
+              });
+              if (preview.ok && preview.data) {
+                previewPayloadByAssetId.set(item.resultAssetId, preview.data);
+              }
+            }));
+            setOutputItems(Object.freeze(byRun.data.items.map((item) => mapGeneratedResultToOutputGalleryItem({
+              summary: item,
+              previewUrl: buildGeneratedResultPreviewContentUrl({
+                baseUrl: globalThis.location?.origin ?? "",
+                workspaceId,
+                preview: previewPayloadByAssetId.get(item.resultAssetId)?.preview,
+              }),
+            }))));
+            loadedRunOutputs = true;
+          }
+        }
+        if (!loadedRunOutputs) {
+          await loadCollections({
+            preferredOutputRecordId: outputRecordId,
+          });
+        }
         setSelection((current) => setRoleSelection(current, {
           role: "output",
           recordId: outputRecordId,
@@ -3926,8 +4165,27 @@ export function ImageManipulationRuntimeEditorPanel({
                       Run ID: {selectedOutputItem.workflow?.workflowRunId ?? activeRunId ?? "Unavailable"}
                     </p>
                     <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
-                      Source: {selectedOutputItem.sourceImage?.stableId ?? selectedOutputItem.sourceImage?.assetId ?? "Unavailable"}
+                      Result asset: {selectedOutputItem.image.recordId}
                     </p>
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      Result status: {selectedGeneratedResultDetail?.result.status ?? "Unavailable"}
+                    </p>
+                    <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                      Source: {selectedGeneratedResultLineage?.lineage.upstreamInputs[0]?.assetId
+                        ?? selectedOutputItem.sourceImage?.stableId
+                        ?? selectedOutputItem.sourceImage?.assetId
+                        ?? "Unavailable"}
+                    </p>
+                    {selectedGeneratedResultLoading ? (
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        Loading authoritative lineage detail...
+                      </p>
+                    ) : null}
+                    {selectedGeneratedResultError ? (
+                      <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                        {selectedGeneratedResultError}
+                      </p>
+                    ) : null}
                     <pre className="ui-code-block">{JSON.stringify(selectedOutputItem.generationParametersSummary, null, 2)}</pre>
                   </div>
                 </details>

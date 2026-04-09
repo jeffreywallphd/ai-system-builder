@@ -166,3 +166,20 @@ List query contracts now include optional filters for reuse/source selection:
 - `reuseReadyOnly`
 
 These filters are generic and workflow-binding compatible, so clients can request candidates for different image workflow slots without hardcoding one workflow template.
+
+## Story 6.4.1 authoritative gallery/history API integration (implemented)
+
+Generated-result management APIs now expose authoritative list/get/by-run retrieval for studio gallery and history flows, in addition to preview/original/lineage endpoints.
+
+- Backend API contract additions:
+  - `ListGeneratedResultsApiRequest/Response`
+  - `GetGeneratedResultApiRequest/Response`
+  - `ListGeneratedResultsByRunApiRequest/Response`
+- Backend handler integration:
+  - `GeneratedResultManagementBackendApi` now maps generated-result metadata list/get use-case outcomes into stable API errors (`invalid-request`, `forbidden`, `not-found`, `internal`).
+- Identity HTTP transport additions:
+  - `GET /api/v1/generated-results`
+  - `GET /api/v1/generated-results/:resultAssetId`
+  - `GET /api/v1/image-runs/:runId/generated-results`
+
+This closes the contract gap for production-backed studio result browsing and run-linked history reconstruction without backend-local file assumptions.

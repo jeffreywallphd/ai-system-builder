@@ -513,3 +513,30 @@ Known UX limits and intentional non-goals at Feature 7 completion:
 - Feature 7 does not treat backend filesystem paths or provider-local identifiers as user-facing or canonical identity.
 - Feature 7 does not collapse clean boundaries by moving orchestration or persistence truth into renderer-local component state.
 
+## Epic 6.4 Story 6.4.1: Authoritative result gallery and history integration
+
+Story 6.4.1 updates runtime-editor result browsing/continuation surfaces to consume authoritative generated-result APIs instead of dataset-local or transient output-only assumptions.
+
+Updated seams:
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/image-manipulation/GeneratedResultGalleryHistoryAdapter.ts`
+- `src/ui/services/GeneratedResultStudioService.ts`
+- `src/infrastructure/api/generated-results/GeneratedResultManagementBackendApi.ts`
+- `src/infrastructure/transport/http-server/identity/IdentityHttpServer.ts`
+
+Behavior and integration posture:
+
+- Result gallery now lists generated outputs from `GET /api/v1/generated-results` in the active workflow context.
+- Result thumbnails/previews are loaded from protected preview flows (`/preview` + `/preview/content`) using tokenized, workspace-scoped access.
+- Run history is derived from authoritative generated-result records and run linkage, not UI-local run result artifacts.
+- Prior-run reopen uses run-scoped generated-result discovery (`GET /api/v1/image-runs/:runId/generated-results`) so older outputs can be selected reliably.
+- Selected-result inspection now loads authoritative detail and lineage APIs (`get` + `lineage`) for deeper provenance.
+- Reuse actions request protected original content (`/original`) and re-ingest into source/reference datasets, preserving continuation UX without backend-local file coupling.
+
+Outcome:
+
+- UI output identity is now authoritative `resultAssetId`.
+- Gallery/history/preview/reopen/reuse behavior is API-mediated and durable.
+- Downstream sharing/export/reuse extensions can build on stable result metadata + lineage contracts.
+

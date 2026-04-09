@@ -155,6 +155,9 @@ import {
   type GeneratedResultManagementApiResponse,
   type GetGeneratedResultLineageDetailApiRequest,
   type GetGeneratedResultLineageSummaryApiRequest,
+  type GetGeneratedResultApiRequest,
+  type ListGeneratedResultsApiRequest,
+  type ListGeneratedResultsByRunApiRequest,
   type OpenGeneratedResultPreviewContentStreamApiRequest,
   type OpenGeneratedResultOriginalContentStreamApiRequest,
   type RequestGeneratedResultPreviewApiRequest,
@@ -4372,6 +4375,168 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
       if (
         options.generatedResultManagementBackendApi
         && request.method === "GET"
+        && path === "/api/v1/generated-results"
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId is required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const statuses = parseOptionalMultiEnumList(
+              searchParams,
+              "status",
+              "statuses",
+              ["pending-collection", "available", "preview-ready", "failed-collection", "archived"] as const,
+            );
+            if (!statuses.ok) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "status values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const visibilities = parseOptionalMultiEnumList(
+              searchParams,
+              "visibility",
+              "visibilities",
+              ["private", "workspace", "public"] as const,
+            );
+            if (!visibilities.ok) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "visibility values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const mediaTypes = parseOptionalMultiEnumList(
+              searchParams,
+              "mediaType",
+              "mediaTypes",
+              ["image/png", "image/jpeg", "image/webp"] as const,
+            );
+            if (!mediaTypes.ok) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "mediaType values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const previewStates = parseOptionalMultiEnumList(
+              searchParams,
+              "previewState",
+              "previewStates",
+              ["preview-pending", "preview-available", "preview-failed", "preview-unavailable"] as const,
+            );
+            if (!previewStates.ok) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "previewState values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const listRequest: ListGeneratedResultsApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              ownerUserIds: parseOptionalMultiStringList(searchParams, "ownerUserId", "ownerUserIds"),
+              runId: normalizeOptionalString(searchParams.get("runId")),
+              systemId: normalizeOptionalString(searchParams.get("systemId")),
+              workflowId: normalizeOptionalString(searchParams.get("workflowId")),
+              workflowTemplateId: normalizeOptionalString(searchParams.get("workflowTemplateId")),
+              executionNodeId: normalizeOptionalString(searchParams.get("executionNodeId")),
+              statuses: statuses.value,
+              visibilities: visibilities.value,
+              mediaTypes: mediaTypes.value,
+              createdAfter: normalizeOptionalString(searchParams.get("createdAfter")),
+              createdBefore: normalizeOptionalString(searchParams.get("createdBefore")),
+              updatedAfter: normalizeOptionalString(searchParams.get("updatedAfter")),
+              updatedBefore: normalizeOptionalString(searchParams.get("updatedBefore")),
+              previewStates: previewStates.value,
+              hasPreview: parseOptionalBoolean(searchParams.get("hasPreview")),
+              lineageInputAssetIds: parseOptionalMultiStringList(searchParams, "lineageInputAssetId", "lineageInputAssetIds"),
+              requiredInputPurposes: parseOptionalMultiStringList(searchParams, "requiredInputPurpose", "requiredInputPurposes"),
+              requiredAssetClasses: parseOptionalMultiStringList(searchParams, "requiredAssetClass", "requiredAssetClasses"),
+              requiredMediaClasses: parseOptionalMultiStringList(searchParams, "requiredMediaClass", "requiredMediaClasses"),
+              reuseReadyOnly: parseOptionalBoolean(searchParams.get("reuseReadyOnly")),
+              includeArchived: parseOptionalBoolean(searchParams.get("includeArchived")),
+              limit: parseOptionalInteger(searchParams.get("limit")),
+              offset: parseOptionalInteger(searchParams.get("offset")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+
+            const apiResponse = await options.generatedResultManagementBackendApi.listGeneratedResults(
+              listRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, listRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && !path.endsWith("/lineage/summary")
+        && !path.endsWith("/lineage")
+        && !path.endsWith("/preview/content")
+        && !path.endsWith("/preview")
+        && !path.endsWith("/original")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/");
+            if (!resultAssetId || resultAssetId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and resultAssetId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const getRequest: GetGeneratedResultApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.getGeneratedResult(
+              getRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, getRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
         && path.startsWith("/api/v1/generated-results/")
         && path.endsWith("/lineage/summary")
       ) {
@@ -6376,6 +6541,52 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
               hasProgress: Boolean(parsedRequest.data.progress),
               hasHeartbeat: Boolean(parsedRequest.data.heartbeatAt || parsedRequest.data.execution?.heartbeatAt),
             }), apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/image-runs/")
+        && path.endsWith("/generated-results")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and runId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const runId = decodePathTail(path, "/api/v1/image-runs/", "/generated-results");
+            if (!runId || runId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and runId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+            const byRunRequest: ListGeneratedResultsByRunApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              runId,
+              limit: parseOptionalInteger(searchParams.get("limit")),
+              offset: parseOptionalInteger(searchParams.get("offset")),
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.listGeneratedResultsByRun(
+              byRunRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, byRunRequest, apiResponse);
           },
         );
         return;

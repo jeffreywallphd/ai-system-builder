@@ -5,8 +5,11 @@ import { createIdentityAuthTestHarness } from "../../../../api/identity/tests/Te
 import { createIdentityHttpServer } from "../IdentityHttpServer";
 import type { GeneratedResultManagementBackendApi } from "../../../../api/generated-results/GeneratedResultManagementBackendApi";
 import type {
+  GetGeneratedResultApiRequest,
   GetGeneratedResultLineageDetailApiRequest,
   GetGeneratedResultLineageSummaryApiRequest,
+  ListGeneratedResultsApiRequest,
+  ListGeneratedResultsByRunApiRequest,
   OpenGeneratedResultPreviewContentStreamApiRequest,
   OpenGeneratedResultOriginalContentStreamApiRequest,
   RequestGeneratedResultPreviewApiRequest,
@@ -27,12 +30,175 @@ afterEach(async () => {
 });
 
 class StubGeneratedResultManagementBackendApi {
+  public lastListRequest: ListGeneratedResultsApiRequest | undefined;
+  public lastGetRequest: GetGeneratedResultApiRequest | undefined;
+  public lastListByRunRequest: ListGeneratedResultsByRunApiRequest | undefined;
   public lastRequest: OpenGeneratedResultOriginalContentStreamApiRequest | undefined;
   public lastPreviewRequest: RequestGeneratedResultPreviewApiRequest | undefined;
   public lastPreviewOpenRequest: OpenGeneratedResultPreviewContentStreamApiRequest | undefined;
   public lastLineageSummaryRequest: GetGeneratedResultLineageSummaryApiRequest | undefined;
   public lastLineageDetailRequest: GetGeneratedResultLineageDetailApiRequest | undefined;
   public denyAccess = false;
+
+  public async listGeneratedResults(request: ListGeneratedResultsApiRequest) {
+    this.lastListRequest = request;
+    if (this.denyAccess) {
+      return {
+        ok: false as const,
+        error: Object.freeze({
+          code: "forbidden" as const,
+          message: "Forbidden.",
+        }),
+      };
+    }
+    return {
+      ok: true as const,
+      data: Object.freeze({
+        items: Object.freeze([Object.freeze({
+          resultAssetId: "gr-asset-001",
+          workspaceId: request.workspaceId,
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          status: "preview-ready",
+          mediaType: "image/webp",
+          visibility: "workspace",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T01:00:00.000Z",
+          preview: Object.freeze({
+            state: "preview-available",
+            hasPreview: true,
+          }),
+          retrieval: Object.freeze({
+            state: "retrieval-available",
+          }),
+          lineage: Object.freeze({
+            resultAssetId: "gr-asset-001",
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 2,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          reuse: Object.freeze({
+            reusableAsWorkflowInput: true,
+            logicalAssetReference: "storage-instance://storage-alpha/generated-results/run-001/output-001.png",
+            supportedInputPurposes: Object.freeze(["source-image"]),
+            assetClasses: Object.freeze(["image-asset"]),
+            mediaClasses: Object.freeze(["image"]),
+            sourceContext: Object.freeze({
+              runId: "run-001",
+              workflowId: "workflow-001",
+              systemId: "system-001",
+              outputSlot: "primary",
+              inputAssetCount: 2,
+            }),
+          }),
+        })]),
+        pagination: Object.freeze({
+          limit: request.limit ?? 25,
+          offset: request.offset ?? 0,
+          returned: 1,
+          hasMore: false,
+        }),
+      }),
+    };
+  }
+
+  public async getGeneratedResult(request: GetGeneratedResultApiRequest) {
+    this.lastGetRequest = request;
+    if (this.denyAccess) {
+      return {
+        ok: false as const,
+        error: Object.freeze({
+          code: "not-found" as const,
+          message: "Not found.",
+        }),
+      };
+    }
+    return {
+      ok: true as const,
+      data: Object.freeze({
+        result: Object.freeze({
+          resultAssetId: request.resultAssetId,
+          workspaceId: request.workspaceId,
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          status: "preview-ready",
+          mediaType: "image/webp",
+          visibility: "workspace",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T01:00:00.000Z",
+          preview: Object.freeze({ state: "preview-available", hasPreview: true }),
+          retrieval: Object.freeze({ state: "retrieval-available" }),
+          lineage: Object.freeze({
+            resultAssetId: request.resultAssetId,
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 2,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          reuse: Object.freeze({
+            reusableAsWorkflowInput: true,
+            logicalAssetReference: "storage-instance://storage-alpha/generated-results/run-001/output-001.png",
+            supportedInputPurposes: Object.freeze(["source-image"]),
+            assetClasses: Object.freeze(["image-asset"]),
+            mediaClasses: Object.freeze(["image"]),
+            sourceContext: Object.freeze({
+              runId: "run-001",
+              workflowId: "workflow-001",
+              systemId: "system-001",
+              outputSlot: "primary",
+              inputAssetCount: 2,
+            }),
+          }),
+          storage: Object.freeze({ storageInstanceId: "storage-alpha" }),
+          lifecycle: Object.freeze({ pendingSince: "2026-01-01T00:00:00.000Z" }),
+          previewDescriptors: Object.freeze([]),
+          lineageDetail: Object.freeze({
+            inputAssetIds: Object.freeze(["image-asset-001"]),
+            updatedAt: "2026-01-01T01:00:00.000Z",
+          }),
+        }),
+      }),
+    };
+  }
+
+  public async listGeneratedResultsByRun(request: ListGeneratedResultsByRunApiRequest) {
+    this.lastListByRunRequest = request;
+    const listed = await this.listGeneratedResults({
+      actorUserIdentityId: request.actorUserIdentityId,
+      workspaceId: request.workspaceId,
+      runId: request.runId,
+      limit: request.limit,
+      offset: request.offset,
+      correlationId: request.correlationId,
+      occurredAt: request.occurredAt,
+    });
+    if (!listed.ok) {
+      return listed;
+    }
+    return {
+      ok: true as const,
+      data: Object.freeze({
+        runId: request.runId,
+        items: listed.data.items,
+        pagination: listed.data.pagination,
+      }),
+    };
+  }
 
   public async openGeneratedResultOriginalContentStream(request: OpenGeneratedResultOriginalContentStreamApiRequest) {
     this.lastRequest = request;
@@ -254,6 +420,70 @@ async function registerAndLogin(baseUrl: string, username: string): Promise<stri
 }
 
 describe("IdentityHttpServer generated-result protected original retrieval", () => {
+  it("lists generated results through authenticated workspace sessions", async () => {
+    const backend = new StubGeneratedResultManagementBackendApi();
+    const baseUrl = await startServer(backend);
+    const token = await registerAndLogin(baseUrl, "generated.result.route.list.success.1");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/generated-results?workspaceId=workspace-alpha&limit=10&offset=0`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.ok).toBe(true);
+    expect(payload.data.items.length).toBe(1);
+    expect(payload.data.items[0].resultAssetId).toBe("gr-asset-001");
+    expect(backend.lastListRequest?.workspaceId).toBe("workspace-alpha");
+  });
+
+  it("returns generated-result detail records", async () => {
+    const backend = new StubGeneratedResultManagementBackendApi();
+    const baseUrl = await startServer(backend);
+    const token = await registerAndLogin(baseUrl, "generated.result.route.get.success.1");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/generated-results/${encodeURIComponent("gr-asset-001")}?workspaceId=workspace-alpha`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.ok).toBe(true);
+    expect(payload.data.result.resultAssetId).toBe("gr-asset-001");
+    expect(backend.lastGetRequest?.resultAssetId).toBe("gr-asset-001");
+  });
+
+  it("lists run-scoped generated results", async () => {
+    const backend = new StubGeneratedResultManagementBackendApi();
+    const baseUrl = await startServer(backend);
+    const token = await registerAndLogin(baseUrl, "generated.result.route.by.run.success.1");
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/image-runs/${encodeURIComponent("run-001")}/generated-results?workspaceId=workspace-alpha&limit=10&offset=0`,
+      {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const payload = await response.json();
+    expect(payload.ok).toBe(true);
+    expect(payload.data.runId).toBe("run-001");
+    expect(backend.lastListByRunRequest?.runId).toBe("run-001");
+  });
+
   it("blocks unauthenticated original-content retrieval requests", async () => {
     const backend = new StubGeneratedResultManagementBackendApi();
     const baseUrl = await startServer(backend);

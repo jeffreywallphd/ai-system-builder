@@ -25,6 +25,16 @@ import {
   type RequestGeneratedResultPreviewContentRequest,
   type RequestGeneratedResultPreviewContentSuccess,
 } from "@application/generated-results/use-cases/GetGeneratedResultPreviewContentUseCaseContracts";
+import {
+  GeneratedResultMetadataReadErrorCodes,
+  type GeneratedResultMetadataReadResult,
+  type GetGeneratedResultMetadataRequest,
+  type GetGeneratedResultMetadataSuccess,
+  type IGetGeneratedResultMetadataUseCase,
+  type IListGeneratedResultMetadataUseCase,
+  type ListGeneratedResultMetadataRequest,
+  type ListGeneratedResultMetadataSuccess,
+} from "@application/generated-results/use-cases/GeneratedResultMetadataReadUseCaseContracts";
 import { GeneratedResultManagementBackendApi } from "../GeneratedResultManagementBackendApi";
 
 class StubGetGeneratedResultOriginalContentUseCase implements IGetGeneratedResultOriginalContentUseCase {
@@ -238,6 +248,187 @@ class StubGetGeneratedResultLineageDetailUseCase implements IGetGeneratedResultL
   }
 }
 
+class StubListGeneratedResultMetadataUseCase implements IListGeneratedResultMetadataUseCase {
+  public mode: "success" | "invalid-request" = "success";
+
+  public async execute(
+    _request: ListGeneratedResultMetadataRequest,
+  ): Promise<GeneratedResultMetadataReadResult<ListGeneratedResultMetadataSuccess>> {
+    if (this.mode === "invalid-request") {
+      return {
+        ok: false,
+        error: Object.freeze({
+          code: GeneratedResultMetadataReadErrorCodes.invalidRequest,
+          message: "Invalid request.",
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      value: Object.freeze({
+        items: Object.freeze([Object.freeze({
+          resultAssetId: "gr-asset-001",
+          workspaceId: "workspace-alpha",
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          status: "preview-ready",
+          mediaType: "image/webp",
+          visibility: "workspace",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T01:00:00.000Z",
+          preview: Object.freeze({
+            state: "preview-available",
+            hasPreview: true,
+            primaryPreviewKind: "display-safe",
+            availabilityStatus: "available",
+          }),
+          retrieval: Object.freeze({
+            state: "retrieval-available",
+          }),
+          lineage: Object.freeze({
+            resultAssetId: "gr-asset-001",
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 2,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          reuse: Object.freeze({
+            reusableAsWorkflowInput: true,
+            logicalAssetReference: "storage-instance://storage-alpha/generated-results/run-001/output-001.png",
+            supportedInputPurposes: Object.freeze(["source-image"]),
+            assetClasses: Object.freeze(["image-asset"]),
+            mediaClasses: Object.freeze(["image"]),
+            sourceContext: Object.freeze({
+              runId: "run-001",
+              workflowId: "workflow-001",
+              systemId: "system-001",
+              outputSlot: "primary",
+              inputAssetCount: 2,
+            }),
+          }),
+        })]),
+        pagination: Object.freeze({
+          limit: 25,
+          offset: 0,
+          returned: 1,
+          hasMore: false,
+        }),
+      }),
+    };
+  }
+}
+
+class StubGetGeneratedResultMetadataUseCase implements IGetGeneratedResultMetadataUseCase {
+  public mode: "success" | "not-found" = "success";
+
+  public async execute(
+    _request: GetGeneratedResultMetadataRequest,
+  ): Promise<GeneratedResultMetadataReadResult<GetGeneratedResultMetadataSuccess>> {
+    if (this.mode === "not-found") {
+      return {
+        ok: false,
+        error: Object.freeze({
+          code: GeneratedResultMetadataReadErrorCodes.notFound,
+          message: "Not found.",
+        }),
+      };
+    }
+
+    return {
+      ok: true,
+      value: Object.freeze({
+        result: Object.freeze({
+          resultAssetId: "gr-asset-001",
+          workspaceId: "workspace-alpha",
+          runId: "run-001",
+          systemId: "system-001",
+          workflowId: "workflow-001",
+          outputSlot: "primary",
+          status: "preview-ready",
+          mediaType: "image/webp",
+          visibility: "workspace",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T01:00:00.000Z",
+          preview: Object.freeze({
+            state: "preview-available",
+            hasPreview: true,
+            primaryPreviewKind: "display-safe",
+            availabilityStatus: "available",
+          }),
+          retrieval: Object.freeze({
+            state: "retrieval-available",
+          }),
+          lineage: Object.freeze({
+            resultAssetId: "gr-asset-001",
+            runId: "run-001",
+            systemId: "system-001",
+            workflowId: "workflow-001",
+            outputSlot: "primary",
+            inputAssetCount: 2,
+            hasWorkflowTemplateVersion: true,
+            hasSystemSnapshot: true,
+            hasParameterSnapshot: true,
+            hasSelectedNode: true,
+          }),
+          reuse: Object.freeze({
+            reusableAsWorkflowInput: true,
+            logicalAssetReference: "storage-instance://storage-alpha/generated-results/run-001/output-001.png",
+            supportedInputPurposes: Object.freeze(["source-image"]),
+            assetClasses: Object.freeze(["image-asset"]),
+            mediaClasses: Object.freeze(["image"]),
+            sourceContext: Object.freeze({
+              runId: "run-001",
+              workflowId: "workflow-001",
+              systemId: "system-001",
+              outputSlot: "primary",
+              inputAssetCount: 2,
+            }),
+          }),
+          storage: Object.freeze({
+            storageInstanceId: "storage-alpha",
+          }),
+          lifecycle: Object.freeze({
+            pendingSince: "2026-01-01T00:00:00.000Z",
+          }),
+          previewDescriptors: Object.freeze([]),
+          lineageDetail: Object.freeze({
+            inputAssetIds: Object.freeze(["image-asset-001"]),
+            updatedAt: "2026-01-01T01:00:00.000Z",
+          }),
+        }),
+      }),
+    };
+  }
+}
+
+function createApi(input: {
+  readonly original?: StubGetGeneratedResultOriginalContentUseCase;
+  readonly previewRequest?: StubRequestGeneratedResultPreviewContentUseCase;
+  readonly previewOpen?: StubOpenGeneratedResultPreviewContentUseCase;
+  readonly lineageSummary?: StubGetGeneratedResultLineageSummaryUseCase;
+  readonly lineageDetail?: StubGetGeneratedResultLineageDetailUseCase;
+  readonly listMetadata?: StubListGeneratedResultMetadataUseCase;
+  readonly getMetadata?: StubGetGeneratedResultMetadataUseCase;
+} = {}): GeneratedResultManagementBackendApi {
+  return new GeneratedResultManagementBackendApi({
+    listGeneratedResultMetadataUseCase: input.listMetadata ?? new StubListGeneratedResultMetadataUseCase(),
+    getGeneratedResultMetadataUseCase: input.getMetadata ?? new StubGetGeneratedResultMetadataUseCase(),
+    getGeneratedResultOriginalContentUseCase: input.original ?? new StubGetGeneratedResultOriginalContentUseCase(),
+    requestGeneratedResultPreviewContentUseCase: input.previewRequest ?? new StubRequestGeneratedResultPreviewContentUseCase(),
+    openGeneratedResultPreviewContentUseCase: input.previewOpen ?? new StubOpenGeneratedResultPreviewContentUseCase(),
+    getGeneratedResultLineageSummaryUseCase: input.lineageSummary ?? new StubGetGeneratedResultLineageSummaryUseCase(),
+    getGeneratedResultLineageDetailUseCase: input.lineageDetail ?? new StubGetGeneratedResultLineageDetailUseCase(),
+  });
+}
+
 describe("GeneratedResultManagementBackendApi", () => {
   it("returns invalid-request when actor identity is missing", async () => {
     const useCase = new StubGetGeneratedResultOriginalContentUseCase();
@@ -245,12 +436,12 @@ describe("GeneratedResultManagementBackendApi", () => {
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
     const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
     const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: useCase,
-      requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
-      openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
-      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
-      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    const api = createApi({
+      original: useCase,
+      previewRequest: previewRequestUseCase,
+      previewOpen: previewOpenUseCase,
+      lineageSummary: lineageSummaryUseCase,
+      lineageDetail: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -271,12 +462,12 @@ describe("GeneratedResultManagementBackendApi", () => {
     const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
     const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
 
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: useCase,
-      requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
-      openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
-      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
-      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    const api = createApi({
+      original: useCase,
+      previewRequest: previewRequestUseCase,
+      previewOpen: previewOpenUseCase,
+      lineageSummary: lineageSummaryUseCase,
+      lineageDetail: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -297,12 +488,12 @@ describe("GeneratedResultManagementBackendApi", () => {
     const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
     const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
 
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: useCase,
-      requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
-      openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
-      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
-      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    const api = createApi({
+      original: useCase,
+      previewRequest: previewRequestUseCase,
+      previewOpen: previewOpenUseCase,
+      lineageSummary: lineageSummaryUseCase,
+      lineageDetail: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -321,12 +512,12 @@ describe("GeneratedResultManagementBackendApi", () => {
     const previewOpenUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
     const lineageSummaryUseCase = new StubGetGeneratedResultLineageSummaryUseCase();
     const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: useCase,
-      requestGeneratedResultPreviewContentUseCase: previewRequestUseCase,
-      openGeneratedResultPreviewContentUseCase: previewOpenUseCase,
-      getGeneratedResultLineageSummaryUseCase: lineageSummaryUseCase,
-      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    const api = createApi({
+      original: useCase,
+      previewRequest: previewRequestUseCase,
+      previewOpen: previewOpenUseCase,
+      lineageSummary: lineageSummaryUseCase,
+      lineageDetail: lineageDetailUseCase,
     });
 
     const response = await api.openGeneratedResultOriginalContentStream({
@@ -351,13 +542,7 @@ describe("GeneratedResultManagementBackendApi", () => {
   });
 
   it("returns preview selection metadata without exposing storage internals", async () => {
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
-      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
-      openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
-      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
-      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
-    });
+    const api = createApi();
 
     const response = await api.requestGeneratedResultPreview({
       actorUserIdentityId: "user-owner",
@@ -377,12 +562,8 @@ describe("GeneratedResultManagementBackendApi", () => {
   it("maps preview-open invalid state to invalid-state API errors", async () => {
     const openUseCase = new StubOpenGeneratedResultPreviewContentUseCase();
     openUseCase.mode = "invalid-state";
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
-      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
-      openGeneratedResultPreviewContentUseCase: openUseCase,
-      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
-      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
+    const api = createApi({
+      previewOpen: openUseCase,
     });
 
     const response = await api.openGeneratedResultPreviewContentStream({
@@ -397,13 +578,7 @@ describe("GeneratedResultManagementBackendApi", () => {
   });
 
   it("returns lineage summary for authorized callers", async () => {
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
-      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
-      openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
-      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
-      getGeneratedResultLineageDetailUseCase: new StubGetGeneratedResultLineageDetailUseCase(),
-    });
+    const api = createApi();
 
     const response = await api.getGeneratedResultLineageSummary({
       actorUserIdentityId: "user-owner",
@@ -422,12 +597,8 @@ describe("GeneratedResultManagementBackendApi", () => {
   it("maps lineage-detail not-found to not-found API error", async () => {
     const lineageDetailUseCase = new StubGetGeneratedResultLineageDetailUseCase();
     lineageDetailUseCase.mode = "not-found";
-    const api = new GeneratedResultManagementBackendApi({
-      getGeneratedResultOriginalContentUseCase: new StubGetGeneratedResultOriginalContentUseCase(),
-      requestGeneratedResultPreviewContentUseCase: new StubRequestGeneratedResultPreviewContentUseCase(),
-      openGeneratedResultPreviewContentUseCase: new StubOpenGeneratedResultPreviewContentUseCase(),
-      getGeneratedResultLineageSummaryUseCase: new StubGetGeneratedResultLineageSummaryUseCase(),
-      getGeneratedResultLineageDetailUseCase: lineageDetailUseCase,
+    const api = createApi({
+      lineageDetail: lineageDetailUseCase,
     });
 
     const response = await api.getGeneratedResultLineageDetail({
@@ -438,5 +609,73 @@ describe("GeneratedResultManagementBackendApi", () => {
 
     expect(response.ok).toBeFalse();
     expect(response.error?.code).toBe("not-found");
+  });
+
+  it("lists generated result metadata for authorized callers", async () => {
+    const api = createApi();
+    const response = await api.listGeneratedResults({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      limit: 10,
+      offset: 0,
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+    expect(response.data.items).toHaveLength(1);
+    expect(response.data.items[0]?.resultAssetId).toBe("gr-asset-001");
+  });
+
+  it("returns generated result detail for get requests", async () => {
+    const api = createApi();
+    const response = await api.getGeneratedResult({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      resultAssetId: "gr-asset-001",
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+    expect(response.data.result.runId).toBe("run-001");
+    expect(response.data.result.preview.state).toBe("preview-available");
+  });
+
+  it("maps get result not-found to not-found API errors", async () => {
+    const getUseCase = new StubGetGeneratedResultMetadataUseCase();
+    getUseCase.mode = "not-found";
+    const api = createApi({
+      getMetadata: getUseCase,
+    });
+
+    const response = await api.getGeneratedResult({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      resultAssetId: "missing",
+    });
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.code).toBe("not-found");
+  });
+
+  it("lists generated results scoped to a run", async () => {
+    const api = createApi();
+    const response = await api.listGeneratedResultsByRun({
+      actorUserIdentityId: "user-owner",
+      workspaceId: "workspace-alpha",
+      runId: "run-001",
+      limit: 5,
+      offset: 0,
+    });
+
+    expect(response.ok).toBeTrue();
+    if (!response.ok || !response.data) {
+      return;
+    }
+    expect(response.data.runId).toBe("run-001");
+    expect(response.data.items[0]?.runId).toBe("run-001");
   });
 });
