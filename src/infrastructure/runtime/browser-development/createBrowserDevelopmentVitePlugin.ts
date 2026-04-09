@@ -2,7 +2,6 @@ import process from "node:process";
 import path from "node:path";
 import net from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import {
   HostSecureTransportKinds,
@@ -12,8 +11,9 @@ import {
 import {
   resolveBrowserDevelopmentManagedRuntimeFromEnvironment,
 } from "./BrowserDevelopmentManagedRuntime";
+import { BROWSER_DEVELOPMENT_REPOSITORY_ROOT } from "./BrowserDevelopmentPaths";
 
-const REPOSITORY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const REPOSITORY_ROOT = BROWSER_DEVELOPMENT_REPOSITORY_ROOT;
 const BROWSER_IDENTITY_DATABASE_PATH = path.resolve(
   REPOSITORY_ROOT,
   "dev",

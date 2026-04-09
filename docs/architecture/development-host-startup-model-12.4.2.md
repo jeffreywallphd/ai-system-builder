@@ -48,6 +48,14 @@ Added `dev/tests/HostDevelopmentStartupScripts.test.ts` to validate startup work
 - host-based aliases and combined local mode remain defined
 - package scripts do not use direct legacy `IdentityServerHost.ts` startup as a default path
 
+### Browser development runtime bootstrap path correction
+
+Browser-mode Vite runtime bootstrap now resolves the repository root through a shared browser-development path module (`src/infrastructure/runtime/browser-development/BrowserDevelopmentPaths.ts`).
+
+This removes duplicate path math and prevents accidental `src/src/...` entrypoint resolution when auto-starting managed runtime infrastructure (for example `service-supervisor.js` and authoritative server startup).
+
+A regression test (`src/infrastructure/runtime/tests/BrowserDevelopmentPaths.test.ts`) now verifies browser-development bootstrap paths resolve to the actual repository root and expected supervisor entrypoint.
+
 ## Developer-facing startup model
 
 - Standard local app development remains: `npm run dev` (desktop host path).
