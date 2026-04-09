@@ -43,8 +43,25 @@ export interface CreateGeneratedResultPreviewAccessDescriptorResult {
   readonly accessHandle: string;
 }
 
+export interface ResolveGeneratedResultPreviewAccessDescriptorRequest {
+  readonly accessHandle: string;
+}
+
+export interface ResolveGeneratedResultPreviewAccessDescriptorResult {
+  readonly workspaceId: string;
+  readonly resultAssetId: string;
+  readonly derivativeId: string;
+  readonly previewKind: GeneratedResultPreviewKind;
+  readonly storageInstanceId: string;
+  readonly objectKey: string;
+  readonly occurredAt: string;
+}
+
 export interface IGeneratedResultPreviewAccessPort {
   createPreviewAccessDescriptor(
     request: CreateGeneratedResultPreviewAccessDescriptorRequest,
   ): CreateGeneratedResultPreviewAccessDescriptorResult;
+  resolvePreviewAccessDescriptor(
+    request: ResolveGeneratedResultPreviewAccessDescriptorRequest,
+  ): ResolveGeneratedResultPreviewAccessDescriptorResult | undefined;
 }

@@ -286,3 +286,34 @@ Generated-result preview generation now has a concrete platform-service pipeline
 - Access-handle minting is ported (`IGeneratedResultPreviewAccessPort`) so future policy-aware, expiring, or revocation-capable handle systems can replace tokenization without changing use-case contracts.
 - Image transformation remains ported (`IGeneratedResultPreviewImageProcessorPort`) so alternate media processors/backends can be introduced without altering orchestration logic.
 
+## Story 6.3.2 protected preview retrieval APIs and services (implemented)
+
+Generated-result previews now have authenticated request/open retrieval flows consistent with the protected-preview posture.
+
+- New application use cases:
+  - `RequestGeneratedResultPreviewContentUseCase`
+  - `OpenGeneratedResultPreviewContentUseCase`
+  - `GetGeneratedResultPreviewContentUseCaseContracts`
+- New generated-result backend API handlers:
+  - `requestGeneratedResultPreview`
+  - `openGeneratedResultPreviewContentStream`
+- New identity HTTP routes:
+  - `GET /api/v1/generated-results/:resultAssetId/preview`
+  - `GET /api/v1/generated-results/:resultAssetId/preview/content`
+
+### Retrieval behavior
+
+- Preview request flow enforces active workspace membership and private-visibility owner/admin checks before exposing preview access metadata.
+- Preview-open flow requires a tokenized preview handle and revalidates workspace/result linkage before opening storage reads.
+- Preview reads are streamed through authoritative server mediation with `inline` disposition, `nosniff`, and `private, no-store` headers.
+
+### Preview availability states
+
+- Request responses now surface explicit preview states for client safety and UX clarity:
+  - `preview-available`
+  - `preview-pending`
+  - `preview-failed`
+  - `preview-unavailable`
+- Pending/missing/failed conditions are returned as structured responses without leaking raw storage object layout.
+- Stale/invalid preview tokens return explicit invalid-state failures requiring a new preview request.
+

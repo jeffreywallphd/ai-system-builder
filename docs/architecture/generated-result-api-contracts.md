@@ -99,3 +99,21 @@ Application query/list use cases now project authoritative generated-result meta
 Supported listing filters include workspace/owner/source linkage (`runId/systemId/workflowId/workflowTemplateId/executionNodeId`), lifecycle + visibility, created/updated activity windows, and preview availability (`previewStates`, `hasPreview`).
 
 Response projection includes DTO-ready preview state hints, retrieval state hints, and lineage summary/run linkage metadata sourced from persisted generated-result records and lineage/previews repositories.
+
+## Story 6.3.2 protected preview retrieval contract integration (implemented)
+
+Generated-result preview retrieval now has explicit backend API + HTTP transport contracts aligned with the shared generated-result preview-state model.
+
+- Backend API contract additions in `PublicGeneratedResultManagementApiContract.ts`:
+  - `RequestGeneratedResultPreviewApiRequest/Response`
+  - `OpenGeneratedResultPreviewContentStreamApiRequest/Response`
+- Backend API implementation updates in `GeneratedResultManagementBackendApi.ts` map preview request/open use-case outcomes into stable public API errors.
+- Identity transport now serves:
+  - `GET /api/v1/generated-results/:resultAssetId/preview`
+  - `GET /api/v1/generated-results/:resultAssetId/preview/content`
+
+Contract posture:
+
+- Preview request responses expose stateful availability (`preview-available`, `preview-pending`, `preview-failed`, `preview-unavailable`) with tokenized access metadata only.
+- Preview content open requires a preview token and never exposes raw derivative object paths or storage-instance internals.
+- Pending/missing/failed preview outcomes remain structured and explicit for gallery/history/detail clients.

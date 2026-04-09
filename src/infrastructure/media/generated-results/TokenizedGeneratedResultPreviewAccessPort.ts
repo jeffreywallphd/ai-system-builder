@@ -1,9 +1,12 @@
-import { createCipheriv, createHash, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import type {
   CreateGeneratedResultPreviewAccessDescriptorRequest,
   CreateGeneratedResultPreviewAccessDescriptorResult,
   IGeneratedResultPreviewAccessPort,
+  ResolveGeneratedResultPreviewAccessDescriptorRequest,
+  ResolveGeneratedResultPreviewAccessDescriptorResult,
 } from "@application/generated-results/ports/GeneratedResultPreviewGenerationPorts";
+import { GeneratedResultPreviewKinds } from "@domain/image-assets/GeneratedResultAssetDerivativeDomain";
 
 const AccessTokenVersionPrefix = "grpreviewv1";
 
@@ -27,6 +30,72 @@ export class TokenizedGeneratedResultPreviewAccessPort implements IGeneratedResu
       protectedResourceId,
       accessHandle: `preview-access://generated-results/${accessToken}`,
     });
+  }
+
+  public resolvePreviewAccessDescriptor(
+    request: ResolveGeneratedResultPreviewAccessDescriptorRequest,
+  ): ResolveGeneratedResultPreviewAccessDescriptorResult | undefined {
+    const normalizedHandle = request.accessHandle.trim();
+    const prefix = "preview-access://generated-results/";
+    if (!normalizedHandle.startsWith(prefix)) {
+      return undefined;
+    }
+
+    const token = normalizedHandle.slice(prefix.length);
+    const parts = token.split(".");
+    if (parts.length !== 4 || parts[0] !== AccessTokenVersionPrefix) {
+      return undefined;
+    }
+
+    const iv = tryDecodeBase64(parts[1]);
+    const ciphertext = tryDecodeBase64(parts[2]);
+    const authTag = tryDecodeBase64(parts[3]);
+    if (!iv || !ciphertext || !authTag || iv.length !== 12 || authTag.length !== 16) {
+      return undefined;
+    }
+
+    try {
+      const decipher = createDecipheriv("aes-256-gcm", this.encryptionKey, iv);
+      decipher.setAuthTag(authTag);
+      const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+      const payload = JSON.parse(plaintext.toString("utf8")) as {
+        readonly version?: number;
+        readonly workspaceId?: string;
+        readonly resultAssetId?: string;
+        readonly derivativeId?: string;
+        readonly previewKind?: string;
+        readonly storageInstanceId?: string;
+        readonly objectKey?: string;
+        readonly occurredAt?: string;
+      };
+      if (
+        payload.version !== 1
+        || !normalizeRequired(payload.workspaceId)
+        || !normalizeRequired(payload.resultAssetId)
+        || !normalizeRequired(payload.derivativeId)
+        || !normalizeRequired(payload.previewKind)
+        || !Object.values(GeneratedResultPreviewKinds).includes(
+          payload.previewKind as ResolveGeneratedResultPreviewAccessDescriptorResult["previewKind"],
+        )
+        || !normalizeRequired(payload.storageInstanceId)
+        || !normalizeRequired(payload.objectKey)
+        || !normalizeRequired(payload.occurredAt)
+      ) {
+        return undefined;
+      }
+
+      return Object.freeze({
+        workspaceId: payload.workspaceId,
+        resultAssetId: payload.resultAssetId,
+        derivativeId: payload.derivativeId,
+        previewKind: payload.previewKind as ResolveGeneratedResultPreviewAccessDescriptorResult["previewKind"],
+        storageInstanceId: payload.storageInstanceId,
+        objectKey: payload.objectKey,
+        occurredAt: payload.occurredAt,
+      });
+    } catch {
+      return undefined;
+    }
   }
 
   private toProtectedResourceId(request: CreateGeneratedResultPreviewAccessDescriptorRequest): string {
@@ -61,4 +130,20 @@ export class TokenizedGeneratedResultPreviewAccessPort implements IGeneratedResu
       authTag.toString("base64url"),
     ].join(".");
   }
+}
+
+function tryDecodeBase64(value: string | undefined): Buffer | undefined {
+  if (!value) {
+    return undefined;
+  }
+  try {
+    return Buffer.from(value, "base64url");
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeRequired(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
 }
