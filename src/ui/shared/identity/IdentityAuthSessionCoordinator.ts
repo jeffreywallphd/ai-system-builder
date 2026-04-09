@@ -56,6 +56,7 @@ export interface IdentitySessionBootstrapOptions {
 
 const DefaultSessionValidationTimeoutMs = 4_000;
 const DefaultActorContextTimeoutMs = 5_000;
+const WorkspaceContextProgressNoticeDelaysMs = Object.freeze([1_500, 3_500] as const);
 const BootstrapRequestRetryPolicy = Object.freeze({
   maxAttempts: 1,
 });
@@ -156,6 +157,7 @@ export class IdentityAuthSessionCoordinator {
 
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.loadingWorkspaceContext,
+        detail: "Requesting workspace context and permissions from the identity service.",
       });
       const actorContext = await this.resolveSessionActorContextWithTiming({
         sessionToken: session.sessionToken,
@@ -293,6 +295,12 @@ export class IdentityAuthSessionCoordinator {
   ): Promise<Awaited<ReturnType<IdentityAuthService["resolveSessionActorContext"]>>> {
     const startedAt = Date.now();
     const timeoutMs = normalizeTimeoutMs(options?.actorContextTimeoutMs, DefaultActorContextTimeoutMs);
+    const cancelPendingProgressNotices = this.scheduleWorkspaceContextProgressNotices(
+      options,
+      startedAt,
+      timeoutMs,
+      request.workspaceId,
+    );
     logInitDiagnostic("resolveSessionActorContext:start", Object.freeze({
       timeoutMs,
       startedAt: new Date(startedAt).toISOString(),
@@ -312,11 +320,45 @@ export class IdentityAuthSessionCoordinator {
       }));
       return result;
     } finally {
+      cancelPendingProgressNotices();
       logInitDiagnostic("resolveSessionActorContext:end", Object.freeze({
         durationMs: Date.now() - startedAt,
         endedAt: new Date().toISOString(),
       }));
     }
+  }
+
+  private scheduleWorkspaceContextProgressNotices(
+    options: IdentitySessionBootstrapOptions | undefined,
+    startedAt: number,
+    timeoutMs: number,
+    workspaceId?: string,
+  ): () => void {
+    if (!options?.onProgress) {
+      return () => {
+        // no-op
+      };
+    }
+    const timers = WorkspaceContextProgressNoticeDelaysMs.map((delayMs) => setTimeout(() => {
+      const elapsedMs = Date.now() - startedAt;
+      const remainingMs = Math.max(0, timeoutMs - elapsedMs);
+      const workspaceClause = workspaceId ? ` for workspace ${workspaceId}` : "";
+      const detail = delayMs === WorkspaceContextProgressNoticeDelaysMs[0]
+        ? `Still waiting on identity service response${workspaceClause}; server startup can add a short delay. (${elapsedMs} ms elapsed)`
+        : `Identity service is still resolving workspace context${workspaceClause}. (${elapsedMs} ms elapsed, ~${remainingMs} ms before timeout)`;
+      this.publishProgress(options, {
+        stageId: AppInitializationStageIds.loadingWorkspaceContext,
+        detail,
+      });
+      logInitDiagnostic("resolveSessionActorContext:progress", Object.freeze({
+        elapsedMs,
+        remainingMs,
+        requestedWorkspaceId: workspaceId,
+      }));
+    }, delayMs));
+    return () => {
+      timers.forEach((timerId) => clearTimeout(timerId));
+    };
   }
 }
 

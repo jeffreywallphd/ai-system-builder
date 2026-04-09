@@ -14,6 +14,10 @@ The renderer startup card now uses a two-panel layout so users can see both:
 - The activity log is fed from the same initialization progress event stream as the stage checklist.
 - Duplicate consecutive events are ignored to avoid noisy log output.
 - The activity log is capped to the most recent 40 events to keep rendering stable.
+- Workspace context loading now emits additional user-friendly technical details while waiting:
+  - Initial request message indicates that identity service context/permissions are being requested.
+  - Follow-up progress notices explain when waiting is likely due to service startup and include elapsed timing.
+  - Near-timeout notices include elapsed and approximate remaining timeout budget.
 
 ## Implementation details
 
