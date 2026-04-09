@@ -1299,11 +1299,11 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const generatedResultManagementBackendApi = new GeneratedResultManagementBackendApi({
     listGeneratedResultMetadataUseCase: new ListGeneratedResultMetadataUseCase({
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceAuthorizationRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
     }),
     getGeneratedResultMetadataUseCase: new GetGeneratedResultMetadataUseCase({
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
-      workspaceAuthorizationReadRepository: workspaceAuthorizationRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
     }),
     getGeneratedResultOriginalContentUseCase: new GetGeneratedResultOriginalContentUseCase({
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
@@ -2290,4 +2290,3 @@ export async function initializeCertificateAuthorityForFirstSetup(
     certificateAuthorityRepository.dispose();
   }
 }
-
