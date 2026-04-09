@@ -34,6 +34,7 @@ describe("AuthoritativeServerBootstrapStageOrchestrator", () => {
     const orchestrator = createAuthoritativeServerBootstrapStageOrchestrator({
       tracer,
       parentSpan: rootSpan,
+      clock: () => now,
     });
     const observedStageIds: string[] = [];
     const initialStatus = orchestrator.getStatus();
@@ -119,6 +120,11 @@ describe("AuthoritativeServerBootstrapStageOrchestrator", () => {
     expect(servicesMetadata?.stageId).toBe(AuthoritativeServerBootstrapStageIds.services);
     expect(servicesMetadata?.stageSequence).toBe(1);
     expect(servicesMetadata?.stageCount).toBe(4);
+    const finalizedStatus = orchestrator.getStatus();
+    expect(finalizedStatus.stages[0]?.durationMs).toBe(5);
+    expect(finalizedStatus.stages[1]?.durationMs).toBe(5);
+    expect(finalizedStatus.stages[2]?.durationMs).toBe(5);
+    expect(finalizedStatus.stages[3]?.durationMs).toBe(5);
   });
 
   it("fails when stage execution order does not match orchestrator sequence", async () => {
@@ -154,6 +160,8 @@ describe("AuthoritativeServerBootstrapStageOrchestrator", () => {
 
     const status = orchestrator.getStatus();
     expect(status.stages[0]?.state).toBe(AuthoritativeServerStartupStageStates.failed);
+    expect(status.stages[0]?.failure?.message).toBe("services failed");
+    expect(status.stages[0]?.durationMs).toBeDefined();
     expect(status.stages[1]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
     expect(status.stages[2]?.state).toBe(AuthoritativeServerStartupStageStates.pending);
     expect(status.stages[3]?.state).toBe(AuthoritativeServerStartupStageStates.pending);

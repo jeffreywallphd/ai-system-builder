@@ -78,7 +78,10 @@ import {
   createAuthoritativeServerSecurityBootstrapStage,
   type AuthoritativeServerSecurityBootstrapStage,
 } from "./AuthoritativeServerSecurityBootstrapStage";
-import { createAuthoritativeServerBootstrapStageOrchestrator } from "./AuthoritativeServerBootstrapStageOrchestrator";
+import {
+  createAuthoritativeServerBootstrapStageOrchestrator,
+  type AuthoritativeServerBootstrapStageOrchestrator,
+} from "./AuthoritativeServerBootstrapStageOrchestrator";
 
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
@@ -216,6 +219,29 @@ async function runStartupChildStepSpan<TResult>(input: {
   }
 }
 
+interface AuthoritativeServerPipelineStageSummary {
+  readonly stageId: string;
+  readonly sequence: number;
+  readonly status: "completed" | "failed";
+  readonly startedAt: string;
+  readonly endedAt: string;
+  readonly durationMs: number;
+  readonly failure?: Readonly<Record<string, string>>;
+}
+
+function summarizeStartupError(error: unknown): Readonly<Record<string, string>> {
+  if (error instanceof Error) {
+    return Object.freeze({
+      name: error.name || "Error",
+      message: error.message || "Authoritative server startup failed.",
+    });
+  }
+  return Object.freeze({
+    name: "Error",
+    message: String(error),
+  });
+}
+
 export function createAuthoritativeServerCompositionRoot(
   input: AuthoritativeServerCompositionRootOptions,
 ): ExecutableHostCompositionRoot<AuthoritativeServerHostRuntimeHandle> {
@@ -234,12 +260,17 @@ export function createAuthoritativeServerCompositionRoot(
       }, boot);
 
       const lifecycle = createHostLifecycleCoordinator({ boot });
+      const startupStartedAtMs = Date.now();
+      const startupStartedAt = new Date(startupStartedAtMs).toISOString();
       let startedHost: IdentityServerHost | undefined;
       let persistenceRuntime: SqlitePersistenceRuntime | undefined;
       let persistentPlatformServices: AuthoritativePersistentPlatformServices | undefined;
       let startupTracer: StartupTracer | undefined;
       let runtimeMetadata: HostRuntimeMetadata | undefined;
       let startupRootSpan: StartupSpan | undefined;
+      let startupStageOrchestrator: AuthoritativeServerBootstrapStageOrchestrator | undefined;
+      const pipelineStageSummaries: AuthoritativeServerPipelineStageSummary[] = [];
+      let startupFailure: unknown | undefined;
       await lifecycle.markComposing("compose-authoritative-server-host");
       const configStage = (
         input.bootstrap?.createConfigStage
@@ -284,6 +315,7 @@ export function createAuthoritativeServerCompositionRoot(
           parentSpan: startupRootSpan,
           stageOrder: startupStageOrder,
         });
+        startupStageOrchestrator = resolvedStartupStageOrchestrator;
 
         const defaultStageHandlers: HostBootstrapReusableStageHandlers = {
           [HostBootstrapStageIds.configuration]: (context) => {
@@ -508,6 +540,35 @@ export function createAuthoritativeServerCompositionRoot(
               await lifecycle.markStarting("start-authoritative-server-host");
             }
           },
+          onStageCompleted: async (event) => {
+            const startedAtMs = Date.parse(event.startedAt);
+            const completedAtMs = Date.parse(event.completedAt);
+            pipelineStageSummaries.push(Object.freeze({
+              stageId: event.stageId,
+              sequence: event.sequence,
+              status: "completed",
+              startedAt: event.startedAt,
+              endedAt: event.completedAt,
+              durationMs: Number.isNaN(startedAtMs) || Number.isNaN(completedAtMs)
+                ? 0
+                : Math.max(0, completedAtMs - startedAtMs),
+            }));
+          },
+          onStageFailed: async (event) => {
+            const startedAtMs = Date.parse(event.startedAt);
+            const failedAtMs = Date.parse(event.failedAt);
+            pipelineStageSummaries.push(Object.freeze({
+              stageId: event.stageId,
+              sequence: event.sequence,
+              status: "failed",
+              startedAt: event.startedAt,
+              endedAt: event.failedAt,
+              durationMs: Number.isNaN(startedAtMs) || Number.isNaN(failedAtMs)
+                ? 0
+                : Math.max(0, failedAtMs - startedAtMs),
+              failure: summarizeStartupError(event.error),
+            }));
+          },
           onPipelineCompleted: async (event) => {
             if (lifecycle.phase === HostLifecyclePhases.starting) {
               await lifecycle.markStartupCompleted({
@@ -624,9 +685,60 @@ export function createAuthoritativeServerCompositionRoot(
           }
         }
         await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
+        startupFailure = failure;
         throw failure;
       } finally {
         startupRootSpan?.complete();
+        const startupCompletedAtMs = Date.now();
+        const startupCompletedAt = new Date(startupCompletedAtMs).toISOString();
+        const stageStatus = startupStageOrchestrator?.getStatus().stages ?? [];
+        const pipelineFailures = pipelineStageSummaries
+          .filter((stage) => stage.status === "failed")
+          .map((stage) => Object.freeze({
+            stageId: stage.stageId,
+            sequence: stage.sequence,
+            failure: stage.failure,
+          }));
+        const startupSummary = Object.freeze({
+          event: "authoritative-server.startup.summary",
+          hostId: boot.host.hostId,
+          startupReason: boot.startupReason,
+          outcome: startupFailure ? "failed" : "succeeded",
+          traceId: startupTracer?.traceId,
+          startedAt: startupStartedAt,
+          completedAt: startupCompletedAt,
+          durationMs: Math.max(0, startupCompletedAtMs - startupStartedAtMs),
+          pipeline: Object.freeze({
+            stageCount: pipelineStageSummaries.length,
+            stages: Object.freeze([...pipelineStageSummaries]),
+            failedStageCount: pipelineFailures.length,
+            failures: Object.freeze(pipelineFailures),
+          }),
+          authoritativeStages: Object.freeze({
+            stageCount: stageStatus.length,
+            stages: Object.freeze(stageStatus),
+            failedStageCount: stageStatus.filter((stage) => stage.state === "failed").length,
+            failures: Object.freeze(stageStatus
+              .filter((stage) => stage.state === "failed")
+              .map((stage) => Object.freeze({
+                stageId: stage.stageId,
+                sequence: stage.sequence,
+                failure: stage.failure,
+              }))),
+          }),
+          startupFailure: startupFailure ? summarizeStartupError(startupFailure) : undefined,
+        });
+        if (startupFailure) {
+          if (input.hostOptions.logger) {
+            input.hostOptions.logger.error(startupSummary);
+          } else {
+            console.error(startupSummary);
+          }
+        } else if (input.hostOptions.logger) {
+          input.hostOptions.logger.info(startupSummary);
+        } else {
+          console.info(startupSummary);
+        }
       }
     },
   });
