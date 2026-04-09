@@ -1112,7 +1112,7 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
     const requestId = randomUUID();
     const correlationId = resolveRequestCorrelationId(request, requestId);
     setResponseCorrelationHeaders(response, requestId, correlationId);
-    const path = new URL(request.url ?? "/", "http://localhost").pathname;
+    const path = resolveCanonicalRequestPath(request.url);
     const transportState = resolveInboundHttpTransportConnectionState(request);
     logger.info(Object.freeze({
       event: "identity-http.request.received",
@@ -14249,7 +14249,7 @@ function logResponse<TRequest extends Record<string, unknown>>(
     requestId,
     correlationId,
     method: request.method,
-    path: request.url,
+    path: resolveCanonicalRequestPath(request.url),
     statusCode,
     details: {
       request: redactSensitiveAuthPayload(requestPayload),
@@ -14267,6 +14267,15 @@ function logResponse<TRequest extends Record<string, unknown>>(
   }
 
   logger.info(event);
+}
+
+function resolveCanonicalRequestPath(requestUrl: string | undefined): string {
+  const normalizedUrl = requestUrl?.trim() || "/";
+  try {
+    return new URL(normalizedUrl, "http://localhost").pathname;
+  } catch {
+    return "/";
+  }
 }
 
 function normalizeError(error: unknown): string {
@@ -14424,6 +14433,5 @@ class ConsoleIdentityHttpServerLogger implements IdentityHttpServerLogger {
     console.error(JSON.stringify(event));
   }
 }
-
 
 
