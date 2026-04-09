@@ -57,6 +57,15 @@ The dependencies stage additionally composes authoritative run-execution adapter
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
 
+Bootstrap stage contracts for controlled decomposition are now defined in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for:
+- `config`
+- `security`
+- `persistence`
+- `services`
+- `transport`
+
+The contract catalog maps those logical authoritative stages onto the current shared pipeline (`services -> dependencies`, `transport -> feature-registration`) so decomposition can proceed without changing runtime startup order.
+
 Authoritative startup now emits structured startup span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps, including:
 - `config-load`
 - `migrations`
@@ -124,3 +133,4 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
+

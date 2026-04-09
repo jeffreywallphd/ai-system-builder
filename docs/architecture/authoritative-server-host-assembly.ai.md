@@ -18,6 +18,8 @@
 
 ## Startup expectations
 - Shared bootstrap pipeline order remains authoritative: `configuration`, `dependencies`, `logging`, `security`, `persistence`, `feature-registration`.
+- Bootstrap stage contracts for staged decomposition live in `src/hosts/server/AuthoritativeServerBootstrapStageContracts.ts` with typed boundaries for `config`, `security`, `persistence`, `services`, and `transport`.
+- Contract-to-host-stage bindings keep runtime order unchanged while exposing logical boundaries (`services -> dependencies`, `transport -> feature-registration`).
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `config-load`
   - `migrations`
@@ -78,3 +80,4 @@
 - `src/hosts/server/tests/AuthoritativeServerCompositionRoot.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
+
