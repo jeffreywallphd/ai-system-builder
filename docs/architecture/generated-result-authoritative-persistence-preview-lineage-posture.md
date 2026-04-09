@@ -409,3 +409,25 @@ Authoritative integration coverage now validates generated-result service behavi
   - verifies list/lineage/read projections come from authoritative generated-result records
   - asserts backend-local temporary file references are not surfaced through authoritative records or lineage outputs
 
+## Story 6.4.2 result-detail and lineage inspection UX flows (implemented)
+
+Image manipulation studio result review now includes a dedicated result-detail + lineage inspector surface that uses authoritative generated-result APIs and presents provenance in layered form.
+
+### UI integration seam
+
+- `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+- `src/ui/components/studio-shell/tests/ImageManipulationRuntimeEditorPanel.test.tsx`
+
+### Behavior posture
+
+- Detail/lineage retrieval remains API-backed (`getGeneratedResult`, `getGeneratedResultLineageDetail`) keyed by canonical `resultAssetId`.
+- Default review copy is plain-language and task-oriented (`Result details`) so non-technical users can quickly understand origin context.
+- Advanced provenance remains collapsed by default (`Advanced provenance`) and exposes bounded run/workflow/system/input/execution-node context for debugging and trust.
+- Result review can reopen corresponding run context from history (`Open run context`), keeping detail inspection aligned with gallery/history continuation flows.
+
+### Safety and boundary posture
+
+- UI avoids exposing storage topology, filesystem paths, or protected access internals in provenance views.
+- Provenance summaries rely on normalized generated-result DTOs and lineage summaries instead of re-deriving backend execution details in the UI.
+- Advanced detail focuses on stable lineage pointers (run/system/workflow/input assets, snapshot/version references, execution context hints) to support future admin/debug expansion without changing default user messaging.
+
