@@ -2,7 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { AppDistributionTargets, getAppRuntimeProfile } from "./domain/runtime/AppRuntimeProfile";
+import { AppDistributionTargets, getAppRuntimeProfile } from "./src/domain/runtime/AppRuntimeProfile";
 
 const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const srcAliases = [
