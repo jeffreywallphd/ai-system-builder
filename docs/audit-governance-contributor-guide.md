@@ -40,6 +40,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
    - `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`
    - `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`
    - `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
+   - `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts`
 7. Validate review-surface compatibility:
    - `src/ui/services/GovernanceAuditReviewService.ts`
    - `src/ui/shared/admin/GovernanceAuditRedaction.ts`
@@ -79,6 +80,7 @@ Provide contributor rules for safely extending audit taxonomy and event capture 
 - Reuse existing normalized references instead of custom raw resource refs.
 - Reuse centralized audit operational redaction (`src/application/audit/shared/AuditOperationalSignalRedaction.ts`) for audit diagnostics/log payloads instead of ad hoc masking.
 - Keep audit write/read observability emission at application/host boundaries (`AuthoritativeAuditRecordingService`, `AuditLedgerBackendApi`, `AuditLedgerObservability`), not in domain models.
+- For resilience-sensitive events (for example repeated submission denials, node availability transitions, and result-collection degraded/failed states), record normalized issue category + bounded counters/status summaries only; do not include raw backend diagnostics payloads.
 
 ## Data/content that must never be recorded
 

@@ -12,6 +12,7 @@ const NodeTrustActionByType = Object.freeze({
   "node-revoked": "node.revoked",
   "node-heartbeat-recorded": "node.heartbeat.recorded",
   "node-heartbeat-rejected": "node.heartbeat.rejected",
+  "node-availability-transitioned": "node.availability.transitioned",
   "node-trusted-inventory-queried": "node.inventory.trusted.queried",
   "node-inventory-queried": "node.inventory.queried",
   "node-inventory-detail-queried": "node.inventory.detail.queried",

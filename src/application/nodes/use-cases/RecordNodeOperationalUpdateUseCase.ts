@@ -1,6 +1,7 @@
-﻿import {
+import {
   createNodeCapabilityProfile,
   createNodeIdentity,
+  NodeHeartbeatStatuses,
   recordNodeLastSeen,
   type NodeCapabilityProfile,
   type NodeHeartbeatStatus,
@@ -252,6 +253,23 @@ export class RecordNodeOperationalUpdateUseCase {
         deploymentTagsSynchronized,
       }),
     });
+    const previousHeartbeatStatus = node.lastSeen?.heartbeatStatus;
+    if (shouldAuditAvailabilityTransition(previousHeartbeatStatus, request.heartbeatStatus)) {
+      await publishNodeTrustAuditEventBestEffort(this.dependencies.auditSink, {
+        type: NodeTrustAuditEventTypes.availabilityTransitioned,
+        actorUserIdentityId,
+        occurredAt: seenAt,
+        nodeId,
+        workspaceId: mutation.record.workspaceId,
+        outcome: "success",
+        details: Object.freeze({
+          previousHeartbeatStatus,
+          heartbeatStatus: request.heartbeatStatus,
+          transitionCategory: classifyAvailabilityTransition(previousHeartbeatStatus, request.heartbeatStatus),
+          reasonCode: "node-availability-transition",
+        }),
+      });
+    }
 
     return {
       ok: true,
@@ -287,6 +305,33 @@ function normalizeDeploymentTags(value: ReadonlyArray<string>): ReadonlyArray<st
   return Object.freeze([...normalized.values()]);
 }
 
+function shouldAuditAvailabilityTransition(
+  previous: NodeHeartbeatStatus | undefined,
+  next: NodeHeartbeatStatus,
+): boolean {
+  if (!previous || previous === next) {
+    return false;
+  }
+  return isDegradedOrUnavailable(previous) || isDegradedOrUnavailable(next);
+}
+
+function isDegradedOrUnavailable(status: NodeHeartbeatStatus): boolean {
+  return status === NodeHeartbeatStatuses.degraded || status === NodeHeartbeatStatuses.offline;
+}
+
+function classifyAvailabilityTransition(
+  previous: NodeHeartbeatStatus | undefined,
+  next: NodeHeartbeatStatus,
+): "degraded" | "recovered" | "status-change" {
+  if (isDegradedOrUnavailable(next)) {
+    return "degraded";
+  }
+  if (previous && isDegradedOrUnavailable(previous) && next === NodeHeartbeatStatuses.online) {
+    return "recovered";
+  }
+  return "status-change";
+}
+
 function areStringSetsEqual(left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean {
   if (left.length !== right.length) {
     return false;
@@ -301,4 +346,5 @@ function areStringSetsEqual(left: ReadonlyArray<string>, right: ReadonlyArray<st
 
   return true;
 }
+
 

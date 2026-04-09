@@ -15,7 +15,7 @@ Related architecture baseline: `docs/architecture/audit-ledger-persistence-query
 - durable ledger persistence: `src/application/audit/ports/AuditLedgerPersistencePorts.ts`, `src/infrastructure/persistence/audit/SqliteAuditLedgerRepository.ts`
 - application retrieval: `src/application/audit/use-cases/AuditLedgerQueryService.ts`, `src/application/audit/use-cases/AuditGovernanceProjectionQueryService.ts`, `src/application/audit/use-cases/WorkspaceAuditLedgerReadAuthorizer.ts`
 - shared contracts: `src/shared/contracts/audit/AuditEventContracts.ts`, `src/shared/dto/audit/AuditEventDtos.ts`, `src/shared/schemas/audit/AuditEventSchemaContracts.ts`
-- source adapters: `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`, `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`
+- source adapters: `src/infrastructure/audit/AuthoritativeRunSubmissionAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSchedulingGovernanceEventSink.ts`, `src/infrastructure/audit/AuthoritativeStorageManagementAuditSink.ts`, `src/infrastructure/audit/AuthoritativeSecretAccessAuditHook.ts`, `src/infrastructure/audit/AuthoritativeNodeTrustAuditSink.ts` (availability-transition resilience events)
 - observability/failure-hardening: `src/application/audit/shared/AuditOperationalSignalRedaction.ts`, `src/application/audit/ports/AuditLedgerObservabilityPorts.ts`, `src/infrastructure/api/audit/AuditLedgerObservability.ts`, `src/infrastructure/api/audit/AuditLedgerBackendApi.ts`
 
 ## Must-follow rules
@@ -29,6 +29,7 @@ Related architecture baseline: `docs/architecture/audit-ledger-persistence-query
 - Use `AuditGovernanceProjectionQueryService` projection-policy seams for deployment-profile-specific governance view growth and compliance/export note shaping, rather than introducing controller/UI branching.
 - Never place raw secret/prompt/path/credential material in ledger payload details.
 - Never place raw secret/prompt/path/credential material in audit observability logs or failure details.
+- For resilience-sensitive events (repeated validation denials, node availability transitions, result-collection degraded/failed outcomes), keep payloads normalized/bounded (`issueCategory`, status, counts) and exclude raw backend diagnostics blobs.
 - Keep retention lifecycle behavior metadata-only in this slice; do not add destructive retention jobs.
 - Do not ship placeholder compliance-export endpoints or fake profile toggles; add only real seams that preserve current behavior.
 

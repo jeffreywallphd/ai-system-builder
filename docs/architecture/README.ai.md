@@ -242,6 +242,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Feature 8 / Epic 8.2 Story 8.2.1 hardened ingestion/retrieval validation and failure normalization posture for malformed/unsupported/corrupted/stale image asset requests: `docs/architecture/image-asset-validation-retrieval-hardening.md`
 - Feature 8 / Epic 8.2 Story 8.2.5 structured resilience diagnostics, request-to-run/result correlation, and redaction-safe observability conventions across image slice services: `docs/architecture/image-manipulation-resilience-diagnostics-correlation-redaction-conventions.md`
 - Feature 8 / Epic 8.4 Story 8.4.1 representative resilience verification matrix baseline across uploads, workflow/system compatibility, readiness routing, dispatch/cancellation/output persistence failures, preview degradation, and protected retrieval unavailability: `docs/architecture/image-manipulation-resilience-verification-matrix.md`
+- Feature 8 / Epic 8.4 Story 8.4.2 resilience-sensitive audit hardening for repeated validation denials, node availability transitions, result-collection degraded/failed outcomes, protected retrieval denials, and retry/recovery governance events: `docs/architecture/run-submission-lifecycle-audit-hooks.md`, `docs/audit-governance-contributor-guide.md`
 
 ## Direction 4 (Phase 1) foundation
 - Agent concepts are now first-class inner-layer artifacts (`src/domain/agents/*`) with validated goal, policy, memory, and execution-session models (including lifecycle and invariant enforcement).

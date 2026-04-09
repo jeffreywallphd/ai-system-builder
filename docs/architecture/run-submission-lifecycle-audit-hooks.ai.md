@@ -21,6 +21,7 @@ Story 18.1.7 extends this slice by faning these events into the canonical author
 
 ## Emitted event types
 - `run-submission-denied` (validation denials)
+- `run-submission-denial-pattern-detected` (repeated denial bursts for same workspace+actor principal)
 - `run-submission-accepted` (post-persistence acceptance)
 - `run-lifecycle-transitioned` (initial `none` -> `submitted`)
 
@@ -31,6 +32,7 @@ Story 18.1.7 extends this slice by faning these events into the canonical author
 ## Platform integration
 - `PlatformRunSubmissionAuditSink` maps events into platform audit records (`eventKind: runs`) with stable actions:
   - `run.submission.denied`
+  - `run.submission.denial-pattern.detected`
   - `run.submission.accepted`
   - `run.lifecycle.transitioned`
 - `AuthoritativeRunSubmissionAuditSink` maps the same event types into canonical authoritative run orchestration records.
@@ -41,6 +43,7 @@ Story 18.1.7 extends this slice by faning these events into the canonical author
 - `src/application/runs/tests/AuthoritativeRunCreationUseCase.test.ts`
 - `src/infrastructure/api/runs/tests/PlatformRunSubmissionAuditSink.test.ts`
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/application/runs/tests/FinalizeRunExecutionOutcomeUseCase.test.ts`
 - `src/application/runs/tests/HandleRunDispatchResultUseCase.test.ts`
 - `src/application/runs/tests/IngestRunExecutionUpdateUseCase.test.ts`
 
@@ -56,6 +59,7 @@ Story 18.1.7 extends this slice by faning these events into the canonical author
   - `run.lifecycle.transitioned` (including terminal completion/failure/cancelled updates)
   - `run.execution-update.ingested`
   - `run.cancellation.requested`
+  - `run.result.collection.failed` / `run.result.collection.degraded` (terminal result-collection persistence failure/degradation)
 - Redaction posture:
   - user-safe lifecycle summaries only in shared payload
   - bounded operational fields in admin-only payloads under centralized authoritative recorder sanitization

@@ -71,4 +71,25 @@ describe("PlatformRunSubmissionAuditSink", () => {
     expect(repository.events[0]?.targetRef).toBe("run:123");
     expect(repository.events[0]?.outcome).toBe("succeeded");
   });
+
+  it("maps repeated denial-pattern events as denied orchestration actions", async () => {
+    const repository = new InMemoryPlatformAuditRepository();
+    const sink = new PlatformRunSubmissionAuditSink(repository);
+
+    await sink.recordRunSubmissionEvent(Object.freeze({
+      type: "run-submission-denial-pattern-detected",
+      occurredAt: "2026-04-08T09:00:00.000Z",
+      workspaceId: "workspace-alpha",
+      actorServiceId: "service:run-validation",
+      details: Object.freeze({
+        issueCategory: "authorization-denial",
+        attemptsInWindow: 3,
+      }),
+    }));
+
+    expect(repository.events.length).toBe(1);
+    expect(repository.events[0]?.action).toBe("run.submission.denial-pattern.detected");
+    expect(repository.events[0]?.outcome).toBe("denied");
+    expect(repository.events[0]?.actorId).toBe("service:run-validation");
+  });
 });

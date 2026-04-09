@@ -35,6 +35,9 @@ Story 18.1.7 extends this hook path so these events also flow through the canoni
 - `run-submission-denied`
   - emitted on validation denial (`invalid-request`, `forbidden`, `not-found`, `policy-ineligible`)
   - includes actor/workspace context when available
+- `run-submission-denial-pattern-detected`
+  - emitted on repeated denial bursts for the same workspace+actor principal
+  - includes normalized issue category and bounded window/threshold metadata
 - `run-submission-accepted`
   - emitted after authoritative run persistence succeeds
   - includes actor/workspace/run context
@@ -74,6 +77,9 @@ Additional audited actions in this extension:
   - emitted for non-transitioning progress/heartbeat/internal-diagnostics execution updates
 - `run.cancellation.requested`
   - emitted for cancellation request outcomes (`cancelled`, `cancellation-requested`, `already-finalized`, `already-cancelling`, `denied`)
+- `run.result.collection.failed` / `run.result.collection.degraded`
+  - emitted when terminal result-collection persistence fails or only partially persists outputs
+  - includes normalized issue category/status/count hints without backend payload leakage
 
 Redaction posture for this extension:
 
@@ -87,6 +93,7 @@ Run submission audit adapters map application audit event types to stable orches
 
 - `run-submission-accepted` -> `run.submission.accepted` (`outcome: succeeded`)
 - `run-submission-denied` -> `run.submission.denied` (`outcome: denied`)
+- `run-submission-denial-pattern-detected` -> `run.submission.denial-pattern.detected` (`outcome: denied`)
 - `run-lifecycle-transitioned` -> `run.lifecycle.transitioned` (`outcome: succeeded`)
 
 All mapped events use:
@@ -107,6 +114,7 @@ All mapped events use:
 - `src/infrastructure/api/runs/tests/PlatformRunSubmissionAuditSink.test.ts`
   - application-event to platform-audit mapping and outcome semantics
 - `src/infrastructure/audit/tests/AuthoritativeSecurityAuditAdapters.test.ts`
+- `src/application/runs/tests/FinalizeRunExecutionOutcomeUseCase.test.ts`
 - `src/application/runs/tests/HandleRunDispatchResultUseCase.test.ts`
 - `src/application/runs/tests/IngestRunExecutionUpdateUseCase.test.ts`
   - application-event to authoritative canonical run audit mapping

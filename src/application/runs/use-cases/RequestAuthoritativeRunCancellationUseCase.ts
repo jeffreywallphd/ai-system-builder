@@ -234,6 +234,7 @@ export class RequestAuthoritativeRunCancellationUseCase {
       queueRepository: dependencies.queueRepository,
       resultRegistrationPort: dependencies.resultRegistrationPort,
       resultCollectionPersistencePort: dependencies.resultCollectionPersistencePort,
+      authoritativeAuditRecorder: dependencies.authoritativeAuditRecorder,
     });
   }
 
