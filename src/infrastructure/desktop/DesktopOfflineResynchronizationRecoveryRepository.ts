@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import {
+  type SqliteCompatDatabase,
+  openSqliteCompatDatabase,
+} from "../persistence/sqlite/SqliteCompat";
 import {
   type IOfflineResynchronizationRecoveryStateRepository,
   type OfflineResynchronizationAttemptMarker,
@@ -73,7 +76,7 @@ export class DesktopOfflineResynchronizationRecoveryRepository
 implements IOfflineResynchronizationRecoveryStateRepository {
   private readonly databasePath: string;
   private readonly maxEntries: number;
-  private database?: Database.Database;
+  private database?: SqliteCompatDatabase;
 
   constructor(options: DesktopOfflineResynchronizationRecoveryRepositoryOptions) {
     this.databasePath = options.databasePath;
@@ -324,17 +327,17 @@ implements IOfflineResynchronizationRecoveryStateRepository {
     }
   }
 
-  private getDatabase(): Database.Database {
+  private getDatabase(): SqliteCompatDatabase {
     if (!this.database) {
       fs.mkdirSync(path.dirname(this.databasePath), { recursive: true });
-      this.database = new Database(this.databasePath);
+      this.database = openSqliteCompatDatabase(this.databasePath);
       this.database.pragma("journal_mode = WAL");
       this.database.pragma("foreign_keys = ON");
     }
     return this.database;
   }
 
-  private ensureMigrationTable(db: Database.Database): void {
+  private ensureMigrationTable(db: SqliteCompatDatabase): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS offline_resynchronization_recovery_schema_migrations (
         version INTEGER PRIMARY KEY,

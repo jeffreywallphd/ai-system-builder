@@ -1,6 +1,9 @@
 ﻿import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import {
+  type SqliteCompatDatabase,
+  openSqliteCompatDatabase,
+} from "../persistence/sqlite/SqliteCompat";
 import type { IProductionStorageInitializer } from "@application/runtime/interfaces/IProductionStorageInitializer";
 import type { DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
 
@@ -40,7 +43,7 @@ export interface DesktopStorageDatabaseOptions {
 
 export class DesktopStorageDatabase implements IProductionStorageInitializer {
   private readonly databasePath: string;
-  private database?: Database.Database;
+  private database?: SqliteCompatDatabase;
 
   constructor(private readonly options: DesktopStorageDatabaseOptions) {
     this.databasePath = options.paths.databasePath;
@@ -136,10 +139,10 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     return Object.freeze(created);
   }
 
-  private getDatabase(): Database.Database {
+  private getDatabase(): SqliteCompatDatabase {
     if (!this.database) {
       fs.mkdirSync(path.dirname(this.databasePath), { recursive: true });
-      this.database = new Database(this.databasePath);
+      this.database = openSqliteCompatDatabase(this.databasePath);
       this.database.pragma("journal_mode = WAL");
       this.database.pragma("foreign_keys = ON");
     }
@@ -147,7 +150,7 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     return this.database;
   }
 
-  private applyMigrations(db: Database.Database): ReadonlyArray<string> {
+  private applyMigrations(db: SqliteCompatDatabase): ReadonlyArray<string> {
     this.ensureMigrationTable(db);
     const applied = new Set(
       (db.prepare("SELECT version FROM schema_migrations ORDER BY version ASC").all() as Array<{ version: number }>)
@@ -177,7 +180,7 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     return Object.freeze(appliedNames);
   }
 
-  private ensureMigrationTable(db: Database.Database): void {
+  private ensureMigrationTable(db: SqliteCompatDatabase): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version INTEGER PRIMARY KEY,
