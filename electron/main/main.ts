@@ -108,7 +108,9 @@ import {
   type AuthoritativeServerHostRuntimeHandle,
 } from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 if (started) {
   app.quit();
 }

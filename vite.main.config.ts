@@ -8,7 +8,6 @@ const REPOSITORY_ROOT = path.dirname(fileURLToPath(import.meta.url));
 const srcAliases = createSrcAliases(REPOSITORY_ROOT);
 const staticExternalModules = new Set([
   "electron",
-  "better-sqlite3",
   "electron-squirrel-startup",
   "sharp",
   ...builtinModules,
@@ -34,6 +33,21 @@ function isSharpRuntimeModule(id: string): boolean {
   );
 }
 
+function isBetterSqlite3RuntimeModule(id: string): boolean {
+  const normalizedId = id.replace(/\\/g, "/");
+  const withoutQuery = normalizedId.split("?")[0];
+  const sanitizedId = withoutQuery
+    .replace(/^\0+/, "")
+    .replace(/^commonjs-external:/, "")
+    .replace(/^\/@id\//, "");
+
+  return (
+    sanitizedId === "better-sqlite3" ||
+    sanitizedId.startsWith("better-sqlite3/") ||
+    sanitizedId.includes("/node_modules/better-sqlite3/")
+  );
+}
+
 export default defineConfig({
   resolve: {
     alias: srcAliases,
@@ -46,7 +60,10 @@ export default defineConfig({
       fileName: () => "main.mjs",
     },
     rollupOptions: {
-      external: (id) => staticExternalModules.has(id) || isSharpRuntimeModule(id),
+      external: (id) =>
+        staticExternalModules.has(id) ||
+        isSharpRuntimeModule(id) ||
+        isBetterSqlite3RuntimeModule(id),
     },
   },
 });
