@@ -56,8 +56,8 @@ export default defineConfig({
     outDir: ".vite/build",
     lib: {
       entry: "electron/main/main.ts",
-      formats: ["es"],
-      fileName: () => "main.mjs",
+      formats: ["cjs"],
+      fileName: () => "main.cjs",
     },
     rollupOptions: {
       external: (id) =>
