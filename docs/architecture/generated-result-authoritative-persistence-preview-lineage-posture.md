@@ -431,3 +431,42 @@ Image manipulation studio result review now includes a dedicated result-detail +
 - Provenance summaries rely on normalized generated-result DTOs and lineage summaries instead of re-deriving backend execution details in the UI.
 - Advanced detail focuses on stable lineage pointers (run/system/workflow/input assets, snapshot/version references, execution context hints) to support future admin/debug expansion without changing default user messaging.
 
+## Story 6.4.3 result persistence and protected-access audit integration (implemented)
+
+Generated-result persistence, preview-generation outcomes, and protected content access now emit authoritative audit events through reusable platform audit services.
+
+### Canonical implementation seams
+
+- `src/application/generated-results/ports/GeneratedResultAuditPort.ts`
+- `src/infrastructure/audit/AuthoritativeGeneratedResultAuditSink.ts`
+- `src/infrastructure/persistence/generated-results/SqliteRunCollectedResultPersistenceAdapter.ts`
+- `src/application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase.ts`
+- `src/application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase.ts`
+- `src/application/generated-results/use-cases/RequestGeneratedResultPreviewContentUseCase.ts`
+- `src/application/generated-results/use-cases/OpenGeneratedResultPreviewContentUseCase.ts`
+- `src/hosts/server/IdentityServerHost.ts`
+
+### Audited generated-result event coverage
+
+- Result persistence records from run finalization:
+  - `generated-result-persisted`
+- Preview-generation/provisioning outcomes:
+  - `generated-result-preview-generation-recorded`
+- Protected generated-result original access:
+  - `generated-result-original-content-accessed`
+- Protected generated-result preview request and open actions:
+  - `generated-result-preview-access-requested`
+  - `generated-result-preview-content-opened`
+
+### Category and action posture
+
+- Persistence and preview-generation events are mapped to run/orchestration actions (`run.result.*`) via authoritative run-audit recording.
+- Protected original/preview access events are mapped to protected-data actions (`asset.protected.generated-result.*`) via authoritative protected-data recording.
+- Events include actor, workspace, result asset id, and lineage-sensitive linkage (`runId`, `workflowId`, `systemId`, optional `executionNodeId`) when available.
+
+### Redaction and safety posture
+
+- Generated-result audit details are sanitized through a dedicated generated-result audit port sanitizer before sink emission.
+- Sensitive keys and content-like fields (tokens, credentials, payload/body/content bytes, filesystem/storage paths, object keys, backend handles) are redacted.
+- Audit payloads remain bounded to normalized reason codes, statuses, linkage identifiers, and safe summaries; raw backend/storage internals are excluded.
+

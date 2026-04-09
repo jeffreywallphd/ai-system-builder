@@ -32,6 +32,12 @@ import type {
   GeneratedResultPersistenceRecord,
   GeneratedResultPreviewPersistenceRecord,
 } from "@shared/dto/assets/GeneratedResultPersistenceDtos";
+import {
+  GeneratedResultAuditEventTypes,
+  GeneratedResultAuditOutcomes,
+  publishGeneratedResultAuditEventBestEffort,
+  type GeneratedResultAuditSink,
+} from "../ports/GeneratedResultAuditPort";
 
 const DefaultMaxSourceBytes = 64 * 1024 * 1024;
 const SupportedSourceMediaTypePattern = /^image\/[a-z0-9.+-]+$/;
@@ -62,6 +68,7 @@ export interface GenerateGeneratedResultPreviewUseCaseDependencies {
   readonly storageLogicalAccessResolutionService: IStorageLogicalAccessResolutionService;
   readonly previewImageProcessorPort: IGeneratedResultPreviewImageProcessorPort;
   readonly previewAccessPort: IGeneratedResultPreviewAccessPort;
+  readonly auditSink?: GeneratedResultAuditSink;
   readonly maxSourceBytes?: number;
   readonly clock?: {
     now(): Date;
@@ -90,6 +97,12 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
     try {
       request = validateGenerateGeneratedResultPreviewRequest(input);
     } catch (error) {
+      await this.publishPreviewGenerationAuditEvent({
+        input,
+        occurredAt: this.clock.now().toISOString(),
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "invalid-request",
+      });
       return this.failure(
         GenerateGeneratedResultPreviewErrorCodes.invalidRequest,
         error instanceof Error ? error.message : "Invalid generated-result preview-generation request.",
@@ -101,6 +114,12 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
     const previewKind = request.previewKind ?? GeneratedResultPreviewKinds.displaySafe;
     const previewProfile = PreviewProfiles[previewKind];
     if (!previewProfile) {
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "unsupported-preview-kind",
+      });
       return this.failure(
         GenerateGeneratedResultPreviewErrorCodes.invalidRequest,
         `Unsupported preview kind '${previewKind}'.`,
@@ -110,6 +129,12 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
 
     const result = await this.dependencies.generatedResultRepository.findResultById(request.resultAssetId);
     if (!result || result.workspaceId !== request.workspaceId) {
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "result-not-found",
+      });
       return this.failure(
         GenerateGeneratedResultPreviewErrorCodes.notFound,
         "Generated result was not found for the workspace.",
@@ -122,6 +147,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
       && result.status !== GeneratedResultAssetStatuses.previewReady
       && result.status !== GeneratedResultAssetStatuses.archived
     ) {
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "result-not-preview-generatable",
+      });
       return this.failure(
         GenerateGeneratedResultPreviewErrorCodes.invalidState,
         `Generated result '${result.resultAssetId}' is not preview-generatable in status '${result.status}'.`,
@@ -131,6 +163,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
 
     const sourceMediaType = result.mediaType;
     if (!sourceMediaType || !SupportedSourceMediaTypePattern.test(sourceMediaType)) {
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.rejected,
+        reasonCode: "unsupported-source-media-type",
+      });
       return this.failure(
         GenerateGeneratedResultPreviewErrorCodes.invalidState,
         "Generated result mediaType is not an image type supported for preview generation.",
@@ -147,6 +186,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
       && !request.forceRegenerate
     ) {
       if (!existingForKind.protectedResourceId || !existingForKind.accessHandle) {
+        await this.publishPreviewGenerationAuditEvent({
+          input: request,
+          occurredAt,
+          result,
+          outcome: GeneratedResultAuditOutcomes.rejected,
+          reasonCode: "existing-preview-metadata-invalid",
+        });
         return this.failure(
           GenerateGeneratedResultPreviewErrorCodes.invalidState,
           "Existing preview descriptor is missing protected access metadata.",
@@ -154,6 +200,17 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         );
       }
 
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        details: Object.freeze({
+          previewKind: existingForKind.previewKind,
+          derivativeId: existingForKind.derivativeId,
+          previewStatus: "reused",
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -192,6 +249,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         operationKey: request.operationKey,
         correlationId: request.correlationId,
       });
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.failed,
+        reasonCode: "preview-source-reference-unavailable",
+      });
       return this.failure(
         failure.code,
         failure.message,
@@ -208,6 +272,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         occurredAt,
       });
       if (!readPlan.ok) {
+        await this.publishPreviewGenerationAuditEvent({
+          input: request,
+          occurredAt,
+          result,
+          outcome: GeneratedResultAuditOutcomes.rejected,
+          reasonCode: `read-plan-${readPlan.error.code}`,
+        });
         return this.failure(
           mapStorageResolutionErrorCode(readPlan.error.code),
           readPlan.error.message,
@@ -236,6 +307,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         occurredAt,
       });
       if (!createKeyPlan.ok) {
+        await this.publishPreviewGenerationAuditEvent({
+          input: request,
+          occurredAt,
+          result,
+          outcome: GeneratedResultAuditOutcomes.rejected,
+          reasonCode: `create-key-plan-${createKeyPlan.error.code}`,
+        });
         return this.failure(
           mapStorageResolutionErrorCode(createKeyPlan.error.code),
           createKeyPlan.error.message,
@@ -266,6 +344,13 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         occurredAt,
       });
       if (!writePlan.ok) {
+        await this.publishPreviewGenerationAuditEvent({
+          input: request,
+          occurredAt,
+          result,
+          outcome: GeneratedResultAuditOutcomes.rejected,
+          reasonCode: `write-plan-${writePlan.error.code}`,
+        });
         return this.failure(
           mapStorageResolutionErrorCode(writePlan.error.code),
           writePlan.error.message,
@@ -327,6 +412,17 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         correlationId: request.correlationId,
       });
 
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.success,
+        details: Object.freeze({
+          previewKind: savedPreview.record.previewKind,
+          derivativeId: savedPreview.record.derivativeId,
+          previewStatus: "generated",
+        }),
+      });
       return {
         ok: true,
         value: Object.freeze({
@@ -364,6 +460,16 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         correlationId: request.correlationId,
       });
 
+      await this.publishPreviewGenerationAuditEvent({
+        input: request,
+        occurredAt,
+        result,
+        outcome: GeneratedResultAuditOutcomes.failed,
+        reasonCode: failureCode,
+        details: Object.freeze({
+          retryable: persistedFailure.retryable,
+        }),
+      });
       return this.failure(
         persistedFailure.code,
         persistedFailure.message,
@@ -530,6 +636,44 @@ export class GenerateGeneratedResultPreviewUseCase implements IGenerateGenerated
         details,
       }),
     };
+  }
+
+  private async publishPreviewGenerationAuditEvent(input: {
+    readonly input: Pick<
+      GenerateGeneratedResultPreviewRequest,
+      "resultAssetId" | "workspaceId" | "actorUserId" | "operationKey" | "correlationId" | "previewKind"
+    >;
+    readonly occurredAt: string;
+    readonly outcome: typeof GeneratedResultAuditOutcomes[keyof typeof GeneratedResultAuditOutcomes];
+    readonly result?: GeneratedResultPersistenceRecord;
+    readonly reasonCode?: string;
+    readonly details?: Readonly<Record<string, unknown>>;
+  }): Promise<void> {
+    await publishGeneratedResultAuditEventBestEffort(this.dependencies.auditSink, {
+      type: GeneratedResultAuditEventTypes.previewGenerationRecorded,
+      occurredAt: input.occurredAt,
+      workspaceId: input.input.workspaceId,
+      actorUserId: input.input.actorUserId,
+      correlationId: input.input.correlationId,
+      operationKey: input.input.operationKey,
+      outcome: input.outcome,
+      result: Object.freeze({
+        resultAssetId: input.input.resultAssetId,
+        runId: input.result?.runId,
+        workflowId: input.result?.workflowId,
+        systemId: input.result?.systemId,
+        executionNodeId: input.result?.executionNodeId,
+        storageInstanceId: input.result?.storageInstanceId,
+        visibility: input.result?.visibility,
+        lifecycleStatus: input.result?.status,
+        mediaType: input.result?.mediaType,
+      }),
+      details: Object.freeze({
+        reasonCode: input.reasonCode,
+        previewKind: input.input.previewKind ?? GeneratedResultPreviewKinds.displaySafe,
+        ...(input.details ?? {}),
+      }),
+    });
   }
 }
 

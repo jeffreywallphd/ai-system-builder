@@ -33,6 +33,7 @@ import {
   GetGeneratedResultOriginalContentUseCase,
 } from "../use-cases/GetGeneratedResultOriginalContentUseCase";
 import { GeneratedResultOriginalContentReadErrorCodes } from "../use-cases/GetGeneratedResultOriginalContentUseCaseContracts";
+import type { GeneratedResultAuditEvent, GeneratedResultAuditSink } from "../ports/GeneratedResultAuditPort";
 
 class InMemoryGeneratedResultRepository implements IGeneratedResultPersistenceRepository {
   public readonly records = new Map<string, GeneratedResultPersistenceRecord>();
@@ -209,6 +210,14 @@ class StaticStorageLogicalAccessResolutionService implements IStorageLogicalAcce
   }
 }
 
+class InMemoryGeneratedResultAuditSink implements GeneratedResultAuditSink {
+  public readonly events: GeneratedResultAuditEvent[] = [];
+
+  public async recordGeneratedResultEvent(event: GeneratedResultAuditEvent): Promise<void> {
+    this.events.push(event);
+  }
+}
+
 function buildResultRecord(input?: Partial<GeneratedResultPersistenceRecord>): GeneratedResultPersistenceRecord {
   return Object.freeze({
     resultAssetId: "gr-asset-001",
@@ -268,6 +277,7 @@ describe("GetGeneratedResultOriginalContentUseCase", () => {
   it("streams generated-result original content for authorized workspace members", async () => {
     const repository = new InMemoryGeneratedResultRepository();
     const objectPort = new InMemoryStorageObjectPort();
+    const auditSink = new InMemoryGeneratedResultAuditSink();
     objectPort.objects.set("storage-alpha:generated-results/run-001/output-001.png", Buffer.from("hello", "utf8"));
     repository.records.set("gr-asset-001", buildResultRecord());
 
@@ -275,6 +285,7 @@ describe("GetGeneratedResultOriginalContentUseCase", () => {
       generatedResultRepository: repository,
       storageLogicalAccessResolutionService: new StaticStorageLogicalAccessResolutionService(objectPort),
       workspaceAuthorizationReadRepository: new StaticWorkspaceAuthorizationReadRepository(true),
+      auditSink,
     });
 
     const outcome = await useCase.execute({
@@ -296,6 +307,11 @@ describe("GetGeneratedResultOriginalContentUseCase", () => {
       chunks.push(...chunk);
     }
     expect(Buffer.from(chunks).toString("utf8")).toBe("hello");
+    expect(auditSink.events.some((event) => (
+      event.type === "generated-result-original-content-accessed"
+      && event.outcome === "success"
+      && event.result.resultAssetId === "gr-asset-001"
+    ))).toBeTrue();
   });
 
   it("blocks callers without active workspace membership", async () => {

@@ -62,6 +62,7 @@ import { AuthoritativeAuthorizationPolicyEventRecorder } from "@infrastructure/a
 import { AuthoritativeStorageManagementAuditSink } from "@infrastructure/audit/AuthoritativeStorageManagementAuditSink";
 import { AuthoritativeProtectedAssetAuditSink } from "@infrastructure/audit/AuthoritativeProtectedAssetAuditSink";
 import { AuthoritativeImageAssetAuditSink } from "@infrastructure/audit/AuthoritativeImageAssetAuditSink";
+import { AuthoritativeGeneratedResultAuditSink } from "@infrastructure/audit/AuthoritativeGeneratedResultAuditSink";
 import { AuthoritativeRunSubmissionAuditSink } from "@infrastructure/audit/AuthoritativeRunSubmissionAuditSink";
 import { AuthoritativeDeploymentPolicyGovernanceEventSink } from "@infrastructure/audit/AuthoritativeDeploymentPolicyGovernanceEventSink";
 import {
@@ -1286,11 +1287,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const generatedResultPreviewAccessPort = new TokenizedGeneratedResultPreviewAccessPort(
     resolveGeneratedResultPreviewAccessTokenSecret(env),
   );
+  const generatedResultAuditSink = new AuthoritativeGeneratedResultAuditSink(authoritativeAuditRecorder);
   const generatedResultPreviewGenerationUseCase = new GenerateGeneratedResultPreviewUseCase({
     generatedResultRepository: persistentPlatformServices.generatedResultRepository,
     storageLogicalAccessResolutionService,
     previewImageProcessorPort: new SharpGeneratedResultPreviewImageProcessor(),
     previewAccessPort: generatedResultPreviewAccessPort,
+    auditSink: generatedResultAuditSink,
     clock: workspaceClock,
   });
   const generatedResultManagementBackendApi = new GeneratedResultManagementBackendApi({
@@ -1306,11 +1309,13 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
       storageLogicalAccessResolutionService,
       workspaceAuthorizationReadRepository: workspaceRepository,
+      auditSink: generatedResultAuditSink,
       clock: workspaceClock,
     }),
     requestGeneratedResultPreviewContentUseCase: new RequestGeneratedResultPreviewContentUseCase({
       generatedResultRepository: persistentPlatformServices.generatedResultRepository,
       workspaceAuthorizationReadRepository: workspaceRepository,
+      auditSink: generatedResultAuditSink,
       clock: workspaceClock,
     }),
     openGeneratedResultPreviewContentUseCase: new OpenGeneratedResultPreviewContentUseCase({
@@ -1318,6 +1323,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       storageLogicalAccessResolutionService,
       workspaceAuthorizationReadRepository: workspaceRepository,
       previewAccessPort: generatedResultPreviewAccessPort,
+      auditSink: generatedResultAuditSink,
       clock: workspaceClock,
     }),
     getGeneratedResultLineageSummaryUseCase: new GetGeneratedResultLineageSummaryUseCase({
@@ -1334,6 +1340,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
   const runCollectedResultPersistencePort = new SqliteRunCollectedResultPersistenceAdapter({
     repository: persistentPlatformServices.generatedResultRepository,
     generateGeneratedResultPreviewUseCase: generatedResultPreviewGenerationUseCase,
+    auditSink: generatedResultAuditSink,
     now: () => workspaceClock.now(),
   });
   const authoritativeRunMutationBackendApi = new AuthoritativeRunMutationBackendApi({
