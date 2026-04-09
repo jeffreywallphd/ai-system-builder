@@ -29,6 +29,8 @@ Use this as the implementation contract for operational UX feedback in the image
   - setup blockers = user configuration/image selection actions,
   - backend blockers = readiness/node availability conditions from authoritative APIs.
 - Backend messaging must distinguish:
+  - no compatible backend for the selected workflow/translation contract,
+  - node disabled or suppressed by policy,
   - no eligible node,
   - temporary backend outage/unavailable state,
   - degraded but runnable backend,

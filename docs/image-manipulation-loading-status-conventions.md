@@ -36,6 +36,8 @@ This note defines UX conventions for operational feedback in the image manipulat
 - Operational readiness and outage messaging:
   - Launch precheck explicitly separates setup blockers (image/configuration issues) from execution-environment blockers (backend/node operational issues).
   - Backend/node availability copy distinguishes:
+    - no compatible backend available for the selected workflow/contract,
+    - node disabled or suppressed by policy,
     - no eligible node currently routable (`execution-node-no-eligible-match`),
     - temporary backend outage/unavailability,
     - degraded-but-runnable backend state,

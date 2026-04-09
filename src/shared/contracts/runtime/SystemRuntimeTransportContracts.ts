@@ -12,6 +12,7 @@ import type {
 } from "@infrastructure/api/system-runtime/sdk/PublicExternalRuntimeSdkContract";
 import type { SharedApiMutationResult } from "@shared/contracts/api/SharedApiContractPrimitives";
 import {
+  type ExecutionReadinessNodeAvailabilitySummary,
   RunOrchestrationTransportRoutes,
 } from "@shared/contracts/runtime/RunOrchestrationTransportContracts";
 
@@ -126,6 +127,7 @@ export interface RuntimeExecutionReadinessResponse {
     readonly supportedOperationKinds: ReadonlyArray<string>;
     readonly supportedTranslationContractVersions: ReadonlyArray<string>;
   };
+  readonly nodeAvailability?: RuntimeExecutionReadinessNodeAvailabilitySummary;
   readonly issues: ReadonlyArray<{
     readonly code: string;
     readonly severity: "error" | "warning";
@@ -133,6 +135,9 @@ export interface RuntimeExecutionReadinessResponse {
   }>;
   readonly diagnostics?: Readonly<Record<string, unknown>>;
 }
+
+export type RuntimeExecutionReadinessNodeAvailabilitySummary =
+  ExecutionReadinessNodeAvailabilitySummary;
 
 export interface SystemRuntimeTransportContract {
   readonly startRun: {
