@@ -153,7 +153,9 @@ import {
 import {
   GeneratedResultManagementApiErrorCodes,
   type GeneratedResultManagementApiResponse,
+  type OpenGeneratedResultPreviewContentStreamApiRequest,
   type OpenGeneratedResultOriginalContentStreamApiRequest,
+  type RequestGeneratedResultPreviewApiRequest,
 } from "../../../api/generated-results/sdk/PublicGeneratedResultManagementApiContract";
 import {
   RuntimeQueueItemStatuses,
@@ -4361,6 +4363,157 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             const statusCode = mapStorageManagementStatusCode(apiResponse);
             writeJson(response, statusCode, apiResponse);
             logResponse(logger, requestId, request, statusCode, detailRequest, apiResponse);
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && path.endsWith("/preview/content")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId, resultAssetId, and previewToken are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview/content");
+            const previewToken = normalizeOptionalString(searchParams.get("previewToken"));
+            if (!resultAssetId || resultAssetId.includes("/") || !previewToken) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId, resultAssetId, and previewToken are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const streamRequest: OpenGeneratedResultPreviewContentStreamApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              previewToken,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.openGeneratedResultPreviewContentStream(
+              streamRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            if (!apiResponse.ok || !apiResponse.data) {
+              writeJson(response, statusCode, apiResponse);
+              logResponse(logger, requestId, request, statusCode, streamRequest, apiResponse);
+              return;
+            }
+
+            const contentDisposition = buildContentDispositionHeader(
+              apiResponse.data.contentDisposition,
+              apiResponse.data.contentDispositionFileName,
+            );
+            response.statusCode = 200;
+            response.setHeader("content-type", apiResponse.data.mimeType);
+            response.setHeader("content-length", String(apiResponse.data.sizeBytes));
+            response.setHeader("content-disposition", contentDisposition);
+            response.setHeader("x-content-type-options", "nosniff");
+            response.setHeader("cache-control", "private, no-store");
+
+            try {
+              for await (const chunk of apiResponse.data.stream) {
+                const encoded = Buffer.from(chunk);
+                if (!response.write(encoded)) {
+                  await once(response, "drain");
+                }
+              }
+              response.end();
+              logResponse(logger, requestId, request, 200, streamRequest, Object.freeze({
+                ok: true,
+                data: Object.freeze({
+                  resultAssetId: apiResponse.data.resultAssetId,
+                  workspaceId: apiResponse.data.workspaceId,
+                  mimeType: apiResponse.data.mimeType,
+                  sizeBytes: apiResponse.data.sizeBytes,
+                }),
+              }));
+            } catch (error) {
+              if (!response.headersSent) {
+                const failed = buildGeneratedResultManagementInternalErrorResponse(
+                  "Generated-result preview stream could not be completed.",
+                );
+                writeJson(response, 500, failed);
+                logResponse(logger, requestId, request, 500, streamRequest, failed);
+                return;
+              }
+              response.destroy(error instanceof Error ? error : undefined);
+            }
+          },
+        );
+        return;
+      }
+      if (
+        options.generatedResultManagementBackendApi
+        && request.method === "GET"
+        && path.startsWith("/api/v1/generated-results/")
+        && path.endsWith("/preview")
+      ) {
+        await requireAuthenticatedWorkspaceSession(
+          request,
+          response,
+          requestId,
+          options.backendApi,
+          logger,
+          options.transportTrust,
+          {
+            missingWorkspaceMessage: "workspaceId and resultAssetId are required.",
+            buildInvalidResponse: buildGeneratedResultManagementInvalidRequestResponse,
+          },
+          async (context) => {
+            const resultAssetId = decodePathTail(path, "/api/v1/generated-results/", "/preview");
+            if (!resultAssetId || resultAssetId.includes("/")) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "workspaceId and resultAssetId are required.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const preferredPreviewKinds = parseOptionalMultiEnumList(
+              searchParams,
+              "preferredPreviewKind",
+              "preferredPreviewKinds",
+              ["thumbnail", "display-safe", "history-safe"] as const,
+            );
+            if (!preferredPreviewKinds.ok) {
+              const invalid = buildGeneratedResultManagementInvalidRequestResponse(
+                "preferredPreviewKind values are invalid.",
+              );
+              writeJson(response, 400, invalid);
+              logResponse(logger, requestId, request, 400, Object.freeze({}), invalid);
+              return;
+            }
+
+            const previewRequest: RequestGeneratedResultPreviewApiRequest = Object.freeze({
+              actorUserIdentityId: context.actor.userIdentityId,
+              workspaceId: context.workspace.workspaceId,
+              resultAssetId,
+              preferredPreviewKinds: preferredPreviewKinds.value,
+              correlationId: normalizeOptionalString(searchParams.get("correlationId")),
+              occurredAt: normalizeOptionalString(searchParams.get("occurredAt")),
+            });
+            const apiResponse = await options.generatedResultManagementBackendApi.requestGeneratedResultPreview(
+              previewRequest,
+            );
+            const statusCode = mapGeneratedResultManagementStatusCode(apiResponse);
+            writeJson(response, statusCode, apiResponse);
+            logResponse(logger, requestId, request, statusCode, previewRequest, apiResponse);
           },
         );
         return;

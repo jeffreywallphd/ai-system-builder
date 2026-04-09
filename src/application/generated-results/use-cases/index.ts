@@ -3,5 +3,8 @@ export * from "./GetGeneratedResultMetadataUseCase";
 export * from "./ListGeneratedResultMetadataUseCase";
 export * from "./GetGeneratedResultOriginalContentUseCaseContracts";
 export * from "./GetGeneratedResultOriginalContentUseCase";
+export * from "./GetGeneratedResultPreviewContentUseCaseContracts";
+export * from "./RequestGeneratedResultPreviewContentUseCase";
+export * from "./OpenGeneratedResultPreviewContentUseCase";
 export * from "./GenerateGeneratedResultPreviewUseCaseContracts";
 export * from "./GenerateGeneratedResultPreviewUseCase";

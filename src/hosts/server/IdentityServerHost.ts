@@ -86,6 +86,7 @@ import { WorkspaceAwareStoragePolicyEvaluationAdapter } from "@infrastructure/ap
 import { AssetManagementBackendApi } from "@infrastructure/api/assets/AssetManagementBackendApi";
 import { ImageAssetManagementBackendApi } from "@infrastructure/api/image-assets/ImageAssetManagementBackendApi";
 import { ImageAssetManagementObservability } from "@infrastructure/api/image-assets/ImageAssetManagementObservability";
+import { GeneratedResultManagementBackendApi } from "@infrastructure/api/generated-results/GeneratedResultManagementBackendApi";
 import { AuthoritativeRunSubmissionBackendApi } from "@infrastructure/api/runs/AuthoritativeRunSubmissionBackendApi";
 import { AuthoritativeRunQueryBackendApi } from "@infrastructure/api/runs/AuthoritativeRunQueryBackendApi";
 import { AuthoritativeRunMutationBackendApi } from "@infrastructure/api/runs/AuthoritativeRunMutationBackendApi";
@@ -133,6 +134,9 @@ import { RequestImageAssetPreviewContentUseCase } from "@application/image-asset
 import { InitiateImageAssetCreationUseCase } from "@application/image-assets/use-cases/InitiateImageAssetCreationUseCase";
 import { ListImageAssetMetadataUseCase } from "@application/image-assets/use-cases/ListImageAssetMetadataUseCase";
 import { GenerateGeneratedResultPreviewUseCase } from "@application/generated-results/use-cases/GenerateGeneratedResultPreviewUseCase";
+import { GetGeneratedResultOriginalContentUseCase } from "@application/generated-results/use-cases/GetGeneratedResultOriginalContentUseCase";
+import { OpenGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/OpenGeneratedResultPreviewContentUseCase";
+import { RequestGeneratedResultPreviewContentUseCase } from "@application/generated-results/use-cases/RequestGeneratedResultPreviewContentUseCase";
 import { StorageLogicalAccessResolutionService } from "@application/storage/use-cases/StorageLogicalAccessResolutionService";
 import { EncryptionPolicyEvaluationService } from "@application/security/use-cases/EncryptionPolicyEvaluationService";
 import { EncryptionKeyResolutionService } from "@application/security/use-cases/EncryptionKeyResolutionService";
@@ -1275,14 +1279,35 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     observability: auditLedgerObservability,
   });
+  const generatedResultPreviewAccessPort = new TokenizedGeneratedResultPreviewAccessPort(
+    resolveGeneratedResultPreviewAccessTokenSecret(env),
+  );
   const generatedResultPreviewGenerationUseCase = new GenerateGeneratedResultPreviewUseCase({
     generatedResultRepository: persistentPlatformServices.generatedResultRepository,
     storageLogicalAccessResolutionService,
     previewImageProcessorPort: new SharpGeneratedResultPreviewImageProcessor(),
-    previewAccessPort: new TokenizedGeneratedResultPreviewAccessPort(
-      resolveGeneratedResultPreviewAccessTokenSecret(env),
-    ),
+    previewAccessPort: generatedResultPreviewAccessPort,
     clock: workspaceClock,
+  });
+  const generatedResultManagementBackendApi = new GeneratedResultManagementBackendApi({
+    getGeneratedResultOriginalContentUseCase: new GetGeneratedResultOriginalContentUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      storageLogicalAccessResolutionService,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    requestGeneratedResultPreviewContentUseCase: new RequestGeneratedResultPreviewContentUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      clock: workspaceClock,
+    }),
+    openGeneratedResultPreviewContentUseCase: new OpenGeneratedResultPreviewContentUseCase({
+      generatedResultRepository: persistentPlatformServices.generatedResultRepository,
+      storageLogicalAccessResolutionService,
+      workspaceAuthorizationReadRepository: workspaceRepository,
+      previewAccessPort: generatedResultPreviewAccessPort,
+      clock: workspaceClock,
+    }),
   });
   const runCollectedResultPersistencePort = new SqliteRunCollectedResultPersistenceAdapter({
     repository: persistentPlatformServices.generatedResultRepository,
@@ -1444,6 +1469,7 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     storageManagementBackendApi,
     assetManagementBackendApi,
     imageAssetManagementBackendApi,
+    generatedResultManagementBackendApi,
     auditLedgerBackendApi,
     deploymentPolicyReadBackendApi,
     deploymentPolicyWriteBackendApi,
