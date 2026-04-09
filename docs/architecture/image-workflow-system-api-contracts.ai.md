@@ -259,3 +259,32 @@ Source-of-truth posture for this story:
 - System Studio avoids keeping a separate conflicting local truth for saved system configuration.
 
 This keeps System Studio ready for later run-submission integration because saved/reopened systems carry workflow version binding, readiness summary, and parameter baseline from authoritative contracts.
+
+## Story 2.4.4 readiness + validation feedback in studio
+
+System Studio now consumes structured readiness feedback from authoritative image-system API read models and projects it into consistent save/reopen/edit UX.
+
+Canonical seams:
+
+- `StudioShellBackendApi` read-model projection:
+  - `StudioImageSystemReadinessReadModel`
+  - `StudioImageSystemReadinessIssueReadModel`
+  - `StudioImageSystemDefinitionSummaryReadModel.readiness`
+  - `StudioImageSystemDefinitionReadModel.readiness`
+- UI integration:
+  - `src/ui/components/studio-shell/SystemWorkflowSelectionPresenter.ts`
+  - `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+  - `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+
+Behavioral posture:
+
+- blocking issues and advisories are rendered separately.
+- readiness badges are stable and shared (`Blocked`, `Advisory`, `Ready`, `Runnable`) for saved and recent system surfaces.
+- readiness issues include field-aware labels derived from authoritative issue paths to make corrective action clear.
+- save/update/reopen status messages now report authoritative readiness outcome instead of local inferred state.
+
+Architecture guardrail:
+
+- system-definition readiness used by studio flows is sourced from authoritative API responses.
+- persistence blocking remains enforced by application-layer validation/readiness gates.
+- studio copy now makes blocking posture explicit so incomplete/invalid configurations are less likely to continue into downstream run orchestration paths.

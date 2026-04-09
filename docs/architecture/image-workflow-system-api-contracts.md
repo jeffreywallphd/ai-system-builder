@@ -314,6 +314,35 @@ Source-of-truth posture for this story:
 
 This keeps System Studio ready for later run-submission integration because saved/reopened systems carry workflow version binding, readiness summary, and parameter baseline from authoritative contracts.
 
+## Story 2.4.4 readiness and validation feedback in studio
+
+System Studio now renders structured readiness feedback from authoritative image-system API read models so save/reopen/edit flows expose the same blocking and advisory posture.
+
+Canonical seams for this story:
+
+- backend read-model projection in `StudioShellBackendApi`:
+  - `StudioImageSystemReadinessReadModel`
+  - `StudioImageSystemReadinessIssueReadModel`
+  - `StudioImageSystemDefinitionSummaryReadModel.readiness`
+  - `StudioImageSystemDefinitionReadModel.readiness`
+- UI readiness presentation:
+  - `src/ui/components/studio-shell/SystemWorkflowSelectionPresenter.ts`
+  - `src/ui/components/studio-shell/SystemStudioWorkManagementPanel.tsx`
+  - `src/ui/components/studio-shell/ImageManipulationRuntimeEditorPanel.tsx`
+
+Readiness UX behavior:
+
+- blocking issues and advisories are shown in separate sections.
+- readiness badges are consistent (`Blocked`, `Advisory`, `Ready`, `Runnable`) across saved-system selection and recent-system reopen surfaces.
+- issue rows include field-aware labels derived from authoritative issue paths (for example edit type binding, operation settings, output destination), keeping fix guidance specific.
+- save/update/reopen status messaging reflects returned authoritative readiness counts rather than UI-local heuristics.
+
+Source-of-truth posture:
+
+- readiness state, summary, and issue lists come from image-system query/save API responses.
+- the studio does not infer readiness from ad hoc component-only rules for system definition persistence and reopen flows.
+- invalid/incomplete definitions remain blocked by application-layer authoring validation before persistence, and studio messaging now surfaces this posture explicitly.
+
 ## Related architecture notes
 
 - `docs/architecture/image-workflow-system-definition-layer.md`

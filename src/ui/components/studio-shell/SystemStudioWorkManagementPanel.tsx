@@ -69,6 +69,45 @@ function readDefaultReferenceValues(content: string): {
   }
 }
 
+function toReadinessBadgeClassName(tone: "success" | "warning" | "danger" | "neutral"): string {
+  if (tone === "success") {
+    return "ui-badge ui-badge--success";
+  }
+  if (tone === "warning") {
+    return "ui-badge ui-badge--warning";
+  }
+  if (tone === "danger") {
+    return "ui-badge ui-badge--danger";
+  }
+  return "ui-badge ui-badge--neutral";
+}
+
+function toFriendlyReadinessFieldLabel(path: string | undefined): string {
+  const normalizedPath = path?.trim() ?? "";
+  if (!normalizedPath) {
+    return "Setup";
+  }
+  if (normalizedPath.startsWith("workflowBinding.")) {
+    return "Selected edit type";
+  }
+  if (normalizedPath.startsWith("parameterBaseline.values.")) {
+    return "Operation settings";
+  }
+  if (normalizedPath.startsWith("inputAssetSelections.")) {
+    return "Input selection";
+  }
+  if (normalizedPath.startsWith("outputTargetBindings.")) {
+    return "Output destination";
+  }
+  if (normalizedPath.startsWith("runtimeStatus")) {
+    return "Launch status";
+  }
+  if (normalizedPath.startsWith("lifecycleState")) {
+    return "System lifecycle";
+  }
+  return "Setup";
+}
+
 export function SystemStudioWorkManagementPanel({ context }: { readonly context: StudioShellExtensionContext }): JSX.Element {
   const service = useMemo(() => new StudioShellService(), []);
   const draft = context.snapshot?.draft;
@@ -383,8 +422,15 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   return;
                 }
                 setSelectedSavedSystemId(saveResponse.data.systemId);
+                setSelectedSavedSystemDetail(saveResponse.data);
                 setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
-                setStatus("Saved as new image system.");
+                setStatus(
+                  saveResponse.data.readiness.blockingIssueCount > 0
+                    ? "Saved with blocking readiness issues. Resolve them before launch."
+                    : saveResponse.data.readiness.advisoryIssueCount > 0
+                      ? "Saved with advisories. Review readiness guidance."
+                      : "Saved as new image system.",
+                );
                 void context.operations.refresh();
               });
             });
@@ -413,6 +459,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                 return;
               }
               const reopened = response.data;
+              setSelectedSavedSystemDetail(reopened);
               setWorkflowAssetId(reopened.workflowId);
               setWorkflowVersionId(reopened.workflowVersionTag);
               setWorkflowParameterValues(reopened.parameterBaseline);
@@ -441,7 +488,13 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   return;
                 }
                 setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
-                setStatus(`Reopened '${reopened.title}' (${reopened.readinessSummary}).`);
+                setStatus(
+                  reopened.readiness.blockingIssueCount > 0
+                    ? `Reopened '${reopened.title}' with blocking readiness issues.`
+                    : reopened.readiness.advisoryIssueCount > 0
+                      ? `Reopened '${reopened.title}' with advisories.`
+                      : `Reopened '${reopened.title}'.`,
+                );
                 void context.operations.refresh();
               });
             });
@@ -508,8 +561,15 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
                   return;
                 }
                 setSelectedSavedSystemId(updateResponse.data.systemId);
+                setSelectedSavedSystemDetail(updateResponse.data);
                 setWorkflowParameterValuesByWorkflowId(Object.freeze(nextWorkflowValues));
-                setStatus("Updated saved image system.");
+                setStatus(
+                  updateResponse.data.readiness.blockingIssueCount > 0
+                    ? "Updated system with blocking readiness issues. Resolve them before launch."
+                    : updateResponse.data.readiness.advisoryIssueCount > 0
+                      ? "Updated system with advisories. Review readiness guidance."
+                      : "Updated saved image system.",
+                );
                 void context.operations.refresh();
               });
             });
@@ -534,6 +594,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
               <option key={system.systemId} value={system.systemId}>
                 {system.title}
                 {system.editTypeTitle ? ` - ${system.editTypeTitle}` : ""}
+                {` (${system.readinessBadgeLabel})`}
               </option>
             ))}
           </select>
@@ -549,10 +610,59 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
         ) : null}
         {selectedSavedSystemDetail ? (
           <div className="ui-card ui-card--padded ui-stack ui-stack--2xs">
-            <strong>{selectedSavedSystemDetail.title}</strong>
+            <div className="ui-row ui-row--xs ui-row--middle">
+              <strong>{selectedSavedSystemDetail.title}</strong>
+              <span
+                className={toReadinessBadgeClassName(
+                  selectedSavedSystemDetail.readiness.blockingIssueCount > 0
+                    ? "danger"
+                    : selectedSavedSystemDetail.readiness.advisoryIssueCount > 0
+                      ? "warning"
+                      : selectedSavedSystemDetail.readiness.state === "configuration-runnable"
+                        ? "success"
+                        : "neutral",
+                )}
+              >
+                {selectedSavedSystemDetail.readiness.blockingIssueCount > 0
+                  ? "Blocked"
+                  : selectedSavedSystemDetail.readiness.advisoryIssueCount > 0
+                    ? "Advisory"
+                    : selectedSavedSystemDetail.readiness.state === "configuration-runnable"
+                      ? "Runnable"
+                      : "Ready"}
+              </span>
+            </div>
             <p className="ui-text-small ui-text-secondary">
               Readiness: {selectedSavedSystemDetail.readinessSummary}
             </p>
+            {selectedSavedSystemDetail.readiness.blockingIssueCount > 0 ? (
+              <section className="ui-stack ui-stack--2xs">
+                <p className="ui-text-small ui-text-danger" style={{ margin: 0 }}>
+                  Blocking issues ({selectedSavedSystemDetail.readiness.blockingIssueCount})
+                </p>
+                <ul className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  {selectedSavedSystemDetail.readiness.blockingIssues.map((issue) => (
+                    <li key={`blocking-${issue.code}-${issue.path ?? "root"}`}>
+                      <strong>{toFriendlyReadinessFieldLabel(issue.path)}:</strong> {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+            {selectedSavedSystemDetail.readiness.advisoryIssueCount > 0 ? (
+              <section className="ui-stack ui-stack--2xs">
+                <p className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  Advisories ({selectedSavedSystemDetail.readiness.advisoryIssueCount})
+                </p>
+                <ul className="ui-text-small ui-text-secondary" style={{ margin: 0 }}>
+                  {selectedSavedSystemDetail.readiness.advisoryIssues.map((issue) => (
+                    <li key={`advisory-${issue.code}-${issue.path ?? "root"}`}>
+                      <strong>{toFriendlyReadinessFieldLabel(issue.path)}:</strong> {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
             <details>
               <summary className="ui-text-small ui-text-secondary">Advanced system metadata</summary>
               <p className="ui-text-small ui-text-secondary" style={{ marginTop: "0.5rem" }}>

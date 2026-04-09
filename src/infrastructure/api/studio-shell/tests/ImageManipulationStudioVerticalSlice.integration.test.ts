@@ -107,6 +107,9 @@ describe("Image manipulation studio vertical slice verification", () => {
     expect(savedSystem.ok).toBeTrue();
     expect(savedSystem.data?.workflowId).toBe(selectedWorkflowId);
     expect((savedSystem.data?.readinessSummary.length ?? 0) > 0).toBeTrue();
+    expect(savedSystem.data?.readiness).toBeDefined();
+    expect(typeof savedSystem.data?.readiness.blockingIssueCount).toBe("number");
+    expect(typeof savedSystem.data?.readiness.advisoryIssueCount).toBe("number");
     const systemId = savedSystem.data!.systemId;
 
     const readinessDetail = await api.getImageSystemDefinition({
@@ -116,6 +119,7 @@ describe("Image manipulation studio vertical slice verification", () => {
     });
     expect(readinessDetail.ok).toBeTrue();
     expect((readinessDetail.data?.readinessState.length ?? 0) > 0).toBeTrue();
+    expect(readinessDetail.data?.readiness).toBeDefined();
     expect(readinessDetail.data?.parameterBaseline).toEqual(
       expect.objectContaining({
         resultCount: 1,

@@ -471,6 +471,7 @@ describe("StudioShellService integration", () => {
     expect(savedNew.data?.parameterBaseline).toEqual({
       scaleFactor: 2,
     });
+    expect(savedNew.data?.readiness).toBeDefined();
 
     const systemId = savedNew.data?.systemId;
     expect(systemId).toBeDefined();
@@ -478,6 +479,7 @@ describe("StudioShellService integration", () => {
     const listed = await service.listImageSystemDefinitions({});
     expect(listed.ok).toBeTrue();
     expect(listed.data?.items.some((entry) => entry.systemId === systemId)).toBeTrue();
+    expect(typeof listed.data?.items[0]?.readiness.blockingIssueCount).toBe("number");
 
     const updated = await service.updateDraft({
       studioId: "studio-system",
@@ -522,6 +524,7 @@ describe("StudioShellService integration", () => {
     expect(savedUpdate.data?.parameterBaseline).toEqual({
       scaleFactor: 4,
     });
+    expect(savedUpdate.data?.readiness).toBeDefined();
 
     const reopened = await service.getImageSystemDefinition({
       systemId: systemId!,
@@ -531,6 +534,7 @@ describe("StudioShellService integration", () => {
     expect(reopened.data?.parameterBaseline).toEqual({
       scaleFactor: 4,
     });
+    expect(reopened.data?.readiness).toBeDefined();
   });
 
   it("lists workflow run summaries and loads run detail through the studio-shell bridge", async () => {
