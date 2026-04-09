@@ -556,7 +556,7 @@ export function createDeploymentProfilePresetCatalog(input: {
   readonly presets: ReadonlyArray<{
     readonly profileId: string;
     readonly parentProfileId?: string;
-    readonly policyOverrides?: Readonly<Record<string, Readonly<Record<string, DeploymentPolicyScalarValue>>>;
+    readonly policyOverrides?: Readonly<Record<string, Readonly<Record<string, DeploymentPolicyScalarValue>>>>;
   }>;
 }): DeploymentProfilePresetCatalog {
   const byProfile: Partial<Record<DeploymentProfileId, DeploymentProfilePolicyPreset>> = {};
