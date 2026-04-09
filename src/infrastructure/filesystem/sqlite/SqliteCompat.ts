@@ -19,6 +19,7 @@ export interface SqliteCompatDatabase {
 }
 
 const require = createRequire(import.meta.url);
+type ModuleRequire = (id: string) => unknown;
 
 type BetterSqlite3Database = {
   pragma(value: string): void;
@@ -32,9 +33,12 @@ type BetterSqlite3Database = {
   close(): void;
 };
 
-export function openSqliteCompatDatabase(databasePath: string): SqliteCompatDatabase {
+export function openSqliteCompatDatabase(
+  databasePath: string,
+  moduleRequire: ModuleRequire = require,
+): SqliteCompatDatabase {
   try {
-    const BetterSqlite3 = require("better-sqlite3") as new (path: string) => BetterSqlite3Database;
+    const BetterSqlite3 = resolveBetterSqlite3Constructor(moduleRequire("better-sqlite3"));
     if (BetterSqlite3) {
       return BetterSqlite3Factory(databasePath, BetterSqlite3);
     }
@@ -42,13 +46,13 @@ export function openSqliteCompatDatabase(databasePath: string): SqliteCompatData
     // Continue through compatible fallbacks.
   }
 
-  const nodeSqlite = openNodeSqliteDatabase(databasePath);
+  const nodeSqlite = openNodeSqliteDatabase(databasePath, moduleRequire);
   if (nodeSqlite) {
     return nodeSqlite;
   }
 
   if (isBunRuntime()) {
-    return openBunSqliteDatabase(databasePath);
+    return openBunSqliteDatabase(databasePath, moduleRequire);
   }
 
   throw new Error(
@@ -63,7 +67,26 @@ function BetterSqlite3Factory(
   return DatabaseConstructor ? new DatabaseConstructor(databasePath) : openBunSqliteDatabase(databasePath);
 }
 
-function openBunSqliteDatabase(databasePath: string): SqliteCompatDatabase {
+function resolveBetterSqlite3Constructor(
+  moduleExport: unknown,
+): (new (path: string) => BetterSqlite3Database) | undefined {
+  if (typeof moduleExport === "function") {
+    return moduleExport as new (path: string) => BetterSqlite3Database;
+  }
+
+  if (
+    moduleExport &&
+    typeof moduleExport === "object" &&
+    "default" in moduleExport &&
+    typeof (moduleExport as { default?: unknown }).default === "function"
+  ) {
+    return (moduleExport as { default: new (path: string) => BetterSqlite3Database }).default;
+  }
+
+  return undefined;
+}
+
+function openBunSqliteDatabase(databasePath: string, moduleRequire: ModuleRequire = require): SqliteCompatDatabase {
   try {
     type BunSqliteModule = {
       readonly Database: new (path: string, options?: { readonly create?: boolean }) => {
@@ -78,7 +101,7 @@ function openBunSqliteDatabase(databasePath: string): SqliteCompatDatabase {
         close(): void;
       };
     };
-    const sqlite = require("bun:sqlite") as BunSqliteModule;
+    const sqlite = moduleRequire("bun:sqlite") as BunSqliteModule;
     const db = new sqlite.Database(databasePath, { create: true });
     return new BunSqliteCompatDatabase(db);
   } catch (error) {
@@ -91,7 +114,10 @@ function isBunRuntime(): boolean {
   return typeof process !== "undefined" && typeof process.versions?.bun === "string";
 }
 
-function openNodeSqliteDatabase(databasePath: string): SqliteCompatDatabase | undefined {
+function openNodeSqliteDatabase(
+  databasePath: string,
+  moduleRequire: ModuleRequire = require,
+): SqliteCompatDatabase | undefined {
   try {
     type NodeSqliteModule = {
       readonly DatabaseSync: new (path: string) => {
@@ -105,7 +131,7 @@ function openNodeSqliteDatabase(databasePath: string): SqliteCompatDatabase | un
       };
     };
 
-    const sqlite = require("node:sqlite") as NodeSqliteModule;
+    const sqlite = moduleRequire("node:sqlite") as NodeSqliteModule;
     const database = new sqlite.DatabaseSync(databasePath);
     return new NodeSqliteCompatDatabase(database);
   } catch {
