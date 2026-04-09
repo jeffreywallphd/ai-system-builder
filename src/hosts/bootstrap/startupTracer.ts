@@ -60,6 +60,7 @@ export interface StartupSpan {
 
 export interface StartupTracer {
   readonly traceId: string;
+  readonly startupCorrelationId: string;
   startSpan(name: string, options?: StartupSpanOptions): StartupSpan;
   runInSpan<TResult>(
     name: string,
@@ -180,6 +181,7 @@ class StartupTracerSpan implements StartupSpan {
     const event = Object.freeze({
       event: `startup.span.${outcome}`,
       traceId: this.state.traceId,
+      startupCorrelationId: this.state.traceId,
       startupReason: this.state.startupReason,
       spanId: this.spanId,
       parentSpanId: this.parentSpanId,
@@ -223,6 +225,7 @@ class StartupTracerSpan implements StartupSpan {
     const event = Object.freeze({
       event: "startup.span.slow",
       traceId: this.state.traceId,
+      startupCorrelationId: this.state.traceId,
       startupReason: this.state.startupReason,
       spanId: this.spanId,
       parentSpanId: this.parentSpanId,
@@ -263,6 +266,7 @@ export function createStartupSpanPinoLogger(options: StartupSpanPinoLoggerOption
   const childLogger = logger.child(Object.freeze({
     component: "startup-tracer",
     traceId: options.traceId,
+    startupCorrelationId: options.traceId,
     startupReason: options.startupReason,
   }));
   return new StartupSpanPinoLoggerBridge(childLogger);
@@ -291,6 +295,7 @@ export function createStartupTracer(options: StartupTracerOptions = {}): Startup
 
   return Object.freeze({
     traceId: state.traceId,
+    startupCorrelationId: state.traceId,
     startSpan(name: string, spanOptions?: StartupSpanOptions): StartupSpan {
       return new StartupTracerSpan(state, undefined, name, spanOptions);
     },

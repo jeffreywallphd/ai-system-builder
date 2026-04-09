@@ -36,6 +36,12 @@
   - shared pipeline stage durations and failed stage diagnostics
   - authoritative orchestrator stage durations and failed stage diagnostics
   - top-level startup failure details when startup fails
+- Story 1.3.3 adds startup correlation ID propagation for startup observability:
+  - startup tracer initialization generates one per-startup `startupCorrelationId`
+  - startup span events (`startup.span.completed`, `startup.span.failed`, `startup.span.slow`) include `startupCorrelationId`
+  - startup summary events include `startupCorrelationId` (equal to `traceId`)
+  - authoritative runtime handles expose `startupCorrelationId` so entrypoint lifecycle logs share the same identifier
+  - startup failures surfaced by the entrypoint include `startupCorrelationId` when available
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `services`
   - `security`

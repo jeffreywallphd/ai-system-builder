@@ -81,6 +81,7 @@ describe("startupTracer", () => {
     const childEvent = logger.infoEvents[1];
     expect(childEvent?.event).toBe("startup.span.completed");
     expect(childEvent?.traceId).toBe("trace-startup-1");
+    expect(childEvent?.startupCorrelationId).toBe("trace-startup-1");
     expect(childEvent?.spanName).toBe("dependencies");
     expect(childEvent?.spanDepth).toBe(1);
     expect(childEvent?.spanHierarchy).toEqual(["authoritative-startup", "dependencies"]);
@@ -128,6 +129,7 @@ describe("startupTracer", () => {
     const event = logger.errorEvents[0];
     const error = event?.error as Record<string, unknown> | undefined;
     expect(event?.event).toBe("startup.span.failed");
+    expect(event?.startupCorrelationId).toBe("trace-startup-2");
     expect(event?.errorTagged).toBeTrue();
     expect(event?.durationMs).toBe(60);
     expect(event?.slow).toBe(false);
@@ -179,6 +181,7 @@ describe("startupTracer", () => {
     expect(logger.infoEvents[0]?.slowWarningThresholdMs).toBe(5_000);
     expect(logger.warnEvents).toHaveLength(1);
     expect(logger.warnEvents[0]?.event).toBe("startup.span.slow");
+    expect(logger.warnEvents[0]?.startupCorrelationId).toBe("trace-startup-4");
     expect(logger.warnEvents[0]?.spanName).toBe("persistence");
     expect(logger.warnEvents[0]?.durationMs).toBe(5_200);
     expect(logger.warnEvents[0]?.thresholdExceededByMs).toBe(200);

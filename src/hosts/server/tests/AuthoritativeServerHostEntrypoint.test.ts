@@ -106,6 +106,8 @@ describe("AuthoritativeServerHostEntrypoint", () => {
 
     expect(runtime.phase).toBe("ready");
     expect(runtime.address).toBe("127.0.0.1:6200");
+    expect(typeof runtime.startupCorrelationId).toBe("string");
+    expect((runtime.startupCorrelationId ?? "").length).toBeGreaterThan(10);
     expect(observedStageOrder.slice(0, 5)).toEqual([
       "configuration",
       "dependencies",

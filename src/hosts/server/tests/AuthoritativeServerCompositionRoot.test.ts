@@ -122,6 +122,8 @@ describe("AuthoritativeServerCompositionRoot", () => {
 
     const runtime = await root.compose(boot);
     expect(runtime.port).toBe(4100);
+    expect(typeof runtime.startupCorrelationId).toBe("string");
+    expect((runtime.startupCorrelationId ?? "").length).toBeGreaterThan(10);
     expect(runtime.phase).toBe("ready");
     expect(runtime.runtimeMetadata.hostId).toBe("host:server:authoritative");
     expect(runtime.runtimeMetadata.roleInspection.isAuthoritativeControlPlane).toBeTrue();
@@ -984,6 +986,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const summary = hostLogger.infoEvents.find((event) => event.event === "authoritative-server.startup.summary");
     expect(summary).toBeDefined();
     expect(summary?.outcome).toBe("succeeded");
+    expect(summary?.startupCorrelationId).toBe(summary?.traceId);
     expect(summary?.durationMs).toBeTypeOf("number");
     expect((summary?.pipeline as Record<string, unknown> | undefined)?.stageCount).toBe(6);
     expect((summary?.authoritativeStages as Record<string, unknown> | undefined)?.stageCount).toBe(4);
@@ -1024,6 +1027,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     const summary = hostLogger.errorEvents.find((event) => event.event === "authoritative-server.startup.summary");
     expect(summary).toBeDefined();
     expect(summary?.outcome).toBe("failed");
+    expect(summary?.startupCorrelationId).toBe(summary?.traceId);
     const pipeline = summary?.pipeline as Record<string, unknown> | undefined;
     expect(pipeline?.failedStageCount).toBe(1);
     expect(summary?.startupFailure).toEqual({

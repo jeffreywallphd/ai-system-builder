@@ -129,12 +129,27 @@ function isMainModule(metaUrl: string): boolean {
   return pathToFileURL(path.resolve(mainScriptPath)).href === metaUrl;
 }
 
+function extractStartupCorrelationIdFromError(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  const candidate = error as { startupCorrelationId?: unknown; traceId?: unknown };
+  const startupCorrelationId = normalizeOptional(
+    typeof candidate.startupCorrelationId === "string" ? candidate.startupCorrelationId : undefined,
+  );
+  if (startupCorrelationId) {
+    return startupCorrelationId;
+  }
+  return normalizeOptional(typeof candidate.traceId === "string" ? candidate.traceId : undefined);
+}
+
 async function runAuthoritativeServerHostFromCli(): Promise<void> {
   const runtime = await startAuthoritativeServerHostAssembly(
     resolveAuthoritativeServerHostEntrypointOptionsFromEnvironment(process.env),
   );
+  const startupCorrelationId = runtime.startupCorrelationId ? ` (startupCorrelationId=${runtime.startupCorrelationId})` : "";
   process.stdout.write(
-    `[ai-loom] authoritative server host started at ${runtime.address} (phase=${runtime.phase})\n`,
+    `[ai-loom] authoritative server host started at ${runtime.address} (phase=${runtime.phase})${startupCorrelationId}\n`,
   );
 
   let stopping = false;
@@ -143,7 +158,7 @@ async function runAuthoritativeServerHostFromCli(): Promise<void> {
       return;
     }
     stopping = true;
-    process.stdout.write(`[ai-loom] authoritative server host stopping (${signal})\n`);
+    process.stdout.write(`[ai-loom] authoritative server host stopping (${signal})${startupCorrelationId}\n`);
     await runtime.stop();
     process.exit(0);
   };
@@ -160,7 +175,9 @@ const thisModulePath = fileURLToPath(import.meta.url);
 if (isMainModule(pathToFileURL(thisModulePath).href)) {
   runAuthoritativeServerHostFromCli().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    process.stderr.write(`[ai-loom] authoritative server host failed: ${message}\n`);
+    const startupCorrelationId = extractStartupCorrelationIdFromError(error);
+    const suffix = startupCorrelationId ? ` (startupCorrelationId=${startupCorrelationId})` : "";
+    process.stderr.write(`[ai-loom] authoritative server host failed: ${message}${suffix}\n`);
     process.exit(1);
   });
 }

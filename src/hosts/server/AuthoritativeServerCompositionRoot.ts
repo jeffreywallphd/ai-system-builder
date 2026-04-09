@@ -86,6 +86,7 @@ import {
 export interface AuthoritativeServerHostRuntimeHandle extends HostRuntimeHandle {
   readonly port: number;
   readonly address: string;
+  readonly startupCorrelationId?: string;
   readonly transitionHistory: ReadonlyArray<HostLifecycleTransition>;
 }
 
@@ -240,6 +241,17 @@ function summarizeStartupError(error: unknown): Readonly<Record<string, string>>
     name: "Error",
     message: String(error),
   });
+}
+
+function attachStartupCorrelationIdToError(
+  error: unknown,
+  startupCorrelationId: string | undefined,
+): void {
+  if (!(error instanceof Error) || !startupCorrelationId) {
+    return;
+  }
+  (error as Error & { startupCorrelationId?: string }).startupCorrelationId = startupCorrelationId;
+  (error as Error & { traceId?: string }).traceId = startupCorrelationId;
 }
 
 export function createAuthoritativeServerCompositionRoot(
@@ -638,6 +650,7 @@ export function createAuthoritativeServerCompositionRoot(
           },
           port: activeHost.port,
           address: activeHost.address,
+          startupCorrelationId: resolvedStartupTracer.startupCorrelationId,
           get readiness() {
             return lifecycle.readiness;
           },
@@ -686,6 +699,7 @@ export function createAuthoritativeServerCompositionRoot(
         }
         await lifecycle.markStartupFailed("authoritative-server-start-failed", failure);
         startupFailure = failure;
+        attachStartupCorrelationIdToError(failure, startupTracer?.startupCorrelationId);
         throw failure;
       } finally {
         startupRootSpan?.complete();
@@ -705,6 +719,7 @@ export function createAuthoritativeServerCompositionRoot(
           startupReason: boot.startupReason,
           outcome: startupFailure ? "failed" : "succeeded",
           traceId: startupTracer?.traceId,
+          startupCorrelationId: startupTracer?.startupCorrelationId,
           startedAt: startupStartedAt,
           completedAt: startupCompletedAt,
           durationMs: Math.max(0, startupCompletedAtMs - startupStartedAtMs),
