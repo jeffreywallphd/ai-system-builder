@@ -15,6 +15,7 @@ type StartupSpanLogLevel = "info" | "error";
 export interface StartupSpanLogger {
   info(payload: Readonly<Record<string, unknown>>): void;
   error(payload: Readonly<Record<string, unknown>>): void;
+  warn?(payload: Readonly<Record<string, unknown>>): void;
 }
 
 export interface StartupSpanRedactionOptions {
@@ -28,11 +29,17 @@ export interface StartupTracerOptions {
   readonly traceId?: string;
   readonly startupReason?: string;
   readonly slowSpanThresholdMs?: number;
+  readonly slowSpanWarnings?: StartupSpanSlowWarningOptions;
   readonly pino?: {
     readonly options?: PinoLoggerOptions;
   };
   readonly redaction?: StartupSpanRedactionOptions;
   readonly clock?: () => number;
+}
+
+export interface StartupSpanSlowWarningOptions {
+  readonly defaultThresholdMs?: number;
+  readonly thresholdsBySpanName?: Readonly<Record<string, number>>;
 }
 
 export interface StartupSpanOptions {
@@ -105,6 +112,7 @@ interface StartupTracerRuntimeState {
   readonly traceId: string;
   readonly startupReason?: string;
   readonly slowSpanThresholdMs: number;
+  readonly slowSpanWarnings: Required<StartupSpanSlowWarningOptions>;
   readonly logger: StartupSpanLogger;
   readonly redaction: Required<StartupSpanRedactionOptions>;
   readonly clock: () => number;
@@ -166,6 +174,8 @@ class StartupTracerSpan implements StartupSpan {
     const endedAt = new Date(endedAtMilliseconds).toISOString();
     const durationMs = Math.max(0, endedAtMilliseconds - this.startedAtMilliseconds);
     const slow = durationMs > this.state.slowSpanThresholdMs;
+    const slowWarningThresholdMs = resolveSlowWarningThresholdMs(this.state.slowSpanWarnings, this.name);
+    const slowWarning = durationMs > slowWarningThresholdMs;
     const mergedMetadata = mergeMetadata(this.metadata, sanitizeMetadata(metadata, this.state.redaction));
     const event = Object.freeze({
       event: `startup.span.${outcome}`,
@@ -182,12 +192,60 @@ class StartupTracerSpan implements StartupSpan {
       durationMs,
       slow,
       slowSpanThresholdMs: this.state.slowSpanThresholdMs,
+      slowWarning,
+      slowWarningThresholdMs,
       metadata: mergedMetadata,
       errorTagged: outcome === "failed",
       error: outcome === "failed" ? sanitizeError(error, this.state.redaction) : undefined,
     } satisfies Readonly<Record<string, unknown>>);
 
     this.state.logger[level](event);
+    if (slowWarning) {
+      this.emitSlowWarningEvent({
+        outcome,
+        endedAt,
+        durationMs,
+        slowWarningThresholdMs,
+        metadata: mergedMetadata,
+        error,
+      });
+    }
+  }
+
+  private emitSlowWarningEvent(input: {
+    readonly outcome: "completed" | "failed";
+    readonly endedAt: string;
+    readonly durationMs: number;
+    readonly slowWarningThresholdMs: number;
+    readonly metadata: Readonly<Record<string, unknown>> | undefined;
+    readonly error: unknown;
+  }): void {
+    const event = Object.freeze({
+      event: "startup.span.slow",
+      traceId: this.state.traceId,
+      startupReason: this.state.startupReason,
+      spanId: this.spanId,
+      parentSpanId: this.parentSpanId,
+      spanName: this.name,
+      spanDepth: this.depth,
+      spanHierarchy: this.hierarchy,
+      spanHierarchyPath: this.hierarchy.join(" > "),
+      startedAt: this.startedAt,
+      endedAt: input.endedAt,
+      durationMs: input.durationMs,
+      slowWarningThresholdMs: input.slowWarningThresholdMs,
+      thresholdExceededByMs: input.durationMs - input.slowWarningThresholdMs,
+      spanOutcome: input.outcome,
+      metadata: input.metadata,
+      errorTagged: input.outcome === "failed",
+      error: input.outcome === "failed" ? sanitizeError(input.error, this.state.redaction) : undefined,
+    } satisfies Readonly<Record<string, unknown>>);
+
+    if (this.state.logger.warn) {
+      this.state.logger.warn(event);
+      return;
+    }
+    this.state.logger.info(event);
   }
 }
 
@@ -227,6 +285,7 @@ export function createStartupTracer(options: StartupTracerOptions = {}): Startup
     logger,
     redaction,
     clock: options.clock ?? (() => Date.now()),
+    slowSpanWarnings: resolveSlowSpanWarningOptions(options.slowSpanWarnings, options.slowSpanThresholdMs),
     spanCounter: 0,
   };
 
@@ -262,6 +321,10 @@ class StartupSpanPinoLoggerBridge implements StartupSpanLogger {
 
   public error(payload: Readonly<Record<string, unknown>>): void {
     this.logger.error(payload);
+  }
+
+  public warn(payload: Readonly<Record<string, unknown>>): void {
+    this.logger.warn(payload);
   }
 }
 
@@ -402,4 +465,28 @@ function resolveSlowSpanThresholdMs(value: number | undefined): number {
     throw new Error("Startup tracer slowSpanThresholdMs must be a positive finite number.");
   }
   return Math.floor(value);
+}
+
+function resolveSlowSpanWarningOptions(
+  options: StartupSpanSlowWarningOptions | undefined,
+  fallbackThresholdMs: number | undefined,
+): Required<StartupSpanSlowWarningOptions> {
+  const thresholdBaseline = resolveSlowSpanThresholdMs(fallbackThresholdMs);
+  const defaultThresholdMs = resolveSlowSpanThresholdMs(options?.defaultThresholdMs ?? thresholdBaseline);
+  const thresholdsBySpanName: Record<string, number> = {};
+  for (const [rawSpanName, rawThreshold] of Object.entries(options?.thresholdsBySpanName ?? {})) {
+    const spanName = normalizeRequired(rawSpanName, "Startup tracer slowSpanWarnings spanName");
+    thresholdsBySpanName[spanName] = resolveSlowSpanThresholdMs(rawThreshold);
+  }
+  return Object.freeze({
+    defaultThresholdMs,
+    thresholdsBySpanName: Object.freeze(thresholdsBySpanName),
+  });
+}
+
+function resolveSlowWarningThresholdMs(
+  slowSpanWarnings: Required<StartupSpanSlowWarningOptions>,
+  spanName: string,
+): number {
+  return slowSpanWarnings.thresholdsBySpanName[spanName] ?? slowSpanWarnings.defaultThresholdMs;
 }
