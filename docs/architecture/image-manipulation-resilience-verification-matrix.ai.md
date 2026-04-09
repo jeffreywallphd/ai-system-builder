@@ -30,3 +30,6 @@
 - Preserve run/result/history coherence under failure.
 - Keep retryability and user/operator guidance explicit.
 - Avoid hidden local fallback behavior.
+
+## Maintenance rule
+- When new resilience-sensitive failure classes are added, update this matrix and `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md` together.

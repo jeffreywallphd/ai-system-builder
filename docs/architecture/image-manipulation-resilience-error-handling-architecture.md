@@ -119,6 +119,7 @@ Feature 8 foundations:
 - `docs/architecture/image-manipulation-resilience-state-contracts.md`
 - `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
 - `docs/architecture/image-manipulation-studio-resilience-messaging-conventions.md`
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 
 Features 1-7 baseline and integration posture:
 

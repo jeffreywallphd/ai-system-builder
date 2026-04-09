@@ -3,6 +3,13 @@
 ## Purpose
 This note defines UX conventions for operational feedback in the image manipulation runtime editor so users are never left with stagnant, generic waiting states.
 
+## Cross-feature references
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
+- `docs/architecture/image-manipulation-studio-feature-7-ux-composition-posture.md`
+- `docs/architecture/image-manipulation-resilience-error-handling-architecture.md`
+- `docs/architecture/image-manipulation-resilience-state-contracts.md`
+- `docs/architecture/image-manipulation-retry-recovery-escalation-contracts.md`
+
 ## Principles
 - Keep status authoritative: do not imply completion before backend state confirms it.
 - Prefer specific progress context over generic spinners.
@@ -24,8 +31,8 @@ This note defines UX conventions for operational feedback in the image manipulat
   - High-frequency operational waits (hydration, readiness checks, run history/image-library loading, review refresh) use loading notices instead of static status blocks.
   - Restored runtime sessions surface explicit rehydration/reconciliation messaging so reopened work does not appear stale or frozen.
 - Manual refresh clarity:
-  - Refresh actions communicate that authoritative run history and output selections are being updated.
-  - When any surface (collections, run history, readiness, recent assets/systems, image library) is partially unavailable after loading settles, the editor shows a `Refresh recommended` state with a direct recovery action.
+- Refresh actions communicate that authoritative run history and output selections are being updated.
+- When any surface (collections, run history, readiness, recent assets/systems, image library) is partially unavailable after loading settles, the editor shows a `Refresh recommended` state with a direct recovery action routed through authoritative studio/runtime APIs.
 - Operational readiness and outage messaging:
   - Launch precheck explicitly separates setup blockers (image/configuration issues) from execution-environment blockers (backend/node operational issues).
   - Backend/node availability copy distinguishes:
@@ -41,3 +48,4 @@ This note defines UX conventions for operational feedback in the image manipulat
 - Completion is only shown after result persistence and post-run refresh complete.
 - Degraded and warning states continue to surface backend advisories instead of masking them.
 - Outage/degraded/no-eligible-node messaging is derived from authoritative readiness contracts (readiness state, issues, node-availability reason codes), not UI-local inference.
+- Recovery actions in this surface do not call backend adapters directly and do not rely on filesystem path state; they must preserve authoritative run/result/asset identity.

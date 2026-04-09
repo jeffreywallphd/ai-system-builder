@@ -15,6 +15,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 - `docs/architecture/run-submission-lifecycle-audit-hooks.md`
 - `docs/architecture/run-submission-pipeline-extension-guardrails.md`
 - `docs/architecture/image-run-feature-4-final-baseline.md`
+- `docs/architecture/image-manipulation-feature-8-cross-feature-operational-guidance.md`
 
 ## Required implementation path
 
@@ -61,6 +62,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 - Audit hooks must prefer redacted summary data (counts/flags/codes) rather than raw sensitive payload values.
 - Application-level submission orchestration (`SubmitImageRunUseCase`) is the canonical seam for validation + readiness + authoritative creation; infrastructure APIs should delegate to it.
 - Submission readiness checks for workflow/system validity, asset-slot completeness, parameter validity, policy denials, and backend dependencies must remain centralized in `ImageRunSubmissionReadinessValidationService`; do not duplicate them in route handlers or UI.
+- For degraded or unavailable backend conditions, preserve normalized resilience and retry/recovery guidance semantics from shared contracts; do not emit route-local fallback classifications.
 
 ## Prohibited patterns
 
@@ -69,6 +71,7 @@ Provide a practical workflow for contributors extending the authoritative run-su
 - Performing direct run persistence writes from route handlers, UI components, or thin backend API wrappers is prohibited.
 - Implementing ad-hoc run payload parsers outside shared run schema contracts is prohibited.
 - Duplicating lifecycle transition legality outside `src/domain/runs/RunDomain.ts` is prohibited.
+- Allowing direct studio/component/backend-adapter submission paths that bypass authoritative API and use-case seams is prohibited.
 
 ## Review checklist
 
