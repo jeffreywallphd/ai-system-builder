@@ -49,6 +49,12 @@
   - successful startup runs append baseline samples to `authoritative-server-startup-baseline.json` in the authoritative database directory
   - each baseline sample records total startup duration and per-stage durations across shared pipeline and authoritative staged decomposition
   - baseline persistence is best-effort and cannot block startup completion
+- Story 1.4.3 adds startup regression alerts against recorded baselines:
+  - baseline recording now compares current successful startup duration against the mean of previously recorded successful baseline samples
+  - when startup duration regression exceeds a configured threshold, startup logs one structured warning event:
+    - `authoritative-server.startup.baseline-regression.detected`
+  - warning event payload includes baseline and current duration, regression delta, threshold, and sample counts
+  - baseline comparison and warning emission remain non-blocking for startup completion
 - Startup emits structured span events (`startup.span.completed` / `startup.span.failed`) for major bootstrap steps:
   - `services`
   - `security`
@@ -68,6 +74,7 @@
   - `AI_LOOM_SERVER_DATABASE_PATH`
   - `AI_LOOM_SERVER_HOST`
   - `AI_LOOM_SERVER_PORT`
+  - `AI_LOOM_SERVER_STARTUP_REGRESSION_WARNING_THRESHOLD_MS`
   - `AI_LOOM_PERSISTENCE_SQLITE_DATABASE_PATH`
   - `AI_LOOM_PERSISTENCE_SQLITE_JOURNAL_MODE`
   - `AI_LOOM_PERSISTENCE_SQLITE_FOREIGN_KEYS`
@@ -114,6 +121,6 @@
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
-- `src/hosts/server/AuthoritativeServerStartupBaselineRecorder.ts`
+- `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

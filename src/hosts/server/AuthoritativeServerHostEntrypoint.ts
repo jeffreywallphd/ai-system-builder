@@ -20,6 +20,7 @@ export const AuthoritativeServerHostEnvironmentKeys = Object.freeze({
   databasePath: "AI_LOOM_SERVER_DATABASE_PATH",
   host: "AI_LOOM_SERVER_HOST",
   port: "AI_LOOM_SERVER_PORT",
+  startupRegressionWarningThresholdMs: "AI_LOOM_SERVER_STARTUP_REGRESSION_WARNING_THRESHOLD_MS",
 });
 
 export interface AuthoritativeServerHostEntrypointBootOptions {
@@ -66,6 +67,22 @@ function resolvePort(value: string | undefined): number | undefined {
   return parsed;
 }
 
+function resolveStartupRegressionWarningThresholdMs(
+  env: Readonly<Record<string, string | undefined>>,
+): number | undefined {
+  const normalized = normalizeOptional(env[AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs]);
+  if (!normalized) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(normalized, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(
+      `Environment variable '${AuthoritativeServerHostEnvironmentKeys.startupRegressionWarningThresholdMs}' must be a non-negative integer.`,
+    );
+  }
+  return parsed;
+}
+
 export function createAuthoritativeServerHostBootConfiguration(
   options?: AuthoritativeServerHostEntrypointBootOptions,
 ): HostBootConfiguration {
@@ -82,13 +99,16 @@ export function createAuthoritativeServerHostBootConfiguration(
 export function constructAuthoritativeServerHostAssembly(
   options: AuthoritativeServerHostEntrypointOptions,
 ): ConstructedAuthoritativeServerHostAssembly {
+  const resolvedEnvironment = options.boot?.environment ?? options.hostOptions.env ?? process.env;
+  const startupRegressionWarningThresholdMs = resolveStartupRegressionWarningThresholdMs(resolvedEnvironment);
   const bootstrap = Object.freeze({
     ...(options.bootstrap ?? {}),
     recordStartupBaseline: options.bootstrap?.recordStartupBaseline
       ?? (async (measurement) => {
-        await recordAuthoritativeServerStartupBaseline({
+        return recordAuthoritativeServerStartupBaseline({
           databasePath: options.hostOptions.databasePath,
           measurement,
+          regressionWarningThresholdMs: startupRegressionWarningThresholdMs,
         });
       }),
   } satisfies NonNullable<AuthoritativeServerCompositionRootOptions["bootstrap"]>);

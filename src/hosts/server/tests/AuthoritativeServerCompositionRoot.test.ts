@@ -993,6 +993,54 @@ describe("AuthoritativeServerCompositionRoot", () => {
     expect(hostLogger.errorEvents).toHaveLength(0);
   });
 
+  it("emits warning logs when startup baseline regression exceeds threshold", async () => {
+    const hostLogger = new CapturingHostLogger();
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+        logger: hostLogger,
+      },
+      startHost: async () => ({
+        port: 5902,
+        address: "127.0.0.1:5902",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        recordStartupBaseline: async () => Object.freeze({
+          baselinePath: "C:/tmp/authoritative-server-startup-baseline.json",
+          sampleCount: 5,
+          regressionWarning: Object.freeze({
+            thresholdMs: 1_000,
+            baselineDurationMs: 2_000,
+            currentDurationMs: 3_500,
+            regressionDurationMs: 1_500,
+            previousSampleCount: 4,
+          }),
+        }),
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-baseline-regression-warning-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    await runtime.stop();
+
+    const regressionWarning = hostLogger.warnEvents.find(
+      (event) => event.event === "authoritative-server.startup.baseline-regression.detected",
+    );
+    expect(regressionWarning).toBeDefined();
+    expect(regressionWarning?.thresholdMs).toBe(1_000);
+    expect(regressionWarning?.regressionDurationMs).toBe(1_500);
+    expect(regressionWarning?.previousSampleCount).toBe(4);
+  });
+
   it("emits structured startup summary on startup failure with failed stage diagnostics", async () => {
     const hostLogger = new CapturingHostLogger();
     const root = createAuthoritativeServerCompositionRoot({
