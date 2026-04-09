@@ -298,6 +298,71 @@ describe("IdentityAuthSessionCoordinator", () => {
     await coordinator.refreshIfAuthenticated({ workspaceId: "  " });
     expect(seenWorkspaceIds).toEqual(["workspace:alpha", undefined]);
   });
+
+  it("publishes user-facing progress details while workspace context is still loading", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    const progressDetails: string[] = [];
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveAuthenticatedSession: async () => ({
+        ok: true,
+        data: {
+          principal: {
+            userIdentityId: "user-1",
+            username: "alice",
+          },
+          session: {
+            sessionId: "identity-session:1",
+            providerId: "provider:local-password",
+            providerSubject: "alice",
+            accessChannel: "desktop",
+            issuedAt: "2026-04-04T20:00:00.000Z",
+            expiresAt: "2026-04-05T20:00:00.000Z",
+          },
+        },
+      }),
+      resolveSessionActorContext: async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1_800);
+        });
+        return {
+          ok: true,
+          data: {
+            actor: {
+              userIdentityId: "user-1",
+              username: "alice",
+            },
+            session: {
+              sessionId: "identity-session:1",
+              providerId: "provider:local-password",
+              accessChannel: "desktop",
+              issuedAt: "2026-04-04T20:00:00.000Z",
+              expiresAt: "2026-04-05T20:00:00.000Z",
+              assuranceLevel: "authenticated-untrusted",
+              trustState: "untrusted",
+            },
+            workspaceContext: {
+              requestedWorkspaceId: "workspace:alpha",
+              resolvedWorkspaceId: "workspace:alpha",
+              workspaces: [],
+            },
+          },
+        };
+      },
+    });
+
+    await coordinator.bootstrap({
+      workspaceId: "workspace:alpha",
+      onProgress: (update) => {
+        if (typeof update.detail === "string") {
+          progressDetails.push(update.detail);
+        }
+      },
+    });
+
+    expect(progressDetails.some((detail) => detail.includes("Requesting workspace context and permissions"))).toBeTrue();
+    expect(progressDetails.some((detail) => detail.includes("Still waiting on identity service response"))).toBeTrue();
+  });
 });
 
 function createSession(overrides: Partial<ReturnType<typeof buildSession>> = {}) {
@@ -319,7 +384,7 @@ function buildSession() {
     sessionToken: "token-1",
     sessionTokenType: "Bearer" as const,
     sessionIssuedAt: "2026-04-04T20:00:00.000Z",
-    sessionExpiresAt: "2026-04-05T20:00:00.000Z",
+    sessionExpiresAt: "2027-04-05T20:00:00.000Z",
   };
 }
 

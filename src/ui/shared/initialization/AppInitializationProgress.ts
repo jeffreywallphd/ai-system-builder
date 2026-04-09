@@ -56,7 +56,7 @@ const AppInitializationStagePresentationMap: Record<AppInitializationStageId, Ap
   }),
   [AppInitializationStageIds.loadingWorkspaceContext]: Object.freeze({
     title: "Loading your workspace access",
-    subtitle: "Loading your workspace context and permissions.",
+    subtitle: "Resolving workspace context and permissions from the identity service.",
   }),
   [AppInitializationStageIds.readyForSignIn]: Object.freeze({
     title: "Preparing sign-in",
