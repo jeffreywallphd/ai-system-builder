@@ -104,7 +104,7 @@ Repository startup command:
 In addition to the direct server script entrypoint above, runtime startup consumers now route through this same authoritative host assembly:
 
 - `electron/main/main.ts` (desktop host local control-plane startup)
-- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` (browser-development local control-plane startup via `npm run start:authoritative-server` + `AI_LOOM_SERVER_*` env when `bun` is available, with automatic in-process authoritative host assembly fallback when `bun` is unavailable)
+- `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` (browser-development local control-plane startup via `npm run start:authoritative-server` + `AI_LOOM_SERVER_*` env when `bun` is available; when `bun` is unavailable startup fails fast with explicit guidance to install `bun` or start an authoritative host manually)
 
 ## Testing
 
