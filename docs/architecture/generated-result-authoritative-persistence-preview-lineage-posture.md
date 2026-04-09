@@ -377,3 +377,35 @@ Generated-result listing now supports source-selection/reuse filters:
 
 Persistence and repository seams now include lineage-input filtering support, so selectors can request candidates by upstream source context and compatibility constraints without redesigning the underlying result asset model.
 
+## Story 6.3.5 integration coverage for result, preview, and lineage service flows (implemented)
+
+Authoritative integration coverage now validates generated-result service behavior over durable persistence seams rather than adapter-local transient payloads.
+
+- Added integration suite:
+  - `src/application/generated-results/tests/GeneratedResultServiceFlows.integration.test.ts`
+
+### Covered service flows
+
+- Collected output persistence through `SqliteRunCollectedResultPersistenceAdapter` writing authoritative generated-result records into `SqliteGeneratedResultPersistenceAdapter`, including partial/failure outcomes.
+- Generated-result listing via `ListGeneratedResultMetadataUseCase` projected from authoritative persisted records.
+- Protected original retrieval via `GetGeneratedResultOriginalContentUseCase` using storage logical-access resolution and object-port mediation.
+- Protected preview retrieval request/open via:
+  - `RequestGeneratedResultPreviewContentUseCase`
+  - `OpenGeneratedResultPreviewContentUseCase`
+- Lineage summary/detail retrieval via:
+  - `GetGeneratedResultLineageSummaryUseCase`
+  - `GetGeneratedResultLineageDetailUseCase`
+
+### State and regression posture covered
+
+- Preview state coverage:
+  - `preview-pending`
+  - `preview-unavailable` (missing descriptor)
+  - `preview-failed`
+  - `preview-available` with protected token open flow
+- Persistence outcome coverage:
+  - partially persisted run outputs with explicit failed-collection records
+- Leakage/regression safeguards:
+  - verifies list/lineage/read projections come from authoritative generated-result records
+  - asserts backend-local temporary file references are not surfaced through authoritative records or lineage outputs
+

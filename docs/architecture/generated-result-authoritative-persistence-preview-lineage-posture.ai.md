@@ -375,3 +375,35 @@ List query seams now support reuse-aware and lineage-aware candidate selection:
 
 Repository/persistence filtering now supports lineage-input constraints so source-selection flows can request compatible reusable outputs without introducing result-model forks.
 
+## Story 6.3.5 integration coverage for result, preview, and lineage service flows (implemented)
+
+Authoritative integration coverage now validates end-to-end generated-result service behavior over durable persistence seams rather than adapter-local transient output payloads.
+
+- Added integration suite:
+  - `src/application/generated-results/tests/GeneratedResultServiceFlows.integration.test.ts`
+
+### Covered service flows
+
+- collected output persistence through `SqliteRunCollectedResultPersistenceAdapter` writing authoritative generated-result records into `SqliteGeneratedResultPersistenceAdapter` (including partial/failure outcomes),
+- generated-result listing via `ListGeneratedResultMetadataUseCase` projected from authoritative persisted records,
+- protected original retrieval via `GetGeneratedResultOriginalContentUseCase` using storage logical-access resolution and object-port mediation,
+- protected preview retrieval request/open via:
+  - `RequestGeneratedResultPreviewContentUseCase`
+  - `OpenGeneratedResultPreviewContentUseCase`
+- lineage summary/detail retrieval via:
+  - `GetGeneratedResultLineageSummaryUseCase`
+  - `GetGeneratedResultLineageDetailUseCase`
+
+### State and regression posture covered
+
+- preview state coverage:
+  - `preview-pending`
+  - `preview-unavailable` (missing descriptor)
+  - `preview-failed`
+  - `preview-available` + protected token open path
+- persistence outcome coverage:
+  - partially persisted run outputs with explicit failed-collection records
+- leakage/regression safeguards:
+  - verifies result/lineage/list projections come from authoritative generated-result records
+  - asserts backend-local temporary file references are not surfaced through authoritative records or lineage outputs
+
