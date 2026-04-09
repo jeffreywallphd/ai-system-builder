@@ -21,7 +21,7 @@
   - `dev:desktop:start` -> `node --preserve-symlinks --preserve-symlinks-main node_modules/@electron-forge/cli/dist/electron-forge.js start`
   - `dev:desktop` chains `prepare` then `start`.
 - Desktop preflight native dependency repair now resolves the `electron-rebuild` package CLI and executes it through the active Node runtime (`process.execPath`) rather than invoking wrapper binaries directly, which avoids Windows `.cmd` spawn `EINVAL` failures during `better-sqlite3` rebuild attempts.
-- Desktop preflight compatibility checks now execute `better-sqlite3` runtime probes in short-lived Node/Electron subprocesses (instead of the persistent preflight process), which avoids Windows file-lock `EPERM` failures when `electron-rebuild` unlinks `better_sqlite3.node`.
+- Desktop preflight compatibility checks now execute the `better-sqlite3` runtime probe in a short-lived Electron subprocess (instead of the persistent preflight process), which avoids Windows file-lock `EPERM` failures when `electron-rebuild` unlinks `better_sqlite3.node` and validates the runtime used by desktop startup.
 - Electron main-process Vite bundling now treats native image-processing runtime dependencies as external:
   - `vite.main.config.ts` externalizes `sharp` and `@img/sharp-*` packages, including resolved `node_modules` path variants plus CommonJS virtual ID prefixes used in Rollup (`commonjs-external:*` and `/@id/*`) so Electron resolves native binaries from `node_modules` at runtime.
 - Generated-result preview image processing now loads `sharp` at runtime in `src/infrastructure/media/generated-results/SharpGeneratedResultPreviewImageProcessor.ts` using dynamic import to prevent static sharp bundling in Electron main while preserving image derivative behavior.

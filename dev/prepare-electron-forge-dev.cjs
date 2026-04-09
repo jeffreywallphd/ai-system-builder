@@ -72,10 +72,6 @@ async function prepareDesktopDevStart() {
   }
 }
 
-function canLoadBetterSqlite3() {
-  return canLoadBetterSqlite3InNodeRuntime();
-}
-
 function canLoadBetterSqlite3InElectronRuntime() {
   try {
     const moduleRequire = createRequire(path.join(process.cwd(), "package.json"));
@@ -96,20 +92,6 @@ function canLoadBetterSqlite3InElectronRuntime() {
       },
     });
 
-    return result.status === 0;
-  } catch {
-    return false;
-  }
-}
-
-function canLoadBetterSqlite3InNodeRuntime() {
-  try {
-    const result = spawnSync(process.execPath, ["-e", createBetterSqlite3RuntimeProbeScript()], {
-      cwd: process.cwd(),
-      stdio: "ignore",
-      shell: false,
-      env: process.env,
-    });
     return result.status === 0;
   } catch {
     return false;
@@ -242,7 +224,7 @@ function rebuildBetterSqlite3ForElectron() {
 }
 
 async function ensureElectronNativeModuleCompatibility() {
-  if (canLoadBetterSqlite3() && canLoadBetterSqlite3InElectronRuntime()) {
+  if (canLoadBetterSqlite3InElectronRuntime()) {
     return;
   }
 
@@ -251,7 +233,7 @@ async function ensureElectronNativeModuleCompatibility() {
   );
   rebuildBetterSqlite3ForElectron();
 
-  if (!canLoadBetterSqlite3() || !canLoadBetterSqlite3InElectronRuntime()) {
+  if (!canLoadBetterSqlite3InElectronRuntime()) {
     throw new Error(
       "[dev-preflight] better-sqlite3 remains unavailable after rebuild. " +
         "Delete node_modules, reinstall dependencies, and ensure native build prerequisites are installed.",
