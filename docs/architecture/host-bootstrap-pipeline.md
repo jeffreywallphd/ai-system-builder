@@ -89,6 +89,7 @@ This keeps the common startup sequence stable while preserving host-level extens
 - resolves authoritative `config` and `security` stage implementations through:
   - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- routes logical authoritative startup stages through `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts` so startup stage execution remains sequential with stage-aligned spans (`services`, `security`, `persistence`, `transport`)
 - composes canonical stages and optional host-specific customization stages
 - starts the production identity server during `feature-registration`
 - records host lifecycle transitions around pipeline execution (`composing -> starting -> ready`)

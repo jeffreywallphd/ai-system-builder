@@ -828,7 +828,7 @@ describe("AuthoritativeServerCompositionRoot", () => {
     ]);
   });
 
-  it("emits startup spans for config load, persistence setup, and migrations with slow-step tagging", async () => {
+  it("emits stage-aligned startup spans for orchestrated startup with nested persistence diagnostics", async () => {
     const startupLogger = new CapturingStartupSpanLogger();
     let now = 1_000;
     const root = createAuthoritativeServerCompositionRoot({
@@ -911,8 +911,25 @@ describe("AuthoritativeServerCompositionRoot", () => {
       .filter((event) => event.event === "startup.span.completed")
       .map((event) => event.spanName);
     expect(completedSpanNames).toContain("config-load");
+    expect(completedSpanNames).toContain("services");
+    expect(completedSpanNames).toContain("security");
+    expect(completedSpanNames).toContain("persistence");
+    expect(completedSpanNames).toContain("transport");
     expect(completedSpanNames).toContain("persistence-setup");
     expect(completedSpanNames).toContain("migrations");
+
+    const stageSpanSequence = completedSpanNames.filter((spanName) => (
+      spanName === "services"
+      || spanName === "security"
+      || spanName === "persistence"
+      || spanName === "transport"
+    ));
+    expect(stageSpanSequence).toEqual([
+      "services",
+      "security",
+      "persistence",
+      "transport",
+    ]);
 
     const migrationSpan = startupLogger.infoEvents.find((event) => event.spanName === "migrations");
     expect(migrationSpan?.durationMs).toBe(5_200);

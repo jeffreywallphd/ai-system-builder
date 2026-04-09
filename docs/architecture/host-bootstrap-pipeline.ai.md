@@ -73,6 +73,7 @@
 - Initial staged bootstrap extraction now lives in:
   - `src/hosts/server/AuthoritativeServerConfigBootstrapStage.ts`
   - `src/hosts/server/AuthoritativeServerSecurityBootstrapStage.ts`
+- Logical authoritative stages are now executed through `src/hosts/server/AuthoritativeServerBootstrapStageOrchestrator.ts` so stage sequencing stays centralized and startup spans align to stage ids (`services`, `security`, `persistence`, `transport`).
 - Bootstrap `dependencies` now composes host-aware service registration plans and `feature-registration` enforces authoritative service coverage before runtime host start.
 - Identity server runtime start happens in `feature-registration` stage.
 - Existing lifecycle transition semantics are preserved (`composing -> starting -> ready -> stopping -> stopped`) with fail-safe failure transition handling.
