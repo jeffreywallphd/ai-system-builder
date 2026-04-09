@@ -30,6 +30,20 @@ import type { SqlitePersistenceRuntime } from "@infrastructure/persistence/sqlit
 import type { AuthoritativePersistentPlatformServices } from "@infrastructure/persistence/AuthoritativePersistenceComposition";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
+import { createStartupTracer, type StartupSpanLogger } from "../../bootstrap/startupTracer";
+
+class CapturingStartupSpanLogger implements StartupSpanLogger {
+  public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly errorEvents: Array<Readonly<Record<string, unknown>>> = [];
+
+  public info(payload: Readonly<Record<string, unknown>>): void {
+    this.infoEvents.push(payload);
+  }
+
+  public error(payload: Readonly<Record<string, unknown>>): void {
+    this.errorEvents.push(payload);
+  }
+}
 
 function createDeploymentPolicyBootstrapResolutionStub(
   profileId = HostDeploymentProfileIds.home,
@@ -770,6 +784,98 @@ describe("AuthoritativeServerCompositionRoot", () => {
       "persistent-services-dispose",
       "persistence-runtime-dispose",
     ]);
+  });
+
+  it("emits startup spans for config load, persistence setup, and migrations with slow-step tagging", async () => {
+    const startupLogger = new CapturingStartupSpanLogger();
+    let now = 1_000;
+    const root = createAuthoritativeServerCompositionRoot({
+      hostOptions: {
+        databasePath: "test.sqlite",
+      },
+      startHost: async () => ({
+        port: 5800,
+        address: "127.0.0.1:5800",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      bootstrap: {
+        createStartupTracer: ({ boot }) => createStartupTracer({
+          logger: startupLogger,
+          traceId: "startup-span-test-trace",
+          startupReason: boot.startupReason,
+          clock: () => now,
+        }),
+        createPersistenceRuntime: () => Object.freeze({
+          configuration: Object.freeze({
+            databasePath: "test.sqlite",
+            pragmas: Object.freeze({
+              journalMode: "WAL",
+              foreignKeys: true,
+            }),
+          }),
+          start: async () => {
+            now += 5_200;
+            return Object.freeze({
+              databasePath: "test.sqlite",
+              migrationIdsApplied: Object.freeze([]),
+            });
+          },
+          getConnection: () => {
+            throw new Error("not used");
+          },
+          dispose: async () => {},
+        }) satisfies SqlitePersistenceRuntime,
+        composePersistentPlatformServices: () => Object.freeze({
+          databasePath: "test.sqlite",
+          identityRepository: {} as never,
+          trustedDeviceRepository: {} as never,
+          workspaceRepository: {} as never,
+          authorizationRepository: {} as never,
+          nodeTrustRepository: {} as never,
+          executionNodeRepository: {} as never,
+          nodeTrustAuditRecorder: {} as never,
+          certificateAuthorityRepository: {} as never,
+          secretRecordRepository: {} as never,
+          storageInstanceRepository: {} as never,
+          storageManagementAuditRecorder: {} as never,
+          assetRepository: {} as never,
+          assetAuditRecorder: {} as never,
+          assetUploadSessionRepository: {} as never,
+          imageAssetRepository: {} as never,
+          imageWorkflowSystemRepository: {} as never,
+          platformPersistenceRepository: {} as never,
+          auditLedgerRepository: {} as never,
+          deploymentPolicyRepository: {} as never,
+          generatedResultRepository: {} as never,
+          dispose: () => {},
+        }) satisfies AuthoritativePersistentPlatformServices,
+        resolveDeploymentPolicyBootstrap: async () => createDeploymentPolicyBootstrapResolutionStub(),
+      },
+    });
+
+    const boot = createHostBootConfiguration({
+      host: AuthoritativeServerHostRuntime,
+      mode: "cold-start",
+      startupReason: "authoritative-server-startup-span-test",
+      requiredDependencyIds: ["dep:application:control-plane-services"],
+    });
+
+    const runtime = await root.compose(boot);
+    await runtime.stop();
+
+    const completedSpanNames = startupLogger.infoEvents
+      .filter((event) => event.event === "startup.span.completed")
+      .map((event) => event.spanName);
+    expect(completedSpanNames).toContain("config-load");
+    expect(completedSpanNames).toContain("persistence-setup");
+    expect(completedSpanNames).toContain("migrations");
+
+    const migrationSpan = startupLogger.infoEvents.find((event) => event.spanName === "migrations");
+    expect(migrationSpan?.durationMs).toBe(5_200);
+    expect(migrationSpan?.slow).toBe(true);
+    expect(startupLogger.errorEvents).toHaveLength(0);
   });
 });
 

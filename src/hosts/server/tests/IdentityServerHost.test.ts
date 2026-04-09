@@ -38,6 +38,7 @@ import { SqliteCertificateAuthorityPersistenceAdapter } from "@infrastructure/pe
 import { InternalCertificateAuthorityIssuer } from "@infrastructure/security/ca/InternalCertificateAuthorityIssuer";
 import { createFileSystemProtectedSecretStoreFromEnvironment } from "@infrastructure/security/secrets/FileSystemProtectedSecretStore";
 import { ProtectedCertificateAuthorityRootMaterialStorage } from "@infrastructure/security/ca/ProtectedCertificateAuthorityRootMaterialStorage";
+import { createStartupTracer, type StartupSpanLogger } from "@hosts/bootstrap/startupTracer";
 import {
   CertificateStatuses,
   CertificateSubjectReferenceKinds,
@@ -81,6 +82,19 @@ class StubCertificateAuthorityIssuerPort {
 
   public async revokeCertificateMaterial(): Promise<never> {
     throw new Error("not implemented in host test");
+  }
+}
+
+class CapturingStartupSpanLogger implements StartupSpanLogger {
+  public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly errorEvents: Array<Readonly<Record<string, unknown>>> = [];
+
+  public info(payload: Readonly<Record<string, unknown>>): void {
+    this.infoEvents.push(payload);
+  }
+
+  public error(payload: Readonly<Record<string, unknown>>): void {
+    this.errorEvents.push(payload);
   }
 }
 
@@ -205,6 +219,40 @@ describe("IdentityServerHost", () => {
       const registerBody = await register.json();
       expect(registerBody.ok).toBe(true);
       expect(registerBody.data.providerId).toBe("provider:local-password");
+    } finally {
+      await host.close();
+      rmSync(tempDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it("emits startup spans for config load, CA init, orchestration recovery, and server start", async () => {
+    const tempDirectory = mkdtempSync(join(tmpdir(), "ai-loom-identity-startup-span-host-test-"));
+    const databasePath = join(tempDirectory, "identity-startup-span-host.sqlite");
+    const spanLogger = new CapturingStartupSpanLogger();
+    const startupTracer = createStartupTracer({
+      logger: spanLogger,
+      traceId: "identity-startup-span-test",
+      startupReason: "identity-server-host-startup-span-test",
+    });
+
+    const host = await startIdentityServerHost({
+      databasePath,
+      host: "127.0.0.1",
+      providerAccountPolicies: new IdentityProviderAccountPolicyConfig({
+        bootstrapSeedDefaults: true,
+      }),
+      startupTracer,
+    });
+
+    try {
+      const completedSpanNames = spanLogger.infoEvents
+        .filter((event) => event.event === "startup.span.completed")
+        .map((event) => event.spanName);
+      expect(completedSpanNames).toContain("config-load");
+      expect(completedSpanNames).toContain("ca-init");
+      expect(completedSpanNames).toContain("orchestration-recovery");
+      expect(completedSpanNames).toContain("server-start");
+      expect(spanLogger.errorEvents).toHaveLength(0);
     } finally {
       await host.close();
       rmSync(tempDirectory, { recursive: true, force: true });

@@ -27,6 +27,7 @@ export interface StartupTracerOptions {
   readonly logger?: StartupSpanLogger;
   readonly traceId?: string;
   readonly startupReason?: string;
+  readonly slowSpanThresholdMs?: number;
   readonly pino?: {
     readonly options?: PinoLoggerOptions;
   };
@@ -103,6 +104,7 @@ const DefaultPinoRedactionPaths = Object.freeze([
 interface StartupTracerRuntimeState {
   readonly traceId: string;
   readonly startupReason?: string;
+  readonly slowSpanThresholdMs: number;
   readonly logger: StartupSpanLogger;
   readonly redaction: Required<StartupSpanRedactionOptions>;
   readonly clock: () => number;
@@ -163,6 +165,7 @@ class StartupTracerSpan implements StartupSpan {
     const endedAtMilliseconds = this.state.clock();
     const endedAt = new Date(endedAtMilliseconds).toISOString();
     const durationMs = Math.max(0, endedAtMilliseconds - this.startedAtMilliseconds);
+    const slow = durationMs > this.state.slowSpanThresholdMs;
     const mergedMetadata = mergeMetadata(this.metadata, sanitizeMetadata(metadata, this.state.redaction));
     const event = Object.freeze({
       event: `startup.span.${outcome}`,
@@ -177,6 +180,8 @@ class StartupTracerSpan implements StartupSpan {
       startedAt: this.startedAt,
       endedAt,
       durationMs,
+      slow,
+      slowSpanThresholdMs: this.state.slowSpanThresholdMs,
       metadata: mergedMetadata,
       errorTagged: outcome === "failed",
       error: outcome === "failed" ? sanitizeError(error, this.state.redaction) : undefined,
@@ -218,6 +223,7 @@ export function createStartupTracer(options: StartupTracerOptions = {}): Startup
   const state: StartupTracerRuntimeState = {
     traceId,
     startupReason,
+    slowSpanThresholdMs: resolveSlowSpanThresholdMs(options.slowSpanThresholdMs),
     logger,
     redaction,
     clock: options.clock ?? (() => Date.now()),
@@ -386,4 +392,14 @@ function normalizeRequired(value: string, field: string): string {
 function normalizeOptional(value: string | undefined): string | undefined {
   const normalized = value?.trim();
   return normalized ? normalized : undefined;
+}
+
+function resolveSlowSpanThresholdMs(value: number | undefined): number {
+  if (value === undefined) {
+    return 5_000;
+  }
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error("Startup tracer slowSpanThresholdMs must be a positive finite number.");
+  }
+  return Math.floor(value);
 }

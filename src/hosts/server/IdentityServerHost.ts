@@ -286,6 +286,7 @@ import type {
   ResolveTransportSecurityPolicyRequest,
 } from "@application/security/ports/TransportSecurityPorts";
 import type { DeploymentPolicyBootstrapResolutionResult } from "@application/configuration/DeploymentPolicyBootstrapResolutionService";
+import { createStartupTracer, type StartupSpan, type StartupTracer } from "@hosts/bootstrap/startupTracer";
 
 export interface IdentityServerHostOptions {
   readonly databasePath: string;
@@ -310,6 +311,7 @@ export interface IdentityServerHostOptions {
   readonly persistentPlatformServices?: AuthoritativePersistentPlatformServices;
   readonly routeRegistrationPlan?: AuthoritativeApiRouteRegistrationPlan;
   readonly runExecutionAdapters?: AuthoritativeRunExecutionAdapterRegistration;
+  readonly startupTracer?: StartupTracer;
 }
 
 export interface IdentityServerHost {
@@ -421,15 +423,32 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     hostAddress,
     env,
   });
+  const startupTracer = options.startupTracer ?? createStartupTracer({
+    startupReason: "authoritative-server-runtime-startup",
+  });
+  const startupRootSpan = startupTracer.startSpan("authoritative-server-runtime-startup", {
+    metadata: Object.freeze({
+      hostAddress,
+      startupReason: "authoritative-server-runtime-startup",
+    }),
+  });
   let secretService: ServerComposedSecretService | undefined;
   try {
-    const auditRetentionLifecycleConfig = resolveAuditRetentionLifecycleConfig({
-      env,
-      deploymentProfile: options.deploymentProfile
-        ? {
-          profileId: options.deploymentProfile.profileId,
-        }
-        : undefined,
+    const auditRetentionLifecycleConfig = await runStartupStepSpan({
+      tracer: startupTracer,
+      parentSpan: startupRootSpan,
+      name: "config-load",
+      metadata: Object.freeze({
+        component: "identity-server-host",
+      }),
+      run: async () => resolveAuditRetentionLifecycleConfig({
+        env,
+        deploymentProfile: options.deploymentProfile
+          ? {
+            profileId: options.deploymentProfile.profileId,
+          }
+          : undefined,
+      }),
     });
     const auditLedgerObservability = new AuditLedgerObservability({
       logger: createAuditLedgerOperationalLogger(options.logger),
@@ -460,10 +479,29 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       env,
       secretService,
     });
-    const providerAccountPolicies = options.providerAccountPolicies
-      ?? IdentityProviderAccountPolicyConfig.fromEnv(env);
-    await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
-    await validateCertificateAuthorityStartup(certificateAuthorityRepository, env);
+    const providerAccountPolicies = await runStartupStepSpan({
+      tracer: startupTracer,
+      parentSpan: startupRootSpan,
+      name: "identity-provider-policy-load",
+      run: async () => options.providerAccountPolicies
+        ?? IdentityProviderAccountPolicyConfig.fromEnv(env),
+    });
+    await runStartupStepSpan({
+      tracer: startupTracer,
+      parentSpan: startupRootSpan,
+      name: "identity-startup-configuration",
+      run: async () => {
+        await applyIdentityStartupConfiguration(repository, providerAccountPolicies);
+      },
+    });
+    await runStartupStepSpan({
+      tracer: startupTracer,
+      parentSpan: startupRootSpan,
+      name: "ca-init",
+      run: async () => {
+        await validateCertificateAuthorityStartup(certificateAuthorityRepository, env);
+      },
+    });
 
     const authenticator = new LocalPasswordIdentityAuthenticator(new ScryptLocalPasswordCredentialService());
     const identityPolicyService = new IdentityPolicyService(repository);
@@ -1390,15 +1428,20 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
     observability: runOrchestrationObservability,
   });
-  const runStartupRecovery = await new RecoverRunOrchestrationStartupStateUseCase({
-    runRepository: persistentPlatformServices.platformPersistenceRepository,
-    queueRepository: persistentPlatformServices.platformPersistenceRepository,
-    placementHoldRepository: persistentPlatformServices.platformPersistenceRepository,
-    orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
-    resultCollectionPersistencePort: runCollectedResultPersistencePort,
-    transactionManager: persistentPlatformServices.platformPersistenceRepository,
-    now: () => workspaceClock.now(),
-  }).execute();
+  const runStartupRecovery = await runStartupStepSpan({
+    tracer: startupTracer,
+    parentSpan: startupRootSpan,
+    name: "orchestration-recovery",
+    run: async () => new RecoverRunOrchestrationStartupStateUseCase({
+      runRepository: persistentPlatformServices.platformPersistenceRepository,
+      queueRepository: persistentPlatformServices.platformPersistenceRepository,
+      placementHoldRepository: persistentPlatformServices.platformPersistenceRepository,
+      orchestrationIntentRepository: persistentPlatformServices.platformPersistenceRepository,
+      resultCollectionPersistencePort: runCollectedResultPersistencePort,
+      transactionManager: persistentPlatformServices.platformPersistenceRepository,
+      now: () => workspaceClock.now(),
+    }).execute(),
+  });
   if (runStartupRecovery.summary.appliedCount > 0 || runStartupRecovery.summary.manualFollowUpCount > 0) {
     options.logger?.info({
       event: "run.orchestration-recovery.startup",
@@ -1537,12 +1580,21 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
     }),
   });
 
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(options.port ?? 0, hostAddress, () => {
-      server.off("error", reject);
-      resolve();
-    });
+  await runStartupStepSpan({
+    tracer: startupTracer,
+    parentSpan: startupRootSpan,
+    name: "server-start",
+    metadata: Object.freeze({
+      hostAddress,
+      requestedPort: options.port ?? 0,
+    }),
+    run: async () => new Promise<void>((resolve, reject) => {
+      server.once("error", reject);
+      server.listen(options.port ?? 0, hostAddress, () => {
+        server.off("error", reject);
+        resolve();
+      });
+    }),
   });
 
   const addressInfo = server.address() as AddressInfo;
@@ -1578,12 +1630,15 @@ export async function startIdentityServerHost(options: IdentityServerHostOptions
       }),
     });
   } catch (error) {
+    startupRootSpan.fail(error);
     imageAssetRepository.dispose();
     if (ownsPersistentPlatformServices) {
       persistentPlatformServices.dispose();
     }
     secretService?.dispose();
     throw error;
+  } finally {
+    startupRootSpan.complete();
   }
 }
 
@@ -2115,6 +2170,26 @@ function resolveOptionalString(value: unknown): string | undefined {
   }
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : undefined;
+}
+
+async function runStartupStepSpan<TResult>(input: {
+  readonly tracer: StartupTracer;
+  readonly parentSpan: StartupSpan;
+  readonly name: string;
+  readonly metadata?: Readonly<Record<string, unknown>>;
+  readonly run: (span: StartupSpan) => Promise<TResult> | TResult;
+}): Promise<TResult> {
+  const span = input.parentSpan.startChild(input.name, {
+    metadata: input.metadata,
+  });
+  try {
+    const result = await input.run(span);
+    span.complete();
+    return result;
+  } catch (error) {
+    span.fail(error);
+    throw error;
+  }
 }
 
 async function validateCertificateAuthorityStartup(
