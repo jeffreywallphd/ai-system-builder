@@ -1,5 +1,6 @@
 import path from "node:path";
 import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
+import type { IWorkflowRunSummaryRepository } from "../../src/application/ports/interfaces/IWorkflowRunSummaryRepository";
 import { ListWorkflowRunSummariesUseCase } from "../../src/application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import { DesktopWorkflowPersistence } from "../../src/infrastructure/desktop/DesktopWorkflowPersistence";
 import type { AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
@@ -29,7 +30,6 @@ type DesktopStoragePaths = ReturnType<typeof resolveDesktopStoragePaths>;
 type StudioShellDependencies = {
   readonly repository: SqliteStudioShellRepository;
   readonly workflowPersistenceRepository: SqliteWorkflowPersistenceRepository;
-  readonly workflowRunSummaryRepository: SqliteWorkflowRunSummaryRepository;
   readonly imageRunHistoryRepository: SqliteImageRunHistoryRepository;
   readonly imageWorkflowSystemPersistence: SqliteImageWorkflowSystemPersistenceAdapter;
 };
@@ -76,7 +76,10 @@ export interface DeferredDesktopFeatureRuntimeFactories {
   createWorkflowPersistenceRepository(args: { readonly sqliteDatabasePath: string }): SqliteWorkflowPersistenceRepository;
   createImageRunHistoryRepository(args: { readonly sqliteDatabasePath: string }): SqliteImageRunHistoryRepository;
   createImageWorkflowSystemPersistence(args: { readonly sqliteDatabasePath: string }): SqliteImageWorkflowSystemPersistenceAdapter;
-  createStudioShellBackendApi(args: StudioShellDependencies & { readonly storageRootDirectory: string }): StudioShellBackendApi;
+  createStudioShellBackendApi(args: StudioShellDependencies & {
+    readonly storageRootDirectory: string;
+    readonly workflowRunSummaryRepository?: IWorkflowRunSummaryRepository;
+  }): StudioShellBackendApi;
   createSystemStudioBackendApi(repository: SqliteStudioShellRepository): SystemStudioBackendApi;
   createSystemRuntimeExecutionStore(args: { readonly sqliteDatabasePath: string }): SqliteSystemRuntimeExecutionStore;
   createSystemRuntimeExecutionAuditRepository(args: { readonly sqliteDatabasePath: string }): SqliteExecutionAuditRepository;
@@ -194,6 +197,28 @@ function disposeIfSupported(value: unknown): void {
   maybeDisposable.dispose?.();
 }
 
+function createLazyWorkflowRunSummaryRepository(
+  getRepository: () => SqliteWorkflowRunSummaryRepository,
+): IWorkflowRunSummaryRepository {
+  return Object.freeze({
+    async upsert(record) {
+      return getRepository().upsert(record);
+    },
+    async upsertDetail(record) {
+      return getRepository().upsertDetail(record);
+    },
+    async getByRunId(runId) {
+      return getRepository().getByRunId(runId);
+    },
+    async getDetailByRunId(runId) {
+      return getRepository().getDetailByRunId(runId);
+    },
+    async list(query) {
+      return getRepository().list(query);
+    },
+  });
+}
+
 export function createDeferredDesktopFeatureRuntime(
   options: CreateDeferredDesktopFeatureRuntimeOptions,
 ): DeferredDesktopFeatureRuntime {
@@ -257,7 +282,6 @@ export function createDeferredDesktopFeatureRuntime(
     if (studioDependencies) {
       return studioDependencies;
     }
-    const workflowRunSummaryRepository = ensureWorkflowRunHistory().repository;
     const repository = factories.createStudioShellRepository({
       sqliteDatabasePath: path.join(options.storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"),
     });
@@ -273,7 +297,6 @@ export function createDeferredDesktopFeatureRuntime(
     studioDependencies = Object.freeze({
       repository,
       workflowPersistenceRepository,
-      workflowRunSummaryRepository,
       imageRunHistoryRepository,
       imageWorkflowSystemPersistence,
     });
@@ -309,9 +332,13 @@ export function createDeferredDesktopFeatureRuntime(
         return studioShellBackendApi;
       }
       const dependencies = ensureStudioDependencies();
+      const workflowRunSummaryRepository = createLazyWorkflowRunSummaryRepository(
+        () => ensureWorkflowRunHistory().repository,
+      );
       studioShellBackendApi = factories.createStudioShellBackendApi({
         ...dependencies,
         storageRootDirectory: path.join(options.storagePaths.storageDirectory, "storage"),
+        workflowRunSummaryRepository,
       });
       return studioShellBackendApi;
     },

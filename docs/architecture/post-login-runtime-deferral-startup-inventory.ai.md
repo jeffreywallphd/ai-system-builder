@@ -37,5 +37,5 @@ Document concrete startup-time service/repository/backend initialization points 
 
 - Group A: fixed pre-login auth-shell dependencies.
 - Group B: post-login shared prerequisites only.
-- Group C: studio/system/image/workflow dependency chain.
+- Group C: studio/system/image dependency chain with workflow-run history kept independently lazy (shared by adapter).
 - Group D: canonical registry and agent lazy runtimes with explicit dependency ordering.
