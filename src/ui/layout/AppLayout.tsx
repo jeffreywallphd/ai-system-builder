@@ -26,8 +26,10 @@ import {
 } from "../shared/accessibility";
 import DesktopOfflineStatusSurface from "../shared/connectivity/DesktopOfflineStatusSurface";
 import { DesktopConnectivityService } from "../shared/connectivity/DesktopConnectivityService";
+import { SurfaceStatePanel } from "../shared/components/presentation-state";
 import type { OfflineSynchronizationStateSnapshotDto } from "@shared/contracts/runtime/OfflineSynchronizationContracts";
 import { ROUTE_PATHS } from "../routes/RouteConfig";
+import { useDeferredRuntimeFeatureGate } from "../runtime/DeferredRuntimeFeatureGate";
 
 const fallbackConsoleState: RuntimeConsoleState = Object.freeze({
   isExpanded: false,
@@ -83,6 +85,7 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
   const globalCommandTrigger = useMemo(() => new GlobalCommandTrigger(), []);
   const previousPathnameRef = useRef(location.pathname);
   const mainContentRef = useRef<HTMLElement>(null);
+  const deferredRuntimeGate = useDeferredRuntimeFeatureGate(location.pathname);
 
   useSurfaceRouteFocus(location.pathname, mainContentRef, {
     onAnnounce: setRouteAnnouncement,
@@ -316,7 +319,29 @@ export default function AppLayout({ onRequestLogout }: AppLayoutProps): JSX.Elem
           />
           <GuidedOnboardingFlowSurface pathname={location.pathname} />
           <ContextNavigationBar model={contextNavigation} />
-          <Outlet />
+          {deferredRuntimeGate.surfaceState ? (
+            <section className="ui-page">
+              <SurfaceStatePanel
+                state={deferredRuntimeGate.surfaceState}
+                action={deferredRuntimeGate.surfaceState.retryable
+                  ? (
+                    <button
+                      type="button"
+                      className="ui-button ui-button--secondary"
+                      onClick={() => {
+                        void deferredRuntimeGate.retry();
+                      }}
+                      disabled={deferredRuntimeGate.isRetrying}
+                    >
+                      {deferredRuntimeGate.isRetrying ? "Retrying startup..." : "Retry startup"}
+                    </button>
+                  )
+                  : undefined}
+              />
+            </section>
+          ) : (
+            <Outlet />
+          )}
         </div>
       </main>
 
