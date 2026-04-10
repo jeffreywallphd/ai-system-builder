@@ -83,6 +83,7 @@ import { logInitializationCheckpoint, logInitializationEnd, logInitializationMem
 import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
 import { listEntries, toFileEntry } from "./ModelFileEntries";
 import { resolveModelFileAbsolutePath } from "./ModelFilePathPolicy";
+import { registerAuthBootstrapIpc } from "./AuthBootstrapIpcRegistration";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
   DesktopConnectivityStateService,
@@ -515,71 +516,71 @@ function registerAuthIpc(): void {
     return;
   }
   authIpcRegistered = true;
-
-  ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {
-    event.returnValue = bootstrapContext;
-  });
-  ipcMain.on("ai-loom-desktop-storage:getItem", (event, key: string) => {
-    event.returnValue = storageDatabase?.getItem(key) ?? null;
-  });
-  ipcMain.on("ai-loom-desktop-storage:setItem", (_event, key: string, value: string) => {
-    storageDatabase?.setItem(key, value);
-  });
-  ipcMain.on("ai-loom-desktop-storage:removeItem", (_event, key: string) => {
-    storageDatabase?.removeItem(key);
-  });
-  ipcMain.handle("ai-loom-desktop-connectivity:get-state", async () => {
-    const state = desktopConnectivityStateService?.getState() ?? {
-      state: "connecting",
-      stale: false,
-      localModeActive: false,
-      lastChangedAt: new Date().toISOString(),
-      canQueueOperations: true,
-      canResynchronize: false,
-    };
-    return JSON.stringify(state);
-  });
-  ipcMain.handle("ai-loom-desktop-connectivity:set-offline-mode", async (_event, requestJson: string) => {
-    const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
-    if (!desktopConnectivityStateService) {
-      return JSON.stringify({
-        state: "connecting",
-        stale: false,
-        localModeActive: false,
-        detail: "Desktop connectivity state service is unavailable.",
-        lastChangedAt: new Date().toISOString(),
-        canQueueOperations: true,
-        canResynchronize: false,
-      });
-    }
-    const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
-    return JSON.stringify(state);
-  });
-  ipcMain.on("ai-loom-desktop-secrets:is-available", (event) => {
-    event.returnValue = safeStorage.isEncryptionAvailable();
-  });
-  ipcMain.on("ai-loom-desktop-secrets:get", (event, key: string) => {
-    const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
-    if (!encoded) {
-      event.returnValue = null;
-      return;
-    }
-    try {
-      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
-      event.returnValue = decrypted;
-    } catch {
-      event.returnValue = null;
-    }
-  });
-  ipcMain.on("ai-loom-desktop-secrets:set", (_event, key: string, value: string) => {
-    if (!safeStorage.isEncryptionAvailable()) {
-      return;
-    }
-    const encrypted = safeStorage.encryptString(value).toString("base64");
-    storageDatabase?.setItem(`secure:${key}`, encrypted);
-  });
-  ipcMain.on("ai-loom-desktop-secrets:remove", (_event, key: string) => {
-    storageDatabase?.removeItem(`secure:${key}`);
+  registerAuthBootstrapIpc({
+    ipcMain,
+    getBootstrapContext: () => bootstrapContext,
+    storage: {
+      getItem: (key: string) => storageDatabase?.getItem(key) ?? null,
+      setItem: (key: string, value: string) => {
+        storageDatabase?.setItem(key, value);
+      },
+      removeItem: (key: string) => {
+        storageDatabase?.removeItem(key);
+      },
+    },
+    connectivity: {
+      getState: () => {
+        const state = desktopConnectivityStateService?.getState() ?? {
+          state: "connecting",
+          stale: false,
+          localModeActive: false,
+          lastChangedAt: new Date().toISOString(),
+          canQueueOperations: true,
+          canResynchronize: false,
+        };
+        return JSON.stringify(state);
+      },
+      setOfflineMode: (requestJson: string) => {
+        const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
+        if (!desktopConnectivityStateService) {
+          return JSON.stringify({
+            state: "connecting",
+            stale: false,
+            localModeActive: false,
+            detail: "Desktop connectivity state service is unavailable.",
+            lastChangedAt: new Date().toISOString(),
+            canQueueOperations: true,
+            canResynchronize: false,
+          });
+        }
+        const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
+        return JSON.stringify(state);
+      },
+    },
+    secrets: {
+      isAvailable: () => safeStorage.isEncryptionAvailable(),
+      getSecret: (key: string) => {
+        const encoded = storageDatabase?.getItem(`secure:${key}`) ?? null;
+        if (!encoded) {
+          return null;
+        }
+        try {
+          return safeStorage.decryptString(Buffer.from(encoded, "base64"));
+        } catch {
+          return null;
+        }
+      },
+      setSecret: (key: string, value: string) => {
+        if (!safeStorage.isEncryptionAvailable()) {
+          return;
+        }
+        const encrypted = safeStorage.encryptString(value).toString("base64");
+        storageDatabase?.setItem(`secure:${key}`, encrypted);
+      },
+      removeSecret: (key: string) => {
+        storageDatabase?.removeItem(`secure:${key}`);
+      },
+    },
   });
 }
 

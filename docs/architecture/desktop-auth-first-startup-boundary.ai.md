@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1-A.2  
-Story: A.1.2-A.1.3, A.2.1
+Story: A.1.2-A.1.3, A.2.1-A.2.2
 
 ## Purpose
 
@@ -29,6 +29,20 @@ Desktop storage initialization is now scope-aware:
   - preserves existing full directory provisioning for runtime and feature infrastructure.
 
 This keeps auth/session bootstrap storage available on clean machines and existing installations while moving non-auth storage provisioning off the login critical path.
+
+## Story A.2.2 implementation update
+
+Auth/bootstrap IPC registration is now isolated into a dedicated module:
+
+- `electron/main/AuthBootstrapIpcRegistration.ts` owns pre-login auth/bootstrap IPC channel binding.
+- `electron/main/main.ts` now delegates pre-login registration through that module and keeps feature/runtime IPC registration in the deferred post-login path.
+
+Pre-login registration remains limited to:
+
+- bootstrap sync retrieval
+- desktop storage `getItem/setItem/removeItem`
+- secrets availability/read/write/remove
+- auth connectivity state read/write endpoints
 
 ## Target phase model
 
