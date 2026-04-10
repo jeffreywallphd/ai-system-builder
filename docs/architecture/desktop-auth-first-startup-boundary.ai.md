@@ -109,6 +109,29 @@ Post-login warmup now starts from renderer authentication success paths with exp
 
 Result: authenticated routes can render immediately while deferred warmup begins asynchronously, and warmup trigger behavior is directly observable in desktop logs.
 
+## Story A.3.4 implementation update
+
+Desktop startup logging now uses explicit phased identifiers so startup regressions can be localized:
+
+- `desktop-startup.pre-login-auth-shell-bootstrap`
+- `desktop-startup.identity-auth-host-readiness`
+- `desktop-startup.main-window-creation`
+- `desktop-startup.post-login-warmup`
+- `desktop-startup.deferred-feature-registration`
+
+Main-process startup logs now emit:
+
+- timing phase events on `[ai-loom][startup]` (start/end/checkpoint)
+- memory snapshots on `[ai-loom][startup-memory]` at key checkpoints
+
+Startup contract regression checks are now codified in tests:
+
+- startup sequence asserts main-window creation before service-supervisor startup,
+- pre-login initializer set excludes workflow/studio/system runtime initialization,
+- preload sync bootstrap call is verified against the shared auth-bootstrap IPC channel contract.
+
+Result: startup slowdowns can be attributed quickly to pre-login auth-shell bootstrap versus post-login warmup.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

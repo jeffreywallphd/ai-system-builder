@@ -67,6 +67,7 @@ import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktop
 import { listEntries, toFileEntry } from "./ModelFileEntries";
 import { resolveModelFileAbsolutePath } from "./ModelFilePathPolicy";
 import { registerAuthBootstrapIpc } from "./AuthBootstrapIpcRegistration";
+import { DesktopStartupPhases, validateDesktopStartupContract } from "./DesktopStartupContract";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
   DesktopConnectivityStateService,
@@ -90,6 +91,7 @@ const repoRoot = path.resolve(__dirname, "../..");
 const isPackaged = app.isPackaged;
 const rendererDevUrl = process.env.ELECTRON_RENDERER_URL || "http://127.0.0.1:5174";
 const preloadScriptPath = resolvePreloadScriptPath();
+validateDesktopStartupContract();
 
 function resolvePreloadScriptPath(): string {
   const preloadCandidates = [
@@ -222,11 +224,12 @@ function ensureAgentStudioBackendApi(
     sessionRepository: agentSessionRepository,
   });
   agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
-  logInitializationMemory("desktop-runtime-bootstrap", "agent-runtime-ready");
+  logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "agent-runtime-ready");
   return agentStudioBackendApi;
 }
 
 async function createMainWindow(): Promise<void> {
+  const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
   const window = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -242,7 +245,14 @@ async function createMainWindow(): Promise<void> {
   mainWindow = window;
   window.once("ready-to-show", () => window.show());
 
-  await loadRendererRoot(window);
+  try {
+    await loadRendererRoot(window);
+    logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded", mainWindowCreateStartedAt);
+    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded");
+  } finally {
+    logInitializationEnd(DesktopStartupPhases.mainWindowCreation, mainWindowCreateStartedAt);
+    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "ready");
+  }
 }
 
 async function loadRendererRoot(window: BrowserWindow, search?: string): Promise<void> {
@@ -454,7 +464,7 @@ async function ensureCanonicalRegistryRuntime(
     reconcileIdentityUseCase: new ReconcileCanonicalIdentityMappingsUseCase(repository, repository),
     registryBackendApi,
   };
-  logInitializationMemory("desktop-runtime-bootstrap", "canonical-registry-runtime-ready");
+  logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, "canonical-registry-runtime-ready");
   return canonicalRegistryRuntime;
 }
 
@@ -575,9 +585,10 @@ function registerAuthIpc(): void {
 }
 
 async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
-  const authShellStartedAt = logInitializationStart("desktop-auth-shell-bootstrap");
+  const authShellStartedAt = logInitializationStart(DesktopStartupPhases.preLoginAuthShellBootstrap);
+  logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "start");
   try {
-    const storageInitializationStartedAt = logInitializationStart("desktop-storage-initialize");
+    const storageInitializationStartedAt = logInitializationStart("desktop-startup.pre-login-storage-initialize");
     const storagePaths = resolveDesktopStoragePaths({
       userDataPath: app.getPath("userData"),
       logsPath: app.getPath("logs"),
@@ -586,12 +597,12 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     await new InitializeProductionStorageUseCase(storageDatabase).execute({
       scope: ProductionStorageInitializationScopes.authShellPreLogin,
     });
-    logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
-    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "storage-ready", authShellStartedAt);
-    logInitializationMemory("desktop-auth-shell-bootstrap", "storage-ready");
+    logInitializationEnd("desktop-startup.pre-login-storage-initialize", storageInitializationStartedAt);
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready");
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-    const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");
+    const authoritativeServerStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
     authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
       hostOptions: {
         databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
@@ -607,9 +618,10 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
         environment: process.env,
       },
     });
-    logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
-    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "authoritative-server-ready", authShellStartedAt);
-    logInitializationMemory("desktop-auth-shell-bootstrap", "authoritative-server-ready");
+    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authoritativeServerStartAt);
+    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
     const identityApiBaseUrl = assertSecureTransportEndpoint(
       `http://${authoritativeServerRuntime.address}`,
       resolveHostSecureTransportConfig({
@@ -635,13 +647,15 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
       intervalMs: 3_000,
     });
     registerAuthIpc();
+    logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready", authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready");
     return Object.freeze({
       storagePaths,
       identityApiBaseUrl,
     });
   } finally {
-    logInitializationEnd("desktop-auth-shell-bootstrap", authShellStartedAt);
-    logInitializationMemory("desktop-auth-shell-bootstrap", "bootstrap-complete");
+    logInitializationEnd(DesktopStartupPhases.preLoginAuthShellBootstrap, authShellStartedAt);
+    logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "complete");
   }
 }
 
@@ -649,9 +663,15 @@ function registerDeferredFeatureIpc(register: () => void): void {
   if (deferredFeatureIpcRegistered) {
     return;
   }
-  deferredFeatureIpcRegistered = true;
-  register();
-  deferredFeatureIpcReady = true;
+  const deferredFeatureRegistrationStartedAt = logInitializationStart(DesktopStartupPhases.deferredFeatureRegistration);
+  try {
+    deferredFeatureIpcRegistered = true;
+    register();
+    deferredFeatureIpcReady = true;
+    logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
+  } finally {
+    logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
+  }
 }
 
 function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
@@ -676,6 +696,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
 
   postLoginWarmupStarted = true;
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
   postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
   try {
     await postLoginBootstrapPromise;
@@ -693,26 +714,28 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
 }
 
 async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
-  const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
+  const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
   try {
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
   const { storagePaths, identityApiBaseUrl } = authShell;
   if (!storageDatabase) {
     throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
   }
-  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
+  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
   const pythonRuntime = resolveDesktopPythonRuntime({
     isPackaged,
     repoRoot,
     resourcesPath: process.resourcesPath,
     storagePaths,
   });
-  logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "python-runtime-resolved", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "python-runtime-resolved");
+  logInitializationEnd("desktop-startup.post-login-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
+  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved", bootstrapStartedAt);
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved");
   await new InitializeProductionStorageUseCase(storageDatabase).execute({
     scope: ProductionStorageInitializationScopes.fullRuntime,
   });
-  logInitializationMemory("desktop-runtime-bootstrap", "full-storage-provisioning-ready");
+  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready", bootstrapStartedAt);
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready");
   serviceSupervisor = new DesktopServiceSupervisor({
     repoRoot,
     isPackaged,
@@ -721,11 +744,11 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     pythonRuntime,
     pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
   });
-  const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
+  const supervisorStartAt = logInitializationStart("desktop-startup.post-login-service-supervisor-start");
   await serviceSupervisor.start();
-  logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "local-service-supervisor-ready", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "local-service-supervisor-ready");
+  logInitializationEnd("desktop-startup.post-login-service-supervisor-start", supervisorStartAt);
+  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready", bootstrapStartedAt);
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready");
 
   const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -1168,7 +1191,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     fs.copyFileSync(absoluteSourcePath, absoluteTargetPath);
   });
 
-  logInitializationMemory("desktop-runtime-bootstrap", "ipc-and-api-bindings-ready");
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "ipc-and-api-bindings-ready");
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
     const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
@@ -1374,6 +1397,8 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     });
   });
   });
+  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-registration-ready", bootstrapStartedAt);
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-registration-ready");
 
   if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
     console.warn(
@@ -1381,8 +1406,8 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     );
   }
   } finally {
-    logInitializationEnd("desktop-runtime-bootstrap", bootstrapStartedAt);
-    logInitializationMemory("desktop-runtime-bootstrap", "bootstrap-complete");
+    logInitializationEnd(DesktopStartupPhases.postLoginWarmup, bootstrapStartedAt);
+    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "complete");
   }
 }
 
@@ -1418,7 +1443,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
 }
 
 app.whenReady().then(async () => {
-  const desktopHostStartupAt = logInitializationStart("desktop-host-bootstrap");
+  const desktopHostStartupAt = logInitializationStart(DesktopStartupPhases.hostBootstrap);
   try {
     desktopHostRuntime = await startDesktopHostAssembly({
       startHost: async () => {
@@ -1426,8 +1451,11 @@ app.whenReady().then(async () => {
           const authShell = await bootstrapAuthShell();
           authShellBootstrapResult = authShell;
           installRendererContentSecurityPolicy();
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
+          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
           await createMainWindow();
-          logInitializationMemory("desktop-host-bootstrap", "main-window-ready");
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
+          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
           return Object.freeze({
             close: disposeDesktopRuntimeResources,
           });
@@ -1442,7 +1470,7 @@ app.whenReady().then(async () => {
       },
     });
   } finally {
-    logInitializationEnd("desktop-host-bootstrap", desktopHostStartupAt);
+    logInitializationEnd(DesktopStartupPhases.hostBootstrap, desktopHostStartupAt);
   }
 
   app.on("activate", async () => {

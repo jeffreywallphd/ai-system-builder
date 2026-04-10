@@ -332,8 +332,11 @@ Direction 3 trust updates now also use local-first persistence seams for MCP gov
   - `resolveAuthenticatedSession`
   - `resolveSessionActorContext`
 - Shared API request timeout behavior now classifies timeout aborts as `domainCode: request-timeout` in `src/ui/shared/api/SharedApiClient.ts` so startup flows can distinguish timeout from user cancellation and route users to sign-in instead of leaving bootstrap pending.
-- Electron desktop startup now emits concise timing checkpoints in `electron/main/main.ts` for:
-  - `desktop-host-bootstrap`
-  - `desktop-runtime-bootstrap`
-  - `local-service-supervisor-start`
-  - `authoritative-server-startup`
+- Electron desktop startup now emits phased startup timing and memory checkpoints in `electron/main/main.ts` for:
+  - `desktop-startup.host-bootstrap`
+  - `desktop-startup.pre-login-auth-shell-bootstrap`
+  - `desktop-startup.identity-auth-host-readiness`
+  - `desktop-startup.main-window-creation`
+  - `desktop-startup.post-login-warmup`
+  - `desktop-startup.deferred-feature-registration`
+- Startup phase events are logged on `[ai-loom][startup]` and memory snapshots are logged on `[ai-loom][startup-memory]`, so slow pre-login boot can be separated from slow post-login warmup.
