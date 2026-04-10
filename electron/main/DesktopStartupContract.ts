@@ -44,9 +44,26 @@ export const PreLoginAuthShellForbiddenInitializers = Object.freeze([
   "desktop-connectivity-monitor",
   "python-runtime-resolution",
   "service-supervisor",
-  "workflow-runtime",
-  "studio-runtime",
-  "system-runtime",
+  "workflow-persistence",
+  "execution-history",
+  "workflow-run-history",
+  "studio-shell-backend-api",
+  "system-studio-backend-api",
+  "system-runtime-backend-api",
+  "canonical-registry-runtime",
+  "agent-runtime",
+]);
+
+export const PreLoginStartupForbiddenRuntimeGroups = Object.freeze([
+  "service-supervisor",
+  "python-runtime-resolution",
+  "workflow-persistence",
+  "execution-history",
+  "workflow-run-history",
+  "studio-shell-backend-api",
+  "system-studio-backend-api",
+  "system-runtime-backend-api",
+  "desktop-connectivity-monitor",
 ]);
 
 export const DesktopStartupRequiredAuthBootstrapIpcChannels = Object.freeze([
@@ -82,6 +99,12 @@ export function validateDesktopStartupContract(): void {
   const preLoginViolations = PreLoginAuthShellInitializers.filter((initializer) => preLoginForbidden.has(initializer));
   if (preLoginViolations.length > 0) {
     throw new Error(`Pre-login bootstrap includes forbidden runtime initializers: ${preLoginViolations.join(", ")}.`);
+  }
+  const deferredRuntimeBoundaryMissing = PreLoginStartupForbiddenRuntimeGroups.filter((group) => !preLoginForbidden.has(group));
+  if (deferredRuntimeBoundaryMissing.length > 0) {
+    throw new Error(
+      `Pre-login startup contract is missing deferred runtime guard groups: ${deferredRuntimeBoundaryMissing.join(", ")}.`,
+    );
   }
 
   if (!DesktopStartupRequiredAuthBootstrapIpcChannels.includes(DesktopBootstrapIpcChannels.bootstrap)) {

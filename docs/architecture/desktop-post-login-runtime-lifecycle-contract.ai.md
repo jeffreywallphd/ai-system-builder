@@ -136,6 +136,27 @@ The runtime lifecycle contract now includes explicit timing + memory checkpoints
 
 Each first-use group now emits paired `[ai-loom][startup]` timing and `[ai-loom][startup-memory]` checkpoints using `desktop-startup.deferred-feature-runtime.*` timing phases.
 
+## Story C.3.4 startup boundary regression safeguards
+
+The deferred runtime lifecycle contract now includes explicit regression guardrails that prevent non-auth runtime groups from drifting back into pre-login startup:
+
+- startup contract guard list (`PreLoginStartupForbiddenRuntimeGroups`) now explicitly requires:
+  - `service-supervisor`
+  - `python-runtime-resolution`
+  - `workflow-persistence`
+  - `execution-history`
+  - `workflow-run-history`
+  - `studio-shell-backend-api`
+  - `system-studio-backend-api`
+  - `system-runtime-backend-api`
+  - `desktop-connectivity-monitor`
+- startup contract validation fails if this required guard list is removed or narrowed.
+- focused Electron main regression coverage now asserts:
+  - `bootstrapAuthShell()` does not activate those runtime groups,
+  - connectivity monitoring starts only once post-login warmup is accepted,
+  - Python runtime resolution and service-supervisor startup remain in post-login composition,
+  - workflow/studio/system backends remain lazy through deferred runtime `ensure*` paths.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,

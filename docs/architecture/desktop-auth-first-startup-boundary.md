@@ -272,6 +272,29 @@ Startup instrumentation now adds explicit timing and memory checkpoints that sep
 
 Instrumentation remains scoped to major lifecycle checkpoints and first-use composition boundaries so startup diagnostics stay actionable instead of noisy.
 
+## Story C.3.4 deferred-runtime startup boundary regression safeguards
+
+Deferred-runtime startup boundary protection now explicitly treats non-auth runtime groups as pre-login forbidden scope in startup contracts and tests:
+
+- `electron/main/DesktopStartupContract.ts` now codifies the required forbidden deferred-runtime groups for pre-login startup:
+  - `service-supervisor`
+  - `python-runtime-resolution`
+  - `workflow-persistence`
+  - `execution-history`
+  - `workflow-run-history`
+  - `studio-shell-backend-api`
+  - `system-studio-backend-api`
+  - `system-runtime-backend-api`
+  - `desktop-connectivity-monitor`
+- startup contract validation now fails if that guard set is removed or narrowed, so boundary drift is not silent.
+- new focused regression tests (`electron/main/tests/MainDeferredRuntimeStartupBoundary.test.ts`) verify:
+  - `bootstrapAuthShell()` remains free of those deferred runtime activations,
+  - connectivity monitoring starts only from accepted post-login warmup,
+  - Python runtime resolution and service supervisor startup remain in post-login composition,
+  - workflow/studio/system backend activation remains on-demand through deferred runtime `ensure*` paths.
+
+Result: non-auth runtime responsibilities cannot quietly return to pre-login startup without immediate contract/test failures.
+
 ## Story C.2.4 deferred studio/system/image runtime module loading
 
 Studio shell, system runtime, and image workflow/system persistence infrastructure is now deferred from pre-login startup to post-login runtime composition at module-load level as well as object-construction level:
