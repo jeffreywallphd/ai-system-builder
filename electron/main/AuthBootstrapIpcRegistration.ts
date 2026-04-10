@@ -7,6 +7,7 @@ export const AUTH_BOOTSTRAP_IPC_CHANNELS = Object.freeze({
   storageSetItem: "ai-loom-desktop-storage:setItem",
   storageRemoveItem: "ai-loom-desktop-storage:removeItem",
   deferredFeatureApiReady: "ai-loom-desktop-runtime:is-feature-api-ready",
+  startPostLoginWarmup: "ai-loom-desktop-runtime:start-post-login-warmup",
   connectivityGetState: "ai-loom-desktop-connectivity:get-state",
   connectivitySetOfflineMode: "ai-loom-desktop-connectivity:set-offline-mode",
   secretsIsAvailable: "ai-loom-desktop-secrets:is-available",
@@ -24,6 +25,7 @@ export type RegisterAuthBootstrapIpcParams = {
     readonly removeItem: (key: string) => void;
   };
   readonly isDeferredFeatureIpcReady: () => boolean;
+  readonly startPostLoginWarmup: () => Promise<void>;
   readonly connectivity: {
     readonly getState: () => Promise<string> | string;
     readonly setOfflineMode: (requestJson: string) => Promise<string> | string;
@@ -51,6 +53,9 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
   });
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady, (event) => {
     event.returnValue = params.isDeferredFeatureIpcReady();
+  });
+  params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup, async () => {
+    await params.startPostLoginWarmup();
   });
   params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState, () => params.connectivity.getState());
   params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivitySetOfflineMode, (_event, requestJson: string) => (

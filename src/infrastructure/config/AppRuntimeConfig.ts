@@ -55,6 +55,11 @@ interface DesktopConfigOptions {
   readonly pythonRuntimeBaseUrl?: string;
 }
 
+interface DesktopAuthShellConfigOptions {
+  readonly storage: DesktopStoragePaths;
+  readonly identityApiBaseUrl?: string;
+}
+
 export class AppRuntimeConfig {
   public readonly runtimeMode: AppRuntimeMode;
   public readonly hostKind: AppHostKind;
@@ -259,6 +264,20 @@ export class AppRuntimeConfig {
     }));
   }
 
+  public static forDesktopDevelopmentAuthShell(options: DesktopAuthShellConfigOptions): AppRuntimeConfig {
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-development", {
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
+      uiSettingsPersistenceMode: "local-storage",
+      installedModelCatalogMode: "browser-local-storage",
+      seedStarterNode: true,
+      identityApiBaseUrl: options.identityApiBaseUrl,
+      modelInstallDirectory: options.storage.modelsDirectory,
+      desktopStorage: options.storage,
+    }));
+  }
+
   public static forDesktopProduction(options: DesktopConfigOptions): AppRuntimeConfig {
     return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-production", {
       workflowRepositoryMode: "filesystem-indexed",
@@ -276,6 +295,20 @@ export class AppRuntimeConfig {
       workflowIndexDatabasePath: `${options.storage.storageDirectory}/workflow-index.sqlite`,
       desktopStorage: options.storage,
       desktopPythonRuntime: options.pythonRuntime,
+    }));
+  }
+
+  public static forDesktopProductionAuthShell(options: DesktopAuthShellConfigOptions): AppRuntimeConfig {
+    return new AppRuntimeConfig(AppRuntimeConfig.createValues("desktop-production", {
+      workflowRepositoryMode: "filesystem-indexed",
+      workflowExecutorMode: "strategy",
+      nodeCatalogMode: "registered",
+      uiSettingsPersistenceMode: "desktop-sqlite",
+      installedModelCatalogMode: "desktop-sqlite",
+      seedStarterNode: false,
+      identityApiBaseUrl: options.identityApiBaseUrl,
+      modelInstallDirectory: options.storage.modelsDirectory,
+      desktopStorage: options.storage,
     }));
   }
 

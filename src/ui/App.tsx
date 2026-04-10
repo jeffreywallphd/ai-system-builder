@@ -81,6 +81,13 @@ export default function App({
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!authenticated) {
+      return;
+    }
+    void requestDesktopPostLoginWarmup();
+  }, [authenticated]);
+
+  useEffect(() => {
     if (!isAuthBootstrapPending) {
       setIsInitializationStillWorking(false);
       return;
@@ -343,4 +350,16 @@ function appendInitializationProgressLog(
   }
   const next = [...current, Object.freeze(entry)];
   return Object.freeze(next.slice(Math.max(0, next.length - InitializationProgressLogMaxEntries)));
+}
+
+async function requestDesktopPostLoginWarmup(): Promise<void> {
+  const runtimeBridge = window.aiLoomDesktop?.runtime;
+  if (!runtimeBridge?.startPostLoginWarmup) {
+    return;
+  }
+  try {
+    await runtimeBridge.startPostLoginWarmup();
+  } catch (error) {
+    console.warn("Desktop post-login warmup request failed.", error);
+  }
 }

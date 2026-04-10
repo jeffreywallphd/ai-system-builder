@@ -19,8 +19,8 @@ It is responsible for:
 - creating the `BrowserWindow`
 - resolving storage paths
 - initializing production storage
-- resolving the desktop Python runtime
-- starting the desktop service supervisor
+- resolving the desktop Python runtime (post-login warmup)
+- starting the desktop service supervisor (post-login warmup)
 - building the bootstrap context exposed to the renderer
 - registering IPC handlers for storage, workflow persistence, execution-run history, model-file operations, canonical asset reads, and thin agent-authoring backend operations
 

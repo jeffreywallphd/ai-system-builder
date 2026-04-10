@@ -75,6 +75,29 @@ describe("AppRuntimeConfig", () => {
     expect(config.pythonRuntimeBaseUrl).toBe("http://127.0.0.1:8100");
   });
 
+  it("builds auth-shell desktop runtime config without python and supervisor details", () => {
+    const config = AppRuntimeConfig.forDesktopProductionAuthShell({
+      storage: {
+        appDataDirectory: "/tmp/ai-loom",
+        storageDirectory: "/tmp/ai-loom/storage",
+        databasePath: "/tmp/ai-loom/storage/app.sqlite",
+        runtimeDirectory: "/tmp/ai-loom/runtime",
+        logsDirectory: "/tmp/ai-loom/logs",
+        modelsDirectory: "/tmp/ai-loom/models",
+        assetsDirectory: "/tmp/ai-loom/assets",
+      },
+      identityApiBaseUrl: "http://127.0.0.1:8788",
+    });
+
+    expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
+    expect(config.modelInstallDirectory).toBe("/tmp/ai-loom/models");
+    expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
+    expect(config.serviceSupervisorBaseUrl).toBeUndefined();
+    expect(config.serviceSupervisorPort).toBeUndefined();
+    expect(config.pythonRuntimeBaseUrl).toBeUndefined();
+    expect(config.desktopPythonRuntime).toBeUndefined();
+  });
+
   it("reads browser development runtime bootstrap env overrides", () => {
     const globalWithWindow = (globalThis as typeof globalThis & {
       window?: {

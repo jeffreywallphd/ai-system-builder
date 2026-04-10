@@ -77,6 +77,17 @@ Deferred APIs are now guarded in preload and return controlled unavailable behav
 
 Auth/bootstrap IPC now also includes a readiness probe channel (`ai-loom-desktop-runtime:is-feature-api-ready`) so preload can gate deferred APIs without forcing broad startup initialization.
 
+## Story A.3.1 service supervisor + Python runtime warmup split
+
+Desktop startup now defers Python runtime resolution and supervisor startup until after authentication:
+
+- `bootstrapAuthShell()` no longer resolves desktop Python runtime details.
+- Pre-login runtime config bootstrap uses auth-shell-only config creation and omits service supervisor/Python runtime details.
+- Post-login warmup resolves Python runtime and starts `DesktopServiceSupervisor` before deferred feature IPC is marked ready.
+- Warmup is triggered through a dedicated auth/bootstrap IPC signal (`ai-loom-desktop-runtime:start-post-login-warmup`) emitted after renderer authentication state becomes authenticated.
+
+This preserves trusted-device/session bootstrap behavior while removing Python/supervisor startup from the first-render login critical path.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)

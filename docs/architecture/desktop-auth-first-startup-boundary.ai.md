@@ -67,6 +67,17 @@ Auth/bootstrap IPC now includes a deferred-feature readiness channel:
 
 - `ai-loom-desktop-runtime:is-feature-api-ready`
 
+## Story A.3.1 implementation update
+
+Python runtime resolution and service-supervisor startup are now post-login warmup responsibilities:
+
+- `bootstrapAuthShell()` no longer resolves desktop Python runtime metadata.
+- Pre-login bootstrap runtime config is now created from auth-shell config paths that do not require supervisor/Python runtime fields.
+- `bootstrapPostLoginRuntime()` now resolves desktop Python runtime and starts `DesktopServiceSupervisor` during warmup.
+- Warmup is started by an explicit auth/bootstrap IPC trigger (`ai-loom-desktop-runtime:start-post-login-warmup`) invoked after renderer authentication succeeds.
+
+Result: first login-capable window creation no longer waits on Python runtime resolution or supervisor startup.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

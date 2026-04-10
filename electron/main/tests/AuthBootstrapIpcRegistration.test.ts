@@ -42,6 +42,7 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
+      startPostLoginWarmup: async () => undefined,
       connectivity: {
         getState: () => "{}",
         setOfflineMode: () => "{}",
@@ -70,6 +71,7 @@ describe("registerAuthBootstrapIpc", () => {
     expect(handleChannels).toEqual([
       AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState,
       AUTH_BOOTSTRAP_IPC_CHANNELS.connectivitySetOfflineMode,
+      AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup,
     ].sort());
   });
 
@@ -94,6 +96,9 @@ describe("registerAuthBootstrapIpc", () => {
         },
       },
       isDeferredFeatureIpcReady: () => true,
+      startPostLoginWarmup: async () => {
+        operations.push("runtime:warmup:start");
+      },
       connectivity: {
         getState: () => JSON.stringify({ state: "connected" }),
         setOfflineMode: (requestJson: string) => {
@@ -142,6 +147,7 @@ describe("registerAuthBootstrapIpc", () => {
     const deferredReadyEvent: { returnValue?: unknown } = {};
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady)?.(deferredReadyEvent);
     expect(deferredReadyEvent.returnValue).toBe(true);
+    await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({});
 
     const connectivityState = await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState)?.({});
     expect(connectivityState).toBe(JSON.stringify({ state: "connected" }));
@@ -155,6 +161,7 @@ describe("registerAuthBootstrapIpc", () => {
       "storage:remove:session",
       "secrets:set:token:updated",
       "secrets:remove:token",
+      "runtime:warmup:start",
       "connectivity:set:{\"active\":true}",
     ]);
   });

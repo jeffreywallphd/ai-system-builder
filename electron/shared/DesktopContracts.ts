@@ -236,6 +236,7 @@ export interface DesktopConnectivityBridge {
 
 export interface DesktopRuntimeBootstrapBridge {
   isDeferredFeatureApiReady(): boolean;
+  startPostLoginWarmup(): Promise<void>;
 }
 
 export interface DesktopBridge {
