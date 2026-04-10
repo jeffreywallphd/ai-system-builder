@@ -234,10 +234,15 @@ export interface DesktopConnectivityBridge {
   setOfflineMode(requestJson: string): Promise<string>;
 }
 
+export interface DesktopRuntimeBootstrapBridge {
+  isDeferredFeatureApiReady(): boolean;
+}
+
 export interface DesktopBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly secrets?: DesktopMcpSecretBridge;
+  readonly runtime?: DesktopRuntimeBootstrapBridge;
   readonly workflows: DesktopWorkflowBridge;
   readonly executionRuns: DesktopExecutionRunBridge;
   readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;

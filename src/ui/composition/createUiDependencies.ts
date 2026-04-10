@@ -896,20 +896,28 @@ function createWorkflowRepository(
   desktopStorage = resolveDesktopStorageAdapter()
 ) {
   if (desktopWorkflowBridge && config.workflowRepositoryMode === "filesystem-indexed") {
-    const desktopStatus = desktopWorkflowBridge.getWorkflowPersistenceStatus();
-    return {
-      repository: new DesktopBridgeWorkflowRepository(nodeCatalogProvider, desktopWorkflowBridge),
-      status: {
-        configuredMode: config.workflowRepositoryMode,
-        effectiveMode: desktopStatus.provider,
-        isDegraded: desktopStatus.degraded,
-        detail: desktopStatus.degraded
-          ? `Expected dev persistence is filesystem + SQLite, but the desktop bridge reported degradation: ${desktopStatus.detail}`
-          : `Expected dev persistence is active at ${desktopStatus.workflowsDirectory} with SQLite index ${desktopStatus.indexDatabasePath}.`,
-        workflowsDirectory: desktopStatus.workflowsDirectory,
-        indexDatabasePath: desktopStatus.indexDatabasePath,
-      },
-    };
+    let desktopStatus: ReturnType<typeof desktopWorkflowBridge.getWorkflowPersistenceStatus> | undefined;
+    try {
+      desktopStatus = desktopWorkflowBridge.getWorkflowPersistenceStatus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Desktop workflow persistence is unavailable.";
+      console.warn(`[ai-loom][startup] Desktop workflow bridge is not ready during repository bootstrap: ${message}`);
+    }
+    if (desktopStatus) {
+      return {
+        repository: new DesktopBridgeWorkflowRepository(nodeCatalogProvider, desktopWorkflowBridge),
+        status: {
+          configuredMode: config.workflowRepositoryMode,
+          effectiveMode: desktopStatus.provider,
+          isDegraded: desktopStatus.degraded,
+          detail: desktopStatus.degraded
+            ? `Expected dev persistence is filesystem + SQLite, but the desktop bridge reported degradation: ${desktopStatus.detail}`
+            : `Expected dev persistence is active at ${desktopStatus.workflowsDirectory} with SQLite index ${desktopStatus.indexDatabasePath}.`,
+          workflowsDirectory: desktopStatus.workflowsDirectory,
+          indexDatabasePath: desktopStatus.indexDatabasePath,
+        },
+      };
+    }
   }
 
   const browserStorage = typeof window !== "undefined" ? window.localStorage : undefined;

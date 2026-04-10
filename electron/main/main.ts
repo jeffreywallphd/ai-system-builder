@@ -169,6 +169,7 @@ const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
 const DesktopServiceSupervisorPort = 8790;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
+let deferredFeatureIpcReady = false;
 let postLoginBootstrapPromise: Promise<void> | undefined;
 let isDesktopRuntimeDisposing = false;
 
@@ -528,6 +529,7 @@ function registerAuthIpc(): void {
         storageDatabase?.removeItem(key);
       },
     },
+    isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
     connectivity: {
       getState: () => {
         const state = desktopConnectivityStateService?.getState() ?? {
@@ -685,6 +687,7 @@ function registerDeferredFeatureIpc(register: () => void): void {
   }
   deferredFeatureIpcRegistered = true;
   register();
+  deferredFeatureIpcReady = true;
 }
 
 async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
@@ -1440,6 +1443,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   authoritativeServerRuntime = undefined;
   bootstrapContext = undefined;
   rendererContentSecurityPolicyRuntimeConfig = undefined;
+  deferredFeatureIpcReady = false;
   isDesktopRuntimeDisposing = false;
 }
 

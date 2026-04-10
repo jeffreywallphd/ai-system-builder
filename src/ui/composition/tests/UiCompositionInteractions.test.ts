@@ -193,6 +193,72 @@ describe("ui composition interactions", () => {
     }
   });
 
+  it("falls back safely when desktop workflow bridge status is unavailable during startup", () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const previousWindow = window;
+    const localStorageMock = {
+      getItem: () => null,
+      setItem: () => undefined,
+      removeItem: () => undefined,
+      clear: () => undefined,
+      key: () => null,
+      length: 0,
+    };
+    const fallbackWindow = Object.assign({}, previousWindow, {
+      localStorage: localStorageMock,
+      aiLoomDesktop: {
+        ...(previousWindow.aiLoomDesktop ?? {}),
+        storage: previousWindow.aiLoomDesktop?.storage ?? {
+          getItem: () => null,
+          setItem: () => undefined,
+          removeItem: () => undefined,
+        },
+        workflows: {
+          saveWorkflowRecord: () => undefined,
+          loadWorkflowRecord: () => null,
+          listWorkflowSummaries: () => [],
+          deleteWorkflowRecord: () => undefined,
+          workflowExists: () => false,
+          getWorkflowPersistenceStatus: () => {
+            throw new Error("Desktop workflow bridge deferred");
+          },
+        },
+      },
+    }) as Window;
+    (globalThis as { window: Window }).window = fallbackWindow;
+
+    const config = AppRuntimeConfig.forDesktopDevelopment({
+      storage: {
+        appDataDirectory: "dev/app-data",
+        storageDirectory: "dev/storage",
+        databasePath: "dev/storage.sqlite",
+        runtimeDirectory: "dev/runtime",
+        logsDirectory: "dev/logs",
+        modelsDirectory: "dev/models",
+        assetsDirectory: "dev/assets",
+      },
+      pythonRuntime: {
+        mode: "development-local",
+        runtimeRoot: "dev/python",
+        workspaceDirectory: "dev/workspace",
+        isAvailable: true,
+      },
+      serviceSupervisorBaseUrl: "http://127.0.0.1:8790",
+      serviceSupervisorPort: 8790,
+      pythonRuntimeBaseUrl: "http://127.0.0.1:8100",
+    });
+
+    try {
+      const dependencies = createUiDependencies({ config });
+      expect(dependencies.operationalStatus.workflowPersistence.effectiveMode).toBe("browser-storage-fallback");
+    } finally {
+      (globalThis as { window: Window }).window = previousWindow;
+    }
+  });
+
   it("memoizes lazily initialized feature dependencies", () => {
     const dependencies = createUiDependencies({
       config: AppRuntimeConfig.forDevelopment(),
