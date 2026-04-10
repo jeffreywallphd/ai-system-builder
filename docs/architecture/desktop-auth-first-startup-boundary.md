@@ -211,6 +211,23 @@ This contract defines:
 - renderer-safe lifecycle status/readiness probes exposed through preload,
 - deterministic teardown/reset expectations for logout and application quit.
 
+## Story C.2.1 post-login and on-demand runtime composition split
+
+Desktop main-process runtime startup now separates post-login shared warmup composition from on-demand feature composition paths:
+
+- `composePostLoginRuntime(...)` now owns post-login shared prerequisites only:
+  - full-runtime storage provisioning
+  - Python runtime resolution
+  - service supervisor startup
+  - full runtime-config projection and deferred runtime container creation
+- `createOnDemandFeatureCompositionPaths(...)` now defines explicit first-use feature composition paths used by deferred IPC handlers for:
+  - workflow/execution/workflow-run persistence
+  - studio shell/system runtime backends
+  - canonical registry runtime composition
+  - agent runtime composition
+
+Result: `bootstrapPostLoginRuntime(...)` is now a thin orchestration seam that composes post-login prerequisites and delegates feature graph activation to named on-demand composition paths, rather than acting as a single broad runtime bootstrap unit.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)
