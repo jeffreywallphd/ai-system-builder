@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import type { IpcMain } from "electron";
-import type { DesktopAuthBootstrapContext } from "../../shared/DesktopContracts";
+import {
+  DesktopPostLoginWarmupTriggerSources,
+  type DesktopAuthBootstrapContext,
+} from "../../shared/DesktopContracts";
 import {
   AUTH_BOOTSTRAP_IPC_CHANNELS,
   registerAuthBootstrapIpc,
@@ -96,8 +99,8 @@ describe("registerAuthBootstrapIpc", () => {
         },
       },
       isDeferredFeatureIpcReady: () => true,
-      startPostLoginWarmup: async () => {
-        operations.push("runtime:warmup:start");
+      startPostLoginWarmup: async (request) => {
+        operations.push(`runtime:warmup:start:${request.triggerSource}`);
       },
       connectivity: {
         getState: () => JSON.stringify({ state: "connected" }),
@@ -147,7 +150,10 @@ describe("registerAuthBootstrapIpc", () => {
     const deferredReadyEvent: { returnValue?: unknown } = {};
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady)?.(deferredReadyEvent);
     expect(deferredReadyEvent.returnValue).toBe(true);
-    await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({});
+    await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({}, {
+      triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+      requestedAt: "2026-04-10T13:00:00.000Z",
+    });
 
     const connectivityState = await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState)?.({});
     expect(connectivityState).toBe(JSON.stringify({ state: "connected" }));
@@ -161,8 +167,42 @@ describe("registerAuthBootstrapIpc", () => {
       "storage:remove:session",
       "secrets:set:token:updated",
       "secrets:remove:token",
-      "runtime:warmup:start",
+      "runtime:warmup:start:explicit-login",
       "connectivity:set:{\"active\":true}",
     ]);
+  });
+
+  it("normalizes invalid warmup request payloads to unknown trigger source", async () => {
+    const { ipcMain, handleHandlers } = createFakeIpcMain();
+    const operations: string[] = [];
+
+    registerAuthBootstrapIpc({
+      ipcMain: asIpcMainPort(ipcMain),
+      getBootstrapContext: () => undefined,
+      storage: {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined,
+      },
+      isDeferredFeatureIpcReady: () => false,
+      startPostLoginWarmup: async (request) => {
+        operations.push(request.triggerSource);
+      },
+      connectivity: {
+        getState: () => "{}",
+        setOfflineMode: () => "{}",
+      },
+      secrets: {
+        isAvailable: () => false,
+        getSecret: () => null,
+        setSecret: () => undefined,
+        removeSecret: () => undefined,
+      },
+    });
+
+    await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({}, {
+      triggerSource: "invalid-value",
+    });
+    expect(operations).toEqual([DesktopPostLoginWarmupTriggerSources.unknown]);
   });
 });

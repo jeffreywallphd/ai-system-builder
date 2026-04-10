@@ -12,6 +12,10 @@ import {
   getAppInitializationStagePresentation,
   type AppInitializationProgressUpdate,
 } from "./shared/initialization/AppInitializationProgress";
+import {
+  DesktopPostLoginWarmupTriggerSources,
+  requestDesktopPostLoginWarmup,
+} from "./runtime/DesktopPostLoginWarmup";
 
 type AppAuthNotice = "session-expired" | "session-invalid" | "session-context-unavailable" | "session-bootstrap-timeout";
 
@@ -65,6 +69,9 @@ export default function App({
       setAuthenticated(isAuthenticated);
       setIsAuthBootstrapPending(false);
       setAuthNotice(undefined);
+      if (isAuthenticated) {
+        void requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.unknown);
+      }
       setInitializationProgress(Object.freeze({
         stageId: isAuthenticated ? AppInitializationStageIds.ready : AppInitializationStageIds.readyForSignIn,
       }));
@@ -79,13 +86,6 @@ export default function App({
       setIsInitializationStillWorking(false);
     }
   }, [isAuthenticated]);
-
-  useEffect(() => {
-    if (!authenticated) {
-      return;
-    }
-    void requestDesktopPostLoginWarmup();
-  }, [authenticated]);
 
   useEffect(() => {
     if (!isAuthBootstrapPending) {
@@ -147,6 +147,7 @@ export default function App({
       if (result.status === IdentitySessionBootstrapStatus.authenticated) {
         setAuthenticated(true);
         setAuthNotice(undefined);
+        void requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.sessionRestore);
         publishInitializationProgress({
           stageId: AppInitializationStageIds.ready,
         });
@@ -189,6 +190,7 @@ export default function App({
         if (result.status === IdentitySessionBootstrapStatus.authenticated) {
           setAuthenticated(true);
           setAuthNotice(undefined);
+          void requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.sessionRefresh);
           return;
         }
 
@@ -218,6 +220,7 @@ export default function App({
     if (result.status === IdentitySessionBootstrapStatus.authenticated) {
       setAuthenticated(true);
       setAuthNotice(undefined);
+      void requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.explicitLogin);
       return true;
     }
 
@@ -350,16 +353,4 @@ function appendInitializationProgressLog(
   }
   const next = [...current, Object.freeze(entry)];
   return Object.freeze(next.slice(Math.max(0, next.length - InitializationProgressLogMaxEntries)));
-}
-
-async function requestDesktopPostLoginWarmup(): Promise<void> {
-  const runtimeBridge = window.aiLoomDesktop?.runtime;
-  if (!runtimeBridge?.startPostLoginWarmup) {
-    return;
-  }
-  try {
-    await runtimeBridge.startPostLoginWarmup();
-  } catch (error) {
-    console.warn("Desktop post-login warmup request failed.", error);
-  }
 }

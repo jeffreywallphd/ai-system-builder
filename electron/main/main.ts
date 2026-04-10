@@ -20,6 +20,7 @@ import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopAuthBootstrapContext,
   DesktopAuthBootstrapRuntimeConfig,
+  DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
 import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
@@ -514,8 +515,8 @@ function registerAuthIpc(): void {
       },
     },
     isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
-    startPostLoginWarmup: async () => {
-      await ensurePostLoginWarmupStarted();
+    startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
+      await ensurePostLoginWarmupStarted(request);
     },
     connectivity: {
       getState: () => {
@@ -653,12 +654,19 @@ function registerDeferredFeatureIpc(register: () => void): void {
   deferredFeatureIpcReady = true;
 }
 
-async function ensurePostLoginWarmupStarted(): Promise<void> {
+function formatPostLoginWarmupRequestLog(request: DesktopPostLoginWarmupRequest): string {
+  return `source=${request.triggerSource}${request.requestedAt ? ` requestedAt=${request.requestedAt}` : ""}`;
+}
+
+async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupRequest): Promise<void> {
+  console.info(`[ai-loom] Post-login warmup requested (${formatPostLoginWarmupRequestLog(request)}).`);
   if (postLoginBootstrapPromise) {
+    console.info("[ai-loom] Post-login warmup request joined in-flight warmup.");
     await postLoginBootstrapPromise;
     return;
   }
   if (postLoginWarmupStarted) {
+    console.info("[ai-loom] Post-login warmup request ignored because warmup was already started.");
     return;
   }
   const authShell = authShellBootstrapResult;
@@ -667,9 +675,11 @@ async function ensurePostLoginWarmupStarted(): Promise<void> {
   }
 
   postLoginWarmupStarted = true;
+  console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
   try {
     await postLoginBootstrapPromise;
+    console.info("[ai-loom] Post-login desktop runtime warmup completed.");
   } catch (error) {
     postLoginBootstrapPromise = undefined;
     if (!isDesktopRuntimeDisposing) {

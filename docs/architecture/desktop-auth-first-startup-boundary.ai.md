@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1-A.3  
-Story: A.1.2-A.1.3, A.2.1-A.2.3, A.3.1-A.3.2
+Story: A.1.2-A.1.3, A.2.1-A.2.3, A.3.1-A.3.3
 
 ## Purpose
 
@@ -94,6 +94,20 @@ Workflow/studio/system runtime repositories and backend APIs are now deferred be
 - Disposal now routes through one container `dispose()` path so lazily-created repositories/adapters remain lifecycle-coherent.
 
 Result: post-login warmup no longer eagerly allocates workflow/studio/system backend graphs; they are created only when feature IPC routes are invoked.
+
+## Story A.3.3 implementation update
+
+Post-login warmup now starts from renderer authentication success paths with explicit trigger provenance:
+
+- `src/ui/App.tsx` requests warmup on:
+  - explicit sign-in success (`explicit-login`),
+  - restored session bootstrap success (`session-restore`),
+  - authenticated visibility refresh (`session-refresh`).
+- `src/ui/runtime/DesktopPostLoginWarmup.ts` coalesces concurrent warmup requests and suppresses duplicate requests after completion so repeated auth-success events remain idempotent from the renderer side.
+- preload and auth bootstrap IPC now pass a narrow warmup request payload (`triggerSource`, optional `requestedAt`) to main process warmup startup.
+- main-process warmup request handling logs request provenance and whether the request started warmup, joined an in-flight warmup, or was ignored after startup.
+
+Result: authenticated routes can render immediately while deferred warmup begins asynchronously, and warmup trigger behavior is directly observable in desktop logs.
 
 ## Target phase model
 

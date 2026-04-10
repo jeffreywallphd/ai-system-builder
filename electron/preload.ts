@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { DesktopPostLoginWarmupRequest } from "./shared/DesktopContracts";
 
 const bootstrap = ipcRenderer.sendSync("ai-loom-desktop:get-bootstrap-sync");
 const DeferredFeatureApiReadyChannel = "ai-loom-desktop-runtime:is-feature-api-ready";
@@ -466,8 +467,8 @@ const authBootstrapSurface = Object.freeze({
   connectivity: connectivityBridge,
   runtime: Object.freeze({
     isDeferredFeatureApiReady,
-    startPostLoginWarmup() {
-      return ipcRenderer.invoke(StartPostLoginWarmupChannel) as Promise<void>;
+    startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest) {
+      return ipcRenderer.invoke(StartPostLoginWarmupChannel, request) as Promise<void>;
     },
   }),
 });

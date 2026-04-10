@@ -234,9 +234,24 @@ export interface DesktopConnectivityBridge {
   setOfflineMode(requestJson: string): Promise<string>;
 }
 
+export const DesktopPostLoginWarmupTriggerSources = Object.freeze({
+  explicitLogin: "explicit-login",
+  sessionRestore: "session-restore",
+  sessionRefresh: "session-refresh",
+  unknown: "unknown",
+});
+
+export type DesktopPostLoginWarmupTriggerSource =
+  typeof DesktopPostLoginWarmupTriggerSources[keyof typeof DesktopPostLoginWarmupTriggerSources];
+
+export interface DesktopPostLoginWarmupRequest {
+  readonly triggerSource: DesktopPostLoginWarmupTriggerSource;
+  readonly requestedAt?: string;
+}
+
 export interface DesktopRuntimeBootstrapBridge {
   isDeferredFeatureApiReady(): boolean;
-  startPostLoginWarmup(): Promise<void>;
+  startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest): Promise<void>;
 }
 
 export interface DesktopBridge {
