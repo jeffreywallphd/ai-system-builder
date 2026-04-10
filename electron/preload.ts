@@ -1,9 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopPostLoginWarmupRequest } from "./shared/DesktopContracts";
+import { DesktopBootstrapIpcChannels } from "./shared/DesktopBootstrapIpcChannels";
 
-const bootstrap = ipcRenderer.sendSync("ai-loom-desktop:get-bootstrap-sync");
-const DeferredFeatureApiReadyChannel = "ai-loom-desktop-runtime:is-feature-api-ready";
-const StartPostLoginWarmupChannel = "ai-loom-desktop-runtime:start-post-login-warmup";
+const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
 const DeferredFeatureApiUnavailableCode = "AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE";
 const DeferredFeatureApiUnavailableDetail = "Desktop feature APIs are unavailable until post-login runtime initialization completes.";
 
@@ -14,7 +13,7 @@ type AsyncBridgeGroup = Record<string, AsyncBridgeMethod>;
 
 function isDeferredFeatureApiReady(): boolean {
   try {
-    return ipcRenderer.sendSync(DeferredFeatureApiReadyChannel) === true;
+    return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.deferredFeatureApiReady) === true;
   } catch {
     return false;
   }
@@ -468,7 +467,7 @@ const authBootstrapSurface = Object.freeze({
   runtime: Object.freeze({
     isDeferredFeatureApiReady,
     startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest) {
-      return ipcRenderer.invoke(StartPostLoginWarmupChannel, request) as Promise<void>;
+      return ipcRenderer.invoke(DesktopBootstrapIpcChannels.startPostLoginWarmup, request) as Promise<void>;
     },
   }),
 });

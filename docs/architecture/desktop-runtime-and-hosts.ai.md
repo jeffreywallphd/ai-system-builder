@@ -204,8 +204,11 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
   - applies bounded timeout defaults for startup-critical identity reads (`resolveAuthenticatedSession`, `resolveSessionActorContext`),
   - and transitions to sign-in-ready state on timeout/transport failures instead of leaving pending bootstrap.
 - `src/ui/shared/api/SharedApiClient.ts` now classifies timeout aborts as `domainCode: request-timeout` (distinct from `request-cancelled`) for clearer startup failure handling.
-- Electron desktop startup timing checkpoints are now logged in `electron/main/main.ts` for:
-  - `desktop-host-bootstrap`
-  - `desktop-runtime-bootstrap`
-  - `local-service-supervisor-start`
-  - `authoritative-server-startup`
+- Electron desktop startup now logs phased startup timing + memory checkpoints in `electron/main/main.ts` for:
+  - `desktop-startup.host-bootstrap`
+  - `desktop-startup.pre-login-auth-shell-bootstrap`
+  - `desktop-startup.identity-auth-host-readiness`
+  - `desktop-startup.main-window-creation`
+  - `desktop-startup.post-login-warmup`
+  - `desktop-startup.deferred-feature-registration`
+- Phase timing events are emitted on `[ai-loom][startup]` and memory snapshots on `[ai-loom][startup-memory]` so pre-login delays can be distinguished from post-login warmup delays.

@@ -4,21 +4,9 @@ import {
   type DesktopAuthBootstrapContext,
   type DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
+import { DesktopBootstrapIpcChannels } from "../shared/DesktopBootstrapIpcChannels";
 
-export const AUTH_BOOTSTRAP_IPC_CHANNELS = Object.freeze({
-  bootstrap: "ai-loom-desktop:get-bootstrap-sync",
-  storageGetItem: "ai-loom-desktop-storage:getItem",
-  storageSetItem: "ai-loom-desktop-storage:setItem",
-  storageRemoveItem: "ai-loom-desktop-storage:removeItem",
-  deferredFeatureApiReady: "ai-loom-desktop-runtime:is-feature-api-ready",
-  startPostLoginWarmup: "ai-loom-desktop-runtime:start-post-login-warmup",
-  connectivityGetState: "ai-loom-desktop-connectivity:get-state",
-  connectivitySetOfflineMode: "ai-loom-desktop-connectivity:set-offline-mode",
-  secretsIsAvailable: "ai-loom-desktop-secrets:is-available",
-  secretsGet: "ai-loom-desktop-secrets:get",
-  secretsSet: "ai-loom-desktop-secrets:set",
-  secretsRemove: "ai-loom-desktop-secrets:remove",
-});
+export const AUTH_BOOTSTRAP_IPC_CHANNELS = DesktopBootstrapIpcChannels;
 
 export type RegisterAuthBootstrapIpcParams = {
   readonly ipcMain: Pick<IpcMain, "on" | "handle">;
