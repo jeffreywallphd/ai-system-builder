@@ -24,6 +24,8 @@ import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-run
 import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SqliteImageWorkflowSystemPersistenceAdapter } from "../../src/infrastructure/persistence/image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
 import type { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
+import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
+import { DesktopStartupPhases } from "./DesktopStartupContract";
 
 type DesktopStoragePaths = ReturnType<typeof resolveDesktopStoragePaths>;
 
@@ -91,6 +93,27 @@ export interface CreateDeferredDesktopFeatureRuntimeOptions {
   readonly runtimeConfigValues: AppRuntimeConfigValues;
   readonly repoRoot: string;
   readonly factories?: Partial<DeferredDesktopFeatureRuntimeFactories>;
+}
+
+const DeferredRuntimeTimingPhases = Object.freeze({
+  workflowPersistence: "desktop-startup.deferred-feature-runtime.workflow-persistence",
+  executionHistory: "desktop-startup.deferred-feature-runtime.execution-history",
+  workflowRunHistory: "desktop-startup.deferred-feature-runtime.workflow-run-history",
+  studioShellBackendApi: "desktop-startup.deferred-feature-runtime.studio-shell-backend-api",
+  systemStudioBackendApi: "desktop-startup.deferred-feature-runtime.system-studio-backend-api",
+  systemRuntimeBackendApi: "desktop-startup.deferred-feature-runtime.system-runtime-backend-api",
+});
+
+function instrumentDeferredRuntimeCreation<T>(timingPhase: string, checkpoint: string, create: () => T): T {
+  const startedAt = logInitializationStart(timingPhase);
+  try {
+    const created = create();
+    logInitializationCheckpoint(DesktopStartupPhases.deferredFeatureRuntime, checkpoint, startedAt);
+    logInitializationMemory(DesktopStartupPhases.deferredFeatureRuntime, checkpoint);
+    return created;
+  } finally {
+    logInitializationEnd(timingPhase, startedAt);
+  }
 }
 
 function createDefaultFactories(): DeferredDesktopFeatureRuntimeFactories {
@@ -241,9 +264,11 @@ export function createDeferredDesktopFeatureRuntime(
     if (workflowPersistence) {
       return workflowPersistence;
     }
-    workflowPersistence = factories.createWorkflowPersistence({
-      workflowsDirectory: workflowPaths.workflowsDirectory,
-      workflowIndexDatabasePath: workflowPaths.workflowIndexDatabasePath,
+    workflowPersistence = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.workflowPersistence, "workflow-persistence-ready", () => {
+      return factories.createWorkflowPersistence({
+        workflowsDirectory: workflowPaths.workflowsDirectory,
+        workflowIndexDatabasePath: workflowPaths.workflowIndexDatabasePath,
+      });
     });
     return workflowPersistence;
   };
@@ -252,14 +277,16 @@ export function createDeferredDesktopFeatureRuntime(
     if (executionHistory) {
       return executionHistory;
     }
-    const repository = factories.createExecutionRunRepository({
-      sqliteDatabasePath: options.storagePaths.databasePath,
-    });
-    const history = factories.createExecutionHistoryInfrastructure(repository);
-    executionHistory = Object.freeze({
-      repository,
-      getExecutionRunUseCase: factories.createGetExecutionRunUseCase(repository),
-      listExecutionRunsUseCase: history.listExecutionRunsUseCase,
+    executionHistory = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.executionHistory, "execution-history-ready", () => {
+      const repository = factories.createExecutionRunRepository({
+        sqliteDatabasePath: options.storagePaths.databasePath,
+      });
+      const history = factories.createExecutionHistoryInfrastructure(repository);
+      return Object.freeze({
+        repository,
+        getExecutionRunUseCase: factories.createGetExecutionRunUseCase(repository),
+        listExecutionRunsUseCase: history.listExecutionRunsUseCase,
+      });
     });
     return executionHistory;
   };
@@ -268,12 +295,14 @@ export function createDeferredDesktopFeatureRuntime(
     if (workflowRunHistory) {
       return workflowRunHistory;
     }
-    const repository = factories.createWorkflowRunSummaryRepository({
-      sqliteDatabasePath: options.storagePaths.databasePath,
-    });
-    workflowRunHistory = Object.freeze({
-      repository,
-      listWorkflowRunSummariesUseCase: factories.createListWorkflowRunSummariesUseCase(repository),
+    workflowRunHistory = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.workflowRunHistory, "workflow-run-history-ready", () => {
+      const repository = factories.createWorkflowRunSummaryRepository({
+        sqliteDatabasePath: options.storagePaths.databasePath,
+      });
+      return Object.freeze({
+        repository,
+        listWorkflowRunSummariesUseCase: factories.createListWorkflowRunSummariesUseCase(repository),
+      });
     });
     return workflowRunHistory;
   };
@@ -331,14 +360,16 @@ export function createDeferredDesktopFeatureRuntime(
       if (studioShellBackendApi) {
         return studioShellBackendApi;
       }
-      const dependencies = ensureStudioDependencies();
-      const workflowRunSummaryRepository = createLazyWorkflowRunSummaryRepository(
-        () => ensureWorkflowRunHistory().repository,
-      );
-      studioShellBackendApi = factories.createStudioShellBackendApi({
-        ...dependencies,
-        storageRootDirectory: path.join(options.storagePaths.storageDirectory, "storage"),
-        workflowRunSummaryRepository,
+      studioShellBackendApi = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.studioShellBackendApi, "studio-shell-backend-api-ready", () => {
+        const dependencies = ensureStudioDependencies();
+        const workflowRunSummaryRepository = createLazyWorkflowRunSummaryRepository(
+          () => ensureWorkflowRunHistory().repository,
+        );
+        return factories.createStudioShellBackendApi({
+          ...dependencies,
+          storageRootDirectory: path.join(options.storagePaths.storageDirectory, "storage"),
+          workflowRunSummaryRepository,
+        });
       });
       return studioShellBackendApi;
     },
@@ -346,14 +377,18 @@ export function createDeferredDesktopFeatureRuntime(
       if (systemStudioBackendApi) {
         return systemStudioBackendApi;
       }
-      systemStudioBackendApi = factories.createSystemStudioBackendApi(ensureStudioDependencies().repository);
+      systemStudioBackendApi = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.systemStudioBackendApi, "system-studio-backend-api-ready", () => {
+        return factories.createSystemStudioBackendApi(ensureStudioDependencies().repository);
+      });
       return systemStudioBackendApi;
     },
     ensureSystemRuntimeBackendApi() {
       if (systemRuntimeBackendApi) {
         return systemRuntimeBackendApi;
       }
-      systemRuntimeBackendApi = factories.createSystemRuntimeBackendApi(ensureSystemRuntimeDependencies());
+      systemRuntimeBackendApi = instrumentDeferredRuntimeCreation(DeferredRuntimeTimingPhases.systemRuntimeBackendApi, "system-runtime-backend-api-ready", () => {
+        return factories.createSystemRuntimeBackendApi(ensureSystemRuntimeDependencies());
+      });
       return systemRuntimeBackendApi;
     },
     dispose() {

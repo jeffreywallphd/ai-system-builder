@@ -153,6 +153,25 @@ Behavioral contract:
 - failure/unavailable messaging stays user-readable while including concise diagnostics (`runtime state`, `reason`, `updatedAt`, optional failure message) for developers;
 - retry action is exposed at the feature boundary and re-requests deferred warmup without resetting the entire app shell.
 
+## Story C.3.3 startup instrumentation contract
+
+Deferred runtime lifecycle observability now includes explicit startup timing and memory checkpoints at major lifecycle boundaries:
+
+- pre-login/auth shell critical-path checkpoints:
+  - auth shell phase instrumentation remains in `desktop-startup.pre-login-auth-shell-bootstrap`.
+  - auth-minimal host readiness phase now includes startup-memory checkpoints at `start` and `ready`.
+- renderer first-window readiness checkpoints:
+  - `desktop-startup.main-window-creation` checkpoint: `first-window-ready-to-show`.
+  - `desktop-startup.host-bootstrap` checkpoint: `renderer-first-window-ready`.
+- post-login warmup composition checkpoint:
+  - `desktop-startup.post-login-warmup` checkpoint: `deferred-feature-runtime-container-ready`.
+- deferred runtime first-use service groups:
+  - workflow persistence (`workflow-persistence-ready`).
+  - execution/workflow run persistence (`execution-history-ready`, `workflow-run-history-ready`).
+  - studio/runtime backends (`studio-shell-backend-api-ready`, `system-studio-backend-api-ready`, `system-runtime-backend-api-ready`).
+
+All deferred first-use group checkpoints emit paired startup timing (`[ai-loom][startup]`) and memory (`[ai-loom][startup-memory]`) logs using dedicated deferred runtime timing phase names under `desktop-startup.deferred-feature-runtime.*`.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)
