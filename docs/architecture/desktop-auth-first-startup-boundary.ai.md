@@ -126,7 +126,7 @@ Main-process startup logs now emit:
 
 Startup contract regression checks are now codified in tests:
 
-- startup sequence asserts main-window creation before service-supervisor startup,
+- startup sequence contract excludes Python runtime resolution and service-supervisor startup from pre-login boot,
 - pre-login initializer set excludes workflow/studio/system runtime initialization,
 - preload sync bootstrap call is verified against the shared auth-bootstrap IPC channel contract.
 
@@ -219,6 +219,26 @@ Desktop runtime startup composition now splits post-login shared bootstrap from 
   - agent runtime composition.
 
 Result: `bootstrapPostLoginRuntime(...)` is now orchestration glue for post-login and on-demand paths instead of a single broad runtime bootstrap block.
+
+## Story C.2.2 implementation update
+
+Desktop startup contracts now explicitly treat Python runtime resolution and service-supervisor startup as post-login warmup-only work:
+
+- `DesktopStartupBootSequence` is now constrained to pre-login auth-shell startup steps only and no longer includes service-supervisor startup.
+- `DesktopPostLoginWarmupSequence` now codifies ordered post-login warmup steps:
+  - `python-runtime-resolution`
+  - `service-supervisor-startup`
+  - `deferred-feature-registration`
+- startup contract validation now fails if Python runtime resolution or supervisor startup appears in the pre-login boot sequence.
+- pre-login startup regression tests now verify:
+  - `bootstrapAuthShell()` does not resolve desktop Python runtime,
+  - `bootstrapAuthShell()` does not construct or start `DesktopServiceSupervisor`,
+  - post-login runtime composition remains the only path that resolves Python runtime and starts supervisor.
+- post-login warmup logging now emits explicit start/ready events for:
+  - desktop Python runtime resolution (`mode`, `available`),
+  - local service supervisor startup (`baseUrl`, `runtimeBaseUrl`).
+
+Result: the login-critical pre-window startup contract no longer models or permits Python/supervisor initialization, while deferred warmup observability is clearer.
 
 ## Target phase model
 

@@ -10,6 +10,9 @@ describe("electron main post-login runtime composition", () => {
     expect(mainSource).toContain("function createOnDemandFeatureCompositionPaths(");
     expect(mainSource).toContain("const runtimeComposition = await composePostLoginRuntime(");
     expect(mainSource).toContain("const onDemand = createOnDemandFeatureCompositionPaths(");
+    expect(mainSource).toContain("const pythonRuntime = resolveDesktopPythonRuntime(");
+    expect(mainSource).toContain("serviceSupervisor = new DesktopServiceSupervisor(");
+    expect(mainSource).toContain("await serviceSupervisor.start()");
   });
 
   it("keeps legacy eager bootstrap entrypoint removed", () => {

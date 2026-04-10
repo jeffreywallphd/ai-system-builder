@@ -43,6 +43,20 @@ Main trigger semantics:
 3. otherwise transition to `warming` with activation mode derived from trigger,
 4. bootstrap post-login runtime once and reuse the same in-flight promise.
 
+## Story C.2.2 runtime infrastructure boundary
+
+The deferred warmup path is now the only contract-allowed location for:
+
+- desktop Python runtime resolution (`resolveDesktopPythonRuntime(...)`)
+- local managed service startup (`DesktopServiceSupervisor.start()`)
+
+Pre-login contract guardrails now require:
+
+- pre-login startup sequence does not include Python runtime resolution or service-supervisor startup,
+- `bootstrapAuthShell()` remains free of Python/supervisor composition logic.
+
+Operational diagnostics now explicitly log deferred warmup start/ready details for both Python runtime resolution and service-supervisor startup.
+
 ## Status/readiness exposure
 - status channel:
   - `ai-loom-desktop-runtime:get-post-login-runtime-status`

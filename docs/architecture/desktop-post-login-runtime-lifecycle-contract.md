@@ -89,6 +89,20 @@ When a feature route or IPC surface first requires deferred runtime and auth-suc
 2. lifecycle status transitions to `warming` with `lazy-feature-demand`.
 3. readiness semantics remain identical (`ready` only after deferred feature IPC registration is complete).
 
+## Story C.2.2 deferred infrastructure scope
+
+Post-login warmup is now the only allowed runtime path for:
+
+- desktop Python runtime resolution (`resolveDesktopPythonRuntime(...)`)
+- local managed service-supervisor startup (`DesktopServiceSupervisor.start()`)
+
+Pre-login startup contract checks now enforce that:
+
+- startup boot sequencing excludes Python runtime resolution and service-supervisor startup
+- `bootstrapAuthShell()` does not compose Python runtime or service-supervisor logic
+
+Warmup diagnostics now include explicit deferred startup logs for Python runtime resolution and supervisor startup readiness.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

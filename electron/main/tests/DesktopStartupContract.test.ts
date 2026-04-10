@@ -4,6 +4,8 @@ import path from "node:path";
 import {
   DesktopStartupBootSequence,
   DesktopStartupBootStepIds,
+  DesktopPostLoginWarmupSequence,
+  DesktopPostLoginWarmupStepIds,
   DesktopStartupRequiredAuthBootstrapIpcChannels,
   PreLoginAuthShellForbiddenInitializers,
   PreLoginAuthShellInitializers,
@@ -12,12 +14,19 @@ import {
 import { DesktopBootstrapIpcChannels } from "../../shared/DesktopBootstrapIpcChannels";
 
 describe("desktop startup boot contract", () => {
-  it("keeps main-window creation ahead of service supervisor startup", () => {
+  it("keeps pre-login boot sequence limited to auth-shell startup", () => {
     const mainWindowIndex = DesktopStartupBootSequence.indexOf(DesktopStartupBootStepIds.mainWindowCreation);
-    const supervisorIndex = DesktopStartupBootSequence.indexOf(DesktopStartupBootStepIds.serviceSupervisorStartup);
     expect(mainWindowIndex).toBeGreaterThan(-1);
-    expect(supervisorIndex).toBeGreaterThan(-1);
-    expect(mainWindowIndex).toBeLessThan(supervisorIndex);
+    expect(DesktopStartupBootSequence).not.toContain(DesktopPostLoginWarmupStepIds.pythonRuntimeResolution);
+    expect(DesktopStartupBootSequence).not.toContain(DesktopPostLoginWarmupStepIds.serviceSupervisorStartup);
+  });
+
+  it("keeps python resolution and supervisor startup in post-login warmup sequence", () => {
+    expect(DesktopPostLoginWarmupSequence).toEqual([
+      DesktopPostLoginWarmupStepIds.pythonRuntimeResolution,
+      DesktopPostLoginWarmupStepIds.serviceSupervisorStartup,
+      DesktopPostLoginWarmupStepIds.deferredFeatureRegistration,
+    ]);
   });
 
   it("keeps pre-login initializers free of workflow/studio/system runtime dependencies", () => {
