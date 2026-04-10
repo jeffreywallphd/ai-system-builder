@@ -1,5 +1,14 @@
+export const ProductionStorageInitializationScopes = Object.freeze({
+  authShellPreLogin: "auth-shell-pre-login",
+  fullRuntime: "full-runtime",
+});
+
+export type ProductionStorageInitializationScope =
+  (typeof ProductionStorageInitializationScopes)[keyof typeof ProductionStorageInitializationScopes];
+
 export interface ProductionStorageInitializationRequest {
   readonly createIfMissing?: boolean;
+  readonly scope?: ProductionStorageInitializationScope;
 }
 
 export interface ProductionStorageInitializationResult {

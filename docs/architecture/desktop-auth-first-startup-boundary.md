@@ -1,8 +1,8 @@
 # Desktop Auth-First Startup Boundary
 
 Feature: A  
-Epic: A.1  
-Story: A.1.2-A.1.3
+Epic: A.1-A.2  
+Story: A.1.2-A.1.3, A.2.1
 
 ## Purpose
 
@@ -19,6 +19,28 @@ Define an explicit Electron startup boundary so the first login-capable window i
 5. `registerDeferredFeatureIpc()` registers non-auth feature IPC after post-login runtime bootstrap starts.
 
 This removes full feature/runtime initialization from the first-render gate while preserving desktop auth bootstrap behavior.
+
+## Story A.2.1 storage initialization split
+
+Pre-login startup now initializes desktop storage in an auth-shell scope (`auth-shell-pre-login`) that provisions only:
+
+- app data root directory
+- storage directory containing persistent key/value SQLite state
+
+This scope supports:
+
+- session bootstrap persistence (`ai-loom.identity.session.v1`)
+- secure desktop trust/bootstrap reads from persistent key/value storage
+- auth-shell local secret/session state
+
+Pre-login no longer eagerly creates:
+
+- runtime directory
+- logs directory
+- models directory
+- assets directory
+
+Post-login runtime bootstrap explicitly upgrades storage initialization to full runtime scope (`full-runtime`) before feature/runtime service composition. This preserves existing full provisioning behavior for later phases while reducing first-render critical path work.
 
 ## Target startup phases
 
