@@ -166,6 +166,20 @@ Regression safeguards for this boundary now include:
 - tests assert Electron main starts `startAuthMinimalServerHostAssembly(...)`,
 - tests assert Electron main does not call `startAuthoritativeServerHostAssembly(...)` in the pre-login path.
 
+## Story B.3.2 trusted-device and session-bootstrap preservation on auth-minimal host
+
+Auth-minimal pre-login host now preserves the desktop security-sensitive auth/bootstrap behavior expected before login:
+
+- `src/hosts/server/AuthMinimalIdentityServerHost.ts` now composes transport trust validation (`ValidateTransportConnectionTrustUseCase` with HTTP/WebSocket transport adapters) on auth-minimal startup, while preserving desktop loopback bypass semantics for desktop-client transport.
+- auth-minimal host integration tests now verify:
+  - local desktop login succeeds through auth-minimal host routes,
+  - saved-session validation (`GET /api/v1/identity/session`) works for desktop sessions,
+  - session actor-context hydration (`GET /api/v1/identity/session/context`) resolves workspace context,
+  - required trusted-device login fails with controlled auth errors when trust bootstrap state is missing,
+  - required trusted-device login succeeds when trusted-device binding is present,
+  - thin-client session validation is rejected by transport trust enforcement.
+- desktop trust bootstrap connectivity diagnostics now expose specific prerequisite failure details for missing trusted-device binding, missing pin reference, and expired pin material.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)

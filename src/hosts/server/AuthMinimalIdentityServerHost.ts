@@ -70,6 +70,20 @@ import {
   type AuthMinimalPersistentPlatformServices,
 } from "@infrastructure/persistence/AuthMinimalPersistenceComposition";
 import type { IdentityServerHost, IdentityServerHostOptions } from "./IdentityServerHost";
+import { ServerManagedTransportTrustStateResolver } from "@infrastructure/security/ServerManagedTransportTrustStateResolver";
+import { ValidateTransportConnectionTrustUseCase } from "@application/security/use-cases/ValidateTransportConnectionTrustUseCase";
+import {
+  HttpTransportTrustValidationAdapter,
+  WebSocketTransportTrustValidationAdapter,
+} from "@infrastructure/transport/TransportTrustValidationAdapters";
+import {
+  evaluateTransportConnectionTrust,
+  resolveBaselineTransportSecurityPolicy,
+} from "@domain/security/TransportSecurityDomain";
+import type {
+  EvaluateTransportConnectionPolicyRequest,
+  ResolveTransportSecurityPolicyRequest,
+} from "@application/security/ports/TransportSecurityPorts";
 
 class SystemIdentityClock implements IIdentityClock {
   public now(): Date {
@@ -80,6 +94,25 @@ class SystemIdentityClock implements IIdentityClock {
 class RandomIdentityIdGenerator implements IIdentityIdGenerator {
   public nextId(namespace: IdentityIdNamespace): string {
     return `${namespace}:${randomUUID()}`;
+  }
+}
+
+class BaselineTransportSecurityPolicyResolver {
+  public async resolveTransportSecurityPolicy(request: ResolveTransportSecurityPolicyRequest) {
+    return Object.freeze({
+      policy: resolveBaselineTransportSecurityPolicy(request.scenario),
+      source: "baseline" as const,
+    });
+  }
+}
+
+class DomainTransportConnectionPolicyEvaluator {
+  public async evaluateTransportConnectionPolicy(request: EvaluateTransportConnectionPolicyRequest) {
+    return evaluateTransportConnectionTrust({
+      policy: request.policy,
+      context: request.context,
+      evaluatedAt: request.evaluatedAt,
+    });
   }
 }
 
@@ -461,6 +494,16 @@ export async function startAuthMinimalIdentityServerHost(
 
     const enableDevLoginRoute = resolveIdentityDevLoginRouteEnabled(env);
     const sessionContextWorkspaceApi = createSessionContextWorkspaceApi(workspaceRepository);
+    const transportTrustStateResolver = new ServerManagedTransportTrustStateResolver({
+      trustedDeviceManagementService,
+    });
+    const transportTrustValidator = new ValidateTransportConnectionTrustUseCase({
+      transportSecurityPolicyResolverPort: new BaselineTransportSecurityPolicyResolver(),
+      transportConnectionPolicyEvaluatorPort: new DomainTransportConnectionPolicyEvaluator(),
+      trustedDeviceStateResolverPort: transportTrustStateResolver,
+    });
+    const httpTransportTrustValidator = new HttpTransportTrustValidationAdapter(transportTrustValidator);
+    const websocketTransportTrustValidator = new WebSocketTransportTrustValidationAdapter(transportTrustValidator);
     const server = createIdentityHttpServer({
       backendApi,
       sessionContextWorkspaceApi,
@@ -472,6 +515,13 @@ export async function startAuthMinimalIdentityServerHost(
         requireWss: secureTransportConfig.requireSecureWebSocket,
         allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
       }),
+      transportTrust: secureTransportConfig.enforceTransportTrustValidation
+        ? Object.freeze({
+            httpValidator: httpTransportTrustValidator,
+            websocketValidator: websocketTransportTrustValidator,
+            allowInsecureLoopback: secureTransportConfig.allowInsecureLoopback,
+          })
+        : undefined,
       development: Object.freeze({
         enableDevLoginRoute,
       }),
