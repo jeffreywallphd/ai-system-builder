@@ -171,11 +171,12 @@ let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
 let deferredFeatureIpcReady = false;
 let postLoginBootstrapPromise: Promise<void> | undefined;
+let postLoginWarmupStarted = false;
 let isDesktopRuntimeDisposing = false;
+let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
 
 type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
   readonly identityApiBaseUrl: string;
 };
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
@@ -530,6 +531,9 @@ function registerAuthIpc(): void {
       },
     },
     isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
+    startPostLoginWarmup: async () => {
+      await ensurePostLoginWarmupStarted();
+    },
     connectivity: {
       getState: () => {
         const state = desktopConnectivityStateService?.getState() ?? {
@@ -602,34 +606,6 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationCheckpoint("desktop-auth-shell-bootstrap", "storage-ready", authShellStartedAt);
     logInitializationMemory("desktop-auth-shell-bootstrap", "storage-ready");
 
-    const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
-    const pythonRuntime = resolveDesktopPythonRuntime({
-      isPackaged,
-      repoRoot,
-      resourcesPath: process.resourcesPath,
-      storagePaths,
-    });
-    logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
-    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "python-runtime-resolved", authShellStartedAt);
-    logInitializationMemory("desktop-auth-shell-bootstrap", "python-runtime-resolved");
-
-    const preLoginServiceSupervisorBaseUrl = process.env.SERVICE_SUPERVISOR_BASE_URL || "http://127.0.0.1:8790";
-    const preLoginPythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100";
-    const baseRuntimeConfig = isPackaged
-      ? AppRuntimeConfig.forDesktopProduction({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: preLoginServiceSupervisorBaseUrl,
-        serviceSupervisorPort: DesktopServiceSupervisorPort,
-        pythonRuntimeBaseUrl: preLoginPythonRuntimeBaseUrl,
-      })
-      : AppRuntimeConfig.forDesktopDevelopment({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: preLoginServiceSupervisorBaseUrl,
-        serviceSupervisorPort: DesktopServiceSupervisorPort,
-        pythonRuntimeBaseUrl: preLoginPythonRuntimeBaseUrl,
-      });
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
     const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");
     authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
@@ -657,10 +633,15 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
         hostAddress: "127.0.0.1",
       }),
     );
-    const runtimeConfig = AppRuntimeConfig.fromValues({
-      ...baseRuntimeConfig.toValues(),
-      identityApiBaseUrl,
-    });
+    const runtimeConfig = isPackaged
+      ? AppRuntimeConfig.forDesktopProductionAuthShell({
+        storage: storagePaths,
+        identityApiBaseUrl,
+      })
+      : AppRuntimeConfig.forDesktopDevelopmentAuthShell({
+        storage: storagePaths,
+        identityApiBaseUrl,
+      });
     buildBootstrapContext({
       runtimeConfig,
       storagePaths,
@@ -672,7 +653,6 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     registerAuthIpc();
     return Object.freeze({
       storagePaths,
-      pythonRuntime,
       identityApiBaseUrl,
     });
   } finally {
@@ -690,13 +670,52 @@ function registerDeferredFeatureIpc(register: () => void): void {
   deferredFeatureIpcReady = true;
 }
 
+async function ensurePostLoginWarmupStarted(): Promise<void> {
+  if (postLoginBootstrapPromise) {
+    await postLoginBootstrapPromise;
+    return;
+  }
+  if (postLoginWarmupStarted) {
+    return;
+  }
+  const authShell = authShellBootstrapResult;
+  if (!authShell) {
+    throw new Error("Auth-shell bootstrap context is unavailable for post-login warmup.");
+  }
+
+  postLoginWarmupStarted = true;
+  postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
+  try {
+    await postLoginBootstrapPromise;
+  } catch (error) {
+    postLoginBootstrapPromise = undefined;
+    if (!isDesktopRuntimeDisposing) {
+      console.error("Post-login desktop runtime bootstrap failed", error);
+      await disposeDesktopRuntimeResources();
+      app.exit(1);
+    }
+    postLoginWarmupStarted = false;
+    throw error;
+  }
+}
+
 async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
   const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
   try {
-  const { storagePaths, pythonRuntime, identityApiBaseUrl } = authShell;
+  const { storagePaths, identityApiBaseUrl } = authShell;
   if (!storageDatabase) {
     throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
   }
+  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
+  const pythonRuntime = resolveDesktopPythonRuntime({
+    isPackaged,
+    repoRoot,
+    resourcesPath: process.resourcesPath,
+    storagePaths,
+  });
+  logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "python-runtime-resolved", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "python-runtime-resolved");
   await new InitializeProductionStorageUseCase(storageDatabase).execute({
     scope: ProductionStorageInitializationScopes.fullRuntime,
   });
@@ -1444,6 +1463,8 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   bootstrapContext = undefined;
   rendererContentSecurityPolicyRuntimeConfig = undefined;
   deferredFeatureIpcReady = false;
+  postLoginWarmupStarted = false;
+  authShellBootstrapResult = undefined;
   isDesktopRuntimeDisposing = false;
 }
 
@@ -1454,18 +1475,10 @@ app.whenReady().then(async () => {
       startHost: async () => {
         try {
           const authShell = await bootstrapAuthShell();
+          authShellBootstrapResult = authShell;
           installRendererContentSecurityPolicy();
           await createMainWindow();
           logInitializationMemory("desktop-host-bootstrap", "main-window-ready");
-          postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
-          postLoginBootstrapPromise.catch(async (error) => {
-            if (isDesktopRuntimeDisposing) {
-              return;
-            }
-            console.error("Post-login desktop runtime bootstrap failed", error);
-            await disposeDesktopRuntimeResources();
-            app.exit(1);
-          });
           return Object.freeze({
             close: disposeDesktopRuntimeResources,
           });

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 const bootstrap = ipcRenderer.sendSync("ai-loom-desktop:get-bootstrap-sync");
 const DeferredFeatureApiReadyChannel = "ai-loom-desktop-runtime:is-feature-api-ready";
+const StartPostLoginWarmupChannel = "ai-loom-desktop-runtime:start-post-login-warmup";
 const DeferredFeatureApiUnavailableCode = "AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE";
 const DeferredFeatureApiUnavailableDetail = "Desktop feature APIs are unavailable until post-login runtime initialization completes.";
 
@@ -465,6 +466,9 @@ const authBootstrapSurface = Object.freeze({
   connectivity: connectivityBridge,
   runtime: Object.freeze({
     isDeferredFeatureApiReady,
+    startPostLoginWarmup() {
+      return ipcRenderer.invoke(StartPostLoginWarmupChannel) as Promise<void>;
+    },
   }),
 });
 

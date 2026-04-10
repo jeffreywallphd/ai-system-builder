@@ -3,6 +3,7 @@
 ## Core fact
 Electron is the desktop host boundary; the renderer accesses desktop capabilities through preload bridge contracts.
 Desktop host startup is now routed through a dedicated desktop host assembly (`src/hosts/desktop/DesktopHostEntrypoint.ts` and `src/hosts/desktop/DesktopHostCompositionRoot.ts`).
+Python runtime resolution and local service-supervisor startup now occur in post-login warmup instead of pre-login window bootstrap.
 
 ## Main files
 - Desktop host assembly entrypoint/composition root: `src/hosts/desktop/DesktopHostEntrypoint.ts`, `src/hosts/desktop/DesktopHostCompositionRoot.ts`
