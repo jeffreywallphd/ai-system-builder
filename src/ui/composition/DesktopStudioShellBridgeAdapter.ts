@@ -4,5 +4,5 @@ export function resolveDesktopStudioShellBridge(): DesktopStudioShellBridge | un
   if (typeof window === "undefined") {
     return undefined;
   }
-  return window.aiLoomDesktop?.studioShell;
+  return window.aiLoomDesktop?.features?.studioShell ?? window.aiLoomDesktop?.studioShell;
 }

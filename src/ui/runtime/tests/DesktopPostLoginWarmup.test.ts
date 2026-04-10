@@ -44,4 +44,22 @@ describe("requestDesktopPostLoginWarmup", () => {
     await requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.sessionRefresh);
     expect(invocations).toBe(1);
   });
+
+  it("uses auth-scoped runtime bridge when available", async () => {
+    const startPostLoginWarmup = mock((_request: unknown) => Promise.resolve());
+    (globalThis as { window: Window }).window = {
+      aiLoomDesktop: {
+        auth: {
+          runtime: {
+            isDeferredFeatureApiReady: () => false,
+            getPostLoginRuntimeStatus: () => ({ state: "unavailable", updatedAt: new Date().toISOString() }),
+            startPostLoginWarmup,
+          },
+        },
+      },
+    } as unknown as Window;
+
+    await requestDesktopPostLoginWarmup(DesktopPostLoginWarmupTriggerSources.explicitLogin);
+    expect(startPostLoginWarmup).toHaveBeenCalledTimes(1);
+  });
 });

@@ -5,5 +5,5 @@ export function resolveDesktopExecutionRunBridge(): DesktopExecutionRunBridge | 
     return undefined;
   }
 
-  return window.aiLoomDesktop?.executionRuns;
+  return window.aiLoomDesktop?.features?.executionRuns ?? window.aiLoomDesktop?.executionRuns;
 }

@@ -49,7 +49,7 @@ export default function App({
     return false;
   });
   const [initializationProgress, setInitializationProgress] = useState<Readonly<AppInitializationProgressUpdate>>(() => {
-    if (typeof window !== "undefined" && window.aiLoomDesktop?.bootstrap) {
+    if (typeof window !== "undefined" && (window.aiLoomDesktop?.auth?.bootstrap ?? window.aiLoomDesktop?.bootstrap)) {
       return Object.freeze({ stageId: AppInitializationStageIds.startingIdentityServices });
     }
     return Object.freeze({ stageId: AppInitializationStageIds.loadingSavedSession });

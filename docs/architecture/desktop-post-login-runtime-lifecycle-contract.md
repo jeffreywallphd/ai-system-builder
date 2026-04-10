@@ -113,6 +113,22 @@ Connectivity monitoring now follows the same deferred lifecycle boundary as othe
 - renderer offline-mode write attempts before monitoring startup receive the same fallback state rather than partial pre-login monitoring emulation.
 - runtime teardown (`disposeDesktopRuntimeResources()`) explicitly stops connectivity monitoring before resetting runtime state, so quit/logout shutdown paths remain deterministic.
 
+## Story C.3.1 preload and IPC surface split contract
+
+Desktop bridge exposure is now explicitly separated into two surfaces:
+
+- `window.aiLoomDesktop.auth`
+  - always available during pre-login startup
+  - includes bootstrap metadata, storage, secrets, connectivity, and runtime lifecycle probe/trigger APIs
+- `window.aiLoomDesktop.features`
+  - deferred feature bridge surface
+  - APIs are guarded until deferred runtime is ready
+  - first deferred feature use issues a `feature-demand` warmup trigger through the existing runtime warmup channel
+
+Compatibility rule:
+
+- legacy root aliases (for example `window.aiLoomDesktop.workflows`) may remain for transition compatibility, but renderer integrations should resolve through `auth` and `features` as the canonical contract.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

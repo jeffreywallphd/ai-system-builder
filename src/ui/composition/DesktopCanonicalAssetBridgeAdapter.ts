@@ -5,5 +5,5 @@ export function resolveDesktopCanonicalAssetBridge(): DesktopCanonicalAssetBridg
     return undefined;
   }
 
-  return window.aiLoomDesktop?.canonicalAssets;
+  return window.aiLoomDesktop?.features?.canonicalAssets ?? window.aiLoomDesktop?.canonicalAssets;
 }

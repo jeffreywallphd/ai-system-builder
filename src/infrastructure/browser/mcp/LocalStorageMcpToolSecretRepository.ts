@@ -281,6 +281,6 @@ function resolveDesktopSecretBridge(): DesktopMcpSecretBridge | undefined {
   if (typeof window === "undefined") {
     return undefined;
   }
-  return window.aiLoomDesktop?.secrets;
+  return window.aiLoomDesktop?.auth?.secrets ?? window.aiLoomDesktop?.secrets;
 }
 

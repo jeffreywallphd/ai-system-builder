@@ -317,13 +317,19 @@ export class AppRuntimeConfig {
   }
 
   public static resolveDefault(): AppRuntimeConfig {
-    const desktopBootstrap = (globalThis as typeof globalThis & {
+    const desktopBridge = (globalThis as typeof globalThis & {
       aiLoomDesktop?: {
+        auth?: {
+          bootstrap?: {
+            runtimeConfig: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig;
+          };
+        };
         bootstrap?: {
           runtimeConfig: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig;
         };
       };
-    }).aiLoomDesktop?.bootstrap;
+    }).aiLoomDesktop;
+    const desktopBootstrap = desktopBridge?.auth?.bootstrap ?? desktopBridge?.bootstrap;
 
     if (desktopBootstrap?.runtimeConfig) {
       return new AppRuntimeConfig(expandDesktopBootstrapRuntimeConfig(desktopBootstrap.runtimeConfig));

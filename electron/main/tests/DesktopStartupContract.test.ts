@@ -44,6 +44,9 @@ describe("desktop startup boot contract", () => {
     const preloadSource = fs.readFileSync(path.resolve(process.cwd(), "electron/preload.ts"), "utf8");
     expect(preloadSource).toContain("ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap)");
     expect(preloadSource).toContain("ipcRenderer.sendSync(DesktopBootstrapIpcChannels.postLoginRuntimeStatus)");
+    expect(preloadSource).toContain("auth: authBootstrapSurface");
+    expect(preloadSource).toContain("features: deferredFeatureSurface");
+    expect(preloadSource).toContain("DesktopPostLoginWarmupTriggerSources.featureDemand");
   });
 
   it("validates the aggregate startup boot contract", () => {
