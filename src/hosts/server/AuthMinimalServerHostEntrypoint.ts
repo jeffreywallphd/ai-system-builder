@@ -10,7 +10,7 @@ import type { AuthoritativeServerHostRuntimeHandle } from "./AuthoritativeServer
 import {
   assertAuthMinimalServerApiRouteRegistrationCoverage,
   composeAuthMinimalServerApiRouteRegistrationPlan,
-} from "./AuthoritativeServerApiRouteComposition";
+} from "./AuthMinimalServerApiRouteComposition";
 import { startAuthMinimalIdentityServerHost } from "./AuthMinimalIdentityServerHost";
 import {
   createSqlitePersistenceRuntime,
