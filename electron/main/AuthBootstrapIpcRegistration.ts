@@ -1,5 +1,9 @@
 import type { IpcMain } from "electron";
-import type { DesktopAuthBootstrapContext } from "../shared/DesktopContracts";
+import {
+  DesktopPostLoginWarmupTriggerSources,
+  type DesktopAuthBootstrapContext,
+  type DesktopPostLoginWarmupRequest,
+} from "../shared/DesktopContracts";
 
 export const AUTH_BOOTSTRAP_IPC_CHANNELS = Object.freeze({
   bootstrap: "ai-loom-desktop:get-bootstrap-sync",
@@ -25,7 +29,7 @@ export type RegisterAuthBootstrapIpcParams = {
     readonly removeItem: (key: string) => void;
   };
   readonly isDeferredFeatureIpcReady: () => boolean;
-  readonly startPostLoginWarmup: () => Promise<void>;
+  readonly startPostLoginWarmup: (request: DesktopPostLoginWarmupRequest) => Promise<void>;
   readonly connectivity: {
     readonly getState: () => Promise<string> | string;
     readonly setOfflineMode: (requestJson: string) => Promise<string> | string;
@@ -37,6 +41,33 @@ export type RegisterAuthBootstrapIpcParams = {
     readonly removeSecret: (key: string) => void;
   };
 };
+
+function parsePostLoginWarmupRequest(value: unknown): DesktopPostLoginWarmupRequest {
+  if (typeof value !== "object" || value === null) {
+    return Object.freeze({ triggerSource: DesktopPostLoginWarmupTriggerSources.unknown });
+  }
+  const request = value as {
+    readonly triggerSource?: unknown;
+    readonly requestedAt?: unknown;
+  };
+  const requestedAt = typeof request.requestedAt === "string" ? request.requestedAt : undefined;
+  const triggerSource = request.triggerSource;
+  if (
+    triggerSource === DesktopPostLoginWarmupTriggerSources.explicitLogin
+    || triggerSource === DesktopPostLoginWarmupTriggerSources.sessionRestore
+    || triggerSource === DesktopPostLoginWarmupTriggerSources.sessionRefresh
+    || triggerSource === DesktopPostLoginWarmupTriggerSources.unknown
+  ) {
+    return Object.freeze({
+      triggerSource,
+      requestedAt,
+    });
+  }
+  return Object.freeze({
+    triggerSource: DesktopPostLoginWarmupTriggerSources.unknown,
+    requestedAt,
+  });
+}
 
 export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams): void {
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.bootstrap, (event) => {
@@ -54,8 +85,8 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady, (event) => {
     event.returnValue = params.isDeferredFeatureIpcReady();
   });
-  params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup, async () => {
-    await params.startPostLoginWarmup();
+  params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup, async (_event, request?: unknown) => {
+    await params.startPostLoginWarmup(parsePostLoginWarmupRequest(request));
   });
   params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState, () => params.connectivity.getState());
   params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivitySetOfflineMode, (_event, requestJson: string) => (
