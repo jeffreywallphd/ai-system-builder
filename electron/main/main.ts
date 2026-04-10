@@ -25,7 +25,6 @@ import { RendererDeliveryModes } from "../../src/domain/runtime/AppRuntimeProfil
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopBootstrapContext,
-  DesktopIdentityTransportTrustBootstrap,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
 import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
@@ -78,11 +77,13 @@ import {
   type LaunchSystemRuntimeWindowReadModel,
 } from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
-import { resolveModelFileAbsolutePath, toLogicalModelPath } from "./ModelFilePathPolicy";
+import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
+import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
+import { listEntries, toFileEntry } from "./ModelFileEntries";
+import { resolveModelFileAbsolutePath } from "./ModelFilePathPolicy";
 import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../src/hosts/desktop/DesktopHostEntrypoint";
 import {
   DesktopConnectivityStateService,
-  type DesktopConnectivityProbePort,
 } from "../../src/hosts/desktop/DesktopConnectivityStateService";
 import {
   startAuthoritativeServerHostAssembly,
@@ -161,30 +162,6 @@ type CanonicalRegistryRuntime = {
 };
 let canonicalRegistryRuntime: CanonicalRegistryRuntime | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
-const IDENTITY_SESSION_STORAGE_KEY = "ai-loom.identity.session.v1";
-const CONNECTIVITY_PROBE_TIMEOUT_MS = 1_750;
-
-const DESKTOP_TRUST_STORAGE_KEYS = Object.freeze({
-  trustedDeviceBindingId: "identity.desktop.transport.trusted-device-binding-id",
-  trustMarker: "identity.desktop.transport.trust-marker",
-  materialKind: "identity.desktop.transport.material-kind",
-  pinReference: "identity.desktop.transport.pin-reference",
-  publicKeyFingerprint: "identity.desktop.transport.public-key-fingerprint",
-  issuedAt: "identity.desktop.transport.issued-at",
-  expiresAt: "identity.desktop.transport.expires-at",
-});
-
-const DESKTOP_TRUST_ENV_KEYS = Object.freeze({
-  enforcement: "AI_LOOM_DESKTOP_TRUST_BOOTSTRAP_ENFORCEMENT",
-  trustedDeviceBindingId: "AI_LOOM_DESKTOP_TRUSTED_DEVICE_BINDING_ID",
-  trustMarker: "AI_LOOM_DESKTOP_TRUST_MARKER",
-  materialKind: "AI_LOOM_DESKTOP_TRUST_MATERIAL_KIND",
-  pinReference: "AI_LOOM_DESKTOP_TRUST_PIN_REFERENCE",
-  publicKeyFingerprint: "AI_LOOM_DESKTOP_TRUST_PUBLIC_KEY_FINGERPRINT",
-  issuedAt: "AI_LOOM_DESKTOP_TRUST_ISSUED_AT",
-  expiresAt: "AI_LOOM_DESKTOP_TRUST_EXPIRES_AT",
-});
-
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -195,314 +172,6 @@ function createRendererSearch(params: Record<string, string | undefined>): strin
   }
   const serialized = search.toString();
   return serialized ? `?${serialized}` : undefined;
-}
-
-function toFileEntry(modelsRootPath: string, filePath: string) {
-  const stats = fs.statSync(filePath);
-  return {
-    path: toLogicalModelPath(modelsRootPath, filePath),
-    kind: stats.isDirectory() ? "directory" as const : "file" as const,
-    size: stats.isFile() ? stats.size : undefined,
-    modifiedAt: stats.mtime.toISOString(),
-  };
-}
-
-function listEntries(modelsRootPath: string, rootPath: string, recursive = false): ReadonlyArray<ReturnType<typeof toFileEntry>> {
-  if (!fs.existsSync(rootPath)) {
-    return [];
-  }
-
-  const results: ReturnType<typeof toFileEntry>[] = [];
-  const walk = (currentPath: string) => {
-    for (const entry of fs.readdirSync(currentPath, { withFileTypes: true })) {
-      const entryPath = path.join(currentPath, entry.name);
-      results.push(toFileEntry(modelsRootPath, entryPath));
-      if (recursive && entry.isDirectory()) {
-        walk(entryPath);
-      }
-    }
-  };
-  walk(rootPath);
-  return results;
-}
-
-function resolveDesktopIdentityTransportTrustBootstrap(): DesktopIdentityTransportTrustBootstrap | undefined {
-  const enforcement = normalizeTrustBootstrapEnforcement(process.env[DESKTOP_TRUST_ENV_KEYS.enforcement]);
-  const trustedDeviceBindingId = readDesktopTrustValue({
-    storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustedDeviceBindingId,
-    envKey: DESKTOP_TRUST_ENV_KEYS.trustedDeviceBindingId,
-  });
-  const pinReference = readDesktopTrustSecretValue({
-    storageKey: DESKTOP_TRUST_STORAGE_KEYS.pinReference,
-    envKey: DESKTOP_TRUST_ENV_KEYS.pinReference,
-  });
-
-  const trustConfigured = Boolean(trustedDeviceBindingId || pinReference);
-  const effectiveEnforcement = enforcement ?? (trustConfigured ? "required" : "optional");
-  if (!trustConfigured && effectiveEnforcement !== "required") {
-    return undefined;
-  }
-
-  const materialKind = normalizeMaterialKind(
-    readDesktopTrustValue({
-      storageKey: DESKTOP_TRUST_STORAGE_KEYS.materialKind,
-      envKey: DESKTOP_TRUST_ENV_KEYS.materialKind,
-    }),
-  ) ?? "opaque-marker";
-
-  return Object.freeze({
-    enforcement: effectiveEnforcement,
-    registeredDevice: trustedDeviceBindingId
-      ? Object.freeze({
-          trustedDeviceBindingId,
-          trustMarker: readDesktopTrustSecretValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.trustMarker,
-            envKey: DESKTOP_TRUST_ENV_KEYS.trustMarker,
-          }),
-        })
-      : undefined,
-    pinnedTrustMaterial: pinReference
-      ? Object.freeze({
-          pinReference,
-          materialKind,
-          publicKeyFingerprint: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.publicKeyFingerprint,
-            envKey: DESKTOP_TRUST_ENV_KEYS.publicKeyFingerprint,
-          }),
-          issuedAt: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.issuedAt,
-            envKey: DESKTOP_TRUST_ENV_KEYS.issuedAt,
-          }),
-          expiresAt: readDesktopTrustValue({
-            storageKey: DESKTOP_TRUST_STORAGE_KEYS.expiresAt,
-            envKey: DESKTOP_TRUST_ENV_KEYS.expiresAt,
-          }),
-        })
-      : undefined,
-  });
-}
-
-function readDesktopTrustValue(input: {
-  readonly storageKey: string;
-  readonly envKey: string;
-}): string | undefined {
-  const fromStorage = normalizeOptional(storageDatabase?.getItem(input.storageKey) ?? undefined);
-  if (fromStorage) {
-    return fromStorage;
-  }
-  return normalizeOptional(process.env[input.envKey]);
-}
-
-function readDesktopTrustSecretValue(input: {
-  readonly storageKey: string;
-  readonly envKey: string;
-}): string | undefined {
-  const encoded = storageDatabase?.getItem(`secure:${input.storageKey}`);
-  if (encoded) {
-    try {
-      const decrypted = safeStorage.decryptString(Buffer.from(encoded, "base64"));
-      const normalized = normalizeOptional(decrypted);
-      if (normalized) {
-        return normalized;
-      }
-    } catch {
-      // fall through to non-secret and env fallback
-    }
-  }
-  return readDesktopTrustValue(input);
-}
-
-function normalizeMaterialKind(
-  value: string | undefined,
-): "session-signing-key" | "attestation-key" | "opaque-marker" | undefined {
-  if (value === "session-signing-key" || value === "attestation-key" || value === "opaque-marker") {
-    return value;
-  }
-  return undefined;
-}
-
-function normalizeTrustBootstrapEnforcement(value: string | undefined): "required" | "optional" | undefined {
-  const normalized = normalizeOptional(value)?.toLowerCase();
-  if (normalized === "required" || normalized === "optional") {
-    return normalized;
-  }
-  return undefined;
-}
-
-function normalizeOptional(value: string | undefined): string | undefined {
-  const normalized = value?.trim();
-  return normalized ? normalized : undefined;
-}
-
-function normalizeHttpOrigin(value: string): string | undefined {
-  try {
-    const origin = new URL(value).origin;
-    return origin === "null" ? undefined : origin;
-  } catch {
-    return undefined;
-  }
-}
-
-function createDesktopConnectivityProbePort(identityApiBaseUrl: string): DesktopConnectivityProbePort {
-  return Object.freeze({
-    probe: async () => {
-      const trustBootstrap = resolveDesktopIdentityTransportTrustBootstrap();
-      const trustEnforcement = trustBootstrap?.enforcement ?? "optional";
-      const trustPrerequisitesSatisfied = evaluateTrustPrerequisitesSatisfied(trustBootstrap);
-      const trustedSession = resolveTrustedSessionAvailability(trustEnforcement);
-      const transport = await probeTransportReachability(identityApiBaseUrl);
-      return Object.freeze({
-        transportReachable: transport.transportReachable,
-        transportTransientFailure: transport.transportTransientFailure,
-        transportDetail: transport.transportDetail,
-        trustedSessionAvailable: trustedSession.available,
-        trustedSessionDetail: trustedSession.detail,
-        trustPrerequisitesSatisfied,
-        trustPrerequisitesDetail: trustPrerequisitesSatisfied
-          ? undefined
-          : "Desktop trust bootstrap prerequisites are incomplete for trusted-session operation.",
-        trustEnforcement,
-      });
-    },
-  });
-}
-
-function evaluateTrustPrerequisitesSatisfied(
-  bootstrap: DesktopIdentityTransportTrustBootstrap | undefined,
-): boolean {
-  if (!bootstrap || bootstrap.enforcement !== "required") {
-    return true;
-  }
-  const trustedDeviceBindingId = normalizeOptional(bootstrap.registeredDevice?.trustedDeviceBindingId);
-  const pinReference = normalizeOptional(bootstrap.pinnedTrustMaterial?.pinReference);
-  const expiresAt = normalizeOptional(bootstrap.pinnedTrustMaterial?.expiresAt);
-  if (!trustedDeviceBindingId || !pinReference) {
-    return false;
-  }
-  if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
-    return false;
-  }
-  return true;
-}
-
-function resolveTrustedSessionAvailability(
-  trustEnforcement: "required" | "optional",
-): { readonly available: boolean; readonly detail?: string } {
-  const payload = storageDatabase?.getItem(IDENTITY_SESSION_STORAGE_KEY);
-  if (!payload) {
-    return Object.freeze({
-      available: false,
-      detail: "No persisted authenticated session was found in desktop storage.",
-    });
-  }
-  try {
-    const parsed = JSON.parse(payload) as {
-      readonly sessionToken?: string;
-      readonly sessionExpiresAt?: string;
-      readonly sessionTrustState?: string;
-    };
-    const sessionToken = normalizeOptional(parsed.sessionToken);
-    if (!sessionToken) {
-      return Object.freeze({
-        available: false,
-        detail: "Persisted desktop session is missing a session token.",
-      });
-    }
-    const expiresAt = normalizeOptional(parsed.sessionExpiresAt);
-    const expiresAtMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
-    if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
-      return Object.freeze({
-        available: false,
-        detail: "Persisted desktop session is expired.",
-      });
-    }
-    const trustState = normalizeOptional(parsed.sessionTrustState);
-    if (trustEnforcement === "required" && trustState !== "trusted") {
-      return Object.freeze({
-        available: false,
-        detail: "Persisted desktop session is not trusted under required trust enforcement.",
-      });
-    }
-    if (trustState === "revoked" || trustState === "expired") {
-      return Object.freeze({
-        available: false,
-        detail: `Persisted desktop session trust state '${trustState}' is not eligible for trusted operation.`,
-      });
-    }
-    return Object.freeze({ available: true });
-  } catch {
-    return Object.freeze({
-      available: false,
-      detail: "Persisted desktop session payload is invalid JSON.",
-    });
-  }
-}
-
-async function probeTransportReachability(identityApiBaseUrl: string): Promise<{
-  readonly transportReachable: boolean;
-  readonly transportTransientFailure?: boolean;
-  readonly transportDetail?: string;
-}> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => {
-    controller.abort();
-  }, CONNECTIVITY_PROBE_TIMEOUT_MS);
-  try {
-    const response = await fetch(identityApiBaseUrl, {
-      method: "GET",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-    return Object.freeze({
-      transportReachable: true,
-      transportTransientFailure: false,
-      transportDetail: `Authoritative server probe responded with HTTP ${response.status}.`,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown connectivity probe error.";
-    return Object.freeze({
-      transportReachable: false,
-      transportTransientFailure: true,
-      transportDetail: message,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function logInitializationStart(phase: string): number {
-  const startedAt = Date.now();
-  console.info(`\n[ai-loom][init] ${phase}:start startedAt=${new Date(startedAt).toISOString()}\n`);
-  return startedAt;
-}
-
-function logInitializationEnd(phase: string, startedAt: number): void {
-  const endedAt = Date.now();
-  console.info(
-    `\n[ai-loom][init] ${phase}:end durationMs=${endedAt - startedAt} startedAt=${new Date(startedAt).toISOString()} endedAt=${new Date(endedAt).toISOString()}\n`,
-  );
-}
-
-function logInitializationCheckpoint(
-  phase: string,
-  checkpoint: string,
-  startedAt: number,
-): void {
-  const now = Date.now();
-  console.info(
-    `\n[ai-loom][init] ${phase}:checkpoint name=${checkpoint} elapsedMs=${now - startedAt} at=${new Date(now).toISOString()}\n`,
-  );
-}
-
-function logInitializationMemory(phase: string, checkpoint: string): void {
-  const usage = process.memoryUsage();
-  console.info(
-    `\n[ai-loom][memory] ${phase}:checkpoint name=${checkpoint} rssMB=${toMegabytes(usage.rss)} heapUsedMB=${toMegabytes(usage.heapUsed)} heapTotalMB=${toMegabytes(usage.heapTotal)} externalMB=${toMegabytes(usage.external)} arrayBuffersMB=${toMegabytes(usage.arrayBuffers)} at=${new Date().toISOString()}\n`,
-  );
-}
-
-function toMegabytes(value: number): string {
-  return (value / (1024 * 1024)).toFixed(1);
 }
 
 function createDesktopAgentRunner(params: {
@@ -883,10 +552,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       port: 8790,
     },
     pythonRuntime,
-    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap(),
+    identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap((key) => storageDatabase?.getItem(key) ?? null),
   });
   desktopConnectivityStateService = new DesktopConnectivityStateService();
-  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl), {
+  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
     intervalMs: 3_000,
   });
 
