@@ -96,6 +96,26 @@ Contract rule:
 - renderer may continue using readiness for binary gating.
 - renderer should use status probe for warming/failed/unavailable awareness.
 
+## Story C.3.2 renderer readiness/failure boundary
+
+Renderer now applies a deferred-runtime feature-entry boundary instead of assuming post-login runtime is immediately ready:
+
+- `src/ui/runtime/DeferredRuntimeFeatureGate.ts`
+  - resolves runtime bridge from `window.aiLoomDesktop.auth.runtime` (legacy fallback supported),
+  - requests `feature-demand` warmup on first gated feature entry,
+  - polls lifecycle status until `ready`,
+  - maps lifecycle states into controlled surface states (`loading`, `disconnected`, `error`) with retry support.
+- `src/ui/layout/AppLayout.tsx`
+  - gates deferred-runtime-dependent routes at the `Outlet` boundary:
+    - `/build*`, `/explore*`, `/run*`, `/assets*`, `/workflows/*`, `/studio-shell/*`
+  - renders existing `SurfaceStatePanel` status presentation and a localized retry action when runtime is unavailable/failed.
+
+Contract intent:
+
+- login remains fast (no new global post-login blocking screen),
+- deferred feature entry points no longer race deferred runtime warmup,
+- failures/unavailability are surfaced in a controlled way that is clear to users and actionable for developers.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,

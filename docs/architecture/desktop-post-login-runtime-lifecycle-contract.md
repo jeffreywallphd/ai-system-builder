@@ -129,6 +129,30 @@ Compatibility rule:
 
 - legacy root aliases (for example `window.aiLoomDesktop.workflows`) may remain for transition compatibility, but renderer integrations should resolve through `auth` and `features` as the canonical contract.
 
+## Story C.3.2 renderer deferred runtime readiness/failure handling
+
+Renderer feature-entry handling now enforces deferred runtime readiness without introducing a monolithic post-login blocker:
+
+- `src/ui/layout/AppLayout.tsx` now applies a feature-entry boundary before `Outlet` rendering for deferred-runtime-dependent routes:
+  - `/build*`
+  - `/explore*`
+  - `/run*`
+  - `/assets*`
+  - `/workflows/*`
+  - `/studio-shell/*`
+- `src/ui/runtime/DeferredRuntimeFeatureGate.ts` now:
+  - reads lifecycle status through `auth.runtime.getPostLoginRuntimeStatus()` (with legacy fallback),
+  - requests `feature-demand` warmup on gated route entry,
+  - polls lifecycle status while warmup is in progress,
+  - maps `warming`, `unavailable`, and `failed` into controlled surface presentation states.
+
+Behavioral contract:
+
+- authenticated login flow stays fast and unchanged;
+- only deferred-dependent feature entries show localized warmup/failure states;
+- failure/unavailable messaging stays user-readable while including concise diagnostics (`runtime state`, `reason`, `updatedAt`, optional failure message) for developers;
+- retry action is exposed at the feature boundary and re-requests deferred warmup without resetting the entire app shell.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)
