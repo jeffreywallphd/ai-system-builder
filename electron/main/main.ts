@@ -672,8 +672,9 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     isPackaged,
     resourcesPath: process.resourcesPath,
     storagePaths,
-    pythonRuntime,
-  });
+      pythonRuntime,
+      pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
+    });
   const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
   await serviceSupervisor.start();
   logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
@@ -685,12 +686,14 @@ async function bootstrapDesktopRuntime(): Promise<void> {
         pythonRuntime,
         serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
         serviceSupervisorPort: 8790,
+        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
       })
     : AppRuntimeConfig.forDesktopDevelopment({
         storage: storagePaths,
         pythonRuntime,
         serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
         serviceSupervisorPort: 8790,
+        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
       });
   const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
   const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");

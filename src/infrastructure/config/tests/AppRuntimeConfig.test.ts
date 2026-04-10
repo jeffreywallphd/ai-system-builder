@@ -54,6 +54,7 @@ describe("AppRuntimeConfig", () => {
       },
       serviceSupervisorBaseUrl: "http://127.0.0.1:8790",
       serviceSupervisorPort: 8790,
+      pythonRuntimeBaseUrl: "http://127.0.0.1:8100",
     });
 
     expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
@@ -71,6 +72,7 @@ describe("AppRuntimeConfig", () => {
     expect(config.isPackagedDesktopHost).toBe(true);
     expect(config.isDevSyncEnabled).toBe(false);
     expect(config.modelInstallDirectory).toBe("/tmp/ai-loom/models");
+    expect(config.pythonRuntimeBaseUrl).toBe("http://127.0.0.1:8100");
   });
 
   it("reads browser development runtime bootstrap env overrides", () => {
@@ -99,4 +101,3 @@ describe("AppRuntimeConfig", () => {
     }
   });
 });
-

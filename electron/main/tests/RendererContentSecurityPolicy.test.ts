@@ -22,11 +22,12 @@ describe("createRendererContentSecurityPolicy", () => {
         identityApiBaseUrl: "http://127.0.0.1:56609",
         serviceSupervisorBaseUrl: "http://127.0.0.1:8790",
         serviceSupervisorPort: 8790,
+        pythonRuntimeBaseUrl: "http://127.0.0.1:8100",
       },
     });
 
-    expect(policy).toContain("script-src 'self' 'unsafe-inline' http://localhost:5174 http://127.0.0.1:56609 http://127.0.0.1:8790");
-    expect(policy).toContain("connect-src 'self' http://localhost:5174 http://127.0.0.1:56609 http://127.0.0.1:8790 ws://localhost:5174 ws://127.0.0.1:56609 ws://127.0.0.1:8790");
+    expect(policy).toContain("script-src 'self' 'unsafe-inline' http://localhost:5174 http://127.0.0.1:56609 http://127.0.0.1:8790 http://127.0.0.1:8100");
+    expect(policy).toContain("connect-src 'self' http://localhost:5174 http://127.0.0.1:56609 http://127.0.0.1:8790 http://127.0.0.1:8100 ws://localhost:5174 ws://127.0.0.1:56609 ws://127.0.0.1:8790 ws://127.0.0.1:8100");
   });
 
   it("ignores invalid endpoint inputs", () => {
