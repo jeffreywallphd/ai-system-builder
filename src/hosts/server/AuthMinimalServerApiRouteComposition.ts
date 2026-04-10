@@ -11,6 +11,28 @@ export const AuthMinimalServerRequiredRouteFamilyIds = Object.freeze([
   "identity-auth",
 ]);
 
+export const AuthMinimalServerForbiddenRouteFamilyIds = Object.freeze([
+  "workspace-invitations",
+  "workspace-administration",
+  "authorization-management",
+  "deployment-policy-read",
+  "deployment-policy-write",
+  "audit-ledger",
+  "node-trust",
+  "execution-node-management",
+  "security-certificate-operations",
+  "security-secret-metadata",
+  "storage-management",
+  "asset-management",
+  "image-asset-management",
+  "system-runtime",
+  "run-submission",
+  "run-read",
+  "run-mutation",
+  "image-run-api",
+  "run-execution-update",
+]);
+
 export function composeAuthMinimalServerApiRouteRegistrationPlan(): AuthoritativeApiRouteRegistrationPlan {
   return composeAuthoritativeApiRouteRegistrationPlan({
     backendAvailability: Object.freeze({
@@ -41,4 +63,20 @@ export function assertAuthMinimalServerApiRouteRegistrationCoverage(
   plan: AuthoritativeApiRouteRegistrationPlan,
 ): void {
   assertAuthoritativeApiRouteFamilyCoverage(plan, AuthMinimalServerRequiredRouteFamilyIds);
+  const selectedRouteFamilyIds = new Set(plan.registeredRouteFamilies.map((family) => family.routeFamilyId));
+  const unexpectedRouteFamilyIds = [...selectedRouteFamilyIds]
+    .filter((routeFamilyId) => !AuthMinimalServerRequiredRouteFamilyIds.includes(routeFamilyId))
+    .sort();
+  if (unexpectedRouteFamilyIds.length > 0) {
+    throw new Error(
+      `Auth-minimal startup route scope expanded unexpectedly: ${unexpectedRouteFamilyIds.join(", ")}.`,
+    );
+  }
+  const forbiddenRouteFamilyIds = AuthMinimalServerForbiddenRouteFamilyIds
+    .filter((routeFamilyId) => selectedRouteFamilyIds.has(routeFamilyId));
+  if (forbiddenRouteFamilyIds.length > 0) {
+    throw new Error(
+      `Auth-minimal startup route scope includes forbidden families: ${forbiddenRouteFamilyIds.join(", ")}.`,
+    );
+  }
 }

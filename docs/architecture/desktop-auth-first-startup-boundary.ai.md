@@ -170,6 +170,26 @@ Auth-minimal pre-login host now preserves trusted-device/session-bootstrap secur
   - thin-client session validation is rejected by transport trust enforcement on the narrowed host.
 - desktop trust-bootstrap diagnostics now return specific prerequisite failure details (missing binding id, missing pin reference, expired pin material) so trust/bootstrap failures remain understandable.
 
+## Story B.3.3 implementation update
+
+Auth-minimal pre-login startup now includes explicit scope-creep regression guards in composition code:
+
+- route coverage guard in `src/hosts/server/AuthMinimalServerApiRouteComposition.ts` now enforces an exclusive auth-minimal route family boundary:
+  - required route family remains `identity-auth`,
+  - any additional composed route family now fails the auth-minimal coverage assertion.
+- service coverage guard in `src/hosts/server/AuthMinimalServerHostEntrypoint.ts` now enforces a narrowed auth-minimal startup service contract:
+  - only the auth-minimal startup service IDs are composed for service-plan coverage,
+  - unexpected or forbidden control-plane service IDs now fail startup assertions.
+- persistence scope guard in `src/hosts/server/AuthMinimalServerHostEntrypoint.ts` now asserts non-auth persistence repositories are not composed on pre-login startup.
+
+Auth-minimal startup scope is also now observable in development logs through structured diagnostics:
+
+- `auth-minimal-server.startup.route-scope`
+- `auth-minimal-server.startup.service-scope`
+- `auth-minimal-server.startup.persistence-scope`
+
+Regression tests now include explicit negative checks for route/service scope expansion so boundary regressions fail loudly.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):
