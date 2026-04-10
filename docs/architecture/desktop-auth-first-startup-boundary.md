@@ -142,6 +142,15 @@ Regression checks now codify the boot contract in main-process tests:
 
 This allows developers to distinguish slow pre-login auth-shell startup from slower post-login warmup directly from logs.
 
+## Story B.2.1 auth-minimal host startup path
+
+Pre-login server startup now uses a dedicated auth-minimal server entrypoint:
+
+- `src/hosts/server/AuthMinimalServerHostEntrypoint.ts`
+- `startAuthMinimalServerHostAssembly(...)` from `electron/main/main.ts`
+
+The auth-minimal path preserves host lifecycle/startup pipeline behavior while narrowing pre-login startup to auth-critical route registration and persistence composition needed for desktop identity/session bootstrap.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)
@@ -237,7 +246,7 @@ Not required for pre-login auth bootstrap:
 Primary over-scope in current startup:
 
 - Full desktop runtime bootstrap before window creation (`bootstrapDesktopRuntime()` gate).
-- Broad authoritative server host startup before first render (`startAuthoritativeServerHostAssembly(...)` as full host startup).
+- Broad authoritative server host startup before first render (replaced by `startAuthMinimalServerHostAssembly(...)` auth-minimal startup).
 - Full preload bridge exposure on startup (`electron/preload.ts`) regardless of login/auth phase.
 - Feature IPC registrations and repository composition that are unrelated to login/session validation.
 

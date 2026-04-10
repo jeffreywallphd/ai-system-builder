@@ -23,6 +23,13 @@ The entrypoint composes and starts the host through:
 1. `constructAuthoritativeServerHostAssembly(...)`
 2. `startAuthoritativeServerHostAssembly(...)`
 
+Story B.2.1 also introduces an auth-minimal startup entrypoint for pre-login desktop bootstrap:
+
+- `src/hosts/server/AuthMinimalServerHostEntrypoint.ts`
+- `src/hosts/server/AuthMinimalIdentityServerHost.ts`
+
+This path still uses the shared authoritative host lifecycle/startup pipeline, but narrows route registration and startup persistence composition to auth-critical concerns.
+
 ## Control-plane composition responsibilities
 
 The authoritative host composition explicitly wires control-plane coverage for:
@@ -173,7 +180,7 @@ Repository startup command:
 
 In addition to the direct server script entrypoint above, runtime startup consumers now route through this same authoritative host assembly:
 
-- `electron/main/main.ts` (desktop host local control-plane startup)
+- `electron/main/main.ts` now starts pre-login identity runtime through `startAuthMinimalServerHostAssembly(...)` for auth-shell bootstrap.
 - `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` (browser-development local control-plane startup via `npm run start:authoritative-server` + `AI_LOOM_SERVER_*` env when `bun` is available; when `bun` is unavailable startup fails fast with explicit guidance to install `bun` or start an authoritative host manually)
 
 ## Testing
@@ -183,6 +190,7 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
+- `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
