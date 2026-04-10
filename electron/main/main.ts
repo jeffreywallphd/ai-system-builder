@@ -68,7 +68,7 @@ import {
   SystemRuntimeWindowLaunchQueryParam,
   type LaunchSystemRuntimeWindowReadModel,
 } from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
-import { createRendererContentSecurityPolicy } from "./RendererContentSecurityPolicy";
+import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
 import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
 import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
 import { listEntries, toFileEntry } from "./ModelFileEntries";
@@ -112,13 +112,13 @@ function resolvePreloadScriptPath(): string {
 }
 
 function installRendererContentSecurityPolicy(): void {
-  const policy = createRendererContentSecurityPolicy({
+  const resolvePolicy = createRendererContentSecurityPolicyResolver({
     rendererDevUrl,
-    runtimeConfig: rendererContentSecurityPolicyRuntimeConfig,
+    getRuntimeConfig: () => rendererContentSecurityPolicyRuntimeConfig,
   });
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
-    responseHeaders["Content-Security-Policy"] = [policy];
+    responseHeaders["Content-Security-Policy"] = [resolvePolicy()];
     callback({ responseHeaders });
   });
 }
@@ -1674,4 +1674,3 @@ app.on("window-all-closed", () => {
 app.on("before-quit", async () => {
   await desktopHostRuntime?.stop();
 });
-

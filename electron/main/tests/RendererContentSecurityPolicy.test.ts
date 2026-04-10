@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { createRendererContentSecurityPolicy } from "../RendererContentSecurityPolicy";
+import type { AppRuntimeConfigValues } from "../../../src/infrastructure/config/AppRuntimeConfig";
+import {
+  createRendererContentSecurityPolicy,
+  createRendererContentSecurityPolicyResolver,
+} from "../RendererContentSecurityPolicy";
 
 describe("createRendererContentSecurityPolicy", () => {
   it("allows renderer dev assets and runtime local APIs for connect-src", () => {
@@ -78,5 +82,43 @@ describe("createRendererContentSecurityPolicy", () => {
 
     expect(policy).not.toContain("http://localhost:5174");
     expect(policy).toContain("connect-src 'self' http://127.0.0.1:56609 ws://127.0.0.1:56609");
+  });
+});
+
+describe("createRendererContentSecurityPolicyResolver", () => {
+  it("re-evaluates runtime origins so post-login supervisor endpoints are allowed", () => {
+    let runtimeConfig: AppRuntimeConfigValues | undefined = {
+        runtimeMode: "desktop-development",
+        hostKind: "desktop",
+        lifecycleStage: "development",
+        distributionTarget: "electron",
+        rendererDeliveryMode: "dev-server",
+        workflowRepositoryMode: "filesystem-indexed",
+        workflowExecutorMode: "strategy",
+        nodeCatalogMode: "registered",
+        uiSettingsPersistenceMode: "local-storage",
+        installedModelCatalogMode: "browser-local-storage",
+        seedStarterNode: true,
+        isProductionMode: false,
+        modelInstallDirectory: "dev/models",
+        identityApiBaseUrl: "http://127.0.0.1:49997",
+      };
+
+    const resolvePolicy = createRendererContentSecurityPolicyResolver({
+      rendererDevUrl: "http://127.0.0.1:5174",
+      getRuntimeConfig: () => runtimeConfig,
+    });
+
+    const preLoginPolicy = resolvePolicy();
+    expect(preLoginPolicy).not.toContain("http://127.0.0.1:8790");
+
+    runtimeConfig = {
+      ...runtimeConfig,
+      serviceSupervisorBaseUrl: "http://127.0.0.1:8790",
+    };
+
+    const postLoginPolicy = resolvePolicy();
+    expect(postLoginPolicy).toContain("connect-src 'self' http://127.0.0.1:5174 http://127.0.0.1:49997 http://127.0.0.1:8790");
+    expect(postLoginPolicy).toContain("ws://127.0.0.1:8790");
   });
 });

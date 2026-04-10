@@ -8,6 +8,11 @@ interface RendererContentSecurityPolicyOptions {
   readonly runtimeConfig?: AppRuntimeConfigValues;
 }
 
+interface RendererContentSecurityPolicyResolverOptions {
+  readonly rendererDevUrl: string;
+  readonly getRuntimeConfig: () => AppRuntimeConfigValues | undefined;
+}
+
 function normalizeOrigin(input: string | undefined): string | undefined {
   const normalized = input?.trim();
   if (!normalized) {
@@ -102,4 +107,13 @@ export function createRendererContentSecurityPolicy(options: RendererContentSecu
     `base-uri ${SELF_SOURCE}`,
     "frame-ancestors 'none'",
   ].join("; ");
+}
+
+export function createRendererContentSecurityPolicyResolver(
+  options: RendererContentSecurityPolicyResolverOptions,
+): () => string {
+  return () => createRendererContentSecurityPolicy({
+    rendererDevUrl: options.rendererDevUrl,
+    runtimeConfig: options.getRuntimeConfig(),
+  });
 }
