@@ -20,7 +20,14 @@ import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopAuthBootstrapContext,
   DesktopAuthBootstrapRuntimeConfig,
+  DesktopPostLoginRuntimeStatus,
+  DesktopPostLoginRuntimeUnavailableReason,
   DesktopPostLoginWarmupRequest,
+} from "../shared/DesktopContracts";
+import {
+  DesktopPostLoginRuntimeActivationModes,
+  DesktopPostLoginRuntimeStates,
+  DesktopPostLoginRuntimeUnavailableReasons,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
 import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
@@ -156,11 +163,63 @@ let postLoginBootstrapPromise: Promise<void> | undefined;
 let postLoginWarmupStarted = false;
 let isDesktopRuntimeDisposing = false;
 let authShellBootstrapResult: AuthShellBootstrapResult | undefined;
+let postLoginRuntimeStatus: DesktopPostLoginRuntimeStatus = Object.freeze({
+  state: DesktopPostLoginRuntimeStates.unavailable,
+  unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
+  updatedAt: new Date().toISOString(),
+});
 
 type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   readonly identityApiBaseUrl: string;
 };
+
+function markPostLoginRuntimeUnavailable(reason: DesktopPostLoginRuntimeUnavailableReason): void {
+  postLoginRuntimeStatus = Object.freeze({
+    state: DesktopPostLoginRuntimeStates.unavailable,
+    unavailableReason: reason,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function markPostLoginRuntimeWarming(request: DesktopPostLoginWarmupRequest): void {
+  postLoginRuntimeStatus = Object.freeze({
+    state: DesktopPostLoginRuntimeStates.warming,
+    activationMode: request.triggerSource === "feature-demand"
+      ? DesktopPostLoginRuntimeActivationModes.lazyFeatureDemand
+      : DesktopPostLoginRuntimeActivationModes.authSuccessWarmup,
+    triggerSource: request.triggerSource,
+    requestedAt: request.requestedAt,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function markPostLoginRuntimeReady(): void {
+  postLoginRuntimeStatus = Object.freeze({
+    ...postLoginRuntimeStatus,
+    state: DesktopPostLoginRuntimeStates.ready,
+    failure: undefined,
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+function markPostLoginRuntimeFailed(request: DesktopPostLoginWarmupRequest, error: unknown): void {
+  const message = error instanceof Error ? error.message : "Post-login runtime warmup failed.";
+  postLoginRuntimeStatus = Object.freeze({
+    state: DesktopPostLoginRuntimeStates.failed,
+    activationMode: request.triggerSource === "feature-demand"
+      ? DesktopPostLoginRuntimeActivationModes.lazyFeatureDemand
+      : DesktopPostLoginRuntimeActivationModes.authSuccessWarmup,
+    triggerSource: request.triggerSource,
+    requestedAt: request.requestedAt,
+    updatedAt: new Date().toISOString(),
+    failure: Object.freeze({
+      message,
+      failedAt: new Date().toISOString(),
+      retryable: true,
+    }),
+  });
+}
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -525,6 +584,7 @@ function registerAuthIpc(): void {
       },
     },
     isDeferredFeatureIpcReady: () => deferredFeatureIpcReady,
+    getPostLoginRuntimeStatus: () => postLoginRuntimeStatus,
     startPostLoginWarmup: async (request: DesktopPostLoginWarmupRequest) => {
       await ensurePostLoginWarmupStarted(request);
     },
@@ -670,6 +730,7 @@ function registerDeferredFeatureIpc(register: () => void): void {
     deferredFeatureIpcRegistered = true;
     register();
     deferredFeatureIpcReady = true;
+    markPostLoginRuntimeReady();
     logInitializationMemory(DesktopStartupPhases.deferredFeatureRegistration, "ready");
   } finally {
     logInitializationEnd(DesktopStartupPhases.deferredFeatureRegistration, deferredFeatureRegistrationStartedAt);
@@ -697,6 +758,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
   }
 
   postLoginWarmupStarted = true;
+  markPostLoginRuntimeWarming(request);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
   postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
@@ -705,6 +767,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
     console.info("[ai-loom] Post-login desktop runtime warmup completed.");
   } catch (error) {
     postLoginBootstrapPromise = undefined;
+    markPostLoginRuntimeFailed(request, error);
     if (!isDesktopRuntimeDisposing) {
       console.error("Post-login desktop runtime bootstrap failed", error);
       await disposeDesktopRuntimeResources();
@@ -1415,6 +1478,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
 
 async function disposeDesktopRuntimeResources(): Promise<void> {
   isDesktopRuntimeDisposing = true;
+  markPostLoginRuntimeUnavailable(DesktopPostLoginRuntimeUnavailableReasons.shuttingDown);
   const pendingPostLoginBootstrap = postLoginBootstrapPromise;
   postLoginBootstrapPromise = undefined;
   await pendingPostLoginBootstrap?.catch(() => undefined);
@@ -1441,6 +1505,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   deferredFeatureIpcReady = false;
   postLoginWarmupStarted = false;
   authShellBootstrapResult = undefined;
+  markPostLoginRuntimeUnavailable(DesktopPostLoginRuntimeUnavailableReasons.preLogin);
   isDesktopRuntimeDisposing = false;
 }
 

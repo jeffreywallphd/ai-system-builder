@@ -46,6 +46,7 @@ export const DesktopStartupRequiredAuthBootstrapIpcChannels = Object.freeze([
   DesktopBootstrapIpcChannels.storageSetItem,
   DesktopBootstrapIpcChannels.storageRemoveItem,
   DesktopBootstrapIpcChannels.deferredFeatureApiReady,
+  DesktopBootstrapIpcChannels.postLoginRuntimeStatus,
   DesktopBootstrapIpcChannels.startPostLoginWarmup,
 ]);
 

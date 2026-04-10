@@ -2,6 +2,7 @@ import type { IpcMain } from "electron";
 import {
   DesktopPostLoginWarmupTriggerSources,
   type DesktopAuthBootstrapContext,
+  type DesktopPostLoginRuntimeStatus,
   type DesktopPostLoginWarmupRequest,
 } from "../shared/DesktopContracts";
 import { DesktopBootstrapIpcChannels } from "../shared/DesktopBootstrapIpcChannels";
@@ -17,6 +18,7 @@ export type RegisterAuthBootstrapIpcParams = {
     readonly removeItem: (key: string) => void;
   };
   readonly isDeferredFeatureIpcReady: () => boolean;
+  readonly getPostLoginRuntimeStatus: () => DesktopPostLoginRuntimeStatus;
   readonly startPostLoginWarmup: (request: DesktopPostLoginWarmupRequest) => Promise<void>;
   readonly connectivity: {
     readonly getState: () => Promise<string> | string;
@@ -44,6 +46,7 @@ function parsePostLoginWarmupRequest(value: unknown): DesktopPostLoginWarmupRequ
     triggerSource === DesktopPostLoginWarmupTriggerSources.explicitLogin
     || triggerSource === DesktopPostLoginWarmupTriggerSources.sessionRestore
     || triggerSource === DesktopPostLoginWarmupTriggerSources.sessionRefresh
+    || triggerSource === DesktopPostLoginWarmupTriggerSources.featureDemand
     || triggerSource === DesktopPostLoginWarmupTriggerSources.unknown
   ) {
     return Object.freeze({
@@ -72,6 +75,9 @@ export function registerAuthBootstrapIpc(params: RegisterAuthBootstrapIpcParams)
   });
   params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady, (event) => {
     event.returnValue = params.isDeferredFeatureIpcReady();
+  });
+  params.ipcMain.on(AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus, (event) => {
+    event.returnValue = params.getPostLoginRuntimeStatus();
   });
   params.ipcMain.handle(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup, async (_event, request?: unknown) => {
     await params.startPostLoginWarmup(parsePostLoginWarmupRequest(request));

@@ -238,6 +238,7 @@ export const DesktopPostLoginWarmupTriggerSources = Object.freeze({
   explicitLogin: "explicit-login",
   sessionRestore: "session-restore",
   sessionRefresh: "session-refresh",
+  featureDemand: "feature-demand",
   unknown: "unknown",
 });
 
@@ -249,8 +250,50 @@ export interface DesktopPostLoginWarmupRequest {
   readonly requestedAt?: string;
 }
 
+export const DesktopPostLoginRuntimeActivationModes = Object.freeze({
+  authSuccessWarmup: "auth-success-warmup",
+  lazyFeatureDemand: "lazy-feature-demand",
+});
+
+export type DesktopPostLoginRuntimeActivationMode =
+  typeof DesktopPostLoginRuntimeActivationModes[keyof typeof DesktopPostLoginRuntimeActivationModes];
+
+export const DesktopPostLoginRuntimeStates = Object.freeze({
+  unavailable: "unavailable",
+  warming: "warming",
+  ready: "ready",
+  failed: "failed",
+});
+
+export type DesktopPostLoginRuntimeState =
+  typeof DesktopPostLoginRuntimeStates[keyof typeof DesktopPostLoginRuntimeStates];
+
+export const DesktopPostLoginRuntimeUnavailableReasons = Object.freeze({
+  preLogin: "pre-login",
+  loggedOut: "logged-out",
+  shuttingDown: "shutting-down",
+});
+
+export type DesktopPostLoginRuntimeUnavailableReason =
+  typeof DesktopPostLoginRuntimeUnavailableReasons[keyof typeof DesktopPostLoginRuntimeUnavailableReasons];
+
+export interface DesktopPostLoginRuntimeStatus {
+  readonly state: DesktopPostLoginRuntimeState;
+  readonly updatedAt: string;
+  readonly activationMode?: DesktopPostLoginRuntimeActivationMode;
+  readonly triggerSource?: DesktopPostLoginWarmupTriggerSource;
+  readonly requestedAt?: string;
+  readonly unavailableReason?: DesktopPostLoginRuntimeUnavailableReason;
+  readonly failure?: {
+    readonly message: string;
+    readonly failedAt: string;
+    readonly retryable: boolean;
+  };
+}
+
 export interface DesktopRuntimeBootstrapBridge {
   isDeferredFeatureApiReady(): boolean;
+  getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus;
   startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest): Promise<void>;
 }
 
