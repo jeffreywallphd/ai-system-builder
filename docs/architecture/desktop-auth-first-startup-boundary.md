@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1-A.2  
-Story: A.1.2-A.1.3, A.2.1-A.2.2
+Story: A.1.2-A.1.3, A.2.1-A.2.3
 
 ## Purpose
 
@@ -55,6 +55,27 @@ Pre-login registration remains limited to:
 - desktop storage `getItem/setItem/removeItem`
 - secrets availability/read/write/remove
 - auth connectivity state read/write endpoints
+
+## Story A.2.3 preload + deferred API guard split
+
+Preload now separates always-available auth/bootstrap APIs from deferred feature APIs:
+
+- Always available at renderer startup:
+  - `bootstrap`
+  - `storage`
+  - `secrets`
+  - `connectivity`
+  - `runtime.isDeferredFeatureApiReady()`
+- Deferred/guarded:
+  - workflows, execution runs, workflow run summaries, model files, canonical assets, studio shell, registry, agents
+
+Deferred APIs are now guarded in preload and return controlled unavailable behavior until post-login runtime IPC registration completes:
+
+- async deferred APIs reject with a stable, explicit unavailable error
+- sync deferred APIs throw explicit unavailable errors
+- workflow persistence status reports a degraded deferred state instead of crashing startup composition
+
+Auth/bootstrap IPC now also includes a readiness probe channel (`ai-loom-desktop-runtime:is-feature-api-ready`) so preload can gate deferred APIs without forcing broad startup initialization.
 
 ## Target startup phases
 

@@ -3,6 +3,7 @@ import type {
   DesktopAuthBootstrapContext,
   DesktopCanonicalAssetBridge,
   DesktopConnectivityBridge,
+  DesktopRuntimeBootstrapBridge,
   DesktopExecutionRunBridge,
   DesktopModelFileBridge,
   DesktopRegistryBridge,
@@ -28,6 +29,7 @@ declare global {
         setSecret(key: string, value: string): void;
         removeSecret(key: string): void;
       };
+      runtime?: DesktopRuntimeBootstrapBridge;
       workflows: DesktopWorkflowBridge;
       executionRuns: DesktopExecutionRunBridge;
       workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;

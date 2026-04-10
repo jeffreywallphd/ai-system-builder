@@ -41,6 +41,7 @@ describe("registerAuthBootstrapIpc", () => {
         setItem: () => undefined,
         removeItem: () => undefined,
       },
+      isDeferredFeatureIpcReady: () => false,
       connectivity: {
         getState: () => "{}",
         setOfflineMode: () => "{}",
@@ -61,6 +62,7 @@ describe("registerAuthBootstrapIpc", () => {
       AUTH_BOOTSTRAP_IPC_CHANNELS.secretsIsAvailable,
       AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove,
       AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet,
+      AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageGetItem,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem,
@@ -91,6 +93,7 @@ describe("registerAuthBootstrapIpc", () => {
           storage.delete(key);
         },
       },
+      isDeferredFeatureIpcReady: () => true,
       connectivity: {
         getState: () => JSON.stringify({ state: "connected" }),
         setOfflineMode: (requestJson: string) => {
@@ -135,6 +138,10 @@ describe("registerAuthBootstrapIpc", () => {
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet)?.({}, "token", "updated");
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove)?.({}, "token");
     expect(secrets.get("token")).toBeUndefined();
+
+    const deferredReadyEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady)?.(deferredReadyEvent);
+    expect(deferredReadyEvent.returnValue).toBe(true);
 
     const connectivityState = await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.connectivityGetState)?.({});
     expect(connectivityState).toBe(JSON.stringify({ state: "connected" }));
