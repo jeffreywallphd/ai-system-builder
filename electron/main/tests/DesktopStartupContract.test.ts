@@ -30,8 +30,10 @@ describe("desktop startup boot contract", () => {
 
   it("requires auth bootstrap channels used by preload sync bootstrap", () => {
     expect(DesktopStartupRequiredAuthBootstrapIpcChannels).toContain(DesktopBootstrapIpcChannels.bootstrap);
+    expect(DesktopStartupRequiredAuthBootstrapIpcChannels).toContain(DesktopBootstrapIpcChannels.postLoginRuntimeStatus);
     const preloadSource = fs.readFileSync(path.resolve(process.cwd(), "electron/preload.ts"), "utf8");
     expect(preloadSource).toContain("ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap)");
+    expect(preloadSource).toContain("ipcRenderer.sendSync(DesktopBootstrapIpcChannels.postLoginRuntimeStatus)");
   });
 
   it("validates the aggregate startup boot contract", () => {

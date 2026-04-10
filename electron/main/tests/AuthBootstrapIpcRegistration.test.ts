@@ -45,6 +45,11 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
+      getPostLoginRuntimeStatus: () => ({
+        state: "unavailable",
+        unavailableReason: "pre-login",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      }),
       startPostLoginWarmup: async () => undefined,
       connectivity: {
         getState: () => "{}",
@@ -67,6 +72,7 @@ describe("registerAuthBootstrapIpc", () => {
       AUTH_BOOTSTRAP_IPC_CHANNELS.secretsRemove,
       AUTH_BOOTSTRAP_IPC_CHANNELS.secretsSet,
       AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady,
+      AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageGetItem,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageRemoveItem,
       AUTH_BOOTSTRAP_IPC_CHANNELS.storageSetItem,
@@ -99,6 +105,12 @@ describe("registerAuthBootstrapIpc", () => {
         },
       },
       isDeferredFeatureIpcReady: () => true,
+      getPostLoginRuntimeStatus: () => ({
+        state: "warming",
+        activationMode: "auth-success-warmup",
+        triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+        updatedAt: "2026-04-10T12:00:00.000Z",
+      }),
       startPostLoginWarmup: async (request) => {
         operations.push(`runtime:warmup:start:${request.triggerSource}`);
       },
@@ -150,6 +162,14 @@ describe("registerAuthBootstrapIpc", () => {
     const deferredReadyEvent: { returnValue?: unknown } = {};
     onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.deferredFeatureApiReady)?.(deferredReadyEvent);
     expect(deferredReadyEvent.returnValue).toBe(true);
+    const runtimeStatusEvent: { returnValue?: unknown } = {};
+    onHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.postLoginRuntimeStatus)?.(runtimeStatusEvent);
+    expect(runtimeStatusEvent.returnValue).toEqual({
+      state: "warming",
+      activationMode: "auth-success-warmup",
+      triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
+      updatedAt: "2026-04-10T12:00:00.000Z",
+    });
     await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({}, {
       triggerSource: DesktopPostLoginWarmupTriggerSources.explicitLogin,
       requestedAt: "2026-04-10T13:00:00.000Z",
@@ -185,6 +205,11 @@ describe("registerAuthBootstrapIpc", () => {
         removeItem: () => undefined,
       },
       isDeferredFeatureIpcReady: () => false,
+      getPostLoginRuntimeStatus: () => ({
+        state: "unavailable",
+        unavailableReason: "pre-login",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      }),
       startPostLoginWarmup: async (request) => {
         operations.push(request.triggerSource);
       },
@@ -204,5 +229,44 @@ describe("registerAuthBootstrapIpc", () => {
       triggerSource: "invalid-value",
     });
     expect(operations).toEqual([DesktopPostLoginWarmupTriggerSources.unknown]);
+  });
+
+  it("passes through feature-demand trigger source for lazy runtime activation", async () => {
+    const { ipcMain, handleHandlers } = createFakeIpcMain();
+    const operations: string[] = [];
+
+    registerAuthBootstrapIpc({
+      ipcMain: asIpcMainPort(ipcMain),
+      getBootstrapContext: () => undefined,
+      storage: {
+        getItem: () => null,
+        setItem: () => undefined,
+        removeItem: () => undefined,
+      },
+      isDeferredFeatureIpcReady: () => false,
+      getPostLoginRuntimeStatus: () => ({
+        state: "unavailable",
+        unavailableReason: "pre-login",
+        updatedAt: "2026-04-10T00:00:00.000Z",
+      }),
+      startPostLoginWarmup: async (request) => {
+        operations.push(request.triggerSource);
+      },
+      connectivity: {
+        getState: () => "{}",
+        setOfflineMode: () => "{}",
+      },
+      secrets: {
+        isAvailable: () => false,
+        getSecret: () => null,
+        setSecret: () => undefined,
+        removeSecret: () => undefined,
+      },
+    });
+
+    await handleHandlers.get(AUTH_BOOTSTRAP_IPC_CHANNELS.startPostLoginWarmup)?.({}, {
+      triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
+    });
+    expect(operations).toEqual([DesktopPostLoginWarmupTriggerSources.featureDemand]);
   });
 });

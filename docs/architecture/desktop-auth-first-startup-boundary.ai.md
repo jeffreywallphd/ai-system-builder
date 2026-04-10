@@ -190,6 +190,19 @@ Auth-minimal startup scope is also now observable in development logs through st
 
 Regression tests now include explicit negative checks for route/service scope expansion so boundary regressions fail loudly.
 
+## Story C.1.3 implementation update
+
+Post-login runtime orchestration now has an explicit lifecycle contract boundary:
+
+- `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+
+Contract coverage now explicitly defines:
+
+- auth-success plus lazy feature-demand warmup trigger semantics,
+- authoritative main-process lifecycle status states (`unavailable`, `warming`, `ready`, `failed`),
+- preload/runtime bridge status and readiness probes for renderer-safe state checks,
+- teardown/reset lifecycle expectations for logout and application quit.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

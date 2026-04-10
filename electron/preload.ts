@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DesktopPostLoginWarmupRequest } from "./shared/DesktopContracts";
+import {
+  DesktopPostLoginRuntimeStates,
+  DesktopPostLoginRuntimeUnavailableReasons,
+  type DesktopPostLoginRuntimeStatus,
+  type DesktopPostLoginWarmupRequest,
+} from "./shared/DesktopContracts";
 import { DesktopBootstrapIpcChannels } from "./shared/DesktopBootstrapIpcChannels";
 
 const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
@@ -16,6 +21,18 @@ function isDeferredFeatureApiReady(): boolean {
     return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.deferredFeatureApiReady) === true;
   } catch {
     return false;
+  }
+}
+
+function getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
+  try {
+    return ipcRenderer.sendSync(DesktopBootstrapIpcChannels.postLoginRuntimeStatus) as DesktopPostLoginRuntimeStatus;
+  } catch {
+    return Object.freeze({
+      state: DesktopPostLoginRuntimeStates.unavailable,
+      unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
+      updatedAt: new Date().toISOString(),
+    });
   }
 }
 
@@ -466,6 +483,7 @@ const authBootstrapSurface = Object.freeze({
   connectivity: connectivityBridge,
   runtime: Object.freeze({
     isDeferredFeatureApiReady,
+    getPostLoginRuntimeStatus,
     startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest) {
       return ipcRenderer.invoke(DesktopBootstrapIpcChannels.startPostLoginWarmup, request) as Promise<void>;
     },

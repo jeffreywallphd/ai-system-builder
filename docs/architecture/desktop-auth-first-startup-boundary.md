@@ -198,6 +198,19 @@ Auth-minimal startup now enforces the pre-login boundary in code and surfaces it
 
 Regression tests now verify these guardrails and fail loudly when route or service scope widens.
 
+## Story C.1.3 post-login runtime lifecycle contract
+
+Post-login runtime orchestration now has an explicit lifecycle contract boundary documented in:
+
+- `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+
+This contract defines:
+
+- warmup trigger behavior for auth-success and lazy feature-demand activation,
+- authoritative main-process lifecycle state tracking (`unavailable`, `warming`, `ready`, `failed`),
+- renderer-safe lifecycle status/readiness probes exposed through preload,
+- deterministic teardown/reset expectations for logout and application quit.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)
