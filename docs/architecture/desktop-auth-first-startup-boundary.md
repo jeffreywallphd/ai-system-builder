@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1-A.2  
-Story: A.1.2-A.1.3, A.2.1
+Story: A.1.2-A.1.3, A.2.1-A.2.2
 
 ## Purpose
 
@@ -41,6 +41,20 @@ Pre-login no longer eagerly creates:
 - assets directory
 
 Post-login runtime bootstrap explicitly upgrades storage initialization to full runtime scope (`full-runtime`) before feature/runtime service composition. This preserves existing full provisioning behavior for later phases while reducing first-render critical path work.
+
+## Story A.2.2 auth IPC registration split
+
+Auth/bootstrap IPC registration is now isolated into a dedicated module:
+
+- `electron/main/AuthBootstrapIpcRegistration.ts` owns pre-login auth/bootstrap IPC channel binding.
+- `electron/main/main.ts` delegates pre-login registration through that module while feature/runtime IPC handlers remain in deferred post-login registration.
+
+Pre-login registration remains limited to:
+
+- bootstrap sync retrieval
+- desktop storage `getItem/setItem/removeItem`
+- secrets availability/read/write/remove
+- auth connectivity state read/write endpoints
 
 ## Target startup phases
 
