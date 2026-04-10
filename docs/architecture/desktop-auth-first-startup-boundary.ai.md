@@ -263,6 +263,24 @@ Desktop connectivity monitoring is now deferred out of pre-login startup:
 
 Result: login-capable startup avoids recurring connectivity probe activity while renderer connectivity consumers retain stable, explicit pre-warmup behavior.
 
+## Story C.3.3 implementation update
+
+Startup observability now includes explicit timing + memory checkpoints across pre-login and deferred runtime boundaries so deferred startup impact is measurable and regressions are easier to spot:
+
+- pre-login/auth-minimal host:
+  - `desktop-startup.identity-auth-host-readiness` now emits startup-memory checkpoints at `start` and `ready`.
+- first window readiness:
+  - `desktop-startup.main-window-creation` now emits `first-window-ready-to-show`.
+  - `desktop-startup.host-bootstrap` now emits `renderer-first-window-ready`.
+- post-login warmup:
+  - `desktop-startup.post-login-warmup` now emits `deferred-feature-runtime-container-ready` after deferred runtime container composition.
+- deferred runtime first-use groups (timed + memory-checkpointed in `DeferredDesktopFeatureRuntime`):
+  - workflow persistence (`desktop-startup.deferred-feature-runtime.workflow-persistence`, `workflow-persistence-ready`)
+  - execution/workflow run persistence (`...execution-history`, `...workflow-run-history`)
+  - studio/runtime backends (`...studio-shell-backend-api`, `...system-studio-backend-api`, `...system-runtime-backend-api`)
+
+Instrumentation stays focused on high-value phase and first-use boundaries rather than per-request logging.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

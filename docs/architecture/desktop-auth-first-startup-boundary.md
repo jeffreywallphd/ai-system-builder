@@ -248,6 +248,30 @@ Desktop startup contracts now explicitly enforce that Python runtime resolution 
 
 This keeps login-critical startup free of Python/runtime supervisor initialization and improves warmup observability when deferred runtime comes online.
 
+## Story C.3.3 startup timing and memory instrumentation for deferred runtime phases
+
+Startup instrumentation now adds explicit timing and memory checkpoints that separate pre-login critical path work from deferred runtime cost:
+
+- pre-login and auth-minimal host checkpoints:
+  - auth-minimal host startup now emits startup-memory `start` + `ready` checkpoints in the `desktop-startup.identity-auth-host-readiness` phase.
+- renderer first-window readiness checkpoints:
+  - `desktop-startup.main-window-creation` now emits `first-window-ready-to-show` timing/memory checkpoint.
+  - `desktop-startup.host-bootstrap` now emits `renderer-first-window-ready` timing/memory checkpoint.
+- post-login warmup checkpoint:
+  - `desktop-startup.post-login-warmup` now emits `deferred-feature-runtime-container-ready` once deferred feature runtime container composition is complete.
+- deferred service-group checkpoints (on first feature demand):
+  - workflow persistence:
+    - timing phase `desktop-startup.deferred-feature-runtime.workflow-persistence`
+    - checkpoint `workflow-persistence-ready`
+  - execution and workflow-run persistence:
+    - timing phases `desktop-startup.deferred-feature-runtime.execution-history` and `desktop-startup.deferred-feature-runtime.workflow-run-history`
+    - checkpoints `execution-history-ready` and `workflow-run-history-ready`
+  - studio/runtime backend groups:
+    - timing phases `desktop-startup.deferred-feature-runtime.studio-shell-backend-api`, `...system-studio-backend-api`, `...system-runtime-backend-api`
+    - checkpoints `studio-shell-backend-api-ready`, `system-studio-backend-api-ready`, `system-runtime-backend-api-ready`
+
+Instrumentation remains scoped to major lifecycle checkpoints and first-use composition boundaries so startup diagnostics stay actionable instead of noisy.
+
 ## Story C.2.4 deferred studio/system/image runtime module loading
 
 Studio shell, system runtime, and image workflow/system persistence infrastructure is now deferred from pre-login startup to post-login runtime composition at module-load level as well as object-construction level:

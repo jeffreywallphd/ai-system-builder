@@ -378,7 +378,11 @@ async function createMainWindow(): Promise<void> {
   });
 
   mainWindow = window;
-  window.once("ready-to-show", () => window.show());
+  window.once("ready-to-show", () => {
+    logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
+    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
+    window.show();
+  });
 
   try {
     await loadRendererRoot(window);
@@ -714,6 +718,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
     const authMinimalHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+    logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "start");
     console.info("[ai-loom][startup] Starting auth-minimal identity host for pre-login bootstrap.");
     authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
       hostOptions: {
@@ -918,6 +923,8 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
     runtimeConfigValues: runtimeConfig.toValues(),
     repoRoot,
   });
+  logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready", bootstrapStartedAt);
+  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "deferred-feature-runtime-container-ready");
   const featureRuntime = deferredFeatureRuntime;
   if (!featureRuntime) {
     throw new Error("Deferred desktop feature runtime is unavailable for post-login bootstrap.");
@@ -1627,6 +1634,8 @@ app.whenReady().then(async () => {
           logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
           logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
           await createMainWindow();
+          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready", desktopHostStartupAt);
+          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready");
           logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
           logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
           return Object.freeze({

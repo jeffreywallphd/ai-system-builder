@@ -116,6 +116,26 @@ Contract intent:
 - deferred feature entry points no longer race deferred runtime warmup,
 - failures/unavailability are surfaced in a controlled way that is clear to users and actionable for developers.
 
+## Story C.3.3 startup instrumentation boundary
+
+The runtime lifecycle contract now includes explicit timing + memory checkpoints that separate critical-path startup from deferred/runtime-on-demand work:
+
+- pre-login/auth-minimal host:
+  - auth-shell phase remains instrumented under `desktop-startup.pre-login-auth-shell-bootstrap`.
+  - auth-minimal host readiness now logs startup-memory at `start` and `ready` in `desktop-startup.identity-auth-host-readiness`.
+- first-window readiness:
+  - `desktop-startup.main-window-creation` now logs `first-window-ready-to-show`.
+  - `desktop-startup.host-bootstrap` now logs `renderer-first-window-ready`.
+- post-login warmup:
+  - `desktop-startup.post-login-warmup` now logs `deferred-feature-runtime-container-ready` after deferred container composition.
+- deferred first-use service groups (in `DeferredDesktopFeatureRuntime`):
+  - workflow persistence
+  - execution/workflow run persistence
+  - studio shell backend
+  - system studio/runtime backends
+
+Each first-use group now emits paired `[ai-loom][startup]` timing and `[ai-loom][startup-memory]` checkpoints using `desktop-startup.deferred-feature-runtime.*` timing phases.
+
 ## Deferred API behavior
 - before readiness:
   - async deferred APIs reject with explicit unavailable errors,
