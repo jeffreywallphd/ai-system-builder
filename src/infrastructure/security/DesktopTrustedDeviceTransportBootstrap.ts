@@ -1,4 +1,4 @@
-import type { DesktopBootstrapContext } from "../../../electron/shared/DesktopContracts";
+import type { DesktopAuthBootstrapContext } from "../../../electron/shared/DesktopContracts";
 
 export const DesktopTrustedDeviceBootstrapFailureReasons = Object.freeze({
   registrationMissing: "registration-missing",
@@ -33,7 +33,7 @@ export type DesktopTrustedDeviceTransportBootstrapState =
   };
 
 export interface IDesktopTrustedDeviceBootstrapPort {
-  getDesktopBootstrapContext(): DesktopBootstrapContext | undefined;
+  getDesktopBootstrapContext(): DesktopAuthBootstrapContext | undefined;
 }
 
 export interface IDesktopTrustedDeviceBootstrapClockPort {
@@ -99,7 +99,7 @@ export function resolveDesktopTrustedDeviceTransportBootstrap(
 }
 
 export class WindowDesktopTrustedDeviceBootstrapPort implements IDesktopTrustedDeviceBootstrapPort {
-  public getDesktopBootstrapContext(): DesktopBootstrapContext | undefined {
+  public getDesktopBootstrapContext(): DesktopAuthBootstrapContext | undefined {
     if (typeof window === "undefined") {
       return undefined;
     }

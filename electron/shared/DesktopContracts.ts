@@ -40,7 +40,30 @@ export interface DesktopIdentityTransportTrustBootstrap {
   readonly pinnedTrustMaterial?: DesktopPinnedTrustMaterialBootstrap;
 }
 
-export interface DesktopBootstrapContext {
+export type DesktopAuthBootstrapRuntimeConfig =
+  Omit<
+    AppRuntimeConfigValues,
+    "serviceSupervisorBaseUrl"
+    | "serviceSupervisorPort"
+    | "pythonRuntimeBaseUrl"
+    | "workflowStorageDirectory"
+    | "workflowIndexDatabasePath"
+    | "desktopStorage"
+    | "desktopPythonRuntime"
+  >;
+
+export interface DesktopAuthBootstrapContext {
+  readonly runtimeConfig: DesktopAuthBootstrapRuntimeConfig;
+  readonly storage?: Pick<DesktopStoragePaths, "appDataDirectory">;
+  readonly environment?: {
+    readonly isPackaged: boolean;
+  };
+  readonly identityTransportTrust?: DesktopIdentityTransportTrustBootstrap;
+}
+
+export type DesktopBootstrapContext = DesktopAuthBootstrapContext;
+
+export interface DesktopPostLoginRuntimeContext {
   readonly runtimeConfig: AppRuntimeConfigValues;
   readonly storage: DesktopStoragePaths;
   readonly serviceSupervisor: {

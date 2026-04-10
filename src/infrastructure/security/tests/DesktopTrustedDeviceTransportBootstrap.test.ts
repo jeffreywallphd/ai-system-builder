@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import type { DesktopAuthBootstrapContext } from "../../../../electron/shared/DesktopContracts";
 import {
   DesktopTrustedDeviceBootstrapFailureReasons,
   resolveDesktopTrustedDeviceTransportBootstrap,
@@ -114,8 +115,32 @@ describe("resolveDesktopTrustedDeviceTransportBootstrap", () => {
   });
 });
 
-function createBootstrapPort(bootstrap: unknown): IDesktopTrustedDeviceBootstrapPort {
+function createBootstrapPort(
+  bootstrap: Pick<DesktopAuthBootstrapContext, "identityTransportTrust"> | undefined,
+): IDesktopTrustedDeviceBootstrapPort {
   return Object.freeze({
-    getDesktopBootstrapContext: () => bootstrap as any,
+    getDesktopBootstrapContext: () => {
+      if (!bootstrap) {
+        return undefined;
+      }
+      return Object.freeze({
+        runtimeConfig: {
+          runtimeMode: "desktop-development",
+          hostKind: "desktop",
+          lifecycleStage: "development",
+          distributionTarget: "electron",
+          rendererDeliveryMode: "dev-server",
+          workflowRepositoryMode: "filesystem-indexed",
+          workflowExecutorMode: "strategy",
+          nodeCatalogMode: "registered",
+          uiSettingsPersistenceMode: "local-storage",
+          installedModelCatalogMode: "browser-local-storage",
+          seedStarterNode: true,
+          isProductionMode: false,
+          modelInstallDirectory: "dev/models",
+        },
+        ...bootstrap,
+      });
+    },
   });
 }

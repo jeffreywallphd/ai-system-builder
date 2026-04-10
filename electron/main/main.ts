@@ -15,7 +15,7 @@ import {
   createExecutionRunRepository,
 } from "../../src/infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
-import { AppRuntimeConfig } from "../../src/infrastructure/config/AppRuntimeConfig";
+import { AppRuntimeConfig, type AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import {
   HostSecureTransportKinds,
   assertSecureTransportEndpoint,
@@ -24,7 +24,8 @@ import {
 import { RendererDeliveryModes } from "../../src/domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
-  DesktopBootstrapContext,
+  DesktopAuthBootstrapContext,
+  DesktopAuthBootstrapRuntimeConfig,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
 import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
@@ -118,7 +119,7 @@ function resolvePreloadScriptPath(): string {
 function installRendererContentSecurityPolicy(): void {
   const policy = createRendererContentSecurityPolicy({
     rendererDevUrl,
-    runtimeConfig: bootstrapContext?.runtimeConfig,
+    runtimeConfig: rendererContentSecurityPolicyRuntimeConfig,
   });
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders = details.responseHeaders ? { ...details.responseHeaders } : {};
@@ -143,7 +144,8 @@ let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
 let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
-let bootstrapContext: DesktopBootstrapContext | undefined;
+let bootstrapContext: DesktopAuthBootstrapContext | undefined;
+let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
 type CanonicalRegistryRuntime = {
@@ -471,17 +473,39 @@ async function ensureCanonicalRegistryRuntime(
 function buildBootstrapContext(params: {
   readonly runtimeConfig: AppRuntimeConfig;
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
-  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
 }): void {
+  const runtimeConfigValues = params.runtimeConfig.toValues();
+  rendererContentSecurityPolicyRuntimeConfig = runtimeConfigValues;
   bootstrapContext = Object.freeze({
-    runtimeConfig: params.runtimeConfig.toValues(),
-    storage: params.storagePaths,
-    serviceSupervisor: {
-      baseUrl: params.runtimeConfig.serviceSupervisorBaseUrl,
-      port: params.runtimeConfig.serviceSupervisorPort ?? DesktopServiceSupervisorPort,
+    runtimeConfig: projectDesktopAuthBootstrapRuntimeConfig(runtimeConfigValues),
+    storage: {
+      appDataDirectory: params.storagePaths.appDataDirectory,
     },
-    pythonRuntime: params.pythonRuntime,
+    environment: {
+      isPackaged,
+    },
     identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap((key) => storageDatabase?.getItem(key) ?? null),
+  });
+}
+
+function projectDesktopAuthBootstrapRuntimeConfig(values: AppRuntimeConfigValues): DesktopAuthBootstrapRuntimeConfig {
+  return Object.freeze({
+    runtimeMode: values.runtimeMode,
+    hostKind: values.hostKind,
+    lifecycleStage: values.lifecycleStage,
+    distributionTarget: values.distributionTarget,
+    rendererDeliveryMode: values.rendererDeliveryMode,
+    workflowRepositoryMode: values.workflowRepositoryMode,
+    workflowExecutorMode: values.workflowExecutorMode,
+    nodeCatalogMode: values.nodeCatalogMode,
+    uiSettingsPersistenceMode: values.uiSettingsPersistenceMode,
+    installedModelCatalogMode: values.installedModelCatalogMode,
+    seedStarterNode: values.seedStarterNode,
+    isProductionMode: values.isProductionMode,
+    devSyncBaseUrl: values.devSyncBaseUrl,
+    devSyncToken: values.devSyncToken,
+    identityApiBaseUrl: values.identityApiBaseUrl,
+    modelInstallDirectory: values.modelInstallDirectory,
   });
 }
 
@@ -634,7 +658,6 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     buildBootstrapContext({
       runtimeConfig,
       storagePaths,
-      pythonRuntime,
     });
     desktopConnectivityStateService = new DesktopConnectivityStateService();
     desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
@@ -700,7 +723,6 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   buildBootstrapContext({
     runtimeConfig,
     storagePaths,
-    pythonRuntime,
   });
   const workflowsDirectory = runtimeConfig.workflowStorageDirectory
     ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
@@ -1406,6 +1428,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   serviceSupervisor = undefined;
   authoritativeServerRuntime = undefined;
   bootstrapContext = undefined;
+  rendererContentSecurityPolicyRuntimeConfig = undefined;
   isDesktopRuntimeDisposing = false;
 }
 

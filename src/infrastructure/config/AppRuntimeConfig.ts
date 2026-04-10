@@ -9,7 +9,11 @@ import {
   type AppLifecycleStage,
   type RendererDeliveryMode,
 } from "@domain/runtime/AppRuntimeProfile";
-import type { DesktopPythonRuntimeInfo, DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
+import type {
+  DesktopAuthBootstrapRuntimeConfig,
+  DesktopPythonRuntimeInfo,
+  DesktopStoragePaths,
+} from "../../../electron/shared/DesktopContracts";
 
 export type WorkflowRepositoryMode = "browser-storage" | "filesystem-indexed" | "memory";
 export type WorkflowExecutorMode = "scaffold" | "strategy";
@@ -281,15 +285,49 @@ export class AppRuntimeConfig {
 
   public static resolveDefault(): AppRuntimeConfig {
     const desktopBootstrap = (globalThis as typeof globalThis & {
-      aiLoomDesktop?: { bootstrap?: { runtimeConfig: AppRuntimeConfigValues } };
+      aiLoomDesktop?: {
+        bootstrap?: {
+          runtimeConfig: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig;
+        };
+      };
     }).aiLoomDesktop?.bootstrap;
 
     if (desktopBootstrap?.runtimeConfig) {
-      return new AppRuntimeConfig(desktopBootstrap.runtimeConfig);
+      return new AppRuntimeConfig(expandDesktopBootstrapRuntimeConfig(desktopBootstrap.runtimeConfig));
     }
 
     return AppRuntimeConfig.forDevelopment();
   }
+}
+
+function expandDesktopBootstrapRuntimeConfig(
+  values: AppRuntimeConfigValues | DesktopAuthBootstrapRuntimeConfig,
+): AppRuntimeConfigValues {
+  return Object.freeze({
+    runtimeMode: values.runtimeMode,
+    hostKind: values.hostKind,
+    lifecycleStage: values.lifecycleStage,
+    distributionTarget: values.distributionTarget,
+    rendererDeliveryMode: values.rendererDeliveryMode,
+    workflowRepositoryMode: values.workflowRepositoryMode,
+    workflowExecutorMode: values.workflowExecutorMode,
+    nodeCatalogMode: values.nodeCatalogMode,
+    uiSettingsPersistenceMode: values.uiSettingsPersistenceMode,
+    installedModelCatalogMode: values.installedModelCatalogMode,
+    seedStarterNode: values.seedStarterNode,
+    isProductionMode: values.isProductionMode,
+    devSyncBaseUrl: values.devSyncBaseUrl,
+    devSyncToken: values.devSyncToken,
+    identityApiBaseUrl: values.identityApiBaseUrl,
+    modelInstallDirectory: values.modelInstallDirectory,
+    serviceSupervisorBaseUrl: "serviceSupervisorBaseUrl" in values ? values.serviceSupervisorBaseUrl : undefined,
+    serviceSupervisorPort: "serviceSupervisorPort" in values ? values.serviceSupervisorPort : undefined,
+    pythonRuntimeBaseUrl: "pythonRuntimeBaseUrl" in values ? values.pythonRuntimeBaseUrl : undefined,
+    workflowStorageDirectory: "workflowStorageDirectory" in values ? values.workflowStorageDirectory : undefined,
+    workflowIndexDatabasePath: "workflowIndexDatabasePath" in values ? values.workflowIndexDatabasePath : undefined,
+    desktopStorage: "desktopStorage" in values ? values.desktopStorage : undefined,
+    desktopPythonRuntime: "desktopPythonRuntime" in values ? values.desktopPythonRuntime : undefined,
+  });
 }
 
 export function isDesktopProductionConfig(config: AppRuntimeConfig): boolean {
