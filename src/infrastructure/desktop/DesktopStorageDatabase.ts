@@ -1,10 +1,14 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import {
   type SqliteCompatDatabase,
   openSqliteCompatDatabase,
 } from "../persistence/sqlite/SqliteCompat";
-import type { IProductionStorageInitializer } from "@application/runtime/interfaces/IProductionStorageInitializer";
+import {
+  ProductionStorageInitializationScopes,
+  type IProductionStorageInitializer,
+  type ProductionStorageInitializationRequest,
+} from "@application/runtime/interfaces/IProductionStorageInitializer";
 import type { DesktopStoragePaths } from "../../../electron/shared/DesktopContracts";
 
 interface MigrationDefinition {
@@ -49,14 +53,15 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     this.databasePath = options.paths.databasePath;
   }
 
-  public initialize(): Promise<{
+  public initialize(request: ProductionStorageInitializationRequest = {}): Promise<{
     appDataDirectory: string;
     storageDirectory: string;
     databasePath: string;
     createdDirectories: ReadonlyArray<string>;
     appliedMigrations: ReadonlyArray<string>;
   }> {
-    const createdDirectories = this.ensureDirectories();
+    const scope = request.scope ?? ProductionStorageInitializationScopes.fullRuntime;
+    const createdDirectories = this.ensureDirectories(scope);
     const db = this.getDatabase();
     const appliedMigrations = this.applyMigrations(db);
 
@@ -118,15 +123,23 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     this.database = undefined;
   }
 
-  private ensureDirectories(): ReadonlyArray<string> {
-    const directories = [
-      this.options.paths.appDataDirectory,
-      this.options.paths.storageDirectory,
+  private ensureDirectories(scope: ProductionStorageInitializationRequest["scope"]): ReadonlyArray<string> {
+    const fullRuntimeDirectories = [
       this.options.paths.runtimeDirectory,
       this.options.paths.logsDirectory,
       this.options.paths.modelsDirectory,
       this.options.paths.assetsDirectory,
     ];
+    const directories = scope === ProductionStorageInitializationScopes.authShellPreLogin
+      ? [
+          this.options.paths.appDataDirectory,
+          this.options.paths.storageDirectory,
+        ]
+      : [
+          this.options.paths.appDataDirectory,
+          this.options.paths.storageDirectory,
+          ...fullRuntimeDirectories,
+        ];
 
     const created: string[] = [];
     for (const directory of directories) {
@@ -190,4 +203,3 @@ export class DesktopStorageDatabase implements IProductionStorageInitializer {
     `);
   }
 }
-

@@ -1,8 +1,8 @@
 # AI Companion: Desktop Auth-First Startup Boundary
 
 Feature: A  
-Epic: A.1  
-Story: A.1.2-A.1.3
+Epic: A.1-A.2  
+Story: A.1.2-A.1.3, A.2.1
 
 ## Purpose
 
@@ -17,6 +17,18 @@ Define the startup split so Electron can render the login-capable window from a 
 - `createMainWindow()` runs immediately after auth-shell bootstrap.
 - `bootstrapPostLoginRuntime()` runs after window creation to start service supervisor and compose broader runtime services.
 - `registerDeferredFeatureIpc()` gates non-auth IPC registration so feature surfaces are clearly post-login/deferred.
+
+## Story A.2.1 implementation update
+
+Desktop storage initialization is now scope-aware:
+
+- `auth-shell-pre-login` scope (used in `bootstrapAuthShell()`):
+  - creates only app data + storage directories needed for key/value session and trust bootstrap state.
+  - does not create runtime/logs/models/assets directories on the pre-login path.
+- `full-runtime` scope (used in `bootstrapPostLoginRuntime()`):
+  - preserves existing full directory provisioning for runtime and feature infrastructure.
+
+This keeps auth/session bootstrap storage available on clean machines and existing installations while moving non-auth storage provisioning off the login critical path.
 
 ## Target phase model
 

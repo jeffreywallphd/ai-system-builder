@@ -5,6 +5,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import { InitializeProductionStorageUseCase } from "../../src/application/runtime/InitializeProductionStorageUseCase";
+import { ProductionStorageInitializationScopes } from "../../src/application/runtime/interfaces/IProductionStorageInitializer";
 import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../src/infrastructure/desktop/DesktopStorageDatabase";
@@ -591,7 +592,9 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
       logsPath: app.getPath("logs"),
     });
     storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
-    await new InitializeProductionStorageUseCase(storageDatabase).execute();
+    await new InitializeProductionStorageUseCase(storageDatabase).execute({
+      scope: ProductionStorageInitializationScopes.authShellPreLogin,
+    });
     logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
     logInitializationCheckpoint("desktop-auth-shell-bootstrap", "storage-ready", authShellStartedAt);
     logInitializationMemory("desktop-auth-shell-bootstrap", "storage-ready");
@@ -687,6 +690,13 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
   try {
   const { storagePaths, pythonRuntime, identityApiBaseUrl } = authShell;
+  if (!storageDatabase) {
+    throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
+  }
+  await new InitializeProductionStorageUseCase(storageDatabase).execute({
+    scope: ProductionStorageInitializationScopes.fullRuntime,
+  });
+  logInitializationMemory("desktop-runtime-bootstrap", "full-storage-provisioning-ready");
   serviceSupervisor = new DesktopServiceSupervisor({
     repoRoot,
     isPackaged,
