@@ -1,8 +1,8 @@
 # AI Companion: Desktop Auth-First Startup Boundary
 
 Feature: A  
-Epic: A.1-A.2  
-Story: A.1.2-A.1.3, A.2.1-A.2.3
+Epic: A.1-A.3  
+Story: A.1.2-A.1.3, A.2.1-A.2.3, A.3.1-A.3.2
 
 ## Purpose
 
@@ -77,6 +77,23 @@ Python runtime resolution and service-supervisor startup are now post-login warm
 - Warmup is started by an explicit auth/bootstrap IPC trigger (`ai-loom-desktop-runtime:start-post-login-warmup`) invoked after renderer authentication succeeds.
 
 Result: first login-capable window creation no longer waits on Python runtime resolution or supervisor startup.
+
+## Story A.3.2 implementation update
+
+Workflow/studio/system runtime repositories and backend APIs are now deferred behind a dedicated lazy feature-runtime container:
+
+- `electron/main/DeferredDesktopFeatureRuntime.ts` owns post-login deferred runtime composition for:
+  - workflow persistence
+  - execution run history + workflow run history
+  - studio shell persistence + backend API
+  - system studio backend API
+  - system runtime backend API + runtime audit/execution stores
+  - image workflow persistence adapters used by studio/system flows
+- `bootstrapPostLoginRuntime()` now creates this container and registers deferred IPC handlers without eagerly constructing those object graphs.
+- Deferred IPC handlers now resolve dependencies via `ensure*` lazy initializers on first feature use.
+- Disposal now routes through one container `dispose()` path so lazily-created repositories/adapters remain lifecycle-coherent.
+
+Result: post-login warmup no longer eagerly allocates workflow/studio/system backend graphs; they are created only when feature IPC routes are invoked.
 
 ## Target phase model
 

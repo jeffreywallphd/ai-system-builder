@@ -6,15 +6,8 @@ import { fileURLToPath } from "node:url";
 import { app, BrowserWindow, ipcMain, safeStorage, session } from "electron";
 import { InitializeProductionStorageUseCase } from "../../src/application/runtime/InitializeProductionStorageUseCase";
 import { ProductionStorageInitializationScopes } from "../../src/application/runtime/interfaces/IProductionStorageInitializer";
-import { GetExecutionRunUseCase } from "../../src/application/execution/GetExecutionRunUseCase";
 import { resolveDesktopStoragePaths } from "../../src/infrastructure/desktop/DesktopAppPaths";
 import { DesktopStorageDatabase } from "../../src/infrastructure/desktop/DesktopStorageDatabase";
-import { DesktopWorkflowPersistence } from "../../src/infrastructure/desktop/DesktopWorkflowPersistence";
-import { SqliteExecutionRunRepository } from "../../src/infrastructure/filesystem/execution/SqliteExecutionRunRepository";
-import {
-  createExecutionHistoryInfrastructure,
-  createExecutionRunRepository,
-} from "../../src/infrastructure/execution/createExecutionInfrastructure";
 import { resolveDesktopPythonRuntime } from "../../src/infrastructure/desktop/DesktopPythonRuntimeResolver";
 import { AppRuntimeConfig, type AppRuntimeConfigValues } from "../../src/infrastructure/config/AppRuntimeConfig";
 import {
@@ -57,22 +50,11 @@ import type { AgentPlanningStrategy } from "../../src/domain/agents/Agent";
 import type { AgentConfigurationValidationInput } from "../../src/application/agents/services/AgentConfigurationValidationService";
 import type { AgentRunControlRequest, AgentRunRequest } from "../../src/application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../src/application/agents/TriggerAgentLaunchUseCase";
-import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
+import type { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
 import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import { ListWorkflowRunSummariesUseCase } from "../../src/application/workflow-run-history/ListWorkflowRunSummariesUseCase";
-import { SqliteStudioShellRepository } from "../../src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
-import { SqliteWorkflowPersistenceRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
-import { SqliteWorkflowRunSummaryRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../src/application/studio-shell/contracts";
-import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
-import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
-import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
-import { SqliteExecutionAuditRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteExecutionAuditRepository";
-import { SqliteImageRunHistoryRepository } from "../../src/infrastructure/filesystem/system-runtime/SqliteImageRunHistoryRepository";
-import { SqliteImageWorkflowSystemPersistenceAdapter } from "../../src/infrastructure/persistence/image-workflows/SqliteImageWorkflowSystemPersistenceAdapter";
-import { LocalStorageInstanceProvisioner } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceProvisioner";
-import { LocalSystemOutputArtifactStorage } from "../../src/infrastructure/filesystem/system-runtime/LocalSystemOutputArtifactStorage";
-import { LocalStorageInstanceLifecycleInfrastructure } from "../../src/infrastructure/filesystem/system-runtime/LocalStorageInstanceLifecycleInfrastructure";
+import type { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
+import type { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import {
   parseSystemRuntimeWindowLaunchContract,
   SystemRuntimeWindowLaunchQueryParam,
@@ -88,6 +70,10 @@ import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../s
 import {
   DesktopConnectivityStateService,
 } from "../../src/hosts/desktop/DesktopConnectivityStateService";
+import {
+  createDeferredDesktopFeatureRuntime,
+  type DeferredDesktopFeatureRuntime,
+} from "./DeferredDesktopFeatureRuntime";
 import {
   startAuthoritativeServerHostAssembly,
   type AuthoritativeServerHostRuntimeHandle,
@@ -132,24 +118,17 @@ function installRendererContentSecurityPolicy(): void {
 
 let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
-let workflowPersistence: DesktopWorkflowPersistence | undefined;
-let executionRunRepository: SqliteExecutionRunRepository | undefined;
-let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
-let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
-let workflowRunSummaryRepository: SqliteWorkflowRunSummaryRepository | undefined;
-let listWorkflowRunSummariesUseCase: ListWorkflowRunSummariesUseCase | undefined;
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let agentRunnerAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let agentStudioBackendApi: AgentStudioBackendApi | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
-let studioShellRepository: SqliteStudioShellRepository | undefined;
-let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
+let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
 type CanonicalRegistryRuntime = {
   readonly repository: SqliteAssetSystemRepository;
   readonly listCanonicalAssetsUseCase: any;
@@ -356,11 +335,15 @@ async function launchRuntimeWindowFromContract(
 
 async function ensureCanonicalRegistryRuntime(
   storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
-  systemRuntimeBackendApi: SystemRuntimeBackendApi,
 ): Promise<CanonicalRegistryRuntime> {
   if (canonicalRegistryRuntime) {
     return canonicalRegistryRuntime;
   }
+  const runtime = deferredFeatureRuntime;
+  if (!runtime) {
+    throw new Error("Deferred desktop feature runtime is unavailable.");
+  }
+  const systemRuntimeBackendApi = runtime.ensureSystemRuntimeBackendApi();
   const [
     { InMemoryAssetLineageGraphProjectionSink },
     { ExplainCanonicalVersionExistenceUseCase, GetCanonicalProvenanceSummaryUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase },
@@ -454,7 +437,7 @@ async function ensureCanonicalRegistryRuntime(
   const registryBackendApi = new RegistryBackendApi(
     new CrossStudioRegistryQueryService(registryQueryService),
     new RegistryDependencyGraphService(registryQueryService, repository, repository, registryCacheLayer),
-    workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
+    new ListPersistedWorkflowsUseCase(runtime.ensureWorkflowPersistenceRepository()),
   );
   canonicalRegistryRuntime = {
     repository,
@@ -757,118 +740,76 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     runtimeConfig,
     storagePaths,
   });
-  const workflowsDirectory = runtimeConfig.workflowStorageDirectory
-    ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
-    : path.resolve(repoRoot, "dev/workflow-data/workflows");
-  const workflowIndexDatabasePath = runtimeConfig.workflowIndexDatabasePath
-    ? path.resolve(repoRoot, runtimeConfig.workflowIndexDatabasePath)
-    : path.resolve(repoRoot, "dev/workflow-data/workflows/workflow-index.sqlite");
-  workflowPersistence = new DesktopWorkflowPersistence({
-    workflowsDirectory,
-    indexDatabasePath: workflowIndexDatabasePath,
+  const runtimeConfigValues = runtimeConfig.toValues();
+  deferredFeatureRuntime = createDeferredDesktopFeatureRuntime({
+    storagePaths,
+    runtimeConfigValues,
+    repoRoot,
   });
-  executionRunRepository = createExecutionRunRepository({
-    sqliteDatabasePath: storagePaths.databasePath,
-  }) as SqliteExecutionRunRepository;
-  workflowRunSummaryRepository = new SqliteWorkflowRunSummaryRepository(storagePaths.databasePath);
-  listWorkflowRunSummariesUseCase = new ListWorkflowRunSummariesUseCase(workflowRunSummaryRepository);
-  studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
-  workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
-    path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
-  );
-  const imageWorkflowSystemPersistence = new SqliteImageWorkflowSystemPersistenceAdapter(
-    path.join(storagePaths.assetsDirectory, "image-workflow-system.sqlite"),
-  );
-  const studioShellBackendApi = new StudioShellBackendApi(
-    studioShellRepository,
-    workflowPersistenceRepository,
-    workflowRunSummaryRepository,
-    undefined,
-    new SqliteImageRunHistoryRepository(path.join(storagePaths.assetsDirectory, "system-image-run-history.sqlite")),
-    {
-      storageInstanceProvisioner: new LocalStorageInstanceProvisioner({
-        storageRootDirectory: path.join(storagePaths.storageDirectory, "storage"),
-      }),
-      workflowOutputArtifactStorage: new LocalSystemOutputArtifactStorage(
-        path.join(storagePaths.storageDirectory, "storage"),
-      ),
-      storageLifecycleInfrastructure: new LocalStorageInstanceLifecycleInfrastructure(
-        path.join(storagePaths.storageDirectory, "storage"),
-      ),
-      imageSystemDefinitionRepository: imageWorkflowSystemPersistence,
-    },
-  );
-  const systemStudioBackendApi = new SystemStudioBackendApi(studioShellRepository);
-  const runtimeExecutionStore = new SqliteSystemRuntimeExecutionStore(path.join(storagePaths.assetsDirectory, "system-runtime.sqlite"));
-  const runtimeExecutionAuditRepository = new SqliteExecutionAuditRepository(path.join(storagePaths.assetsDirectory, "system-runtime-audit.sqlite"));
-  const systemRuntimeBackendApi = new SystemRuntimeBackendApi(studioShellRepository, runtimeExecutionStore, undefined, undefined, undefined, undefined, undefined, runtimeExecutionAuditRepository);
-  const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
-  getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
-  listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
+  const featureRuntime = deferredFeatureRuntime;
+  if (!featureRuntime) {
+    throw new Error("Deferred desktop feature runtime is unavailable for post-login bootstrap.");
+  }
   registerDeferredFeatureIpc(() => {
+  const getStudioShellBackendApi = () => featureRuntime.ensureStudioShellBackendApi();
+  const getSystemStudioBackendApi = () => featureRuntime.ensureSystemStudioBackendApi();
+  const getSystemRuntimeBackendApi = () => featureRuntime.ensureSystemRuntimeBackendApi();
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
-    workflowPersistence?.saveWorkflowRecord(recordJson);
+    featureRuntime.ensureWorkflowPersistence().saveWorkflowRecord(recordJson);
   });
   ipcMain.on("ai-loom-desktop-workflows:load-record", (event, id: string) => {
-    event.returnValue = workflowPersistence?.loadWorkflowRecord(id) ?? null;
+    event.returnValue = featureRuntime.ensureWorkflowPersistence().loadWorkflowRecord(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:list-summaries", (event) => {
-    event.returnValue = workflowPersistence?.listWorkflowSummaries() ?? [];
+    event.returnValue = featureRuntime.ensureWorkflowPersistence().listWorkflowSummaries();
   });
   ipcMain.on("ai-loom-desktop-workflows:delete-record", (_event, id: string) => {
-    workflowPersistence?.deleteWorkflowRecord(id);
+    featureRuntime.ensureWorkflowPersistence().deleteWorkflowRecord(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:exists", (event, id: string) => {
-    event.returnValue = workflowPersistence?.workflowExists(id) ?? false;
+    event.returnValue = featureRuntime.ensureWorkflowPersistence().workflowExists(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:status", (event) => {
-    event.returnValue = workflowPersistence?.getWorkflowPersistenceStatus() ?? {
-      provider: "desktop-filesystem-indexed",
-      workflowsDirectory,
-      indexDatabasePath: workflowIndexDatabasePath,
-      degraded: true,
-      detail: "Desktop workflow persistence service is unavailable.",
-    };
+    event.returnValue = featureRuntime.ensureWorkflowPersistence().getWorkflowPersistenceStatus();
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:save", async (_event, runJson: string) => {
-    if (!executionRunRepository) {
-      return;
-    }
-    await executionRunRepository.saveRun(JSON.parse(runJson));
+    const { repository } = featureRuntime.ensureExecutionHistory();
+    await repository.saveRun(JSON.parse(runJson));
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
-    const run = await getExecutionRunUseCase?.execute(runId);
+    const { getExecutionRunUseCase } = featureRuntime.ensureExecutionHistory();
+    const run = await getExecutionRunUseCase.execute(runId);
     return run ? JSON.stringify(run) : null;
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const runs = await listExecutionRunsUseCase?.execute(criteria);
-    return (runs ?? []).map((run) => JSON.stringify(run));
+    const { listExecutionRunsUseCase } = featureRuntime.ensureExecutionHistory();
+    const runs = await listExecutionRunsUseCase.execute(criteria);
+    return runs.map((run) => JSON.stringify(run));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:save", async (_event, summaryJson: string) => {
-    if (!workflowRunSummaryRepository) {
-      return;
-    }
+    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
     await workflowRunSummaryRepository.upsert(JSON.parse(summaryJson));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:load", async (_event, runId: string) => {
-    const summary = await workflowRunSummaryRepository?.getByRunId(runId);
+    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const summary = await workflowRunSummaryRepository.getByRunId(runId);
     return summary ? JSON.stringify(summary) : null;
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:save-detail", async (_event, detailJson: string) => {
-    if (!workflowRunSummaryRepository) {
-      return;
-    }
+    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
     await workflowRunSummaryRepository.upsertDetail(JSON.parse(detailJson));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:load-detail", async (_event, runId: string) => {
-    const detail = await workflowRunSummaryRepository?.getDetailByRunId(runId);
+    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const detail = await workflowRunSummaryRepository.getDetailByRunId(runId);
     return detail ? JSON.stringify(detail) : null;
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:list", async (_event, queryJson?: string) => {
     const query = queryJson ? JSON.parse(queryJson) : undefined;
-    const summaries = await listWorkflowRunSummariesUseCase?.execute(query);
-    return (summaries ?? []).map((summary) => JSON.stringify(summary));
+    const { listWorkflowRunSummariesUseCase } = featureRuntime.ensureWorkflowRunHistory();
+    const summaries = await listWorkflowRunSummariesUseCase.execute(query);
+    return summaries.map((summary) => JSON.stringify(summary));
   });
   ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
     const agentApi = ensureAgentStudioBackendApi(storagePaths);
@@ -954,193 +895,193 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(await agentApi.getStudioSnapshot(agentId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
-    return JSON.stringify(await studioShellBackendApi.initializeStudio(studioId, name));
+    return JSON.stringify(await getStudioShellBackendApi().initializeStudio(studioId, name));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:snapshot", async (_event, studioId: string) => {
-    return JSON.stringify(await studioShellBackendApi.loadSnapshot(studioId));
+    return JSON.stringify(await getStudioShellBackendApi().loadSnapshot(studioId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:start-session", async (_event, studioId: string) => {
-    return JSON.stringify(await studioShellBackendApi.startSession(studioId));
+    return JSON.stringify(await getStudioShellBackendApi().startSession(studioId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:create-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as CreateAssetDraftCommand;
-    return JSON.stringify(await studioShellBackendApi.createDraft(request));
+    return JSON.stringify(await getStudioShellBackendApi().createDraft(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:update-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as UpdateAssetDraftCommand;
-    return JSON.stringify(await studioShellBackendApi.updateDraft(request));
+    return JSON.stringify(await getStudioShellBackendApi().updateDraft(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:update-dependencies", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as UpdateAssetDraftDependenciesCommand;
-    return JSON.stringify(await studioShellBackendApi.updateDependencies(request));
+    return JSON.stringify(await getStudioShellBackendApi().updateDependencies(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:transition-lifecycle", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as TransitionAssetDraftLifecycleCommand;
-    return JSON.stringify(await studioShellBackendApi.transitionLifecycle(request));
+    return JSON.stringify(await getStudioShellBackendApi().transitionLifecycle(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:publish-version", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as PublishAssetDraftVersionCommand;
-    return JSON.stringify(await studioShellBackendApi.publishVersion(request));
+    return JSON.stringify(await getStudioShellBackendApi().publishVersion(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:validate-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as { studioId: string; draftId: string };
-    return JSON.stringify(await studioShellBackendApi.validateDraft(request));
+    return JSON.stringify(await getStudioShellBackendApi().validateDraft(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:image-workflows:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listImageWorkflowDefinitions"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listImageWorkflowDefinitions(request));
+    return JSON.stringify(await getStudioShellBackendApi().listImageWorkflowDefinitions(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:image-workflows:get", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getImageWorkflowDefinition"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getImageWorkflowDefinition(request));
+    return JSON.stringify(await getStudioShellBackendApi().getImageWorkflowDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listImageSystemDefinitions"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listImageSystemDefinitions(request));
+    return JSON.stringify(await getStudioShellBackendApi().listImageSystemDefinitions(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:get", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getImageSystemDefinition"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getImageSystemDefinition(request));
+    return JSON.stringify(await getStudioShellBackendApi().getImageSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:image-systems:save", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["saveImageSystemDefinition"]>[0];
-    return JSON.stringify(await studioShellBackendApi.saveImageSystemDefinition(request));
+    return JSON.stringify(await getStudioShellBackendApi().saveImageSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:get-persisted-workflow", async (_event, workflowId: string) => {
-    return JSON.stringify(await studioShellBackendApi.getPersistedWorkflow(workflowId));
+    return JSON.stringify(await getStudioShellBackendApi().getPersistedWorkflow(workflowId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:duplicate-persisted-workflow", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["duplicatePersistedWorkflow"]>[0];
-    return JSON.stringify(await studioShellBackendApi.duplicatePersistedWorkflow(request));
+    return JSON.stringify(await getStudioShellBackendApi().duplicatePersistedWorkflow(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-execution-readiness", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessWorkflowExecutionReadiness"]>[0];
-    return JSON.stringify(await studioShellBackendApi.assessWorkflowExecutionReadiness(request));
+    return JSON.stringify(await getStudioShellBackendApi().assessWorkflowExecutionReadiness(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:run-workflow-draft", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runWorkflowDraft"]>[0];
-    return JSON.stringify(await studioShellBackendApi.runWorkflowDraft(request));
+    return JSON.stringify(await getStudioShellBackendApi().runWorkflowDraft(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:data-execution-readiness", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["assessDataStudioExecutionReadiness"]>[0];
-    return JSON.stringify(await studioShellBackendApi.assessDataStudioExecutionReadiness(request));
+    return JSON.stringify(await getStudioShellBackendApi().assessDataStudioExecutionReadiness(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:run-data-pipeline", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["runDataStudioPipeline"]>[0];
-    return JSON.stringify(await studioShellBackendApi.runDataStudioPipeline(request));
+    return JSON.stringify(await getStudioShellBackendApi().runDataStudioPipeline(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listDataStudioPipelines"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listDataStudioPipelines(request));
+    return JSON.stringify(await getStudioShellBackendApi().listDataStudioPipelines(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:data-pipelines:load", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["loadDataStudioPipeline"]>[0];
-    return JSON.stringify(await studioShellBackendApi.loadDataStudioPipeline(request));
+    return JSON.stringify(await getStudioShellBackendApi().loadDataStudioPipeline(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listWorkflowRuns"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listWorkflowRuns(request));
+    return JSON.stringify(await getStudioShellBackendApi().listWorkflowRuns(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:get-detail", async (_event, runId: string) => {
-    return JSON.stringify(await studioShellBackendApi.getWorkflowRunDetail(runId));
+    return JSON.stringify(await getStudioShellBackendApi().getWorkflowRunDetail(runId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:workflow-runs:start-rerun", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["startWorkflowRunRerun"]>[0];
-    return JSON.stringify(await studioShellBackendApi.startWorkflowRunRerun(request));
+    return JSON.stringify(await getStudioShellBackendApi().startWorkflowRunRerun(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:list", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["listChildComponents"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.listChildComponents(request));
+    return JSON.stringify(await getSystemStudioBackendApi().listChildComponents(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:add", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["addChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.addChildComponent(request));
+    return JSON.stringify(await getSystemStudioBackendApi().addChildComponent(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:remove", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["removeChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.removeChildComponent(request));
+    return JSON.stringify(await getSystemStudioBackendApi().removeChildComponent(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-components:reorder", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["reorderChildComponent"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.reorderChildComponent(request));
+    return JSON.stringify(await getSystemStudioBackendApi().reorderChildComponent(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-interfaces:update", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateInterfaces"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateInterfaces(request));
+    return JSON.stringify(await getSystemStudioBackendApi().updateInterfaces(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-parameters:update", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateParameters"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateParameters(request));
+    return JSON.stringify(await getSystemStudioBackendApi().updateParameters(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-execution-metadata:update", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["updateExecutionMetadata"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.updateExecutionMetadata(request));
+    return JSON.stringify(await getSystemStudioBackendApi().updateExecutionMetadata(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:save", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["saveSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.saveSystemDefinition(request));
+    return JSON.stringify(await getSystemStudioBackendApi().saveSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:load", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["loadSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.loadSystemDefinition(request));
+    return JSON.stringify(await getSystemStudioBackendApi().loadSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:duplicate", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["duplicateSystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.duplicateSystemDefinition(request));
+    return JSON.stringify(await getSystemStudioBackendApi().duplicateSystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-definition:modify", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["modifySystemDefinition"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.modifySystemDefinition(request));
+    return JSON.stringify(await getSystemStudioBackendApi().modifySystemDefinition(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-compatibility:insights", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemStudioBackendApi["getCompatibilityInsights"]>[0];
-    return JSON.stringify(await systemStudioBackendApi.getCompatibilityInsights(request));
+    return JSON.stringify(await getSystemStudioBackendApi().getCompatibilityInsights(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:start", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["startExecution"]>[0];
-    return JSON.stringify(await systemRuntimeBackendApi.startExecution(request));
+    return JSON.stringify(await getSystemRuntimeBackendApi().startExecution(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:status", async (_event, executionId: string) => {
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionStatus(executionId));
+    return JSON.stringify(await getSystemRuntimeBackendApi().getExecutionStatus(executionId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:trace", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<SystemRuntimeBackendApi["getExecutionTrace"]>[0];
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionTrace(request));
+    return JSON.stringify(await getSystemRuntimeBackendApi().getExecutionTrace(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:system-runtime:result", async (_event, executionId: string) => {
-    return JSON.stringify(await systemRuntimeBackendApi.getExecutionResult(executionId));
+    return JSON.stringify(await getSystemRuntimeBackendApi().getExecutionResult(executionId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:upload", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["ingestReferenceImageUpload"]>[0];
-    return JSON.stringify(await studioShellBackendApi.ingestReferenceImageUpload(request));
+    return JSON.stringify(await getStudioShellBackendApi().ingestReferenceImageUpload(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:persist-outputs", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["persistReferenceImageOutputs"]>[0];
-    return JSON.stringify(await studioShellBackendApi.persistReferenceImageOutputs(request));
+    return JSON.stringify(await getStudioShellBackendApi().persistReferenceImageOutputs(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-outputs", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageOutputs"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageOutputs(request));
+    return JSON.stringify(await getStudioShellBackendApi().listReferenceImageOutputs(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-output", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageOutput"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getReferenceImageOutput(request));
+    return JSON.stringify(await getStudioShellBackendApi().getReferenceImageOutput(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-dataset-items", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageDatasetItems"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageDatasetItems(request));
+    return JSON.stringify(await getStudioShellBackendApi().listReferenceImageDatasetItems(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:get-dataset-item", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["getReferenceImageDatasetItem"]>[0];
-    return JSON.stringify(await studioShellBackendApi.getReferenceImageDatasetItem(request));
+    return JSON.stringify(await getStudioShellBackendApi().getReferenceImageDatasetItem(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:list-run-history", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["listReferenceImageRunHistory"]>[0];
-    return JSON.stringify(await studioShellBackendApi.listReferenceImageRunHistory(request));
+    return JSON.stringify(await getStudioShellBackendApi().listReferenceImageRunHistory(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:reference-image:chain-to-input", async (_event, requestJson: string) => {
     const request = JSON.parse(requestJson) as Parameters<StudioShellBackendApi["chainReferenceImageDatasetItemToInput"]>[0];
-    return JSON.stringify(await studioShellBackendApi.chainReferenceImageDatasetItemToInput(request));
+    return JSON.stringify(await getStudioShellBackendApi().chainReferenceImageDatasetItemToInput(request));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:runtime-window:launch", async (_event, requestJson: string) => {
     try {
@@ -1220,7 +1161,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   logInitializationMemory("desktop-runtime-bootstrap", "ipc-and-api-bindings-ready");
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
@@ -1241,65 +1182,65 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
       }));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const filters = JSON.parse(filtersJson);
     return JSON.stringify(await registryBackendApi.filterAssets(filters));
   });
   ipcMain.handle("ai-loom-desktop-registry:search", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-assets", async (_event, limit?: number) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listExploreAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-search", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchExploreAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getAssetDetail(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1317,7 +1258,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:version-chain", async (_event, assetId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
@@ -1344,7 +1285,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return withState;
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:dependency-state", async (_event, versionId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1366,7 +1307,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:reconcile-identity", async (_event, entityType: string, entityId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1377,7 +1318,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(reconciled);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:replay-scope", async (_event, entityType: string, entityId: string, versionId?: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ replayed: false, reason: "Canonical asset system is unavailable." });
     }
@@ -1385,7 +1326,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(replay);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:verify-projection", async (_event, assetId: string, versionIdsInScope?: ReadonlyArray<string>) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1393,7 +1334,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(canonicalRuntime.projectionTrustReadModelService.summarize(verification));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] });
     }
@@ -1402,7 +1343,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(result);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:management-snapshot", async (_event, assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1445,19 +1386,17 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   await authoritativeServerRuntime?.stop();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
-  executionRunRepository?.dispose();
-  workflowRunSummaryRepository?.dispose();
+  deferredFeatureRuntime?.dispose();
   agentRepository?.dispose();
   agentSessionRepository?.dispose();
   agentRunnerAssetSystemRepository?.dispose();
   canonicalRegistryRuntime?.repository.dispose();
-  studioShellRepository?.dispose();
-  workflowPersistenceRepository?.dispose();
   agentStudioBackendApi = undefined;
   agentRepository = undefined;
   agentSessionRepository = undefined;
   agentRunnerAssetSystemRepository = undefined;
   canonicalRegistryRuntime = undefined;
+  deferredFeatureRuntime = undefined;
   serviceSupervisor = undefined;
   authoritativeServerRuntime = undefined;
   bootstrapContext = undefined;
