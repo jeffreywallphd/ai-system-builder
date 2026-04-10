@@ -28,7 +28,7 @@ export const DesktopStartupBootSequence = Object.freeze([
 
 export const PreLoginAuthShellInitializers = Object.freeze([
   "desktop-storage-auth-shell-pre-login",
-  "authoritative-identity-host",
+  "auth-minimal-identity-host",
   "auth-bootstrap-ipc",
   "desktop-connectivity-monitor",
 ]);

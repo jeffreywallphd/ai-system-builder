@@ -141,6 +141,21 @@ Pre-login server startup now uses an explicit auth-minimal host path:
 
 This keeps pre-login identity bootstrap on the shared host lifecycle pipeline while narrowing startup composition to auth-critical route/persistence responsibilities.
 
+## Story B.3.1 implementation update
+
+Electron main now hardens auth-minimal startup integration details:
+
+- pre-login startup logs explicitly call out auth-minimal identity host start/ready.
+- `bootstrapAuthShell()` still derives `identityApiBaseUrl` from auth-minimal host runtime address, preserving renderer auth/bootstrap URL contract.
+- pre-login runtime naming in Electron main now uses auth-minimal host terminology instead of authoritative wording.
+- shutdown/disposal path continues stopping auth-minimal host through shared pre-login cleanup.
+
+Regression safeguards now include:
+
+- pre-login startup initializer naming updated to `auth-minimal-identity-host`.
+- tests assert Electron main starts `startAuthMinimalServerHostAssembly(...)`.
+- tests assert Electron main does not call `startAuthoritativeServerHostAssembly(...)` on the pre-login path.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

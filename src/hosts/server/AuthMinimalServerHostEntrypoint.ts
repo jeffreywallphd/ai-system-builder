@@ -25,6 +25,7 @@ import type { DeploymentPolicyBootstrapResolutionResult } from "@application/con
 import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
 
 const DefaultAuthMinimalStartupReason = "auth-minimal-server-entrypoint-startup";
+export type AuthMinimalServerHostRuntimeHandle = AuthoritativeServerHostRuntimeHandle;
 
 export interface AuthMinimalServerHostEntrypointOptions
   extends AuthoritativeServerHostEntrypointOptions {
@@ -107,7 +108,7 @@ export function constructAuthMinimalServerHostAssembly(
 
 export async function startAuthMinimalServerHostAssembly(
   options: AuthMinimalServerHostEntrypointOptions,
-): Promise<AuthoritativeServerHostRuntimeHandle> {
+): Promise<AuthMinimalServerHostRuntimeHandle> {
   const assembly = constructAuthMinimalServerHostAssembly(options);
   return assembly.compositionRoot.compose(assembly.boot);
 }

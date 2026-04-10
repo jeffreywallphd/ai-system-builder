@@ -78,7 +78,7 @@ import {
 } from "./DeferredDesktopFeatureRuntime";
 import {
   startAuthMinimalServerHostAssembly,
-  type AuthoritativeServerHostRuntimeHandle,
+  type AuthMinimalServerHostRuntimeHandle,
 } from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
@@ -126,7 +126,7 @@ let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let agentRunnerAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let agentStudioBackendApi: AgentStudioBackendApi | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
-let authMinimalServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
+let authMinimalServerRuntime: AuthMinimalServerHostRuntimeHandle | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
@@ -602,7 +602,8 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "storage-ready");
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-    const authoritativeServerStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+    const authMinimalHostStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
+    console.info("[ai-loom][startup] Starting auth-minimal identity host for pre-login bootstrap.");
     authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
       hostOptions: {
         databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
@@ -618,7 +619,8 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
         environment: process.env,
       },
     });
-    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authoritativeServerStartAt);
+    logInitializationEnd(DesktopStartupPhases.identityAuthHostReadiness, authMinimalHostStartAt);
+    console.info(`[ai-loom][startup] Auth-minimal identity host ready at ${authMinimalServerRuntime.address}.`);
     logInitializationMemory(DesktopStartupPhases.identityAuthHostReadiness, "ready");
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");

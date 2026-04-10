@@ -24,6 +24,8 @@ describe("desktop startup boot contract", () => {
     const forbidden = new Set(PreLoginAuthShellForbiddenInitializers);
     const violations = PreLoginAuthShellInitializers.filter((initializer) => forbidden.has(initializer));
     expect(violations).toEqual([]);
+    expect(PreLoginAuthShellInitializers).toContain("auth-minimal-identity-host");
+    expect(PreLoginAuthShellInitializers).not.toContain("authoritative-identity-host");
   });
 
   it("requires auth bootstrap channels used by preload sync bootstrap", () => {
