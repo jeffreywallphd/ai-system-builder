@@ -77,9 +77,9 @@ import {
   type DeferredDesktopFeatureRuntime,
 } from "./DeferredDesktopFeatureRuntime";
 import {
-  startAuthoritativeServerHostAssembly,
+  startAuthMinimalServerHostAssembly,
   type AuthoritativeServerHostRuntimeHandle,
-} from "../../src/hosts/server/AuthoritativeServerHostEntrypoint";
+} from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
 const __filename = fileURLToPath(import.meta.url);
@@ -126,7 +126,7 @@ let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
 let agentRunnerAssetSystemRepository: SqliteAssetSystemRepository | undefined;
 let agentStudioBackendApi: AgentStudioBackendApi | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
-let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
+let authMinimalServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
 let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
@@ -603,7 +603,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
 
     const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
     const authoritativeServerStartAt = logInitializationStart(DesktopStartupPhases.identityAuthHostReadiness);
-    authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
+    authMinimalServerRuntime = await startAuthMinimalServerHostAssembly({
       hostOptions: {
         databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
         cors: {
@@ -614,7 +614,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
         env: process.env,
       },
       boot: {
-        startupReason: "electron-main-authoritative-server-host-startup",
+        startupReason: "electron-main-auth-minimal-server-host-startup",
         environment: process.env,
       },
     });
@@ -623,7 +623,7 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "identity-auth-host-ready");
     const identityApiBaseUrl = assertSecureTransportEndpoint(
-      `http://${authoritativeServerRuntime.address}`,
+      `http://${authMinimalServerRuntime.address}`,
       resolveHostSecureTransportConfig({
         hostKind: HostSecureTransportKinds.desktop,
         hostAddress: "127.0.0.1",
@@ -1418,7 +1418,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   await pendingPostLoginBootstrap?.catch(() => undefined);
   desktopConnectivityStateService?.stopMonitoring();
   desktopConnectivityStateService = undefined;
-  await authoritativeServerRuntime?.stop();
+  await authMinimalServerRuntime?.stop();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();
   deferredFeatureRuntime?.dispose();
@@ -1433,7 +1433,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   canonicalRegistryRuntime = undefined;
   deferredFeatureRuntime = undefined;
   serviceSupervisor = undefined;
-  authoritativeServerRuntime = undefined;
+  authMinimalServerRuntime = undefined;
   bootstrapContext = undefined;
   rendererContentSecurityPolicyRuntimeConfig = undefined;
   deferredFeatureIpcReady = false;

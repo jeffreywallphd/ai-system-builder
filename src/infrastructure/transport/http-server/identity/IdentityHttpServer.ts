@@ -977,6 +977,7 @@ export interface IdentityHttpServerOptions {
   readonly executionNodeManagementBackendApi?: ExecutionNodeManagementBackendApi;
   readonly workspaceBackendApi?: WorkspaceInvitationBackendApi;
   readonly workspaceAdministrationBackendApi?: WorkspaceAdministrationBackendApi;
+  readonly sessionContextWorkspaceApi?: Pick<WorkspaceAdministrationBackendApi, "listWorkspaces">;
   readonly logger?: IdentityHttpServerLogger;
   readonly maxBodyBytes?: number;
   readonly serverFactory?: IdentityHttpServerFactory;
@@ -1249,8 +1250,9 @@ export function createIdentityHttpServer(options: IdentityHttpServerOptions): Id
             }
 
             let workspaces: ReadonlyArray<ResolveSessionActorWorkspaceContextApiRecord> = Object.freeze([]);
-            if (options.workspaceAdministrationBackendApi) {
-              const workspaceResponse = await options.workspaceAdministrationBackendApi.listWorkspaces({
+            const sessionContextWorkspaceApi = options.sessionContextWorkspaceApi ?? options.workspaceAdministrationBackendApi;
+            if (sessionContextWorkspaceApi) {
+              const workspaceResponse = await sessionContextWorkspaceApi.listWorkspaces({
                 actorUserIdentityId: context.principal.userIdentityId,
                 limit: 200,
                 offset: 0,

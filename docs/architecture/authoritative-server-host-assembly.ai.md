@@ -7,8 +7,11 @@
 ## Main implementation seams
 - Composition root: `src/hosts/server/AuthoritativeServerCompositionRoot.ts`
 - Dedicated entrypoint: `src/hosts/server/AuthoritativeServerHostEntrypoint.ts`
+- Auth-minimal entrypoint: `src/hosts/server/AuthMinimalServerHostEntrypoint.ts`
+- Auth-minimal runtime host startup implementation: `src/hosts/server/AuthMinimalIdentityServerHost.ts`
 - Runtime host startup implementation: `src/hosts/server/IdentityServerHost.ts`
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
+- Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
 - Route registration composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 
 ## Control-plane ownership
@@ -113,7 +116,7 @@
   - `feature-registration` stage injects composed run-execution adapter registration into `startIdentityServerHost(...)`
 
 ## Entrypoint consumers
-- `electron/main/main.ts` now delegates desktop local control-plane startup through `startAuthoritativeServerHostAssembly(...)`.
+- `electron/main/main.ts` now delegates pre-login desktop startup through `startAuthMinimalServerHostAssembly(...)`.
 - `src/infrastructure/runtime/browser-development/createBrowserDevelopmentVitePlugin.ts` now starts browser-development local control-plane startup through `npm run start:authoritative-server` with `AI_LOOM_SERVER_*` env wiring when `bun` is available; when `bun` is unavailable, startup now fails fast with explicit guidance to install `bun` or start an authoritative host manually.
 
 ## Tests
@@ -121,6 +124,7 @@
 - `src/hosts/server/tests/AuthoritativeServerBootstrapStageOrchestrator.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
+- `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
