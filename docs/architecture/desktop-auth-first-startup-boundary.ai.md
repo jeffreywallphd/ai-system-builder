@@ -2,22 +2,21 @@
 
 Feature: A  
 Epic: A.1  
-Story: A.1.1
+Story: A.1.2
 
 ## Purpose
 
 Define the startup split so Electron can render the login-capable window from a minimal auth bootstrap path, then move broader runtime initialization behind login or lazy feature demand.
 
-## Current issue
+## Current implementation (A.1.2)
 
-`electron/main/main.ts` currently blocks window creation on full `bootstrapDesktopRuntime()`:
+`electron/main/main.ts` now uses explicit startup phases:
 
-- starts service supervisor + full authoritative host,
-- builds broad runtime context,
-- registers large IPC surface (workflows, studio, runtime, model files, agents, registry),
-- then creates the window.
-
-This over-scopes first-render startup.
+- `bootstrapAuthShell()` runs storage + auth identity bootstrap + trusted-device bootstrap context.
+- `registerAuthIpc()` binds auth/bootstrap IPC only.
+- `createMainWindow()` runs immediately after auth-shell bootstrap.
+- `bootstrapPostLoginRuntime()` runs after window creation to start service supervisor and compose broader runtime services.
+- `registerDeferredFeatureIpc()` gates non-auth IPC registration so feature surfaces are clearly post-login/deferred.
 
 ## Target phase model
 

@@ -162,6 +162,17 @@ type CanonicalRegistryRuntime = {
 };
 let canonicalRegistryRuntime: CanonicalRegistryRuntime | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
+const DesktopServiceSupervisorPort = 8790;
+let authIpcRegistered = false;
+let deferredFeatureIpcRegistered = false;
+let postLoginBootstrapPromise: Promise<void> | undefined;
+let isDesktopRuntimeDisposing = false;
+
+type AuthShellBootstrapResult = {
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
+  readonly identityApiBaseUrl: string;
+};
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -457,107 +468,28 @@ async function ensureCanonicalRegistryRuntime(
   return canonicalRegistryRuntime;
 }
 
-async function bootstrapDesktopRuntime(): Promise<void> {
-  const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
-  try {
-  const storageInitializationStartedAt = logInitializationStart("desktop-storage-initialize");
-  const storagePaths = resolveDesktopStoragePaths({
-    userDataPath: app.getPath("userData"),
-    logsPath: app.getPath("logs"),
-  });
-
-  storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
-  await new InitializeProductionStorageUseCase(storageDatabase).execute();
-  logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "storage-ready", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "storage-ready");
-
-  const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
-  const pythonRuntime = resolveDesktopPythonRuntime({
-    isPackaged,
-    repoRoot,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-  });
-  logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "python-runtime-resolved", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "python-runtime-resolved");
-
-  serviceSupervisor = new DesktopServiceSupervisor({
-    repoRoot,
-    isPackaged,
-    resourcesPath: process.resourcesPath,
-    storagePaths,
-      pythonRuntime,
-      pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
-    });
-  const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
-  await serviceSupervisor.start();
-  logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "local-service-supervisor-ready", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "local-service-supervisor-ready");
-
-  const baseRuntimeConfig = isPackaged
-    ? AppRuntimeConfig.forDesktopProduction({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: 8790,
-        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-      })
-    : AppRuntimeConfig.forDesktopDevelopment({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: 8790,
-        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-      });
-  const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
-  const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");
-  authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
-    hostOptions: {
-      databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
-      cors: {
-        allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
-        allowLoopbackOrigins: true,
-        allowNullOrigin: isPackaged,
-      },
-      env: process.env,
-    },
-    boot: {
-      startupReason: "electron-main-authoritative-server-host-startup",
-      environment: process.env,
-    },
-  });
-  logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
-  logInitializationCheckpoint("desktop-runtime-bootstrap", "authoritative-server-ready", bootstrapStartedAt);
-  logInitializationMemory("desktop-runtime-bootstrap", "authoritative-server-ready");
-  const identityApiBaseUrl = assertSecureTransportEndpoint(
-    `http://${authoritativeServerRuntime.address}`,
-    resolveHostSecureTransportConfig({
-      hostKind: HostSecureTransportKinds.desktop,
-      hostAddress: "127.0.0.1",
-    }),
-  );
-  const runtimeConfig = AppRuntimeConfig.fromValues({
-    ...baseRuntimeConfig.toValues(),
-    identityApiBaseUrl,
-  });
-
+function buildBootstrapContext(params: {
+  readonly runtimeConfig: AppRuntimeConfig;
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
+}): void {
   bootstrapContext = Object.freeze({
-    runtimeConfig: runtimeConfig.toValues(),
-    storage: storagePaths,
+    runtimeConfig: params.runtimeConfig.toValues(),
+    storage: params.storagePaths,
     serviceSupervisor: {
-      baseUrl: serviceSupervisor.baseUrl,
-      port: 8790,
+      baseUrl: params.runtimeConfig.serviceSupervisorBaseUrl,
+      port: params.runtimeConfig.serviceSupervisorPort ?? DesktopServiceSupervisorPort,
     },
-    pythonRuntime,
+    pythonRuntime: params.pythonRuntime,
     identityTransportTrust: resolveDesktopIdentityTransportTrustBootstrap((key) => storageDatabase?.getItem(key) ?? null),
   });
-  desktopConnectivityStateService = new DesktopConnectivityStateService();
-  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
-    intervalMs: 3_000,
-  });
+}
+
+function registerAuthIpc(): void {
+  if (authIpcRegistered) {
+    return;
+  }
+  authIpcRegistered = true;
 
   ipcMain.on("ai-loom-desktop:get-bootstrap-sync", (event) => {
     event.returnValue = bootstrapContext;
@@ -624,6 +556,152 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   ipcMain.on("ai-loom-desktop-secrets:remove", (_event, key: string) => {
     storageDatabase?.removeItem(`secure:${key}`);
   });
+}
+
+async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
+  const authShellStartedAt = logInitializationStart("desktop-auth-shell-bootstrap");
+  try {
+    const storageInitializationStartedAt = logInitializationStart("desktop-storage-initialize");
+    const storagePaths = resolveDesktopStoragePaths({
+      userDataPath: app.getPath("userData"),
+      logsPath: app.getPath("logs"),
+    });
+    storageDatabase = new DesktopStorageDatabase({ paths: storagePaths });
+    await new InitializeProductionStorageUseCase(storageDatabase).execute();
+    logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
+    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "storage-ready", authShellStartedAt);
+    logInitializationMemory("desktop-auth-shell-bootstrap", "storage-ready");
+
+    const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
+    const pythonRuntime = resolveDesktopPythonRuntime({
+      isPackaged,
+      repoRoot,
+      resourcesPath: process.resourcesPath,
+      storagePaths,
+    });
+    logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
+    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "python-runtime-resolved", authShellStartedAt);
+    logInitializationMemory("desktop-auth-shell-bootstrap", "python-runtime-resolved");
+
+    const preLoginServiceSupervisorBaseUrl = process.env.SERVICE_SUPERVISOR_BASE_URL || "http://127.0.0.1:8790";
+    const preLoginPythonRuntimeBaseUrl = process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100";
+    const baseRuntimeConfig = isPackaged
+      ? AppRuntimeConfig.forDesktopProduction({
+        storage: storagePaths,
+        pythonRuntime,
+        serviceSupervisorBaseUrl: preLoginServiceSupervisorBaseUrl,
+        serviceSupervisorPort: DesktopServiceSupervisorPort,
+        pythonRuntimeBaseUrl: preLoginPythonRuntimeBaseUrl,
+      })
+      : AppRuntimeConfig.forDesktopDevelopment({
+        storage: storagePaths,
+        pythonRuntime,
+        serviceSupervisorBaseUrl: preLoginServiceSupervisorBaseUrl,
+        serviceSupervisorPort: DesktopServiceSupervisorPort,
+        pythonRuntimeBaseUrl: preLoginPythonRuntimeBaseUrl,
+      });
+    const rendererOrigin = normalizeHttpOrigin(rendererDevUrl);
+    const authoritativeServerStartAt = logInitializationStart("authoritative-server-startup");
+    authoritativeServerRuntime = await startAuthoritativeServerHostAssembly({
+      hostOptions: {
+        databasePath: path.join(storagePaths.storageDirectory, "identity", "identity.sqlite"),
+        cors: {
+          allowedOrigins: rendererOrigin ? [rendererOrigin] : [],
+          allowLoopbackOrigins: true,
+          allowNullOrigin: isPackaged,
+        },
+        env: process.env,
+      },
+      boot: {
+        startupReason: "electron-main-authoritative-server-host-startup",
+        environment: process.env,
+      },
+    });
+    logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
+    logInitializationCheckpoint("desktop-auth-shell-bootstrap", "authoritative-server-ready", authShellStartedAt);
+    logInitializationMemory("desktop-auth-shell-bootstrap", "authoritative-server-ready");
+    const identityApiBaseUrl = assertSecureTransportEndpoint(
+      `http://${authoritativeServerRuntime.address}`,
+      resolveHostSecureTransportConfig({
+        hostKind: HostSecureTransportKinds.desktop,
+        hostAddress: "127.0.0.1",
+      }),
+    );
+    const runtimeConfig = AppRuntimeConfig.fromValues({
+      ...baseRuntimeConfig.toValues(),
+      identityApiBaseUrl,
+    });
+    buildBootstrapContext({
+      runtimeConfig,
+      storagePaths,
+      pythonRuntime,
+    });
+    desktopConnectivityStateService = new DesktopConnectivityStateService();
+    desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
+      intervalMs: 3_000,
+    });
+    registerAuthIpc();
+    return Object.freeze({
+      storagePaths,
+      pythonRuntime,
+      identityApiBaseUrl,
+    });
+  } finally {
+    logInitializationEnd("desktop-auth-shell-bootstrap", authShellStartedAt);
+    logInitializationMemory("desktop-auth-shell-bootstrap", "bootstrap-complete");
+  }
+}
+
+function registerDeferredFeatureIpc(register: () => void): void {
+  if (deferredFeatureIpcRegistered) {
+    return;
+  }
+  deferredFeatureIpcRegistered = true;
+  register();
+}
+
+async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
+  const bootstrapStartedAt = logInitializationStart("desktop-runtime-bootstrap");
+  try {
+  const { storagePaths, pythonRuntime, identityApiBaseUrl } = authShell;
+  serviceSupervisor = new DesktopServiceSupervisor({
+    repoRoot,
+    isPackaged,
+    resourcesPath: process.resourcesPath,
+    storagePaths,
+    pythonRuntime,
+    pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
+  });
+  const supervisorStartAt = logInitializationStart("local-service-supervisor-start");
+  await serviceSupervisor.start();
+  logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
+  logInitializationCheckpoint("desktop-runtime-bootstrap", "local-service-supervisor-ready", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "local-service-supervisor-ready");
+
+  const baseRuntimeConfig = isPackaged
+    ? AppRuntimeConfig.forDesktopProduction({
+        storage: storagePaths,
+        pythonRuntime,
+        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
+        serviceSupervisorPort: DesktopServiceSupervisorPort,
+        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
+      })
+    : AppRuntimeConfig.forDesktopDevelopment({
+        storage: storagePaths,
+        pythonRuntime,
+        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
+        serviceSupervisorPort: DesktopServiceSupervisorPort,
+        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
+      });
+  const runtimeConfig = AppRuntimeConfig.fromValues({
+    ...baseRuntimeConfig.toValues(),
+    identityApiBaseUrl,
+  });
+  buildBootstrapContext({
+    runtimeConfig,
+    storagePaths,
+    pythonRuntime,
+  });
   const workflowsDirectory = runtimeConfig.workflowStorageDirectory
     ? path.resolve(repoRoot, runtimeConfig.workflowStorageDirectory)
     : path.resolve(repoRoot, "dev/workflow-data/workflows");
@@ -672,6 +750,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   const executionHistoryInfrastructure = createExecutionHistoryInfrastructure(executionRunRepository);
   getExecutionRunUseCase = new GetExecutionRunUseCase(executionRunRepository);
   listExecutionRunsUseCase = executionHistoryInfrastructure.listExecutionRunsUseCase;
+  registerDeferredFeatureIpc(() => {
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
     workflowPersistence?.saveWorkflowRecord(recordJson);
   });
@@ -1288,6 +1367,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       })),
     });
   });
+  });
 
   if (runtimeConfig.isPackagedDesktopHost && !pythonRuntime.isAvailable) {
     console.warn(
@@ -1301,6 +1381,10 @@ async function bootstrapDesktopRuntime(): Promise<void> {
 }
 
 async function disposeDesktopRuntimeResources(): Promise<void> {
+  isDesktopRuntimeDisposing = true;
+  const pendingPostLoginBootstrap = postLoginBootstrapPromise;
+  postLoginBootstrapPromise = undefined;
+  await pendingPostLoginBootstrap?.catch(() => undefined);
   desktopConnectivityStateService?.stopMonitoring();
   desktopConnectivityStateService = undefined;
   await authoritativeServerRuntime?.stop();
@@ -1319,6 +1403,10 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   agentSessionRepository = undefined;
   agentRunnerAssetSystemRepository = undefined;
   canonicalRegistryRuntime = undefined;
+  serviceSupervisor = undefined;
+  authoritativeServerRuntime = undefined;
+  bootstrapContext = undefined;
+  isDesktopRuntimeDisposing = false;
 }
 
 app.whenReady().then(async () => {
@@ -1326,18 +1414,27 @@ app.whenReady().then(async () => {
   try {
     desktopHostRuntime = await startDesktopHostAssembly({
       startHost: async () => {
-        await bootstrapDesktopRuntime();
         try {
+          const authShell = await bootstrapAuthShell();
           installRendererContentSecurityPolicy();
           await createMainWindow();
           logInitializationMemory("desktop-host-bootstrap", "main-window-ready");
+          postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
+          postLoginBootstrapPromise.catch(async (error) => {
+            if (isDesktopRuntimeDisposing) {
+              return;
+            }
+            console.error("Post-login desktop runtime bootstrap failed", error);
+            await disposeDesktopRuntimeResources();
+            app.exit(1);
+          });
+          return Object.freeze({
+            close: disposeDesktopRuntimeResources,
+          });
         } catch (error) {
           await disposeDesktopRuntimeResources();
           throw error;
         }
-        return Object.freeze({
-          close: disposeDesktopRuntimeResources,
-        });
       },
       boot: {
         startupReason: "electron-main-desktop-host-startup",

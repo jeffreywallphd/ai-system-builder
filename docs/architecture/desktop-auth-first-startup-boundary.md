@@ -2,23 +2,23 @@
 
 Feature: A  
 Epic: A.1  
-Story: A.1.1
+Story: A.1.2
 
 ## Purpose
 
 Define an explicit Electron startup boundary so the first login-capable window is created from a minimal auth bootstrap surface, with non-auth runtime moved to post-login or deferred feature initialization.
 
-## Current startup behavior (as implemented)
+## Current startup behavior (as implemented in A.1.2)
 
-`electron/main/main.ts` currently runs one monolithic `bootstrapDesktopRuntime()` path before `createMainWindow()`:
+`electron/main/main.ts` now uses explicit startup phase entrypoints:
 
-1. Initializes desktop storage and runtime config (`460-556`).
-2. Starts local service supervisor and full authoritative server host (`486-534`).
-3. Builds `bootstrapContext` and starts connectivity monitoring (`547-560`).
-4. Registers auth IPC plus broad workflow/runtime/agent/studio/registry/model-file IPC (`562-1290`).
-5. Only after all of the above, creates the main window (`1327-1333`).
+1. `bootstrapAuthShell()` initializes storage, auth identity bootstrap, and trusted-device/session bootstrap data.
+2. `registerAuthIpc()` registers auth/bootstrap IPC only.
+3. `createMainWindow()` runs immediately after auth-shell phase completion.
+4. `bootstrapPostLoginRuntime()` starts service supervisor and composes broader desktop runtime.
+5. `registerDeferredFeatureIpc()` registers non-auth feature IPC after post-login runtime bootstrap starts.
 
-This makes first render depend on work that is not required for login/session restoration.
+This removes full feature/runtime initialization from the first-render gate while preserving desktop auth bootstrap behavior.
 
 ## Target startup phases
 
