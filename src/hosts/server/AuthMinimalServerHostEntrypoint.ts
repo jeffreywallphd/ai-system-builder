@@ -96,10 +96,7 @@ export function constructAuthMinimalServerHostAssembly(
         ?? (async () => createAuthMinimalDeploymentPolicyBootstrapStub()),
       assertServiceCoverage: options.bootstrap?.assertServiceCoverage
         ?? ((_plan: HostServiceRegistrationPlan) => {}),
-      composeComfyUiExecutionAdapter: options.bootstrap?.composeComfyUiExecutionAdapter
-        ?? (() => undefined),
-      composeRunExecutionAdapterRegistration: options.bootstrap?.composeRunExecutionAdapterRegistration
-        ?? (() => undefined),
+      executionInfrastructureEnabled: false,
     },
     boot: {
       ...options.boot,

@@ -66,6 +66,12 @@ Story B.2.2 introduces a dedicated auth-minimal route registration plan and cove
 - `assertAuthMinimalServerApiRouteRegistrationCoverage(...)` validates only the auth-minimal required route-family list (`identity-auth`).
 - Full authoritative route registration and full coverage assertion remain in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts` for authoritative startup mode.
 
+Story B.2.4 narrows auth-minimal dependencies composition further:
+- `src/hosts/server/AuthoritativeServerCompositionRoot.ts` now supports `bootstrap.executionInfrastructureEnabled`.
+- `src/hosts/server/AuthMinimalServerHostEntrypoint.ts` forces `executionInfrastructureEnabled: false` for pre-login startup.
+- With auth-minimal startup, dependencies stage does not compose ComfyUI execution infrastructure or run-execution adapter registration artifacts, and does not inject `runExecutionAdapters` into host startup.
+- Full authoritative startup continues composing execution infrastructure when enabled.
+
 ## Startup expectations
 
 The entrypoint defaults to a full authoritative startup dependency contract and uses the shared host bootstrap pipeline (`configuration -> dependencies -> logging -> security -> persistence -> feature-registration`).
