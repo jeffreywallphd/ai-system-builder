@@ -102,8 +102,8 @@ describe("createDeferredDesktopFeatureRuntime", () => {
     runtime.ensureStudioShellBackendApi();
     runtime.ensureStudioShellBackendApi();
 
-    expect(created.workflowRunSummaryRepository).toBe(1);
-    expect(created.listWorkflowRunSummariesUseCase).toBe(1);
+    expect(created.workflowRunSummaryRepository ?? 0).toBe(0);
+    expect(created.listWorkflowRunSummariesUseCase ?? 0).toBe(0);
     expect(created.studioShellRepository).toBe(1);
     expect(created.workflowPersistenceRepository).toBe(1);
     expect(created.imageRunHistoryRepository).toBe(1);
@@ -111,6 +111,12 @@ describe("createDeferredDesktopFeatureRuntime", () => {
     expect(created.studioShellBackendApi).toBe(1);
     expect(created.systemStudioBackendApi ?? 0).toBe(0);
     expect(created.systemRuntimeBackendApi ?? 0).toBe(0);
+
+    runtime.ensureWorkflowRunHistory();
+    runtime.ensureWorkflowRunHistory();
+
+    expect(created.workflowRunSummaryRepository).toBe(1);
+    expect(created.listWorkflowRunSummariesUseCase).toBe(1);
 
     runtime.ensureSystemStudioBackendApi();
     runtime.ensureSystemRuntimeBackendApi();
@@ -164,6 +170,7 @@ describe("createDeferredDesktopFeatureRuntime", () => {
 
     runtime.ensureExecutionHistory();
     runtime.ensureStudioShellBackendApi();
+    runtime.ensureWorkflowRunHistory();
     runtime.dispose();
 
     expect(disposed).toEqual([
