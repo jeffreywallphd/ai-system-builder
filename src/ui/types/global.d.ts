@@ -1,6 +1,6 @@
 import type {
   DesktopAgentAuthoringBridge,
-  DesktopBootstrapContext,
+  DesktopAuthBootstrapContext,
   DesktopCanonicalAssetBridge,
   DesktopConnectivityBridge,
   DesktopExecutionRunBridge,
@@ -20,7 +20,7 @@ interface DesktopStorageBridge {
 declare global {
   interface Window {
     aiLoomDesktop?: {
-      bootstrap: DesktopBootstrapContext;
+      bootstrap: DesktopAuthBootstrapContext;
       storage: DesktopStorageBridge;
       secrets?: {
         isAvailable(): boolean;

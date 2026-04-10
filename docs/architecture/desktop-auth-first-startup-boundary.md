@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1  
-Story: A.1.2
+Story: A.1.2-A.1.3
 
 ## Purpose
 
@@ -90,15 +90,25 @@ Required:
   - Used by `resolveDesktopIdentityApiBaseUrl()` and `IdentityAuthService` HTTP client construction.
 - `bootstrap.identityTransportTrust`
   - Used by `DesktopTrustedDeviceTransportBootstrap` to enforce trusted-device bootstrap preconditions and request shaping.
+- optional auth-shell metadata:
+  - `bootstrap.storage.appDataDirectory`
+  - `bootstrap.environment.isPackaged`
 - `storage` bridge (`getItem/setItem/removeItem`)
   - Used by `IdentityAuthSessionStore` for `ai-loom.identity.session.v1` persistence/restore.
 
 Not required for pre-login auth bootstrap:
 
-- `bootstrap.storage` path metadata (`appDataDirectory`, `modelsDirectory`, etc.).
+- full `bootstrap.storage` path metadata (`modelsDirectory`, `assetsDirectory`, etc.).
 - `bootstrap.serviceSupervisor` details.
 - `bootstrap.pythonRuntime` details.
+- runtime config fields for service supervisor/Python/workflow path metadata.
 - Any workflow/model/studio/agent/canonical runtime services.
+
+## Story A.1.3 implementation updates
+
+- `DesktopAuthBootstrapContext` now defines the preload bootstrap contract for pre-login auth/session restoration.
+- `DesktopAuthBootstrapRuntimeConfig` is a projected runtime config subset that excludes service supervisor, Python runtime, workflow path metadata, and desktop storage runtime internals.
+- `AppRuntimeConfig.resolveDefault()` remains backward-safe by materializing both legacy full bootstrap runtime payloads and the new auth-minimal runtime payload.
 
 ## Over-scoped pre-login dependencies to remove from critical path
 

@@ -2,7 +2,7 @@
 
 Feature: A  
 Epic: A.1  
-Story: A.1.2
+Story: A.1.2-A.1.3
 
 ## Purpose
 
@@ -50,14 +50,22 @@ Required pre-login:
 
 - `bootstrap.runtimeConfig.identityApiBaseUrl`
 - `bootstrap.identityTransportTrust`
+- optional `bootstrap.storage.appDataDirectory` and `bootstrap.environment.isPackaged` for auth-shell presentation/diagnostics
 - desktop storage bridge (`getItem/setItem/removeItem`) for `ai-loom.identity.session.v1`
 
 Not required pre-login:
 
-- bootstrap storage-path metadata
-- service-supervisor details
-- python runtime details
+- full storage-path metadata
+- service-supervisor details/base URL
+- python runtime details/base URL
+- workflow path metadata
 - workflow/studio/agent/model/registry runtime initialization
+
+## Story A.1.3 implementation notes
+
+- preload bootstrap contract is now explicitly auth-minimal (`DesktopAuthBootstrapContext`).
+- `bootstrap.runtimeConfig` is projected to `DesktopAuthBootstrapRuntimeConfig` and no longer exposes service supervisor or Python/runtime path fields.
+- renderer runtime config resolution remains backward-safe by accepting both legacy full runtime config payloads and the new minimal payload.
 
 ## Major work to move off critical path
 

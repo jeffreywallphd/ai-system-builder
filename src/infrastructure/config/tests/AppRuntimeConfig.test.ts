@@ -100,4 +100,60 @@ describe("AppRuntimeConfig", () => {
       globalWithWindow.window = previousWindow;
     }
   });
+
+  it("resolves desktop runtime config from auth-minimal bootstrap payload", () => {
+    const globalWithDesktop = (globalThis as typeof globalThis & {
+      aiLoomDesktop?: {
+        bootstrap?: {
+          runtimeConfig: {
+            runtimeMode: "desktop-production";
+            hostKind: "desktop";
+            lifecycleStage: "production";
+            distributionTarget: "electron";
+            rendererDeliveryMode: "packaged-assets";
+            workflowRepositoryMode: "filesystem-indexed";
+            workflowExecutorMode: "strategy";
+            nodeCatalogMode: "registered";
+            uiSettingsPersistenceMode: "desktop-sqlite";
+            installedModelCatalogMode: "desktop-sqlite";
+            seedStarterNode: false;
+            isProductionMode: true;
+            identityApiBaseUrl: string;
+            modelInstallDirectory: string;
+          };
+        };
+      };
+    });
+    const previousDesktopBootstrap = globalWithDesktop.aiLoomDesktop;
+    try {
+      globalWithDesktop.aiLoomDesktop = {
+        bootstrap: {
+          runtimeConfig: {
+            runtimeMode: "desktop-production",
+            hostKind: "desktop",
+            lifecycleStage: "production",
+            distributionTarget: "electron",
+            rendererDeliveryMode: "packaged-assets",
+            workflowRepositoryMode: "filesystem-indexed",
+            workflowExecutorMode: "strategy",
+            nodeCatalogMode: "registered",
+            uiSettingsPersistenceMode: "desktop-sqlite",
+            installedModelCatalogMode: "desktop-sqlite",
+            seedStarterNode: false,
+            isProductionMode: true,
+            identityApiBaseUrl: "http://127.0.0.1:8788",
+            modelInstallDirectory: "/tmp/ai-loom/models",
+          },
+        },
+      };
+
+      const config = AppRuntimeConfig.resolveDefault();
+      expect(config.runtimeMode).toBe(AppRuntimeModes.desktopProduction);
+      expect(config.identityApiBaseUrl).toBe("http://127.0.0.1:8788");
+      expect(config.serviceSupervisorBaseUrl).toBeUndefined();
+      expect(config.pythonRuntimeBaseUrl).toBeUndefined();
+    } finally {
+      globalWithDesktop.aiLoomDesktop = previousDesktopBootstrap;
+    }
+  });
 });
