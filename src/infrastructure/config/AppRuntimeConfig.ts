@@ -36,6 +36,7 @@ export interface AppRuntimeConfigValues {
   readonly modelInstallDirectory: string;
   readonly serviceSupervisorBaseUrl?: string;
   readonly serviceSupervisorPort?: number;
+  readonly pythonRuntimeBaseUrl?: string;
   readonly workflowStorageDirectory?: string;
   readonly workflowIndexDatabasePath?: string;
   readonly desktopStorage?: DesktopStoragePaths;
@@ -47,6 +48,7 @@ interface DesktopConfigOptions {
   readonly pythonRuntime: DesktopPythonRuntimeInfo;
   readonly serviceSupervisorBaseUrl: string;
   readonly serviceSupervisorPort: number;
+  readonly pythonRuntimeBaseUrl?: string;
 }
 
 export class AppRuntimeConfig {
@@ -68,6 +70,7 @@ export class AppRuntimeConfig {
   public readonly modelInstallDirectory: string;
   public readonly serviceSupervisorBaseUrl?: string;
   public readonly serviceSupervisorPort?: number;
+  public readonly pythonRuntimeBaseUrl?: string;
   public readonly workflowStorageDirectory?: string;
   public readonly workflowIndexDatabasePath?: string;
   public readonly desktopStorage?: DesktopStoragePaths;
@@ -92,6 +95,7 @@ export class AppRuntimeConfig {
     this.modelInstallDirectory = values.modelInstallDirectory.trim();
     this.serviceSupervisorBaseUrl = values.serviceSupervisorBaseUrl?.trim() || undefined;
     this.serviceSupervisorPort = values.serviceSupervisorPort;
+    this.pythonRuntimeBaseUrl = values.pythonRuntimeBaseUrl?.trim() || undefined;
     this.workflowStorageDirectory = values.workflowStorageDirectory?.trim() || undefined;
     this.workflowIndexDatabasePath = values.workflowIndexDatabasePath?.trim() || undefined;
     this.desktopStorage = values.desktopStorage;
@@ -130,6 +134,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: this.modelInstallDirectory,
       serviceSupervisorBaseUrl: this.serviceSupervisorBaseUrl,
       serviceSupervisorPort: this.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: this.pythonRuntimeBaseUrl,
       workflowStorageDirectory: this.workflowStorageDirectory,
       workflowIndexDatabasePath: this.workflowIndexDatabasePath,
       desktopStorage: this.desktopStorage,
@@ -190,6 +195,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: values.modelInstallDirectory,
       serviceSupervisorBaseUrl: values.serviceSupervisorBaseUrl,
       serviceSupervisorPort: values.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: values.pythonRuntimeBaseUrl,
       workflowStorageDirectory: values.workflowStorageDirectory,
       workflowIndexDatabasePath: values.workflowIndexDatabasePath,
       desktopStorage: values.desktopStorage,
@@ -241,6 +247,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: options.pythonRuntimeBaseUrl,
       workflowStorageDirectory: "dev/workflow-data/workflows",
       workflowIndexDatabasePath: "dev/workflow-data/workflows/workflow-index.sqlite",
       desktopStorage: options.storage,
@@ -260,6 +267,7 @@ export class AppRuntimeConfig {
       modelInstallDirectory: options.storage.modelsDirectory,
       serviceSupervisorBaseUrl: options.serviceSupervisorBaseUrl,
       serviceSupervisorPort: options.serviceSupervisorPort,
+      pythonRuntimeBaseUrl: options.pythonRuntimeBaseUrl,
       workflowStorageDirectory: `${options.storage.appDataDirectory}/workflow-data/workflows`,
       workflowIndexDatabasePath: `${options.storage.storageDirectory}/workflow-index.sqlite`,
       desktopStorage: options.storage,
@@ -287,4 +295,3 @@ export class AppRuntimeConfig {
 export function isDesktopProductionConfig(config: AppRuntimeConfig): boolean {
   return isProductionRuntimeMode(config.runtimeMode);
 }
-

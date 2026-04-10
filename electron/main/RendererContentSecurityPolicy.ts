@@ -63,6 +63,11 @@ function resolveHttpOrigins(options: RendererContentSecurityPolicyOptions): Read
     origins.add(serviceSupervisorOrigin);
   }
 
+  const pythonRuntimeOrigin = normalizeOrigin(runtimeConfig.pythonRuntimeBaseUrl);
+  if (pythonRuntimeOrigin) {
+    origins.add(pythonRuntimeOrigin);
+  }
+
   return [...origins];
 }
 

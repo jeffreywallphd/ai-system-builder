@@ -11,20 +11,27 @@ export interface DesktopServiceSupervisorOptions {
   readonly pythonRuntime: DesktopPythonRuntimeInfo;
   readonly port?: number;
   readonly host?: string;
+  readonly pythonRuntimeBaseUrl?: string;
 }
 
 export class DesktopServiceSupervisor {
   private processHandle?: ChildProcess;
   private readonly port: number;
   private readonly host: string;
+  private readonly pythonRuntimeBaseUrl: string;
 
   constructor(private readonly options: DesktopServiceSupervisorOptions) {
     this.port = options.port ?? 8790;
     this.host = options.host ?? "127.0.0.1";
+    this.pythonRuntimeBaseUrl = options.pythonRuntimeBaseUrl ?? "http://127.0.0.1:8100";
   }
 
   public get baseUrl(): string {
     return `http://${this.host}:${this.port}`;
+  }
+
+  public get runtimeBaseUrl(): string {
+    return this.pythonRuntimeBaseUrl;
   }
 
   public async start(): Promise<void> {
@@ -51,7 +58,7 @@ export class DesktopServiceSupervisor {
         this.options.repoRoot,
       ]),
       PYTHON_RUNTIME_MODE: "managed-local",
-      PYTHON_RUNTIME_BASE_URL: "http://127.0.0.1:8100",
+      PYTHON_RUNTIME_BASE_URL: this.pythonRuntimeBaseUrl,
       PYTHON_RUNTIME_WORKDIR: this.options.pythonRuntime.workspaceDirectory,
       PYTHON_RUNTIME_INTERPRETER_PATH: this.options.pythonRuntime.executablePath ?? "",
       PYTHON_RUNTIME_EXECUTABLE: this.options.pythonRuntime.executablePath ?? process.env.PYTHON_RUNTIME_EXECUTABLE ?? "python",
