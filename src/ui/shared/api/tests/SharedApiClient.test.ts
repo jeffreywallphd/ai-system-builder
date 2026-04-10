@@ -204,6 +204,33 @@ describe("SharedApiClient", () => {
     expect(response.error?.domainCode).toBe("request-timeout");
   });
 
+  it("enforces timeout even when fetch never settles after abort", async () => {
+    const fetchImplementation: typeof fetch = async (_input, _init) => {
+      return await new Promise<Response>(() => {
+        // intentionally unresolved to simulate transport that ignores abort
+      });
+    };
+    const client = new SharedApiClient({
+      baseUrl: "http://127.0.0.1:8788",
+      fetchImplementation,
+      retryPolicy: {
+        maxAttempts: 1,
+      },
+    });
+
+    const startedAt = Date.now();
+    const response = await client.requestJson<{ ok: boolean; error?: { domainCode?: string } }>({
+      method: "GET",
+      path: "/api/v1/timeout-stuck",
+      timeoutMs: 10,
+    });
+    const durationMs = Date.now() - startedAt;
+
+    expect(response.ok).toBeFalse();
+    expect(response.error?.domainCode).toBe("request-timeout");
+    expect(durationMs).toBeLessThan(250);
+  });
+
   it("maps parser failures to normalized internal errors", async () => {
     const client = new SharedApiClient({
       baseUrl: "http://127.0.0.1:8788",

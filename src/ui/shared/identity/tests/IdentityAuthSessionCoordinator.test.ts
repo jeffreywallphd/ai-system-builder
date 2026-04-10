@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import {
   IdentityAuthApiErrorCodes,
   type IdentityAuthApiErrorCode,
@@ -13,6 +13,10 @@ import {
 import { IdentityAuthSessionStore } from "../IdentityAuthSessionStore";
 
 describe("IdentityAuthSessionCoordinator", () => {
+  beforeEach(() => {
+    IdentityAuthSessionCoordinator.resetInFlightBootstrapForTests();
+  });
+
   it("returns unauthenticated when no stored session is available", async () => {
     const store = createSessionStore();
     const coordinator = new IdentityAuthSessionCoordinator(store, {
@@ -242,6 +246,76 @@ describe("IdentityAuthSessionCoordinator", () => {
       expect(result.error?.code).toBe("timeout");
       expect(result.error?.retryable).toBeTrue();
     }
+  });
+
+  it("reuses in-flight bootstrap work for concurrent callers", async () => {
+    const store = createSessionStore();
+    store.saveSession(createSession());
+    let resolveActorContext: ((value: IdentityAuthApiResponse<unknown>) => void) | undefined;
+    let resolveSessionCalls = 0;
+    let resolveActorContextCalls = 0;
+    const actorContextPromise = new Promise<IdentityAuthApiResponse<unknown>>((resolve) => {
+      resolveActorContext = resolve;
+    });
+    const coordinator = new IdentityAuthSessionCoordinator(store, {
+      resolveAuthenticatedSession: async () => {
+        resolveSessionCalls += 1;
+        return {
+          ok: true,
+          data: {
+            principal: {
+              userIdentityId: "user-1",
+              username: "alice",
+            },
+            session: {
+              sessionId: "identity-session:1",
+              providerId: "provider:local-password",
+              providerSubject: "alice",
+              accessChannel: "desktop",
+              issuedAt: "2026-04-04T20:00:00.000Z",
+              expiresAt: "2026-04-05T20:00:00.000Z",
+            },
+          },
+        };
+      },
+      resolveSessionActorContext: async () => {
+        resolveActorContextCalls += 1;
+        return await actorContextPromise as IdentityAuthApiResponse<never>;
+      },
+    });
+
+    const first = coordinator.bootstrap();
+    const second = coordinator.bootstrap();
+    resolveActorContext?.({
+      ok: true,
+      data: {
+        actor: {
+          userIdentityId: "user-1",
+          username: "alice",
+        },
+        session: {
+          sessionId: "identity-session:1",
+          providerId: "provider:local-password",
+          accessChannel: "desktop",
+          issuedAt: "2026-04-04T20:00:00.000Z",
+          expiresAt: "2026-04-05T20:00:00.000Z",
+          assuranceLevel: "authenticated-untrusted",
+          trustState: "untrusted",
+        },
+        workspaceContext: {
+          requestedWorkspaceId: undefined,
+          resolvedWorkspaceId: undefined,
+          workspaces: [],
+        },
+      },
+    });
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(firstResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    expect(secondResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
+    expect(resolveSessionCalls).toBe(1);
+    expect(resolveActorContextCalls).toBe(1);
   });
 
   it("passes requested workspace context through bootstrap and refresh", async () => {
