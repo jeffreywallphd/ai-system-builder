@@ -135,6 +135,7 @@ let bootstrapContext: DesktopAuthBootstrapContext | undefined;
 let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
+let desktopConnectivityMonitoringStarted = false;
 let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
 let deferredDesktopFeatureRuntimeFactory: ((options: {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -170,6 +171,7 @@ let postLoginRuntimeStatus: DesktopPostLoginRuntimeStatus = Object.freeze({
   unavailableReason: DesktopPostLoginRuntimeUnavailableReasons.preLogin,
   updatedAt: new Date().toISOString(),
 });
+const DeferredConnectivityStateDetail = "Connectivity monitoring is deferred until post-login runtime warmup starts.";
 
 type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -237,6 +239,63 @@ function markPostLoginRuntimeFailed(request: DesktopPostLoginWarmupRequest, erro
     }),
   });
 }
+
+function createDeferredConnectivityState(detail?: string): {
+  readonly state: "connecting";
+  readonly stale: false;
+  readonly localModeActive: false;
+  readonly detail?: string;
+  readonly lastChangedAt: string;
+  readonly canQueueOperations: true;
+  readonly canResynchronize: false;
+} {
+  return Object.freeze({
+    state: "connecting",
+    stale: false,
+    localModeActive: false,
+    detail,
+    lastChangedAt: new Date().toISOString(),
+    canQueueOperations: true,
+    canResynchronize: false,
+  });
+}
+
+function getConnectivityStateForAuthBootstrapIpc(): string {
+  if (!desktopConnectivityMonitoringStarted) {
+    return JSON.stringify(createDeferredConnectivityState(DeferredConnectivityStateDetail));
+  }
+  const state = desktopConnectivityStateService?.getState() ?? createDeferredConnectivityState();
+  return JSON.stringify(state);
+}
+
+function setConnectivityOfflineModeForAuthBootstrapIpc(requestJson: string): string {
+  const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
+  if (!desktopConnectivityMonitoringStarted || !desktopConnectivityStateService) {
+    return JSON.stringify(createDeferredConnectivityState(DeferredConnectivityStateDetail));
+  }
+  const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
+  return JSON.stringify(state);
+}
+
+function startDesktopConnectivityMonitoring(identityApiBaseUrl: string): void {
+  if (desktopConnectivityMonitoringStarted) {
+    return;
+  }
+  if (!desktopConnectivityStateService) {
+    desktopConnectivityStateService = new DesktopConnectivityStateService();
+  }
+  desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
+    intervalMs: 3_000,
+  });
+  desktopConnectivityMonitoringStarted = true;
+}
+
+function stopDesktopConnectivityMonitoring(): void {
+  desktopConnectivityStateService?.stopMonitoring();
+  desktopConnectivityMonitoringStarted = false;
+  desktopConnectivityStateService = undefined;
+}
+
 function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -606,33 +665,8 @@ function registerAuthIpc(): void {
       await ensurePostLoginWarmupStarted(request);
     },
     connectivity: {
-      getState: () => {
-        const state = desktopConnectivityStateService?.getState() ?? {
-          state: "connecting",
-          stale: false,
-          localModeActive: false,
-          lastChangedAt: new Date().toISOString(),
-          canQueueOperations: true,
-          canResynchronize: false,
-        };
-        return JSON.stringify(state);
-      },
-      setOfflineMode: (requestJson: string) => {
-        const request = JSON.parse(requestJson) as { readonly active?: boolean; readonly detail?: string };
-        if (!desktopConnectivityStateService) {
-          return JSON.stringify({
-            state: "connecting",
-            stale: false,
-            localModeActive: false,
-            detail: "Desktop connectivity state service is unavailable.",
-            lastChangedAt: new Date().toISOString(),
-            canQueueOperations: true,
-            canResynchronize: false,
-          });
-        }
-        const state = desktopConnectivityStateService.setDeliberateOfflineMode(request.active === true, request.detail);
-        return JSON.stringify(state);
-      },
+      getState: () => getConnectivityStateForAuthBootstrapIpc(),
+      setOfflineMode: (requestJson: string) => setConnectivityOfflineModeForAuthBootstrapIpc(requestJson),
     },
     secrets: {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -721,10 +755,6 @@ async function bootstrapAuthShell(): Promise<AuthShellBootstrapResult> {
       runtimeConfig,
       storagePaths,
     });
-    desktopConnectivityStateService = new DesktopConnectivityStateService();
-    desktopConnectivityStateService.startMonitoring(createDesktopConnectivityProbePort(identityApiBaseUrl, (key) => storageDatabase?.getItem(key) ?? null), {
-      intervalMs: 3_000,
-    });
     registerAuthIpc();
     logInitializationCheckpoint(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready", authShellStartedAt);
     logInitializationMemory(DesktopStartupPhases.preLoginAuthShellBootstrap, "auth-bootstrap-ipc-ready");
@@ -776,6 +806,7 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
 
   postLoginWarmupStarted = true;
   markPostLoginRuntimeWarming(request);
+  startDesktopConnectivityMonitoring(authShell.identityApiBaseUrl);
   console.info("[ai-loom] Starting post-login desktop runtime warmup.");
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "request-accepted");
   postLoginBootstrapPromise = bootstrapPostLoginRuntime(authShell);
@@ -1557,8 +1588,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   const pendingPostLoginBootstrap = postLoginBootstrapPromise;
   postLoginBootstrapPromise = undefined;
   await pendingPostLoginBootstrap?.catch(() => undefined);
-  desktopConnectivityStateService?.stopMonitoring();
-  desktopConnectivityStateService = undefined;
+  stopDesktopConnectivityMonitoring();
   await authMinimalServerRuntime?.stop();
   await serviceSupervisor?.stop();
   storageDatabase?.dispose();

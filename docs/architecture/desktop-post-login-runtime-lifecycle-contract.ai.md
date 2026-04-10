@@ -57,6 +57,16 @@ Pre-login contract guardrails now require:
 
 Operational diagnostics now explicitly log deferred warmup start/ready details for both Python runtime resolution and service-supervisor startup.
 
+## Story C.2.5 connectivity monitoring lifecycle boundary
+
+Connectivity monitoring now uses the deferred runtime lifecycle contract:
+
+- pre-login auth-shell startup no longer starts recurring connectivity monitoring probes.
+- monitoring starts only once post-login warmup is accepted (`ensurePostLoginWarmupStarted(...)`).
+- pre-warmup renderer connectivity reads return a controlled fallback payload (`connecting`) with explicit deferred-monitoring detail.
+- pre-warmup offline-mode write attempts return the same fallback payload, preventing partial pre-login monitoring emulation.
+- runtime disposal/teardown explicitly stops connectivity monitoring before runtime reset so quit/logout lifecycle remains deterministic.
+
 ## Status/readiness exposure
 - status channel:
   - `ai-loom-desktop-runtime:get-post-login-runtime-status`
