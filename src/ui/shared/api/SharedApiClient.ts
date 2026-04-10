@@ -180,13 +180,16 @@ export class SharedApiClient {
       });
 
       try {
-        const response = await this.fetchImplementation(url, {
-          method: options.method,
-          headers: this.buildHeaders(options.sessionToken, options.headers, options.body),
-          body: options.body === undefined ? undefined : JSON.stringify(options.body),
-          signal: requestSignal.signal,
-          credentials: this.credentials,
-        });
+        const response = await raceRequestTimeout(
+          this.fetchImplementation(url, {
+            method: options.method,
+            headers: this.buildHeaders(options.sessionToken, options.headers, options.body),
+            body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            signal: requestSignal.signal,
+            credentials: this.credentials,
+          }),
+          requestSignal.timeoutAt,
+        );
 
         const parsedResponse = await this.parseResponse(response, options.parseResponse);
         const shouldRetry = this.shouldRetryResponse(response, parsedResponse, retryPolicy, options.method, attempt, maxAttempts);
@@ -207,6 +210,26 @@ export class SharedApiClient {
           retryable: true,
         });
       } catch (error) {
+        if (error instanceof SharedApiRequestTimeoutError) {
+          this.emitDiagnosticEvent({
+            severity: "warn",
+            stage: "request-timeout",
+            method: options.method,
+            path: options.path,
+            url,
+            attempt,
+            maxAttempts,
+            retryable: true,
+          });
+          return this.normalizeErrorResponse(
+            SharedApiErrorCodes.temporarilyUnavailable,
+            "Request timed out.",
+            Object.freeze({
+              retryable: true,
+              domainCode: "request-timeout",
+            }),
+          ) as TResponse;
+        }
         if (isAbortError(error)) {
           if (requestSignal.didTimeout()) {
             this.emitDiagnosticEvent({
@@ -488,6 +511,7 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
   readonly signal: AbortSignal | undefined;
   readonly dispose: () => void;
   readonly didTimeout: () => boolean;
+  readonly timeoutAt: number | undefined;
 } {
   if (!signal && typeof timeoutMs !== "number") {
     return {
@@ -496,12 +520,16 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
         // no-op
       },
       didTimeout: () => false,
+      timeoutAt: undefined,
     };
   }
 
   const controller = new AbortController();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
+  const timeoutAt = typeof timeoutMs === "number" && timeoutMs >= 0
+    ? Date.now() + timeoutMs
+    : undefined;
   const onAbort = () => controller.abort();
   if (signal) {
     if (signal.aborted) {
@@ -521,6 +549,7 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
   return {
     signal: controller.signal,
     didTimeout: () => timedOut,
+    timeoutAt,
     dispose: () => {
       if (signal) {
         signal.removeEventListener("abort", onAbort);
@@ -530,6 +559,36 @@ function createRequestSignal(signal: AbortSignal | undefined, timeoutMs: number 
       }
     },
   };
+}
+
+class SharedApiRequestTimeoutError extends Error {
+  public constructor() {
+    super("SharedApiClient request timed out.");
+    this.name = "SharedApiRequestTimeoutError";
+  }
+}
+
+async function raceRequestTimeout<TResponse>(
+  requestPromise: Promise<TResponse>,
+  timeoutAt: number | undefined,
+): Promise<TResponse> {
+  if (timeoutAt === undefined) {
+    return requestPromise;
+  }
+
+  const remainingMs = Math.max(0, timeoutAt - Date.now());
+  if (remainingMs === 0) {
+    throw new SharedApiRequestTimeoutError();
+  }
+
+  return await Promise.race([
+    requestPromise,
+    new Promise<TResponse>((_resolve, reject) => {
+      setTimeout(() => {
+        reject(new SharedApiRequestTimeoutError());
+      }, remainingMs);
+    }),
+  ]);
 }
 
 function resolveRetryDelayMs(retryPolicy: Required<SharedApiRetryPolicy>, attempt: number): number {

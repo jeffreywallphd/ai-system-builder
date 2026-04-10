@@ -52,6 +52,7 @@ export interface IdentitySessionBootstrapOptions {
   readonly onProgress?: (update: AppInitializationProgressUpdate) => void;
   readonly sessionValidationTimeoutMs?: number;
   readonly actorContextTimeoutMs?: number;
+  readonly signal?: AbortSignal;
 }
 
 const DefaultSessionValidationTimeoutMs = 4_000;
@@ -62,6 +63,12 @@ const BootstrapRequestRetryPolicy = Object.freeze({
 });
 
 export class IdentityAuthSessionCoordinator {
+  private static activeBootstrap:
+    | {
+      readonly promise: Promise<IdentitySessionBootstrapResult>;
+    }
+    | undefined;
+
   private readonly now: () => Date;
 
   public constructor(
@@ -72,13 +79,30 @@ export class IdentityAuthSessionCoordinator {
     this.now = now;
   }
 
+  public static resetInFlightBootstrapForTests(): void {
+    IdentityAuthSessionCoordinator.activeBootstrap = undefined;
+  }
+
   public async bootstrap(options?: IdentitySessionBootstrapOptions): Promise<IdentitySessionBootstrapResult> {
+    if (IdentityAuthSessionCoordinator.activeBootstrap) {
+      return IdentityAuthSessionCoordinator.activeBootstrap.promise;
+    }
+
     const startedAt = Date.now();
     logInitDiagnostic("renderer-session-bootstrap:start", Object.freeze({
       startedAt: new Date(startedAt).toISOString(),
     }));
+    const bootstrapPromise = this.resolveActiveSession(options)
+      .finally(() => {
+        if (IdentityAuthSessionCoordinator.activeBootstrap?.promise === bootstrapPromise) {
+          IdentityAuthSessionCoordinator.activeBootstrap = undefined;
+        }
+      });
+    IdentityAuthSessionCoordinator.activeBootstrap = Object.freeze({
+      promise: bootstrapPromise,
+    });
     try {
-      return await this.resolveActiveSession(options);
+      return await bootstrapPromise;
     } finally {
       logInitDiagnostic("renderer-session-bootstrap:end", Object.freeze({
         durationMs: Date.now() - startedAt,
@@ -271,6 +295,7 @@ export class IdentityAuthSessionCoordinator {
       const result = await this.authService.resolveAuthenticatedSession(request, {
         timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
+        signal: options?.signal,
       });
       logInitDiagnostic("resolveAuthenticatedSession:result", Object.freeze({
         ok: result.ok,
@@ -310,6 +335,7 @@ export class IdentityAuthSessionCoordinator {
       const result = await this.authService.resolveSessionActorContext(request, {
         timeoutMs,
         retryPolicy: BootstrapRequestRetryPolicy,
+        signal: options?.signal,
       });
       logInitDiagnostic("resolveSessionActorContext:result", Object.freeze({
         ok: result.ok,

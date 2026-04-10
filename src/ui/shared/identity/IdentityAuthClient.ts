@@ -55,6 +55,7 @@ import { SharedApiClient, type SharedApiRetryPolicy } from "../api/SharedApiClie
 export interface IdentityAuthRequestOptions {
   readonly timeoutMs?: number;
   readonly retryPolicy?: SharedApiRetryPolicy;
+  readonly signal?: AbortSignal;
 }
 
 export interface IdentityAuthClient {
@@ -443,6 +444,7 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
       path,
       body,
       sessionToken,
+      signal: options?.signal,
       timeoutMs: options?.timeoutMs,
       retryPolicy: options?.retryPolicy,
     });
@@ -457,10 +459,10 @@ export class HttpIdentityAuthClient implements IdentityAuthClient {
       method: "GET",
       path,
       sessionToken,
+      signal: options?.signal,
       timeoutMs: options?.timeoutMs,
       retryPolicy: options?.retryPolicy,
     });
   }
 }
-
 
