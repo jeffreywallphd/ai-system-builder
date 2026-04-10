@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   AuthProviderCategories,
   AuthProviderKinds,
+  type CredentialPolicy,
   createAuthProvider,
 } from "@domain/identity/IdentityDomain";
 import { type IdentityIdNamespace } from "@application/contracts/IdentityApplicationContracts";
@@ -256,17 +257,7 @@ async function runStartupStepSpan<TResult>(input: {
 async function applyIdentityStartupConfiguration(
   repository: {
     saveAuthProvider(provider: ReturnType<typeof createAuthProvider>): Promise<unknown>;
-    saveCredentialPolicy(policy: {
-      readonly id: string;
-      readonly providerId: string;
-      readonly minLength: number;
-      readonly requiresUppercase: boolean;
-      readonly requiresLowercase: boolean;
-      readonly requiresDigit: boolean;
-      readonly requiresSymbol: boolean;
-      readonly maxAgeDays?: number;
-      readonly historyCount?: number;
-    }): Promise<unknown>;
+    saveCredentialPolicy(policy: CredentialPolicy): Promise<unknown>;
   },
   policies: IdentityProviderAccountPolicyConfig,
 ): Promise<void> {
@@ -279,7 +270,7 @@ async function applyIdentityStartupConfiguration(
     kind: AuthProviderKinds.localPassword,
     category: AuthProviderCategories.local,
     displayName: policies.localProviderDisplayName,
-    enabled: true,
+    status: policies.localProviderStatus,
     allowsRegistration: policies.allowLocalRegistration,
     supportsCredentialChange: true,
     metadata: {
@@ -288,17 +279,7 @@ async function applyIdentityStartupConfiguration(
     },
   }));
 
-  await repository.saveCredentialPolicy({
-    id: policies.localCredentialPolicyId,
-    providerId: policies.localProviderId,
-    minLength: policies.localCredentialPolicy.minLength,
-    requiresUppercase: policies.localCredentialPolicy.requiresUppercase,
-    requiresLowercase: policies.localCredentialPolicy.requiresLowercase,
-    requiresDigit: policies.localCredentialPolicy.requiresDigit,
-    requiresSymbol: policies.localCredentialPolicy.requiresSymbol,
-    maxAgeDays: policies.localCredentialPolicy.maxAgeDays,
-    historyCount: policies.localCredentialPolicy.historyCount,
-  });
+  await repository.saveCredentialPolicy(policies.buildLocalCredentialPolicy());
 }
 
 export async function startAuthMinimalIdentityServerHost(
