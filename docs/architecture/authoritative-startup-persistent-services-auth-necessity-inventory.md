@@ -182,3 +182,16 @@ The following repositories/services are intentionally excluded from auth-minimal
 - certificate-authority and secret-record persistence.
 
 Remaining shared runtime behavior in pre-login startup is limited to SQLite runtime startup and the narrowed auth-minimal migration hook set. Workspace persistence remains in auth-minimal mode only because `identity-auth` session-context responses depend on workspace context at login-time.
+
+## Story B.2.4 implementation notes
+
+Auth-minimal startup now explicitly disables execution-adapter composition at the shared server composition-root seam:
+
+- `AuthoritativeServerCompositionRoot` now supports `executionInfrastructureEnabled` in bootstrap options.
+- `AuthMinimalServerHostEntrypoint` forces `executionInfrastructureEnabled: false` for pre-login startup.
+- With this flag disabled, pre-login startup does not compose:
+  - `createComfyUiExecutionAdapterInfrastructure(...)`
+  - `createAuthoritativeRunExecutionAdapterRegistration(...)`
+  - Comfy/run-execution startup artifacts or `runExecutionAdapters` host-start options
+
+Full authoritative startup behavior remains unchanged; execution adapter composition still occurs there when enabled by runtime configuration.

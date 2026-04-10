@@ -6,7 +6,11 @@ import {
   startAuthMinimalServerHostAssembly,
 } from "../AuthMinimalServerHostEntrypoint";
 import { AuthoritativeServerApiRouteRegistrationPlanArtifactKey } from "../AuthoritativeServerApiRouteComposition";
-import { AuthoritativeServerPersistentPlatformServicesArtifactKey } from "../AuthoritativeServerCompositionRoot";
+import {
+  AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+  AuthoritativeServerPersistentPlatformServicesArtifactKey,
+  AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+} from "../AuthoritativeServerCompositionRoot";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 
 describe("AuthMinimalServerHostEntrypoint", () => {
@@ -24,6 +28,9 @@ describe("AuthMinimalServerHostEntrypoint", () => {
   it("composes auth-minimal route registration and starts through the dedicated entrypoint", async () => {
     let observedRouteFamilyIds: ReadonlyArray<string> = [];
     let composedAuthMinimalPersistenceShape: Readonly<Record<string, unknown>> | undefined;
+    let observedComfyExecutionAdapterArtifact: unknown;
+    let observedRunExecutionRegistrationArtifact: unknown;
+    let observedStartedHostRunExecutionAdapters: unknown;
     let stopCount = 0;
 
     const assembly = constructAuthMinimalServerHostAssembly({
@@ -46,6 +53,12 @@ describe("AuthMinimalServerHostEntrypoint", () => {
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
+            observedComfyExecutionAdapterArtifact = context.getArtifact(
+              AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+            );
+            observedRunExecutionRegistrationArtifact = context.getArtifact(
+              AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+            );
           },
           [HostBootstrapStageIds.persistence]: (context) => {
             const services = context.getArtifact<unknown>(
@@ -63,15 +76,24 @@ describe("AuthMinimalServerHostEntrypoint", () => {
       hostOptions: {
         databasePath: "auth-minimal.sqlite",
       },
-      startHost: async () => ({
-        port: 6300,
-        address: "127.0.0.1:6300",
-        secretService: {} as never,
-        platformSecretConsumers: {} as never,
-        close: async () => {
-          stopCount += 1;
+      startHost: async (options) => {
+        observedStartedHostRunExecutionAdapters = options.runExecutionAdapters;
+        return {
+          port: 6300,
+          address: "127.0.0.1:6300",
+          secretService: {} as never,
+          platformSecretConsumers: {} as never,
+          close: async () => {
+            stopCount += 1;
+          },
+        };
+      },
+      boot: {
+        environment: {
+          AI_LOOM_COMFYUI_ADAPTER_ENABLED: "true",
+          AI_LOOM_COMFYUI_BASE_URL: "http://127.0.0.1:8188",
         },
-      }),
+      },
       bootstrap: {
         stageHandlers: {
           [HostBootstrapStageIds.dependencies]: (context) => {
@@ -79,6 +101,12 @@ describe("AuthMinimalServerHostEntrypoint", () => {
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
+            observedComfyExecutionAdapterArtifact = context.getArtifact(
+              AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
+            );
+            observedRunExecutionRegistrationArtifact = context.getArtifact(
+              AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+            );
           },
           [HostBootstrapStageIds.persistence]: (context) => {
             const services = context.getArtifact<unknown>(
@@ -102,6 +130,9 @@ describe("AuthMinimalServerHostEntrypoint", () => {
     expect(composedAuthMinimalPersistenceShape?.platformPersistenceRepository).toBeUndefined();
     expect(composedAuthMinimalPersistenceShape?.auditLedgerRepository).toBeUndefined();
     expect(composedAuthMinimalPersistenceShape?.generatedResultRepository).toBeUndefined();
+    expect(observedComfyExecutionAdapterArtifact).toBeUndefined();
+    expect(observedRunExecutionRegistrationArtifact).toBeUndefined();
+    expect(observedStartedHostRunExecutionAdapters).toBeUndefined();
 
     await runtime.stop();
     expect(runtime.phase).toBe("stopped");

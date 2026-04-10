@@ -120,6 +120,7 @@ export interface AuthoritativeServerCompositionRootOptions {
     }) => AuthoritativePersistentPlatformServices;
     readonly composeApiRouteRegistrationPlan?: () => AuthoritativeApiRouteRegistrationPlan;
     readonly assertApiRouteRegistrationCoverage?: (plan: AuthoritativeApiRouteRegistrationPlan) => void;
+    readonly executionInfrastructureEnabled?: boolean;
     readonly composeComfyUiExecutionAdapter?: (input: {
       readonly hostConfiguration: IdentityServerHostOptions;
       readonly environment: Readonly<Record<string, string | undefined>>;
@@ -372,6 +373,10 @@ export function createAuthoritativeServerCompositionRoot(
                   AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
                   apiRouteRegistrationPlan,
                 );
+                const executionInfrastructureEnabled = input.bootstrap?.executionInfrastructureEnabled ?? true;
+                if (!executionInfrastructureEnabled) {
+                  return;
+                }
                 const comfyUiExecutionAdapter = (
                   input.bootstrap?.composeComfyUiExecutionAdapter
                   ?? ((adapterInput) => createComfyUiExecutionAdapterInfrastructure({

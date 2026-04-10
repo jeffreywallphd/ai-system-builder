@@ -119,6 +119,11 @@
   - `composeAuthMinimalServerApiRouteRegistrationPlan(...)` and `assertAuthMinimalServerApiRouteRegistrationCoverage(...)` live in `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
   - auth-minimal coverage requires `identity-auth` only
   - authoritative mode retains full control-plane route-family assertion in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
+- Story B.2.4 removes execution-adapter composition from auth-minimal pre-login startup:
+  - `AuthoritativeServerCompositionRoot` exposes `bootstrap.executionInfrastructureEnabled`
+  - `AuthMinimalServerHostEntrypoint` sets `executionInfrastructureEnabled: false`
+  - pre-login dependencies stage skips ComfyUI execution adapter composition and run-execution adapter registration artifacts/injection
+  - full authoritative startup keeps execution composition behavior unchanged
 
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates pre-login desktop startup through `startAuthMinimalServerHostAssembly(...)`.
