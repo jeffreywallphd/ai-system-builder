@@ -45,3 +45,25 @@ Classify authoritative startup stages, persistence responsibilities, and persist
 ## Refactor target
 
 Auth-minimal startup mode should start only identity-auth transport and auth-critical persistence/service composition, while deferring deployment policy, execution adapters, non-auth route families, and broader authoritative control-plane composition to post-login or first feature use.
+
+## Story B.2.3 implementation notes
+
+Current auth-minimal persistence composition (`src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`) now narrows pre-login persistent composition to:
+
+- identity repository,
+- trusted-device repository,
+- workspace repository (kept only for identity session-context workspace hydration),
+- identity + workspace migration hooks.
+
+The following repositories/services are intentionally excluded from auth-minimal pre-login composition:
+
+- deployment policy administration persistence,
+- storage management persistence,
+- asset management and image-asset persistence,
+- run orchestration and platform persistence,
+- generated-result persistence,
+- audit-ledger persistence,
+- node-trust/execution-node persistence,
+- certificate-authority and secret-record persistence.
+
+Remaining shared runtime behavior in pre-login startup is limited to SQLite runtime startup and the narrowed auth-minimal migration hook set. Workspace persistence remains in auth-minimal mode only because `identity-auth` session-context responses depend on workspace context at login-time.

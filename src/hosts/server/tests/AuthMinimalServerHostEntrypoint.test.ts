@@ -6,6 +6,7 @@ import {
   startAuthMinimalServerHostAssembly,
 } from "../AuthMinimalServerHostEntrypoint";
 import { AuthoritativeServerApiRouteRegistrationPlanArtifactKey } from "../AuthoritativeServerApiRouteComposition";
+import { AuthoritativeServerPersistentPlatformServicesArtifactKey } from "../AuthoritativeServerCompositionRoot";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
 
 describe("AuthMinimalServerHostEntrypoint", () => {
@@ -22,6 +23,7 @@ describe("AuthMinimalServerHostEntrypoint", () => {
 
   it("composes auth-minimal route registration and starts through the dedicated entrypoint", async () => {
     let observedRouteFamilyIds: ReadonlyArray<string> = [];
+    let composedAuthMinimalPersistenceShape: Readonly<Record<string, unknown>> | undefined;
     let stopCount = 0;
 
     const assembly = constructAuthMinimalServerHostAssembly({
@@ -44,6 +46,12 @@ describe("AuthMinimalServerHostEntrypoint", () => {
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
+          },
+          [HostBootstrapStageIds.persistence]: (context) => {
+            const services = context.getArtifact<unknown>(
+              AuthoritativeServerPersistentPlatformServicesArtifactKey,
+            );
+            composedAuthMinimalPersistenceShape = (services ?? {}) as Readonly<Record<string, unknown>>;
           },
         },
       },
@@ -72,12 +80,28 @@ describe("AuthMinimalServerHostEntrypoint", () => {
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
           },
+          [HostBootstrapStageIds.persistence]: (context) => {
+            const services = context.getArtifact<unknown>(
+              AuthoritativeServerPersistentPlatformServicesArtifactKey,
+            );
+            composedAuthMinimalPersistenceShape = (services ?? {}) as Readonly<Record<string, unknown>>;
+          },
         },
       },
     });
 
     expect(runtime.phase).toBe("ready");
     expect(observedRouteFamilyIds).toEqual(["identity-auth"]);
+    expect(composedAuthMinimalPersistenceShape?.identityRepository).toBeDefined();
+    expect(composedAuthMinimalPersistenceShape?.trustedDeviceRepository).toBeDefined();
+    expect(composedAuthMinimalPersistenceShape?.workspaceRepository).toBeDefined();
+    expect(composedAuthMinimalPersistenceShape?.authorizationRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.deploymentPolicyRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.storageInstanceRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.assetRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.platformPersistenceRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.auditLedgerRepository).toBeUndefined();
+    expect(composedAuthMinimalPersistenceShape?.generatedResultRepository).toBeUndefined();
 
     await runtime.stop();
     expect(runtime.phase).toBe("stopped");
