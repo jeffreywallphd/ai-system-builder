@@ -4,6 +4,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { HostBootstrapStageIds } from "../../bootstrap/HostBootstrapPipeline";
 import {
+  AuthMinimalServerForbiddenServiceIds,
+  AuthMinimalServerRequiredServiceIds,
+  assertAuthMinimalServerServiceCoverage,
   constructAuthMinimalServerHostAssembly,
   createAuthMinimalServerHostBootConfiguration,
   startAuthMinimalServerHostAssembly,
@@ -13,8 +16,10 @@ import {
   AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
   AuthoritativeServerPersistentPlatformServicesArtifactKey,
   AuthoritativeServerRunExecutionAdapterRegistrationArtifactKey,
+  AuthoritativeServerServiceRegistrationPlanArtifactKey,
 } from "../AuthoritativeServerCompositionRoot";
 import type { AuthoritativeApiRouteRegistrationPlan } from "@infrastructure/transport/http-server/AuthoritativeApiRouteRegistration";
+import type { HostServiceRegistrationPlan } from "@infrastructure/config/HostServiceRegistration";
 import { SqliteWorkspacePersistenceAdapter } from "@infrastructure/persistence/workspaces/SqliteWorkspacePersistenceAdapter";
 import { SqliteTrustedDevicePersistenceAdapter } from "@infrastructure/persistence/identity/SqliteTrustedDevicePersistenceAdapter";
 import {
@@ -37,6 +42,24 @@ import {
 } from "@domain/workspaces/WorkspaceDomain";
 import { WorkspaceVisibilities } from "@shared/workspaces/WorkspaceOwnership";
 
+class CapturingHostLogger {
+  public readonly infoEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly warnEvents: Array<Readonly<Record<string, unknown>>> = [];
+  public readonly errorEvents: Array<Readonly<Record<string, unknown>>> = [];
+
+  public info(event: Readonly<Record<string, unknown>>): void {
+    this.infoEvents.push(event);
+  }
+
+  public warn(event: Readonly<Record<string, unknown>>): void {
+    this.warnEvents.push(event);
+  }
+
+  public error(event: Readonly<Record<string, unknown>>): void {
+    this.errorEvents.push(event);
+  }
+}
+
 describe("AuthMinimalServerHostEntrypoint", () => {
   it("constructs a boot configuration with auth-minimal startup reason", () => {
     const boot = createAuthMinimalServerHostBootConfiguration({
@@ -51,6 +74,7 @@ describe("AuthMinimalServerHostEntrypoint", () => {
 
   it("composes auth-minimal route registration and starts through the dedicated entrypoint", async () => {
     let observedRouteFamilyIds: ReadonlyArray<string> = [];
+    let observedServiceIds: ReadonlyArray<string> = [];
     let composedAuthMinimalPersistenceShape: Readonly<Record<string, unknown>> | undefined;
     let observedComfyExecutionAdapterArtifact: unknown;
     let observedRunExecutionRegistrationArtifact: unknown;
@@ -77,6 +101,10 @@ describe("AuthMinimalServerHostEntrypoint", () => {
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
+            const servicePlan = context.getArtifact<HostServiceRegistrationPlan>(
+              AuthoritativeServerServiceRegistrationPlanArtifactKey,
+            );
+            observedServiceIds = servicePlan?.selectedServices.map((service) => service.serviceId) ?? [];
             observedComfyExecutionAdapterArtifact = context.getArtifact(
               AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
             );
@@ -125,6 +153,10 @@ describe("AuthMinimalServerHostEntrypoint", () => {
               AuthoritativeServerApiRouteRegistrationPlanArtifactKey,
             );
             observedRouteFamilyIds = routePlan?.registeredRouteFamilies.map((family) => family.routeFamilyId) ?? [];
+            const servicePlan = context.getArtifact<HostServiceRegistrationPlan>(
+              AuthoritativeServerServiceRegistrationPlanArtifactKey,
+            );
+            observedServiceIds = servicePlan?.selectedServices.map((service) => service.serviceId) ?? [];
             observedComfyExecutionAdapterArtifact = context.getArtifact(
               AuthoritativeServerComfyUiExecutionAdapterArtifactKey,
             );
@@ -144,6 +176,10 @@ describe("AuthMinimalServerHostEntrypoint", () => {
 
     expect(runtime.phase).toBe("ready");
     expect(observedRouteFamilyIds).toEqual(["identity-auth"]);
+    expect(observedServiceIds).toEqual(AuthMinimalServerRequiredServiceIds);
+    for (const forbiddenServiceId of AuthMinimalServerForbiddenServiceIds) {
+      expect(observedServiceIds).not.toContain(forbiddenServiceId);
+    }
     expect(composedAuthMinimalPersistenceShape?.identityRepository).toBeDefined();
     expect(composedAuthMinimalPersistenceShape?.trustedDeviceRepository).toBeDefined();
     expect(composedAuthMinimalPersistenceShape?.workspaceRepository).toBeDefined();
@@ -161,6 +197,59 @@ describe("AuthMinimalServerHostEntrypoint", () => {
     await runtime.stop();
     expect(runtime.phase).toBe("stopped");
     expect(stopCount).toBe(1);
+  });
+
+  it("fails coverage assertions when auth-minimal service scope expands", () => {
+    const expandedPlan = Object.freeze({
+      hostId: "host:server:authoritative",
+      selectedServices: Object.freeze([
+        Object.freeze({ serviceId: "svc:application:identity-control-plane" }),
+        Object.freeze({ serviceId: "svc:infrastructure:server-transport-adapters" }),
+        Object.freeze({ serviceId: "svc:infrastructure:server-persistence-adapters" }),
+        Object.freeze({ serviceId: "svc:platform:boot-lifecycle" }),
+        Object.freeze({ serviceId: "svc:application:workspace-control-plane" }),
+      ]),
+      startupDependencyCoverage: Object.freeze({}),
+      servicesByLayer: Object.freeze({
+        "shared-contracts": Object.freeze([]),
+        domain: Object.freeze([]),
+        application: Object.freeze([]),
+        infrastructure: Object.freeze([]),
+        host: Object.freeze([]),
+      }),
+    }) as unknown as HostServiceRegistrationPlan;
+
+    expect(() => assertAuthMinimalServerServiceCoverage(expandedPlan))
+      .toThrow("Auth-minimal startup composition includes unexpected services");
+  });
+
+  it("emits auth-minimal startup scope diagnostics in development mode", async () => {
+    const logger = new CapturingHostLogger();
+    const runtime = await startAuthMinimalServerHostAssembly({
+      hostOptions: {
+        databasePath: "auth-minimal.sqlite",
+        logger,
+      },
+      startHost: async () => ({
+        port: 6301,
+        address: "127.0.0.1:6301",
+        secretService: {} as never,
+        platformSecretConsumers: {} as never,
+        close: async () => {},
+      }),
+      boot: {
+        environment: {
+          NODE_ENV: "development",
+        },
+      },
+    });
+
+    await runtime.stop();
+
+    const infoEvents = logger.infoEvents.map((event) => event.event);
+    expect(infoEvents).toContain("auth-minimal-server.startup.route-scope");
+    expect(infoEvents).toContain("auth-minimal-server.startup.service-scope");
+    expect(infoEvents).toContain("auth-minimal-server.startup.persistence-scope");
   });
 
   it("preserves session bootstrap, trusted-device enforcement, and transport trust behavior", async () => {

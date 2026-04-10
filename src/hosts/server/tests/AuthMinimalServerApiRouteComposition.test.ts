@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  AuthMinimalServerForbiddenRouteFamilyIds,
   AuthMinimalServerRequiredRouteFamilyIds,
   assertAuthMinimalServerApiRouteRegistrationCoverage,
   composeAuthMinimalServerApiRouteRegistrationPlan,
@@ -25,6 +26,17 @@ describe("AuthMinimalServerApiRouteComposition", () => {
     expect(() => assertAuthMinimalServerApiRouteRegistrationCoverage(plan)).not.toThrow();
     expect(() => assertAuthoritativeServerApiRouteRegistrationCoverage(plan))
       .toThrow(AuthoritativeApiRouteRegistrationError);
+  });
+
+  it("fails when non-auth route families are composed into auth-minimal startup", () => {
+    const authoritativePlan = composeAuthoritativeServerApiRouteRegistrationPlan();
+
+    expect(() => assertAuthMinimalServerApiRouteRegistrationCoverage(authoritativePlan))
+      .toThrow("Auth-minimal startup route scope expanded unexpectedly");
+    for (const forbiddenRouteFamilyId of AuthMinimalServerForbiddenRouteFamilyIds) {
+      expect(authoritativePlan.registeredRouteFamilies.map((family) => family.routeFamilyId))
+        .toContain(forbiddenRouteFamilyId);
+    }
   });
 
   it("keeps full authoritative route coverage available for authoritative mode", () => {
