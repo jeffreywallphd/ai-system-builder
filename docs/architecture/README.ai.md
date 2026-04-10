@@ -118,6 +118,7 @@ Use this file as the shortest reliable orientation before reading the human arch
 - Authoritative server executable host assembly baseline (dedicated startup entrypoint + runtime lifecycle expectations): `docs/architecture/authoritative-server-host-assembly.md`
 - Shared SQLite persistence bootstrap/runtime baseline for authoritative startup lifecycle and migration-hook coordination: `docs/architecture/persistence-bootstrap-and-lifecycle.md`
 - Desktop executable host assembly baseline (dedicated startup entrypoint + desktop runtime lifecycle expectations): `docs/architecture/desktop-host-assembly.md`
+- Auth-first Electron startup split boundary baseline for pre-login bootstrap, post-login warmup, and on-demand feature initialization: `docs/architecture/desktop-auth-first-startup-boundary.md`
 - Offline local-mode authority boundary baseline for offline-capable resource classes, explicit local-vs-authoritative state ownership, queued mutation disclosure invariants, reconnect conflict categories, and prohibited shortcuts: `docs/architecture/offline-local-mode-authority-boundaries.md`
 - Shared offline synchronization contract/DTO/schema baseline and transition semantics: `docs/architecture/offline-sync-shared-contracts.md`
 - Offline transition/reconnect audit + operational hook baseline for structured outcome visibility and sanitized payload publication: `docs/architecture/offline-local-mode-audit-operational-hooks.md`
