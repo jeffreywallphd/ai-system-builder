@@ -88,7 +88,7 @@ export function createDesktopConnectivityProbePort(identityApiBaseUrl: string, r
     probe: async () => {
       const trustBootstrap = resolveDesktopIdentityTransportTrustBootstrap(readStorageItem);
       const trustEnforcement = trustBootstrap?.enforcement ?? "optional";
-      const trustPrerequisitesSatisfied = evaluateTrustPrerequisitesSatisfied(trustBootstrap);
+      const trustPrerequisites = evaluateTrustPrerequisites(trustBootstrap);
       const trustedSession = resolveTrustedSessionAvailability(readStorageItem, trustEnforcement);
       const transport = await probeTransportReachability(identityApiBaseUrl);
       return Object.freeze({
@@ -97,10 +97,8 @@ export function createDesktopConnectivityProbePort(identityApiBaseUrl: string, r
         transportDetail: transport.transportDetail,
         trustedSessionAvailable: trustedSession.available,
         trustedSessionDetail: trustedSession.detail,
-        trustPrerequisitesSatisfied,
-        trustPrerequisitesDetail: trustPrerequisitesSatisfied
-          ? undefined
-          : "Desktop trust bootstrap prerequisites are incomplete for trusted-session operation.",
+        trustPrerequisitesSatisfied: trustPrerequisites.satisfied,
+        trustPrerequisitesDetail: trustPrerequisites.detail,
         trustEnforcement,
       });
     },
@@ -160,20 +158,30 @@ function normalizeOptional(value: string | undefined): string | undefined {
   return normalized ? normalized : undefined;
 }
 
-function evaluateTrustPrerequisitesSatisfied(bootstrap: DesktopIdentityTransportTrustBootstrap | undefined): boolean {
+function evaluateTrustPrerequisites(
+  bootstrap: DesktopIdentityTransportTrustBootstrap | undefined,
+): { readonly satisfied: boolean; readonly detail?: string } {
   if (!bootstrap || bootstrap.enforcement !== "required") {
-    return true;
+    return Object.freeze({ satisfied: true });
   }
   const trustedDeviceBindingId = normalizeOptional(bootstrap.registeredDevice?.trustedDeviceBindingId);
   const pinReference = normalizeOptional(bootstrap.pinnedTrustMaterial?.pinReference);
   const expiresAt = normalizeOptional(bootstrap.pinnedTrustMaterial?.expiresAt);
   if (!trustedDeviceBindingId || !pinReference) {
-    return false;
+    return Object.freeze({
+      satisfied: false,
+      detail: !trustedDeviceBindingId
+        ? "Trusted-device binding ID is missing from desktop trust bootstrap state."
+        : "Pinned trust material reference is missing from desktop trust bootstrap state.",
+    });
   }
   if (expiresAt && Date.parse(expiresAt) <= Date.now()) {
-    return false;
+    return Object.freeze({
+      satisfied: false,
+      detail: `Pinned trust material expired at ${expiresAt}.`,
+    });
   }
-  return true;
+  return Object.freeze({ satisfied: true });
 }
 
 function resolveTrustedSessionAvailability(readStorageItem: (key: string) => string | null, trustEnforcement: "required" | "optional"): { readonly available: boolean; readonly detail?: string } {
