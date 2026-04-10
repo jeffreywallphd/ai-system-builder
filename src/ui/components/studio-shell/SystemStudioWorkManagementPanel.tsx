@@ -127,7 +127,7 @@ export function SystemStudioWorkManagementPanel({ context }: { readonly context:
   const [isWorkflowListLoading, setIsWorkflowListLoading] = useState(false);
   const [workflowParameterValues, setWorkflowParameterValues] = useState<Readonly<Record<string, unknown>>>(Object.freeze({}));
   const [workflowParameterValuesByWorkflowId, setWorkflowParameterValuesByWorkflowId] = useState<
-    Readonly<Record<string, Readonly<Record<string, unknown>>>
+    Readonly<Record<string, Readonly<Record<string, unknown>>>>
   >(defaults.workflowParameterValuesByWorkflowId ?? Object.freeze({}));
   const [workflowParameterStatus, setWorkflowParameterStatus] = useState<string>();
   const [savedSystems, setSavedSystems] = useState<ReadonlyArray<StudioImageSystemDefinitionSummaryReadModel>>([]);
