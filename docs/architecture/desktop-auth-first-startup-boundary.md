@@ -136,7 +136,7 @@ Main-process logs now emit both timing and memory checkpoints for those phases u
 
 Regression checks now codify the boot contract in main-process tests:
 
-- main window creation precedes service supervisor startup in the startup sequence contract,
+- pre-login startup boot sequence excludes Python runtime resolution and service-supervisor startup,
 - pre-login bootstrap initializer set excludes workflow/studio/system runtime dependencies,
 - preload sync bootstrap call is tied to the shared auth-bootstrap IPC channel contract.
 
@@ -227,6 +227,26 @@ Desktop main-process runtime startup now separates post-login shared warmup comp
   - agent runtime composition
 
 Result: `bootstrapPostLoginRuntime(...)` is now a thin orchestration seam that composes post-login prerequisites and delegates feature graph activation to named on-demand composition paths, rather than acting as a single broad runtime bootstrap unit.
+
+## Story C.2.2 deferred Python runtime resolution and supervisor startup contract
+
+Desktop startup contracts now explicitly enforce that Python runtime resolution and local service-supervisor startup remain outside pre-login boot:
+
+- `DesktopStartupBootSequence` now contains only pre-login auth-shell startup steps and excludes service-supervisor startup.
+- `DesktopPostLoginWarmupSequence` now defines ordered post-login warmup steps:
+  - `python-runtime-resolution`
+  - `service-supervisor-startup`
+  - `deferred-feature-registration`
+- startup contract validation now fails if Python runtime resolution or service-supervisor startup is introduced into pre-login boot sequencing.
+- startup regression tests now verify:
+  - `bootstrapAuthShell()` does not resolve desktop Python runtime,
+  - `bootstrapAuthShell()` does not construct/start `DesktopServiceSupervisor`,
+  - post-login runtime composition remains the only path that resolves Python runtime and starts the supervisor.
+- post-login warmup logging now emits explicit runtime start/ready diagnostics for:
+  - desktop Python runtime resolution (`mode`, `available`)
+  - local service supervisor startup (`baseUrl`, `runtimeBaseUrl`)
+
+This keeps login-critical startup free of Python/runtime supervisor initialization and improves warmup observability when deferred runtime comes online.
 
 ## Target startup phases
 

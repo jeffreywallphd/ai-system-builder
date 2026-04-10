@@ -803,6 +803,7 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
   }
 
   const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
+  console.info("[ai-loom][startup] Resolving desktop Python runtime for post-login warmup.");
   const pythonRuntime = resolveDesktopPythonRuntime({
     isPackaged,
     repoRoot,
@@ -810,6 +811,9 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
     storagePaths,
   });
   logInitializationEnd("desktop-startup.post-login-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
+  console.info(
+    `[ai-loom][startup] Desktop Python runtime resolved (mode=${pythonRuntime.mode}, available=${pythonRuntime.isAvailable}).`,
+  );
   logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved", bootstrapStartedAt);
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved");
 
@@ -828,8 +832,12 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
     pythonRuntimeBaseUrl: process.env.PYTHON_RUNTIME_BASE_URL || "http://127.0.0.1:8100",
   });
   const supervisorStartAt = logInitializationStart("desktop-startup.post-login-service-supervisor-start");
+  console.info("[ai-loom][startup] Starting desktop local service supervisor for post-login runtime.");
   await serviceSupervisor.start();
   logInitializationEnd("desktop-startup.post-login-service-supervisor-start", supervisorStartAt);
+  console.info(
+    `[ai-loom][startup] Desktop local service supervisor ready (baseUrl=${serviceSupervisor.baseUrl}, runtimeBaseUrl=${serviceSupervisor.runtimeBaseUrl}).`,
+  );
   logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready", bootstrapStartedAt);
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "local-service-supervisor-ready");
 

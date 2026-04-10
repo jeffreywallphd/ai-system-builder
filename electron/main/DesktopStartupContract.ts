@@ -14,16 +14,24 @@ export const DesktopStartupBootStepIds = Object.freeze({
   preLoginBootstrap: "pre-login-bootstrap",
   authBootstrapIpcRegistration: "auth-bootstrap-ipc-registration",
   mainWindowCreation: "main-window-creation",
-  serviceSupervisorStartup: "service-supervisor-startup",
-  deferredFeatureRegistration: "deferred-feature-registration",
 });
 
 export const DesktopStartupBootSequence = Object.freeze([
   DesktopStartupBootStepIds.preLoginBootstrap,
   DesktopStartupBootStepIds.authBootstrapIpcRegistration,
   DesktopStartupBootStepIds.mainWindowCreation,
-  DesktopStartupBootStepIds.serviceSupervisorStartup,
-  DesktopStartupBootStepIds.deferredFeatureRegistration,
+]);
+
+export const DesktopPostLoginWarmupStepIds = Object.freeze({
+  pythonRuntimeResolution: "python-runtime-resolution",
+  serviceSupervisorStartup: "service-supervisor-startup",
+  deferredFeatureRegistration: "deferred-feature-registration",
+});
+
+export const DesktopPostLoginWarmupSequence = Object.freeze([
+  DesktopPostLoginWarmupStepIds.pythonRuntimeResolution,
+  DesktopPostLoginWarmupStepIds.serviceSupervisorStartup,
+  DesktopPostLoginWarmupStepIds.deferredFeatureRegistration,
 ]);
 
 export const PreLoginAuthShellInitializers = Object.freeze([
@@ -34,6 +42,7 @@ export const PreLoginAuthShellInitializers = Object.freeze([
 ]);
 
 export const PreLoginAuthShellForbiddenInitializers = Object.freeze([
+  "python-runtime-resolution",
   "service-supervisor",
   "workflow-runtime",
   "studio-runtime",
@@ -59,10 +68,14 @@ function indexOfRequiredStep(stepId: string): number {
 }
 
 export function validateDesktopStartupContract(): void {
-  const mainWindowStepIndex = indexOfRequiredStep(DesktopStartupBootStepIds.mainWindowCreation);
-  const supervisorStepIndex = indexOfRequiredStep(DesktopStartupBootStepIds.serviceSupervisorStartup);
-  if (mainWindowStepIndex >= supervisorStepIndex) {
-    throw new Error("Desktop startup contract requires main-window creation before service-supervisor startup.");
+  indexOfRequiredStep(DesktopStartupBootStepIds.preLoginBootstrap);
+  indexOfRequiredStep(DesktopStartupBootStepIds.authBootstrapIpcRegistration);
+  indexOfRequiredStep(DesktopStartupBootStepIds.mainWindowCreation);
+  if (DesktopStartupBootSequence.includes(DesktopPostLoginWarmupStepIds.pythonRuntimeResolution)) {
+    throw new Error("Desktop startup boot contract cannot include python runtime resolution.");
+  }
+  if (DesktopStartupBootSequence.includes(DesktopPostLoginWarmupStepIds.serviceSupervisorStartup)) {
+    throw new Error("Desktop startup boot contract cannot include service-supervisor startup.");
   }
 
   const preLoginForbidden = new Set(PreLoginAuthShellForbiddenInitializers);
