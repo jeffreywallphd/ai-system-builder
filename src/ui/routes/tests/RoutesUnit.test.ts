@@ -3,7 +3,7 @@ import { readSource } from "../../tests/testUtils";
 
 describe("ui/routes unit coverage", () => {
   it("defines route paths and route metadata", () => {
-    const source = readSource("ui/routes/RouteConfig.ts");
+    const source = readSource("src/ui/routes/RouteConfig.ts");
 
     expect(source).toContain('export const ROUTE_PATHS = Object.freeze({');
     expect(source).toContain('login: "/auth/login"');
@@ -82,8 +82,8 @@ describe("ui/routes unit coverage", () => {
   });
 
   it("provides navigation helper and protected route behavior", () => {
-    const configSource = readSource("ui/routes/RouteConfig.ts");
-    const protectedRouteSource = readSource("ui/routes/ProtectedRoute.tsx");
+    const configSource = readSource("src/ui/routes/RouteConfig.ts");
+    const protectedRouteSource = readSource("src/ui/routes/ProtectedRoute.tsx");
 
     expect(configSource).toContain("getNavigationRoutes");
     expect(protectedRouteSource).toContain("useLocation");
@@ -92,10 +92,12 @@ describe("ui/routes unit coverage", () => {
   });
 
   it("wires route tree to layout and pages", () => {
-    const source = readSource("ui/routes/AppRouter.tsx");
+    const source = readSource("src/ui/routes/AppRouter.tsx");
 
     expect(source).toContain("createBrowserRouter");
     expect(source).toContain("<RouterProvider router={router} />");
+    expect(source).toContain("<Suspense fallback={<AppRouterLoadingFallback />}>");
+    expect(source).toContain('const BuildPage = lazy(async () => await import("../pages/BuildPage"));');
     expect(source).toContain("<ProtectedRoute");
     expect(source).toContain("path: ROUTE_PATHS.build");
     expect(source).toContain("path: ROUTE_PATHS.login");

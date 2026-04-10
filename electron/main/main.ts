@@ -498,6 +498,17 @@ function logInitializationCheckpoint(
   );
 }
 
+function logInitializationMemory(phase: string, checkpoint: string): void {
+  const usage = process.memoryUsage();
+  console.info(
+    `\n[ai-loom][memory] ${phase}:checkpoint name=${checkpoint} rssMB=${toMegabytes(usage.rss)} heapUsedMB=${toMegabytes(usage.heapUsed)} heapTotalMB=${toMegabytes(usage.heapTotal)} externalMB=${toMegabytes(usage.external)} arrayBuffersMB=${toMegabytes(usage.arrayBuffers)} at=${new Date().toISOString()}\n`,
+  );
+}
+
+function toMegabytes(value: number): string {
+  return (value / (1024 * 1024)).toFixed(1);
+}
+
 function createDesktopAgentRunner(params: {
   readonly assetSystemRepository: SqliteAssetSystemRepository;
   readonly sessionRepository: SqliteAgentExecutionSessionRepository;
@@ -656,6 +667,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   await new InitializeProductionStorageUseCase(storageDatabase).execute();
   logInitializationEnd("desktop-storage-initialize", storageInitializationStartedAt);
   logInitializationCheckpoint("desktop-runtime-bootstrap", "storage-ready", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "storage-ready");
 
   const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-python-runtime-resolve");
   const pythonRuntime = resolveDesktopPythonRuntime({
@@ -666,6 +678,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   logInitializationEnd("desktop-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
   logInitializationCheckpoint("desktop-runtime-bootstrap", "python-runtime-resolved", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "python-runtime-resolved");
 
   serviceSupervisor = new DesktopServiceSupervisor({
     repoRoot,
@@ -679,6 +692,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   await serviceSupervisor.start();
   logInitializationEnd("local-service-supervisor-start", supervisorStartAt);
   logInitializationCheckpoint("desktop-runtime-bootstrap", "local-service-supervisor-ready", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "local-service-supervisor-ready");
 
   const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
@@ -714,6 +728,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   });
   logInitializationEnd("authoritative-server-startup", authoritativeServerStartAt);
   logInitializationCheckpoint("desktop-runtime-bootstrap", "authoritative-server-ready", bootstrapStartedAt);
+  logInitializationMemory("desktop-runtime-bootstrap", "authoritative-server-ready");
   const identityApiBaseUrl = assertSecureTransportEndpoint(
     `http://${authoritativeServerRuntime.address}`,
     resolveHostSecureTransportConfig({
@@ -1316,6 +1331,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
     workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
   );
+  logInitializationMemory("desktop-runtime-bootstrap", "ipc-and-api-bindings-ready");
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
     if (!canonicalAssetSystemRepository?.isAvailable) {
@@ -1499,6 +1515,7 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   }
   } finally {
     logInitializationEnd("desktop-runtime-bootstrap", bootstrapStartedAt);
+    logInitializationMemory("desktop-runtime-bootstrap", "bootstrap-complete");
   }
 }
 
@@ -1524,6 +1541,7 @@ app.whenReady().then(async () => {
         try {
           installRendererContentSecurityPolicy();
           await createMainWindow();
+          logInitializationMemory("desktop-host-bootstrap", "main-window-ready");
         } catch (error) {
           await disposeDesktopRuntimeResources();
           throw error;
