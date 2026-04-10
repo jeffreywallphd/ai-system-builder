@@ -203,6 +203,23 @@ Contract coverage now explicitly defines:
 - preload/runtime bridge status and readiness probes for renderer-safe state checks,
 - teardown/reset lifecycle expectations for logout and application quit.
 
+## Story C.2.1 implementation update
+
+Desktop runtime startup composition now splits post-login shared bootstrap from on-demand feature composition paths:
+
+- `composePostLoginRuntime(...)` now owns only shared post-login prerequisites:
+  - full-runtime storage initialization,
+  - Python runtime resolution,
+  - service supervisor startup,
+  - runtime-config upgrade and deferred feature-runtime container creation.
+- `createOnDemandFeatureCompositionPaths(...)` now defines explicit first-use composition entrypoints consumed by deferred IPC handlers for:
+  - workflow/execution/workflow-run runtime,
+  - studio shell/system runtime backend APIs,
+  - canonical registry runtime composition,
+  - agent runtime composition.
+
+Result: `bootstrapPostLoginRuntime(...)` is now orchestration glue for post-login and on-demand paths instead of a single broad runtime bootstrap block.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

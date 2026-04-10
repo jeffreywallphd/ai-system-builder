@@ -111,6 +111,15 @@ Minimum segmentation target:
   - canonical registry/canonical assets
   - agents
 
+## Story C.2.1 implementation checkpoint
+
+`electron/main/main.ts` now encodes the split above with explicit composition seams:
+
+- `composePostLoginRuntime(...)` for post-login shared warmup prerequisites.
+- `createOnDemandFeatureCompositionPaths(...)` for first-use feature runtime composition consumed by deferred IPC handlers.
+
+This keeps pre-login bootstrap unchanged, keeps post-login warmup focused on shared runtime prerequisites, and makes on-demand feature composition paths explicit in main-process code.
+
 ## Observability and validation contract
 
 Boundary compliance must remain observable and testable:

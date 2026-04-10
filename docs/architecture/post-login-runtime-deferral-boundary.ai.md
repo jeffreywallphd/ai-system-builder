@@ -101,6 +101,15 @@ Suggested activation groups:
 - canonical assets/registry
 - agents
 
+## Story C.2.1 implementation checkpoint
+
+`electron/main/main.ts` now uses explicit composition seams aligned with this boundary:
+
+- `composePostLoginRuntime(...)` for shared post-login warmup prerequisites.
+- `createOnDemandFeatureCompositionPaths(...)` for first-use feature runtime composition from deferred IPC handlers.
+
+This keeps pre-login scope unchanged while making post-login and on-demand runtime paths explicit in code.
+
 ## Observability/validation continuity
 
 Keep these protections:

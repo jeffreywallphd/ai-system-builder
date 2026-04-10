@@ -778,14 +778,30 @@ async function ensurePostLoginWarmupStarted(request: DesktopPostLoginWarmupReque
   }
 }
 
-async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
-  const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
-  try {
-  logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
+type PostLoginRuntimeComposition = {
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly runtimeConfig: AppRuntimeConfig;
+  readonly pythonRuntime: ReturnType<typeof resolveDesktopPythonRuntime>;
+  readonly featureRuntime: DeferredDesktopFeatureRuntime;
+};
+
+type OnDemandFeatureCompositionPaths = {
+  readonly getWorkflowPersistence: () => ReturnType<DeferredDesktopFeatureRuntime["ensureWorkflowPersistence"]>;
+  readonly getExecutionHistory: () => ReturnType<DeferredDesktopFeatureRuntime["ensureExecutionHistory"]>;
+  readonly getWorkflowRunHistory: () => ReturnType<DeferredDesktopFeatureRuntime["ensureWorkflowRunHistory"]>;
+  readonly getStudioShellBackendApi: () => ReturnType<DeferredDesktopFeatureRuntime["ensureStudioShellBackendApi"]>;
+  readonly getSystemStudioBackendApi: () => ReturnType<DeferredDesktopFeatureRuntime["ensureSystemStudioBackendApi"]>;
+  readonly getSystemRuntimeBackendApi: () => ReturnType<DeferredDesktopFeatureRuntime["ensureSystemRuntimeBackendApi"]>;
+  readonly getCanonicalRegistryRuntime: () => Promise<CanonicalRegistryRuntime>;
+  readonly getAgentStudioBackendApi: () => AgentStudioBackendApi;
+};
+
+async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, bootstrapStartedAt: number): Promise<PostLoginRuntimeComposition> {
   const { storagePaths, identityApiBaseUrl } = authShell;
   if (!storageDatabase) {
     throw new Error("Desktop storage database is unavailable for post-login runtime bootstrap.");
   }
+
   const pythonRuntimeResolutionStartedAt = logInitializationStart("desktop-startup.post-login-python-runtime-resolve");
   const pythonRuntime = resolveDesktopPythonRuntime({
     isPackaged,
@@ -796,11 +812,13 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   logInitializationEnd("desktop-startup.post-login-python-runtime-resolve", pythonRuntimeResolutionStartedAt);
   logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved", bootstrapStartedAt);
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "python-runtime-resolved");
+
   await new InitializeProductionStorageUseCase(storageDatabase).execute({
     scope: ProductionStorageInitializationScopes.fullRuntime,
   });
   logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready", bootstrapStartedAt);
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "full-storage-provisioning-ready");
+
   serviceSupervisor = new DesktopServiceSupervisor({
     repoRoot,
     isPackaged,
@@ -817,19 +835,19 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
 
   const baseRuntimeConfig = isPackaged
     ? AppRuntimeConfig.forDesktopProduction({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: DesktopServiceSupervisorPort,
-        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-      })
+      storage: storagePaths,
+      pythonRuntime,
+      serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
+      serviceSupervisorPort: DesktopServiceSupervisorPort,
+      pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
+    })
     : AppRuntimeConfig.forDesktopDevelopment({
-        storage: storagePaths,
-        pythonRuntime,
-        serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
-        serviceSupervisorPort: DesktopServiceSupervisorPort,
-        pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
-      });
+      storage: storagePaths,
+      pythonRuntime,
+      serviceSupervisorBaseUrl: serviceSupervisor.baseUrl,
+      serviceSupervisorPort: DesktopServiceSupervisorPort,
+      pythonRuntimeBaseUrl: serviceSupervisor.runtimeBaseUrl,
+    });
   const runtimeConfig = AppRuntimeConfig.fromValues({
     ...baseRuntimeConfig.toValues(),
     identityApiBaseUrl,
@@ -838,158 +856,189 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     runtimeConfig,
     storagePaths,
   });
-  const runtimeConfigValues = runtimeConfig.toValues();
   deferredFeatureRuntime = createDeferredDesktopFeatureRuntime({
     storagePaths,
-    runtimeConfigValues,
+    runtimeConfigValues: runtimeConfig.toValues(),
     repoRoot,
   });
   const featureRuntime = deferredFeatureRuntime;
   if (!featureRuntime) {
     throw new Error("Deferred desktop feature runtime is unavailable for post-login bootstrap.");
   }
+
+  return Object.freeze({
+    storagePaths,
+    runtimeConfig,
+    pythonRuntime,
+    featureRuntime,
+  });
+}
+
+function createOnDemandFeatureCompositionPaths(params: {
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly featureRuntime: DeferredDesktopFeatureRuntime;
+}): OnDemandFeatureCompositionPaths {
+  return Object.freeze({
+    getWorkflowPersistence: () => params.featureRuntime.ensureWorkflowPersistence(),
+    getExecutionHistory: () => params.featureRuntime.ensureExecutionHistory(),
+    getWorkflowRunHistory: () => params.featureRuntime.ensureWorkflowRunHistory(),
+    getStudioShellBackendApi: () => params.featureRuntime.ensureStudioShellBackendApi(),
+    getSystemStudioBackendApi: () => params.featureRuntime.ensureSystemStudioBackendApi(),
+    getSystemRuntimeBackendApi: () => params.featureRuntime.ensureSystemRuntimeBackendApi(),
+    getCanonicalRegistryRuntime: () => ensureCanonicalRegistryRuntime(params.storagePaths),
+    getAgentStudioBackendApi: () => ensureAgentStudioBackendApi(params.storagePaths),
+  });
+}
+
+async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): Promise<void> {
+  const bootstrapStartedAt = logInitializationStart(DesktopStartupPhases.postLoginWarmup);
+  try {
+    logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "start");
+    const runtimeComposition = await composePostLoginRuntime(authShell, bootstrapStartedAt);
+    const { storagePaths, runtimeConfig, pythonRuntime, featureRuntime } = runtimeComposition;
   registerDeferredFeatureIpc(() => {
-  const getStudioShellBackendApi = () => featureRuntime.ensureStudioShellBackendApi();
-  const getSystemStudioBackendApi = () => featureRuntime.ensureSystemStudioBackendApi();
-  const getSystemRuntimeBackendApi = () => featureRuntime.ensureSystemRuntimeBackendApi();
+  const onDemand = createOnDemandFeatureCompositionPaths({ storagePaths, featureRuntime });
+  const getStudioShellBackendApi = () => onDemand.getStudioShellBackendApi();
+  const getSystemStudioBackendApi = () => onDemand.getSystemStudioBackendApi();
+  const getSystemRuntimeBackendApi = () => onDemand.getSystemRuntimeBackendApi();
   ipcMain.on("ai-loom-desktop-workflows:save-record", (_event, recordJson: string) => {
-    featureRuntime.ensureWorkflowPersistence().saveWorkflowRecord(recordJson);
+    onDemand.getWorkflowPersistence().saveWorkflowRecord(recordJson);
   });
   ipcMain.on("ai-loom-desktop-workflows:load-record", (event, id: string) => {
-    event.returnValue = featureRuntime.ensureWorkflowPersistence().loadWorkflowRecord(id);
+    event.returnValue = onDemand.getWorkflowPersistence().loadWorkflowRecord(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:list-summaries", (event) => {
-    event.returnValue = featureRuntime.ensureWorkflowPersistence().listWorkflowSummaries();
+    event.returnValue = onDemand.getWorkflowPersistence().listWorkflowSummaries();
   });
   ipcMain.on("ai-loom-desktop-workflows:delete-record", (_event, id: string) => {
-    featureRuntime.ensureWorkflowPersistence().deleteWorkflowRecord(id);
+    onDemand.getWorkflowPersistence().deleteWorkflowRecord(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:exists", (event, id: string) => {
-    event.returnValue = featureRuntime.ensureWorkflowPersistence().workflowExists(id);
+    event.returnValue = onDemand.getWorkflowPersistence().workflowExists(id);
   });
   ipcMain.on("ai-loom-desktop-workflows:status", (event) => {
-    event.returnValue = featureRuntime.ensureWorkflowPersistence().getWorkflowPersistenceStatus();
+    event.returnValue = onDemand.getWorkflowPersistence().getWorkflowPersistenceStatus();
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:save", async (_event, runJson: string) => {
-    const { repository } = featureRuntime.ensureExecutionHistory();
+    const { repository } = onDemand.getExecutionHistory();
     await repository.saveRun(JSON.parse(runJson));
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:load", async (_event, runId: string) => {
-    const { getExecutionRunUseCase } = featureRuntime.ensureExecutionHistory();
+    const { getExecutionRunUseCase } = onDemand.getExecutionHistory();
     const run = await getExecutionRunUseCase.execute(runId);
     return run ? JSON.stringify(run) : null;
   });
   ipcMain.handle("ai-loom-desktop-execution-runs:list", async (_event, criteriaJson?: string) => {
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const { listExecutionRunsUseCase } = featureRuntime.ensureExecutionHistory();
+    const { listExecutionRunsUseCase } = onDemand.getExecutionHistory();
     const runs = await listExecutionRunsUseCase.execute(criteria);
     return runs.map((run) => JSON.stringify(run));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:save", async (_event, summaryJson: string) => {
-    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const { repository: workflowRunSummaryRepository } = onDemand.getWorkflowRunHistory();
     await workflowRunSummaryRepository.upsert(JSON.parse(summaryJson));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:load", async (_event, runId: string) => {
-    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const { repository: workflowRunSummaryRepository } = onDemand.getWorkflowRunHistory();
     const summary = await workflowRunSummaryRepository.getByRunId(runId);
     return summary ? JSON.stringify(summary) : null;
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:save-detail", async (_event, detailJson: string) => {
-    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const { repository: workflowRunSummaryRepository } = onDemand.getWorkflowRunHistory();
     await workflowRunSummaryRepository.upsertDetail(JSON.parse(detailJson));
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:load-detail", async (_event, runId: string) => {
-    const { repository: workflowRunSummaryRepository } = featureRuntime.ensureWorkflowRunHistory();
+    const { repository: workflowRunSummaryRepository } = onDemand.getWorkflowRunHistory();
     const detail = await workflowRunSummaryRepository.getDetailByRunId(runId);
     return detail ? JSON.stringify(detail) : null;
   });
   ipcMain.handle("ai-loom-desktop-workflow-runs:list", async (_event, queryJson?: string) => {
     const query = queryJson ? JSON.parse(queryJson) : undefined;
-    const { listWorkflowRunSummariesUseCase } = featureRuntime.ensureWorkflowRunHistory();
+    const { listWorkflowRunSummariesUseCase } = onDemand.getWorkflowRunHistory();
     const summaries = await listWorkflowRunSummariesUseCase.execute(query);
     return summaries.map((summary) => JSON.stringify(summary));
   });
   ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as CreateAgentRequest;
     return JSON.stringify(await agentApi.createAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:update", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as UpdateAgentRequest;
     return JSON.stringify(await agentApi.updateAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:get", async (_event, agentId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.getAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:list", async (_event, includeArchived = true) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.listAgents(includeArchived));
   });
   ipcMain.handle("ai-loom-desktop-agents:delete", async (_event, agentId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.deleteAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:archive", async (_event, agentId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.archiveAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-goals", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as ConfigureAgentGoalsRequest;
     return JSON.stringify(await agentApi.configureGoals(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-policy", async (_event, agentId: string, policyJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const policy = JSON.parse(policyJson) as AgentPolicy;
     return JSON.stringify(await agentApi.configurePolicy(agentId, policy));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-tools", async (_event, agentId: string, toolAccessJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const toolAccess = JSON.parse(toolAccessJson) as AgentToolAccessPolicy;
     return JSON.stringify(await agentApi.configureTools(agentId, toolAccess));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-memory", async (_event, agentId: string, memoryJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const memory = JSON.parse(memoryJson) as AgentMemoryConfiguration;
     return JSON.stringify(await agentApi.configureMemory(agentId, memory));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-strategy", async (_event, agentId: string, planningStrategyJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const planningStrategy = JSON.parse(planningStrategyJson) as AgentPlanningStrategy;
     return JSON.stringify(await agentApi.configureStrategy(agentId, planningStrategy));
   });
   ipcMain.handle("ai-loom-desktop-agents:validate", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as AgentConfigurationValidationInput;
     return JSON.stringify(await agentApi.validateConfiguration(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:launch", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as AgentRunRequest;
     return JSON.stringify(await agentApi.launchAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:trigger-launch", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as TriggerAgentLaunchRequest;
     return JSON.stringify(await agentApi.triggerLaunch(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:list-sessions", async (_event, agentId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.listSessions(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:get-session", async (_event, sessionId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.getSessionDetail(sessionId));
   });
   ipcMain.handle("ai-loom-desktop-agents:control-run", async (_event, requestJson: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     const request = JSON.parse(requestJson) as AgentRunControlRequest;
     return JSON.stringify(await agentApi.controlRun(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
-    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    const agentApi = onDemand.getAgentStudioBackendApi();
     return JSON.stringify(await agentApi.getStudioSnapshot(agentId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
@@ -1259,7 +1308,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
   logInitializationMemory(DesktopStartupPhases.postLoginWarmup, "ipc-and-api-bindings-ready");
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
@@ -1280,65 +1329,65 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
       }));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const filters = JSON.parse(filtersJson);
     return JSON.stringify(await registryBackendApi.filterAssets(filters));
   });
   ipcMain.handle("ai-loom-desktop-registry:search", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-assets", async (_event, limit?: number) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listExploreAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-search", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchExploreAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getAssetDetail(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     const { registryBackendApi } = canonicalRuntime;
     const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1356,7 +1405,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:version-chain", async (_event, assetId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
@@ -1383,7 +1432,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return withState;
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:dependency-state", async (_event, versionId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1405,7 +1454,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:reconcile-identity", async (_event, entityType: string, entityId: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1416,7 +1465,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(reconciled);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:replay-scope", async (_event, entityType: string, entityId: string, versionId?: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ replayed: false, reason: "Canonical asset system is unavailable." });
     }
@@ -1424,7 +1473,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(replay);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:verify-projection", async (_event, assetId: string, versionIdsInScope?: ReadonlyArray<string>) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1432,7 +1481,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(canonicalRuntime.projectionTrustReadModelService.summarize(verification));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] });
     }
@@ -1441,7 +1490,7 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
     return JSON.stringify(result);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:management-snapshot", async (_event, assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) => {
-    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths);
+    const canonicalRuntime = await onDemand.getCanonicalRegistryRuntime();
     if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
@@ -1559,3 +1608,4 @@ app.on("window-all-closed", () => {
 app.on("before-quit", async () => {
   await desktopHostRuntime?.stop();
 });
+
