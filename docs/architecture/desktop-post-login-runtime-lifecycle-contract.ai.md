@@ -67,6 +67,22 @@ Connectivity monitoring now uses the deferred runtime lifecycle contract:
 - pre-warmup offline-mode write attempts return the same fallback payload, preventing partial pre-login monitoring emulation.
 - runtime disposal/teardown explicitly stops connectivity monitoring before runtime reset so quit/logout lifecycle remains deterministic.
 
+## Story C.3.1 preload and IPC surface split boundary
+
+Desktop preload bridge exposure is now split into canonical namespaces:
+
+- `window.aiLoomDesktop.auth`
+  - always available during pre-login startup
+  - contains bootstrap context, storage, secrets, connectivity, and runtime lifecycle probes/triggers
+- `window.aiLoomDesktop.features`
+  - deferred feature bridge groups
+  - guarded until deferred feature IPC readiness is true
+  - first guarded access emits a `feature-demand` warmup request through the runtime warmup channel
+
+Compatibility constraint:
+
+- legacy root aliases can remain temporarily for compatibility, but new renderer integration should consume `auth` and `features` namespaces as the authoritative contract.
+
 ## Status/readiness exposure
 - status channel:
   - `ai-loom-desktop-runtime:get-post-login-runtime-status`

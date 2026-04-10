@@ -193,7 +193,7 @@ function resolveStorage(): StorageLike | undefined {
     return undefined;
   }
 
-  const desktopStorage = window.aiLoomDesktop?.storage;
+  const desktopStorage = window.aiLoomDesktop?.auth?.storage ?? window.aiLoomDesktop?.storage;
   if (desktopStorage) {
     return desktopStorage;
   }

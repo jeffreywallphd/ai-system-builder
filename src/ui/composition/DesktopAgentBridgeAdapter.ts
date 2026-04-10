@@ -4,5 +4,5 @@ export function resolveDesktopAgentBridge(): DesktopAgentAuthoringBridge | undef
   if (typeof window === "undefined") {
     return undefined;
   }
-  return window.aiLoomDesktop?.agents;
+  return window.aiLoomDesktop?.features?.agents ?? window.aiLoomDesktop?.agents;
 }

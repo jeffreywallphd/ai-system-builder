@@ -297,16 +297,39 @@ export interface DesktopRuntimeBootstrapBridge {
   startPostLoginWarmup(request?: DesktopPostLoginWarmupRequest): Promise<void>;
 }
 
-export interface DesktopBridge {
+export interface DesktopAuthBootstrapBridge {
   readonly bootstrap: DesktopBootstrapContext;
   readonly storage: DesktopKeyValueStorageBridge;
   readonly secrets?: DesktopMcpSecretBridge;
   readonly runtime?: DesktopRuntimeBootstrapBridge;
-  readonly workflows: DesktopWorkflowBridge;
-  readonly executionRuns: DesktopExecutionRunBridge;
+  readonly connectivity?: DesktopConnectivityBridge;
+}
+
+export interface DesktopDeferredFeatureBridge {
+  readonly workflows?: DesktopWorkflowBridge;
+  readonly executionRuns?: DesktopExecutionRunBridge;
   readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
-  readonly modelFiles: DesktopModelFileBridge;
-  readonly canonicalAssets: DesktopCanonicalAssetBridge;
+  readonly modelFiles?: DesktopModelFileBridge;
+  readonly canonicalAssets?: DesktopCanonicalAssetBridge;
+  readonly agents?: DesktopAgentAuthoringBridge;
+  readonly studioShell?: DesktopStudioShellBridge;
+  readonly registry?: DesktopRegistryBridge;
+}
+
+export interface DesktopBridge {
+  readonly auth: DesktopAuthBootstrapBridge;
+  readonly features: DesktopDeferredFeatureBridge;
+
+  // Legacy root aliases kept for compatibility while renderer code adopts auth/features split.
+  readonly bootstrap: DesktopBootstrapContext;
+  readonly storage: DesktopKeyValueStorageBridge;
+  readonly secrets?: DesktopMcpSecretBridge;
+  readonly runtime?: DesktopRuntimeBootstrapBridge;
+  readonly workflows?: DesktopWorkflowBridge;
+  readonly executionRuns?: DesktopExecutionRunBridge;
+  readonly workflowRunSummaries?: DesktopWorkflowRunSummaryBridge;
+  readonly modelFiles?: DesktopModelFileBridge;
+  readonly canonicalAssets?: DesktopCanonicalAssetBridge;
   readonly agents?: DesktopAgentAuthoringBridge;
   readonly studioShell?: DesktopStudioShellBridge;
   readonly registry?: DesktopRegistryBridge;

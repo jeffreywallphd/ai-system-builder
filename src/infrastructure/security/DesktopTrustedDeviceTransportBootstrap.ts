@@ -103,7 +103,7 @@ export class WindowDesktopTrustedDeviceBootstrapPort implements IDesktopTrustedD
     if (typeof window === "undefined") {
       return undefined;
     }
-    return window.aiLoomDesktop?.bootstrap;
+    return window.aiLoomDesktop?.auth?.bootstrap ?? window.aiLoomDesktop?.bootstrap;
   }
 }
 

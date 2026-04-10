@@ -4,5 +4,5 @@ export function resolveDesktopRegistryBridge(): DesktopRegistryBridge | undefine
   if (typeof window === "undefined") {
     return undefined;
   }
-  return window.aiLoomDesktop?.registry;
+  return window.aiLoomDesktop?.features?.registry ?? window.aiLoomDesktop?.registry;
 }

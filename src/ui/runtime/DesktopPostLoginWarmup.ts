@@ -17,7 +17,7 @@ function createWarmupRequest(triggerSource: DesktopPostLoginWarmupTriggerSource)
 export async function requestDesktopPostLoginWarmup(
   triggerSource: DesktopPostLoginWarmupTriggerSource,
 ): Promise<void> {
-  const runtimeBridge = window.aiLoomDesktop?.runtime;
+  const runtimeBridge = window.aiLoomDesktop?.auth?.runtime ?? window.aiLoomDesktop?.runtime;
   if (!runtimeBridge?.startPostLoginWarmup) {
     return;
   }

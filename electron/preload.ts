@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
+  DesktopPostLoginWarmupTriggerSources,
   DesktopPostLoginRuntimeStates,
   DesktopPostLoginRuntimeUnavailableReasons,
   type DesktopPostLoginRuntimeStatus,
@@ -10,6 +11,7 @@ import { DesktopBootstrapIpcChannels } from "./shared/DesktopBootstrapIpcChannel
 const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
 const DeferredFeatureApiUnavailableCode = "AI_LOOM_DESKTOP_FEATURE_API_UNAVAILABLE";
 const DeferredFeatureApiUnavailableDetail = "Desktop feature APIs are unavailable until post-login runtime initialization completes.";
+let deferredFeatureDemandWarmupRequest: Promise<void> | undefined;
 
 type SyncBridgeMethod = (...args: ReadonlyArray<any>) => any;
 type AsyncBridgeMethod = (...args: ReadonlyArray<any>) => Promise<any>;
@@ -37,9 +39,32 @@ function getPostLoginRuntimeStatus(): DesktopPostLoginRuntimeStatus {
 }
 
 function createDeferredFeatureUnavailableError(apiPath: string): Error & { code: string } {
-  const error = new Error(`${DeferredFeatureApiUnavailableDetail} Requested API: ${apiPath}.`) as Error & { code: string };
+  const runtimeStatus = getPostLoginRuntimeStatus();
+  const state = runtimeStatus.state;
+  const unavailableReason = runtimeStatus.unavailableReason ? ` (${runtimeStatus.unavailableReason})` : "";
+  const error = new Error(
+    `${DeferredFeatureApiUnavailableDetail} Current runtime state: ${state}${unavailableReason}. Requested API: ${apiPath}.`,
+  ) as Error & { code: string };
   error.code = DeferredFeatureApiUnavailableCode;
   return error;
+}
+
+function startDeferredFeatureWarmupOnDemand(): void {
+  if (deferredFeatureDemandWarmupRequest) {
+    return;
+  }
+  deferredFeatureDemandWarmupRequest = ipcRenderer.invoke(
+    DesktopBootstrapIpcChannels.startPostLoginWarmup,
+    Object.freeze({
+      triggerSource: DesktopPostLoginWarmupTriggerSources.featureDemand,
+      requestedAt: new Date().toISOString(),
+    }),
+  ).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[ai-loom][desktop-runtime] deferred feature warmup request failed: ${message}`);
+  }).finally(() => {
+    deferredFeatureDemandWarmupRequest = undefined;
+  });
 }
 
 function guardDeferredSyncGroup<TGroup extends SyncBridgeGroup>(
@@ -49,6 +74,7 @@ function guardDeferredSyncGroup<TGroup extends SyncBridgeGroup>(
   const entries = Object.entries(group).map(([methodName, method]) => {
     const guarded: SyncBridgeMethod = (...args: ReadonlyArray<any>) => {
       if (!isDeferredFeatureApiReady()) {
+        startDeferredFeatureWarmupOnDemand();
         throw createDeferredFeatureUnavailableError(`${groupName}.${methodName}`);
       }
       return method(...args);
@@ -65,6 +91,7 @@ function guardDeferredAsyncGroup<TGroup extends AsyncBridgeGroup>(
   const entries = Object.entries(group).map(([methodName, method]) => {
     const guarded: AsyncBridgeMethod = (...args: ReadonlyArray<any>) => {
       if (!isDeferredFeatureApiReady()) {
+        startDeferredFeatureWarmupOnDemand();
         return Promise.reject(createDeferredFeatureUnavailableError(`${groupName}.${methodName}`));
       }
       return method(...args);
@@ -128,6 +155,7 @@ const workflowsBridge = Object.freeze({
   },
   getWorkflowPersistenceStatus() {
     if (!isDeferredFeatureApiReady()) {
+      startDeferredFeatureWarmupOnDemand();
       return Object.freeze({
         provider: "desktop-runtime-deferred",
         workflowsDirectory: "",
@@ -501,7 +529,12 @@ const deferredFeatureSurface = Object.freeze({
   agents: guardDeferredAsyncGroup("agents", agentsBridge),
 });
 
-contextBridge.exposeInMainWorld("aiLoomDesktop", {
+const desktopBridge = Object.freeze({
+  auth: authBootstrapSurface,
+  features: deferredFeatureSurface,
   ...authBootstrapSurface,
+  // Legacy root aliases kept while renderer migrates to auth/features split.
   ...deferredFeatureSurface,
 });
+
+contextBridge.exposeInMainWorld("aiLoomDesktop", desktopBridge);

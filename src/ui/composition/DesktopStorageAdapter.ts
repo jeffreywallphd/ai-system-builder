@@ -5,7 +5,7 @@ export function resolveDesktopStorageAdapter(): StorageLike | undefined {
     return undefined;
   }
 
-  const storage = window.aiLoomDesktop?.storage;
+  const storage = window.aiLoomDesktop?.auth?.storage ?? window.aiLoomDesktop?.storage;
   if (!storage) {
     return undefined;
   }
