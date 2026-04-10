@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { lazy, Suspense, useMemo } from "react";
 import {
   createBrowserRouter,
   Navigate,
@@ -6,57 +6,58 @@ import {
   type RouteObject,
 } from "react-router-dom";
 import AppLayout from "../layout/AppLayout";
-import HomePage from "../pages/HomePage";
-import NotFoundPage from "../pages/NotFoundPage";
-import LegacyWorkflowEditorRedirectPage from "../pages/LegacyWorkflowEditorRedirectPage";
-import WorkflowConversationPage from "../pages/WorkflowConversationPage";
-import ContextWorkbenchPage from "../pages/ContextWorkbenchPage";
-import ToolRunPage from "../pages/ToolRunPage";
-import SettingsPage from "../pages/SettingsPage";
-import AuthorizationSharingManagementPage from "../pages/AuthorizationSharingManagementPage";
-import AuthorizationSharingThinClientPage from "../pages/AuthorizationSharingThinClientPage";
-import AuthorizationReportingPage from "../pages/AuthorizationReportingPage";
-import SecurityPolicyConfigurationPage from "../pages/SecurityPolicyConfigurationPage";
-import StorageAdministrationPage from "../pages/StorageAdministrationPage";
-import WorkflowStudioPage from "../pages/WorkflowStudioPage";
-import ContextBundleStudioPage from "../pages/ContextBundleStudioPage";
-import DatasetPipelineStudioPage from "../pages/DatasetPipelineStudioPage";
-import TrainingRecipeStudioPage from "../pages/TrainingRecipeStudioPage";
-import ToolChainStudioPage from "../pages/ToolChainStudioPage";
-import SystemStudioPage from "../pages/SystemStudioPage";
-import ModelStudioPage from "../pages/ModelStudioPage";
-import DatasetStudioPage from "../pages/DatasetStudioPage";
-import SchemaStudioPage from "../pages/SchemaStudioPage";
-import ToolStudioPage from "../pages/ToolStudioPage";
-import PromptTemplateStudioPage from "../pages/PromptTemplateStudioPage";
-import EmbeddingIndexStudioPage from "../pages/EmbeddingIndexStudioPage";
-import ConfigProfileStudioPage from "../pages/ConfigProfileStudioPage";
-import BuildPage from "../pages/BuildPage";
-import BuildAutomatePage from "../pages/BuildAutomatePage";
-import RegistryPage from "../pages/RegistryPage";
-import AssetDetailPage from "../pages/AssetDetailPage";
-import RunPage from "../pages/RunPage";
-import AssetsPage from "../pages/AssetsPage";
-import LoginPage from "../pages/LoginPage";
-import RegisterPage from "../pages/RegisterPage";
-import IdentityAdminPage from "../pages/IdentityAdminPage";
-import TrustedDevicesPage from "../pages/TrustedDevicesPage";
-import WorkspaceAdministrationPage from "../pages/WorkspaceAdministrationPage";
-import NodeEnrollmentReviewPage from "../pages/NodeEnrollmentReviewPage";
-import NodeInventoryPage from "../pages/NodeInventoryPage";
-import WorkspaceMembershipThinClientPage from "../pages/WorkspaceMembershipThinClientPage";
-import WorkspaceInvitationOnboardingPage from "../pages/WorkspaceInvitationOnboardingPage";
-import SecretMetadataManagementPage from "../pages/SecretMetadataManagementPage";
-import GovernanceAuditReviewPage from "../pages/GovernanceAuditReviewPage";
-import DeploymentPolicyAdministrationPage from "../pages/DeploymentPolicyAdministrationPage";
-import DesktopAdministrationShellPage from "../pages/DesktopAdministrationShellPage";
-import AdminLiteEntryPage from "../pages/AdminLiteEntryPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ROUTE_PATHS } from "./RouteConfig";
 import { IdentityAuthSessionStore } from "@shared/identity/IdentityAuthSessionStore";
 import { isRoutePathAccessibleForSession } from "./SurfaceRouteAccessPolicy";
 import type { LoginLocalIdentityApiResponse } from "@infrastructure/api/identity/sdk/PublicIdentityAuthApiContract";
 import { DevLoginFeatureFlag } from "../features/DevLoginFeatureFlag";
+
+const HomePage = lazy(async () => await import("../pages/HomePage"));
+const NotFoundPage = lazy(async () => await import("../pages/NotFoundPage"));
+const LegacyWorkflowEditorRedirectPage = lazy(async () => await import("../pages/LegacyWorkflowEditorRedirectPage"));
+const WorkflowConversationPage = lazy(async () => await import("../pages/WorkflowConversationPage"));
+const ContextWorkbenchPage = lazy(async () => await import("../pages/ContextWorkbenchPage"));
+const ToolRunPage = lazy(async () => await import("../pages/ToolRunPage"));
+const SettingsPage = lazy(async () => await import("../pages/SettingsPage"));
+const AuthorizationSharingManagementPage = lazy(async () => await import("../pages/AuthorizationSharingManagementPage"));
+const AuthorizationSharingThinClientPage = lazy(async () => await import("../pages/AuthorizationSharingThinClientPage"));
+const AuthorizationReportingPage = lazy(async () => await import("../pages/AuthorizationReportingPage"));
+const SecurityPolicyConfigurationPage = lazy(async () => await import("../pages/SecurityPolicyConfigurationPage"));
+const StorageAdministrationPage = lazy(async () => await import("../pages/StorageAdministrationPage"));
+const WorkflowStudioPage = lazy(async () => await import("../pages/WorkflowStudioPage"));
+const ContextBundleStudioPage = lazy(async () => await import("../pages/ContextBundleStudioPage"));
+const DatasetPipelineStudioPage = lazy(async () => await import("../pages/DatasetPipelineStudioPage"));
+const TrainingRecipeStudioPage = lazy(async () => await import("../pages/TrainingRecipeStudioPage"));
+const ToolChainStudioPage = lazy(async () => await import("../pages/ToolChainStudioPage"));
+const SystemStudioPage = lazy(async () => await import("../pages/SystemStudioPage"));
+const ModelStudioPage = lazy(async () => await import("../pages/ModelStudioPage"));
+const DatasetStudioPage = lazy(async () => await import("../pages/DatasetStudioPage"));
+const SchemaStudioPage = lazy(async () => await import("../pages/SchemaStudioPage"));
+const ToolStudioPage = lazy(async () => await import("../pages/ToolStudioPage"));
+const PromptTemplateStudioPage = lazy(async () => await import("../pages/PromptTemplateStudioPage"));
+const EmbeddingIndexStudioPage = lazy(async () => await import("../pages/EmbeddingIndexStudioPage"));
+const ConfigProfileStudioPage = lazy(async () => await import("../pages/ConfigProfileStudioPage"));
+const BuildPage = lazy(async () => await import("../pages/BuildPage"));
+const BuildAutomatePage = lazy(async () => await import("../pages/BuildAutomatePage"));
+const RegistryPage = lazy(async () => await import("../pages/RegistryPage"));
+const AssetDetailPage = lazy(async () => await import("../pages/AssetDetailPage"));
+const RunPage = lazy(async () => await import("../pages/RunPage"));
+const AssetsPage = lazy(async () => await import("../pages/AssetsPage"));
+const LoginPage = lazy(async () => await import("../pages/LoginPage"));
+const RegisterPage = lazy(async () => await import("../pages/RegisterPage"));
+const IdentityAdminPage = lazy(async () => await import("../pages/IdentityAdminPage"));
+const TrustedDevicesPage = lazy(async () => await import("../pages/TrustedDevicesPage"));
+const WorkspaceAdministrationPage = lazy(async () => await import("../pages/WorkspaceAdministrationPage"));
+const NodeEnrollmentReviewPage = lazy(async () => await import("../pages/NodeEnrollmentReviewPage"));
+const NodeInventoryPage = lazy(async () => await import("../pages/NodeInventoryPage"));
+const WorkspaceMembershipThinClientPage = lazy(async () => await import("../pages/WorkspaceMembershipThinClientPage"));
+const WorkspaceInvitationOnboardingPage = lazy(async () => await import("../pages/WorkspaceInvitationOnboardingPage"));
+const SecretMetadataManagementPage = lazy(async () => await import("../pages/SecretMetadataManagementPage"));
+const GovernanceAuditReviewPage = lazy(async () => await import("../pages/GovernanceAuditReviewPage"));
+const DeploymentPolicyAdministrationPage = lazy(async () => await import("../pages/DeploymentPolicyAdministrationPage"));
+const DesktopAdministrationShellPage = lazy(async () => await import("../pages/DesktopAdministrationShellPage"));
+const AdminLiteEntryPage = lazy(async () => await import("../pages/AdminLiteEntryPage"));
 
 export interface AppRouterProps {
   readonly isAuthenticated?: boolean;
@@ -304,7 +305,9 @@ export default function AppRouter({
   const router = useMemo(() => createBrowserRouter([...routes]), [routes]);
 
   return (
-    <RouterProvider router={router} />
+    <Suspense fallback={<AppRouterLoadingFallback />}>
+      <RouterProvider router={router} />
+    </Suspense>
   );
 }
 
@@ -328,3 +331,10 @@ function SurfaceProtectedRoute({ path, children }: SurfaceProtectedRouteProps): 
   return children;
 }
 
+function AppRouterLoadingFallback(): JSX.Element {
+  return (
+    <div className="app-shell-loading" role="status" aria-live="polite" aria-busy>
+      Loading page…
+    </div>
+  );
+}

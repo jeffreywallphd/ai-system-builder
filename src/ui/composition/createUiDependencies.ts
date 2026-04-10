@@ -325,12 +325,12 @@ export function createUiDependencies(
     mcpServerManager: mcpRuntimeIntegration.serverManager,
     workflowRunHistoryService,
   });
-  const executionHistoryService = new ExecutionHistoryService(
+  const executionHistoryFeature = createLazyValue(() => new ExecutionHistoryService(
     executionInfrastructure.listExecutionRunsUseCase,
     executionInfrastructure.executionRunProjectionService,
     executionInfrastructure.listRelatedExecutionRunsUseCase,
     executionInfrastructure.getExecutionRunDetailUseCase,
-  );
+  ));
   const executionEngine = executionInfrastructure.executionEngine;
   const executeWorkflowUseCase = new ExecuteWorkflowUseCase(
     workflowExecutor,
@@ -459,6 +459,7 @@ export function createUiDependencies(
       mcpRuntimeClient: mcpClient,
     })
   );
+  const toolStoreFeature = createLazyValue(() => new ToolStore(toolService));
   const mcpService = new McpService(
     new ListConfiguredMcpServersUseCase(mcpServerCatalog),
     new SearchMcpServersUseCase(mcpClient),
@@ -510,204 +511,229 @@ export function createUiDependencies(
     runtimeDependencyOrchestrator,
   );
   const mcpStore = new McpStore(mcpService);
-  const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
-  const previewToolContextUseCase = new PreviewToolContextUseCase(
-    workflowRepository,
-    loadToolDefinitionUseCase,
-    workflowContextService,
-  );
-  const previewAgentContextUseCase = new PreviewAgentContextUseCase(
-    workflowContextService,
-    new ListToolCapabilitiesUseCase(toolCapabilityCatalog),
-  );
-  const contextService = new ContextService({
-    createContextPackageUseCase: new CreateContextPackageUseCase({
-      contextPackageRepository,
-    }),
-    createContextRecipeUseCase: new CreateContextRecipeUseCase({
-      contextRecipeRepository,
-    }),
-    updateContextPackageUseCase: new UpdateContextPackageUseCase({
-      contextPackageRepository,
-    }),
-    deleteContextPackageUseCase: new DeleteContextPackageUseCase(contextPackageRepository),
-    listContextPackagesUseCase: new ListContextPackagesUseCase(contextPackageRepository),
-    loadContextPackageUseCase: new LoadContextPackageUseCase(contextPackageRepository),
-    searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
-    listContextRecipesUseCase: new ListContextRecipesUseCase(contextRecipeRepository),
-    loadContextRecipeUseCase: new LoadContextRecipeUseCase(contextRecipeRepository),
-    previewWorkflowContextUseCase,
-    previewToolContextUseCase,
-    previewAgentContextUseCase,
-  });
-  const contextStore = new ContextStore(contextService);
-  const tuningDatasetRepository = new LocalStorageTuningDatasetRepository(undefined, durableDesktopStorage as never);
-  const tuningDatasetVersionRepository = new LocalStorageTuningDatasetVersionRepository(durableDesktopStorage as never);
-  const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
-  const fileIngestionService = new DefaultFileIngestionApplicationService(
-    new FileIngestionPolicyService(),
-    new OrchestratedDocumentConversionGateway(
-      new PythonRuntimeDocumentConversionGateway(runtimeClient),
-      runtimeDependencyOrchestrator,
-    ),
-  );
-  const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
-    datasetRepository: tuningDatasetRepository,
-    datasetVersionRepository: tuningDatasetVersionRepository,
-    validationService: new TaskTypeAwareValidationService(duplicationPolicy),
-    splitService: new DeterministicDatasetSplitService(),
-    exportService: new JsonTuningDatasetExportService(),
-    importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
-    generationService: datasetGenerationService,
-    executionEngine,
-    reviewPolicy: new DefaultDatasetReviewPolicy(),
-    duplicationPolicy,
-    statisticsService: new DatasetStatisticsService(duplicationPolicy),
-    releasePolicy: new DefaultDatasetReleasePolicy(),
-    workflowService: new DatasetWorkflowProgressService(),
-    fileIngestionService,
-    datasetSourceIngestionProfile: DatasetSourceIngestionProfile,
-  });
-  const tuningDatasetService = new TuningDatasetService(tuningDatasetApplicationService);
-  const tuningDatasetStore = new TuningDatasetStore(tuningDatasetService);
-  const modelTrainingJobRepository = new LocalStorageModelTrainingJobRepository(undefined, durableDesktopStorage as never);
-  const modelTrainingApplicationService = new DefaultModelTrainingApplicationService(
-    installedModelCatalog,
-    tuningDatasetRepository,
-    tuningDatasetVersionRepository,
-    modelTrainingJobRepository,
-    modelTrainingRuntime,
-    new RuntimeAwareModelCreationEnvironmentGateway(
-      config,
-      runtimeClient,
-      pythonRuntimeConfig.isEnabled,
-      desktopModelFileStorage,
-      desktopModelFileStorage
-        ? "Desktop model-file bridge is connected."
-        : config.runtimeMode === "browser-development"
-          ? "Browser fallback mode does not expose the desktop model-file bridge."
-          : "The desktop model-file bridge is not available in this runtime.",
-      runtimeDependencyOrchestrator,
-    ),
-    desktopModelFileStorage,
-    executionEngine,
-  );
-  const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
-  const modelTrainingStore = new ModelTrainingStore(modelTrainingService);
-  const desktopCanonicalAssetBridge = resolveDesktopCanonicalAssetBridge();
-  const canonicalAssetManagementService = new CanonicalAssetManagementService(desktopCanonicalAssetBridge
-    ? {
-      listAssets: async () => (await desktopCanonicalAssetBridge.listAssets()).map((entry) => JSON.parse(entry)),
-      loadAssetDetail: async (assetId) => {
-        const detail = await desktopCanonicalAssetBridge.loadAssetDetail(assetId);
-        return detail ? JSON.parse(detail) : undefined;
-      },
-      listVersionChain: async (assetId) => (await desktopCanonicalAssetBridge.listVersionChain(assetId)).map((entry) => {
-        const parsed = JSON.parse(entry) as {
-          versionId: string;
-          parentVersionId?: string;
-          label?: string;
-          dependencyState?: {
-            state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
-            reasons: ReadonlyArray<string>;
-            nextActions: ReadonlyArray<string>;
-          };
-          createdAt: string;
-        };
-        return Object.freeze({
-          ...parsed,
-          createdAt: new Date(parsed.createdAt),
-        });
+  const contextFeature = createLazyValue(() => {
+    const previewWorkflowContextUseCase = new PreviewWorkflowContextUseCase(workflowContextService);
+    const previewToolContextUseCase = new PreviewToolContextUseCase(
+      workflowRepository,
+      loadToolDefinitionUseCase,
+      workflowContextService,
+    );
+    const previewAgentContextUseCase = new PreviewAgentContextUseCase(
+      workflowContextService,
+      new ListToolCapabilitiesUseCase(toolCapabilityCatalog),
+    );
+    const contextService = new ContextService({
+      createContextPackageUseCase: new CreateContextPackageUseCase({
+        contextPackageRepository,
       }),
-      evaluateDependencyState: async (versionId) => {
-        const state = await desktopCanonicalAssetBridge.evaluateDependencyState(versionId);
-        if (!state) {
-          throw new Error(`Canonical dependency state for version '${versionId}' is unavailable.`);
-        }
-        const parsed = JSON.parse(state) as {
-          versionId: string;
-          state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
-          lineageConfidence: "exact" | "partial";
-          lifecycle: { source: "persisted-fresh" | "recomputed"; computedAt: string; reason: string; };
-          reasons: ReadonlyArray<string>;
-          nextActions: ReadonlyArray<string>;
-        };
-        return Object.freeze({
-          ...parsed,
-          lifecycle: Object.freeze({
-            ...parsed.lifecycle,
-            computedAt: new Date(parsed.lifecycle.computedAt),
-          }),
-        });
-      },
-      reconcileIdentity: async ({ entityType, entityId }) => {
-        const reconciled = await desktopCanonicalAssetBridge.reconcileIdentity(entityType, entityId);
-        return reconciled ? JSON.parse(reconciled) : undefined;
-      },
-      replayScopedProjection: async ({ entityType, entityId, versionId }) => JSON.parse(
-        await desktopCanonicalAssetBridge.replayScopedProjection(entityType, entityId, versionId),
+      createContextRecipeUseCase: new CreateContextRecipeUseCase({
+        contextRecipeRepository,
+      }),
+      updateContextPackageUseCase: new UpdateContextPackageUseCase({
+        contextPackageRepository,
+      }),
+      deleteContextPackageUseCase: new DeleteContextPackageUseCase(contextPackageRepository),
+      listContextPackagesUseCase: new ListContextPackagesUseCase(contextPackageRepository),
+      loadContextPackageUseCase: new LoadContextPackageUseCase(contextPackageRepository),
+      searchContextPackagesUseCase: new SearchContextPackagesUseCase(contextPackageRepository),
+      listContextRecipesUseCase: new ListContextRecipesUseCase(contextRecipeRepository),
+      loadContextRecipeUseCase: new LoadContextRecipeUseCase(contextRecipeRepository),
+      previewWorkflowContextUseCase,
+      previewToolContextUseCase,
+      previewAgentContextUseCase,
+    });
+    return Object.freeze({
+      contextService,
+      contextStore: new ContextStore(contextService),
+    });
+  });
+
+  const tuningDatasetFeature = createLazyValue(() => {
+    const tuningDatasetRepository = new LocalStorageTuningDatasetRepository(undefined, durableDesktopStorage as never);
+    const tuningDatasetVersionRepository = new LocalStorageTuningDatasetVersionRepository(durableDesktopStorage as never);
+    const duplicationPolicy = new DefaultDatasetDuplicationPolicy();
+    const fileIngestionService = new DefaultFileIngestionApplicationService(
+      new FileIngestionPolicyService(),
+      new OrchestratedDocumentConversionGateway(
+        new PythonRuntimeDocumentConversionGateway(runtimeClient),
+        runtimeDependencyOrchestrator,
       ),
-      verifyProjection: async ({ assetId, versionIdsInScope }) => {
-        const verification = await desktopCanonicalAssetBridge.verifyProjection(assetId, versionIdsInScope);
-        if (!verification) {
-          throw new Error(`Projection verification for canonical asset '${assetId}' is unavailable.`);
-        }
-        return JSON.parse(verification);
-      },
-      rebuildProjectionScopes: async (request) => JSON.parse(
-        await desktopCanonicalAssetBridge.rebuildProjectionScopes(JSON.stringify(request)),
+    );
+    const tuningDatasetApplicationService = new DefaultTuningDatasetStudioApplicationService({
+      datasetRepository: tuningDatasetRepository,
+      datasetVersionRepository: tuningDatasetVersionRepository,
+      validationService: new TaskTypeAwareValidationService(duplicationPolicy),
+      splitService: new DeterministicDatasetSplitService(),
+      exportService: new JsonTuningDatasetExportService(),
+      importService: new BrowserDatasetImportService(new DefaultDatasetPrivacyPolicy()),
+      generationService: datasetGenerationService,
+      executionEngine,
+      reviewPolicy: new DefaultDatasetReviewPolicy(),
+      duplicationPolicy,
+      statisticsService: new DatasetStatisticsService(duplicationPolicy),
+      releasePolicy: new DefaultDatasetReleasePolicy(),
+      workflowService: new DatasetWorkflowProgressService(),
+      fileIngestionService,
+      datasetSourceIngestionProfile: DatasetSourceIngestionProfile,
+    });
+    const tuningDatasetService = new TuningDatasetService(tuningDatasetApplicationService);
+    return Object.freeze({
+      tuningDatasetRepository,
+      tuningDatasetVersionRepository,
+      tuningDatasetService,
+      tuningDatasetStore: new TuningDatasetStore(tuningDatasetService),
+    });
+  });
+
+  const modelTrainingFeature = createLazyValue(() => {
+    const tuningFeature = tuningDatasetFeature();
+    const modelTrainingJobRepository = new LocalStorageModelTrainingJobRepository(undefined, durableDesktopStorage as never);
+    const modelTrainingApplicationService = new DefaultModelTrainingApplicationService(
+      installedModelCatalog,
+      tuningFeature.tuningDatasetRepository,
+      tuningFeature.tuningDatasetVersionRepository,
+      modelTrainingJobRepository,
+      modelTrainingRuntime,
+      new RuntimeAwareModelCreationEnvironmentGateway(
+        config,
+        runtimeClient,
+        pythonRuntimeConfig.isEnabled,
+        desktopModelFileStorage,
+        desktopModelFileStorage
+          ? "Desktop model-file bridge is connected."
+          : config.runtimeMode === "browser-development"
+            ? "Browser fallback mode does not expose the desktop model-file bridge."
+            : "The desktop model-file bridge is not available in this runtime.",
+        runtimeDependencyOrchestrator,
       ),
-      loadManagementSnapshot: async ({ assetId, includeProjectionHealth, versionIdsInProjectionScope }) => {
-        const snapshot = await desktopCanonicalAssetBridge.loadManagementSnapshot(assetId, includeProjectionHealth, versionIdsInProjectionScope);
-        if (!snapshot) {
-          return undefined;
-        }
-        const parsed = JSON.parse(snapshot) as {
-          asset: import("../../application/assets-system/AssetManagementReadModels").CanonicalAssetDetailReadModel;
-          versions: ReadonlyArray<{
+      desktopModelFileStorage,
+      executionEngine,
+    );
+    const modelTrainingService = new ModelTrainingService(modelTrainingApplicationService);
+    return Object.freeze({
+      modelTrainingService,
+      modelTrainingStore: new ModelTrainingStore(modelTrainingService),
+    });
+  });
+
+  const canonicalAssetFeature = createLazyValue(() => {
+    const desktopCanonicalAssetBridge = resolveDesktopCanonicalAssetBridge();
+    return new CanonicalAssetManagementService(desktopCanonicalAssetBridge
+      ? {
+        listAssets: async () => (await desktopCanonicalAssetBridge.listAssets()).map((entry) => JSON.parse(entry)),
+        loadAssetDetail: async (assetId) => {
+          const detail = await desktopCanonicalAssetBridge.loadAssetDetail(assetId);
+          return detail ? JSON.parse(detail) : undefined;
+        },
+        listVersionChain: async (assetId) => (await desktopCanonicalAssetBridge.listVersionChain(assetId)).map((entry) => {
+          const parsed = JSON.parse(entry) as {
             versionId: string;
             parentVersionId?: string;
             label?: string;
-            createdAt: string;
-            dependencyState: {
+            dependencyState?: {
               state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
               reasons: ReadonlyArray<string>;
               nextActions: ReadonlyArray<string>;
             };
-          }>;
-          dependencyLifecycleSummary: {
-            healthy: number;
-            impacted: number;
-            stale: number;
-            partiallyTrusted: number;
-            reconciliationNeeded: number;
+            createdAt: string;
           };
-          existenceExplanation?: { versionId: string; explanation: string; evidence: ReadonlyArray<string>; };
-          operationalSummary: {
-            status: "healthy" | "attention-needed";
-            explanation: string;
-            recommendedActions: ReadonlyArray<string>;
+          return Object.freeze({
+            ...parsed,
+            createdAt: new Date(parsed.createdAt),
+          });
+        }),
+        evaluateDependencyState: async (versionId) => {
+          const state = await desktopCanonicalAssetBridge.evaluateDependencyState(versionId);
+          if (!state) {
+            throw new Error(`Canonical dependency state for version '${versionId}' is unavailable.`);
+          }
+          const parsed = JSON.parse(state) as {
+            versionId: string;
+            state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+            lineageConfidence: "exact" | "partial";
+            lifecycle: { source: "persisted-fresh" | "recomputed"; computedAt: string; reason: string; };
+            reasons: ReadonlyArray<string>;
+            nextActions: ReadonlyArray<string>;
           };
-          projectionHealth?: {
-            matched: boolean;
-            trustState: "trusted" | "mismatch-detected";
-            trustExplanation: string;
-            failedChecks: ReadonlyArray<string>;
-            edgeCount: number;
-            scopedVersionCount: number;
-            mismatchedVersionIds: ReadonlyArray<string>;
+          return Object.freeze({
+            ...parsed,
+            lifecycle: Object.freeze({
+              ...parsed.lifecycle,
+              computedAt: new Date(parsed.lifecycle.computedAt),
+            }),
+          });
+        },
+        reconcileIdentity: async ({ entityType, entityId }) => {
+          const reconciled = await desktopCanonicalAssetBridge.reconcileIdentity(entityType, entityId);
+          return reconciled ? JSON.parse(reconciled) : undefined;
+        },
+        replayScopedProjection: async ({ entityType, entityId, versionId }) => JSON.parse(
+          await desktopCanonicalAssetBridge.replayScopedProjection(entityType, entityId, versionId),
+        ),
+        verifyProjection: async ({ assetId, versionIdsInScope }) => {
+          const verification = await desktopCanonicalAssetBridge.verifyProjection(assetId, versionIdsInScope);
+          if (!verification) {
+            throw new Error(`Projection verification for canonical asset '${assetId}' is unavailable.`);
+          }
+          return JSON.parse(verification);
+        },
+        rebuildProjectionScopes: async (request) => JSON.parse(
+          await desktopCanonicalAssetBridge.rebuildProjectionScopes(JSON.stringify(request)),
+        ),
+        loadManagementSnapshot: async ({ assetId, includeProjectionHealth, versionIdsInProjectionScope }) => {
+          const snapshot = await desktopCanonicalAssetBridge.loadManagementSnapshot(assetId, includeProjectionHealth, versionIdsInProjectionScope);
+          if (!snapshot) {
+            return undefined;
+          }
+          const parsed = JSON.parse(snapshot) as {
+            asset: import("../../application/assets-system/AssetManagementReadModels").CanonicalAssetDetailReadModel;
+            versions: ReadonlyArray<{
+              versionId: string;
+              parentVersionId?: string;
+              label?: string;
+              createdAt: string;
+              dependencyState: {
+                state: "healthy" | "impacted" | "stale" | "partially-trusted" | "reconciliation-needed";
+                reasons: ReadonlyArray<string>;
+                nextActions: ReadonlyArray<string>;
+              };
+            }>;
+            dependencyLifecycleSummary: {
+              healthy: number;
+              impacted: number;
+              stale: number;
+              partiallyTrusted: number;
+              reconciliationNeeded: number;
+            };
+            existenceExplanation?: { versionId: string; explanation: string; evidence: ReadonlyArray<string>; };
+            operationalSummary: {
+              status: "healthy" | "attention-needed";
+              explanation: string;
+              recommendedActions: ReadonlyArray<string>;
+            };
+            projectionHealth?: {
+              matched: boolean;
+              trustState: "trusted" | "mismatch-detected";
+              trustExplanation: string;
+              failedChecks: ReadonlyArray<string>;
+              edgeCount: number;
+              scopedVersionCount: number;
+              mismatchedVersionIds: ReadonlyArray<string>;
+            };
           };
-        };
-        return Object.freeze({
-          ...parsed,
-          versions: Object.freeze(parsed.versions.map((entry) => Object.freeze({
-            ...entry,
-            createdAt: new Date(entry.createdAt),
-          }))),
-        });
-      },
-    }
-    : undefined);
+          return Object.freeze({
+            ...parsed,
+            versions: Object.freeze(parsed.versions.map((entry) => Object.freeze({
+              ...entry,
+              createdAt: new Date(entry.createdAt),
+            }))),
+          });
+        },
+      }
+      : undefined);
+  });
+
+  logUiDependencyMemoryCheckpoint("core-features-ready");
 
   return Object.freeze({
     config,
@@ -729,21 +755,88 @@ export function createUiDependencies(
     managedServicesService,
     managedServicesStore,
     toolService,
-    toolStore: new ToolStore(toolService),
+    get toolStore() {
+      return toolStoreFeature();
+    },
     mcpService,
     mcpStore,
-    contextService,
-    contextStore,
-    tuningDatasetService,
-    tuningDatasetStore,
-    modelTrainingService,
-    modelTrainingStore,
-    executionHistoryService,
-    canonicalAssetManagementService,
+    get contextService() {
+      return contextFeature().contextService;
+    },
+    get contextStore() {
+      return contextFeature().contextStore;
+    },
+    get tuningDatasetService() {
+      return tuningDatasetFeature().tuningDatasetService;
+    },
+    get tuningDatasetStore() {
+      return tuningDatasetFeature().tuningDatasetStore;
+    },
+    get modelTrainingService() {
+      return modelTrainingFeature().modelTrainingService;
+    },
+    get modelTrainingStore() {
+      return modelTrainingFeature().modelTrainingStore;
+    },
+    get executionHistoryService() {
+      return executionHistoryFeature();
+    },
+    get canonicalAssetManagementService() {
+      return canonicalAssetFeature();
+    },
     workflowConversationSessionService,
     workflowProjectionService,
     settingsStore,
   });
+}
+
+function logUiDependencyMemoryCheckpoint(checkpoint: string): void {
+  const processRef = globalThis as typeof globalThis & {
+    process?: {
+      memoryUsage?: () => {
+        rss: number;
+        heapTotal: number;
+        heapUsed: number;
+        external: number;
+        arrayBuffers?: number;
+      };
+    };
+    performance?: {
+      memory?: {
+        totalJSHeapSize: number;
+        usedJSHeapSize: number;
+        jsHeapSizeLimit: number;
+      };
+    };
+  };
+  const memoryUsage = processRef.process?.memoryUsage?.();
+  if (memoryUsage) {
+    console.info(
+      `[ai-loom][memory][ui-composition] checkpoint=${checkpoint} rssMB=${toMegabytes(memoryUsage.rss)} heapUsedMB=${toMegabytes(memoryUsage.heapUsed)} heapTotalMB=${toMegabytes(memoryUsage.heapTotal)} externalMB=${toMegabytes(memoryUsage.external)}`,
+    );
+    return;
+  }
+  const heapMemory = processRef.performance?.memory;
+  if (heapMemory) {
+    console.info(
+      `[ai-loom][memory][ui-composition] checkpoint=${checkpoint} jsHeapUsedMB=${toMegabytes(heapMemory.usedJSHeapSize)} jsHeapTotalMB=${toMegabytes(heapMemory.totalJSHeapSize)} jsHeapLimitMB=${toMegabytes(heapMemory.jsHeapSizeLimit)}`,
+    );
+  }
+}
+
+function toMegabytes(value: number): string {
+  return (value / (1024 * 1024)).toFixed(1);
+}
+
+function createLazyValue<TValue>(factory: () => TValue): () => TValue {
+  let value: TValue | undefined;
+  return () => {
+    if (value !== undefined) {
+      return value;
+    }
+    value = factory();
+    return value;
+  };
 }
 
 
@@ -858,23 +951,35 @@ function createWorkflowExecutor(
   mcpServerCatalog: IMcpServerCatalog,
   runtimeDependencyOrchestrator: Pick<IRuntimeDependencyOrchestrator, "ensureAvailable">,
 ) {
-  const executeMcpToolUseCase = new ExecuteMcpToolUseCase(mcpClient);
-  const executor = new TruthfulWorkflowExecutor({
-    selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
-    strategies: [
-      new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
-      new InterpretedWorkflowExecutionStrategy({
-        runtime: "langchain",
-        nodeExecutor: new LangChainNodeExecutor({
-          pythonRuntimeClient: runtimeEnabled ? runtimeClient : undefined,
-          mcpRuntimeClient: runtimeEnabled ? mcpClient : undefined,
-          mcpServerCatalog: runtimeEnabled ? mcpServerCatalog : undefined,
-          executeMcpToolUseCase: runtimeEnabled ? executeMcpToolUseCase : undefined,
+  const executorFactory = createLazyValue(() => {
+    const executeMcpToolUseCase = new ExecuteMcpToolUseCase(mcpClient);
+    return new TruthfulWorkflowExecutor({
+      selector: new WorkflowRuntimeSelector({ runtimeDependencyOrchestrator }),
+      strategies: [
+        new PythonDelegatedWorkflowExecutionStrategy(runtimeClient),
+        new InterpretedWorkflowExecutionStrategy({
+          runtime: "langchain",
+          nodeExecutor: new LangChainNodeExecutor({
+            pythonRuntimeClient: runtimeEnabled ? runtimeClient : undefined,
+            mcpRuntimeClient: runtimeEnabled ? mcpClient : undefined,
+            mcpServerCatalog: runtimeEnabled ? mcpServerCatalog : undefined,
+            executeMcpToolUseCase: runtimeEnabled ? executeMcpToolUseCase : undefined,
+          }),
+          contextResolver: new DefaultNodeExecutionContextResolver(),
+          outputStoreFactory: () => new DefaultNodeOutputStore(),
         }),
-        contextResolver: new DefaultNodeExecutionContextResolver(),
-        outputStoreFactory: () => new DefaultNodeOutputStore(),
-      }),
-    ],
+      ],
+    });
+  });
+  const executor = Object.freeze({
+    startExecution: async (input: Parameters<TruthfulWorkflowExecutor["startExecution"]>[0]) => (
+      await executorFactory().startExecution(input)
+    ),
+    execute: async (
+      input: Parameters<TruthfulWorkflowExecutor["execute"]>[0],
+      onEvent?: Parameters<TruthfulWorkflowExecutor["execute"]>[1],
+    ) => await executorFactory().execute(input, onEvent),
+    canExecute: (input: Parameters<TruthfulWorkflowExecutor["canExecute"]>[0]) => executorFactory().canExecute(input),
   });
 
   return {
@@ -999,4 +1104,3 @@ function createPythonRuntimeRemediationHints(status: PythonRuntimeManagerStatus)
       return Object.freeze([]);
   }
 }
-

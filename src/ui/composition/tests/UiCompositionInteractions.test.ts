@@ -192,5 +192,20 @@ describe("ui composition interactions", () => {
       window.aiLoomDesktop = previousBridge;
     }
   });
-});
 
+  it("memoizes lazily initialized feature dependencies", () => {
+    const dependencies = createUiDependencies({
+      config: AppRuntimeConfig.forDevelopment(),
+    });
+
+    expect(dependencies.contextService).toBe(dependencies.contextService);
+    expect(dependencies.contextStore).toBe(dependencies.contextStore);
+    expect(dependencies.tuningDatasetService).toBe(dependencies.tuningDatasetService);
+    expect(dependencies.tuningDatasetStore).toBe(dependencies.tuningDatasetStore);
+    expect(dependencies.modelTrainingService).toBe(dependencies.modelTrainingService);
+    expect(dependencies.modelTrainingStore).toBe(dependencies.modelTrainingStore);
+    expect(dependencies.canonicalAssetManagementService).toBe(dependencies.canonicalAssetManagementService);
+    expect(dependencies.executionHistoryService).toBe(dependencies.executionHistoryService);
+    expect(dependencies.toolStore).toBe(dependencies.toolStore);
+  });
+});
