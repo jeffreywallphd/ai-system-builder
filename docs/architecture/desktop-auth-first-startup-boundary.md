@@ -248,6 +248,17 @@ Desktop startup contracts now explicitly enforce that Python runtime resolution 
 
 This keeps login-critical startup free of Python/runtime supervisor initialization and improves warmup observability when deferred runtime comes online.
 
+## Story C.2.4 deferred studio/system/image runtime module loading
+
+Studio shell, system runtime, and image workflow/system persistence infrastructure is now deferred from pre-login startup to post-login runtime composition at module-load level as well as object-construction level:
+
+- `electron/main/main.ts` no longer statically imports `createDeferredDesktopFeatureRuntime` at process bootstrap.
+- `composePostLoginRuntime(...)` now resolves that factory through `ensureDeferredDesktopFeatureRuntimeFactory()` and dynamic-imports `./DeferredDesktopFeatureRuntime` only when post-login warmup starts.
+- studio shell repositories/APIs, system runtime execution stores/audit repositories, and image workflow system persistence adapters remain owned by `DeferredDesktopFeatureRuntime` lazy `ensure*` paths and are still created only on first feature access.
+- teardown now clears the cached deferred runtime factory reference in addition to existing deferred runtime disposal/reset handling.
+
+Result: the pre-login critical path no longer pays eager module-load cost for studio/system/image deferred runtime infrastructure.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)

@@ -240,6 +240,17 @@ Desktop startup contracts now explicitly treat Python runtime resolution and ser
 
 Result: the login-critical pre-window startup contract no longer models or permits Python/supervisor initialization, while deferred warmup observability is clearer.
 
+## Story C.2.4 implementation update
+
+Studio shell, system runtime, and image workflow/system persistence runtime module loading is now deferred from pre-login startup to post-login warmup composition:
+
+- `electron/main/main.ts` no longer statically imports `createDeferredDesktopFeatureRuntime` at module load time.
+- deferred feature runtime factory loading now happens through `ensureDeferredDesktopFeatureRuntimeFactory()` using dynamic import inside `composePostLoginRuntime(...)`.
+- studio shell repositories/APIs, system runtime execution stores/audit repositories, and image workflow system persistence adapters remain owned by `DeferredDesktopFeatureRuntime` lazy `ensure*` composition paths and are still allocated on first feature demand.
+- disposal/reset now also clears the deferred factory reference during runtime teardown so lifecycle reset after shutdown/logout stays coherent.
+
+Result: login-critical pre-window startup avoids both eager runtime object graph construction and eager loading of the studio/system/image deferred runtime module.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

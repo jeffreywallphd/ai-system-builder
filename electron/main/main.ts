@@ -79,10 +79,7 @@ import { startDesktopHostAssembly, type DesktopHostRuntimeHandle } from "../../s
 import {
   DesktopConnectivityStateService,
 } from "../../src/hosts/desktop/DesktopConnectivityStateService";
-import {
-  createDeferredDesktopFeatureRuntime,
-  type DeferredDesktopFeatureRuntime,
-} from "./DeferredDesktopFeatureRuntime";
+import type { DeferredDesktopFeatureRuntime } from "./DeferredDesktopFeatureRuntime";
 import {
   startAuthMinimalServerHostAssembly,
   type AuthMinimalServerHostRuntimeHandle,
@@ -139,6 +136,11 @@ let rendererContentSecurityPolicyRuntimeConfig: AppRuntimeConfigValues | undefin
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
 let deferredFeatureRuntime: DeferredDesktopFeatureRuntime | undefined;
+let deferredDesktopFeatureRuntimeFactory: ((options: {
+  readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+  readonly runtimeConfigValues: AppRuntimeConfigValues;
+  readonly repoRoot: string;
+}) => DeferredDesktopFeatureRuntime) | undefined;
 type CanonicalRegistryRuntime = {
   readonly repository: SqliteAssetSystemRepository;
   readonly listCanonicalAssetsUseCase: any;
@@ -173,6 +175,21 @@ type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
   readonly identityApiBaseUrl: string;
 };
+
+async function ensureDeferredDesktopFeatureRuntimeFactory(): Promise<(
+  options: {
+    readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
+    readonly runtimeConfigValues: AppRuntimeConfigValues;
+    readonly repoRoot: string;
+  },
+) => DeferredDesktopFeatureRuntime> {
+  if (deferredDesktopFeatureRuntimeFactory) {
+    return deferredDesktopFeatureRuntimeFactory;
+  }
+  const runtimeModule = await import("./DeferredDesktopFeatureRuntime");
+  deferredDesktopFeatureRuntimeFactory = runtimeModule.createDeferredDesktopFeatureRuntime;
+  return deferredDesktopFeatureRuntimeFactory;
+}
 
 function markPostLoginRuntimeUnavailable(reason: DesktopPostLoginRuntimeUnavailableReason): void {
   postLoginRuntimeStatus = Object.freeze({
@@ -864,6 +881,7 @@ async function composePostLoginRuntime(authShell: AuthShellBootstrapResult, boot
     runtimeConfig,
     storagePaths,
   });
+  const createDeferredDesktopFeatureRuntime = await ensureDeferredDesktopFeatureRuntimeFactory();
   deferredFeatureRuntime = createDeferredDesktopFeatureRuntime({
     storagePaths,
     runtimeConfigValues: runtimeConfig.toValues(),
@@ -1555,6 +1573,7 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   agentRunnerAssetSystemRepository = undefined;
   canonicalRegistryRuntime = undefined;
   deferredFeatureRuntime = undefined;
+  deferredDesktopFeatureRuntimeFactory = undefined;
   serviceSupervisor = undefined;
   authMinimalServerRuntime = undefined;
   bootstrapContext = undefined;
