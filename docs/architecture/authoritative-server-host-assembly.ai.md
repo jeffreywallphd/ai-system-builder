@@ -13,6 +13,7 @@
 - Authoritative persistence composition seam: `src/infrastructure/persistence/AuthoritativePersistenceComposition.ts`
 - Auth-minimal persistence composition seam: `src/infrastructure/persistence/AuthMinimalPersistenceComposition.ts`
 - Route registration composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
+- Auth-minimal route registration composition seam: `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
 
 ## Control-plane ownership
 - Authoritative server is the single runtime with control-plane authority.
@@ -114,6 +115,10 @@
     - run cancellation signal port via Comfy cancellation bridge (`src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`)
   - `feature-registration` stage asserts authoritative required route-family coverage before transport start
   - `feature-registration` stage injects composed run-execution adapter registration into `startIdentityServerHost(...)`
+- Story B.2.2 narrows auth-minimal pre-login route coverage with dedicated composition:
+  - `composeAuthMinimalServerApiRouteRegistrationPlan(...)` and `assertAuthMinimalServerApiRouteRegistrationCoverage(...)` live in `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
+  - auth-minimal coverage requires `identity-auth` only
+  - authoritative mode retains full control-plane route-family assertion in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
 
 ## Entrypoint consumers
 - `electron/main/main.ts` now delegates pre-login desktop startup through `startAuthMinimalServerHostAssembly(...)`.
@@ -125,6 +130,7 @@
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
+- `src/hosts/server/tests/AuthMinimalServerApiRouteComposition.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 

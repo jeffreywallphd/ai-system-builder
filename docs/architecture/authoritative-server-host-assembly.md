@@ -47,6 +47,7 @@ The host validates startup dependency coverage and authoritative service coverag
 ## Authoritative API route composition
 
 - Host-level route composition seam: `src/hosts/server/AuthoritativeServerApiRouteComposition.ts`
+- Auth-minimal route composition seam: `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`
 - Shared transport route registration catalog:
   - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistration.ts`
   - `src/infrastructure/transport/http-server/AuthoritativeApiRouteRegistrationCatalog.ts`
@@ -59,6 +60,11 @@ The same `dependencies` stage now also composes optional ComfyUI execution adapt
 The dependencies stage additionally composes authoritative run-execution adapter registration (`src/infrastructure/execution/runs/AuthoritativeRunExecutionAdapterRegistration.ts`) so higher layers can resolve:
 - a run-dispatch port with registered backend adapters
 - a run-cancellation signal port backed by the Comfy cancellation adapter bridge (`src/infrastructure/execution/runs/ComfyUiRunExecutionCancellationSignalAdapter.ts`)
+
+Story B.2.2 introduces a dedicated auth-minimal route registration plan and coverage assertion:
+- `composeAuthMinimalServerApiRouteRegistrationPlan(...)` now lives in `src/hosts/server/AuthMinimalServerApiRouteComposition.ts`.
+- `assertAuthMinimalServerApiRouteRegistrationCoverage(...)` validates only the auth-minimal required route-family list (`identity-auth`).
+- Full authoritative route registration and full coverage assertion remain in `src/hosts/server/AuthoritativeServerApiRouteComposition.ts` for authoritative startup mode.
 
 ## Startup expectations
 
@@ -191,6 +197,7 @@ Host assembly coverage lives in:
 - `src/hosts/server/tests/AuthoritativeServerStartupHarness.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerHostEntrypoint.test.ts`
 - `src/hosts/server/tests/AuthMinimalServerHostEntrypoint.test.ts`
+- `src/hosts/server/tests/AuthMinimalServerApiRouteComposition.test.ts`
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
