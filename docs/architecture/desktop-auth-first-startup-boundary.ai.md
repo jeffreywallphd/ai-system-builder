@@ -281,6 +281,29 @@ Startup observability now includes explicit timing + memory checkpoints across p
 
 Instrumentation stays focused on high-value phase and first-use boundaries rather than per-request logging.
 
+## Story C.3.4 implementation update
+
+Deferred-runtime startup boundary regression safeguards now explicitly lock non-auth runtime groups out of pre-login startup:
+
+- `electron/main/DesktopStartupContract.ts` now treats the following runtime groups as mandatory pre-login forbidden scope:
+  - `service-supervisor`
+  - `python-runtime-resolution`
+  - `workflow-persistence`
+  - `execution-history`
+  - `workflow-run-history`
+  - `studio-shell-backend-api`
+  - `system-studio-backend-api`
+  - `system-runtime-backend-api`
+  - `desktop-connectivity-monitor`
+- startup contract validation now fails loudly if this deferred-runtime guard list is removed or narrowed.
+- new focused Electron main regression coverage (`electron/main/tests/MainDeferredRuntimeStartupBoundary.test.ts`) asserts:
+  - `bootstrapAuthShell()` does not activate those deferred runtime groups,
+  - connectivity monitoring starts only from accepted post-login warmup,
+  - Python resolution + service-supervisor startup remain post-login composition work,
+  - workflow/studio/system backend activation remains on-demand through deferred runtime `ensure*` paths.
+
+Result: non-auth runtime scope cannot silently drift back into pre-login startup without direct startup contract or test failures.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

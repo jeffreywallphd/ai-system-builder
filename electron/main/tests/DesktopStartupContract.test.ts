@@ -9,6 +9,7 @@ import {
   DesktopStartupRequiredAuthBootstrapIpcChannels,
   PreLoginAuthShellForbiddenInitializers,
   PreLoginAuthShellInitializers,
+  PreLoginStartupForbiddenRuntimeGroups,
   validateDesktopStartupContract,
 } from "../DesktopStartupContract";
 import { DesktopBootstrapIpcChannels } from "../../shared/DesktopBootstrapIpcChannels";
@@ -29,10 +30,21 @@ describe("desktop startup boot contract", () => {
     ]);
   });
 
-  it("keeps pre-login initializers free of workflow/studio/system runtime dependencies", () => {
+  it("keeps pre-login initializers free of deferred non-auth runtime groups", () => {
     const forbidden = new Set(PreLoginAuthShellForbiddenInitializers);
     const violations = PreLoginAuthShellInitializers.filter((initializer) => forbidden.has(initializer));
     expect(violations).toEqual([]);
+    expect(PreLoginStartupForbiddenRuntimeGroups).toEqual([
+      "service-supervisor",
+      "python-runtime-resolution",
+      "workflow-persistence",
+      "execution-history",
+      "workflow-run-history",
+      "studio-shell-backend-api",
+      "system-studio-backend-api",
+      "system-runtime-backend-api",
+      "desktop-connectivity-monitor",
+    ]);
     expect(PreLoginAuthShellInitializers).toContain("auth-minimal-identity-host");
     expect(PreLoginAuthShellInitializers).not.toContain("desktop-connectivity-monitor");
     expect(PreLoginAuthShellInitializers).not.toContain("authoritative-identity-host");
