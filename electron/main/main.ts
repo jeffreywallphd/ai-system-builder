@@ -28,19 +28,6 @@ import type {
   DesktopIdentityTransportTrustBootstrap,
 } from "../shared/DesktopContracts";
 import { SqliteAssetSystemRepository } from "../../src/infrastructure/filesystem/SqliteAssetSystemRepository";
-import { InMemoryAssetLineageGraphProjectionSink } from "../../src/infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink";
-import { ExplainCanonicalVersionExistenceUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
-import { GetAssetVersionHistoryUseCase } from "../../src/application/assets-system/GetAssetVersionHistoryUseCase";
-import { GetCanonicalDependencyStateUseCase } from "../../src/application/assets-system/CanonicalDependencyStateUseCase";
-import { GetAssetDependencyHealthUseCase } from "../../src/application/assets-system/GetAssetDependencyHealthUseCase";
-import { GetAssetImpactAnalysisUseCase } from "../../src/application/assets-system/GetAssetImpactAnalysisUseCase";
-import { GetCanonicalProvenanceSummaryUseCase } from "../../src/application/assets-system/CanonicalAssetReadUseCases";
-import { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReconciliationUseCases";
-import { ReplayAssetGraphProjectionUseCase } from "../../src/application/assets-system/ReplayAssetGraphProjectionUseCase";
-import { VerifyAssetGraphProjectionUseCase } from "../../src/application/assets-system/VerifyAssetGraphProjectionUseCase";
-import { ProjectionRebuildOrchestrationUseCase } from "../../src/application/assets-system/ProjectionRebuildOrchestrationUseCase";
-import { LoadCanonicalAssetManagementSnapshotUseCase } from "../../src/application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase";
-import { ProjectionTrustReadModelService } from "../../src/application/assets-system/ProjectionTrustReadModelService";
 import { SqliteAgentRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentRepository";
 import { SqliteAgentExecutionSessionRepository } from "../../src/infrastructure/filesystem/agents/SqliteAgentExecutionSessionRepository";
 import { AgentStudioBackendApi } from "../../src/infrastructure/api/agents/AgentStudioBackendApi";
@@ -70,18 +57,12 @@ import type { AgentConfigurationValidationInput } from "../../src/application/ag
 import type { AgentRunControlRequest, AgentRunRequest } from "../../src/application/agents/contracts/AgentRunContracts";
 import type { TriggerAgentLaunchRequest } from "../../src/application/agents/TriggerAgentLaunchUseCase";
 import { StudioShellBackendApi } from "../../src/infrastructure/api/studio-shell/StudioShellBackendApi";
-import { RegistryBackendApi } from "../../src/infrastructure/api/registry/RegistryBackendApi";
 import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
 import { ListWorkflowRunSummariesUseCase } from "../../src/application/workflow-run-history/ListWorkflowRunSummariesUseCase";
 import { SqliteStudioShellRepository } from "../../src/infrastructure/filesystem/studio-shell/SqliteStudioShellRepository";
 import { SqliteWorkflowPersistenceRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowPersistenceRepository";
 import { SqliteWorkflowRunSummaryRepository } from "../../src/infrastructure/filesystem/SqliteWorkflowRunSummaryRepository";
 import type { CreateAssetDraftCommand, PublishAssetDraftVersionCommand, TransitionAssetDraftLifecycleCommand, UpdateAssetDraftCommand, UpdateAssetDraftDependenciesCommand } from "../../src/application/studio-shell/contracts";
-import { RegistryQueryService } from "../../src/application/asset-registry/RegistryQueryService";
-import { CrossStudioRegistryQueryService } from "../../src/application/asset-registry/CrossStudioRegistryQueryService";
-import { RegistryDependencyGraphService } from "../../src/application/asset-registry/RegistryDependencyGraphService";
-import { RegistryCacheLayer } from "../../src/application/asset-registry/RegistryCacheLayer";
-import { CompositionAssetContractResolver } from "../../src/application/contracts/CompositionAssetContractResolver";
 import { SystemStudioBackendApi } from "../../src/infrastructure/api/system-studio/SystemStudioBackendApi";
 import { SystemRuntimeBackendApi } from "../../src/infrastructure/api/system-runtime/SystemRuntimeBackendApi";
 import { SqliteSystemRuntimeExecutionStore } from "../../src/infrastructure/filesystem/system-runtime/SqliteSystemRuntimeExecutionStore";
@@ -153,10 +134,10 @@ let getExecutionRunUseCase: GetExecutionRunUseCase | undefined;
 let listExecutionRunsUseCase: ReturnType<typeof createExecutionHistoryInfrastructure>["listExecutionRunsUseCase"] | undefined;
 let workflowRunSummaryRepository: SqliteWorkflowRunSummaryRepository | undefined;
 let listWorkflowRunSummariesUseCase: ListWorkflowRunSummariesUseCase | undefined;
-let canonicalAssetSystemRepository: SqliteAssetSystemRepository | undefined;
-let canonicalProjectionSink: InMemoryAssetLineageGraphProjectionSink | undefined;
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
+let agentRunnerAssetSystemRepository: SqliteAssetSystemRepository | undefined;
+let agentStudioBackendApi: AgentStudioBackendApi | undefined;
 let serviceSupervisor: DesktopServiceSupervisor | undefined;
 let authoritativeServerRuntime: AuthoritativeServerHostRuntimeHandle | undefined;
 let studioShellRepository: SqliteStudioShellRepository | undefined;
@@ -164,6 +145,21 @@ let workflowPersistenceRepository: SqliteWorkflowPersistenceRepository | undefin
 let bootstrapContext: DesktopBootstrapContext | undefined;
 let desktopHostRuntime: DesktopHostRuntimeHandle | undefined;
 let desktopConnectivityStateService: DesktopConnectivityStateService | undefined;
+type CanonicalRegistryRuntime = {
+  readonly repository: SqliteAssetSystemRepository;
+  readonly listCanonicalAssetsUseCase: any;
+  readonly loadCanonicalAssetDetailUseCase: any;
+  readonly getVersionHistoryUseCase: any;
+  readonly dependencyStateUseCase: any;
+  readonly replayScopedProjectionUseCase: any;
+  readonly verifyProjectionUseCase: any;
+  readonly projectionTrustReadModelService: any;
+  readonly rebuildProjectionOrchestrationUseCase: any;
+  readonly loadManagementSnapshotUseCase: any;
+  readonly reconcileIdentityUseCase: any;
+  readonly registryBackendApi: any;
+};
+let canonicalRegistryRuntime: CanonicalRegistryRuntime | undefined;
 const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
 const IDENTITY_SESSION_STORAGE_KEY = "ai-loom.identity.session.v1";
 const CONNECTIVITY_PROBE_TIMEOUT_MS = 1_750;
@@ -546,6 +542,24 @@ function createDesktopAgentRunner(params: {
   );
 }
 
+function ensureAgentStudioBackendApi(
+  storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
+): AgentStudioBackendApi {
+  if (agentStudioBackendApi) {
+    return agentStudioBackendApi;
+  }
+  agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
+  agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
+  agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
+  const agentRunner = createDesktopAgentRunner({
+    assetSystemRepository: agentRunnerAssetSystemRepository,
+    sessionRepository: agentSessionRepository,
+  });
+  agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
+  logInitializationMemory("desktop-runtime-bootstrap", "agent-runtime-ready");
+  return agentStudioBackendApi;
+}
+
 async function createMainWindow(): Promise<void> {
   const window = new BrowserWindow({
     width: 1440,
@@ -652,6 +666,126 @@ async function launchRuntimeWindowFromContract(
     pageBindingId: contract.launchTarget.pageBindingId,
     routePath: "/",
   });
+}
+
+async function ensureCanonicalRegistryRuntime(
+  storagePaths: ReturnType<typeof resolveDesktopStoragePaths>,
+  systemRuntimeBackendApi: SystemRuntimeBackendApi,
+): Promise<CanonicalRegistryRuntime> {
+  if (canonicalRegistryRuntime) {
+    return canonicalRegistryRuntime;
+  }
+  const [
+    { InMemoryAssetLineageGraphProjectionSink },
+    { ExplainCanonicalVersionExistenceUseCase, GetCanonicalProvenanceSummaryUseCase, ListCanonicalAssetsUseCase, LoadCanonicalAssetDetailUseCase },
+    { GetAssetVersionHistoryUseCase },
+    { GetCanonicalDependencyStateUseCase },
+    { GetAssetDependencyHealthUseCase },
+    { GetAssetImpactAnalysisUseCase },
+    { ReconcileCanonicalIdentityMappingsUseCase, ReplayScopedAssetGraphProjectionUseCase },
+    { ReplayAssetGraphProjectionUseCase },
+    { VerifyAssetGraphProjectionUseCase },
+    { ProjectionRebuildOrchestrationUseCase },
+    { LoadCanonicalAssetManagementSnapshotUseCase },
+    { ProjectionTrustReadModelService },
+    { RegistryBackendApi },
+    { RegistryQueryService },
+    { CrossStudioRegistryQueryService },
+    { RegistryDependencyGraphService },
+    { RegistryCacheLayer },
+    { CompositionAssetContractResolver },
+  ] = await Promise.all([
+    import("../../src/infrastructure/filesystem/InMemoryAssetLineageGraphProjectionSink"),
+    import("../../src/application/assets-system/CanonicalAssetReadUseCases"),
+    import("../../src/application/assets-system/GetAssetVersionHistoryUseCase"),
+    import("../../src/application/assets-system/CanonicalDependencyStateUseCase"),
+    import("../../src/application/assets-system/GetAssetDependencyHealthUseCase"),
+    import("../../src/application/assets-system/GetAssetImpactAnalysisUseCase"),
+    import("../../src/application/assets-system/ReconciliationUseCases"),
+    import("../../src/application/assets-system/ReplayAssetGraphProjectionUseCase"),
+    import("../../src/application/assets-system/VerifyAssetGraphProjectionUseCase"),
+    import("../../src/application/assets-system/ProjectionRebuildOrchestrationUseCase"),
+    import("../../src/application/assets-system/LoadCanonicalAssetManagementSnapshotUseCase"),
+    import("../../src/application/assets-system/ProjectionTrustReadModelService"),
+    import("../../src/infrastructure/api/registry/RegistryBackendApi"),
+    import("../../src/application/asset-registry/RegistryQueryService"),
+    import("../../src/application/asset-registry/CrossStudioRegistryQueryService"),
+    import("../../src/application/asset-registry/RegistryDependencyGraphService"),
+    import("../../src/application/asset-registry/RegistryCacheLayer"),
+    import("../../src/application/contracts/CompositionAssetContractResolver"),
+  ]);
+
+  const repository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
+  const projectionSink = new InMemoryAssetLineageGraphProjectionSink();
+  const listCanonicalAssetsUseCase = new ListCanonicalAssetsUseCase(repository, repository);
+  const loadCanonicalAssetDetailUseCase = new LoadCanonicalAssetDetailUseCase(repository, repository, repository, repository, repository);
+  const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(repository);
+  const explainVersionExistenceUseCase = new ExplainCanonicalVersionExistenceUseCase(
+    new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
+    repository,
+  );
+  const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
+    repository,
+    repository,
+    new GetAssetDependencyHealthUseCase(repository, repository, repository),
+    new GetAssetImpactAnalysisUseCase(repository, repository, repository),
+    new GetCanonicalProvenanceSummaryUseCase(repository, repository, repository),
+    repository,
+  );
+  const replayProjectionUseCase = new ReplayAssetGraphProjectionUseCase(repository, projectionSink);
+  const replayScopedProjectionUseCase = new ReplayScopedAssetGraphProjectionUseCase(repository, replayProjectionUseCase);
+  const verifyProjectionUseCase = new VerifyAssetGraphProjectionUseCase(repository, projectionSink);
+  const projectionTrustReadModelService = new ProjectionTrustReadModelService();
+  const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
+    replayScopedProjectionUseCase,
+    replayProjectionUseCase,
+    verifyProjectionUseCase,
+  );
+  const loadManagementSnapshotUseCase = new LoadCanonicalAssetManagementSnapshotUseCase(
+    loadCanonicalAssetDetailUseCase,
+    getVersionHistoryUseCase,
+    dependencyStateUseCase,
+    explainVersionExistenceUseCase,
+    verifyProjectionUseCase,
+  );
+  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
+  const registryQueryService = new RegistryQueryService(
+    repository,
+    repository,
+    repository,
+    new CompositionAssetContractResolver(),
+    repository,
+    undefined,
+    registryCacheLayer,
+    repository,
+    {
+      async listRecentExecutionsForSystem(input) {
+        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
+        return response.ok && response.data ? response.data : [];
+      },
+    },
+  );
+  const registryBackendApi = new RegistryBackendApi(
+    new CrossStudioRegistryQueryService(registryQueryService),
+    new RegistryDependencyGraphService(registryQueryService, repository, repository, registryCacheLayer),
+    workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
+  );
+  canonicalRegistryRuntime = {
+    repository,
+    listCanonicalAssetsUseCase,
+    loadCanonicalAssetDetailUseCase,
+    getVersionHistoryUseCase,
+    dependencyStateUseCase,
+    replayScopedProjectionUseCase,
+    verifyProjectionUseCase,
+    projectionTrustReadModelService,
+    rebuildProjectionOrchestrationUseCase,
+    loadManagementSnapshotUseCase,
+    reconcileIdentityUseCase: new ReconcileCanonicalIdentityMappingsUseCase(repository, repository),
+    registryBackendApi,
+  };
+  logInitializationMemory("desktop-runtime-bootstrap", "canonical-registry-runtime-ready");
+  return canonicalRegistryRuntime;
 }
 
 async function bootstrapDesktopRuntime(): Promise<void> {
@@ -836,14 +970,6 @@ async function bootstrapDesktopRuntime(): Promise<void> {
   }) as SqliteExecutionRunRepository;
   workflowRunSummaryRepository = new SqliteWorkflowRunSummaryRepository(storagePaths.databasePath);
   listWorkflowRunSummariesUseCase = new ListWorkflowRunSummariesUseCase(workflowRunSummaryRepository);
-  agentRepository = new SqliteAgentRepository(path.join(storagePaths.storageDirectory, "agents", "agents.sqlite"));
-  agentSessionRepository = new SqliteAgentExecutionSessionRepository(path.join(storagePaths.storageDirectory, "agents", "agent-sessions.sqlite"));
-  const agentRunnerAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  const agentRunner = createDesktopAgentRunner({
-    assetSystemRepository: agentRunnerAssetSystemRepository,
-    sessionRepository: agentSessionRepository,
-  });
-  const agentStudioBackendApi = new AgentStudioBackendApi(agentRepository, agentSessionRepository, agentRunner);
   studioShellRepository = new SqliteStudioShellRepository(path.join(storagePaths.storageDirectory, "studio-shell", "studio-shell.sqlite"));
   workflowPersistenceRepository = new SqliteWorkflowPersistenceRepository(
     path.join(storagePaths.storageDirectory, "workflow-studio", "workflow-persistence.sqlite"),
@@ -942,69 +1068,87 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     return (summaries ?? []).map((summary) => JSON.stringify(summary));
   });
   ipcMain.handle("ai-loom-desktop-agents:create", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as CreateAgentRequest;
-    return JSON.stringify(await agentStudioBackendApi.createAgent(request));
+    return JSON.stringify(await agentApi.createAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:update", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as UpdateAgentRequest;
-    return JSON.stringify(await agentStudioBackendApi.updateAgent(request));
+    return JSON.stringify(await agentApi.updateAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:get", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getAgent(agentId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.getAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:list", async (_event, includeArchived = true) => {
-    return JSON.stringify(await agentStudioBackendApi.listAgents(includeArchived));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.listAgents(includeArchived));
   });
   ipcMain.handle("ai-loom-desktop-agents:delete", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.deleteAgent(agentId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.deleteAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:archive", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.archiveAgent(agentId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.archiveAgent(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-goals", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as ConfigureAgentGoalsRequest;
-    return JSON.stringify(await agentStudioBackendApi.configureGoals(request));
+    return JSON.stringify(await agentApi.configureGoals(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-policy", async (_event, agentId: string, policyJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const policy = JSON.parse(policyJson) as AgentPolicy;
-    return JSON.stringify(await agentStudioBackendApi.configurePolicy(agentId, policy));
+    return JSON.stringify(await agentApi.configurePolicy(agentId, policy));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-tools", async (_event, agentId: string, toolAccessJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const toolAccess = JSON.parse(toolAccessJson) as AgentToolAccessPolicy;
-    return JSON.stringify(await agentStudioBackendApi.configureTools(agentId, toolAccess));
+    return JSON.stringify(await agentApi.configureTools(agentId, toolAccess));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-memory", async (_event, agentId: string, memoryJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const memory = JSON.parse(memoryJson) as AgentMemoryConfiguration;
-    return JSON.stringify(await agentStudioBackendApi.configureMemory(agentId, memory));
+    return JSON.stringify(await agentApi.configureMemory(agentId, memory));
   });
   ipcMain.handle("ai-loom-desktop-agents:configure-strategy", async (_event, agentId: string, planningStrategyJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const planningStrategy = JSON.parse(planningStrategyJson) as AgentPlanningStrategy;
-    return JSON.stringify(await agentStudioBackendApi.configureStrategy(agentId, planningStrategy));
+    return JSON.stringify(await agentApi.configureStrategy(agentId, planningStrategy));
   });
   ipcMain.handle("ai-loom-desktop-agents:validate", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as AgentConfigurationValidationInput;
-    return JSON.stringify(await agentStudioBackendApi.validateConfiguration(request));
+    return JSON.stringify(await agentApi.validateConfiguration(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:launch", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as AgentRunRequest;
-    return JSON.stringify(await agentStudioBackendApi.launchAgent(request));
+    return JSON.stringify(await agentApi.launchAgent(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:trigger-launch", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as TriggerAgentLaunchRequest;
-    return JSON.stringify(await agentStudioBackendApi.triggerLaunch(request));
+    return JSON.stringify(await agentApi.triggerLaunch(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:list-sessions", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.listSessions(agentId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.listSessions(agentId));
   });
   ipcMain.handle("ai-loom-desktop-agents:get-session", async (_event, sessionId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getSessionDetail(sessionId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.getSessionDetail(sessionId));
   });
   ipcMain.handle("ai-loom-desktop-agents:control-run", async (_event, requestJson: string) => {
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
     const request = JSON.parse(requestJson) as AgentRunControlRequest;
-    return JSON.stringify(await agentStudioBackendApi.controlRun(request));
+    return JSON.stringify(await agentApi.controlRun(request));
   });
   ipcMain.handle("ai-loom-desktop-agents:studio-snapshot", async (_event, agentId: string) => {
-    return JSON.stringify(await agentStudioBackendApi.getStudioSnapshot(agentId));
+    const agentApi = ensureAgentStudioBackendApi(storagePaths);
+    return JSON.stringify(await agentApi.getStudioSnapshot(agentId));
   });
   ipcMain.handle("ai-loom-desktop-studio-shell:initialize", async (_event, studioId: string, name: string) => {
     return JSON.stringify(await studioShellBackendApi.initializeStudio(studioId, name));
@@ -1270,76 +1414,16 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     fs.copyFileSync(absoluteSourcePath, absoluteTargetPath);
   });
 
-  canonicalAssetSystemRepository = new SqliteAssetSystemRepository(path.join(storagePaths.assetsDirectory, "asset-system.sqlite"));
-  canonicalProjectionSink = new InMemoryAssetLineageGraphProjectionSink();
-  const listCanonicalAssetsUseCase = new ListCanonicalAssetsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository);
-  const loadCanonicalAssetDetailUseCase = new LoadCanonicalAssetDetailUseCase(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-  );
-  const getVersionHistoryUseCase = new GetAssetVersionHistoryUseCase(canonicalAssetSystemRepository);
-  const explainVersionExistenceUseCase = new ExplainCanonicalVersionExistenceUseCase(
-    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    canonicalAssetSystemRepository,
-  );
-  const dependencyStateUseCase = new GetCanonicalDependencyStateUseCase(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    new GetAssetDependencyHealthUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    new GetAssetImpactAnalysisUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    new GetCanonicalProvenanceSummaryUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository, canonicalAssetSystemRepository),
-    canonicalAssetSystemRepository,
-  );
-  const replayProjectionUseCase = new ReplayAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
-  const replayScopedProjectionUseCase = new ReplayScopedAssetGraphProjectionUseCase(canonicalAssetSystemRepository, replayProjectionUseCase);
-  const verifyProjectionUseCase = new VerifyAssetGraphProjectionUseCase(canonicalAssetSystemRepository, canonicalProjectionSink);
-  const projectionTrustReadModelService = new ProjectionTrustReadModelService();
-  const rebuildProjectionOrchestrationUseCase = new ProjectionRebuildOrchestrationUseCase(
-    replayScopedProjectionUseCase,
-    replayProjectionUseCase,
-    verifyProjectionUseCase,
-  );
-  const loadManagementSnapshotUseCase = new LoadCanonicalAssetManagementSnapshotUseCase(
-    loadCanonicalAssetDetailUseCase,
-    getVersionHistoryUseCase,
-    dependencyStateUseCase,
-    explainVersionExistenceUseCase,
-    verifyProjectionUseCase,
-  );
-  const registryCacheLayer = new RegistryCacheLayer({ maxEntriesPerNamespace: 300 });
-  const registryQueryService = new RegistryQueryService(
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    canonicalAssetSystemRepository,
-    new CompositionAssetContractResolver(),
-    canonicalAssetSystemRepository,
-    undefined,
-    registryCacheLayer,
-    canonicalAssetSystemRepository,
-    {
-      async listRecentExecutionsForSystem(input) {
-        const response = await systemRuntimeBackendApi.listRecentExecutionsForSystem(input);
-        return response.ok && response.data ? response.data : [];
-      },
-    },
-  );
-  const registryBackendApi = new RegistryBackendApi(
-    new CrossStudioRegistryQueryService(registryQueryService),
-    new RegistryDependencyGraphService(registryQueryService, canonicalAssetSystemRepository, canonicalAssetSystemRepository, registryCacheLayer),
-    workflowPersistenceRepository ? new ListPersistedWorkflowsUseCase(workflowPersistenceRepository) : undefined,
-  );
   logInitializationMemory("desktop-runtime-bootstrap", "ipc-and-api-bindings-ready");
 
   ipcMain.handle("ai-loom-desktop-canonical-assets:list", async (_event, criteriaJson?: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
     const criteria = criteriaJson ? JSON.parse(criteriaJson) : undefined;
-    const assets = await listCanonicalAssetsUseCase.execute(criteria);
-    const details = await Promise.all(assets.map((asset) => loadCanonicalAssetDetailUseCase.execute(asset.id)));
+    const assets = await canonicalRuntime.listCanonicalAssetsUseCase.execute(criteria);
+    const details = await Promise.all(assets.map((asset: { id: string }) => canonicalRuntime.loadCanonicalAssetDetailUseCase.execute(asset.id)));
     return details
       .filter((entry): entry is NonNullable<typeof entry> => !!entry)
       .map((entry) => JSON.stringify({
@@ -1354,48 +1438,69 @@ async function bootstrapDesktopRuntime(): Promise<void> {
       }));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets", async (_event, limit?: number) => {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:assets-filter", async (_event, filtersJson: string) => {
-    const filters = JSON.parse(filtersJson) as Parameters<RegistryBackendApi["filterAssets"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const filters = JSON.parse(filtersJson);
     return JSON.stringify(await registryBackendApi.filterAssets(filters));
   });
   ipcMain.handle("ai-loom-desktop-registry:search", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchAssets"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-assets", async (_event, limit?: number) => {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
     return JSON.stringify(await registryBackendApi.listExploreAssets(limit));
   });
   ipcMain.handle("ai-loom-desktop-registry:explore-search", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["searchExploreAssets"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.searchExploreAssets(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:asset-detail", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getAssetDetail"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getAssetDetail(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependencies", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependencies"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:dependents", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["getDependents"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.getDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-upstream", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependencies"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependencies(query));
   });
   ipcMain.handle("ai-loom-desktop-registry:traverse-downstream", async (_event, queryJson: string) => {
-    const query = JSON.parse(queryJson) as Parameters<RegistryBackendApi["traverseDependents"]>[0];
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    const { registryBackendApi } = canonicalRuntime;
+    const query = JSON.parse(queryJson);
     return JSON.stringify(await registryBackendApi.traverseDependents(query));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:detail", async (_event, assetId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
-    const detail = await loadCanonicalAssetDetailUseCase.execute(assetId);
+    const detail = await canonicalRuntime.loadCanonicalAssetDetailUseCase.execute(assetId);
     if (!detail) return null;
     return JSON.stringify({
       assetId: detail.assetId,
@@ -1409,12 +1514,13 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:version-chain", async (_event, assetId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return [];
     }
-    const chain = await getVersionHistoryUseCase.execute(assetId);
+    const chain = await canonicalRuntime.getVersionHistoryUseCase.execute(assetId);
     const withState = await Promise.all(chain.map(async (version) => {
-      const dependencyState = await dependencyStateUseCase.execute({
+      const dependencyState = await canonicalRuntime.dependencyStateUseCase.execute({
         versionId: version.versionId,
         preferPersistedIfFreshMs: 300_000,
       }).catch(() => undefined);
@@ -1435,10 +1541,11 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     return withState;
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:dependency-state", async (_event, versionId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
-    const summary = await dependencyStateUseCase.execute({
+    const summary = await canonicalRuntime.dependencyStateUseCase.execute({
       versionId,
       preferPersistedIfFreshMs: 300_000,
     });
@@ -1456,42 +1563,47 @@ async function bootstrapDesktopRuntime(): Promise<void> {
     });
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:reconcile-identity", async (_event, entityType: string, entityId: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
-    const reconciled = await new ReconcileCanonicalIdentityMappingsUseCase(canonicalAssetSystemRepository, canonicalAssetSystemRepository).execute({
+    const reconciled = await canonicalRuntime.reconcileIdentityUseCase.execute({
       entityType: entityType as any,
       entityId,
     });
     return JSON.stringify(reconciled);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:replay-scope", async (_event, entityType: string, entityId: string, versionId?: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ replayed: false, reason: "Canonical asset system is unavailable." });
     }
-    const replay = await replayScopedProjectionUseCase.execute({ entityType: entityType as any, entityId, versionId });
+    const replay = await canonicalRuntime.replayScopedProjectionUseCase.execute({ entityType: entityType as any, entityId, versionId });
     return JSON.stringify(replay);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:verify-projection", async (_event, assetId: string, versionIdsInScope?: ReadonlyArray<string>) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
-    const verification = await verifyProjectionUseCase.execute({ assetId, versionIdsInScope });
-    return JSON.stringify(projectionTrustReadModelService.summarize(verification));
+    const verification = await canonicalRuntime.verifyProjectionUseCase.execute({ assetId, versionIdsInScope });
+    return JSON.stringify(canonicalRuntime.projectionTrustReadModelService.summarize(verification));
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:rebuild-scopes", async (_event, requestJson: string) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return JSON.stringify({ totalScopes: 0, replayedScopes: 0, verifiedScopes: 0, results: [] });
     }
-    const request = JSON.parse(requestJson) as Parameters<ProjectionRebuildOrchestrationUseCase["execute"]>[0];
-    const result = await rebuildProjectionOrchestrationUseCase.execute(request);
+    const request = JSON.parse(requestJson);
+    const result = await canonicalRuntime.rebuildProjectionOrchestrationUseCase.execute(request);
     return JSON.stringify(result);
   });
   ipcMain.handle("ai-loom-desktop-canonical-assets:management-snapshot", async (_event, assetId: string, includeProjectionHealth = true, versionIdsInProjectionScope?: ReadonlyArray<string>) => {
-    if (!canonicalAssetSystemRepository?.isAvailable) {
+    const canonicalRuntime = await ensureCanonicalRegistryRuntime(storagePaths, systemRuntimeBackendApi);
+    if (!canonicalRuntime.repository.isAvailable) {
       return null;
     }
-    const snapshot = await loadManagementSnapshotUseCase.execute({
+    const snapshot = await canonicalRuntime.loadManagementSnapshotUseCase.execute({
       assetId,
       includeProjectionHealth,
       versionIdsInProjectionScope,
@@ -1528,8 +1640,16 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   executionRunRepository?.dispose();
   workflowRunSummaryRepository?.dispose();
   agentRepository?.dispose();
+  agentSessionRepository?.dispose();
+  agentRunnerAssetSystemRepository?.dispose();
+  canonicalRegistryRuntime?.repository.dispose();
   studioShellRepository?.dispose();
   workflowPersistenceRepository?.dispose();
+  agentStudioBackendApi = undefined;
+  agentRepository = undefined;
+  agentSessionRepository = undefined;
+  agentRunnerAssetSystemRepository = undefined;
+  canonicalRegistryRuntime = undefined;
 }
 
 app.whenReady().then(async () => {
