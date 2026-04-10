@@ -38,10 +38,10 @@ export const PreLoginAuthShellInitializers = Object.freeze([
   "desktop-storage-auth-shell-pre-login",
   "auth-minimal-identity-host",
   "auth-bootstrap-ipc",
-  "desktop-connectivity-monitor",
 ]);
 
 export const PreLoginAuthShellForbiddenInitializers = Object.freeze([
+  "desktop-connectivity-monitor",
   "python-runtime-resolution",
   "service-supervisor",
   "workflow-runtime",

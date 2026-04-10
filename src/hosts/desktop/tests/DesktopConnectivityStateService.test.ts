@@ -19,6 +19,33 @@ class RecordingOfflineOperationalSink implements IOfflineOperationalEventSink {
 }
 
 describe("DesktopConnectivityStateService", () => {
+  it("starts and stops monitoring probes explicitly", async () => {
+    const service = new DesktopConnectivityStateService();
+    let probeCount = 0;
+    const probePort = Object.freeze({
+      probe: async () => {
+        probeCount += 1;
+        return Object.freeze({
+          transportReachable: true,
+          trustedSessionAvailable: true,
+          trustPrerequisitesSatisfied: true,
+          trustEnforcement: "optional" as const,
+        });
+      },
+    });
+
+    await waitForMs(25);
+    expect(probeCount).toBe(0);
+
+    service.startMonitoring(probePort, { intervalMs: 25 });
+    await waitForCondition(() => probeCount >= 2);
+    const countAtStop = probeCount;
+    service.stopMonitoring();
+
+    await waitForMs(80);
+    expect(probeCount).toBe(countAtStop);
+  });
+
   it("transitions to connected when transport/session/trust prerequisites are satisfied", () => {
     const service = new DesktopConnectivityStateService({
       now: () => new Date("2026-04-07T12:00:00.000Z"),
@@ -146,3 +173,18 @@ describe("DesktopConnectivityStateService", () => {
     });
   });
 });
+
+function waitForMs(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForCondition(check: () => boolean, timeoutMs = 400, stepMs = 20): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (check()) {
+      return;
+    }
+    await waitForMs(stepMs);
+  }
+  throw new Error("Timed out waiting for expected condition.");
+}

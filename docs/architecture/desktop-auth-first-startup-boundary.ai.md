@@ -251,6 +251,18 @@ Studio shell, system runtime, and image workflow/system persistence runtime modu
 
 Result: login-critical pre-window startup avoids both eager runtime object graph construction and eager loading of the studio/system/image deferred runtime module.
 
+## Story C.2.5 implementation update
+
+Desktop connectivity monitoring is now deferred out of pre-login startup:
+
+- `bootstrapAuthShell()` no longer starts `DesktopConnectivityStateService` monitoring.
+- connectivity monitoring startup is now tied to the first accepted post-login warmup request in `ensurePostLoginWarmupStarted(...)`.
+- auth/bootstrap connectivity IPC now returns a controlled pre-warmup fallback (`connecting`) with explicit deferred-monitoring detail until post-login warmup starts.
+- pre-warmup offline-mode toggle requests return the same controlled deferred fallback payload instead of attempting to emulate post-login connectivity behavior.
+- runtime disposal now explicitly stops deferred connectivity monitoring before clearing runtime state, preserving deterministic shutdown/logout teardown behavior.
+
+Result: login-capable startup avoids recurring connectivity probe activity while renderer connectivity consumers retain stable, explicit pre-warmup behavior.
+
 ## Target phase model
 
 1. `pre-login startup` (critical path):

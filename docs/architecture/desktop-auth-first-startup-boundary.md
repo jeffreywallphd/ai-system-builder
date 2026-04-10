@@ -259,6 +259,20 @@ Studio shell, system runtime, and image workflow/system persistence infrastructu
 
 Result: the pre-login critical path no longer pays eager module-load cost for studio/system/image deferred runtime infrastructure.
 
+## Story C.2.5 deferred connectivity monitoring startup
+
+Desktop connectivity monitoring startup is now moved out of pre-login bootstrap:
+
+- `bootstrapAuthShell()` no longer starts `DesktopConnectivityStateService` monitoring.
+- connectivity monitoring now starts only when `ensurePostLoginWarmupStarted(...)` accepts the first post-login warmup request.
+- auth/bootstrap connectivity IPC keeps returning a controlled fallback state before warmup starts:
+  - state remains `connecting`
+  - detail is explicit that connectivity monitoring is deferred to post-login warmup.
+- offline-mode toggles through auth/bootstrap IPC now return the same controlled deferred fallback before warmup starts instead of attempting pre-login monitoring behavior.
+- teardown remains explicit through `disposeDesktopRuntimeResources()` and now always stops deferred connectivity monitoring before resetting runtime state on shutdown/logout flows.
+
+Result: pre-login startup no longer runs recurring connectivity probes, while renderer connectivity consumers keep a stable, explicit pre-warmup contract.
+
 ## Target startup phases
 
 ## 1) Pre-login startup (critical path)

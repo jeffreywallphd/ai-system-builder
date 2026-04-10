@@ -24,5 +24,6 @@ describe("electron main pre-login host startup", () => {
     expect(authShellSource).not.toContain("resolveDesktopPythonRuntime(");
     expect(authShellSource).not.toContain("new DesktopServiceSupervisor(");
     expect(authShellSource).not.toContain("serviceSupervisor.start(");
+    expect(authShellSource).not.toContain("startMonitoring(");
   });
 });

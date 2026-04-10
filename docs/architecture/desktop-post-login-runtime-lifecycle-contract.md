@@ -103,6 +103,16 @@ Pre-login startup contract checks now enforce that:
 
 Warmup diagnostics now include explicit deferred startup logs for Python runtime resolution and supervisor startup readiness.
 
+## Story C.2.5 deferred connectivity monitoring lifecycle
+
+Connectivity monitoring now follows the same deferred lifecycle boundary as other non-auth runtime services:
+
+- pre-login auth-shell bootstrap does not start recurring connectivity probes.
+- monitoring starts when post-login warmup is first accepted (`ensurePostLoginWarmupStarted(...)`).
+- renderer connectivity reads through auth/bootstrap IPC receive a controlled pre-warmup fallback state until monitoring starts.
+- renderer offline-mode write attempts before monitoring startup receive the same fallback state rather than partial pre-login monitoring emulation.
+- runtime teardown (`disposeDesktopRuntimeResources()`) explicitly stops connectivity monitoring before resetting runtime state, so quit/logout shutdown paths remain deterministic.
+
 ## Status Contract
 
 ### Authoritative status probe (main -> preload -> renderer)

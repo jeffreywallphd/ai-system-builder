@@ -34,6 +34,7 @@ describe("desktop startup boot contract", () => {
     const violations = PreLoginAuthShellInitializers.filter((initializer) => forbidden.has(initializer));
     expect(violations).toEqual([]);
     expect(PreLoginAuthShellInitializers).toContain("auth-minimal-identity-host");
+    expect(PreLoginAuthShellInitializers).not.toContain("desktop-connectivity-monitor");
     expect(PreLoginAuthShellInitializers).not.toContain("authoritative-identity-host");
   });
 
