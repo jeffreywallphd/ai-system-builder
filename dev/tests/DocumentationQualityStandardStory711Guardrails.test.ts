@@ -15,6 +15,8 @@ const governancePolicyAiPath = resolve(repoRoot, "docs/context/governance/contex
 const requiredHeadings = [
   "## Scope and Enforcement Boundary",
   "## Required Rules (Normative, Enforceable)",
+  "## Documentation Category Rule Scope Matrix",
+  "## Category-Specific Enforcement Boundaries",
   "## Recommended Guidance (Non-Blocking)",
   "## Automation Mapping for Lightweight Tooling",
   "## Governance and Change Control",

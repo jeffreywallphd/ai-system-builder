@@ -56,6 +56,28 @@ This is not a broad prose style manifesto. It is intentionally narrow and enforc
 - Governance and contributor docs must keep "required versus non-required" distinctions explicit where policy language is used.
 - Documents should remain single-purpose by authority role; mixed-purpose authority/history content is not allowed in active canonical guidance.
 
+## Documentation Category Rule Scope Matrix
+
+Use this matrix to determine which required rule groups are enforced per documentation category. This scope mapping is normative for linting and validation implementation.
+
+| Documentation category | Rule groups enforced as blocking | Category-specific scope notes |
+| --- | --- | --- |
+| Architecture docs (`docs/architecture/**/*.md`) | 1, 2, 3, 4, 5 | Full enforcement. Active architecture authority docs must keep metadata integrity, status clarity, routing/index discoverability, and link hygiene. |
+| ADR records (`docs/adr/records/*.md`) | 1, 2, 3, 4 | Full metadata and supersession integrity. ADR decision status and replacement/backlink integrity remain blocking. Readability-shape checks are minimal and template-driven. |
+| Context packs (`docs/context/packs/*.pack.md`) | 1, 2, 3, 4, 5 | Strictest enforcement. Required heading shape, metadata alignment, catalog/contract ID integrity, and authoritative reference resolvability are all blocking. |
+| Routing artifacts (`docs/context/routing/*.md`, `docs/context/routing/*.json`, `docs/context/context-map.json`) | 1, 2, 3, 4, 5 | Strictest enforcement. Task/category IDs, mapping references, route hints, and canonical path targets are blocking because these files drive retrieval behavior. |
+| Contributor docs (`docs/contributors/**/*.md`) | 1, 2, 4, 5 | Metadata and status clarity are blocking. Routing/index cross-reference rules apply only when contributor docs are referenced by registry/routing artifacts. |
+| Operations docs (`docs/operations/**/*.md`) | 1, 2, 4 | Metadata and status clarity are blocking. Routing discipline checks apply only when docs are explicitly indexed/routed. Heading-shape checks are advisory unless contract-critical. |
+| Baselines (`docs/baselines/**/*.md`) | 1, 2, 4 | Must keep explicit baseline/historical status signaling and resolvable references. Routing/index placement is selective and non-universal by design. |
+| Historical or superseded materials (any `status: superseded` or under historical/baseline legacy paths) | 1, 2, 4 | Reduced enforcement to avoid false positives. Require valid metadata, explicit supersession/redirect signals, and resolvable replacement pointers; do not require active-router placement or modern readability shape. |
+
+## Category-Specific Enforcement Boundaries
+
+- Keep enforcement profile selection path-first and status-aware: select category by repository path, then apply status (`active`, `superseded`, `archived`) narrowing rules.
+- Treat context packs and routing artifacts as high-risk retrieval assets; apply strict metadata, contract, and heading checks by default.
+- Treat archival and superseded material as reference history, not active authority: validate identity and redirect integrity without requiring active discoverability placement.
+- Avoid category drift in future linting work by encoding this matrix directly in validator configuration, not ad hoc file-by-file exceptions.
+
 ## Recommended Guidance (Non-Blocking)
 
 - Prefer concise sections and decision-oriented phrasing over narrative history in active authority docs.
@@ -83,7 +105,7 @@ Use the following translation model when adding linting and validation:
 
 ## Governance and Change Control
 
-- Treat this document as the canonical quality baseline for Story 7.1.1 and downstream enforcement stories.
+- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, and downstream enforcement stories.
 - Any change to required rules must be accompanied by corresponding validator or guardrail test updates in the same pull request.
 - If a proposed requirement cannot be translated into a lightweight deterministic check, place it under recommended guidance instead of required rules.
 - Keep `.md` and `.ai.md` versions aligned whenever this standard changes.
