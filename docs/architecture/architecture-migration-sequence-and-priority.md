@@ -62,6 +62,10 @@ During migration, old flat docs and new domain docs can coexist only under the r
 4. Keep inbound links stable during transition by preserving legacy paths as stubs until referencing routers and context packs are updated.
 5. Remove stubs only after inbound references are migrated and tests confirm no required router links still depend on the legacy path.
 
+Canonical governance and machine-readable tracking for this policy live in:
+- `docs/architecture/architecture-supersession-and-retirement-governance.md`
+- `docs/architecture/architecture-supersession-registry.json`
+
 ## Contributor Execution Checklist per Wave
 
 1. Select mappings only from the current wave and confirm dependencies are satisfied.
@@ -78,3 +82,4 @@ During migration, old flat docs and new domain docs can coexist only under the r
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
+- [Architecture Supersession and Retirement Governance](./architecture-supersession-and-retirement-governance.md)

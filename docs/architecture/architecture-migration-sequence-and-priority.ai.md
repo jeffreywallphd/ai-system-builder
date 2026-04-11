@@ -62,6 +62,10 @@ Transition rules:
 3. Retain legacy paths as stubs until inbound routers/context packs are updated.
 4. Remove stubs only after inbound links and tests confirm migration safety.
 
+Canonical governance and machine-readable tracking for this policy:
+- `docs/architecture/architecture-supersession-and-retirement-governance.md`
+- `docs/architecture/architecture-supersession-registry.json`
+
 ## Contributor Execution Checklist per Wave
 
 1. Confirm current wave scope and dependency satisfaction.
@@ -78,3 +82,4 @@ Transition rules:
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
+- [Architecture Supersession and Retirement Governance](./architecture-supersession-and-retirement-governance.md)

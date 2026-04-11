@@ -1,33 +1,21 @@
+---
+title: Shared Asset Contracts (Legacy Link Stub)
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/architecture/domains/workspace-storage-and-assets/references/asset-models-and-selection.md
+related_code_paths:
+  - docs/architecture/domains/workspace-storage-and-assets/references/asset-models-and-selection.md
+  - docs/architecture/domains/api-and-transport-surfaces/references/unified-api-surface-contracts.md
+---
+
 # Shared Asset Contracts
 
-## Purpose
+## Supersession Notice
 
-Define canonical shared asset contract boundaries for identity, taxonomy, interface shape, selection semantics, and lineage posture under workspace/storage authority.
-
-## Scope Boundaries
-
-In scope:
-- Shared asset contract model and projection seams.
-- Asset identity/taxonomy/contract consistency requirements.
-- Asset selection and representation boundaries used across studios and APIs.
-
-Out of scope:
-- Endpoint-level transport contracts.
-- Studio-specific page composition behavior.
-- Run lifecycle scheduling and dispatch policy.
-
-## Canonical Asset Contract Posture
-
-- Shared asset contract types remain canonical in `src/domain/contracts/AssetContract.ts`.
-- Contract projection remains application-owned through `src/application/contracts/CompositionAssetContractResolver.ts`.
-- Contract projections are taxonomy-driven and must fail closed for unsupported combinations.
-- Shared contracts describe usage/interface shape, not runtime execution policy.
-
-## Asset Selection and Representation Guardrails
-
-- Asset selectors and read projections must preserve canonical asset identity and lineage metadata.
-- Presentation layers may reshape labels and summaries but cannot redefine contract or tenancy truth.
-- API surfaces may transport contract data but cannot become alternate contract authorities.
+This document is a `migrated-link-stub` and no longer serves as canonical authority.
 
 ## Split Routing for Previously Mixed Content
 

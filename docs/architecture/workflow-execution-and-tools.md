@@ -1,27 +1,21 @@
+---
+title: Workflow Execution and Tools (Legacy Link Stub)
+doc_type: architecture-reference
+status: superseded
+authoritativeness: historical
+owned_by: team:platform-architecture
+last_reviewed: 2026-04-11
+superseded_by: docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md
+related_code_paths:
+  - docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md
+  - docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md
+---
+
 # Workflow Execution and Tools
 
-## Purpose
+## Supersession Notice
 
-Define workflow-to-execution handoff boundaries so workflow authoring contracts, execution control-plane authority, and tool/runtime transport concerns stay explicitly separated.
-
-## Scope Boundaries
-
-In scope:
-- Workflow definition and authored execution-intent boundaries.
-- Tool projection boundaries for workflow-derived capabilities.
-- Handoff contracts from workflow composition into execution control-plane authority.
-
-Out of scope:
-- Detailed run state-machine and scheduling policy contracts.
-- Runtime host bootstrap and preload bridge behavior.
-- Workspace/storage tenancy authority and asset-governance policy.
-
-## Canonical Workflow Handoff Contract
-
-- Workflow authoring remains studio/system composition authority.
-- Execution start/read/status authority remains in the execution control plane.
-- Tool projection is a representation contract and does not become a separate execution authority.
-- Runtime adapters consume execution-control-plane outcomes; they do not redefine lifecycle truth.
+This document is a `migrated-link-stub` and no longer defines canonical architecture behavior.
 
 ## Split Routing for Previously Mixed Content
 
