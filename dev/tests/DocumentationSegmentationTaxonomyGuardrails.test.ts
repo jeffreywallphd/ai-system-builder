@@ -27,12 +27,16 @@ const requiredHumanFrameworkHeadings = [
   "## Segment Selection Signals",
   "## Borderline Case Rules",
   "## Mixed-Content Split and Redirect Procedure",
+  "## Anti-Patterns for Mixed-Purpose and Low-Signal Documents",
+  "## Anti-Pattern Migration Decision Rules",
 ] as const;
 
 const requiredAiFrameworkHeadings = [
   "## Active Versus Historical Decision Rubric",
   "## Borderline and Mixed-Content Rules",
   "## Mixed-Content Split Workflow",
+  "## Anti-Patterns for Mixed-Purpose and Low-Signal Docs",
+  "## Anti-Pattern Decision Triggers",
 ] as const;
 
 describe("documentation segmentation taxonomy guardrails", () => {
@@ -81,6 +85,10 @@ describe("documentation segmentation taxonomy guardrails", () => {
       "If one file would require conflicting authority signals",
       "Extract current authoritative guidance into the destination active doc",
       "Convert the source path into either",
+      "Current architecture guidance combined with running change logs",
+      "Stale planning artifacts presented as current guidance",
+      "README files absorbing too many roles",
+      "If more than one-third of an active document is chronology",
     ]) {
       expect(humanTaxonomy).toContain(phrase);
     }
@@ -91,6 +99,10 @@ describe("documentation segmentation taxonomy guardrails", () => {
       "Movement coordination -> `Migration Guides and Records` or `Temporary Transition Documents`.",
       "If classification is ambiguous, default to non-authoritative placement",
       "Keep the old path as either router index or superseded transition stub with destination links.",
+      "`Architecture + change-log blend`",
+      "`Stale plan as active authority`",
+      "`Overloaded README`",
+      "Move chronology/planning residue when it exceeds one-third of active document content.",
     ]) {
       expect(aiTaxonomy).toContain(phrase);
     }
