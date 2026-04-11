@@ -474,3 +474,20 @@ Guidance for future additions:
 - keep module dependencies explicit through typed parameter objects;
 - keep `main.ts` focused on lifecycle/startup orchestration and dependency composition;
 - preserve existing renderer IPC channel names and sync/async behavior unless a coordinated API migration is planned.
+
+## Story C.4.1 desktop main-process composition seam extraction
+
+Electron main-process composition now extracts windowing and app lifecycle wiring into focused modules:
+
+- `electron/main/DesktopWindowManager.ts`
+  - owns main window creation, renderer loading (packaged vs dev), runtime window launch, and reuse-key tracking/cleanup.
+  - preserves preload wiring, background color, ready-to-show maximize/show behavior, and runtime window defaults.
+- `electron/main/DesktopAppLifecycle.ts`
+  - owns `whenReady`, `activate`, `window-all-closed`, and `before-quit` event registration semantics.
+  - keeps `main.ts` as composition root that wires startup bootstrap, disposal, and host stop hooks.
+
+Contributor boundary guidance:
+
+- place new `BrowserWindow` behavior and renderer route/search loading rules in `DesktopWindowManager`.
+- place Electron app event policy changes in `DesktopAppLifecycle`.
+- keep `electron/main/main.ts` focused on service composition and startup orchestration rather than low-level window/event details.

@@ -203,6 +203,23 @@ Contract coverage now explicitly defines:
 - preload/runtime bridge status and readiness probes for renderer-safe state checks,
 - teardown/reset lifecycle expectations for logout and application quit.
 
+## Story C.4.1 implementation update
+
+Electron main-process composition now extracts windowing and app lifecycle wiring into focused modules:
+
+- `electron/main/DesktopWindowManager.ts`
+  - owns main window creation, renderer loading (packaged vs dev), runtime window launch, and reuse-key tracking/cleanup.
+  - preserves preload wiring, background color, ready-to-show maximize/show behavior, and runtime window defaults.
+- `electron/main/DesktopAppLifecycle.ts`
+  - owns `whenReady`, `activate`, `window-all-closed`, and `before-quit` event registration semantics.
+  - keeps `main.ts` as composition root that wires startup bootstrap, disposal, and host stop hooks.
+
+Contributor boundary guidance:
+
+- place new `BrowserWindow` behavior and renderer route/search loading rules in `DesktopWindowManager`.
+- place Electron app event policy changes in `DesktopAppLifecycle`.
+- keep `electron/main/main.ts` focused on service composition and startup orchestration rather than low-level window/event details.
+
 ## Story C.2.1 implementation update
 
 Desktop runtime startup composition now splits post-login shared bootstrap from on-demand feature composition paths:
