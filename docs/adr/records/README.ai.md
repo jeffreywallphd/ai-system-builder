@@ -35,6 +35,7 @@
 | ADR | Decision Status | Decision Date | Title | Path |
 | --- | --- | --- | --- | --- |
 | 001 | accepted | 2026-04-11 | Single Authoritative Control Plane | `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md` |
+| 002 | accepted | 2026-04-11 | Workspace-Centered Tenancy and Resource Ownership | `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md` |
 
 ## Start Here
 - [ADR Router](../README.ai.md)

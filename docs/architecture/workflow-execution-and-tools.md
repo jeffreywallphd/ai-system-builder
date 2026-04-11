@@ -752,3 +752,7 @@ The image slice proved the shared architecture, but it exposed concrete follow-u
 - Dataset/storage references in runtime context now remain logical and inspectable (binding ids, dataset ids, storage-instance references/areas, sharing scope metadata) with no UI-facing filesystem path contracts.
 - FaceID-enabled runs now require an explicit selected reference image at preflight mapping time, while default non-FaceID template behavior remains runnable without extra setup.
 - Runtime-window session override state now has a dedicated persistence model (`src/ui/runtime/SystemRuntimeWindowSessionPersistenceService.ts`) so restored runs layer serialized runtime overrides on top of hydrated launch defaults for clean reopen/restore continuation.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`

@@ -51,3 +51,7 @@ Helper constructors provide stable target creation for user/role/workspace/publi
   - defaults visibility/policy to `private` + `owner-only`
 
 Use the adaptation helper while resources phase in explicit ownership/visibility/sharing fields without breaking current aggregate structures.
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`

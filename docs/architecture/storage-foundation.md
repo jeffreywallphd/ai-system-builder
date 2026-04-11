@@ -144,3 +144,7 @@ The model is intentionally suitable for later persistence and API projection whi
 - active-state assertions
 - attribution and timestamp invariant failures
 - safe policy mutation through domain APIs
+
+## Related ADRs
+
+- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md`
