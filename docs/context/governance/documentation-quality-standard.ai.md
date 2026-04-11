@@ -14,6 +14,7 @@ related_code_paths:
   - docs/context/governance/context-governance-policy.ai.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Quality Standard
@@ -115,6 +116,54 @@ Readability checks intentionally out of automated scope:
 - Grammar-polish-only issues when semantics are still clear.
 - Subjective prose-quality judgments that lack deterministic signals.
 
+## Ownership and Review Responsibilities (Story 7.1.5)
+
+This section defines quality ownership and review responsibility where linting is necessary but not sufficient.
+
+### Ownership Model by Documentation Category
+
+| Category | Primary owner role | Review responsibility | Escalation path |
+| --- | --- | --- | --- |
+| Architecture docs (`docs/architecture/**`) | Architecture maintainers plus touched-domain feature owners | Confirm authority boundaries, ADR alignment, and domain placement before merge. | Escalate to architecture and developer-experience maintainers in the same pull request. |
+| ADR records (`docs/adr/records/**`) | ADR maintainers plus decision owners | Confirm decision status, replacement-chain integrity, and related-record links before merge. | Escalate to ADR maintainers; do not defer unresolved decision-state drift. |
+| Context packs and routing artifacts (`docs/context/packs/**`, `docs/context/routing/**`, `docs/context/context-map.json`) | Developer-experience maintainers plus context-system contributors | Confirm pack IDs, routing mappings, and retrieval-critical references before merge. | Escalate to developer-experience maintainers; repair retrieval-contract breaks in the same pull request. |
+| Contributor and operations docs (`docs/contributors/**`, `docs/operations/**`) | Feature-area maintainers | Confirm actionability, canonical links, and status signaling before merge. | Escalate to feature-area maintainers and involve developer-experience maintainers for placement/authority ambiguity. |
+| Baseline and historical materials (`docs/baselines/**` plus superseded docs) | Documentation maintainers plus transition owners | Confirm supersession pointers, retention rationale, and non-authoritative labeling before merge. | Escalate to documentation maintainers for archival-boundary ambiguities. |
+
+### Manual Review Triggers (Automation Complements, Not Replacements)
+
+Require manual review even when linting passes if changes affect:
+
+- Canonical authority meaning, contractual boundaries, or operational obligations.
+- Supersession/redirect destinations, replacement chains, or retention rationale.
+- Cross-domain placement where ownership or authoritativeness may become ambiguous.
+- High-risk context assets covering security, identity, trust boundaries, runtime host startup, or policy enforcement.
+- Router/context-map/registry/context-pack references that influence retrieval behavior.
+
+### Interpreting Lint and Validation Failures
+
+- `critical` means merge-blocking contract failure; treat as correctness defect and resolve before approval.
+- `important` means warning-level drift risk; fix in the same pull request or log explicit follow-up work in review notes.
+- `advisory` is non-blocking guidance; merge is acceptable when correctness is intact and no high-risk trigger is active.
+- Repeated warning-only findings in one doc family should create a scoped cleanup task instead of indefinite waivers.
+- Do not silence rules by prose alone; update rule scope and guardrails in the same pull request when suppression is required.
+
+### High-Risk Areas Requiring Additional Scrutiny
+
+Require at least one additional qualified reviewer for:
+
+- Identity, authorization, secret-management, trust, and policy enforcement docs.
+- Runtime host composition, startup authority boundaries, and execution-control routing docs.
+- Context routing contracts, context-map entries, and context-pack catalog relationships consumed by automation.
+- ADR supersession chains and architecture invariants that affect multiple domains.
+
+### How This Fits Normal Repository Maintenance
+
+- Run lightweight validators locally before review (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`).
+- Use severity plus trigger guidance to classify outcomes as block-now, warn-and-fix-soon, or advisory-only.
+- Keep manual review focused on semantic correctness, authority boundaries, and high-risk impact that automation cannot fully judge.
+- Keep validator contracts and reviewer judgment complementary: automation enforces structure, reviewers enforce trustworthiness.
+
 ## Recommended Guidance (Non-Blocking)
 
 - Prefer concise, decision-oriented sections in active authority docs.
@@ -140,7 +189,7 @@ Readability checks intentionally out of automated scope:
 
 ## Governance and Change Control
 
-- Treat this doc as canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, and Story 7.1.4.
+- Treat this doc as canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, Story 7.1.4, and Story 7.1.5.
 - When required rules change, update validator/tests in same pull request.
 - If a proposed rule cannot be checked deterministically with lightweight tooling, keep it non-blocking guidance.
 - Keep `.md` and `.ai.md` versions aligned.

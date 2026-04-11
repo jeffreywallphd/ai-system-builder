@@ -131,6 +131,7 @@ const REQUIRED_DOCUMENTATION_QUALITY_STANDARD_HEADINGS = [
   "## Documentation Category Rule Scope Matrix",
   "## Category-Specific Enforcement Boundaries",
   "## Readability and Signal-to-Noise Enforcement Boundaries",
+  "## Ownership and Review Responsibilities (Story 7.1.5)",
   "## Recommended Guidance (Non-Blocking)",
   "## Automation Mapping for Lightweight Tooling",
   "## Governance and Change Control",

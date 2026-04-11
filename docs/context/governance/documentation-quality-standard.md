@@ -14,6 +14,7 @@ related_code_paths:
   - docs/context/governance/context-governance-policy.md
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-docs-segmentation.cjs
+  - dev/tests/DocumentationQualityOwnershipReviewStory715Guardrails.test.ts
 ---
 
 # Documentation Quality Standard
@@ -115,6 +116,54 @@ Readability checks that remain out of scope for automated enforcement:
 - Grammar polish when meaning is already unambiguous.
 - Subjective "good prose" assessments without deterministic structural indicators.
 
+## Ownership and Review Responsibilities (Story 7.1.5)
+
+This section defines who is responsible for documentation quality outcomes when linting and validators are necessary but not sufficient.
+
+### Ownership Model by Documentation Category
+
+| Documentation category | Primary owner role | Review responsibility | Escalation path when unresolved |
+| --- | --- | --- | --- |
+| Architecture docs (`docs/architecture/**`) | Architecture maintainers and feature owners for touched domains | Validate authority boundaries, ADR alignment, and domain placement before merge. | Escalate to architecture and developer-experience maintainers in the same pull request. |
+| ADR records (`docs/adr/records/**`) | ADR maintainers and decision owners | Validate decision status, replacement chain integrity, and related-record links before merge. | Escalate to ADR maintainers; do not defer unresolved decision-state inconsistencies. |
+| Context packs and routing artifacts (`docs/context/packs/**`, `docs/context/routing/**`, `docs/context/context-map.json`) | Developer-experience maintainers and context-system contributors | Validate pack IDs, routing mappings, and retrieval-critical references before merge. | Escalate to developer-experience maintainers; require same-PR remediation for broken retrieval contracts. |
+| Contributor and operations docs (`docs/contributors/**`, `docs/operations/**`) | Domain maintainers for affected feature area | Validate actionable guidance, canonical links, and status signaling before merge. | Escalate to owning feature maintainers; involve developer-experience maintainers when placement or authority is unclear. |
+| Baseline and historical materials (`docs/baselines/**` and superseded materials) | Documentation maintainers and feature owners performing transition | Validate supersession pointers, retention rationale, and non-authoritative labeling before merge. | Escalate to documentation maintainers when archival boundary decisions are ambiguous. |
+
+### Manual Review Triggers (Automation Complements, Not Replacements)
+
+Require targeted manual review when any of the following apply, even if linting passes:
+
+- Canonical authority changes that alter decision meaning, contractual boundaries, or operational obligations.
+- Supersession and redirect updates that change reader destination paths, replacement chains, or retention rationale.
+- Cross-domain moves where document placement, ownership, or authoritativeness may become ambiguous.
+- High-risk context assets involving security, identity, trust boundaries, runtime host startup, or policy enforcement guidance.
+- Material updates to router, context-map, registry, or context-pack references that influence retrieval behavior.
+
+### Interpreting Lint and Validation Failures
+
+- `critical` failures are merge-blocking contract breaks; maintainers should treat them as correctness defects and resolve before approval.
+- `important` failures are warning-level maintenance risks; maintainers should either resolve in the same pull request or explicitly track follow-up work in review notes.
+- `advisory` findings inform readability and consistency; maintainers may merge when correctness is intact and no high-risk trigger is active.
+- Repeated warning-only findings in the same doc family should trigger a scoped cleanup task rather than indefinite waiver.
+- Do not silence a rule by policy text alone. If suppression is needed, update rule scope and guardrails in the same pull request.
+
+### High-Risk Areas Requiring Additional Scrutiny
+
+Apply at least one additional qualified reviewer for documentation changes in:
+
+- Identity, authorization, secret-management, trust, and policy enforcement documentation.
+- Runtime host composition, startup authority boundaries, and execution-control routing guidance.
+- Context routing contracts, context-map entries, and context-pack catalog relationships used by automation.
+- ADR supersession chains and architecture invariants that govern multiple domains.
+
+### How This Fits Normal Repository Maintenance
+
+- Contributors run lightweight validators locally (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`) before requesting review.
+- Maintainers use severity and trigger guidance in this standard to decide whether a change is block-now, warn-and-fix-soon, or advisory-only.
+- Manual review focuses on semantic correctness, authority boundaries, and high-risk change impact that automation cannot fully judge.
+- Guardrail tests and validator contracts enforce stable structure, while reviewer judgment enforces correctness and trustworthiness.
+
 ## Recommended Guidance (Non-Blocking)
 
 - Prefer concise sections and decision-oriented phrasing over narrative history in active authority docs.
@@ -142,7 +191,7 @@ Use the following translation model when adding linting and validation:
 
 ## Governance and Change Control
 
-- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, Story 7.1.4, and downstream enforcement stories.
+- Treat this document as the canonical quality baseline for Story 7.1.1, Story 7.1.2, Story 7.1.3, Story 7.1.4, Story 7.1.5, and downstream enforcement stories.
 - Any change to required rules must be accompanied by corresponding validator or guardrail test updates in the same pull request.
 - If a proposed requirement cannot be translated into a lightweight deterministic check, place it under recommended guidance instead of required rules.
 - Keep `.md` and `.ai.md` versions aligned whenever this standard changes.
