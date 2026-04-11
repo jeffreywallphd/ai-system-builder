@@ -122,6 +122,28 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("missing-routing-reference.md");
   });
 
+  it("detects missing required headings in documentation indexing model", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-index-model-shape-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const indexingModelPath = join(fixtureRoot, "docs", "context", "documentation-indexing-model.md");
+    const indexingModelContent = readFileSync(indexingModelPath, "utf8").replace(
+      "## Goals",
+      "## Outcomes",
+    );
+    writeFileSync(indexingModelPath, indexingModelContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[DOCUMENTATION_INDEX_MODEL_INVALID]");
+    expect(combinedOutput).toContain("documentation-indexing-model.md is missing required heading '## Goals'.");
+  });
+
   it("detects missing ADR registry record references", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-registry-ref-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
