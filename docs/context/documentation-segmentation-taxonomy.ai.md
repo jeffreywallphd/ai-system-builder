@@ -35,6 +35,37 @@ Use this taxonomy to classify docs by authority state and migration posture so a
 4. When a document changes segment, update metadata and replacement links in the same change.
 5. Temporary transition docs must declare canonical destinations and exit once safe.
 
+## Active Versus Historical Decision Rubric
+
+Run these checks in order:
+
+1. `Current-action test`: should readers follow this for today's behavior?
+2. `Temporal-state test`: is it present-state guidance or prior-state chronology?
+3. `Authority-source test`: is this file canonical for the scope?
+4. `Purpose test`: guidance for execution vs traceability/evidence?
+5. `Replacement test`: if no longer current, is `superseded_by` defined?
+
+Decision shortcut:
+- Current-action + canonical authority -> `Active Guidance`.
+- Prior-state + traceability value -> `Historical Notes` or `Baselines`.
+- Movement coordination -> `Migration Guides and Records` or `Temporary Transition Documents`.
+
+## Borderline and Mixed-Content Rules
+
+1. Keep short rationale in active docs, but move long chronology to historical/baseline docs.
+2. If a doc contains non-current executable steps, split immediately; do not leave them in active authority paths.
+3. If one file would need conflicting authority signals, split the file rather than weakening metadata.
+4. Label any retained history in active docs as non-normative and link to the historical record.
+5. If classification is ambiguous, default to non-authoritative placement and link canonical active guidance.
+
+## Mixed-Content Split Workflow
+
+1. Extract current canonical guidance to active destination docs.
+2. Move chronology/evidence to historical or baseline destinations.
+3. Keep the old path as either router index or superseded transition stub with destination links.
+4. Update metadata and inbound links in the same commit.
+5. Add guardrail checks for headings, links, and metadata expectations.
+
 ## Expected Metadata Signals
 
 - Active guidance: commonly `status: active`, `authoritativeness: canonical|reference`.

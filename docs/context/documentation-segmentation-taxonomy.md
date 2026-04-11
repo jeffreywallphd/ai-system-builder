@@ -85,6 +85,54 @@ This taxonomy classifies documentation by **segment role** in addition to `doc_t
 4. Keep active guidance and historical/transition material in separate files whenever practical.
 5. When a document changes segment, update metadata (`status`, `authoritativeness`, `superseded_by`) and links in the same change.
 
+## Active Versus Historical Decision Framework
+
+Use this sequence in order for every migration decision:
+
+1. **Current-action test**: should a contributor or operator execute this guidance for current behavior today?
+2. **Temporal-state test**: does the document describe present-state contracts or prior-state chronology?
+3. **Authority-source test**: is this the canonical source for the scope, or is canonical authority elsewhere?
+4. **Purpose test**: is the primary value operational/implementation direction or historical traceability/evidence?
+5. **Replacement test**: if no longer current, is there a defined replacement path (`superseded_by`)?
+
+If tests 1 through 4 indicate present-day authority, classify as `Active Guidance`.  
+If tests 2 through 4 indicate retrospective value, classify as `Historical Notes` or `Baselines` based on record depth.  
+If the document primarily coordinates movement between states, classify as `Migration Guides and Records` or `Temporary Transition Documents`.
+
+## Segment Selection Signals
+
+Use these signals to reduce ambiguity in borderline cases:
+
+| If the document mainly... | Classify as... | Required handling |
+| --- | --- | --- |
+| Defines current contracts, guardrails, or operational steps | `Active Guidance` | Keep `status: active`; link to history instead of embedding long chronology. |
+| Preserves a point-in-time state snapshot used as evidence | `Baselines` | Keep `authoritativeness: historical`; do not present as current authority. |
+| Explains prior decisions/chronology without governing current behavior | `Historical Notes` | Mark non-authoritative and cross-link canonical active docs. |
+| Plans or validates movement from old docs to new docs | `Migration Guides and Records` | Keep active only while migration remains in progress. |
+| Declares current rollout scope, non-goals, or deferred boundaries | `Rollout-Boundary Notes` | Keep authoritative only for the active rollout phase. |
+| Exists only to bridge old paths to current canonical destinations | `Temporary Transition Documents` | Include explicit destination links and retirement trigger. |
+| Is replaced and retained for continuity or inbound-link stability | `Superseded or Deprecated Documents` | Set `status: superseded|deprecated`; set `superseded_by` when singular replacement exists. |
+
+## Borderline Case Rules
+
+1. If a document has current instructions plus retrospective rationale, keep only concise rationale in active docs and move chronology to historical/baseline docs.
+2. If current instructions depend on old-state steps that should no longer be executed, split immediately and classify old-state material as historical or superseded.
+3. If one file would require conflicting authority signals (for example both canonical current guidance and historical retirement state), split into separate files instead of averaging metadata.
+4. If historical context is kept in an active doc for comprehension, label it explicitly as non-normative and link to the full historical record.
+5. If maintainers disagree between two adjacent segments, default to the safer non-authoritative segment and add explicit links to canonical active guidance.
+
+## Mixed-Content Split and Redirect Procedure
+
+When a document combines active guidance with history, migration notes, or superseded implementation details:
+
+1. Extract current authoritative guidance into the destination active doc.
+2. Move chronology, prior behavior, or completion evidence into a historical or baseline doc.
+3. Convert the source path into either:
+   - an active index doc (if it remains a router), or
+   - a transition/superseded stub with clear canonical destination links.
+4. Update metadata and inbound links in the same change set so no path is left ambiguous.
+5. Add or update guardrail tests that assert presence of required links and classification headings.
+
 ## Practical Placement Heuristics
 
 1. If contributors should follow it today, classify as `Active Guidance`.
