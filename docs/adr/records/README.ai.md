@@ -15,6 +15,10 @@
 - Keep all required sections from the ADR template in each record.
 - Use optional sections when relevant; treat `Supersession` as required whenever replacement links are involved.
 
+## Authoring Guidance
+- Apply [ADR Authoring Guide](./authoring-guide.ai.md) to keep ADRs concise, decision-first, and durable.
+- Use the guide for writing quality and the template for section contract.
+
 ## ADR Status Taxonomy
 - `proposed`: pending review and not yet architecture authority.
 - `accepted`: approved and authoritative for current direction.
@@ -33,5 +37,6 @@
 
 ## Start Here
 - [ADR Router](../README.ai.md)
+- [ADR Authoring Guide](./authoring-guide.ai.md)
 - [ADR Template](../../context/templates/adr.template.ai.md)
 - [Architecture Router](../../architecture/README.ai.md)

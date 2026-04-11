@@ -15,6 +15,10 @@
 - Include every required section from the standard ADR template; do not remove required headings.
 - Use optional sections only when relevant; `Supersession` becomes required when replacement relationships exist.
 
+## Authoring Guidance
+- Use [ADR Authoring Guide](./authoring-guide.md) for concise, decision-focused writing standards and good/bad examples.
+- Keep that guide complementary to the template: the template defines section shape, the guide defines quality and signal.
+
 ## ADR Status Taxonomy
 - `proposed`: pending review and not yet architecture authority.
 - `accepted`: approved and authoritative for current direction.
@@ -33,5 +37,6 @@
 
 ## Start Here
 - [ADR Router](../README.md)
+- [ADR Authoring Guide](./authoring-guide.md)
 - [ADR Template](../../context/templates/adr.template.md)
 - [Architecture Router](../../architecture/README.md)

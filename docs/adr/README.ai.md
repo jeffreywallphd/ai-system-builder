@@ -84,9 +84,11 @@ Each ADR must include these lightweight metadata fields in frontmatter:
 - Required: `Status`, `Decision Date`, `Decision Statement`, `Context and Problem Statement`, `Decision Drivers`, `Considered Options`, `Chosen Approach`, `Consequences`, `Related Documentation`, and `Related Code Paths`.
 - Optional: `Supersession` (required whenever the ADR supersedes another ADR or is superseded) and `Follow-Up Actions`.
 - Author from `docs/context/templates/adr.template.ai.md` to keep ADR memory durable and consistent.
+- Apply ADR quality guidance to avoid low-signal content: `docs/adr/records/authoring-guide.ai.md`.
 
 ## Start Here
 - [ADR Records Home](./records/README.ai.md)
+- [ADR Authoring Guide](./records/authoring-guide.ai.md)
 - [ADR Template](../context/templates/adr.template.ai.md)
 - [Architecture Router](../architecture/README.ai.md)
 - [Docs Top-Level Contract](../README.ai.md)

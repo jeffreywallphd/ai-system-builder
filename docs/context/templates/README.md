@@ -35,6 +35,7 @@ The ADR template distinguishes required vs optional sections explicitly:
 - Required: `Status`, `Decision Date`, `Decision Statement`, `Context and Problem Statement`, `Decision Drivers`, `Considered Options`, `Chosen Approach`, `Consequences`, `Related Documentation`, and `Related Code Paths`.
 - Optional: `Supersession` and `Follow-Up Actions` (`Supersession` is required when a supersession relationship exists).
 - ADR metadata and lifecycle anchors: required `adr_number`, required `decision_status` (`proposed`, `accepted`, `superseded`, `deprecated`), required `decision_date`, and title format `ADR-<NNN> <Decision Title>`.
+- ADR writing quality guidance (problem framing, options, decision clarity, and tradeoff honesty): `docs/adr/records/authoring-guide.md`.
 
 ## Routing Entry Template
 

@@ -1,0 +1,55 @@
+# AI Companion: ADR Authoring Guide
+
+Use this with `docs/context/templates/adr.template.ai.md`. The template enforces section shape; this guide enforces signal quality.
+
+## Goal
+
+Produce ADRs that are concise, decision-focused, and durable for human and AI reuse.
+
+## Quality Rules
+
+- Capture one decision per ADR.
+- Explain the problem pressure that required the decision now.
+- Compare realistic alternatives with explicit accept/reject reasoning.
+- State the final decision directly with architectural scope boundaries.
+- Record tradeoffs and risks, not only benefits.
+
+## Section Expectations
+
+- `Decision Statement`: clear final choice, not intent language.
+- `Context and Problem Statement`: constraints and failure mode if undecided.
+- `Considered Options`: real options, including rejected ones.
+- `Chosen Approach`: stable architecture boundaries and authority model.
+- `Consequences`: upside, downside, and residual risk.
+
+## Good vs Bad (AI Loom Studio)
+
+### Decision Statement
+
+- Bad: "We may move policy writes closer to each host later."
+- Good: "Policy writes remain authoritative-server only. Other hosts consume policy updates as read-only projections."
+
+### Considered Options
+
+- Bad: "Option B was not ideal."
+- Good: "Option B (host-local policy writes) was rejected because it fragments authority and complicates audit lineage."
+
+### Consequences
+
+- Bad: "This design is best."
+- Good: "This improves policy consistency and governance traceability, but increases dependency on reliable event publication for read-model freshness."
+
+## Reject These Patterns
+
+- ADRs that become architecture primers instead of decisions.
+- ADRs that capture sprint chronology instead of durable rationale.
+- Speculative content without accepted/rejected outcomes.
+- Filler text that omits concrete tradeoffs.
+
+## Fast Self-Check
+
+- Is the final decision obvious immediately?
+- Can a reviewer name the top rejected alternative and reason?
+- Are non-trivial downsides explicit?
+- Is transient implementation detail excluded?
+
