@@ -36,6 +36,7 @@ Use this page to pick the right documentation path quickly. It routes by reader 
 
 - Place a new document: use [Docs Placement Guide](./contributors/docs-placement-guide.md).
 - Apply taxonomy and metadata correctly: use [Documentation Taxonomy](./context/documentation-taxonomy.md), [Documentation Segmentation Taxonomy](./context/documentation-segmentation-taxonomy.md), [Documentation Segmentation Seed Guidance](./context/documentation-segmentation-seed-guidance.md), [Supersession and Redirect Conventions](./context/documentation-supersession-and-redirect-conventions.md), and [Metadata Header Contract](./context/documentation-metadata-header.md).
+- Plan historical-isolation migration work: use [Documentation Segmentation Migration Inventory](./documentation-segmentation-migration-inventory.md).
 - Locate current system design authority: use [Architecture Router](./architecture/README.md).
 - Find historical delivery/migration records and Feature 1 handoff context: use [Baselines Router](./baselines/README.md).
 
@@ -45,6 +46,7 @@ Use this page to pick the right documentation path quickly. It routes by reader 
 - Contribute a code change safely: [Contributors Router](./contributors/README.md) -> [Documentation Placement Guide](./contributors/docs-placement-guide.md) -> [Architecture Router](./architecture/README.md).
 - Operate or troubleshoot the system locally: [Operations Router](./operations/README.md) -> [Node Bootstrap Identity Operations](./node-bootstrap-identity-operations.md) -> [Secret Health And Operational Diagnostics](./secret-health-and-operational-diagnostics.md).
 - Review historical baselines and migration context: [Baselines Router](./baselines/README.md) -> [Feature 1 Documentation Foundation Completion Handoff](./baselines/feature-1-documentation-foundation-handoff.md) -> [Documentation Migration Baseline](./documentation-migration-baseline.md).
+- Plan segmentation and historical-isolation migration batches: [Documentation Segmentation Migration Inventory](./documentation-segmentation-migration-inventory.md) -> [Baseline and Historical Folder Strategy](./context/documentation-baseline-and-historical-folder-strategy.md) -> [Baselines Router](./baselines/README.md).
 - Prepare AI context for implementation or analysis: [Context Router](./context/README.md) -> [Documentation Taxonomy](./context/documentation-taxonomy.md) -> [Documentation Segmentation Taxonomy](./context/documentation-segmentation-taxonomy.md) -> [Documentation Segmentation Seed Guidance](./context/documentation-segmentation-seed-guidance.md) -> [Supersession and Redirect Conventions](./context/documentation-supersession-and-redirect-conventions.md).
 
 ## Durability Rules
