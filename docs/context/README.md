@@ -21,6 +21,7 @@
 
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
+- [Documentation Indexing Model and Goals](./documentation-indexing-model.md)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.md)
 - [Documentation Segmentation Seed Guidance](./documentation-segmentation-seed-guidance.md)
 - [Documentation Status Signals](./documentation-status-signals.md)

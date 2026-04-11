@@ -23,6 +23,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/context-asset-metadata.md",
   "docs/context/context-asset-metadata.ai.md",
   "docs/context/context-asset-metadata.contract.json",
+  "docs/context/documentation-indexing-model.md",
+  "docs/context/documentation-indexing-model.ai.md",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -50,6 +52,23 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/governance/context-asset-lifecycle.ai.md",
   "docs/context/governance/context-system-rollout-boundaries.md",
   "docs/context/governance/context-system-rollout-boundaries.ai.md",
+];
+
+const REQUIRED_DOCUMENTATION_INDEXING_MODEL_HEADINGS = [
+  "## Discovery Problems This Model Solves",
+  "## Indexing Model",
+  "## Goals",
+  "## Non-Goals and Complexity Boundaries",
+  "## Relationship to Taxonomy, Routing, and Context Packs",
+];
+
+const REQUIRED_DOCUMENTATION_INDEXING_MODEL_AI_HEADINGS = [
+  "## Model Summary",
+  "## Core Goals",
+  "## Discovery Problems Addressed",
+  "## Relationship Contract",
+  "## Non-Goals",
+  "## Complexity Target",
 ];
 
 const REQUIRED_ADR_FILES = [
@@ -284,6 +303,34 @@ function validateDocsFoundation(repoRoot) {
         code: "ADR_FILE_MISSING",
         message: `Missing required ADR foundation file: ${relativePath}`,
       });
+    }
+  }
+
+  const documentationIndexingModelPath = resolve(repoRoot, "docs/context/documentation-indexing-model.md");
+  if (existsSync(documentationIndexingModelPath)) {
+    const content = readFileSync(documentationIndexingModelPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEXING_MODEL_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_MODEL_INVALID",
+          `docs/context/documentation-indexing-model.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationIndexingModelAiPath = resolve(repoRoot, "docs/context/documentation-indexing-model.ai.md");
+  if (existsSync(documentationIndexingModelAiPath)) {
+    const content = readFileSync(documentationIndexingModelAiPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEXING_MODEL_AI_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_MODEL_INVALID",
+          `docs/context/documentation-indexing-model.ai.md is missing required heading '${heading}'.`,
+        );
+      }
     }
   }
 
