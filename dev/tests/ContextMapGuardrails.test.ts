@@ -23,10 +23,24 @@ type ContextMap = {
   routingContractPath: string;
   routingSeedPath: string;
   contextPackCatalogPath: string;
+  contextAssemblyPolicy: {
+    tierOrder: string[];
+    profileCatalog: Array<{
+      profileId: string;
+      tiers: Array<{
+        tierId: string;
+        priority: number;
+        defaultWeight: number;
+        includeByDefault: boolean;
+        rationale: string;
+      }>;
+    }>;
+  };
   taskCategoryDefaults: Array<{
     taskCategoryId: string;
     selectionMode: string;
     priorityTier: string;
+    contextAssemblyProfileId: string;
   }>;
   globalExclusionRules: string[];
   globalExclusionTags: Array<{
@@ -41,6 +55,15 @@ type ContextMap = {
     mappingId: string;
     taskCategoryId: string;
     intentId: string;
+    contextAssemblyProfileId: string;
+    contextAssemblyTierHints: Record<
+      string,
+      {
+        weight: number;
+        includeByDefault: boolean;
+        rationale: string;
+      }
+    >;
     packRefs: Array<{
       packId: string;
       priorityOrder: number;
@@ -80,6 +103,13 @@ describe("context map guardrails", () => {
     expect(contextMap.routingContractPath).toBe("docs/context/routing/task-to-context-routing.contract.json");
     expect(contextMap.routingSeedPath).toBe("docs/context/routing/task-to-context-routing.seed.json");
     expect(contextMap.contextPackCatalogPath).toBe("docs/context/packs/context-pack-catalog.seed.json");
+    expect(contextMap.contextAssemblyPolicy.tierOrder).toEqual([
+      "foundation",
+      "domain",
+      "implementation",
+      "optional",
+    ]);
+    expect(contextMap.contextAssemblyPolicy.profileCatalog.length).toBeGreaterThanOrEqual(1);
     expect(contextMap.globalExclusionRules.length).toBeGreaterThanOrEqual(1);
     expect(contextMap.globalExclusionTags.length).toBeGreaterThanOrEqual(4);
     expect(contextMap.authorityTagCatalog.authoritativeSourceTags.length).toBeGreaterThanOrEqual(1);
@@ -109,11 +139,13 @@ describe("context map guardrails", () => {
     for (const entry of contextMap.taskCategoryDefaults) {
       expect(allowedSelectionModes).toContain(entry.selectionMode);
       expect(allowedPriorityTiers).toContain(entry.priorityTier);
+      expect(entry.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
     }
 
     for (const mapping of contextMap.taskCategoryMappings) {
       expect(mapping.mappingId.trim().length).toBeGreaterThan(0);
       expect(mapping.intentId.trim().length).toBeGreaterThan(0);
+      expect(mapping.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
       expect(mapping.excludePackIds).toBeDefined();
       expect(Array.isArray(mapping.excludePackIds)).toBe(true);
       expect(mapping.exclusionTagIds.length).toBeGreaterThanOrEqual(1);
@@ -141,6 +173,21 @@ describe("context map guardrails", () => {
         expect(ref.priorityOrder).toBeGreaterThan(0);
         expect(allowedPackIds.has(ref.packId)).toBe(true);
       }
+
+      const tierHints = mapping.contextAssemblyTierHints;
+      expect(Object.keys(tierHints)).toEqual([
+        "foundation",
+        "domain",
+        "implementation",
+        "optional",
+      ]);
+      expect(tierHints.foundation.includeByDefault).toBe(true);
+      expect(tierHints.domain.includeByDefault).toBe(true);
+      expect(tierHints.implementation.includeByDefault).toBe(false);
+      expect(tierHints.optional.includeByDefault).toBe(false);
+      expect(tierHints.foundation.weight).toBeGreaterThan(tierHints.domain.weight);
+      expect(tierHints.domain.weight).toBeGreaterThan(tierHints.implementation.weight);
+      expect(tierHints.implementation.weight).toBeGreaterThan(tierHints.optional.weight);
     }
   });
 
@@ -153,10 +200,14 @@ describe("context map guardrails", () => {
     expect(humanSpec).toContain("## Top-Level Shape");
     expect(humanSpec).toContain("## Mapping Entry Shape");
     expect(humanSpec).toContain("## Validation");
+    expect(humanSpec).toContain("contextAssemblyPolicy");
+    expect(humanSpec).toContain("contextAssemblyTierHints");
 
     expect(aiSpec).toContain("## Required Map Concepts");
     expect(aiSpec).toContain("## Authoring Rules");
     expect(aiSpec).toContain("## Guardrails");
+    expect(aiSpec).toContain("contextAssemblyPolicy");
+    expect(aiSpec).toContain("contextAssemblyTierHints");
 
     expect(routingReadme).toContain("../context-map.json");
     expect(routingAiReadme).toContain("../context-map.json");

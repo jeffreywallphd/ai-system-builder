@@ -18,9 +18,25 @@ Machine-readable artifacts are authoritative for categories, selection modes, an
 1. Assign one `taskCategory`.
 2. Gather required routing fields: `taskSummary`, `taskCategory`, `requestedOutcomes`, `changedPaths`, `constraints`.
 3. Resolve mapping entry from `task-to-context-routing.seed.json`.
-4. Apply selection mode and exclusions from `context-map.json` and mapping metadata.
+4. Apply selection mode, assembly profile ordering, and exclusions from `context-map.json` and mapping metadata.
 5. Load minimum sufficient context.
 6. Validate output against authoritative docs and tests.
+
+## Context Assembly Priority and Ordering Rules
+
+Apply `foundation-domain-implementation-optional-v1` across initial categories with strict order:
+
+1. `foundation` (first-tier, required): routing contracts, context foundations, governance constraints.
+2. `domain` (first-tier, required): category-mapped domain docs scoped by changed paths and primary surfaces.
+3. `implementation` (second-tier, conditional): implementation-specific references for touched surfaces and quality gates.
+4. `optional` (second-tier, opt-in): support material only for explicit unresolved gaps.
+
+Rationale:
+
+- First-tier context is canonical and must be loaded before any lower-tier material.
+- Second-tier context is additive and must not override first-tier authority.
+- To minimize token waste, delay tier 3 and tier 4 until outcomes cannot be met with tier 1 and tier 2.
+- Remove tier 4 first when context becomes noisy.
 
 ## Minimum Sufficient Context Rules
 

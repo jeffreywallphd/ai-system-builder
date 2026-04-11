@@ -6,6 +6,7 @@
 
 ## Purpose
 - Canonical location for machine-readable routing contracts and mapping seeds.
+- Ensure deterministic context assembly ordering so first-tier context is loaded before optional support material.
 
 ## Belongs Here
 - Task-to-context mapping contracts.

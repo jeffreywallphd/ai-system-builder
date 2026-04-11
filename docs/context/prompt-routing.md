@@ -18,9 +18,25 @@ Treat machine-readable files as authoritative for category, selection mode, and 
 1. Classify the task into exactly one `taskCategory`.
 2. Capture required routing signals: `taskSummary`, `taskCategory`, `requestedOutcomes`, `changedPaths`, `constraints`.
 3. Resolve the mapped route from `task-to-context-routing.seed.json`.
-4. Apply selection mode and exclusions from `context-map.json` and the mapping entry.
+4. Apply selection mode, assembly profile ordering, and exclusions from `context-map.json` and the mapping entry.
 5. Load only the minimum set of context assets needed to satisfy outcomes and quality gates.
 6. Validate answers and changes against authoritative source docs and tests.
+
+## Context Assembly Priority and Ordering Rules
+
+Use `foundation-domain-implementation-optional-v1` for initial task categories and keep tier order fixed:
+
+1. `foundation` (first-tier, required): routing contracts, context-pack foundations, governance constraints.
+2. `domain` (first-tier, required): category-mapped architecture/contributor docs tied to `changedPaths` and `primarySurfaces`.
+3. `implementation` (second-tier, conditional): implementation-specific references for touched code paths and quality gates.
+4. `optional` (second-tier, opt-in): supporting material only when unresolved gaps remain.
+
+Rationale:
+
+- First-tier context (`foundation`, `domain`) carries canonical decision authority and must be assembled first.
+- Second-tier context (`implementation`, `optional`) is additive and should never displace first-tier authority.
+- Keep token usage low by loading tier 3 and tier 4 only when outcome requirements cannot be met from tier 1 and tier 2.
+- Remove tier 4 sources first when prompt size is constrained.
 
 ## Minimum Sufficient Context Rules
 

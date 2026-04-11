@@ -18,6 +18,53 @@
     "exclusions",
     "notes"
   ],
+  "contextAssemblyTierOrder": [
+    "foundation",
+    "domain",
+    "implementation",
+    "optional"
+  ],
+  "contextAssemblyProfiles": [
+    {
+      "id": "foundation-domain-implementation-optional-v1",
+      "displayName": "Foundation, Domain, Implementation, Optional",
+      "description": "Deterministic four-tier context assembly profile that maximizes high-signal context and limits optional noise.",
+      "tiers": [
+        {
+          "tierId": "foundation",
+          "priority": 1,
+          "required": true,
+          "tokenBudgetHint": "high",
+          "selectionRule": "load canonical routing contracts and foundational pack context first.",
+          "rationale": "Foundational context defines mandatory contracts and prevents downstream drift."
+        },
+        {
+          "tierId": "domain",
+          "priority": 2,
+          "required": true,
+          "tokenBudgetHint": "high",
+          "selectionRule": "load category-mapped architecture or contributor docs for declared task scope.",
+          "rationale": "Domain context narrows decision-making to the task category and changed paths."
+        },
+        {
+          "tierId": "implementation",
+          "priority": 3,
+          "required": false,
+          "tokenBudgetHint": "medium",
+          "selectionRule": "add implementation-adjacent references only for affected surfaces and quality gates.",
+          "rationale": "Implementation references are useful when execution details are needed but should remain scoped."
+        },
+        {
+          "tierId": "optional",
+          "priority": 4,
+          "required": false,
+          "tokenBudgetHint": "low",
+          "selectionRule": "include only explicit gap-filling support material not covered by earlier tiers.",
+          "rationale": "Optional context is lowest precedence to minimize token waste and context noise."
+        }
+      ]
+    }
+  ],
   "supportedTaskCategories": [
     {
       "id": "architecture-review",
@@ -73,6 +120,8 @@
     "taskCategory",
     "intent",
     "routingInputs",
+    "contextAssemblyProfileId",
+    "contextAssemblyTierHints",
     "packIds",
     "selectionMode",
     "priorityTier",

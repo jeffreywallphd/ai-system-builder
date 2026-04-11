@@ -26,6 +26,8 @@ The map intentionally reuses task category identifiers, selection modes, and pri
 - `artifactType`: fixed value (`context-map`).
 - `status`: lifecycle marker for the map artifact.
 - `taskCategoryDefaults`: deterministic per-category defaults (`taskCategoryId`, `selectionMode`, `priorityTier`).
+- `contextAssemblyPolicy`: shared tier ordering, profile catalog, and default weight semantics for context assembly.
+- `taskCategoryDefaults`: deterministic per-category defaults (`taskCategoryId`, `selectionMode`, `priorityTier`, `contextAssemblyProfileId`).
 - `globalExclusionRules`: shared exclusion guidance applied before fallback logic.
 - `globalExclusionTags`: stable exclusion tag identifiers for anti-noise enforcement.
 - `authorityTagCatalog`: stable tags separating authoritative sources from related-only sources.
@@ -39,6 +41,8 @@ Each mapping entry in `taskCategoryMappings` includes:
 - `taskCategoryId`: category identifier from the routing contract.
 - `intentId`: stable intent identifier for audit and future automation.
 - `packRefs`: ordered pack references using `priorityOrder` (lower wins).
+- `contextAssemblyProfileId`: assembly profile identifier from `contextAssemblyPolicy.profileCatalog`.
+- `contextAssemblyTierHints`: mapping-level tier weights and inclusion defaults for `foundation`, `domain`, `implementation`, and `optional`.
 - `excludePackIds`: explicit pack exclusions.
 - `exclusionTagIds`: explicit anti-noise exclusion tags applied for the mapping.
 - `authoritativeSourceTags`: source tags that are allowed to drive decisions.
@@ -52,6 +56,7 @@ This first version is intentionally scoped:
 
 - one deterministic mapping per supported task category;
 - one active pack reference (`context-system-foundations`) per mapping;
+- one deterministic four-tier assembly profile shared across initial task categories;
 - explicit exclusion tags, authority tags, and notes for future extension;
 - no runtime resolver implementation in this story.
 
