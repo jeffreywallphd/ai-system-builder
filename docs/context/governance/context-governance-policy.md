@@ -29,6 +29,7 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Apply rollout boundary assumptions from `docs/context/governance/context-system-rollout-boundaries.md` so initial-release scope remains explicit.
 - Apply documentation segmentation completion boundaries from `docs/context/governance/documentation-segmentation-rollout-boundaries.md` so segmentation follow-on work stays explicit and non-ambiguous.
 - Apply indexing and findability completion boundaries from `docs/context/governance/documentation-indexing-rollout-boundaries.md` so Feature 6 scope and remaining follow-on work stay explicit.
+- Apply required and recommended rule boundaries from `docs/context/governance/documentation-quality-standard.md` so documentation quality expectations remain explicit and enforceable.
 
 ## Review Cadence
 

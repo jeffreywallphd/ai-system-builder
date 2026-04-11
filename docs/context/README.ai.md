@@ -43,6 +43,7 @@
 - [Standard Context Pack Contract](./packs/README.ai.md#standard-context-pack-contract)
 - [Routing Assets Directory](./routing/README.ai.md)
 - [Context Governance Directory](./governance/README.ai.md)
+- [Documentation Quality Standard](./governance/documentation-quality-standard.ai.md)
 - [Context Asset Lifecycle Guidance](./governance/context-asset-lifecycle.ai.md)
 - [Documentation Segmentation Rollout Boundaries and Follow-On Work](./governance/documentation-segmentation-rollout-boundaries.ai.md)
 - [Documentation Indexing Rollout Boundaries and Future Expansion Points](./governance/documentation-indexing-rollout-boundaries.ai.md)

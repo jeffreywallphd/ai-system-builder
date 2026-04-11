@@ -31,6 +31,7 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Expected router files exist (`README.md` and `README.ai.md` at root and top-level docs areas).
 - Required `docs/context` foundation subfolders and seed artifacts exist (`packs`, `routing`, `governance`, `templates`).
 - Documentation indexing model docs remain present with required model headings for human and AI variants.
+- Documentation quality standard docs remain present with required section anchors for required-rules, non-blocking guidance, and automation mapping.
 - Context foundation contracts/seeds are valid JSON and keep expected schema markers.
 - Context map shape stays valid and cross-references remain resolvable (routing categories, profile IDs, exclusion tags, and pack IDs).
 - Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` references.
@@ -131,6 +132,7 @@ Examples:
 - `SUPERSESSION_COMPANION_MISSING`
 - `ACTIVE_PATH_REFERENCE_INVALID`
 - `DOCUMENTATION_INDEX_MODEL_INVALID`
+- `DOCUMENTATION_QUALITY_STANDARD_INVALID`
 - `REGISTRY_FILE_MISSING`
 - `REGISTRY_SHAPE_INVALID`
 - `REGISTRY_ENTRY_INVALID`
