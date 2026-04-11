@@ -22,6 +22,11 @@
 - Use filename format `adr-<NNN>-<kebab-case-title>.md` and keep AI companions as `adr-<NNN>-<kebab-case-title>.ai.md`.
 - Keep broad design contracts in `docs/architecture/`; use ADRs for explicit architecture decisions and rationale.
 
+## ADR Discovery Registry
+- Use `docs/adr/records/adr-registry.json` as the canonical fast-discovery artifact for ADR lookup by identifier, status, summary, and domain.
+- Keep registry entries sorted by `adrNumber` ascending and synchronized with ADR frontmatter (`adr_number`, `decision_status`, `decision_date`, and title).
+- Keep `discoveryIndex.byDecisionStatus` and `discoveryIndex.byDomain` aligned with `records` so assistants and maintainers can route quickly without scanning every ADR file.
+
 ## ADR Decision Thresholds
 
 ### ADR Required
@@ -102,6 +107,7 @@ Treat ADRs as integrated system docs, not an isolated decision folder. Keep cros
 
 ## Start Here
 - [ADR Records Home](./records/README.ai.md)
+- [ADR Discovery Registry](./records/adr-registry.json)
 - [ADR Authoring Guide](./records/authoring-guide.ai.md)
 - [ADR Template](../context/templates/adr.template.ai.md)
 - [Architecture Router](../architecture/README.ai.md)

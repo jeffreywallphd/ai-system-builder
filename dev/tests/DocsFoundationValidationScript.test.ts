@@ -121,4 +121,26 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("[ROUTING_REFERENCE_INVALID]");
     expect(combinedOutput).toContain("missing-routing-reference.md");
   });
+
+  it("detects missing ADR registry record references", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-registry-ref-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const adrRegistryPath = join(fixtureRoot, "docs", "adr", "records", "adr-registry.json");
+    const adrRegistry = JSON.parse(readFileSync(adrRegistryPath, "utf8")) as {
+      records: Array<{ humanDocPath: string }>;
+    };
+    adrRegistry.records[0].humanDocPath = "docs/adr/records/missing-adr-record.md";
+    writeFileSync(adrRegistryPath, `${JSON.stringify(adrRegistry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_REGISTRY_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("missing-adr-record.md");
+  });
 });

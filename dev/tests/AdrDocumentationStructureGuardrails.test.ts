@@ -97,7 +97,10 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRecords).toContain("deprecated");
     expect(humanRecords).toContain("## ADR Index and Sorting Rules");
     expect(humanRecords).toContain("adr_number");
+    expect(humanRecords).toContain("adr-registry.json");
     expect(humanRecords).toContain("## Current Index");
+    expect(humanRecords).toContain("Related Domains");
+    expect(humanRecords).toContain("Summary");
     expect(humanRecords).toContain("required section");
     expect(humanRecords).toContain("Supersession");
     expect(aiRecords).toContain("adr-<NNN>-<kebab-case-title>.md");
@@ -108,7 +111,10 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRecords).toContain("deprecated");
     expect(aiRecords).toContain("## ADR Index and Sorting Rules");
     expect(aiRecords).toContain("adr_number");
+    expect(aiRecords).toContain("adr-registry.json");
     expect(aiRecords).toContain("## Current Index");
+    expect(aiRecords).toContain("Related Domains");
+    expect(aiRecords).toContain("Summary");
     expect(aiRecords).toContain("required sections");
     expect(aiRecords).toContain("Supersession");
   });
