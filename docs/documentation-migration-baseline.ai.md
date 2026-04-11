@@ -1,3 +1,14 @@
+---
+title: "AI Companion: Documentation Migration Baseline"
+doc_type: baseline
+status: archived
+authoritativeness: historical
+owned_by: team:developer-experience
+last_reviewed: 2026-04-11
+related_code_paths:
+  - docs/documentation-migration-baseline.inventory.json
+---
+
 # AI Companion: Documentation Migration Baseline (Story 1.1.1)
 
 Use `docs/documentation-migration-baseline.inventory.json` as the source of truth for the current docs layout, role classification, and migration risk baseline.

@@ -48,3 +48,15 @@ Use this file for exact metadata-header formatting and required field semantics.
 ## Guardrail
 
 - Validation test: `dev/tests/DocumentationMetadataHeaderGuardrails.test.ts`
+- Seed backfill guardrail: `dev/tests/DocumentationMetadataSeedBackfillGuardrails.test.ts`
+
+## Story 1.2.4 seed examples
+
+Backfilled reference docs that now use the metadata header contract:
+
+- `docs/architecture/README.md` (`architecture-overview`)
+- `docs/architecture/domain-and-application-core.md` (`architecture-reference`)
+- `docs/unified-api-contributor-guide.md` (`contributor-guide`)
+- `docs/security-policy-configuration-operations.md` (`runbook`)
+- `docs/documentation-migration-baseline.md` (`baseline`)
+- `docs/context/documentation-taxonomy.md` (`ai-context`)
