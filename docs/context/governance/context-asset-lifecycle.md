@@ -43,6 +43,7 @@ This guidance defines how context packs and task-to-context routing assets are p
 - Repeated review findings showing stale links, incorrect code paths, or ambiguous guidance.
 - Scheduled review cadence in `reviewExpectations` metadata.
 - Any supersession or deprecation event affecting an upstream referenced asset.
+- Any high-risk pack trigger from `docs/context/governance/high-risk-context-pack-guidance.md`.
 
 ## Ownership Expectations
 
@@ -55,6 +56,7 @@ This guidance defines how context packs and task-to-context routing assets are p
 
 - Minimum cadence: once per feature-epic milestone for governance, pack catalog, and routing seed assets.
 - Assets with `reviewExpectations.cadence` follow the stricter of the explicit cadence or milestone cadence.
+- High-risk packs must follow the stronger ownership and cadence expectations in `docs/context/governance/high-risk-context-pack-guidance.md`.
 - Reviews must validate: metadata accuracy, canonical link health, routing determinism, and duplicate/stale content risk.
 - Update `last_reviewed` on canonical governance docs when lifecycle policy changes.
 
