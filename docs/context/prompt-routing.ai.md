@@ -38,6 +38,36 @@ Machine-readable artifacts are authoritative for categories, selection modes, an
 - Require explicit rationale for out-of-domain documents.
 - Favor authoritative sources (`docs/architecture`, contracts, guardrail tests) over convenience notes.
 
+## Explicit Exclusion Rules by Task Class
+
+Apply these exclusions even when nearby files seem related:
+
+- `architecture-review`: exclude stale historical baselines and superseded migration snapshots when canonical architecture references exist.
+- `feature-decomposition`: exclude implementation-deep diagnostics artifacts unless incident triage is an explicit outcome.
+- `coding-implementation`: exclude overlapping non-authoritative summaries when canonical contracts/architecture docs cover the same behavior.
+- `migration-refactor`: exclude feature-planning narratives not required for behavioral parity.
+- `diagnostics`: exclude adjacent-workflow packs for planning or UX unless reproduction evidence points there.
+- `ui-studio`: exclude backend-only architecture domains without direct UI contract/state-flow impact.
+- `runtime-security`: exclude non-security convenience docs when security/policy contracts are available.
+- `documentation-change`: exclude runtime implementation-only context unless documenting verified runtime behavior changes.
+
+Always exclude:
+
+- stale historical material when newer canonical sources exist;
+- unrelated architecture domains outside `changedPaths` and `primarySurfaces`;
+- overlapping but non-authoritative files when authoritative sources exist;
+- packs useful only for adjacent workflows.
+
+## Authoritative vs Related Material Selection
+
+Use this order:
+
+1. Load authoritative sources first (contracts, mapped canonical docs, path-matched architecture references).
+2. Treat related-but-non-authoritative sources as optional context only.
+3. Add related sources only with explicit gap-based justification.
+4. Remove related sources first when context becomes noisy.
+5. Resolve conflicts in favor of authoritative sources and label related sources as context-only.
+
 ## Task-Type Routing Guidance (AI Loom Repository)
 
 ### `architecture-review`

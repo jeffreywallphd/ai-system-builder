@@ -27,6 +27,8 @@ The map intentionally reuses task category identifiers, selection modes, and pri
 - `status`: lifecycle marker for the map artifact.
 - `taskCategoryDefaults`: deterministic per-category defaults (`taskCategoryId`, `selectionMode`, `priorityTier`).
 - `globalExclusionRules`: shared exclusion guidance applied before fallback logic.
+- `globalExclusionTags`: stable exclusion tag identifiers for anti-noise enforcement.
+- `authorityTagCatalog`: stable tags separating authoritative sources from related-only sources.
 - `taskCategoryMappings`: explicit category-to-pack mappings with stable identifiers.
 
 ## Mapping Entry Shape
@@ -38,6 +40,9 @@ Each mapping entry in `taskCategoryMappings` includes:
 - `intentId`: stable intent identifier for audit and future automation.
 - `packRefs`: ordered pack references using `priorityOrder` (lower wins).
 - `excludePackIds`: explicit pack exclusions.
+- `exclusionTagIds`: explicit anti-noise exclusion tags applied for the mapping.
+- `authoritativeSourceTags`: source tags that are allowed to drive decisions.
+- `relatedSourceTags`: source tags that are context-only and require explicit justification.
 - `notes`: short maintenance or scope notes.
 - `status`: lifecycle marker for the mapping entry.
 
@@ -47,7 +52,7 @@ This first version is intentionally scoped:
 
 - one deterministic mapping per supported task category;
 - one active pack reference (`context-system-foundations`) per mapping;
-- explicit exclusions and notes for future extension;
+- explicit exclusion tags, authority tags, and notes for future extension;
 - no runtime resolver implementation in this story.
 
 ## Validation

@@ -21,12 +21,16 @@ Use this file with `docs/context/context-map.json` to keep deterministic task-to
 - Stable intent identifiers (`intentId`)
 - Ordered pack references (`packRefs[].priorityOrder`)
 - Explicit exclusions (`excludePackIds` and `globalExclusionRules`)
+- Stable exclusion tags (`globalExclusionTags[].tagId`, `exclusionTagIds`)
+- Source authority tags (`authoritativeSourceTags`, `relatedSourceTags`)
 
 ## Authoring Rules
 
 - Keep task categories aligned to the routing contract category IDs.
 - Keep `selectionMode` and `priorityTier` aligned with routing defaults unless a documented exception is required.
 - Keep `packRefs` deterministically ordered and minimal.
+- Keep exclusion tags and authority tags explicit for every mapping.
+- Keep authoritative and related source tags distinct; related tags are context-only.
 - Keep mappings scoped and explicit; do not add speculative categories.
 - Keep notes short and focused on routing behavior.
 
