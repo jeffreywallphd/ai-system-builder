@@ -188,6 +188,28 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("invalid-doc-type");
   });
 
+  it("detects unknown stable-key references in registry entries", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-documentation-registry-record-ref-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      entries: Array<{ relatedRecordIds?: string[] }>;
+    };
+    registry.entries[0].relatedRecordIds = ["doc-missing-record-for-validator-test"];
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_REGISTRY_INVALID]");
+    expect(combinedOutput).toContain("doc-missing-record-for-validator-test");
+  });
+
   it("detects missing ADR registry record references", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-registry-ref-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

@@ -133,5 +133,6 @@ Fallback behavior:
 - Keep active-authoritative docs in `relatedDocPaths` by default; add baseline/superseded links only when mapping intent explicitly requires historical evidence or supersession maintenance.
 - Always include mapping metadata fields:
 `id`, `title`, `purpose`, `domain`, `owner`, `status`, `relatedDocPaths`, `relatedCodePaths`.
+- `relatedDocRecordIds` is optional and provides stable-key references to registry record ids.
 - Keep `id` equal to or deterministically derived from `taskId`.
 - `reviewExpectations` is optional; if present it must include `cadence`.

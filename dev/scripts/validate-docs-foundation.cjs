@@ -31,6 +31,9 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/documentation-registry.md",
   "docs/context/documentation-registry.ai.md",
   "docs/context/documentation-registry.seed.json",
+  "docs/context/documentation-identity-and-reference-conventions.md",
+  "docs/context/documentation-identity-and-reference-conventions.ai.md",
+  "docs/context/documentation-identity-and-reference.contract.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -111,12 +114,15 @@ const OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS = [
   "keywords",
   "relatedCodePaths",
   "relatedDocs",
+  "relatedRecordIds",
   "owner",
   "lastReviewed",
   "aiPath",
   "supersedes",
   "supersededBy",
 ];
+
+const DOCUMENTATION_RECORD_ID_PATTERN = /^doc-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 const REQUIRED_DOCUMENTATION_REGISTRY_ENTRY_FIELDS = [
   "recordId",
@@ -372,6 +378,7 @@ function validateDocsFoundation(repoRoot) {
   const contextMapPath = resolve(repoRoot, "docs/context/context-map.json");
   const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
   const indexedDocumentMetadataContractPath = resolve(repoRoot, "docs/context/documentation-indexed-document-metadata.contract.json");
+  const documentationIdentityReferenceContractPath = resolve(repoRoot, "docs/context/documentation-identity-and-reference.contract.json");
   const documentationRegistrySeedPath = resolve(repoRoot, "docs/context/documentation-registry.seed.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
@@ -382,6 +389,7 @@ function validateDocsFoundation(repoRoot) {
     contextMapPath,
     contextAssetMetadataContractPath,
     indexedDocumentMetadataContractPath,
+    documentationIdentityReferenceContractPath,
     documentationRegistrySeedPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
@@ -471,6 +479,7 @@ function validateDocsFoundation(repoRoot) {
   }
 
   const indexedDocumentMetadataContract = contextJsonArtifacts.get(indexedDocumentMetadataContractPath);
+  const documentationIdentityReferenceContract = contextJsonArtifacts.get(documentationIdentityReferenceContractPath);
   if (indexedDocumentMetadataContract) {
     if (
       indexedDocumentMetadataContract.schemaVersion !== "1.0.0"
@@ -529,6 +538,51 @@ function validateDocsFoundation(repoRoot) {
           });
         }
       }
+    }
+
+    if (
+      indexedDocumentMetadataContract.identityConventionsContractPath
+      !== "docs/context/documentation-identity-and-reference.contract.json"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json must reference docs/context/documentation-identity-and-reference.contract.json.",
+      });
+    }
+  }
+
+  if (documentationIdentityReferenceContract) {
+    if (
+      documentationIdentityReferenceContract.schemaVersion !== "1.0.0"
+      || documentationIdentityReferenceContract.artifactType !== "documentation-identity-and-reference-conventions"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-identity-and-reference.contract.json must declare schemaVersion 1.0.0 and artifactType documentation-identity-and-reference-conventions.",
+      });
+    }
+
+    if (
+      documentationIdentityReferenceContract.canonicalHumanSpecPath
+      !== "docs/context/documentation-identity-and-reference-conventions.md"
+      || documentationIdentityReferenceContract.canonicalAiSpecPath
+      !== "docs/context/documentation-identity-and-reference-conventions.ai.md"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-identity-and-reference.contract.json must reference canonical human/AI spec paths.",
+      });
+    }
+
+    const stableIdentity = documentationIdentityReferenceContract.stableIdentity || {};
+    if (
+      stableIdentity.field !== "recordId"
+      || stableIdentity.pattern !== "^doc-[a-z0-9]+(?:-[a-z0-9]+)*$"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-identity-and-reference.contract.json stableIdentity must define recordId and the canonical doc-id pattern.",
+      });
     }
   }
 
@@ -1116,6 +1170,13 @@ function validateDocsFoundation(repoRoot) {
       ? catalogContract.entryRequiredFields
       : [];
     const allowedStatusValues = new Set(Array.isArray(catalogContract.allowedStatusValues) ? catalogContract.allowedStatusValues : []);
+    const registryRecordIds = new Set(
+      Array.isArray(documentationRegistry?.entries)
+        ? documentationRegistry.entries
+          .map((entry) => entry?.recordId)
+          .filter((value) => isNonEmptyString(value))
+        : [],
+    );
 
     for (const [index, packEntry] of (catalogSeed.packs || []).entries()) {
       if (!packEntry || typeof packEntry !== "object") {
@@ -1191,6 +1252,26 @@ function validateDocsFoundation(repoRoot) {
               "CONTEXT_PACK_REFERENCE_INVALID",
               `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references missing ${listField} path '${referencePath}'.`,
             );
+          }
+        }
+      }
+
+      if (packEntry.relatedDocRecordIds !== undefined) {
+        if (!isArrayOfNonEmptyStrings(packEntry.relatedDocRecordIds)) {
+          addIssue(
+            issues,
+            "CONTEXT_PACK_REFERENCE_INVALID",
+            `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
+          );
+        } else {
+          for (const recordId of packEntry.relatedDocRecordIds) {
+            if (!registryRecordIds.has(recordId)) {
+              addIssue(
+                issues,
+                "CONTEXT_PACK_REFERENCE_INVALID",
+                `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references unknown relatedDocRecordId '${recordId}'.`,
+              );
+            }
           }
         }
       }
@@ -1488,6 +1569,14 @@ function validateDocsFoundation(repoRoot) {
           .filter((profileId) => isNonEmptyString(profileId))
         : [],
     );
+    const registryRecordIds = new Set(
+      Array.isArray(documentationRegistry?.entries)
+        ? documentationRegistry.entries
+          .map((entry) => entry?.recordId)
+          .filter((value) => isNonEmptyString(value))
+        : [],
+    );
+
     for (const mapping of routingSeed.mappings || []) {
       if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(mapping.taskCategory)) {
         addIssue(
@@ -1549,6 +1638,26 @@ function validateDocsFoundation(repoRoot) {
           }
         }
       }
+
+      if (mapping.relatedDocRecordIds !== undefined) {
+        if (!isArrayOfNonEmptyStrings(mapping.relatedDocRecordIds)) {
+          addIssue(
+            issues,
+            "ROUTING_REFERENCE_INVALID",
+            `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
+          );
+        } else {
+          for (const recordId of mapping.relatedDocRecordIds) {
+            if (!registryRecordIds.has(recordId)) {
+              addIssue(
+                issues,
+                "ROUTING_REFERENCE_INVALID",
+                `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
+              );
+            }
+          }
+        }
+      }
     }
 
     for (const example of routingSeed.routingExamples || []) {
@@ -1586,6 +1695,26 @@ function validateDocsFoundation(repoRoot) {
               "ROUTING_REFERENCE_INVALID",
               `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references missing expectedRelatedDocOrder path '${referencePath}'.`,
             );
+          }
+        }
+      }
+
+      if (example.relatedDocRecordIds !== undefined) {
+        if (!isArrayOfNonEmptyStrings(example.relatedDocRecordIds)) {
+          addIssue(
+            issues,
+            "ROUTING_REFERENCE_INVALID",
+            `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' field 'relatedDocRecordIds' must be a non-empty string array when set.`,
+          );
+        } else {
+          for (const recordId of example.relatedDocRecordIds) {
+            if (!registryRecordIds.has(recordId)) {
+              addIssue(
+                issues,
+                "ROUTING_REFERENCE_INVALID",
+                `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references unknown relatedDocRecordId '${recordId}'.`,
+              );
+            }
           }
         }
       }
@@ -1728,6 +1857,13 @@ function validateDocsFoundation(repoRoot) {
 
       const recordId = entry.recordId;
       if (isNonEmptyString(recordId)) {
+        if (!DOCUMENTATION_RECORD_ID_PATTERN.test(recordId)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry has invalid recordId '${recordId}'. Record ids must match '${DOCUMENTATION_RECORD_ID_PATTERN.source}'.`,
+          );
+        }
         if (entryIds.has(recordId)) {
           addIssue(
             issues,
@@ -1812,6 +1948,14 @@ function validateDocsFoundation(repoRoot) {
         }
       }
 
+      if (entry.relatedRecordIds !== undefined && !isArrayOfNonEmptyStrings(entry.relatedRecordIds)) {
+        addIssue(
+          issues,
+          "CONTEXT_REGISTRY_INVALID",
+          `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' field 'relatedRecordIds' must be a non-empty string array when set.`,
+        );
+      }
+
       for (const referenceField of ["relatedCodePaths", "relatedDocs", "supersedes", "supersededBy"]) {
         const value = entry[referenceField];
         if (Array.isArray(value)) {
@@ -1864,6 +2008,27 @@ function validateDocsFoundation(repoRoot) {
               `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' has future lastReviewed '${entry.lastReviewed}'.`,
             );
           }
+        }
+      }
+    }
+
+    for (const entry of documentationRegistry.entries || []) {
+      if (!Array.isArray(entry?.relatedRecordIds)) {
+        continue;
+      }
+      for (const referencedRecordId of entry.relatedRecordIds) {
+        if (!entryIds.has(referencedRecordId)) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' references unknown relatedRecordId '${referencedRecordId}'.`,
+          );
+        } else if (entry.recordId === referencedRecordId) {
+          addIssue(
+            issues,
+            "CONTEXT_REGISTRY_INVALID",
+            `docs/context/documentation-registry.seed.json entry '${entry.recordId || "<unknown>"}' cannot reference itself in relatedRecordIds.`,
+          );
         }
       }
     }

@@ -26,6 +26,7 @@ const optionalFields = [
   "keywords",
   "relatedCodePaths",
   "relatedDocs",
+  "relatedRecordIds",
   "owner",
   "lastReviewed",
   "aiPath",
@@ -47,6 +48,7 @@ type IndexedDocumentMetadataContract = {
   canonicalHumanSpecPath: string;
   canonicalAiSpecPath: string;
   derivedFromTaxonomyContractPath: string;
+  identityConventionsContractPath: string;
   requiredFields: string[];
   optionalFields: string[];
   fieldDefinitions: Record<string, {
@@ -78,6 +80,7 @@ describe("story 6.1.2 indexed document metadata contract guardrails", () => {
     expect(contract.canonicalHumanSpecPath).toBe("docs/context/documentation-indexed-document-metadata.md");
     expect(contract.canonicalAiSpecPath).toBe("docs/context/documentation-indexed-document-metadata.ai.md");
     expect(contract.derivedFromTaxonomyContractPath).toBe("docs/context/documentation-taxonomy.contract.json");
+    expect(contract.identityConventionsContractPath).toBe("docs/context/documentation-identity-and-reference.contract.json");
     expect(contract.requiredFields).toEqual(requiredFields);
     expect(contract.optionalFields).toEqual(optionalFields);
 
@@ -106,6 +109,7 @@ describe("story 6.1.2 indexed document metadata contract guardrails", () => {
     expect(ruleIds.has("rule-index-path-must-be-human-markdown")).toBe(true);
     expect(ruleIds.has("rule-index-aipath-must-be-ai-markdown")).toBe(true);
     expect(ruleIds.has("rule-index-supersession-mutual-exclusion")).toBe(true);
+    expect(ruleIds.has("rule-index-related-record-ids-must-exist")).toBe(true);
     expect(ruleIds.has("rule-index-superseded-status-requires-link")).toBe(true);
     expect(ruleIds.has("rule-index-last-reviewed-not-in-future")).toBe(true);
   });
@@ -122,6 +126,7 @@ describe("story 6.1.2 indexed document metadata contract guardrails", () => {
     expect(example.status).toBe("active");
     expect(example.authoritativeness).toBe("canonical");
     expect(example.aiPath).toBe("docs/context/documentation-indexing-model.ai.md");
+    expect(example.relatedRecordIds).toEqual(["doc-context-documentation-taxonomy"]);
   });
 
   it("keeps docs discoverable from root and context routers", () => {

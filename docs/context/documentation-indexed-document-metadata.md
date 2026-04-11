@@ -11,6 +11,7 @@ Provide a lightweight, stable record shape for documentation indexing so humans 
 - Human-readable: `docs/context/documentation-indexed-document-metadata.md`
 - AI-readable: `docs/context/documentation-indexed-document-metadata.ai.md`
 - Machine-readable: `docs/context/documentation-indexed-document-metadata.contract.json`
+- Identity conventions: `docs/context/documentation-identity-and-reference-conventions.md`
 - Registry seed consumer: `docs/context/documentation-registry.seed.json`
 
 ## Scope
@@ -39,6 +40,7 @@ This contract is for documentation index entries (registry records), not markdow
 | `keywords` | No | `string[]` | Small stable set of search terms for findability. |
 | `relatedCodePaths` | No | `string[]` | Canonical repo paths for directly related implementation code. |
 | `relatedDocs` | No | `string[]` | Canonical repo paths for tightly related docs to follow next. |
+| `relatedRecordIds` | No | `string[]` | Stable registry `recordId` references for durable cross-document linking. |
 | `owner` | No | `string` | Owning team or maintainer for review/routing accountability. |
 | `lastReviewed` | No | `YYYY-MM-DD` | Most recent review date when recency signals are needed. |
 | `aiPath` | No | `string` | Repo-relative path to AI companion variant (`.ai.md`) when present. |
@@ -51,6 +53,7 @@ This contract is for documentation index entries (registry records), not markdow
 - If `aiPath` is set, it must target a `.ai.md` file.
 - `docType`, `status`, and `authoritativeness` must match taxonomy enums.
 - `keywords`, `relatedCodePaths`, and `relatedDocs` should stay concise and canonical.
+- `relatedRecordIds` values must reference existing registry entry `recordId` values when used.
 - `supersedes` and `supersededBy` cannot both be set.
 - If `status` is `superseded`, `supersededBy` is required.
 - If `lastReviewed` is set, it must not be a future date at validation time.
@@ -69,6 +72,7 @@ This contract is for documentation index entries (registry records), not markdow
   "summary": "Defines indexing goals and boundaries for documentation discovery.",
   "keywords": ["indexing", "findability", "routing"],
   "relatedCodePaths": ["dev/scripts/validate-docs-foundation.cjs"],
+  "relatedRecordIds": ["doc-context-documentation-taxonomy"],
   "relatedDocs": [
     "docs/context/documentation-taxonomy.md",
     "docs/context/documentation-metadata-header.md"

@@ -265,6 +265,7 @@ describe("task-to-context routing contract guardrails", () => {
     expect(contract.mappingRequiredFields).toContain("contextAssemblyProfileId");
     expect(contract.mappingRequiredFields).toContain("contextAssemblyTierHints");
     expect(contract.mappingRequiredFields).toContain("priorityTier");
+    expect(contract.mappingOptionalFields).toContain("relatedDocRecordIds");
     expect(contract.mappingOptionalFields).toContain("reviewExpectations");
     expect(contract.contextAssetMetadataContractPath).toBe("docs/context/context-asset-metadata.contract.json");
     expect(contract.reviewExpectationsRequiredFieldsWhenPresent).toEqual(["cadence"]);
@@ -322,6 +323,12 @@ describe("task-to-context routing contract guardrails", () => {
 
       for (const docPath of example.expectedRelatedDocOrder) {
         expect(existsSync(resolve(repoRoot, docPath))).toBe(true);
+      }
+
+      if (example.taskId === "example-documentation-routing-restructure") {
+        const relatedDocRecordIds = (example as unknown as { relatedDocRecordIds?: string[] }).relatedDocRecordIds;
+        expect(Array.isArray(relatedDocRecordIds)).toBe(true);
+        expect(relatedDocRecordIds?.length).toBeGreaterThanOrEqual(1);
       }
     }
 
@@ -405,6 +412,12 @@ describe("task-to-context routing contract guardrails", () => {
       }
       for (const relatedCodePath of relatedCodePaths) {
         expect(existsSync(resolve(repoRoot, relatedCodePath))).toBe(true);
+      }
+
+      if (taskId === "documentation-refactor-context-and-architecture") {
+        const relatedDocRecordIds = mapping.relatedDocRecordIds as string[] | undefined;
+        expect(Array.isArray(relatedDocRecordIds)).toBe(true);
+        expect((relatedDocRecordIds || []).length).toBeGreaterThanOrEqual(1);
       }
     }
   });

@@ -92,10 +92,12 @@ Catalog entries in `context-pack-catalog.seed.json` must follow the metadata bas
 ### Optional Catalog Entry Fields
 
 - `tags`
+- `relatedDocRecordIds`
 - `notes`
 - `reviewExpectations`
 
 `reviewExpectations` is optional, but when present it must include `cadence`.
+Use `relatedDocRecordIds` when you want stable-key links to documentation registry entries in addition to path references.
 
 ### Brevity and Signal-To-Noise Rules
 

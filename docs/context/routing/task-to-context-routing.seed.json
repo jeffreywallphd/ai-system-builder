@@ -152,6 +152,10 @@
         "docs/contributors/router-overview-writing-standard.md",
         "docs/contributors/docs-placement-guide.md"
       ],
+      "relatedDocRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
       "expectedExclusions": [
         "docs/baselines/README.md",
         "docs/architecture/workflow-execution-and-tools.md",
@@ -725,6 +729,10 @@
         "docs/contributors/router-overview-writing-standard.md",
         "docs/contributors/docs-placement-guide.md",
         "docs/contributors/docs-migration-safety-guide.md"
+      ],
+      "relatedDocRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions"
       ],
       "relatedCodePaths": [
         "dev/scripts/validate-docs-foundation.cjs",

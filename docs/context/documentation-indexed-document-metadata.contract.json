@@ -5,6 +5,7 @@
   "canonicalHumanSpecPath": "docs/context/documentation-indexed-document-metadata.md",
   "canonicalAiSpecPath": "docs/context/documentation-indexed-document-metadata.ai.md",
   "derivedFromTaxonomyContractPath": "docs/context/documentation-taxonomy.contract.json",
+  "identityConventionsContractPath": "docs/context/documentation-identity-and-reference.contract.json",
   "requiredFields": [
     "path",
     "title",
@@ -18,6 +19,7 @@
     "keywords",
     "relatedCodePaths",
     "relatedDocs",
+    "relatedRecordIds",
     "owner",
     "lastReviewed",
     "aiPath",
@@ -72,6 +74,11 @@
       "itemType": "string",
       "description": "Repo-relative document paths that are tightly related."
     },
+    "relatedRecordIds": {
+      "type": "array",
+      "itemType": "string",
+      "description": "Stable registry recordId values for durable cross-document references."
+    },
     "owner": {
       "type": "string",
       "description": "Owning team or maintainer."
@@ -109,6 +116,10 @@
       "description": "supersedes and supersededBy cannot both be set."
     },
     {
+      "id": "rule-index-related-record-ids-must-exist",
+      "description": "relatedRecordIds values should resolve to existing documentation registry recordId values."
+    },
+    {
       "id": "rule-index-superseded-status-requires-link",
       "description": "When status is superseded, supersededBy is required."
     },
@@ -130,6 +141,9 @@
       "indexing",
       "findability",
       "routing"
+    ],
+    "relatedRecordIds": [
+      "doc-context-documentation-taxonomy"
     ],
     "relatedCodePaths": [
       "dev/scripts/validate-docs-foundation.cjs"

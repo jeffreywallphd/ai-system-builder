@@ -24,6 +24,7 @@
 - [Documentation Indexing Model and Goals](./documentation-indexing-model.ai.md)
 - [Standard Indexed Document Metadata Contract](./documentation-indexed-document-metadata.ai.md)
 - [Documentation Registry Structure](./documentation-registry.ai.md)
+- [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.ai.md)
 - [Documentation Registry Seed JSON](./documentation-registry.seed.json)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.ai.md)
 - [Documentation Segmentation Seed Guidance](./documentation-segmentation-seed-guidance.ai.md)
