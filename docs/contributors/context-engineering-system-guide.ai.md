@@ -77,6 +77,16 @@ Before finalizing task context:
 
 Use `docs/contributors/documentation-index-daily-usage-guide.ai.md` for the full daily workflow and review checklist.
 
+## Worked Retrieval Flows for Real Tasks (Story 6.3.5)
+
+For concrete task-routing examples, use:
+- `docs/contributors/documentation-index-assisted-discovery-worked-examples.ai.md`
+
+These examples make the integration explicit:
+- index task workflow -> candidate `recordId` retrieval
+- domain/status cross-check -> authority decision
+- routing `taskId` + `relatedDocRecordIds` -> deterministic context assembly
+
 ## Task Playbooks
 
 ### Prompt Preparation

@@ -78,6 +78,17 @@ Before finalizing context for any task category:
 For full daily usage details and review checks, use:
 - `docs/contributors/documentation-index-daily-usage-guide.md`
 
+## Worked Retrieval Flows for Real Tasks (Story 6.3.5)
+
+When task context is ambiguous, use:
+- `docs/contributors/documentation-index-assisted-discovery-worked-examples.md`
+
+These examples show how to:
+- start from index task workflows and collect `recordId` values
+- cross-check domain and status before authority decisions
+- map selected records to routing `taskId` and `relatedDocRecordIds`
+- keep taxonomy/status and authority checks explicit for security and diagnostics tasks
+
 ## Task Playbooks
 
 ### Prompt Preparation

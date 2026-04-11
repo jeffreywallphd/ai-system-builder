@@ -27,7 +27,9 @@ related_code_paths:
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
+  - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
   - docs/contributors/documentation-index-daily-usage-guide.ai.md
+  - docs/contributors/documentation-index-assisted-discovery-worked-examples.ai.md
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -243,6 +245,28 @@ Core boundary reinforced:
 - Metadata (`status`, `authoritativeness`) + active canonical docs -> implementation authority.
 
 When indexed results include historical records, treat them as evidence-only, follow supersession/redirect targets, and confirm current behavior from active canonical sources before implementation work.
+
+## Worked Index-Assisted Discovery Examples Status (Story 6.3.5)
+
+Story 6.3.5 makes index usage operational for real repository tasks by adding worked retrieval examples that explicitly connect:
+
+- index discovery surfaces (`Browse by Task Workflow`, `Browse by Domain`, `Browse by Status`)
+- routing integration (`taskId` and `relatedDocRecordIds` in `task-to-context-routing.seed.json`)
+- taxonomy/authority validation (`status`, `authoritativeness`, active-canonical precedence)
+
+Added guide:
+
+- `docs/contributors/documentation-index-assisted-discovery-worked-examples.ai.md`
+
+Task coverage in the examples:
+
+- architecture review
+- documentation refactor
+- feature decomposition
+- runtime troubleshooting
+- security-sensitive changes
+
+This keeps the registry/index useful as an active discovery-and-routing layer instead of passive metadata.
 
 ## Coverage Policy Contract
 

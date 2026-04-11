@@ -33,6 +33,7 @@
 - [Architecture Domain Navigation Worked Examples](./architecture-domain-navigation-worked-examples.md)
 - [Active vs Historical Docs Worked Examples](./active-vs-historical-docs-worked-examples.md)
 - [Documentation Index Daily Usage Guide](./documentation-index-daily-usage-guide.md)
+- [Documentation Index-Assisted Discovery Worked Examples](./documentation-index-assisted-discovery-worked-examples.md)
 - [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)
 - [Documentation Templates](../context/templates/README.md)
 - [Run Submission Contributor Guide](../run-submission-contributor-guide.md)

@@ -27,7 +27,9 @@ related_code_paths:
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
+  - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
   - docs/contributors/documentation-index-daily-usage-guide.md
+  - docs/contributors/documentation-index-assisted-discovery-worked-examples.md
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -259,6 +261,28 @@ The guide reinforces the key boundary:
 - Metadata fields (`status`, `authoritativeness`) and active canonical docs determine implementation authority.
 
 For indexed historical documents, contributors must treat records as evidence-only, follow supersession/redirect targets, and validate decisions against active canonical sources before implementation.
+
+## Worked Index-Assisted Discovery Examples Status (Story 6.3.5)
+
+Story 6.3.5 operationalizes the index for realistic repo tasks by adding repository-specific worked retrieval examples that explicitly connect:
+
+- index discovery (`Browse by Task Workflow`, `Browse by Domain`, `Browse by Status`)
+- routing integration (`taskId` and `relatedDocRecordIds` in `task-to-context-routing.seed.json`)
+- taxonomy and authority checks (`status`, `authoritativeness`, active-canonical precedence)
+
+The guide added in this story:
+
+- `docs/contributors/documentation-index-assisted-discovery-worked-examples.md`
+
+Covers five practical task types:
+
+- architecture review
+- documentation refactor
+- feature decomposition
+- runtime troubleshooting
+- security-sensitive changes
+
+This keeps the registry and index practical for day-to-day contributor and AI retrieval workflows instead of remaining a passive catalog.
 
 ## Extensibility Boundaries
 
