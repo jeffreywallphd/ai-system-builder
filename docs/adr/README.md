@@ -1,13 +1,23 @@
 # ADR Documentation Router
 
+## Audience
+- Engineers proposing or reviewing architectural decisions.
+- Maintainers tracking supersession and decision history.
+
 ## Purpose
-Architecture Decision Records documenting major technical decisions.
+- Architecture Decision Records and supersession history.
 
 ## Belongs Here
-- ADRs with context, decision, consequences, and status.
-- Superseded ADRs and replacement links.
+- ADR documents with context, decision, status, and consequences.
+- Superseded ADRs with replacement references.
+- Decision history that affects long-term architecture direction.
 
 ## Does Not Belong Here
-- Generic architecture reference docs without a decision record.
-- Operational runbooks.
+- General architecture reference material without a decision record.
+- Operational runbooks and support procedures.
 - Contributor implementation tutorials.
+
+## Start Here
+- [Architecture Router](../architecture/README.md)
+- [Docs Top-Level Contract](../README.md)
+- [Baselines Router](../baselines/README.md)

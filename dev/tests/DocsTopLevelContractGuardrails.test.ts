@@ -12,15 +12,11 @@ const requiredTopLevelFolders = [
   "baselines",
   "adr",
   "context",
+  "prompts",
+  "ui",
 ] as const;
 
-const folderContractReadmeRequirements = [
-  "contributors",
-  "operations",
-  "baselines",
-  "adr",
-  "context",
-] as const;
+const folderContractReadmeRequirements = requiredTopLevelFolders;
 
 describe("docs top-level contract guardrails", () => {
   it("keeps required top-level docs folders present", () => {
@@ -44,10 +40,13 @@ describe("docs top-level contract guardrails", () => {
       const readmePath = resolve(docsRoot, folder, "README.md");
       const content = readFileSync(readmePath, "utf8");
 
+      expect(content).toContain("## Audience");
       expect(content).toContain("## Purpose");
       expect(content).toContain("## Belongs Here");
       expect(content).toContain("## Does Not Belong Here");
+      expect(content).toContain("## Start Here");
       expect((content.match(/^- /gm) || []).length).toBeGreaterThanOrEqual(4);
+      expect((content.match(/\[[^\]]+\]\([^)]+\)/g) || []).length).toBeGreaterThanOrEqual(2);
     }
   });
 

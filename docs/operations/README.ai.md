@@ -1,13 +1,26 @@
 # AI Companion: Operations Documentation Router
 
+## Audience
+- AI assistants routing support/runbook questions.
+- Engineers and operators checking operational authority.
+
 ## Purpose
-Home for operational guidance used to run and support the system.
+- Entry point for runtime/admin operations guidance.
 
 ## Belongs Here
-- Runtime/admin runbooks.
-- Troubleshooting and diagnostics procedures.
+- Runtime operations runbooks and admin procedures.
+- Troubleshooting and diagnostics workflows.
+- Operational governance procedures for support and incident handling.
 
 ## Does Not Belong Here
-- Contributor build/extension process docs.
-- Architecture decision records.
-- Historical baseline snapshots.
+- Contributor coding workflow guidance.
+- Architecture decision records or design rationale history.
+- Historical migration baseline artifacts.
+
+## Start Here
+- [Workspace Administration Operations](../workspace-administration-operations.md)
+- [Storage Administration Operations](../storage-administration-operations.md)
+- [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.md)
+- [Secret Health And Operational Diagnostics](../secret-health-and-operational-diagnostics.md)
+- [Governance Audit Review Workflows](../governance-audit-review-workflows.md)
+- [Architecture Router](../architecture/README.ai.md)

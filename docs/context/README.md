@@ -1,14 +1,24 @@
 # Context Documentation Router
 
+## Audience
+- Engineers and assistants needing cross-feature orientation.
+- Maintainers curating shared taxonomy and glossary context.
+
 ## Purpose
-Shared domain context used for orientation, taxonomy, and cross-feature understanding.
+- Shared context and taxonomy references used across the docs system.
 
 ## Belongs Here
-- Glossaries and taxonomy references.
-- Cross-domain context maps and orientation docs.
-- Context packs used by humans and AI assistants.
+- Cross-domain taxonomy overviews and glossary-style references.
+- Context packs that help readers map concepts across features.
+- Shared orientation docs reused by both human and AI readers.
 
 ## Does Not Belong Here
 - Feature-specific operational runbooks.
-- Detailed implementation instructions for contributors.
-- Architecture decisions better captured as ADRs.
+- Step-by-step contributor implementation workflows.
+- Architecture decision history better captured as ADRs.
+
+## Start Here
+- [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.md)
+- [Architecture Router](../architecture/README.md)
+- [Contributors Router](../contributors/README.md)
+- [Operations Router](../operations/README.md)
