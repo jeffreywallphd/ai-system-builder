@@ -146,6 +146,51 @@ function extractMarkdownLinks(markdownContent) {
   return links;
 }
 
+function extractBacktickedValues(text) {
+  const values = [];
+  const pattern = /`([^`]+)`/g;
+  let match = pattern.exec(text);
+  while (match) {
+    values.push(match[1].trim());
+    match = pattern.exec(text);
+  }
+  return values.filter((value) => value.length > 0);
+}
+
+function extractSectionBody(markdownContent, heading) {
+  const normalized = markdownContent.replace(/\r\n/g, "\n");
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionPattern = new RegExp(`^${escapedHeading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|\\n#\\s+|$)`, "m");
+  const match = normalized.match(sectionPattern);
+  return match ? match[1] : "";
+}
+
+function looksLikeRepoPath(pathValue) {
+  return /^(?:\.{1,2}\/|\/|docs\/|src\/|dev\/|electron\/|user\/)/.test(pathValue);
+}
+
+function extractDocPathReferences(text) {
+  const references = new Set();
+  for (const linkTarget of extractMarkdownLinks(text)) {
+    const normalized = normalizeLocalLink(linkTarget);
+    if (normalized) {
+      references.add(normalized);
+    }
+  }
+
+  for (const candidate of extractBacktickedValues(text)) {
+    if (!looksLikeRepoPath(candidate)) {
+      continue;
+    }
+    const normalized = normalizeLocalLink(candidate);
+    if (normalized) {
+      references.add(normalized);
+    }
+  }
+
+  return [...references];
+}
+
 function normalizeLocalLink(linkTarget) {
   if (typeof linkTarget !== "string") {
     return "";
@@ -431,6 +476,32 @@ function validateSupersessionRegistry({ issues, repoRoot }) {
       );
     }
 
+    if (!Array.isArray(entry?.canonicalDestinations) || entry.canonicalDestinations.length === 0) {
+      addIssue(
+        issues,
+        "SUPERSESSION_REGISTRY_INVALID",
+        `Superseded entry '${sourcePath}' must include non-empty canonicalDestinations.`,
+      );
+    } else {
+      for (const destinationPath of entry.canonicalDestinations) {
+        if (!isNonEmptyString(destinationPath)) {
+          addIssue(
+            issues,
+            "SUPERSESSION_REGISTRY_INVALID",
+            `Superseded entry '${sourcePath}' has invalid canonical destination path.`,
+          );
+          continue;
+        }
+        if (!existsSync(resolve(repoRoot, destinationPath))) {
+          addIssue(
+            issues,
+            "SUPERSESSION_CANONICAL_DESTINATION_INVALID",
+            `Canonical destination is missing: ${destinationPath} (from ${sourcePath})`,
+          );
+        }
+      }
+    }
+
     let frontmatter;
     let sourceContent;
     try {
@@ -478,9 +549,123 @@ function validateSupersessionRegistry({ issues, repoRoot }) {
         );
       }
     }
+
+    const requiredRedirectTargets = [supersededByPath];
+    if (Array.isArray(entry?.canonicalDestinations)) {
+      requiredRedirectTargets.push(...entry.canonicalDestinations);
+    }
+    validateRedirectReferences({
+      issues,
+      repoRoot,
+      sourcePath,
+      sourceContent,
+      requiredTargets: requiredRedirectTargets,
+    });
   }
 
   return { supersededPaths };
+}
+
+function validateRedirectReferences({
+  issues,
+  repoRoot,
+  sourcePath,
+  sourceContent,
+  requiredTargets = [],
+}) {
+  const redirectBody = extractSectionBody(sourceContent, "## Redirect");
+  if (!redirectBody.trim()) {
+    addIssue(
+      issues,
+      "SUPERSESSION_REDIRECT_SECTION_INVALID",
+      `${sourcePath} must include non-empty redirect guidance in '## Redirect'.`,
+    );
+    return;
+  }
+
+  const redirectReferences = extractDocPathReferences(redirectBody);
+  if (redirectReferences.length === 0) {
+    addIssue(
+      issues,
+      "SUPERSESSION_REDIRECT_REFERENCE_MISSING",
+      `${sourcePath} must include at least one local destination path in '## Redirect'.`,
+    );
+    return;
+  }
+
+  const normalizedRequiredTargets = requiredTargets
+    .filter((entry) => isNonEmptyString(entry))
+    .map((entry) => normalizeLocalLink(entry))
+    .filter((entry) => entry.length > 0);
+  const redirectReferenceSet = new Set(redirectReferences);
+
+  for (const requiredTarget of normalizedRequiredTargets) {
+    if (!redirectReferenceSet.has(requiredTarget)) {
+      addIssue(
+        issues,
+        "SUPERSESSION_REDIRECT_TARGET_MISSING",
+        `${sourcePath} redirect section must include '${requiredTarget}'.`,
+      );
+    }
+  }
+
+  for (const targetPath of redirectReferences) {
+    const resolvedTarget = resolveLinkTarget(repoRoot, sourcePath, targetPath);
+    if (!existsSync(resolvedTarget)) {
+      addIssue(
+        issues,
+        "SUPERSESSION_REDIRECT_REFERENCE_INVALID",
+        `${sourcePath} redirect target is missing: ${targetPath}`,
+      );
+    }
+  }
+
+  if (!sourcePath.endsWith(".md")) {
+    return;
+  }
+
+  const aiCompanionSourcePath = sourcePath.replace(/\.md$/, ".ai.md");
+  const aiCompanionAbsolutePath = resolve(repoRoot, aiCompanionSourcePath);
+  if (!existsSync(aiCompanionAbsolutePath)) {
+    addIssue(
+      issues,
+      "SUPERSESSION_COMPANION_MISSING",
+      `${sourcePath} is missing AI companion stub: ${aiCompanionSourcePath}`,
+    );
+    return;
+  }
+
+  const aiSourceContent = readFileSync(aiCompanionAbsolutePath, "utf8");
+  const aiRedirectBody = extractSectionBody(aiSourceContent, "## Redirect");
+  if (!aiRedirectBody.trim()) {
+    addIssue(
+      issues,
+      "SUPERSESSION_REDIRECT_SECTION_INVALID",
+      `${aiCompanionSourcePath} must include non-empty redirect guidance in '## Redirect'.`,
+    );
+    return;
+  }
+
+  const aiRedirectReferences = extractDocPathReferences(aiRedirectBody);
+  if (aiRedirectReferences.length === 0) {
+    addIssue(
+      issues,
+      "SUPERSESSION_REDIRECT_REFERENCE_MISSING",
+      `${aiCompanionSourcePath} must include at least one local destination path in '## Redirect'.`,
+    );
+    return;
+  }
+
+  for (const targetPath of aiRedirectReferences) {
+    const resolvedTarget = resolveLinkTarget(repoRoot, aiCompanionSourcePath, targetPath);
+    if (!existsSync(resolvedTarget)) {
+      addIssue(
+        issues,
+        "SUPERSESSION_REDIRECT_REFERENCE_INVALID",
+        `${aiCompanionSourcePath} redirect target is missing: ${targetPath}`,
+      );
+    }
+  }
 }
 
 function validateActivePathLinks({ issues, repoRoot, supersededPaths }) {
@@ -558,7 +743,7 @@ function main() {
     "Docs segmentation validation passed.",
     `Checked status-signal anchor docs: ${STATUS_SIGNAL_ANCHOR_DOCS.length}`,
     "Checked segmentation inventory category and baseline-destination invariants.",
-    `Checked supersession registry entries: ${supersededPathCount}`,
+    `Checked supersession registry entries and redirect cross-references: ${supersededPathCount}`,
     `Checked active router docs for invalid superseded links: ${ACTIVE_PATH_DOCS.length}`,
   ].join("\n") + "\n");
 }

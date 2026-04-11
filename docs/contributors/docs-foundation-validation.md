@@ -50,6 +50,8 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Segmentation status-signal anchor docs keep required `## Documentation Status` markers.
 - Segmentation inventory candidates retain baseline destination guidance for non-superseded historical material.
 - Supersession registry entries remain consistent with stub frontmatter and valid superseded destinations.
+- Supersession registry canonical destination lists stay resolvable.
+- Superseded stub `## Redirect` sections include resolvable local destination paths and include required canonical targets.
 - Active top-level routers avoid linking directly to superseded documentation paths.
 
 ## Run Locally
@@ -111,8 +113,14 @@ Examples:
 - `SEGMENTATION_SUPERSESSION_LINK_INVALID`
 - `SUPERSESSION_REGISTRY_INVALID`
 - `SUPERSESSION_DESTINATION_INVALID`
+- `SUPERSESSION_CANONICAL_DESTINATION_INVALID`
 - `SUPERSESSION_METADATA_MISMATCH`
 - `SUPERSESSION_SECTION_MISSING`
+- `SUPERSESSION_REDIRECT_SECTION_INVALID`
+- `SUPERSESSION_REDIRECT_REFERENCE_MISSING`
+- `SUPERSESSION_REDIRECT_TARGET_MISSING`
+- `SUPERSESSION_REDIRECT_REFERENCE_INVALID`
+- `SUPERSESSION_COMPANION_MISSING`
 - `ACTIVE_PATH_REFERENCE_INVALID`
 
 ## Scope Notes

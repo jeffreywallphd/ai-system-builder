@@ -50,6 +50,8 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Segmentation status-signal anchor docs keep required `## Documentation Status` markers.
 - Segmentation inventory candidates keep baseline destination guidance for non-superseded historical material.
 - Supersession registry entries keep frontmatter and destination alignment.
+- Supersession registry canonical destination lists stay resolvable.
+- Superseded stub `## Redirect` sections keep resolvable local destination paths and required canonical targets.
 - Active top-level routers avoid linking to superseded paths.
 
 ## Run Command
@@ -102,8 +104,14 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `SEGMENTATION_SUPERSESSION_LINK_INVALID`
 - `SUPERSESSION_REGISTRY_INVALID`
 - `SUPERSESSION_DESTINATION_INVALID`
+- `SUPERSESSION_CANONICAL_DESTINATION_INVALID`
 - `SUPERSESSION_METADATA_MISMATCH`
 - `SUPERSESSION_SECTION_MISSING`
+- `SUPERSESSION_REDIRECT_SECTION_INVALID`
+- `SUPERSESSION_REDIRECT_REFERENCE_MISSING`
+- `SUPERSESSION_REDIRECT_TARGET_MISSING`
+- `SUPERSESSION_REDIRECT_REFERENCE_INVALID`
+- `SUPERSESSION_COMPANION_MISSING`
 - `ACTIVE_PATH_REFERENCE_INVALID`
 
 ## Scope Notes
