@@ -23,6 +23,8 @@
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.ai.md)
 - [Context Asset Metadata Standard](./context-asset-metadata.ai.md)
+- [Context Map](./context-map.ai.md)
+- [Context Map JSON](./context-map.json)
 - [Context Pack Directory](./packs/README.ai.md)
 - [Standard Context Pack Contract](./packs/README.ai.md#standard-context-pack-contract)
 - [Routing Assets Directory](./routing/README.ai.md)
