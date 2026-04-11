@@ -1,214 +1,49 @@
-# AI Companion: Offline Local-Mode Authority Boundaries
+﻿# AI Companion: Offline Local-Mode Authority Boundaries
 
-## Purpose
+## Core fact
 
-Story 19.1.7 hardens the offline/local-mode architecture docs so future features keep limited local autonomy without creating silent competing truth.
+Offline local mode is bounded local autonomy; authoritative global truth remains server-owned.
 
-## Canonical files
+## Active authority scope
 
-- `src/domain/platform/OfflineLocalModeBoundaries.ts`
-- `src/application/common/OfflineResourceClassificationPolicy.ts`
-- `src/application/common/OfflineLocalModeResynchronization.ts`
-- `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
-- `src/application/common/OfflinePendingOperationPersistence.ts`
-- `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
-- `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
-- `src/application/common/OfflineDesktopStartupRecovery.ts`
-- `src/application/common/OfflineOperationalEventPorts.ts`
-- `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
-- `src/hosts/desktop/DesktopConnectivityStateService.ts`
-- `src/hosts/desktop/DesktopOfflineSnapshotCacheHost.ts`
-- `src/hosts/desktop/DesktopOfflinePendingOperationHost.ts`
-- `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
-- `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
-- `src/infrastructure/api/system-runtime/DesktopOfflineOperationalEventSink.ts`
-- `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
-- `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
-- `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
-- `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
-- `src/infrastructure/desktop/DesktopOfflineValueProtection.ts`
-- `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
-- `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
-- `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
-- `docs/architecture/offline-local-mode-authority-boundaries.md`
-- `docs/offline-local-mode-contributor-guide.md`
+Use this doc for current boundary rules only:
+- authority and storage posture;
+- allowed offline capability classes;
+- reconnect decision and prohibited-shortcut constraints.
+
+Historical chronology moved to:
+- `docs/baselines/architecture/identity-trust-and-security/offline-local-mode-authority-boundaries-historical-evolution.ai.md`
 
 ## Required invariants
 
-- Desktop offline support is bounded local autonomy, not a second control plane.
-- Authoritative global truth remains server-owned.
-- Offline local state remains explicitly local until reconnect outcomes are decided.
-- Client code must not treat offline local state as silently authoritative global truth.
-- Conflict/rejection outcomes remain visible and require user/admin intervention where required.
+- Offline state remains explicitly local until reconnect outcomes apply.
+- Reconnect outcomes must remain explicit and auditable.
+- Server-authoritative-only resources stay uncached and non-local.
+- Reconciliation control flow must not depend on best-effort event publication.
 
-## Current production model summary
+## Canonical seams
 
-- Explicit offline resource-class catalog with capability matrix, authority scope, behavior class, and storage bucket.
-- Deterministic classification from visibility/role/sharing/sensitivity/storage-rule/device-trust inputs.
-- Explicit local draft lifecycle and queued replay envelope semantics.
-- Explicit reconnect decision actions (`apply-to-authoritative`, `conflict-requires-review`, `reject-not-allowed`).
-- Canonical bounded conflict classes + decision-rule taxonomy.
-- Explicitly limited offline execution classes and reconnect registration envelope flow.
-- Explicit desktop connectivity-state transitions (`connected`, `degraded`, `reconnecting`, `disconnected`) derived from transport/session/trust/offline-intent probes.
-- Dedicated desktop authoritative snapshot cache service + SQLite persistence with bounded retention and metadata integrity digest checks.
-- Snapshot records persist logical resource snapshots and offline eligibility markers, not raw filesystem references.
-- Dedicated pending-operation persistence and replay-preparation service + SQLite queue store for durable unsynced operation intent.
-- Pending-operation records persist actor/workspace context, dependency metadata, base-version metadata, retryability metadata, and canonical replay payload digest for deterministic replay.
-- Dedicated local-execution registration persistence and replay-preparation service + SQLite queue store for durable local execution metadata registration intent.
-- Local-execution registration records persist actor/workspace context, execution metadata/output linkage payload, retryability metadata, and canonical metadata digest for deterministic reconnect registration replay.
-- Offline snapshot/pending-operation/registration repositories now persist sensitive JSON envelope/payload fields through protected local-value storage when available (Electron `safeStorage`) and record explicit per-row protection posture metadata.
-- Controlled reconnect coordinator revalidates stale cached snapshots, plans replay decisions, executes eligible replay through authoritative APIs in dependency order, updates local queue status, and captures explicit reconciliation outcomes.
-- Coordinator applies explicit post-sync cache maintenance: refresh stale snapshots, invalidate revoked/deleted/permission-lost/invalidated resources, and invalidate stale snapshots that cannot be refreshed.
-- Reject replay outcomes now persist non-retryable reason codes for revocation/permission-loss rejection classes so reconnect retry visibility remains explicit and bounded.
-- Coordinator emits structured blocked replay metadata (reason code/message/dependency blockers) so UI/admin surfaces can expose why replay did not proceed.
-- Terminal blocked replay states (`retry-exhausted`, `non-retryable`) are persisted as explicit rejected outcomes while retaining local unsynced records for manual intervention.
-- Coordinator emits structured pending-operation cleanup classifications (`successful`, `conflicted`, `failed`, `abandoned`) with explicit remove-vs-retain local cleanup actions.
-- Host/application seams emit sanitized structured offline/resync hook outcomes (`offline-entered`, `offline-exited`, `replay-succeeded`, `replay-failed`, `conflict-detected`, `protected-local-execution-registered`) for operational/governance visibility.
-- Infrastructure offline observability now emits sanitized structured logs/metrics with attempt-level correlation (`requestId`, `correlationId`, `syncAttemptId`) and replay/cache failure summaries.
-- Desktop shell now includes a shared offline-aware status surface/presenter seam that consumes canonical offline connectivity/synchronization contracts for user-visible online/offline/reconnecting/unsynced guidance.
-- Desktop startup recovery now inspects interrupted-resync markers, queue retryability metadata, preserved draft resources, and snapshot expiry metadata so restart-time state remains explicit and durable.
-- Desktop host runtime now records resynchronization attempt started/completed markers and can perform bounded startup auto-retry of interrupted attempts when reconnect preconditions are satisfied.
+- `src/domain/platform/OfflineLocalModeBoundaries.ts`
+- `src/application/common/OfflineLocalModeResynchronization.ts`
+- `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
+- `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
+- `src/hosts/desktop/DesktopConnectivityStateService.ts`
+- `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
 
-## Desktop cache + resync workflow baseline (Story 19.2.8)
-
-- canonical workflow source of truth: `docs/architecture/offline-local-mode-authority-boundaries.md`
-- new flow sections in the human doc cover:
-  - cache population + offline transition sequence
-  - reconnect replay + conflict handling sequence
-  - post-sync cache refresh/invalidation cleanup sequence
-- workflow map cross-links host/application/infrastructure/shared seams:
-  - reconnect coordinator: `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
-  - pending-operation replay prep: `src/application/common/OfflinePendingOperationPersistence.ts`
-  - snapshot cache policy + storage: `src/application/common/OfflineAuthoritativeSnapshotCache.ts`
-  - connectivity transitions: `src/hosts/desktop/DesktopConnectivityStateService.ts`
-  - desktop runtime composition: `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
-  - sqlite durability adapters:
-    - `src/infrastructure/desktop/DesktopOfflineSnapshotCacheRepository.ts`
-    - `src/infrastructure/desktop/DesktopOfflinePendingOperationRepository.ts`
-  - shared queue/connectivity/outcome contracts:
-    - `src/shared/contracts/runtime/OfflineSynchronizationContracts.ts`
-    - `src/shared/dto/runtime/OfflineSynchronizationDtos.ts`
-    - `src/shared/schemas/runtime/OfflineSynchronizationSchemaContracts.ts`
-
-## Desktop UX status surfaces baseline (Story 19.3.1)
-
-- canonical UI seams:
-  - `src/ui/shared/connectivity/DesktopConnectivityService.ts`
-  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
-  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
-  - `src/ui/layout/AppLayout.tsx`
-- required posture:
-  - render explicit offline/reconnecting/connected/unsynced state in shared desktop shell,
-  - display cached-resource and pending-sync summaries,
-  - display explicit policy-limited unsupported actions,
-  - consume shared offline contract DTOs (`OfflineConnectivitySurfaceStateDto`, `OfflineSynchronizationStateSnapshotDto`) instead of ad hoc transport inference.
-
-## Desktop UX interaction-flow baseline (Story 19.3.2)
-
-- keep recovery and sync-resolution interaction flow seams in shared presenter/UI:
-  - `src/ui/presenters/DesktopOfflineStatusPresenter.ts`
-  - `src/ui/shared/connectivity/DesktopOfflineStatusSurface.tsx`
-  - `src/ui/layout/AppLayout.tsx`
-- include explicit user-visible panels for:
-  - preserved unsynced drafts,
-  - sync conflict summaries,
-  - replay outcomes and disposition reasons,
-  - first production recovery/follow-up actions.
-- keep UX honest about bounded automation:
-  - no silent auto-merge claims,
-  - no hidden replay of rejected operations,
-  - no implication that local state becomes authoritative without reconnect outcomes.
-
-## Local execution registration baseline (Story 19.3.3)
-
-- new canonical seams:
-  - `src/application/common/OfflineLocalExecutionRegistrationPersistence.ts`
-  - `src/hosts/desktop/DesktopOfflineLocalExecutionRegistrationHost.ts`
-  - `src/infrastructure/desktop/DesktopOfflineLocalExecutionRegistrationRepository.ts`
-- reconnect coordinator now replays queued local execution registrations explicitly and keeps lineage explicit:
-  - local record history scope remains `explicit-local-activity` until authoritative registration succeeds,
-  - registration outcomes map to explicit statuses (`queued-pending-registration`, `registration-conflict`, `registration-rejected`, `registration-applied`),
-  - success emits `protected-local-execution-registered` without implying disconnected authoritative orchestration,
-  - conflict/rejection remains queryable in local queue + reconciliation outcomes (no silent backdating).
-
-## Desktop startup recovery baseline (Story 19.3.6)
-
-- canonical seams:
-  - `src/application/common/OfflineDesktopStartupRecovery.ts`
-  - `src/infrastructure/desktop/DesktopOfflineResynchronizationRecoveryRepository.ts`
-  - `src/hosts/desktop/DesktopOfflineResynchronizationHost.ts`
-- restart behavior:
-  - startup inspection classifies retryable vs manual-follow-up queue state explicitly,
-  - interrupted resync attempts remain durable across desktop restarts,
-  - optional startup auto-retry is bounded to reconnect-eligible and retryable cases,
-  - unresolved state remains queryable (no silent destructive cleanup).
-
-## Implemented guarantees now called out explicitly
-
-- replay starts only when connectivity marks `canResynchronize=true`.
-- blocked replay operations keep structured reasons/dependency blockers.
-- reconnect cleanup preserves explicit `successful`/`conflicted`/`failed`/`abandoned` classification with remove-vs-retain action.
-- post-sync cache maintenance explicitly refreshes or invalidates entries; stale-unrefreshable cache records are removed.
-- offline operational-event sanitization now redacts path/prompt/credential-like string values in addition to key-based sensitive-field removal.
-- reconnect diagnostics now include explicit `resynchronization-attempt-started` / `resynchronization-attempt-completed` markers and `snapshot-refresh-failed` cache-failure diagnostics.
-
-## Story 19.3.8 production-hardening regression baseline
-
-- representative cross-layer lifecycle guard:
-  - `src/hosts/desktop/tests/DesktopOfflineLifecycleRegression.integration.test.ts`
-- expected invariant coverage:
-  - server-authoritative replay primacy and explicit apply/reject ownership,
-  - explicit unsynced conflict/rejection local state (no silent global divergence),
-  - durable pending-operation/local-execution persistence through reconnect and restart recovery posture,
-  - explicit cache refresh/invalidation maintenance for stale/revoked resources,
-  - shared contract/schema parsing and desktop presenter compatibility for unresolved-work visibility.
-
-## Deployment-profile and future remote/offline evolution seams (Story 19.3.7)
-
-- Added explicit desktop offline policy-resolution seam in:
-  - `src/hosts/desktop/DesktopOfflineLocalModeProfile.ts`
-  - `IDesktopOfflineLocalModePolicyResolverPort`
-  - `DesktopOfflineLocalModePolicyResolutionOptions`
-- Added host runtime option seams so deployment-policy context can flow through offline host factories without changing baseline behavior:
-  - `DesktopOfflinePendingOperationHost`
-  - `DesktopOfflineSnapshotCacheHost`
-  - `DesktopOfflineLocalExecutionRegistrationHost`
-  - `DesktopOfflineResynchronizationHost`
-- Added reconnect decision-policy seam in:
-  - `src/application/common/OfflineControlledResynchronizationCoordinator.ts`
-  - `IOfflineResynchronizationPolicyPort`
-- Default production behavior remains the existing policy:
-  - `planOfflineResynchronization(...)`
-  - `assertResynchronizationPlanPreventsSilentGlobalDivergence(...)`
-- Guardrails keep current behavior honest:
-  - deployment-policy seam cannot broaden offline resource/execution scope beyond current production baseline,
-  - unsupported remote replay endpoint declarations are rejected,
-  - no placeholder profile toggles or fake sync modes are shipped.
-
-## Intentionally deferred behavior (must remain deferred unless explicitly scoped)
-
-- no silent auto-merge expansion beyond baseline authoritative revision match.
-- no multi-desktop queue merge protocol.
-- no secret plaintext offline cache path.
-- no automatic promotion of local cache/draft state to authoritative truth.
-- no coupling of best-effort event publication failures to reconciliation control flow.
-
-## Server-authoritative-only baseline
-
-Must remain server-authoritative:
-- replay authorization and final acceptance/rejection;
-- global lifecycle mutation for shared resources;
-- secret plaintext materialization;
-- authoritative run-orchestration history.
-
-## Prohibited shortcuts (preserved)
+## Prohibited shortcuts
 
 - silent-global-divergence
 - local-cache-as-global-authority
 - unsignaled-authoritative-overwrite
 - pre-marking queued operations as globally applied
-- silent merge of local execution history into authoritative run history
+- silent merge of local execution history into authoritative history
 
-## Contributor workflow pointer
+## Canonical links
 
-Use `docs/offline-local-mode-contributor-guide.md` for extension sequence, required test updates, and prohibited implementation patterns.
+- `docs/architecture/domains/identity-trust-and-security/overview.md`
+- `docs/offline-local-mode-contributor-guide.ai.md`
+
+## Historical material
+
+Full rollout chronology is preserved in:
+- `docs/baselines/architecture/identity-trust-and-security/offline-local-mode-authority-boundaries-historical-evolution.ai.md`

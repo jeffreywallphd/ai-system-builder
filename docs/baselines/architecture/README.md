@@ -31,6 +31,9 @@ related_code_paths:
 - Day-to-day architecture extension guidance.
 
 ## Start Here
+- [Domain and Application Core Historical Evolution](./core-platform-and-composition/domain-and-application-core-historical-evolution.md)
+- [Desktop Runtime and Hosts Historical Evolution](./runtime-host-surfaces/desktop-runtime-and-hosts-historical-evolution.md)
+- [Offline Local-Mode Authority Boundaries Historical Evolution](./identity-trust-and-security/offline-local-mode-authority-boundaries-historical-evolution.md)
 - [Feature 4 Final Baseline: Authorization](./authorization/authorization-feature-4-final-baseline.md)
 - [Deployment Policy Persistence/API Integration Baseline](./deployment-policy-and-audit-governance/deployment-profile-policy-persistence-api-integration-baseline.md)
 - [Image Run Feature 4 Final Baseline](./execution-control-plane-and-scheduling/image-run-feature-4-final-baseline.md)
