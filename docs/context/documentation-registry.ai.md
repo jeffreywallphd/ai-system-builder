@@ -70,6 +70,11 @@ Use `relatedRecordIds` for durable stable-key links between registry entries.
 
 The seed registry includes at least one entry for each major `docType` so findability and routing can validate cross-category behavior from day one.
 
+## Population Planning Input (Story 6.2.1)
+
+- Use `docs/documentation-registry-population-inventory.ai.md` and
+  `docs/documentation-registry-population-inventory.inventory.json` as the practical candidate set and phased ordering source for follow-on registry population work.
+
 ## Coverage Policy Contract
 
 - `coveragePolicy` carries machine-readable inclusion/exclusion boundaries.

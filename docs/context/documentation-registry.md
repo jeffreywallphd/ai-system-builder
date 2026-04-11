@@ -85,6 +85,11 @@ The seed registry should represent major document categories:
 
 It should also include status and authoritativeness indexes, even when some categories are initially empty.
 
+## Population Planning Input (Story 6.2.1)
+
+Use `docs/documentation-registry-population-inventory.md` and
+`docs/documentation-registry-population-inventory.inventory.json` as the practical target set and ordering input for incremental registry-entry population work.
+
 ## Extensibility Boundaries
 
 - Keep structure explicit and readable; avoid introducing a large platform abstraction.
