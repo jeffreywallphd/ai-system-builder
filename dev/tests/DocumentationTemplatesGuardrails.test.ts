@@ -13,6 +13,10 @@ const routingReadmePath = resolve(repoRoot, "docs/context/routing/README.md");
 const routingAiReadmePath = resolve(repoRoot, "docs/context/routing/README.ai.md");
 const routingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
 const routingEntryTemplatePath = resolve(templatesDir, "task-to-context-routing-entry.template.json");
+const registryEntryTemplatePath = resolve(templatesDir, "documentation-registry-entry.template.json");
+const registryArchitectureTemplatePath = resolve(templatesDir, "documentation-registry-entry.architecture.template.json");
+const registryAdrTemplatePath = resolve(templatesDir, "documentation-registry-entry.adr.template.json");
+const registryContextPackTemplatePath = resolve(templatesDir, "documentation-registry-entry.context-pack.template.json");
 
 const requiredFrontmatterFields = [
   "title",
@@ -132,6 +136,10 @@ describe("documentation templates guardrails", () => {
     }
 
     expect(existsSync(routingEntryTemplatePath)).toBe(true);
+    expect(existsSync(registryEntryTemplatePath)).toBe(true);
+    expect(existsSync(registryArchitectureTemplatePath)).toBe(true);
+    expect(existsSync(registryAdrTemplatePath)).toBe(true);
+    expect(existsSync(registryContextPackTemplatePath)).toBe(true);
   });
 
   it("requires metadata header anchors and section guidance in every template", () => {
@@ -210,6 +218,14 @@ describe("documentation templates guardrails", () => {
     expect(templatesAiReadme).toContain("Related Documentation");
     expect(templatesReadme).toContain("task-to-context-routing-entry.template.json");
     expect(templatesAiReadme).toContain("task-to-context-routing-entry.template.json");
+    expect(templatesReadme).toContain("documentation-registry-entry.template.json");
+    expect(templatesReadme).toContain("documentation-registry-entry.architecture.template.json");
+    expect(templatesReadme).toContain("documentation-registry-entry.adr.template.json");
+    expect(templatesReadme).toContain("documentation-registry-entry.context-pack.template.json");
+    expect(templatesAiReadme).toContain("documentation-registry-entry.template.json");
+    expect(templatesAiReadme).toContain("documentation-registry-entry.architecture.template.json");
+    expect(templatesAiReadme).toContain("documentation-registry-entry.adr.template.json");
+    expect(templatesAiReadme).toContain("documentation-registry-entry.context-pack.template.json");
   });
 
   it("keeps routing entry template parseable and aligned to contract-required fields", () => {

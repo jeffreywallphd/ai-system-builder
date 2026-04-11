@@ -20,6 +20,10 @@ Use this folder as the canonical template pack for doc creation.
 - `ai-context` pack contract -> [context-pack.template.md](./context-pack.template.md)
 - Segmentation seed snippets -> [documentation-segmentation-seeds.template.md](./documentation-segmentation-seeds.template.md)
 - Routing entry JSON -> [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
+- Registry entry starter JSON -> [documentation-registry-entry.template.json](./documentation-registry-entry.template.json)
+- Registry architecture example -> [documentation-registry-entry.architecture.template.json](./documentation-registry-entry.architecture.template.json)
+- Registry ADR example -> [documentation-registry-entry.adr.template.json](./documentation-registry-entry.adr.template.json)
+- Registry context-pack example -> [documentation-registry-entry.context-pack.template.json](./documentation-registry-entry.context-pack.template.json)
 - AI companions are colocated as `*.template.ai.md` for markdown templates.
 
 Use `docs/context/documentation-status-signals.ai.md` for the standard non-active status marker wording.
@@ -42,3 +46,4 @@ For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.a
 ## Metadata Anchor
 
 Required header keys are defined in `docs/context/documentation-metadata-header.contract.json`.
+Registry entry starters align with `docs/context/documentation-indexed-document-metadata.contract.json` and `recordId` conventions from `docs/context/documentation-identity-and-reference.contract.json`.

@@ -61,6 +61,18 @@ Use this JSON template when adding entries to `docs/context/routing/task-to-cont
 
 - [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
 
+## Registry Entry Starter Patterns
+
+Use these JSON starter patterns when adding entries to `docs/context/documentation-registry.seed.json`:
+
+- Generic entry scaffold: [documentation-registry-entry.template.json](./documentation-registry-entry.template.json)
+- Architecture doc example: [documentation-registry-entry.architecture.template.json](./documentation-registry-entry.architecture.template.json)
+- ADR example: [documentation-registry-entry.adr.template.json](./documentation-registry-entry.adr.template.json)
+- Context pack example: [documentation-registry-entry.context-pack.template.json](./documentation-registry-entry.context-pack.template.json)
+
+Each starter aligns with `recordId` conventions and the metadata contract in `docs/context/documentation-indexed-document-metadata.contract.json`.
+When copying a starter, replace every value with the concrete target doc information before merge.
+
 ## Metadata Contract Reminder
 
 Every template uses the required metadata header keys from `docs/context/documentation-metadata-header.md`:
