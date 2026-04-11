@@ -31,7 +31,7 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Root and top-level routers keep required `README.md` and `README.ai.md` files.
 - Required `docs/context` foundation subfolders and seed artifacts exist (`packs`, `routing`, `governance`, `templates`).
 - Documentation indexing model docs remain present with required model headings for human and AI variants.
-- Documentation quality standard docs remain present with required section anchors for required-rules, non-blocking guidance, and automation mapping.
+- Documentation quality standard docs remain present with required section anchors for required-rules, ownership/review responsibilities, non-blocking guidance, and automation mapping.
 - Context foundation contract/seed JSON artifacts keep expected schema markers.
 - Context map shape remains valid and references stay resolvable (task categories, profile IDs, exclusion tags, pack IDs).
 - Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` links.
