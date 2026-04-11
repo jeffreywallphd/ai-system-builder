@@ -259,11 +259,16 @@
         "src/application"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-and-application-core"
+        "doc-architecture-domain-and-application-core",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-context-pack-architecture-core"
       ],
       "relatedDocs": [
         "docs/adr/records/adr-registry.json",
-        "docs/architecture/domain-and-application-core.md"
+        "docs/architecture/domain-and-application-core.md",
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/context/packs/architecture-core.pack.md"
       ],
       "owner": "team:architecture",
       "lastReviewed": "2026-04-11"
@@ -490,12 +495,14 @@
       "relatedRecordIds": [
         "doc-architecture-layers-and-boundaries",
         "doc-architecture-domain-taxonomy",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-architecture-core"
       ],
       "relatedDocs": [
         "docs/architecture/layers-and-boundaries.md",
         "docs/architecture/architecture-domain-taxonomy.md",
-        "docs/adr/records/adr-001-single-authoritative-control-plane.md"
+        "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+        "docs/context/packs/architecture-core.pack.md"
       ],
       "owner": "team:platform-architecture",
       "lastReviewed": "2026-04-11"
@@ -977,11 +984,15 @@
       ],
       "relatedRecordIds": [
         "doc-contributors-docs-migration-safety-guide",
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-baseline-documentation-segmentation-migration-inventory",
+        "doc-context-pack-documentation-refactor"
       ],
       "relatedDocs": [
         "docs/documentation-migration-baseline.inventory.json",
-        "docs/context/documentation-segmentation-taxonomy.md"
+        "docs/context/documentation-segmentation-taxonomy.md",
+        "docs/documentation-segmentation-migration-inventory.md",
+        "docs/context/packs/documentation-refactor.pack.md"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -1149,7 +1160,9 @@
         "docs/context/packs/context-pack-catalog.seed.json",
         "docs/contributors/docs-placement-guide.md",
         "docs/contributors/docs-migration-safety-guide.md",
-        "docs/contributors/docs-foundation-validation.md"
+        "docs/contributors/docs-foundation-validation.md",
+        "docs/context/documentation-registry.md",
+        "docs/context/documentation-indexing-model.md"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -1216,12 +1229,18 @@
         "doc-context-documentation-taxonomy",
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-architecture-domain-taxonomy",
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-runtime-and-host",
+        "doc-context-pack-identity-and-security",
+        "doc-context-pack-studio-and-system-composition"
       ],
       "relatedDocs": [
         "docs/context/packs/context-pack-catalog.seed.json",
         "docs/context/packs/README.md",
-        "docs/architecture/README.md"
+        "docs/architecture/README.md",
+        "docs/context/packs/architecture-core.pack.md",
+        "docs/context/packs/runtime-and-host.pack.md"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -1452,15 +1471,20 @@
         "authority boundaries"
       ],
       "relatedCodePaths": [
-        "docs"
+        "docs",
+        "dev/scripts/validate-docs-foundation.cjs"
       ],
       "relatedRecordIds": [
         "doc-context-documentation-taxonomy",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-context-pack-documentation-refactor"
       ],
       "relatedDocs": [
         "docs/README.md",
-        "docs/context/documentation-taxonomy.md"
+        "docs/context/documentation-taxonomy.md",
+        "docs/contributors/docs-foundation-validation.md",
+        "docs/context/routing/task-to-context-routing.seed.json"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -1487,11 +1511,16 @@
         "src/infrastructure"
       ],
       "relatedRecordIds": [
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-context-pack-runtime-and-host",
+        "doc-context-pack-identity-and-security",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
       ],
       "relatedDocs": [
         "docs/operations/README.md",
-        "docs/trusted-device-workflows.md"
+        "docs/trusted-device-workflows.md",
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/context/packs/runtime-and-host.pack.md"
       ],
       "owner": "team:operations",
       "lastReviewed": "2026-04-11"

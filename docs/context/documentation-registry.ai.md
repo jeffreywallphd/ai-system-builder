@@ -20,6 +20,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
+  - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -150,6 +151,28 @@ Enriched records in this story include:
 - `docs/documentation-migration-baseline.md`
 
 Summary and keyword text now prioritizes retrieval cues used in this codebase: architecture-review, coding-implementation, diagnostics triage, runtime-security hardening, documentation-change routing, and migration traceability.
+
+## Relationship Mapping Status (Story 6.2.6)
+
+Selected high-value records now include curated relationship fields to improve practical next-hop navigation without creating a noisy, exhaustive graph.
+
+Relationship mapping in this story connects registry entries to:
+
+- Adjacent code paths most likely to be edited next.
+- Neighbor docs frequently needed for follow-on implementation and review.
+- Upstream/downstream registry records through stable `relatedRecordIds`.
+
+Priority records enriched in this story include:
+
+- `docs/architecture/domain-and-application-core.md`
+- `docs/contributors/docs-placement-guide.md`
+- `docs/node-bootstrap-identity-operations.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/context/packs/repository-overview.pack.md`
+- `docs/context/packs/documentation-refactor.pack.md`
+- `docs/documentation-migration-baseline.md`
+
+Relationship lists remain bounded and deduplicated to preserve maintainability while improving follow-on discovery for contributors and AI routing.
 
 ## Coverage Policy Contract
 

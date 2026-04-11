@@ -20,6 +20,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
+  - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -166,6 +167,28 @@ Priority records enriched in this story include:
 - `docs/documentation-migration-baseline.md`
 
 Summary and keyword wording now emphasizes practical retrieval signals used in this repository, including architecture review, coding implementation, diagnostics triage, runtime security hardening, documentation change workflows, and migration traceability.
+
+## Relationship Mapping Status (Story 6.2.6)
+
+Selected high-value entries now carry curated relationship links for practical next-hop discovery without turning the registry into an exhaustive graph.
+
+Relationship curation in this story links documentation records to:
+
+- Adjacent code ownership paths contributors typically touch next.
+- Neighbor docs commonly needed for implementation follow-through.
+- Upstream/downstream registry records that preserve stable-key navigation.
+
+Priority records with enriched relationship mapping include:
+
+- `docs/architecture/domain-and-application-core.md`
+- `docs/contributors/docs-placement-guide.md`
+- `docs/node-bootstrap-identity-operations.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/context/packs/repository-overview.pack.md`
+- `docs/context/packs/documentation-refactor.pack.md`
+- `docs/documentation-migration-baseline.md`
+
+Relationship lists remain intentionally bounded and deduplicated so follow-on navigation improves while long-term maintenance stays lightweight.
 
 ## Extensibility Boundaries
 
