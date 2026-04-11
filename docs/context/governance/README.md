@@ -20,5 +20,6 @@
 ## Start Here
 - [Context Governance Policy](./context-governance-policy.md)
 - [Context Asset Lifecycle Guidance](./context-asset-lifecycle.md)
+- [High-Risk Context Pack Guidance](./high-risk-context-pack-guidance.md)
 - [Context Routing Directory](../routing/README.md)
 - [Context Packs Directory](../packs/README.md)

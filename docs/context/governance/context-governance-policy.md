@@ -25,6 +25,7 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Keep router pages concise and navigation-first; avoid duplicating full pack content.
 - Keep context-pack entries and routing mappings aligned to `docs/context/context-asset-metadata.contract.json`.
 - Apply lifecycle state transitions and conflict-resolution rules from `docs/context/governance/context-asset-lifecycle.md`.
+- Apply high-risk review controls from `docs/context/governance/high-risk-context-pack-guidance.md` when changing security, runtime/host, or architecture-invariant packs.
 
 ## Review Cadence
 
@@ -37,3 +38,4 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Add or update automated guardrails whenever structure contracts change.
 - Document any contract-breaking changes in the same pull request that introduces them.
 - Keep `.md` and `.ai.md` companion docs aligned when governance guidance changes.
+- Require broader multi-team review when high-risk guidance triggers are met.

@@ -43,6 +43,7 @@ Use this guidance for lifecycle decisions on context packs and task-to-context r
 - Review findings identify stale links or stale claims.
 - `reviewExpectations.cadence` requires review.
 - Upstream asset is deprecated or superseded.
+- Any high-risk pack trigger from `docs/context/governance/high-risk-context-pack-guidance.ai.md`.
 
 ## Ownership Expectations
 
@@ -55,6 +56,7 @@ Use this guidance for lifecycle decisions on context packs and task-to-context r
 
 - Minimum once per feature-epic milestone for governance, pack catalog, and routing seed assets.
 - Use stricter cadence when `reviewExpectations.cadence` is present.
+- Enforce stronger high-risk ownership/cadence controls from `docs/context/governance/high-risk-context-pack-guidance.ai.md` when applicable.
 - Review metadata accuracy, link health, routing determinism, and stale/duplicate risk.
 - Update `last_reviewed` when lifecycle policy changes.
 

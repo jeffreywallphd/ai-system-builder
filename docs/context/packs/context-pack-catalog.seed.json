@@ -97,8 +97,9 @@
         "host-composition",
         "boundaries"
       ],
+      "notes": "High-risk domain: architecture invariants and layer boundaries. Changes require broader review when invariants or routing-critical authority references change.",
       "reviewExpectations": {
-        "cadence": "per-epic-milestone",
+        "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
     },
@@ -172,8 +173,9 @@
         "startup",
         "diagnostics"
       ],
+      "notes": "High-risk domain: runtime startup and host lifecycle boundaries. Changes require broader review when startup authority or deterministic routing references change.",
       "reviewExpectations": {
-        "cadence": "per-epic-milestone",
+        "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
     },
@@ -214,8 +216,9 @@
         "transport-security",
         "secrets"
       ],
+      "notes": "High-risk domain: identity/security invariants including trust, secrets, and redaction posture. Changes require broader review when security boundaries or authoritative references change.",
       "reviewExpectations": {
-        "cadence": "per-epic-milestone",
+        "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
     },
