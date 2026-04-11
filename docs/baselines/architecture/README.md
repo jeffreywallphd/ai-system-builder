@@ -33,6 +33,9 @@ related_code_paths:
 ## Start Here
 - [Domain and Application Core Historical Evolution](./core-platform-and-composition/domain-and-application-core-historical-evolution.md)
 - [Desktop Runtime and Hosts Historical Evolution](./runtime-host-surfaces/desktop-runtime-and-hosts-historical-evolution.md)
+- [Entrypoint Host Composition Migration (Story 12.4.1) Baseline](./runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.md)
+- [Development and Test Startup Host Migration (Story 12.4.2) Baseline](./runtime-host-surfaces/development-host-startup-model-12.4.2.md)
+- [Host Composition Extension Guardrails (Story 12.4.3) Baseline](./runtime-host-surfaces/host-composition-extension-guardrails-12.4.3.md)
 - [Offline Local-Mode Authority Boundaries Historical Evolution](./identity-trust-and-security/offline-local-mode-authority-boundaries-historical-evolution.md)
 - [Feature 4 Final Baseline: Authorization](./authorization/authorization-feature-4-final-baseline.md)
 - [Deployment Policy Persistence/API Integration Baseline](./deployment-policy-and-audit-governance/deployment-profile-policy-persistence-api-integration-baseline.md)

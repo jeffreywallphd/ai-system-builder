@@ -48,6 +48,42 @@
         "docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md"
       ],
       "retention": "Keep as link stub while ADR and historical references remain."
+    },
+    {
+      "sourcePath": "docs/architecture/entrypoint-host-composition-migration-12.4.1.md",
+      "legacyState": "migrated-link-stub",
+      "status": "superseded",
+      "supersededBy": "docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.md",
+      "canonicalDestinations": [
+        "docs/baselines/architecture/runtime-host-surfaces/entrypoint-host-composition-migration-12.4.1.md",
+        "docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md",
+        "docs/architecture/authoritative-server-host-assembly.md"
+      ],
+      "retention": "Keep as link stub for continuity while inbound legacy references are migrated."
+    },
+    {
+      "sourcePath": "docs/architecture/development-host-startup-model-12.4.2.md",
+      "legacyState": "migrated-link-stub",
+      "status": "superseded",
+      "supersededBy": "docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md",
+      "canonicalDestinations": [
+        "docs/baselines/architecture/runtime-host-surfaces/development-host-startup-model-12.4.2.md",
+        "docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md",
+        "docs/architecture/host-bootstrap-pipeline.md"
+      ],
+      "retention": "Keep as link stub while incoming links still target migration-era startup notes."
+    },
+    {
+      "sourcePath": "docs/architecture/host-composition-extension-guardrails-12.4.3.md",
+      "legacyState": "migrated-link-stub",
+      "status": "superseded",
+      "supersededBy": "docs/baselines/architecture/runtime-host-surfaces/host-composition-extension-guardrails-12.4.3.md",
+      "canonicalDestinations": [
+        "docs/baselines/architecture/runtime-host-surfaces/host-composition-extension-guardrails-12.4.3.md",
+        "docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md",
+        "docs/architecture/host-service-registration-composition-rules.md"
+      ],
+      "retention": "Keep as link stub while historical inbound references remain."
     }
   ],
   "legacyAuthorityDocuments": [
