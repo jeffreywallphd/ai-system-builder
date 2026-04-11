@@ -30,6 +30,8 @@ const requiredContextFiles = [
   "docs/context/packs/architecture-core.pack.ai.md",
   "docs/context/packs/context-system-foundations.pack.md",
   "docs/context/packs/context-system-foundations.pack.ai.md",
+  "docs/context/packs/documentation-refactor.pack.md",
+  "docs/context/packs/documentation-refactor.pack.ai.md",
   "docs/context/packs/repository-overview.pack.md",
   "docs/context/packs/repository-overview.pack.ai.md",
   "docs/context/packs/runtime-and-host.pack.md",

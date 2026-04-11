@@ -26,6 +26,7 @@
 - [Seed Pack: Repository Overview](./repository-overview.pack.md)
 - [Seed Pack: Core Architecture](./architecture-core.pack.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.md)
+- [Seed Pack: Documentation Refactor](./documentation-refactor.pack.md)
 - [Seed Pack: Runtime and Host](./runtime-and-host.pack.md)
 - [Seed Pack: Identity and Security](./identity-and-security.pack.md)
 - [Seed Pack: Studio and System Composition](./studio-and-system-composition.pack.md)

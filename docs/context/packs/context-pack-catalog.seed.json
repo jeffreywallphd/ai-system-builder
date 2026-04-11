@@ -103,6 +103,45 @@
       }
     },
     {
+      "id": "documentation-refactor",
+      "title": "Documentation Refactor Pack",
+      "purpose": "Focused context for documentation-system refactor work spanning docs architecture, placement taxonomy, migration safety, and validation guardrails.",
+      "domain": "documentation-system",
+      "owner": "team:developer-experience",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/documentation-refactor.pack.md",
+      "aiDocPath": "docs/context/packs/documentation-refactor.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/README.md",
+        "docs/documentation-migration-baseline.md",
+        "docs/contributors/docs-placement-guide.md",
+        "docs/contributors/docs-migration-safety-guide.md",
+        "docs/contributors/docs-foundation-validation.md",
+        "docs/contributors/router-overview-writing-standard.md",
+        "docs/context/documentation-taxonomy.md",
+        "docs/context/documentation-metadata-header.md"
+      ],
+      "relatedCodePaths": [
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/tests/DocsFoundationValidationScript.test.ts",
+        "dev/tests/DocsPlacementGuideGuardrails.test.ts",
+        "dev/tests/DocumentationMigrationSafetyGuideGuardrails.test.ts",
+        "dev/tests/DocumentationRouterOverviewWritingStandardGuardrails.test.ts",
+        "dev/tests/DocumentationRefactorContextPackGuardrails.test.ts"
+      ],
+      "tags": [
+        "documentation",
+        "docs-refactor",
+        "taxonomy",
+        "migration",
+        "validation"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
+    },
+    {
       "id": "runtime-and-host",
       "title": "Runtime and Host Pack",
       "purpose": "Focused runtime/host/desktop/startup guidance for implementation and diagnostics work across host bootstrap and runtime lifecycle boundaries.",

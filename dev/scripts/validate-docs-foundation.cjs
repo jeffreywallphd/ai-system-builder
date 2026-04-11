@@ -30,6 +30,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/packs/context-pack-catalog.seed.json",
   "docs/context/packs/context-system-foundations.pack.md",
   "docs/context/packs/context-system-foundations.pack.ai.md",
+  "docs/context/packs/documentation-refactor.pack.md",
+  "docs/context/packs/documentation-refactor.pack.ai.md",
   "docs/context/packs/identity-and-security.pack.md",
   "docs/context/packs/identity-and-security.pack.ai.md",
   "docs/context/packs/studio-and-system-composition.pack.md",

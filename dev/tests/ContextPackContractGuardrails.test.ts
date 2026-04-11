@@ -150,6 +150,7 @@ describe("context pack contract guardrails", () => {
     expect(catalogPackIds).toContain("context-system-foundations");
     expect(catalogPackIds).toContain("repository-overview");
     expect(catalogPackIds).toContain("architecture-core");
+    expect(catalogPackIds).toContain("documentation-refactor");
     expect(catalogPackIds).toContain("runtime-and-host");
     expect(catalogPackIds).toContain("identity-and-security");
     expect(catalogPackIds).toContain("studio-and-system-composition");

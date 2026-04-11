@@ -140,9 +140,11 @@
       "expectedPackOrder": [
         "repository-overview",
         "architecture-core",
+        "documentation-refactor",
         "context-system-foundations"
       ],
       "expectedRelatedDocOrder": [
+        "docs/context/packs/documentation-refactor.pack.md",
         "docs/context/routing/README.md",
         "docs/context/context-asset-metadata.md",
         "docs/contributors/router-overview-writing-standard.md",
@@ -692,6 +694,7 @@
       "packIds": [
         "repository-overview",
         "architecture-core",
+        "documentation-refactor",
         "context-system-foundations"
       ],
       "selectionMode": "single",
@@ -703,18 +706,22 @@
       "domain": "documentation-system",
       "owner": "team:developer-experience",
       "relatedDocPaths": [
+        "docs/context/packs/documentation-refactor.pack.md",
         "docs/context/routing/README.md",
         "docs/context/context-asset-metadata.md",
         "docs/contributors/router-overview-writing-standard.md",
-        "docs/contributors/docs-placement-guide.md"
+        "docs/contributors/docs-placement-guide.md",
+        "docs/contributors/docs-migration-safety-guide.md"
       ],
       "relatedCodePaths": [
+        "dev/scripts/validate-docs-foundation.cjs",
         "dev/tests/DocsFoundationValidationScript.test.ts",
         "dev/tests/DocumentationRouterOverviewWritingStandardGuardrails.test.ts",
+        "dev/tests/DocumentationRefactorContextPackGuardrails.test.ts",
         "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
       ],
       "excludePackIds": [],
-      "notes": "Single selection mode keeps documentation routes deterministic while retaining architecture grounding.",
+      "notes": "Single selection mode keeps documentation routes deterministic with documentation-refactor domain context inserted before context-system foundations.",
       "reviewExpectations": {
         "cadence": "per-story",
         "lastReviewed": "2026-04-11"
