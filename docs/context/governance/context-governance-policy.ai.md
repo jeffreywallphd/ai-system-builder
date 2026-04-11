@@ -24,6 +24,7 @@ Use this policy when creating or changing context packs and routing artifacts.
 - Keep seed JSON artifacts valid and parseable at all times.
 - Keep router docs concise and avoid embedding full pack bodies.
 - Keep pack and routing metadata aligned to `docs/context/context-asset-metadata.contract.json`.
+- Apply lifecycle transitions and conflict-resolution rules from `docs/context/governance/context-asset-lifecycle.ai.md`.
 
 ## Review Cadence
 

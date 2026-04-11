@@ -27,6 +27,7 @@
 - [Standard Context Pack Contract](./packs/README.md#standard-context-pack-contract)
 - [Routing Assets Directory](./routing/README.md)
 - [Context Governance Directory](./governance/README.md)
+- [Context Asset Lifecycle Guidance](./governance/context-asset-lifecycle.md)
 - [Documentation Templates](./templates/README.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.md)
 - [Architecture Router](../architecture/README.md)
