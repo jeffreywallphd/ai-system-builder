@@ -246,11 +246,13 @@
       "domain": "decision-records",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Architecture decision record establishing a single authoritative control-plane boundary.",
+      "summary": "Foundational ADR that requires a single authoritative control plane for host composition, routing, and policy enforcement decisions.",
       "keywords": [
-        "adr",
-        "control plane",
-        "decision record"
+        "single authoritative control plane",
+        "host composition",
+        "policy enforcement boundaries",
+        "decision lineage",
+        "architecture review"
       ],
       "relatedCodePaths": [
         "src/hosts/server",
@@ -473,12 +475,13 @@
       "domain": "architecture",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Defines durable inner-layer contracts and dependency direction between domain and application layers.",
+      "summary": "Authoritative boundary guide for domain/application dependency direction used during feature decomposition and coding-implementation planning.",
       "keywords": [
-        "architecture",
-        "domain layer",
-        "application layer",
-        "layer boundaries"
+        "domain layer boundaries",
+        "application services",
+        "dependency direction",
+        "feature decomposition",
+        "coding implementation"
       ],
       "relatedCodePaths": [
         "src/domain",
@@ -773,12 +776,13 @@
       "domain": "architecture",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Defines the canonical architecture domain map used to route architecture discovery and migration work.",
+      "summary": "Canonical map of architecture domains used to route architecture-review, diagnostics, and migration-refactor tasks.",
       "keywords": [
-        "architecture taxonomy",
-        "domain map",
-        "routing",
-        "migration"
+        "architecture domain map",
+        "architecture review",
+        "migration refactor",
+        "runtime host surfaces",
+        "studio and system composition"
       ],
       "relatedCodePaths": [
         "docs/architecture/domains",
@@ -960,11 +964,13 @@
       "domain": "baselines",
       "status": "archived",
       "authoritativeness": "historical",
-      "summary": "Archived point-in-time documentation migration baseline retained for historical traceability and comparison.",
+      "summary": "Historical migration baseline used to compare current docs structure and validate documentation-refactor decisions.",
       "keywords": [
-        "baseline",
-        "migration",
-        "historical"
+        "documentation migration baseline",
+        "historical comparison",
+        "refactor traceability",
+        "segmentation migration",
+        "documentation governance history"
       ],
       "relatedCodePaths": [
         "docs"
@@ -1050,12 +1056,13 @@
       "domain": "architecture",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated architecture pack for layered boundaries and host composition invariants in implementation tasks.",
+      "summary": "Core architecture pack for layer boundaries, domain/application contracts, and host composition invariants before code changes.",
       "keywords": [
-        "context pack",
-        "architecture",
+        "architecture core pack",
         "layer boundaries",
-        "host composition"
+        "domain application contracts",
+        "host composition invariants",
+        "pre-implementation review"
       ],
       "relatedCodePaths": [
         "src/domain",
@@ -1119,12 +1126,13 @@
       "domain": "documentation",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated documentation-system pack for taxonomy, migration safety, and docs validation workflows.",
+      "summary": "Documentation-change pack for taxonomy alignment, registry/routing updates, md/ai parity, and docs-foundation validation.",
       "keywords": [
-        "context pack",
-        "documentation",
-        "migration safety",
-        "validation"
+        "documentation refactor pack",
+        "taxonomy alignment",
+        "registry and routing updates",
+        "md ai parity",
+        "docs foundation validation"
       ],
       "relatedCodePaths": [
         "docs",
@@ -1155,12 +1163,13 @@
       "domain": "identity-and-security",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated identity and security pack for authentication, authorization, trust, and secrets safety constraints.",
+      "summary": "Security pack for identity session trust, authorization enforcement, secret handling, and fail-closed runtime hardening.",
       "keywords": [
-        "context pack",
-        "identity",
-        "authorization",
-        "security"
+        "identity and security pack",
+        "authorization enforcement",
+        "session trust",
+        "secret redaction",
+        "runtime security hardening"
       ],
       "relatedCodePaths": [
         "src/application/identity",
@@ -1188,12 +1197,13 @@
       "domain": "documentation",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated orientation pack for repository structure, core architecture themes, and baseline routing context.",
+      "summary": "Onboarding context pack that routes contributors to repository layout, core docs, and implementation entry points.",
       "keywords": [
-        "context pack",
-        "repository overview",
-        "routing",
-        "orientation"
+        "repository orientation",
+        "context assembly foundation",
+        "entry-point docs",
+        "implementation onboarding",
+        "task routing"
       ],
       "relatedCodePaths": [
         "src/domain",
@@ -1225,12 +1235,13 @@
       "domain": "operations",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated runtime and host pack for startup lifecycle, diagnostics, and bounded host execution behavior.",
+      "summary": "Runtime/host pack for startup sequencing, post-login lifecycle, and regression diagnostics in desktop/server/worker hosts.",
       "keywords": [
-        "context pack",
-        "runtime",
-        "hosts",
-        "diagnostics"
+        "runtime and host pack",
+        "host startup sequencing",
+        "post-login lifecycle",
+        "diagnostics triage",
+        "desktop server worker"
       ],
       "relatedCodePaths": [
         "src/hosts",
@@ -1259,12 +1270,13 @@
       "domain": "architecture",
       "status": "active",
       "authoritativeness": "supplemental",
-      "summary": "Curated studio/system composition pack for shared-model handoff constraints and UI composition boundaries.",
+      "summary": "Studio-system pack for studio handoff contracts, shared model boundaries, and workflow UI coordination tasks.",
       "keywords": [
-        "context pack",
-        "studio composition",
-        "shared model",
-        "handoff"
+        "studio system composition pack",
+        "studio handoff",
+        "shared model boundaries",
+        "workflow studio coordination",
+        "ui studio tasks"
       ],
       "relatedCodePaths": [
         "src/ui",
@@ -1431,11 +1443,13 @@
       "domain": "contributors",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Guides contributors on correct documentation placement and routing boundaries.",
+      "summary": "Contributor workflow guide for placing docs in architecture/contributors/operations/context paths and avoiding misplaced authority.",
       "keywords": [
-        "documentation",
-        "placement",
-        "contributor workflow"
+        "docs placement",
+        "documentation change",
+        "router updates",
+        "md ai pairing",
+        "authority boundaries"
       ],
       "relatedCodePaths": [
         "docs"
@@ -1460,12 +1474,13 @@
       "domain": "operations",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Operational runbook for node identity bootstrap, registration, and supporting workflows.",
+      "summary": "Runbook for node bootstrap identity provisioning, trust enrollment, and startup diagnostics across host workflows.",
       "keywords": [
-        "operations",
-        "bootstrap",
-        "identity",
-        "runbook"
+        "node bootstrap",
+        "identity provisioning",
+        "trust enrollment",
+        "startup diagnostics",
+        "runtime operations"
       ],
       "relatedCodePaths": [
         "src/hosts",

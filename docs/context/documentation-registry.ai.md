@@ -19,6 +19,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
+  - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -128,6 +129,27 @@ Registry seed coverage now adds selective operations and non-active documentatio
 Non-active records are intentionally separated in `discoveryIndex.byStatus` (`active`, `archived`, `superseded`) and `discoveryIndex.byAuthoritativeness` (`historical`) so they remain discoverable without being treated as current implementation authority.
 
 Routing examples and mappings for diagnostics/runtime-security now include stable `relatedDocRecordIds` for operations records to improve deterministic record-based lookup.
+
+## Discovery Summaries and Keyword Quality Status (Story 6.2.5)
+
+High-value phase-1 registry anchors now include concise discovery-oriented summaries and keyword sets grounded in repository task-routing vocabulary and contributor workflows.
+
+Enriched records in this story include:
+
+- `docs/architecture/domain-and-application-core.md`
+- `docs/architecture/architecture-domain-taxonomy.md`
+- `docs/contributors/docs-placement-guide.md`
+- `docs/node-bootstrap-identity-operations.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/context/packs/repository-overview.pack.md`
+- `docs/context/packs/architecture-core.pack.md`
+- `docs/context/packs/runtime-and-host.pack.md`
+- `docs/context/packs/identity-and-security.pack.md`
+- `docs/context/packs/studio-and-system-composition.pack.md`
+- `docs/context/packs/documentation-refactor.pack.md`
+- `docs/documentation-migration-baseline.md`
+
+Summary and keyword text now prioritizes retrieval cues used in this codebase: architecture-review, coding-implementation, diagnostics triage, runtime-security hardening, documentation-change routing, and migration traceability.
 
 ## Coverage Policy Contract
 

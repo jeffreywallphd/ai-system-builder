@@ -19,6 +19,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
+  - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -144,6 +145,27 @@ Registry seed coverage now includes selective high-value operations and non-acti
 To prevent non-active material from competing silently with active guidance, these records are intentionally separated in `discoveryIndex.byStatus` (`active`, `archived`, `superseded`) and `discoveryIndex.byAuthoritativeness` (`historical`).
 
 Runtime diagnostics and runtime-security routing records now include stable `relatedDocRecordIds` for operations runbooks so discovery can resolve authoritative operations guidance through record identifiers instead of brittle path guessing.
+
+## Discovery Summaries and Keyword Quality Status (Story 6.2.5)
+
+High-value phase-1 registry anchors now include concise discovery-oriented summaries and keyword sets aligned to actual task-routing vocabulary and contributor workflows.
+
+Priority records enriched in this story include:
+
+- `docs/architecture/domain-and-application-core.md`
+- `docs/architecture/architecture-domain-taxonomy.md`
+- `docs/contributors/docs-placement-guide.md`
+- `docs/node-bootstrap-identity-operations.md`
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/context/packs/repository-overview.pack.md`
+- `docs/context/packs/architecture-core.pack.md`
+- `docs/context/packs/runtime-and-host.pack.md`
+- `docs/context/packs/identity-and-security.pack.md`
+- `docs/context/packs/studio-and-system-composition.pack.md`
+- `docs/context/packs/documentation-refactor.pack.md`
+- `docs/documentation-migration-baseline.md`
+
+Summary and keyword wording now emphasizes practical retrieval signals used in this repository, including architecture review, coding implementation, diagnostics triage, runtime security hardening, documentation change workflows, and migration traceability.
 
 ## Extensibility Boundaries
 
