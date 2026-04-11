@@ -34,6 +34,7 @@ Context packs may cite ADRs when decision rationale is high-value for implementa
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)
 - [Context Pack Catalog Seed](./context-pack-catalog.seed.json)
 - [Context Asset Metadata Standard](../context-asset-metadata.md)
+- [Architecture Domain Cross-Linking Rules](../../architecture/architecture-domain-cross-linking-rules.md)
 - [Seed Pack: Repository Overview](./repository-overview.pack.md)
 - [Seed Pack: Core Architecture](./architecture-core.pack.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.md)
