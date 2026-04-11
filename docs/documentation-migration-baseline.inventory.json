@@ -4,7 +4,7 @@
   "auditScope": "docs/**/*.(md|ai.md)",
   "branchContext": "codex-2be7374697",
   "summary": {
-    "totalMarkdownFiles": 538,
+    "totalMarkdownFiles": 540,
     "totalDirectories": 9,
     "roleCounts": {
       "architectural": 229,
@@ -9660,6 +9660,40 @@
       },
       "likelyOverloaded": false,
       "likelyTargetArea": "docs/operations"
+    },
+    {
+      "path": "docs/contributors/docs-placement-guide.md",
+      "primaryRole": "contributor-facing",
+      "secondaryRoles": [],
+      "companionPath": "docs/contributors/docs-placement-guide.ai.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 84,
+        "wordCount": 703,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
+    },
+    {
+      "path": "docs/contributors/docs-placement-guide.ai.md",
+      "primaryRole": "ai-context-oriented",
+      "secondaryRoles": [
+        "contributor-facing"
+      ],
+      "companionPath": "docs/contributors/docs-placement-guide.md",
+      "pairStatus": "paired",
+      "hasOwnershipSignal": false,
+      "metrics": {
+        "lineCount": 43,
+        "wordCount": 234,
+        "headingCount": 7,
+        "linkCount": 0
+      },
+      "likelyOverloaded": false,
+      "likelyTargetArea": "retain-current-location"
     }
   ]
 }
