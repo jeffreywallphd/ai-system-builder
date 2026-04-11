@@ -32,7 +32,8 @@
     "start:web-host": "bun run src/hosts/web/WebHostEntrypoint.ts",
     "start:worker-host": "bun run src/hosts/worker/WorkerHostEntrypoint.ts",
     "docs:migration-baseline": "node dev/scripts/generate-docs-migration-baseline.cjs",
-    "docs:validate:foundation": "node dev/scripts/validate-docs-foundation.cjs"
+    "docs:validate:foundation": "node dev/scripts/validate-docs-foundation.cjs",
+    "docs:validate:adr": "node dev/scripts/validate-adr-records.cjs"
   },
   "dependencies": {
     "@huggingface/hub": "^2.6.1",
