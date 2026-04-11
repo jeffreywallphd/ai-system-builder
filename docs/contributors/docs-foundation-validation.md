@@ -8,8 +8,10 @@ last_reviewed: 2026-04-11
 related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
   - dev/scripts/validate-adr-records.cjs
+  - dev/scripts/validate-architecture-domains.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/AdrValidationScript.test.ts
+  - dev/tests/ArchitectureDomainValidationScript.test.ts
 ---
 
 # Documentation Foundation Validation Guide
@@ -38,12 +40,18 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Architecture `## Related ADRs` references resolve and point to registered ADR records.
 - Context pack `## Authoritative Docs` ADR references resolve and point to registered ADR records.
 - ADR index files (`docs/adr/records/README.md` and `.ai.md`) stay synchronized with `adr-registry.json`.
+- Architecture domain folders match taxonomy-defined domain IDs.
+- Each domain keeps required `overview(.ai).md` and `references/README(.ai).md` files.
+- Domain overviews and reference indexes keep required routing links (`./references/README.md` and `../overview.md`).
+- Core markdown links in domain routers, domain overviews, and reference indexes resolve to real repository paths.
+- Domain reference docs maintain `.md` and `.ai.md` companion pairing.
 
 ## Run Locally
 
 ```bash
 npm run docs:validate:foundation
 npm run docs:validate:adr
+npm run docs:validate:architecture-domains
 ```
 
 ## CI Usage
@@ -53,6 +61,7 @@ Run the same command in CI to block changes that erode the baseline docs structu
 ```bash
 npm run docs:validate:foundation
 npm run docs:validate:adr
+npm run docs:validate:architecture-domains
 ```
 
 ## Failure Output
@@ -80,6 +89,12 @@ Examples:
 - `CONTEXT_PACK_ADR_REFERENCE_INVALID`
 - `ADR_INDEX_REFERENCE_INVALID`
 - `ADR_INDEX_REFERENCE_MISSING`
+- `DOMAIN_DIRECTORY_MISSING`
+- `DOMAIN_DIRECTORY_UNEXPECTED`
+- `DOMAIN_REQUIRED_FILE_MISSING`
+- `DOMAIN_REQUIRED_LINK_MISSING`
+- `DOMAIN_CORE_LINK_MISSING`
+- `DOMAIN_REFERENCE_PAIR_MISSING`
 
 ## Scope Notes
 
