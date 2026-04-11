@@ -12,6 +12,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(existsSync(resolve(adrRoot, "README.ai.md"))).toBe(true);
     expect(existsSync(resolve(adrRecordsRoot, "README.md"))).toBe(true);
     expect(existsSync(resolve(adrRecordsRoot, "README.ai.md"))).toBe(true);
+    expect(existsSync(resolve(adrRecordsRoot, "authoring-guide.md"))).toBe(true);
+    expect(existsSync(resolve(adrRecordsRoot, "authoring-guide.ai.md"))).toBe(true);
   });
 
   it("keeps ADR router readmes explicit about ADR file placement", () => {
@@ -44,6 +46,7 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("../context/templates/adr.template.md");
     expect(humanRouter).toContain("Decision Statement");
     expect(humanRouter).toContain("Supersession");
+    expect(humanRouter).toContain("./records/authoring-guide.md");
 
     expect(aiRouter).toContain("## ADR File Home");
     expect(aiRouter).toContain("## ADR Metadata and Lifecycle Rules");
@@ -71,6 +74,7 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("../context/templates/adr.template.ai.md");
     expect(aiRouter).toContain("Decision Statement");
     expect(aiRouter).toContain("Supersession");
+    expect(aiRouter).toContain("./records/authoring-guide.ai.md");
   });
 
   it("keeps records home readmes explicit about naming and indexing contract", () => {
@@ -138,5 +142,35 @@ describe("ADR documentation structure guardrails", () => {
     expect(placementGuideAi).toContain("docs/adr/records/");
     expect(templatesGuide).toContain("docs/adr/records/");
     expect(templatesGuideAi).toContain("docs/adr/records/");
+    expect(templatesGuide).toContain("docs/adr/records/authoring-guide.md");
+    expect(templatesGuideAi).toContain("docs/adr/records/authoring-guide.ai.md");
+  });
+
+  it("keeps ADR authoring guidance practical and decision-focused", () => {
+    const authoringGuide = readFileSync(
+      resolve(adrRecordsRoot, "authoring-guide.md"),
+      "utf8",
+    );
+    const authoringGuideAi = readFileSync(
+      resolve(adrRecordsRoot, "authoring-guide.ai.md"),
+      "utf8",
+    );
+    const recordsReadme = readFileSync(resolve(adrRecordsRoot, "README.md"), "utf8");
+    const recordsReadmeAi = readFileSync(resolve(adrRecordsRoot, "README.ai.md"), "utf8");
+
+    expect(recordsReadme).toContain("./authoring-guide.md");
+    expect(recordsReadmeAi).toContain("./authoring-guide.ai.md");
+
+    for (const guide of [authoringGuide, authoringGuideAi]) {
+      const normalizedGuide = guide.toLowerCase();
+      expect(normalizedGuide).toContain("good");
+      expect(normalizedGuide).toContain("bad");
+      expect(guide).toContain("Decision Statement");
+      expect(guide).toContain("Considered Options");
+      expect(guide).toContain("Consequences");
+      expect(normalizedGuide).toContain("tradeoff");
+      expect(normalizedGuide).toContain("speculative");
+      expect(normalizedGuide).toContain("implementation");
+    }
   });
 });

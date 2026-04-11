@@ -28,6 +28,7 @@ For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.a
 - Required sections: `Status`, `Decision Date`, `Decision Statement`, `Context and Problem Statement`, `Decision Drivers`, `Considered Options`, `Chosen Approach`, `Consequences`, `Related Documentation`, and `Related Code Paths`.
 - Optional sections: `Supersession` and `Follow-Up Actions` (`Supersession` is required when replacement links are present).
 - ADR metadata and lifecycle anchors: required `adr_number`, required `decision_status` (`proposed`, `accepted`, `superseded`, `deprecated`), required `decision_date`, and title format `ADR-<NNN> <Decision Title>`.
+- ADR writing quality guidance (problem framing, alternatives, tradeoff honesty): `docs/adr/records/authoring-guide.ai.md`.
 
 ## Metadata Anchor
 
