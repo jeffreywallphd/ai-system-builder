@@ -25,6 +25,7 @@
 - [Documentation Index Coverage Rules](./documentation-index-coverage-rules.md)
 - [Standard Indexed Document Metadata Contract](./documentation-indexed-document-metadata.md)
 - [Documentation Registry Structure](./documentation-registry.md)
+- [Documentation Index View](./documentation-index.md)
 - [Documentation Registry Population Inventory](../documentation-registry-population-inventory.md)
 - [Documentation Identity, Stable Keys, and Reference Conventions](./documentation-identity-and-reference-conventions.md)
 - [Documentation Registry Seed JSON](./documentation-registry.seed.json)

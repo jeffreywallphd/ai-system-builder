@@ -7,6 +7,7 @@ owned_by: team:developer-experience
 last_reviewed: 2026-04-11
 related_code_paths:
   - docs/context/documentation-registry.seed.json
+  - docs/context/documentation-index.ai.md
   - docs/context/documentation-index-coverage-rules.ai.md
   - docs/context/documentation-indexed-document-metadata.contract.json
   - docs/context/documentation-identity-and-reference.contract.json
@@ -15,7 +16,9 @@ related_code_paths:
   - docs/context/templates/documentation-registry-entry.adr.template.json
   - docs/context/templates/documentation-registry-entry.context-pack.template.json
   - dev/scripts/validate-docs-foundation.cjs
+  - dev/scripts/generate-documentation-index-view.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
+  - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
@@ -173,6 +176,22 @@ Priority records enriched in this story include:
 - `docs/documentation-migration-baseline.md`
 
 Relationship lists remain bounded and deduplicated to preserve maintainability while improving follow-on discovery for contributors and AI routing.
+
+## Human-Readable Index View Status (Story 6.3.1)
+
+Registry discovery metadata now also feeds a concise navigation view for direct human browsing:
+
+- Human view: `docs/context/documentation-index.md`
+- AI view: `docs/context/documentation-index.ai.md`
+- Generator script: `dev/scripts/generate-documentation-index-view.cjs`
+
+The view is intentionally grouped around practical discovery dimensions only:
+
+- `docType` for category routing
+- `domain` for domain routing
+- `status` for lifecycle routing
+
+Alignment is enforced by generation + validation guardrails so the index does not diverge into a separate manually maintained source.
 
 ## Coverage Policy Contract
 

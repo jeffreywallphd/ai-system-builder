@@ -1,5 +1,6 @@
 const { existsSync, readFileSync, readdirSync } = require("node:fs");
 const { resolve } = require("node:path");
+const { generateDocumentationIndexView } = require("./generate-documentation-index-view.cjs");
 
 const REQUIRED_TOP_LEVEL_FOLDERS = [
   "architecture",
@@ -33,6 +34,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/documentation-registry.md",
   "docs/context/documentation-registry.ai.md",
   "docs/context/documentation-registry.seed.json",
+  "docs/context/documentation-index.md",
+  "docs/context/documentation-index.ai.md",
   "docs/context/documentation-identity-and-reference-conventions.md",
   "docs/context/documentation-identity-and-reference-conventions.ai.md",
   "docs/context/documentation-identity-and-reference.contract.json",
@@ -106,6 +109,15 @@ const REQUIRED_DOCUMENTATION_INDEX_COVERAGE_RULES_AI_HEADINGS = [
   "## Excluded Categories",
   "## Status and Authority Rules",
   "## Registry Contract",
+];
+
+const REQUIRED_DOCUMENTATION_INDEX_VIEW_HEADINGS = [
+  "## Canonical Sources",
+  "## At a Glance",
+  "## Browse by Document Type",
+  "## Browse by Domain",
+  "## Browse by Status",
+  "## Maintenance and Validation",
 ];
 
 const REQUIRED_ADR_FILES = [
@@ -426,6 +438,51 @@ function validateDocsFoundation(repoRoot) {
         );
       }
     }
+  }
+
+  const documentationIndexViewPath = resolve(repoRoot, "docs/context/documentation-index.md");
+  if (existsSync(documentationIndexViewPath)) {
+    const content = readFileSync(documentationIndexViewPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEX_VIEW_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_VIEW_INVALID",
+          `docs/context/documentation-index.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationIndexViewAiPath = resolve(repoRoot, "docs/context/documentation-index.ai.md");
+  if (existsSync(documentationIndexViewAiPath)) {
+    const content = readFileSync(documentationIndexViewAiPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_INDEX_VIEW_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_INDEX_VIEW_INVALID",
+          `docs/context/documentation-index.ai.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  try {
+    const documentationIndexResult = generateDocumentationIndexView({ repoRoot, checkOnly: true });
+    if (!documentationIndexResult.matches) {
+      addIssue(
+        issues,
+        "DOCUMENTATION_INDEX_VIEW_OUT_OF_SYNC",
+        "docs/context/documentation-index(.ai).md is out of sync with docs/context/documentation-registry.seed.json. Run node dev/scripts/generate-documentation-index-view.cjs.",
+      );
+    }
+  } catch (error) {
+    addIssue(
+      issues,
+      "DOCUMENTATION_INDEX_VIEW_INVALID",
+      `Failed to validate generated documentation index view: ${error.message}`,
+    );
   }
 
   const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
