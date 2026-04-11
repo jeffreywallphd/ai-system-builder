@@ -156,9 +156,14 @@ ADRs are part of the documentation system, not a standalone archive. Keep relati
   - Architecture overviews/references should include `## Related ADRs` with direct links back to relevant ADR records.
   - Context packs may cite ADRs in `## Authoritative Docs` when the pack must preserve decision intent for implementation tasks.
 
+## Initial ADR Rollout Boundaries
+- The initial ADR rollout is intentionally bounded and not exhaustive.
+- Use [ADR System Rollout Boundaries and Future Expansion Areas](./records/rollout-boundaries.md) for explicit included scope, current gaps, and safe expansion points.
+
 ## Start Here
 - [ADR Records Home](./records/README.md)
 - [ADR Discovery Registry](./records/adr-registry.json)
+- [ADR System Rollout Boundaries and Future Expansion Areas](./records/rollout-boundaries.md)
 - [ADR Authoring Guide](./records/authoring-guide.md)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md)
 - [ADR Template](../context/templates/adr.template.md)

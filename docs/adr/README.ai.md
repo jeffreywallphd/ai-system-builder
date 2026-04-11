@@ -156,9 +156,14 @@ Treat ADRs as integrated system docs, not an isolated decision folder. Keep cros
   - Architecture overviews/references include `## Related ADRs` with direct record links.
   - Context packs can cite ADRs in `## Authoritative Docs` when decision history is needed for safe implementation context.
 
+## Initial ADR Rollout Boundaries
+- The initial ADR rollout is intentionally bounded and not exhaustive.
+- Use [ADR System Rollout Boundaries and Future Expansion Areas](./records/rollout-boundaries.ai.md) for explicit included scope, known gaps, and responsible expansion paths.
+
 ## Start Here
 - [ADR Records Home](./records/README.ai.md)
 - [ADR Discovery Registry](./records/adr-registry.json)
+- [ADR System Rollout Boundaries and Future Expansion Areas](./records/rollout-boundaries.ai.md)
 - [ADR Authoring Guide](./records/authoring-guide.ai.md)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.ai.md)
 - [ADR Template](../context/templates/adr.template.ai.md)
