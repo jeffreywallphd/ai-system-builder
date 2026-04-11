@@ -24,8 +24,15 @@ Provide lean, reusable starting points so document roles, metadata, and section 
 | `baseline` | Historical migration or completion snapshot. | `docs/baselines/` | [baseline.template.md](./baseline.template.md) |
 | `adr` | A specific architecture decision with alternatives and status. | `docs/adr/` | [adr.template.md](./adr.template.md) |
 | `ai-context` | Shared taxonomy or context pack for AI/human routing. | `docs/context/` | [ai-context.template.md](./ai-context.template.md) |
+| `ai-context` (pack contract) | Context packs under `docs/context/packs/` with required contract sections. | `docs/context/packs/` | [context-pack.template.md](./context-pack.template.md) |
 
 For context packs under `docs/context/packs/`, follow the standard contract in `docs/context/packs/README.md#standard-context-pack-contract` in addition to the `ai-context` template.
+
+## Routing Entry Template
+
+Use this JSON template when adding entries to `docs/context/routing/task-to-context-routing.seed.json`:
+
+- [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
 
 ## Metadata Contract Reminder
 
@@ -38,4 +45,4 @@ Every template uses the required metadata header keys from `docs/context/documen
 - `owned_by`
 - `last_reviewed`
 
-AI companion templates are colocated as `*.template.ai.md`.
+AI companion templates are colocated as `*.template.ai.md` for markdown templates.

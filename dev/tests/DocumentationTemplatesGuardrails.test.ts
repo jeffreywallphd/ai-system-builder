@@ -9,6 +9,10 @@ const templatesAiReadmePath = resolve(templatesDir, "README.ai.md");
 const contextReadmePath = resolve(repoRoot, "docs/context/README.md");
 const contextAiReadmePath = resolve(repoRoot, "docs/context/README.ai.md");
 const placementGuidePath = resolve(repoRoot, "docs/contributors/docs-placement-guide.md");
+const routingReadmePath = resolve(repoRoot, "docs/context/routing/README.md");
+const routingAiReadmePath = resolve(repoRoot, "docs/context/routing/README.ai.md");
+const routingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
+const routingEntryTemplatePath = resolve(templatesDir, "task-to-context-routing-entry.template.json");
 
 const requiredFrontmatterFields = [
   "title",
@@ -83,6 +87,15 @@ const requiredTemplates = [
       "## Retrieval and Routing Guidance",
     ],
   },
+  {
+    fileName: "context-pack.template.md",
+    docType: "ai-context",
+    requiredSections: [
+      "## Purpose",
+      "## When To Use",
+      "## Authoritative Docs",
+    ],
+  },
 ] as const;
 
 function read(path: string): string {
@@ -102,6 +115,8 @@ describe("documentation templates guardrails", () => {
       expect(existsSync(path)).toBe(true);
       expect(existsSync(aiPath)).toBe(true);
     }
+
+    expect(existsSync(routingEntryTemplatePath)).toBe(true);
   });
 
   it("requires metadata header anchors and section guidance in every template", () => {
@@ -127,14 +142,38 @@ describe("documentation templates guardrails", () => {
     const contextReadme = read(contextReadmePath);
     const contextAiReadme = read(contextAiReadmePath);
     const placementGuide = read(placementGuidePath);
+    const routingReadme = read(routingReadmePath);
+    const routingAiReadme = read(routingAiReadmePath);
 
     expect(contextReadme).toContain("./templates/README.md");
     expect(contextAiReadme).toContain("./templates/README.ai.md");
     expect(placementGuide).toContain("docs/context/templates/README.md");
+    expect(routingReadme).toContain("../templates/task-to-context-routing-entry.template.json");
+    expect(routingAiReadme).toContain("../templates/task-to-context-routing-entry.template.json");
 
     for (const template of requiredTemplates) {
       expect(templatesReadme).toContain(template.fileName);
       expect(templatesAiReadme).toContain(template.fileName);
+    }
+
+    expect(templatesReadme).toContain("task-to-context-routing-entry.template.json");
+    expect(templatesAiReadme).toContain("task-to-context-routing-entry.template.json");
+  });
+
+  it("keeps routing entry template parseable and aligned to contract-required fields", () => {
+    const routingTemplate = JSON.parse(read(routingEntryTemplatePath)) as Record<string, unknown>;
+    const routingContract = JSON.parse(read(routingContractPath)) as {
+      mappingRequiredFields: string[];
+      routingRequestRequiredFields: string[];
+    };
+
+    for (const field of routingContract.mappingRequiredFields) {
+      expect(routingTemplate[field]).toBeDefined();
+    }
+
+    const routingInputs = routingTemplate.routingInputs as Record<string, unknown>;
+    for (const field of routingContract.routingRequestRequiredFields) {
+      expect(routingInputs[field]).toBeDefined();
     }
   });
 });

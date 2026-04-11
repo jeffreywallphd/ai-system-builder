@@ -25,6 +25,7 @@
 - [Context Asset Metadata Standard](../context-asset-metadata.ai.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.ai.md)
 - [Context Router](../README.ai.md)
+- [Context Pack Template](../templates/context-pack.template.ai.md)
 - [AI Context Template](../templates/ai-context.template.ai.md)
 
 ## Standard Context Pack Contract
