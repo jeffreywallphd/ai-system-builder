@@ -124,3 +124,7 @@ Before opening a PR that adds or changes a protected client-facing operation, ve
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/architecture/identity-server-api.md`
 - `docs/architecture/storage-server-api.md`
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`

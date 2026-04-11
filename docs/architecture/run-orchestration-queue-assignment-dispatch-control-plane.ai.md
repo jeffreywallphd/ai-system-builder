@@ -61,3 +61,6 @@ Story 16.2.8 documents the implemented authoritative orchestration core so sched
 - Advanced scheduler scoring/prioritization policy is deferred; reservation-backed queue semantics are the current stability boundary.
 - Recovery automation remains intentionally guarded to safe deterministic cases; manual follow-up paths are explicit and auditable.
 - Operator-only realtime event expansion beyond user-safe orchestration events is deferred until policy/audience expansion work.
+
+## Related ADRs
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`

@@ -195,3 +195,7 @@ Do not merge these responsibilities into one adapter or transport endpoint.
 - Scheduler scoring/prioritization policy remains intentionally minimal; queue persistence and reservation semantics are stable, but advanced policy tuning is deferred to subsequent scheduling work.
 - Automatic recovery remains guarded to safe cases (expired claims, stale assignment/running windows, persisted dispatch reconciliation). Broader autonomous remediation remains manual-follow-up by design.
 - Realtime event delivery is contract-stable but intentionally bounded to user-safe orchestration signals; expanded operator-only event families remain deferred until policy/audience expansion work.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
