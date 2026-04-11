@@ -160,3 +160,7 @@ When those are absent, it now falls back to the canonical `studioHandoff` contra
 - Assembly now emits compact runtime handoff trace metadata (`imageStudioHandoffRuntime`) that preserves `handoffId`, `traceId`, workflow binding id, and source studio identity for downstream runtime/output seams.
 - Runtime output persistence now propagates handoff trace metadata into output-binding lineage (`outputRelationship.metadata`) and returns a bounded handoff persistence summary (`handoffId`, `traceId`, persisted target instances/record ids).
 - This completes the Data Studio -> Workflow Studio -> system-owned dataset handoff path for the image slice while staying on the same 5.2.1/5.2.2 contract and identity-resolution model.
+
+## Related ADRs
+
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`

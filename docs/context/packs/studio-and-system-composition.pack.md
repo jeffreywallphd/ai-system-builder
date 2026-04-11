@@ -30,6 +30,7 @@
 
 ## Authoritative Docs
 
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`
 - `docs/architecture/studio-handoff-contract.md`
 - `docs/architecture/image-workflow-system-definition-layer.md`
 - `docs/architecture/image-system-domain-foundation.md`
