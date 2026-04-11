@@ -97,6 +97,7 @@ Decision shortcut:
 
 - Canonical taxonomy contract: `docs/context/documentation-taxonomy.md`
 - Placement decisions: `docs/contributors/docs-placement-guide.md`
+- Rollout completion boundaries: `docs/context/governance/documentation-segmentation-rollout-boundaries.ai.md`
 - Supersession/redirect convention source: `docs/context/documentation-supersession-and-redirect-conventions.ai.md`
 - Guardrail test: `dev/tests/DocumentationSegmentationTaxonomyGuardrails.test.ts`
 
