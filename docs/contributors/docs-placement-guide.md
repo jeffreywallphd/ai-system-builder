@@ -45,6 +45,38 @@ Provide one consistent placement rule set so contributors and AI coding agents p
    - Yes: place it in `docs/ui/`.
    - No: put it in the closest authoritative area above and link from secondary areas instead of duplicating content.
 
+## ADR Thresholds For Planned Changes
+
+### ADR Required
+
+- The planned change introduces or revises a durable architectural invariant.
+- The planned change modifies control-plane design or authority boundaries between hosts/services.
+- The planned change changes workspace model guarantees (scope, tenancy, lifecycle, or sharing boundaries).
+- The planned change changes security trust boundaries or identity/authorization enforcement model.
+- The planned change sets or reverses storage policy direction (durability, persistence authority, sync/replication, retention).
+- The planned change commits to studio/system modeling semantics reused across subsystems.
+
+### ADR Recommended
+
+- The planned change introduces a cross-domain tradeoff likely to be debated again without durable rationale.
+- The planned change introduces a platform-level extension seam or abstraction that other work will follow.
+- The planned change is long-lived and high-impact even if rollback remains feasible.
+
+### ADR Unnecessary
+
+- The planned change only clarifies existing accepted ADR intent without changing the decision.
+- The planned change is implementation-local and preserves existing architecture contracts.
+- The planned change belongs to operational runbooks, diagnostics, or incident procedures.
+- The planned change is a baseline, migration inventory, or completion handoff snapshot.
+
+### Placement For Non-ADR Changes
+
+- Architecture contract and invariant details -> `docs/architecture/`.
+- Contributor implementation workflow and extension rules -> `docs/contributors/`.
+- Operational procedure and troubleshooting -> `docs/operations/`.
+- Historical baseline or migration snapshots -> `docs/baselines/`.
+- Shared taxonomy/context for humans and AI -> `docs/context/`.
+
 ## Placement Examples
 
 - Architecture explanation example:

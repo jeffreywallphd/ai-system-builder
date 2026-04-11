@@ -25,6 +25,34 @@
 8. UI behavior contract? -> `docs/ui/`.
 9. If mixed role, keep one authoritative location and link from secondary areas.
 
+## ADR Thresholds For Planned Changes
+
+### ADR Required
+- Planned change introduces or revises a durable architectural invariant.
+- Planned change modifies control-plane design or authority boundaries between hosts/services.
+- Planned change changes workspace model guarantees (scope, tenancy, lifecycle, sharing boundaries).
+- Planned change changes security trust boundaries or identity/authorization enforcement model.
+- Planned change sets or reverses storage policy direction (durability, persistence authority, sync/replication, retention).
+- Planned change commits to studio/system modeling semantics reused across subsystems.
+
+### ADR Recommended
+- Planned change introduces a cross-domain tradeoff likely to be debated again without durable rationale.
+- Planned change introduces a platform extension seam or abstraction that future work will copy.
+- Planned change is long-lived and high-impact even with feasible rollback.
+
+### ADR Unnecessary
+- Planned change only clarifies accepted ADR intent without changing the decision.
+- Planned change is implementation-local and preserves current architecture contracts.
+- Planned change is operational procedure, diagnostics, rollout, or incident response guidance.
+- Planned change is a baseline, migration inventory, or completion handoff snapshot.
+
+### Placement For Non-ADR Changes
+- Architecture contracts/invariants: `docs/architecture/`.
+- Contributor implementation guardrails: `docs/contributors/`.
+- Runtime/admin operations: `docs/operations/`.
+- Historical baselines and migrations: `docs/baselines/`.
+- Shared taxonomy/context: `docs/context/`.
+
 ## Required Examples
 - Architecture explanation -> `docs/architecture/`.
 - Runbook -> `docs/operations/`.

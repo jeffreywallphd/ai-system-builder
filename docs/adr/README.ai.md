@@ -22,6 +22,34 @@
 - Use filename format `adr-<NNN>-<kebab-case-title>.md` and keep AI companions as `adr-<NNN>-<kebab-case-title>.ai.md`.
 - Keep broad design contracts in `docs/architecture/`; use ADRs for explicit architecture decisions and rationale.
 
+## ADR Decision Thresholds
+
+### ADR Required
+- The change introduces or revises a durable architectural invariant that future implementation must respect.
+- The change alters control-plane shape, authority boundaries, or host/runtime composition contracts.
+- The change modifies workspace model guarantees (scope, tenancy, lifecycle, or cross-workspace behavior).
+- The change redefines security trust boundaries, identity/authorization enforcement model, or transport/data trust assumptions.
+- The change sets or reverses storage policy direction (durability model, persistence strategy, replication/sync authority, retention posture).
+- The change locks in studio/system modeling semantics reused across multiple domains or subsystems.
+
+### ADR Recommended
+- The change creates a high-impact cross-domain tradeoff likely to be reopened without explicit rationale.
+- The change introduces a new extension seam, platform-wide abstraction, or default pattern that other teams may copy.
+- The change has long-lived consequences, but remains reversible with bounded migration effort.
+
+### ADR Unnecessary
+- The change clarifies or extends an accepted ADR without modifying the decision itself.
+- The change is implementation-local to one component and preserves existing architecture contracts.
+- The change is operational procedure, diagnostics, rollout sequencing, or incident-response guidance.
+- The change is a historical completion snapshot, migration inventory, or baseline handoff artifact.
+
+### Where To Document When ADR Is Unnecessary
+- Architecture contracts: `docs/architecture/`.
+- Contributor implementation guardrails: `docs/contributors/`.
+- Runtime/admin operations: `docs/operations/`.
+- Historical baselines and migration snapshots: `docs/baselines/`.
+- Shared taxonomy/context semantics: `docs/context/`.
+
 ## ADR Metadata and Lifecycle Rules
 
 ### Numbering and Filename Rules
