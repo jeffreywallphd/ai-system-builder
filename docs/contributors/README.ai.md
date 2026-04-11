@@ -25,6 +25,7 @@
 - [Documentation Placement Guide](./docs-placement-guide.md)
 - [ADR-Informed Implementation and Review Examples](./adr-informed-implementation-and-review-examples.ai.md)
 - [Documentation Migration Safety Guide](./docs-migration-safety-guide.ai.md)
+- [Baseline and Historical Material Usage Guide](./baseline-and-historical-material-usage-guide.ai.md)
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.ai.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.ai.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)
