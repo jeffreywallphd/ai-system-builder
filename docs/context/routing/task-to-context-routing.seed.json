@@ -1,5 +1,113 @@
 {
   "schemaVersion": "1.0.0",
   "artifactType": "task-to-context-routing-map",
+  "taskCategoryMap": [
+    {
+      "taskCategory": "architecture-review",
+      "defaultIntent": "validate-or-evolve-architecture-boundaries",
+      "requiredSignals": [
+        "changedPaths",
+        "requestedOutcomes"
+      ]
+    },
+    {
+      "taskCategory": "feature-decomposition",
+      "defaultIntent": "break-feature-into-implementation-slices",
+      "requiredSignals": [
+        "taskSummary",
+        "requestedOutcomes"
+      ]
+    },
+    {
+      "taskCategory": "coding-implementation",
+      "defaultIntent": "implement-or-modify-code-behavior",
+      "requiredSignals": [
+        "changedPaths",
+        "constraints"
+      ]
+    },
+    {
+      "taskCategory": "migration-refactor",
+      "defaultIntent": "change-structure-with-behavioral-parity",
+      "requiredSignals": [
+        "changedPaths",
+        "constraints"
+      ]
+    },
+    {
+      "taskCategory": "diagnostics",
+      "defaultIntent": "triage-failure-or-regression",
+      "requiredSignals": [
+        "taskSummary",
+        "changedPaths"
+      ]
+    },
+    {
+      "taskCategory": "ui-studio",
+      "defaultIntent": "implement-or-adjust-user-experience",
+      "requiredSignals": [
+        "primarySurfaces",
+        "changedPaths"
+      ]
+    },
+    {
+      "taskCategory": "runtime-security",
+      "defaultIntent": "enforce-runtime-safety-and-policy",
+      "requiredSignals": [
+        "constraints",
+        "qualityGates"
+      ]
+    },
+    {
+      "taskCategory": "documentation-change",
+      "defaultIntent": "update-doc-coverage-or-accuracy",
+      "requiredSignals": [
+        "changedPaths",
+        "requestedOutcomes"
+      ]
+    }
+  ],
+  "routingExamples": [
+    {
+      "taskId": "example-diagnostics-startup-host",
+      "taskCategory": "diagnostics",
+      "routingInputs": {
+        "taskSummary": "Investigate startup failure in the authoritative host path.",
+        "changedPaths": [
+          "src/hosts/server",
+          "docs/architecture/authoritative-server-host-assembly.md"
+        ],
+        "requestedOutcomes": [
+          "root-cause",
+          "minimal-fix",
+          "regression-test"
+        ],
+        "constraints": [
+          "preserve-host-composition-boundaries"
+        ]
+      },
+      "expectedSelectionMode": "fallback",
+      "expectedPriorityTier": "high"
+    },
+    {
+      "taskId": "example-documentation-router-update",
+      "taskCategory": "documentation-change",
+      "routingInputs": {
+        "taskSummary": "Add a new context routing overview and update router links.",
+        "changedPaths": [
+          "docs/context/routing"
+        ],
+        "requestedOutcomes": [
+          "authoritative-doc-update",
+          "guardrail-tests"
+        ],
+        "constraints": [
+          "keep-md-and-ai-docs-aligned"
+        ]
+      },
+      "expectedSelectionMode": "single",
+      "expectedPriorityTier": "normal"
+    }
+  ],
   "mappings": []
 }

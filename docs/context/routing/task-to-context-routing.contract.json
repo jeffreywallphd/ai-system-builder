@@ -1,19 +1,117 @@
 {
   "schemaVersion": "1.0.0",
   "artifactType": "task-to-context-routing-map",
-  "description": "Contract for deterministic routing between task intents and context pack identifiers.",
+  "description": "Contract for deterministic routing between task categories and context pack identifiers.",
+  "canonicalHumanSpecPath": "docs/context/routing/prompt-routing-contract.md",
+  "canonicalAiSpecPath": "docs/context/routing/prompt-routing-contract.ai.md",
+  "routingRequestRequiredFields": [
+    "taskSummary",
+    "taskCategory",
+    "requestedOutcomes",
+    "changedPaths",
+    "constraints"
+  ],
+  "routingRequestOptionalFields": [
+    "primarySurfaces",
+    "qualityGates",
+    "exclusions",
+    "notes"
+  ],
+  "supportedTaskCategories": [
+    {
+      "id": "architecture-review",
+      "displayName": "Architecture Review",
+      "defaultSelectionMode": "ordered",
+      "defaultPriorityTier": "high"
+    },
+    {
+      "id": "feature-decomposition",
+      "displayName": "Feature Decomposition",
+      "defaultSelectionMode": "ordered",
+      "defaultPriorityTier": "high"
+    },
+    {
+      "id": "coding-implementation",
+      "displayName": "Coding Implementation",
+      "defaultSelectionMode": "ordered",
+      "defaultPriorityTier": "normal"
+    },
+    {
+      "id": "migration-refactor",
+      "displayName": "Migration and Refactor",
+      "defaultSelectionMode": "fallback",
+      "defaultPriorityTier": "high"
+    },
+    {
+      "id": "diagnostics",
+      "displayName": "Diagnostics and Troubleshooting",
+      "defaultSelectionMode": "fallback",
+      "defaultPriorityTier": "high"
+    },
+    {
+      "id": "ui-studio",
+      "displayName": "UI and Studio Experience",
+      "defaultSelectionMode": "ordered",
+      "defaultPriorityTier": "normal"
+    },
+    {
+      "id": "runtime-security",
+      "displayName": "Runtime and Security",
+      "defaultSelectionMode": "ordered",
+      "defaultPriorityTier": "critical"
+    },
+    {
+      "id": "documentation-change",
+      "displayName": "Documentation Change",
+      "defaultSelectionMode": "single",
+      "defaultPriorityTier": "normal"
+    }
+  ],
   "mappingRequiredFields": [
     "taskId",
+    "taskCategory",
     "intent",
+    "routingInputs",
     "packIds",
     "selectionMode",
-    "priority",
+    "priorityTier",
     "status"
+  ],
+  "mappingOptionalFields": [
+    "excludePackIds",
+    "fallbackPackIds",
+    "notes"
   ],
   "allowedSelectionModes": [
     "ordered",
     "fallback",
     "single"
+  ],
+  "priorityTiers": [
+    "critical",
+    "high",
+    "normal",
+    "low"
+  ],
+  "fallbackPolicy": {
+    "allowFallbackPackIds": true,
+    "fallbackTriggerRules": [
+      "all_primary_pack_ids_missing_or_inactive",
+      "task_constraints_exclude_all_primary_pack_ids",
+      "task_category_mismatch_requires_safe_default"
+    ],
+    "defaultFallbackBehavior": "use_category_default_then_global_defaults"
+  },
+  "selectionRules": [
+    "include active packs matching task category and routing inputs.",
+    "apply pack priority in ascending order; lower numbers are higher precedence.",
+    "apply exclusion rules before fallback evaluation.",
+    "preserve deterministic pack ordering in final routing result."
+  ],
+  "exclusionRules": [
+    "exclude packs marked deprecated unless explicitly requested.",
+    "exclude packs whose declared scope does not match changedPaths.",
+    "exclude packs explicitly listed in mapping.excludePackIds."
   ],
   "allowedStatusValues": [
     "draft",

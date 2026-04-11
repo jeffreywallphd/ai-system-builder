@@ -10,7 +10,7 @@
 ## Belongs Here
 - Routing contracts that define required mapping fields.
 - Seed task-to-context mapping registries for future stories.
-- Routing guidance that references context pack IDs and docs paths.
+- Prompt routing contracts that define category-specific inclusion, exclusion, and fallback behavior.
 
 ## Does Not Belong Here
 - Full context pack content.
@@ -18,6 +18,7 @@
 - Operational runbooks.
 
 ## Start Here
+- [Prompt Routing Contract and Task Categories](./prompt-routing-contract.md)
 - [Task-to-Context Routing Contract](./task-to-context-routing.contract.json)
 - [Task-to-Context Routing Seed](./task-to-context-routing.seed.json)
 - [Context Packs Directory](../packs/README.md)
