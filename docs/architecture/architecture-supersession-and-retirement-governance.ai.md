@@ -45,8 +45,9 @@ For `migrated-link-stub` docs, require:
 
 1. Frontmatter: `status: superseded`, `authoritativeness: historical`, `superseded_by`.
 2. `## Supersession Notice` explicitly stating non-authoritative status.
-3. Canonical destination links under a stable routing section.
-4. `## Related ADRs` when ADR constraints remain relevant.
+3. Explicit `Effective date`, `Reason`, and `Retention/removal trigger` lines.
+4. `## Redirect` with canonical destination links.
+5. Keep content concise and routing-only; avoid duplicate retired implementation detail.
 
 ## Safe Redirect and Retirement Rules
 

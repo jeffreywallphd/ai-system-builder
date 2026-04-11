@@ -17,24 +17,15 @@ related_code_paths:
 
 This document is a `migrated-link-stub` and does not carry active architecture authority.
 
-## Split Routing for Previously Mixed Content
+Effective date: 2026-04-11.
+Reason: This mixed legacy path was split into domain-specific canonical references.
+Retention/removal trigger: Remove this stub after inbound links are migrated and supersession guardrails pass without this path.
 
-The prior version mixed workflow composition, execution policy, runtime-host mechanics, and API concerns. Canonical authority now routes as follows:
+## Redirect
 
-- Workflow and studio composition contracts:
-  - `docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md`
-- Workflow-to-control-plane execution handoff:
-  - `docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md`
-- Run lifecycle and control-plane state authority:
-  - `docs/architecture/domains/execution-control-plane-and-scheduling/references/run-lifecycle-state-authority.md`
-- Runtime host composition and startup:
-  - `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.md`
-- API and transport boundaries:
-  - `docs/architecture/domains/api-and-transport-surfaces/references/unified-api-surface-contracts.md`
-
-## Related ADRs
-
-- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
-- `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
-- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md`
-- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md`
+Use these canonical sources instead:
+- Primary replacement: `docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.ai.md`
+- Related execution handoff: `docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.ai.md`
+- Related run lifecycle authority: `docs/architecture/domains/execution-control-plane-and-scheduling/references/run-lifecycle-state-authority.ai.md`
+- Related runtime host contracts: `docs/architecture/domains/runtime-host-surfaces/references/host-composition-root-contracts.ai.md`
+- Related API/transport contracts: `docs/architecture/domains/api-and-transport-surfaces/references/unified-api-surface-contracts.ai.md`

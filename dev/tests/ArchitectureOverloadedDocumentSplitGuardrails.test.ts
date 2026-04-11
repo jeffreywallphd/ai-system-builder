@@ -60,12 +60,12 @@ describe("architecture overloaded document split guardrails", () => {
     }
   });
 
-  it("keeps previously overloaded docs routed by explicit split sections", () => {
+  it("keeps previously overloaded docs routed by concise supersession redirect sections", () => {
     const presentation = read("docs/architecture/presentation-and-state.md");
     const sharedAssets = read("docs/architecture/shared-asset-contracts.md");
     const workflowExecution = read("docs/architecture/workflow-execution-and-tools.md");
 
-    expect(presentation).toContain("## Split Routing for Previously Mixed Content");
+    expect(presentation).toContain("## Redirect");
     expect(presentation).toContain(
       "domains/studio-and-system-composition/references/studio-ui-composition-and-state.md",
     );
@@ -73,19 +73,22 @@ describe("architecture overloaded document split guardrails", () => {
       "docs/architecture/multi-surface-ui-composition-foundation.md",
     );
 
-    expect(sharedAssets).toContain("## Split Routing for Previously Mixed Content");
+    expect(sharedAssets).toContain("## Redirect");
     expect(sharedAssets).toContain(
       "domains/workspace-storage-and-assets/references/asset-models-and-selection.md",
     );
 
-    expect(workflowExecution).toContain("## Split Routing for Previously Mixed Content");
+    expect(workflowExecution).toContain("## Redirect");
     expect(workflowExecution).toContain(
       "domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md",
     );
 
     for (const doc of [presentation, sharedAssets, workflowExecution]) {
+      expect(doc).toContain("Effective date:");
+      expect(doc).toContain("Retention/removal trigger:");
       expect(doc).not.toContain("Direction 5 Epic");
       expect(doc).not.toContain("stories 6.");
+      expect(doc).not.toContain("## Split Routing for Previously Mixed Content");
     }
   });
 });

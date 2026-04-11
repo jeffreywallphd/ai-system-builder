@@ -143,10 +143,16 @@ describe("architecture supersession governance guardrails", () => {
 
       expect(md).toContain("## Supersession Notice");
       expect(ai).toContain("## Supersession Notice");
+      expect(md).toContain("## Redirect");
+      expect(ai).toContain("## Redirect");
+      expect(md).toContain("Effective date:");
+      expect(ai).toContain("Effective date:");
+      expect(md).toContain("Retention/removal trigger:");
+      expect(ai).toContain("Retention/removal trigger:");
       expect(md).toContain("migrated-link-stub");
       expect(ai).toContain("migrated-link-stub");
-      expect(md).toContain("## Split Routing for Previously Mixed Content");
-      expect(ai).toContain("## Split Routing for Previously Mixed Content");
+      expect(md).not.toContain("## Split Routing for Previously Mixed Content");
+      expect(ai).not.toContain("## Split Routing for Previously Mixed Content");
 
       expect(mdFrontmatter.status).toBe("superseded");
       expect(aiFrontmatter.status).toBe("superseded");
