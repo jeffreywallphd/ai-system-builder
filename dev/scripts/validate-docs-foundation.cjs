@@ -25,6 +25,9 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/context-asset-metadata.contract.json",
   "docs/context/documentation-indexing-model.md",
   "docs/context/documentation-indexing-model.ai.md",
+  "docs/context/documentation-indexed-document-metadata.md",
+  "docs/context/documentation-indexed-document-metadata.ai.md",
+  "docs/context/documentation-indexed-document-metadata.contract.json",
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
   "docs/context/packs/context-pack.contract.json",
@@ -89,6 +92,27 @@ const REQUIRED_HEADER_FIELDS = [
   "authoritativeness",
   "owned_by",
   "last_reviewed",
+];
+
+const REQUIRED_INDEXED_DOCUMENT_METADATA_FIELDS = [
+  "path",
+  "title",
+  "docType",
+  "domain",
+  "status",
+  "authoritativeness",
+  "summary",
+];
+
+const OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS = [
+  "keywords",
+  "relatedCodePaths",
+  "relatedDocs",
+  "owner",
+  "lastReviewed",
+  "aiPath",
+  "supersedes",
+  "supersededBy",
 ];
 
 const SEED_DOCUMENTS = [
@@ -339,6 +363,7 @@ function validateDocsFoundation(repoRoot) {
   const contextPackContractPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
   const contextMapPath = resolve(repoRoot, "docs/context/context-map.json");
   const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
+  const indexedDocumentMetadataContractPath = resolve(repoRoot, "docs/context/documentation-indexed-document-metadata.contract.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
   const adrRegistryPath = resolve(repoRoot, "docs/adr/records/adr-registry.json");
@@ -347,6 +372,7 @@ function validateDocsFoundation(repoRoot) {
     contextPackContractPath,
     contextMapPath,
     contextAssetMetadataContractPath,
+    indexedDocumentMetadataContractPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
     taskRoutingContractPath,
@@ -431,6 +457,68 @@ function validateDocsFoundation(repoRoot) {
         code: "CONTEXT_CONTRACT_INVALID",
         message: "docs/context/context-asset-metadata.contract.json must declare schemaVersion 1.0.0 and artifactType context-asset-metadata-standard.",
       });
+    }
+  }
+
+  const indexedDocumentMetadataContract = contextJsonArtifacts.get(indexedDocumentMetadataContractPath);
+  if (indexedDocumentMetadataContract) {
+    if (
+      indexedDocumentMetadataContract.schemaVersion !== "1.0.0"
+      || indexedDocumentMetadataContract.artifactType !== "documentation-indexed-document-metadata-standard"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json must declare schemaVersion 1.0.0 and artifactType documentation-indexed-document-metadata-standard.",
+      });
+    }
+
+    if (
+      indexedDocumentMetadataContract.canonicalHumanSpecPath !== "docs/context/documentation-indexed-document-metadata.md"
+      || indexedDocumentMetadataContract.canonicalAiSpecPath !== "docs/context/documentation-indexed-document-metadata.ai.md"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json must reference canonical human/AI spec paths.",
+      });
+    }
+
+    if (
+      !Array.isArray(indexedDocumentMetadataContract.requiredFields)
+      || JSON.stringify(indexedDocumentMetadataContract.requiredFields) !== JSON.stringify(REQUIRED_INDEXED_DOCUMENT_METADATA_FIELDS)
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json requiredFields changed; update validator expectations.",
+      });
+    }
+
+    if (
+      !Array.isArray(indexedDocumentMetadataContract.optionalFields)
+      || JSON.stringify(indexedDocumentMetadataContract.optionalFields) !== JSON.stringify(OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS)
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json optionalFields changed; update validator expectations.",
+      });
+    }
+
+    if (
+      !indexedDocumentMetadataContract.fieldDefinitions
+      || typeof indexedDocumentMetadataContract.fieldDefinitions !== "object"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json must include fieldDefinitions.",
+      });
+    } else {
+      for (const fieldName of [...REQUIRED_INDEXED_DOCUMENT_METADATA_FIELDS, ...OPTIONAL_INDEXED_DOCUMENT_METADATA_FIELDS]) {
+        if (!indexedDocumentMetadataContract.fieldDefinitions[fieldName]) {
+          issues.push({
+            code: "CONTEXT_CONTRACT_INVALID",
+            message: `docs/context/documentation-indexed-document-metadata.contract.json missing fieldDefinitions.${fieldName}.`,
+          });
+        }
+      }
     }
   }
 
@@ -1427,6 +1515,57 @@ function validateDocsFoundation(repoRoot) {
   const allowedAuthoritativeness = new Set(taxonomyContract.metadataFields.authoritativeness.allowedValues);
   const todayUtc = new Date();
   todayUtc.setUTCHours(0, 0, 0, 0);
+
+  if (indexedDocumentMetadataContract) {
+    if (
+      indexedDocumentMetadataContract.derivedFromTaxonomyContractPath !== "docs/context/documentation-taxonomy.contract.json"
+    ) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json must reference docs/context/documentation-taxonomy.contract.json.",
+      });
+    }
+
+    const indexedFieldDefs = indexedDocumentMetadataContract.fieldDefinitions || {};
+    if (indexedFieldDefs.docType?.derivedFromTaxonomyField !== "document_type") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json fieldDefinitions.docType must derive from taxonomy field document_type.",
+      });
+    }
+    if (indexedFieldDefs.status?.derivedFromTaxonomyField !== "status") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json fieldDefinitions.status must derive from taxonomy field status.",
+      });
+    }
+    if (indexedFieldDefs.authoritativeness?.derivedFromTaxonomyField !== "authoritativeness") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json fieldDefinitions.authoritativeness must derive from taxonomy field authoritativeness.",
+      });
+    }
+
+    const exampleEntry = indexedDocumentMetadataContract.exampleEntry || {};
+    if (!allowedDocTypes.has(exampleEntry.docType)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json exampleEntry.docType must use taxonomy document_type values.",
+      });
+    }
+    if (!allowedStatuses.has(exampleEntry.status)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json exampleEntry.status must use taxonomy status values.",
+      });
+    }
+    if (!allowedAuthoritativeness.has(exampleEntry.authoritativeness)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/documentation-indexed-document-metadata.contract.json exampleEntry.authoritativeness must use taxonomy authoritativeness values.",
+      });
+    }
+  }
 
   for (const seedPath of SEED_DOCUMENTS) {
     const absoluteSeedPath = resolve(repoRoot, seedPath);

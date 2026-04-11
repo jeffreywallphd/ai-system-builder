@@ -65,3 +65,4 @@ Use this file for the canonical intent of documentation indexing and findability
 
 - Story guardrail test: `dev/tests/DocumentationIndexingModelGuardrails.test.ts`
 - Foundation validator rule: `dev/scripts/validate-docs-foundation.cjs`
+- Indexed-record metadata contract: `docs/context/documentation-indexed-document-metadata.md`

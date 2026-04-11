@@ -22,6 +22,7 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md)
 - [Documentation Indexing Model and Goals](./documentation-indexing-model.ai.md)
+- [Standard Indexed Document Metadata Contract](./documentation-indexed-document-metadata.ai.md)
 - [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.ai.md)
 - [Documentation Segmentation Seed Guidance](./documentation-segmentation-seed-guidance.ai.md)
 - [Documentation Status Signals](./documentation-status-signals.ai.md)
