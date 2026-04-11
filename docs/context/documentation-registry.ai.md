@@ -27,6 +27,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
+  - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
   - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
   - dev/tests/DocumentationIndexAssistedDiscoveryWorkedExamplesStory635Guardrails.test.ts
@@ -269,6 +270,24 @@ Task coverage in the examples:
 - security-sensitive changes
 
 This keeps the registry/index useful as an active discovery-and-routing layer instead of passive metadata.
+
+## Cross-Reference Validation Status (Story 6.4.2)
+
+Story 6.4.2 adds lightweight registry cross-reference checks so high-value relationships remain trustworthy as documentation paths evolve.
+
+Validation now enforces:
+
+- Indexed `path` and `aiPath` entries resolve to real repository files.
+- If a `relatedDocs` value points to another indexed registry path, the matching stable identifier must also exist in `relatedRecordIds`.
+- Existing path checks still detect broken `relatedCodePaths`, `supersedes`, and `supersededBy` references.
+
+Run:
+
+- `npm run docs:validate:registry`
+
+Cross-reference mismatches emit:
+
+- `REGISTRY_CROSS_REFERENCE_INVALID`
 
 ## Coverage Policy Contract
 

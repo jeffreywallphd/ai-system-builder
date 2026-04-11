@@ -13,6 +13,7 @@ related_code_paths:
   - dev/scripts/validate-docs-segmentation.cjs
   - dev/tests/DocsFoundationValidationScript.test.ts
   - dev/tests/DocumentationRegistryValidationScript.test.ts
+  - dev/tests/DocumentationRegistryCrossReferenceValidationStory642Guardrails.test.ts
   - dev/tests/AdrValidationScript.test.ts
   - dev/tests/ArchitectureDomainValidationScript.test.ts
   - dev/tests/DocsSegmentationValidationScript.test.ts
@@ -57,6 +58,7 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Superseded stub `## Redirect` sections keep resolvable local destination paths and required canonical targets.
 - Active top-level routers avoid linking to superseded paths.
 - Registry validation enforces lightweight shape and metadata invariants for `docs/context/documentation-registry.seed.json`.
+- Registry validation also enforces cross-reference integrity for indexed `relatedDocs` to `relatedRecordIds` alignment.
 
 ## Run Command
 
@@ -123,6 +125,7 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `REGISTRY_SHAPE_INVALID`
 - `REGISTRY_ENTRY_INVALID`
 - `REGISTRY_REFERENCE_INVALID`
+- `REGISTRY_CROSS_REFERENCE_INVALID`
 - `REGISTRY_TAXONOMY_MISMATCH`
 
 ## Scope Notes
