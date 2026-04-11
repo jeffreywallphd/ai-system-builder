@@ -62,7 +62,7 @@ describe("createRendererContentSecurityPolicy", () => {
     expect(policy).not.toContain("://bad");
   });
 
-  it("does not include dev renderer origin for packaged assets mode", () => {
+  it("does not include dev renderer origin for packaged assets mode and still allows desktop deferred runtime loopback endpoints", () => {
     const policy = createRendererContentSecurityPolicy({
       rendererDevUrl: "http://localhost:5174/",
       runtimeConfig: {
@@ -84,12 +84,13 @@ describe("createRendererContentSecurityPolicy", () => {
     });
 
     expect(policy).not.toContain("http://localhost:5174");
-    expect(policy).toContain("connect-src 'self' http://127.0.0.1:56609 ws://127.0.0.1:56609");
+    expect(policy).toContain("connect-src 'self' http://127.0.0.1:56609 http://127.0.0.1:8790 http://127.0.0.1:8100");
+    expect(policy).toContain("ws://127.0.0.1:56609 ws://127.0.0.1:8790 ws://127.0.0.1:8100");
   });
 });
 
 describe("createRendererContentSecurityPolicyResolver", () => {
-  it("re-evaluates runtime origins so post-login supervisor endpoints are allowed", () => {
+  it("allows desktop deferred-runtime loopback endpoints during auth-shell and keeps explicit post-login origins", () => {
     let runtimeConfig: AppRuntimeConfigValues | undefined = {
         runtimeMode: "desktop-development",
         hostKind: "desktop",
@@ -113,7 +114,8 @@ describe("createRendererContentSecurityPolicyResolver", () => {
     });
 
     const preLoginPolicy = resolvePolicy();
-    expect(preLoginPolicy).not.toContain("http://127.0.0.1:8790");
+    expect(preLoginPolicy).toContain("http://127.0.0.1:8790");
+    expect(preLoginPolicy).toContain("http://127.0.0.1:8100");
 
     runtimeConfig = {
       ...runtimeConfig,

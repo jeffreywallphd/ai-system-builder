@@ -54,6 +54,8 @@ Electron main now executes through the desktop host assembly and supplies host-o
 - initial window creation
 - graceful host stop and local runtime resource disposal
 
+Renderer CSP now pre-authorizes loopback deferred-runtime endpoints (`http://127.0.0.1:8790` service supervisor and `http://127.0.0.1:8100` python runtime) for desktop host modes so post-login runtime warmup calls are not blocked by pre-login document policy while still remaining loopback-scoped.
+
 ## Testing
 
 Desktop host assembly coverage lives in:
