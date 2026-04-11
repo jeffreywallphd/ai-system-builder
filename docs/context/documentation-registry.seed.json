@@ -958,9 +958,9 @@
       "title": "Documentation Migration Baseline",
       "docType": "baseline",
       "domain": "baselines",
-      "status": "active",
+      "status": "archived",
       "authoritativeness": "historical",
-      "summary": "Historical baseline inventory for documentation migration and sequencing decisions.",
+      "summary": "Archived point-in-time documentation migration baseline retained for historical traceability and comparison.",
       "keywords": [
         "baseline",
         "migration",
@@ -970,11 +970,12 @@
         "docs"
       ],
       "relatedRecordIds": [
+        "doc-contributors-docs-migration-safety-guide",
         "doc-context-documentation-taxonomy"
       ],
       "relatedDocs": [
-        "docs/baselines/README.md",
-        "docs/documentation-segmentation-migration-inventory.md"
+        "docs/documentation-migration-baseline.inventory.json",
+        "docs/context/documentation-segmentation-taxonomy.md"
       ],
       "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
@@ -1479,6 +1480,310 @@
       ],
       "owner": "team:operations",
       "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-operations-security-policy-configuration",
+      "path": "docs/security-policy-configuration-operations.md",
+      "aiPath": "docs/security-policy-configuration-operations.ai.md",
+      "title": "Security and Policy Configuration Operations",
+      "docType": "runbook",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Operational runbook for security and policy administration surfaces with strict runtime safety posture.",
+      "keywords": [
+        "operations",
+        "security policy",
+        "administration",
+        "runbook"
+      ],
+      "relatedCodePaths": [
+        "src/ui/pages/SecurityPolicyConfigurationPage.tsx",
+        "src/ui/shared/admin/AdminSettingsFormPrimitives.tsx",
+        "src/ui/routes"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security"
+      ],
+      "relatedDocs": [
+        "docs/operations/README.md",
+        "docs/architecture/authorization-foundation.md",
+        "docs/architecture/trusted-device-foundation.md"
+      ],
+      "owner": "team:operations-security",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-operations-secret-health-diagnostics",
+      "path": "docs/secret-health-and-operational-diagnostics.md",
+      "aiPath": "docs/secret-health-and-operational-diagnostics.ai.md",
+      "title": "Secret Health and Operational Diagnostics",
+      "docType": "runbook",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Operational diagnostics reference for secret-service health, degraded-state interpretation, and remediation flow.",
+      "keywords": [
+        "operations",
+        "secrets",
+        "health diagnostics",
+        "runbook"
+      ],
+      "relatedCodePaths": [
+        "src/infrastructure/security/secrets",
+        "src/infrastructure/api/security",
+        "src/infrastructure/transport/http-server/identity",
+        "src/hosts/server/IdentityServerHost.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security"
+      ],
+      "relatedDocs": [
+        "docs/operations/README.md",
+        "docs/secret-bootstrap-and-migration-operations.md",
+        "docs/architecture/secrets-foundation.md"
+      ],
+      "owner": "team:operations-security",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-operations-workspace-administration",
+      "path": "docs/workspace-administration-operations.md",
+      "aiPath": "docs/workspace-administration-operations.ai.md",
+      "title": "Workspace Administration Operations",
+      "docType": "runbook",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Operational runbook for workspace lifecycle and membership administration behavior, including audit-hook posture.",
+      "keywords": [
+        "operations",
+        "workspace administration",
+        "lifecycle",
+        "runbook"
+      ],
+      "relatedCodePaths": [
+        "src/application/workspaces",
+        "src/domain/workspaces",
+        "src/infrastructure/transport/http-server/identity"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-architecture-domain-workspace-storage-and-assets-overview",
+        "doc-architecture-domain-deployment-policy-and-audit-governance-overview"
+      ],
+      "relatedDocs": [
+        "docs/operations/README.md",
+        "docs/architecture/workspace-foundation.md",
+        "docs/architecture/workspace-administration-audit-hooks.md"
+      ],
+      "owner": "team:operations",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-operations-storage-administration",
+      "path": "docs/storage-administration-operations.md",
+      "aiPath": "docs/storage-administration-operations.ai.md",
+      "title": "Storage Administration Operations",
+      "docType": "runbook",
+      "domain": "operations",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Operational runbook for storage administration workflows, lifecycle actions, and policy diagnostics.",
+      "keywords": [
+        "operations",
+        "storage administration",
+        "lifecycle",
+        "runbook"
+      ],
+      "relatedCodePaths": [
+        "src/ui/pages/StorageAdministrationPage.tsx",
+        "src/ui/services/StorageAdministrationService.ts",
+        "src/infrastructure/storage"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-architecture-domain-workspace-storage-and-assets-overview",
+        "doc-context-pack-runtime-and-host"
+      ],
+      "relatedDocs": [
+        "docs/operations/README.md",
+        "docs/architecture/storage-feature-extension-guidance.md",
+        "docs/architecture/storage-foundation.md"
+      ],
+      "owner": "team:operations",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-baseline-documentation-segmentation-migration-inventory",
+      "path": "docs/documentation-segmentation-migration-inventory.md",
+      "aiPath": "docs/documentation-segmentation-migration-inventory.ai.md",
+      "title": "Documentation Segmentation Migration Inventory",
+      "docType": "baseline",
+      "domain": "baselines",
+      "status": "active",
+      "authoritativeness": "historical",
+      "summary": "Selective migration-planning baseline retained for documentation lineage and active-vs-historical separation decisions.",
+      "keywords": [
+        "baseline",
+        "migration inventory",
+        "documentation segmentation",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "docs/documentation-segmentation-migration-inventory.inventory.json",
+        "docs/context/documentation-segmentation-taxonomy.md",
+        "docs/context/documentation-baseline-and-historical-folder-strategy.md"
+      ],
+      "relatedRecordIds": [
+        "doc-baseline-documentation-migration-baseline",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-context-documentation-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/context/documentation-segmentation-taxonomy.md",
+        "docs/context/documentation-baseline-and-historical-folder-strategy.md",
+        "docs/baselines/README.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-baseline-feature-1-documentation-foundation-handoff",
+      "path": "docs/baselines/feature-1-documentation-foundation-handoff.md",
+      "aiPath": "docs/baselines/feature-1-documentation-foundation-handoff.ai.md",
+      "title": "Feature 1 Documentation Foundation Completion Handoff",
+      "docType": "baseline",
+      "domain": "baselines",
+      "status": "archived",
+      "authoritativeness": "historical",
+      "summary": "Archived feature-level baseline handoff describing initial documentation-foundation guarantees and deferred scope.",
+      "keywords": [
+        "baseline",
+        "feature handoff",
+        "documentation foundation",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/tests/DocsFoundationValidationScript.test.ts",
+        "docs/context/documentation-taxonomy.contract.json"
+      ],
+      "relatedRecordIds": [
+        "doc-baseline-documentation-migration-baseline",
+        "doc-context-documentation-taxonomy",
+        "doc-contributors-docs-foundation-validation-guide"
+      ],
+      "relatedDocs": [
+        "docs/baselines/README.md",
+        "docs/context/documentation-taxonomy.md",
+        "docs/contributors/docs-foundation-validation.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-superseded-presentation-and-state",
+      "path": "docs/architecture/presentation-and-state.md",
+      "aiPath": "docs/architecture/presentation-and-state.ai.md",
+      "title": "Presentation and State (Legacy Link Stub)",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "superseded",
+      "authoritativeness": "historical",
+      "summary": "Superseded redirect stub retained for inbound-link continuity to canonical studio and workflow composition references.",
+      "keywords": [
+        "architecture",
+        "superseded",
+        "redirect stub",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/domains/studio-and-system-composition/references/studio-ui-composition-and-state.md",
+        "docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-supersession-and-retirement-governance.md",
+        "docs/context/documentation-supersession-and-redirect-conventions.md"
+      ],
+      "supersededBy": "docs/architecture/domains/studio-and-system-composition/references/studio-ui-composition-and-state.md",
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-superseded-shared-asset-contracts",
+      "path": "docs/architecture/shared-asset-contracts.md",
+      "aiPath": "docs/architecture/shared-asset-contracts.ai.md",
+      "title": "Shared Asset Contracts (Legacy Link Stub)",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "superseded",
+      "authoritativeness": "historical",
+      "summary": "Superseded redirect stub preserved for historical path continuity to workspace asset and API contract references.",
+      "keywords": [
+        "architecture",
+        "superseded",
+        "asset contracts",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/domains/workspace-storage-and-assets/references/asset-models-and-selection.md",
+        "docs/architecture/domains/api-and-transport-surfaces/references/unified-api-surface-contracts.md"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-workspace-storage-and-assets-overview",
+        "doc-architecture-domain-api-and-transport-surfaces-overview",
+        "doc-architecture-domain-studio-and-system-composition-overview"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-supersession-and-retirement-governance.md",
+        "docs/context/documentation-supersession-and-redirect-conventions.md"
+      ],
+      "supersededBy": "docs/architecture/domains/workspace-storage-and-assets/references/asset-models-and-selection.md",
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-superseded-workflow-execution-and-tools",
+      "path": "docs/architecture/workflow-execution-and-tools.md",
+      "aiPath": "docs/architecture/workflow-execution-and-tools.ai.md",
+      "title": "Workflow Execution and Tools (Legacy Link Stub)",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "superseded",
+      "authoritativeness": "historical",
+      "summary": "Superseded redirect stub kept for historical workflow-path continuity and canonical execution/studio redirects.",
+      "keywords": [
+        "architecture",
+        "superseded",
+        "workflow execution",
+        "historical"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md",
+        "docs/architecture/domains/execution-control-plane-and-scheduling/references/workflow-execution-runtime-handoff.md"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-supersession-and-retirement-governance.md",
+        "docs/context/documentation-supersession-and-redirect-conventions.md"
+      ],
+      "supersededBy": "docs/architecture/domains/studio-and-system-composition/references/workflow-and-system-composition-contracts.md",
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -1502,7 +1807,10 @@
         "doc-architecture-domainization-rollout-boundaries",
         "doc-architecture-layers-and-boundaries",
         "doc-architecture-migration-sequence-and-priority",
-        "doc-architecture-supersession-and-retirement-governance"
+        "doc-architecture-supersession-and-retirement-governance",
+        "doc-architecture-superseded-presentation-and-state",
+        "doc-architecture-superseded-shared-asset-contracts",
+        "doc-architecture-superseded-workflow-execution-and-tools"
       ],
       "contributor-guide": [
         "doc-contributors-adr-informed-implementation-and-review-examples",
@@ -1512,7 +1820,11 @@
         "doc-contributors-docs-placement-guide"
       ],
       "runbook": [
-        "doc-operations-node-bootstrap-identity"
+        "doc-operations-node-bootstrap-identity",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-workspace-administration",
+        "doc-operations-storage-administration"
       ],
       "adr": [
         "doc-adr-001-single-authoritative-control-plane",
@@ -1523,7 +1835,9 @@
         "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "baseline": [
-        "doc-baseline-documentation-migration-baseline"
+        "doc-baseline-documentation-migration-baseline",
+        "doc-baseline-documentation-segmentation-migration-inventory",
+        "doc-baseline-feature-1-documentation-foundation-handoff"
       ],
       "ai-context": [
         "doc-context-documentation-identity-and-reference-conventions",
@@ -1563,7 +1877,6 @@
         "doc-architecture-layers-and-boundaries",
         "doc-architecture-migration-sequence-and-priority",
         "doc-architecture-supersession-and-retirement-governance",
-        "doc-baseline-documentation-migration-baseline",
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-context-documentation-taxonomy",
         "doc-context-pack-architecture-core",
@@ -1578,11 +1891,23 @@
         "doc-contributors-docs-foundation-validation-guide",
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
-        "doc-operations-node-bootstrap-identity"
+        "doc-operations-node-bootstrap-identity",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-workspace-administration",
+        "doc-operations-storage-administration",
+        "doc-baseline-documentation-segmentation-migration-inventory"
       ],
       "deprecated": [],
-      "superseded": [],
-      "archived": []
+      "superseded": [
+        "doc-architecture-superseded-presentation-and-state",
+        "doc-architecture-superseded-shared-asset-contracts",
+        "doc-architecture-superseded-workflow-execution-and-tools"
+      ],
+      "archived": [
+        "doc-baseline-documentation-migration-baseline",
+        "doc-baseline-feature-1-documentation-foundation-handoff"
+      ]
     },
     "byDomain": {
       "documentation": [
@@ -1605,7 +1930,10 @@
         "doc-architecture-layers-and-boundaries",
         "doc-architecture-migration-sequence-and-priority",
         "doc-context-pack-architecture-core",
-        "doc-context-pack-studio-and-system-composition"
+        "doc-context-pack-studio-and-system-composition",
+        "doc-architecture-superseded-presentation-and-state",
+        "doc-architecture-superseded-shared-asset-contracts",
+        "doc-architecture-superseded-workflow-execution-and-tools"
       ],
       "contributors": [
         "doc-contributors-adr-informed-implementation-and-review-examples",
@@ -1616,7 +1944,11 @@
       ],
       "operations": [
         "doc-context-pack-runtime-and-host",
-        "doc-operations-node-bootstrap-identity"
+        "doc-operations-node-bootstrap-identity",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-workspace-administration",
+        "doc-operations-storage-administration"
       ],
       "decision-records": [
         "doc-adr-001-single-authoritative-control-plane",
@@ -1627,7 +1959,9 @@
         "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "baselines": [
-        "doc-baseline-documentation-migration-baseline"
+        "doc-baseline-documentation-migration-baseline",
+        "doc-baseline-documentation-segmentation-migration-inventory",
+        "doc-baseline-feature-1-documentation-foundation-handoff"
       ],
       "governance": [
         "doc-architecture-domain-deployment-policy-and-audit-governance-overview",
@@ -1676,7 +2010,11 @@
         "doc-architecture-domainization-rollout-boundaries",
         "doc-architecture-migration-sequence-and-priority",
         "doc-architecture-supersession-and-retirement-governance",
-        "doc-contributors-adr-informed-implementation-and-review-examples"
+        "doc-contributors-adr-informed-implementation-and-review-examples",
+        "doc-operations-security-policy-configuration",
+        "doc-operations-secret-health-diagnostics",
+        "doc-operations-workspace-administration",
+        "doc-operations-storage-administration"
       ],
       "supplemental": [
         "doc-context-pack-architecture-core",
@@ -1687,7 +2025,12 @@
         "doc-context-pack-studio-and-system-composition"
       ],
       "historical": [
-        "doc-baseline-documentation-migration-baseline"
+        "doc-baseline-documentation-migration-baseline",
+        "doc-baseline-documentation-segmentation-migration-inventory",
+        "doc-baseline-feature-1-documentation-foundation-handoff",
+        "doc-architecture-superseded-presentation-and-state",
+        "doc-architecture-superseded-shared-asset-contracts",
+        "doc-architecture-superseded-workflow-execution-and-tools"
       ]
     }
   }

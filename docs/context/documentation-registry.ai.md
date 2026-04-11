@@ -18,6 +18,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
+  - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -105,6 +106,28 @@ Registry seed coverage now extends to additional high-value categories:
   - `docs/contributors/adr-informed-implementation-and-review-examples.md`
 
 Documentation routing entries in `docs/context/routing/task-to-context-routing.seed.json` now include these records through `relatedDocRecordIds`, improving stable-key retrieval beyond architecture docs.
+
+## Operations, Baseline, and Historical Population Status (Story 6.2.4)
+
+Registry seed coverage now adds selective operations and non-active documentation entries with explicit lifecycle and authority signals:
+
+- Additional operations runbooks in `docs/*.md` are indexed as `docType: runbook` in domain `operations`:
+  - `docs/security-policy-configuration-operations.md`
+  - `docs/secret-health-and-operational-diagnostics.md`
+  - `docs/workspace-administration-operations.md`
+  - `docs/storage-administration-operations.md`
+- Selective baseline anchors are indexed as `docType: baseline` with `authoritativeness: historical`:
+  - `docs/documentation-migration-baseline.md`
+  - `docs/documentation-segmentation-migration-inventory.md`
+  - `docs/baselines/feature-1-documentation-foundation-handoff.md`
+- Superseded architecture stubs are represented as explicit historical redirect records:
+  - `docs/architecture/presentation-and-state.md`
+  - `docs/architecture/shared-asset-contracts.md`
+  - `docs/architecture/workflow-execution-and-tools.md`
+
+Non-active records are intentionally separated in `discoveryIndex.byStatus` (`active`, `archived`, `superseded`) and `discoveryIndex.byAuthoritativeness` (`historical`) so they remain discoverable without being treated as current implementation authority.
+
+Routing examples and mappings for diagnostics/runtime-security now include stable `relatedDocRecordIds` for operations records to improve deterministic record-based lookup.
 
 ## Coverage Policy Contract
 

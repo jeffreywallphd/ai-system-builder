@@ -18,6 +18,7 @@ related_code_paths:
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
   - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
+  - dev/tests/DocumentationRegistryOperationsBaselinesHistoricalStory624Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -121,6 +122,28 @@ The registry seed now extends beyond architecture-only coverage and includes:
 
 Discovery mappings are also extended so documentation refactor routes in
 `docs/context/routing/task-to-context-routing.seed.json` can resolve these registry entries through `relatedDocRecordIds` rather than path-only matching.
+
+## Operations, Baseline, and Historical Population Status (Story 6.2.4)
+
+Registry seed coverage now includes selective high-value operations and non-active documentation entries with explicit lifecycle and authority metadata:
+
+- Additional operations runbooks under `docs/*.md` are indexed as `docType: runbook` in the `operations` domain:
+  - `docs/security-policy-configuration-operations.md`
+  - `docs/secret-health-and-operational-diagnostics.md`
+  - `docs/workspace-administration-operations.md`
+  - `docs/storage-administration-operations.md`
+- Selective baseline anchors are indexed under `docType: baseline` with `authoritativeness: historical`:
+  - `docs/documentation-migration-baseline.md`
+  - `docs/documentation-segmentation-migration-inventory.md`
+  - `docs/baselines/feature-1-documentation-foundation-handoff.md`
+- Superseded architecture stubs are indexed explicitly as historical redirect records:
+  - `docs/architecture/presentation-and-state.md`
+  - `docs/architecture/shared-asset-contracts.md`
+  - `docs/architecture/workflow-execution-and-tools.md`
+
+To prevent non-active material from competing silently with active guidance, these records are intentionally separated in `discoveryIndex.byStatus` (`active`, `archived`, `superseded`) and `discoveryIndex.byAuthoritativeness` (`historical`).
+
+Runtime diagnostics and runtime-security routing records now include stable `relatedDocRecordIds` for operations runbooks so discovery can resolve authoritative operations guidance through record identifiers instead of brittle path guessing.
 
 ## Extensibility Boundaries
 
