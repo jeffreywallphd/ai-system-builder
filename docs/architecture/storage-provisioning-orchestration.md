@@ -84,3 +84,7 @@ Failure posture:
 - Add new backend by registering `StorageBackendType -> provisioning/capability adapter` in `StorageBackendAdapterRegistry`.
 - Keep create orchestration unchanged; new backends participate automatically through registry-driven selection.
 - Backend-specific reason codes remain adapter-owned, while orchestrator reason codes cover selection/dispatch failures.
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.md`

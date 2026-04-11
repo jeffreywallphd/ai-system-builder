@@ -53,3 +53,4 @@
 ## Related ADRs
 
 - `docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`

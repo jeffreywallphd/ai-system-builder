@@ -34,3 +34,7 @@ Story 9.2.5 adds the application and infrastructure seams that create storage in
 
 - New backend adapters are added by registry registration only; create-flow orchestration does not change.
 - Backend-specific reason codes stay within adapters; cross-backend orchestration reason codes are centralized.
+
+## Related ADRs
+
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`
