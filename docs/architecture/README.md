@@ -48,6 +48,18 @@ related_code_paths:
 - [API and Transport Surfaces](./domains/api-and-transport-surfaces/overview.md)
 - [Deployment Policy and Audit Governance](./domains/deployment-policy-and-audit-governance/overview.md)
 
+## Route By Common Contributor Task
+- Understand the core system architecture and layer boundaries:
+  [Core Platform and Composition](./domains/core-platform-and-composition/overview.md)
+- Review runtime design, startup boundaries, and host lifecycle behavior:
+  [Runtime Host Surfaces](./domains/runtime-host-surfaces/overview.md)
+- Work on studio-facing behavior and studio/system composition seams:
+  [Studio and System Composition](./domains/studio-and-system-composition/overview.md)
+- Examine security-sensitive trust, authz, and secret-handling boundaries:
+  [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
+- Need full task-to-context-pack assembly rules instead of architecture-only routing:
+  [Context Routing Router](../context/routing/README.md)
+
 ## Route By Document Type
 - Domain boundaries and invariants: start in the relevant `overview.md` above.
 - Contract detail: open each domain `references/README.md` from [Domain Folder Contract](./domains/README.md).

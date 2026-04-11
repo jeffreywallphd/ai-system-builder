@@ -157,6 +157,7 @@ describe("documentation router and overview writing standard guardrails", () => 
 
     for (const section of [
       "## Route By Domain",
+      "## Route By Common Contributor Task",
       "## Route By Document Type",
       "## Active Flat References Pending Domain Migration",
     ] as const) {
@@ -168,6 +169,21 @@ describe("documentation router and overview writing standard guardrails", () => 
     const directDomainLinksAi = (architectureRouterAi.match(/\.\/domains\/[^)\s]+\/overview\.md/g) || []).length;
     expect(directDomainLinksHuman).toBe(8);
     expect(directDomainLinksAi).toBe(8);
+
+    for (const taskSignal of [
+      "Understand the core system architecture and layer boundaries",
+      "Review runtime design, startup boundaries, and host lifecycle behavior",
+      "Work on studio-facing behavior and studio/system composition seams",
+      "Examine security-sensitive trust, authz, and secret-handling boundaries",
+      "./domains/core-platform-and-composition/overview.md",
+      "./domains/runtime-host-surfaces/overview.md",
+      "./domains/studio-and-system-composition/overview.md",
+      "./domains/identity-trust-and-security/overview.md",
+      "../context/routing/README",
+    ] as const) {
+      expect(architectureRouter).toContain(taskSignal);
+      expect(architectureRouterAi).toContain(taskSignal);
+    }
 
     const humanPendingSection = architectureRouter.match(
       /## Active Flat References Pending Domain Migration([\s\S]*?)(?:\n## |\n?$)/,
