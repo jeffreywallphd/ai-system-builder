@@ -124,6 +124,7 @@ ADRs are part of the documentation system, not a standalone archive. Keep relati
 - [ADR Records Home](./records/README.md)
 - [ADR Discovery Registry](./records/adr-registry.json)
 - [ADR Authoring Guide](./records/authoring-guide.md)
+- [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md)
 - [ADR Template](../context/templates/adr.template.md)
 - [Architecture Router](../architecture/README.md)
 - [Docs Top-Level Contract](../README.md)
