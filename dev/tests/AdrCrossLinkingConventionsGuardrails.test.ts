@@ -33,4 +33,38 @@ describe("ADR cross-linking conventions guardrails", () => {
     expect(packSpec).toContain("## ADR Citation Conventions");
     expect(packSpecAi).toContain("## ADR Citation Conventions");
   });
+
+  it("keeps key architecture domain overviews linked to decision records", () => {
+    const domainCore = read("docs/architecture/domain-and-application-core.md");
+    const domainCoreAi = read("docs/architecture/domain-and-application-core.ai.md");
+    const layersBoundaries = read("docs/architecture/layers-and-boundaries.md");
+    const layersBoundariesAi = read("docs/architecture/layers-and-boundaries.ai.md");
+    const desktopHosts = read("docs/architecture/desktop-runtime-and-hosts.md");
+    const desktopHostsAi = read("docs/architecture/desktop-runtime-and-hosts.ai.md");
+
+    expect(domainCore).toContain("## Related ADRs");
+    expect(domainCore).toContain("adr-004-studios-as-views-over-shared-system-and-asset-model.md");
+    expect(domainCore).toContain("adr-006-policy-aware-scheduling-and-controlled-execution.md");
+    expect(domainCoreAi).toContain("## Related ADRs");
+    expect(domainCoreAi).toContain("adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md");
+    expect(domainCoreAi).toContain("adr-006-policy-aware-scheduling-and-controlled-execution.ai.md");
+
+    expect(layersBoundaries).toContain("## Related ADRs");
+    expect(layersBoundaries).toContain("adr-001-single-authoritative-control-plane.md");
+    expect(layersBoundaries).toContain("adr-004-studios-as-views-over-shared-system-and-asset-model.md");
+    expect(layersBoundaries).toContain("adr-005-trust-identity-and-security-boundary-enforcement.md");
+    expect(layersBoundariesAi).toContain("## Related ADRs");
+    expect(layersBoundariesAi).toContain("adr-001-single-authoritative-control-plane.ai.md");
+    expect(layersBoundariesAi).toContain("adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md");
+    expect(layersBoundariesAi).toContain("adr-005-trust-identity-and-security-boundary-enforcement.ai.md");
+
+    expect(desktopHosts).toContain("## Related ADRs");
+    expect(desktopHosts).toContain("adr-001-single-authoritative-control-plane.md");
+    expect(desktopHosts).toContain("adr-003-storage-as-managed-platform-resource.md");
+    expect(desktopHosts).toContain("adr-005-trust-identity-and-security-boundary-enforcement.md");
+    expect(desktopHostsAi).toContain("## Related ADRs");
+    expect(desktopHostsAi).toContain("adr-001-single-authoritative-control-plane.ai.md");
+    expect(desktopHostsAi).toContain("adr-003-storage-as-managed-platform-resource.ai.md");
+    expect(desktopHostsAi).toContain("adr-005-trust-identity-and-security-boundary-enforcement.ai.md");
+  });
 });

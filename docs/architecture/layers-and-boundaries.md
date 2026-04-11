@@ -295,3 +295,9 @@ If a change needs data from the outside world, prefer adding or using an **appli
 - Service composition now classifies application ports, infrastructure adapters, and platform services explicitly, with boundary-layer validation and dependency-cycle prevention.
 - Host-safe gating now enforces capability/role requirements and exposure boundaries (`ui`, `transport`, `execution`, `persistence`) during composition.
 - Authoritative server composition now resolves service registration plans in the host bootstrap `dependencies` stage and enforces required control-plane service coverage before runtime startup in `feature-registration`.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.md`
+- `docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md`

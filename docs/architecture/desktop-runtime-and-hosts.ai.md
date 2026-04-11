@@ -220,3 +220,9 @@ The preload bridge uses synchronous IPC and exposes storage/workflow/model-file 
   - `desktop-startup.post-login-warmup`
   - `desktop-startup.deferred-feature-registration`
 - Phase timing events are emitted on `[ai-loom][startup]` and memory snapshots on `[ai-loom][startup-memory]` so pre-login delays can be distinguished from post-login warmup delays.
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+- `docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md`
+- `docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md`
