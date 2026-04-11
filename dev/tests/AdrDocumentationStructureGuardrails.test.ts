@@ -19,14 +19,20 @@ describe("ADR documentation structure guardrails", () => {
     const aiRouter = readFileSync(resolve(adrRoot, "README.ai.md"), "utf8");
 
     expect(humanRouter).toContain("## ADR File Home");
+    expect(humanRouter).toContain("## Standard ADR Sections");
     expect(humanRouter).toContain("docs/adr/records/");
     expect(humanRouter).toContain("../architecture/README.md");
     expect(humanRouter).toContain("../context/templates/adr.template.md");
+    expect(humanRouter).toContain("Decision Statement");
+    expect(humanRouter).toContain("Supersession");
 
     expect(aiRouter).toContain("## ADR File Home");
+    expect(aiRouter).toContain("## Standard ADR Sections");
     expect(aiRouter).toContain("docs/adr/records/");
     expect(aiRouter).toContain("../architecture/README.ai.md");
     expect(aiRouter).toContain("../context/templates/adr.template.ai.md");
+    expect(aiRouter).toContain("Decision Statement");
+    expect(aiRouter).toContain("Supersession");
   });
 
   it("keeps records home readmes explicit about naming and indexing contract", () => {
@@ -35,8 +41,12 @@ describe("ADR documentation structure guardrails", () => {
 
     expect(humanRecords).toContain("adr-<NNN>-<kebab-case-title>.md");
     expect(humanRecords).toContain("## Current Index");
+    expect(humanRecords).toContain("required section");
+    expect(humanRecords).toContain("Supersession");
     expect(aiRecords).toContain("adr-<NNN>-<kebab-case-title>.md");
     expect(aiRecords).toContain("## Current Index");
+    expect(aiRecords).toContain("required sections");
+    expect(aiRecords).toContain("Supersession");
   });
 
   it("keeps ADR records out of the adr router root", () => {

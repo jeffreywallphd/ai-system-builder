@@ -22,6 +22,11 @@
 - Use filename format `adr-<NNN>-<kebab-case-title>.md` and pair AI companion files as `*.ai.md`.
 - Keep architecture overviews/references in `docs/architecture/`; use ADRs only for explicit choices and tradeoffs.
 
+## Standard ADR Sections
+- Required: `Status`, `Decision Date`, `Decision Statement`, `Context and Problem Statement`, `Decision Drivers`, `Considered Options`, `Chosen Approach`, `Consequences`, `Related Documentation`, and `Related Code Paths`.
+- Optional: `Supersession` (required whenever the ADR supersedes another ADR or is superseded) and `Follow-Up Actions`.
+- Use the template directly so decision records remain concise and consistent: `docs/context/templates/adr.template.md`.
+
 ## Start Here
 - [ADR Records Home](./records/README.md)
 - [ADR Template](../context/templates/adr.template.md)

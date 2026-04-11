@@ -12,6 +12,8 @@
 - Use `adr-<NNN>-<kebab-case-title>.md` for human docs and `adr-<NNN>-<kebab-case-title>.ai.md` for AI companions.
 - Keep decision numbers unique and strictly increasing; never renumber historical ADRs.
 - Keep supersession metadata and replacement links current when statuses change.
+- Keep all required sections from the ADR template in each record.
+- Use optional sections when relevant; treat `Supersession` as required whenever replacement links are involved.
 
 ## Current Index
 - No ADRs recorded yet.
