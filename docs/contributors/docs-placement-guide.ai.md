@@ -74,6 +74,8 @@
 - Start new docs from templates in `docs/context/templates/README.md`.
 
 ## Segmentation Taxonomy Mapping
+- Segmentation model source: `docs/context/documentation-segmentation-taxonomy.ai.md`.
+- Historical landing-zone strategy: `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`.
 - Active Guidance: current architecture/contributor/operations/UI authority docs.
 - Baselines: point-in-time snapshots and completion records.
 - Historical Notes: retained non-authoritative context for traceability.
@@ -81,6 +83,17 @@
 - Rollout-Boundary Notes: phase boundaries, non-goals, and deferred work declarations.
 - Temporary Transition Documents: short-lived stubs and pointer notes during migration.
 - Superseded or Deprecated Documents: retired authority paths with replacement metadata.
+
+## Historical Isolation Target Destinations
+- Default historical destination: `docs/baselines/`.
+- Preferred landing zones:
+  - `docs/baselines/architecture/`
+  - `docs/baselines/contributors/`
+  - `docs/baselines/operations/`
+  - `docs/baselines/context/`
+  - `docs/baselines/ui/`
+  - `docs/baselines/cross-cutting/`
+- Keep old active paths only as short superseded pointer notes when link continuity is required.
 
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`
