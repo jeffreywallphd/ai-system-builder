@@ -3,10 +3,10 @@
 This artifact captures the current-state documentation structure and taxonomy baseline before any migration work.
 
 ## Scope
-- Branch context: `codex-232b79d6bf`
+- Branch context: `codex-f2b6d46d4e`
 - Audited path: `docs/**/*.(md|ai.md)`
-- Audited files: 542
-- Audited directories: 9
+- Audited files: 560
+- Audited directories: 10
 - Machine-readable inventory: `docs/documentation-migration-baseline.inventory.json`
 
 ## Current Folder Layout
@@ -15,36 +15,36 @@ This artifact captures the current-state documentation structure and taxonomy ba
 | --- | ---: | --- | ---: |
 | `docs/architecture` | 471 | ai-context-oriented | 1 |
 | `docs` | 51 | ai-context-oriented | 3 |
-| `docs/context` | 4 | operational | 0 |
+| `docs/context/templates` | 16 | ai-context-oriented | 0 |
+| `docs/context` | 6 | operational | 0 |
 | `docs/contributors` | 4 | operational | 0 |
 | `docs/prompts` | 3 | operational | 1 |
-| `docs/ui` | 3 | operational | 1 |
 
 ## Role Category Breakdown (Primary Role)
 
 | Role | Count |
 | --- | ---: |
 | architectural | 229 |
-| operational | 29 |
-| contributor-facing | 15 |
-| historical | 1 |
-| ai-context-oriented | 268 |
+| operational | 36 |
+| contributor-facing | 16 |
+| historical | 2 |
+| ai-context-oriented | 277 |
 
 ## Role Category Breakdown (Any Role Signal)
 
 | Role | Count |
 | --- | ---: |
 | architectural | 471 |
-| operational | 90 |
-| contributor-facing | 29 |
-| historical | 48 |
-| ai-context-oriented | 268 |
+| operational | 97 |
+| contributor-facing | 31 |
+| historical | 50 |
+| ai-context-oriented | 277 |
 
 ## Major Observations
 - The `docs/architecture/` subtree dominates the doc set with 471 files and mixes current architecture guidance with historical baselines.
 - The docs root currently holds 51 markdown files, creating role ambiguity between contributor guides, operational runbooks, and AI companion content.
-- Companion duplication is extensive: 536 files are in `.md`/`.ai.md` pairs and 6 files do not have a companion.
-- Ownership signals are missing in 533 files, which limits migration accountability.
+- Companion duplication is extensive: 554 files are in `.md`/`.ai.md` pairs and 6 files do not have a companion.
+- Ownership signals are missing in 551 files, which limits migration accountability.
 
 ## Highest-Risk Structural Problems
 - **HIGH** A small number of hub documents are overloaded navigation bottlenecks: Readers must parse very large documents to discover canonical docs, reducing findability and increasing onboarding cost.

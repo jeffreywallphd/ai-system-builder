@@ -1,0 +1,140 @@
+import { describe, expect, it } from "bun:test";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+const repoRoot = process.cwd();
+const templatesDir = resolve(repoRoot, "docs/context/templates");
+const templatesReadmePath = resolve(templatesDir, "README.md");
+const templatesAiReadmePath = resolve(templatesDir, "README.ai.md");
+const contextReadmePath = resolve(repoRoot, "docs/context/README.md");
+const contextAiReadmePath = resolve(repoRoot, "docs/context/README.ai.md");
+const placementGuidePath = resolve(repoRoot, "docs/contributors/docs-placement-guide.md");
+
+const requiredFrontmatterFields = [
+  "title",
+  "doc_type",
+  "status",
+  "authoritativeness",
+  "owned_by",
+  "last_reviewed",
+] as const;
+
+const requiredTemplates = [
+  {
+    fileName: "architecture-overview.template.md",
+    docType: "architecture-overview",
+    requiredSections: [
+      "## Scope and System Boundary",
+      "## Canonical Components and Responsibilities",
+      "## Cross-Cutting Invariants",
+    ],
+  },
+  {
+    fileName: "architecture-reference.template.md",
+    docType: "architecture-reference",
+    requiredSections: [
+      "## Context and Scope",
+      "## Contracts and Interfaces",
+      "## Extension Guardrails",
+    ],
+  },
+  {
+    fileName: "contributor-guide.template.md",
+    docType: "contributor-guide",
+    requiredSections: [
+      "## Purpose and Audience",
+      "## Implementation Workflow",
+      "## Validation and Tests",
+    ],
+  },
+  {
+    fileName: "runbook.template.md",
+    docType: "runbook",
+    requiredSections: [
+      "## Purpose and Operational Scope",
+      "## Procedure",
+      "## Rollback and Recovery",
+    ],
+  },
+  {
+    fileName: "baseline.template.md",
+    docType: "baseline",
+    requiredSections: [
+      "## Snapshot Scope and Date",
+      "## Included Artifacts",
+      "## Successor or Follow-Up Links",
+    ],
+  },
+  {
+    fileName: "adr.template.md",
+    docType: "adr",
+    requiredSections: [
+      "## Status",
+      "## Decision",
+      "## Alternatives Considered",
+    ],
+  },
+  {
+    fileName: "ai-context.template.md",
+    docType: "ai-context",
+    requiredSections: [
+      "## Purpose and Audience",
+      "## Canonical Vocabulary",
+      "## Retrieval and Routing Guidance",
+    ],
+  },
+] as const;
+
+function read(path: string): string {
+  return readFileSync(path, "utf8");
+}
+
+describe("documentation templates guardrails", () => {
+  it("keeps template router docs present", () => {
+    expect(existsSync(templatesReadmePath)).toBe(true);
+    expect(existsSync(templatesAiReadmePath)).toBe(true);
+  });
+
+  it("enforces required templates for each core document type", () => {
+    for (const template of requiredTemplates) {
+      const path = resolve(templatesDir, template.fileName);
+      const aiPath = path.replace(/\.md$/, ".ai.md");
+      expect(existsSync(path)).toBe(true);
+      expect(existsSync(aiPath)).toBe(true);
+    }
+  });
+
+  it("requires metadata header anchors and section guidance in every template", () => {
+    for (const template of requiredTemplates) {
+      const content = read(resolve(templatesDir, template.fileName));
+
+      expect(content.startsWith("---\n")).toBe(true);
+      expect(content).toContain(`doc_type: ${template.docType}`);
+
+      for (const field of requiredFrontmatterFields) {
+        expect(content).toMatch(new RegExp(`^${field}:\\s+.+$`, "m"));
+      }
+
+      for (const section of template.requiredSections) {
+        expect(content).toContain(section);
+      }
+    }
+  });
+
+  it("keeps template location discoverable from context and placement docs", () => {
+    const templatesReadme = read(templatesReadmePath);
+    const templatesAiReadme = read(templatesAiReadmePath);
+    const contextReadme = read(contextReadmePath);
+    const contextAiReadme = read(contextAiReadmePath);
+    const placementGuide = read(placementGuidePath);
+
+    expect(contextReadme).toContain("./templates/README.md");
+    expect(contextAiReadme).toContain("./templates/README.ai.md");
+    expect(placementGuide).toContain("docs/context/templates/README.md");
+
+    for (const template of requiredTemplates) {
+      expect(templatesReadme).toContain(template.fileName);
+      expect(templatesAiReadme).toContain(template.fileName);
+    }
+  });
+});

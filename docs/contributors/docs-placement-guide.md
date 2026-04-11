@@ -79,6 +79,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 
 - Choose folder placement by the document's primary role, not by where related docs already exist.
 - If a document spans multiple roles, keep a single authoritative copy and add links for discoverability.
+- Start from `docs/context/templates/README.md` and select the matching `doc_type` template before drafting new docs.
 - Apply the standard metadata header contract defined in `docs/context/documentation-metadata-header.md`.
 - Use `doc_type`, `status`, and `authoritativeness` values exactly as defined in `docs/context/documentation-taxonomy.md`.
 - Maintain `.md` and `.ai.md` companions together when both are required by local conventions.
