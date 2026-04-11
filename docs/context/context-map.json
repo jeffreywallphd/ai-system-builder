@@ -61,10 +61,15 @@
     "exclude packs outside changed path or task-surface scope",
     "exclude packs explicitly listed in mapping excludePackIds before fallback evaluation",
     "exclude stale historical material when canonical sources exist",
+    "exclude baseline snapshots and superseded pointer docs by default unless historical evidence is explicitly required",
     "exclude unrelated architecture domains and adjacent workflow packs unless explicitly justified",
     "exclude overlapping but non-authoritative files when authoritative sources are available"
   ],
   "globalExclusionTags": [
+    {
+      "tagId": "exclude-baseline-and-superseded-default",
+      "description": "Exclude baseline snapshots and superseded pointer docs unless tasks explicitly require historical evidence."
+    },
     {
       "tagId": "exclude-stale-historical-material",
       "description": "Prevent stale baseline or superseded historical material from displacing current canonical sources."

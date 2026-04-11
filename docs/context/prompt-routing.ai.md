@@ -74,6 +74,8 @@ Apply these exclusions even when nearby files seem related:
 Always exclude:
 
 - stale historical material when newer canonical sources exist;
+- baseline snapshots unless requested outcomes explicitly require historical evidence;
+- superseded pointer docs unless the task is pointer maintenance, redirect validation, or migration traceability;
 - unrelated architecture domains outside `changedPaths` and `primarySurfaces`;
 - overlapping but non-authoritative files when authoritative sources exist;
 - packs useful only for adjacent workflows.
@@ -103,7 +105,7 @@ Primary surfaces:
 ### `feature-decomposition`
 Primary docs:
 - `docs/architecture/README.md`
-- `docs/baselines/README.md`
+- `docs/context/documentation-segmentation-taxonomy.md`
 - `docs/context/routing/prompt-routing-contract.ai.md`
 Primary surfaces:
 - `src/application/`, `src/domain/`
@@ -180,21 +182,21 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/README.md`
-2. `docs/baselines/README.md`
+2. `docs/context/documentation-segmentation-taxonomy.md`
 3. `docs/context/routing/prompt-routing-contract.ai.md`
-- Exclude diagnostics/runtime triage artifacts unless decomposition explicitly includes incident response outcomes.
+- Exclude `docs/baselines/README.md` and diagnostics/runtime triage artifacts unless decomposition explicitly includes historical evidence or incident response outcomes.
 
 ### Example B: Documentation restructuring for routing governance
 - Task request: "Restructure routing docs while keeping `.md` and `.ai.md` pairs aligned."
 - Category: `documentation-change`
 - Inputs: `docs/context`, `docs/contributors`, related `dev/tests`
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `documentation-refactor`, `context-system-foundations`
 - Ordered docs:
 1. `docs/context/routing/README.ai.md`
 2. `docs/context/context-asset-metadata.ai.md`
 3. `docs/contributors/router-overview-writing-standard.ai.md`
 4. `docs/contributors/docs-placement-guide.ai.md`
-- Exclude implementation-focused runtime docs unless documentation claims depend on verified runtime behavior.
+- Exclude `docs/baselines/README.md` and implementation-focused runtime docs unless documentation claims explicitly require historical evidence or verified runtime behavior.
 
 ### Example C: Architecture review for host boundaries
 - Task request: "Review server/desktop/worker host boundary changes before implementation."

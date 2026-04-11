@@ -23,19 +23,22 @@
 - Keep `.md` and `.ai.md` companion docs aligned when both exist.
 - Keep one authoritative home per responsibility; use links instead of duplicate canonical content.
 - Preserve metadata contract fidelity (`doc_type`, `status`, `authoritativeness`, ownership, and review date).
-- Treat migration baseline artifacts as historical references, not canonical replacements.
+- Treat baseline, transitional, and superseded docs as opt-in historical context only.
+- Prefer active canonical routers/contracts by default; include historical evidence only when an outcome explicitly requires it.
 - Keep router/overview docs concise and link-first; avoid catch-all growth.
 
 ## Authoritative Docs
 
 - `docs/architecture/README.md`
-- `docs/documentation-migration-baseline.md`
 - `docs/contributors/docs-placement-guide.md`
 - `docs/contributors/docs-migration-safety-guide.md`
 - `docs/contributors/docs-foundation-validation.md`
 - `docs/contributors/router-overview-writing-standard.md`
 - `docs/context/documentation-taxonomy.md`
 - `docs/context/documentation-metadata-header.md`
+- `docs/context/documentation-status-signals.md`
+- `docs/context/documentation-baseline-and-historical-folder-strategy.md`
+- `docs/context/documentation-supersession-and-redirect-conventions.md`
 - `docs/context/prompt-routing.md`
 
 ## Authoritative Code Paths
@@ -55,6 +58,7 @@
 - Moving docs without pointer/deprecation handling or metadata lifecycle updates.
 - Allowing multiple canonical docs for the same responsibility after a split.
 - Treating archived migration baseline materials as current authoritative guidance.
+- Pulling in `docs/baselines/` or superseded pointer stubs by default when active canonical sources already cover the task.
 - Expanding router docs into long procedural runbooks.
 
 ## Related Packs
