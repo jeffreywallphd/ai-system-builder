@@ -63,6 +63,7 @@ const expectedWorkedExampleTaskIds = [
 ] as const;
 const expectedPackOrder = [
   "repository-overview",
+  "architecture-core",
   "context-system-foundations",
 ] as const;
 

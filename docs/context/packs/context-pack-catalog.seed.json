@@ -66,6 +66,41 @@
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
+    },
+    {
+      "id": "architecture-core",
+      "title": "Core Architecture Pack",
+      "purpose": "Core architecture context for boundary-sensitive design and implementation tasks across layered and host-runtime seams.",
+      "domain": "platform-architecture",
+      "owner": "team:platform-architecture",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/architecture-core.pack.md",
+      "aiDocPath": "docs/context/packs/architecture-core.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/README.md",
+        "docs/architecture/domain-and-application-core.md",
+        "docs/architecture/layers-and-boundaries.md",
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/architecture/worker-host-assembly.md"
+      ],
+      "relatedCodePaths": [
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/hosts",
+        "dev/tests/HostCompositionArchitectureGuardrails.test.ts"
+      ],
+      "tags": [
+        "architecture",
+        "layering",
+        "host-composition",
+        "boundaries"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
     }
   ]
 }
