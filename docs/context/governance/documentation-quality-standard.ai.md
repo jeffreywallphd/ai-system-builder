@@ -160,6 +160,7 @@ Require at least one additional qualified reviewer for:
 ### How This Fits Normal Repository Maintenance
 
 - Run lightweight validators locally before review (`npm run docs:validate:foundation`, `npm run docs:validate:registry`, `npm run docs:validate:adr`, `npm run docs:validate:architecture-domains`, `npm run docs:validate:segmentation`).
+- Use `docs/contributors/documentation-quality-enforced-standards-guide.ai.md` for pre-validation workflow, templates/examples, and common failure-category triage before running validators.
 - Use severity plus trigger guidance to classify outcomes as block-now, warn-and-fix-soon, or advisory-only.
 - Keep manual review focused on semantic correctness, authority boundaries, and high-risk impact that automation cannot fully judge.
 - Keep validator contracts and reviewer judgment complementary: automation enforces structure, reviewers enforce trustworthiness.
