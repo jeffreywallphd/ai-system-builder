@@ -80,10 +80,25 @@ Use this lightweight checklist before moving or reclassifying docs.
 
 - [ ] Primary segment category selected using `docs/context/documentation-segmentation-taxonomy.md`.
 - [ ] Metadata lifecycle updated (`status`, `authoritativeness`, and `superseded_by` when applicable).
+- [ ] Non-active docs include a `## Documentation Status` block from `docs/context/documentation-status-signals.md`.
 - [ ] Baseline destination chosen with `docs/context/documentation-baseline-and-historical-folder-strategy.md` when history is retained.
 - [ ] Supersession/pointer note uses required fields from `docs/context/documentation-supersession-and-redirect-conventions.md`.
 - [ ] Canonical destination link(s) and routers updated in the same change.
 - [ ] `.md` and `.ai.md` companion docs kept aligned.
+
+## Seed 5: Documentation Status Block Template
+
+Use this block in baseline, historical, and migration-record docs to make non-active status explicit.
+
+```markdown
+## Documentation Status
+
+- Segment: <Baselines|Historical Notes|Migration Guides and Records|Temporary Transition Documents|Superseded or Deprecated Documents>
+- Lifecycle status (`status`): <active|deprecated|superseded|archived>
+- Authority state (`authoritativeness`): <canonical|reference|supplemental|historical>
+- Current guidance stance: <state whether this doc is authoritative for current implementation behavior>
+- Canonical active path(s): `docs/<active-path>.md`
+```
 
 ## Fast Placement Decisions for Baselines
 
@@ -100,5 +115,6 @@ Use these quick rules to avoid overthinking baseline placement:
 
 - `docs/context/documentation-segmentation-taxonomy.md`
 - `docs/context/documentation-baseline-and-historical-folder-strategy.md`
+- `docs/context/documentation-status-signals.md`
 - `docs/context/documentation-supersession-and-redirect-conventions.md`
 - `docs/context/templates/documentation-segmentation-seeds.template.md`

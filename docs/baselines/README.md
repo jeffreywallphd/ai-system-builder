@@ -7,6 +7,13 @@
 ## Purpose
 - Historical baseline and migration artifacts used for traceability.
 
+## Documentation Status
+- Segment: `Baselines`
+- Lifecycle status (`status`): `active` (router lifecycle only)
+- Authority state (`authoritativeness`): historical navigation for baseline evidence
+- Current guidance stance: not authoritative for current implementation behavior; use linked active routers for current decisions
+- Canonical active path(s): `docs/architecture/README.md`, `docs/contributors/README.md`, `docs/operations/README.md`, and `docs/context/README.md`
+
 ## Target Folder Strategy
 - Use `docs/baselines/` as the default destination for historical snapshots and migration evidence.
 - Prefer these migration landing zones when applicable:

@@ -22,6 +22,8 @@ Use this folder as the canonical template pack for doc creation.
 - Routing entry JSON -> [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
 - AI companions are colocated as `*.template.ai.md` for markdown templates.
 
+Use `docs/context/documentation-status-signals.ai.md` for the standard non-active status marker wording.
+
 For pack files in `docs/context/packs/`, also apply `docs/context/packs/README.ai.md#standard-context-pack-contract` for required section layout.
 
 ## ADR Template Contract

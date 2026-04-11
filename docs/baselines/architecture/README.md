@@ -20,6 +20,13 @@ related_code_paths:
 ## Purpose
 - Route baseline snapshots away from active architecture guidance paths.
 
+## Documentation Status
+- Segment: `Baselines`
+- Lifecycle status (`status`): `active` (router lifecycle only)
+- Authority state (`authoritativeness`): historical architecture snapshot routing
+- Current guidance stance: not authoritative for current architecture implementation behavior
+- Canonical active path(s): `docs/architecture/README.md` and `docs/architecture/domains/*/overview.md`
+
 ## Belongs Here
 - Historical feature and story completion baselines.
 - Baseline snapshots migrated out of `docs/architecture/`.

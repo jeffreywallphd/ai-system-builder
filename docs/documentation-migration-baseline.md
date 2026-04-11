@@ -13,6 +13,13 @@ related_code_paths:
 
 This artifact captures the current-state documentation structure and taxonomy baseline before any migration work.
 
+## Documentation Status
+- Segment: `Baselines`
+- Lifecycle status (`status`): `archived`
+- Authority state (`authoritativeness`): `historical`
+- Current guidance stance: this file is not authoritative for current implementation behavior; it is point-in-time baseline evidence
+- Canonical active path(s): `docs/README.md`, `docs/context/documentation-taxonomy.md`, and `docs/context/documentation-segmentation-taxonomy.md`
+
 ## Scope
 - Branch context: `codex-f2b6d46d4e`
 - Audited path: `docs/**/*.(md|ai.md)`

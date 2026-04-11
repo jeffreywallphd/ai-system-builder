@@ -15,6 +15,14 @@ related_code_paths:
 
 # AI Companion: Documentation Segmentation Migration Inventory (Story 5.2.1)
 
+## Documentation Status
+
+- Segment: `Migration Guides and Records`
+- Lifecycle status (`status`): `active`
+- Authority state (`authoritativeness`): `canonical` migration-planning reference
+- Current guidance stance: not authoritative for current implementation behavior; use active architecture/contributor/operations docs for implementation decisions
+- Canonical active path(s): `docs/architecture/README.ai.md`, `docs/contributors/README.ai.md`, `docs/operations/README.ai.md`, and `docs/context/documentation-segmentation-taxonomy.ai.md`
+
 ## Purpose
 
 Provide a focused migration inventory of high-value docs that mix active and historical concerns or belong outside active guidance paths.

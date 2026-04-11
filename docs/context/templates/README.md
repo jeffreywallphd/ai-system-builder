@@ -35,7 +35,10 @@ Use [documentation-segmentation-seeds.template.md](./documentation-segmentation-
 - Classification note seed.
 - Supersession marker seed.
 - Baseline introduction seed.
+- Documentation status seed.
 - Migration decision checklist seed.
+
+Use `docs/context/documentation-status-signals.md` for interpretation rules and standard wording.
 
 ## ADR Template Contract
 

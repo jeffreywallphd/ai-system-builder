@@ -41,12 +41,15 @@ describe("documentation segmentation seed guidance guardrails", () => {
       "## Seed 2: Superseded-By Marker Template",
       "## Seed 3: Baseline File Introduction Template",
       "## Seed 4: Migration Decision Checklist",
+      "## Seed 5: Documentation Status Block Template",
       "## Fast Placement Decisions for Baselines",
       "Primary segment",
+      "## Documentation Status",
       "## Supersession Notice",
       "Effective date",
       "Retention/removal trigger",
       "## Baseline Introduction",
+      "docs/context/documentation-status-signals.md",
       "docs/context/documentation-segmentation-taxonomy.md",
       "docs/context/documentation-baseline-and-historical-folder-strategy.md",
       "docs/context/documentation-supersession-and-redirect-conventions.md",
@@ -59,12 +62,15 @@ describe("documentation segmentation seed guidance guardrails", () => {
       "## Seed Template: Superseded-By Marker",
       "## Seed Template: Baseline Introduction",
       "## Seed Template: Migration Decision Checklist",
+      "## Seed Template: Documentation Status Block",
       "## Fast Baseline Routing",
       "Primary segment",
+      "## Documentation Status",
       "## Supersession Notice",
       "Effective date",
       "Retention/removal trigger",
       "## Baseline Introduction",
+      "documentation-status-signals.ai.md",
       "documentation-segmentation-taxonomy.ai.md",
       "documentation-baseline-and-historical-folder-strategy.ai.md",
       "documentation-supersession-and-redirect-conventions.ai.md",
@@ -81,11 +87,14 @@ describe("documentation segmentation seed guidance guardrails", () => {
       expect(content).toContain("## Classification Note Template");
       expect(content).toContain("## Supersession Marker Template");
       expect(content).toContain("## Baseline Introduction Template");
+      expect(content).toContain("## Documentation Status Template");
       expect(content).toContain("## Migration Decision Checklist Template");
       expect(content).toContain("Primary segment");
+      expect(content).toContain("## Documentation Status");
       expect(content).toContain("## Supersession Notice");
       expect(content).toContain("## Baseline Introduction");
       expect(content).toContain("Retention/removal trigger");
+      expect(content).toContain("documentation-status-signals");
       expect(content).toContain("`superseded_by`");
     }
   });

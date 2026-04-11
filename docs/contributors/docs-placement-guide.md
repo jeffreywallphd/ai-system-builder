@@ -81,6 +81,7 @@ Provide one consistent placement rule set so contributors and AI coding agents p
 
 Use `docs/context/documentation-segmentation-taxonomy.md` when classifying docs by authority state and migration posture.
 Use `docs/context/documentation-segmentation-seed-guidance.md` for reusable classification notes, supersession markers, baseline introductions, and migration checklist snippets.
+Use `docs/context/documentation-status-signals.md` for the standard `## Documentation Status` block used by non-active docs.
 Use `docs/context/documentation-baseline-and-historical-folder-strategy.md` to choose concrete baseline landing zones versus superseded pointer-note retention.
 Use `docs/context/documentation-supersession-and-redirect-conventions.md` for required supersession notes, redirect language, pointer-file format, and deprecation marker content.
 
