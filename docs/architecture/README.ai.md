@@ -36,6 +36,7 @@ related_code_paths:
 
 ## Start Here
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
+- [Architecture Domain Migration Inventory](./architecture-domain-migration-inventory.md)
 - [Architecture Domain Folders](./domains/README.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
