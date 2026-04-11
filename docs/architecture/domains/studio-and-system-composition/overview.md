@@ -54,6 +54,12 @@ Out of scope:
 - `execution-control-plane-and-scheduling` owns run lifecycle once work is submitted.
 - `api-and-transport-surfaces` owns authoritative route/event contracts consumed by studio clients.
 
+## Domain Boundary Notes for Common Confusion
+
+- `studio-and-system-composition` vs `core-platform-and-composition`: this domain composes studio-facing projections and handoff flows; core platform domain owns canonical model semantics and business rules.
+- `studio-and-system-composition` vs `workspace-storage-and-assets`: this domain renders and selects using read models; workspace/storage/assets domain remains source of truth for tenancy, asset identity, and lifecycle.
+- `studio-and-system-composition` vs `execution-control-plane-and-scheduling`: this domain ends at validated handoff; run lifecycle authority starts in the control plane after submission.
+
 ## Reference Map
 
 Contract-level details are canonical in `./references/`:

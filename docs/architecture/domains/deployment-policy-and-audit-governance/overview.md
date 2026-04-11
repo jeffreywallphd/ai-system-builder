@@ -54,6 +54,12 @@ Out of scope:
 - `workspace-storage-and-assets` and other domains consume governance outcomes.
 - `api-and-transport-surfaces` exposes policy-admin and audit APIs via shared contracts.
 
+## Domain Boundary Notes for Common Confusion
+
+- `deployment-policy-and-audit-governance` vs `execution-control-plane-and-scheduling`: this domain governs allowed posture and evidence requirements; execution control-plane applies those outcomes when making run lifecycle and placement decisions.
+- `deployment-policy-and-audit-governance` vs `identity-trust-and-security`: this domain records policy/audit governance semantics, while identity domain owns proof and session trust boundaries.
+- `deployment-policy-and-audit-governance` vs operations docs: architecture docs define governance contracts; policy rollout procedures and operational response steps belong in `docs/operations/`.
+
 ## Reference Map
 
 Contract-level details are canonical in `./references/`:
