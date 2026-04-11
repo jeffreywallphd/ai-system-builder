@@ -56,6 +56,7 @@
 ## Related Packs
 
 - `repository-overview`: load first for broad repository orientation.
+- `runtime-and-host`: combine for host/runtime startup, lifecycle, and desktop boundary focused architecture tasks.
 - `context-system-foundations`: combine when architecture tasks also change context contracts/routing/governance.
 
 ## Retrieval Order

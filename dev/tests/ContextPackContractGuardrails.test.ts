@@ -150,6 +150,7 @@ describe("context pack contract guardrails", () => {
     expect(catalogPackIds).toContain("context-system-foundations");
     expect(catalogPackIds).toContain("repository-overview");
     expect(catalogPackIds).toContain("architecture-core");
+    expect(catalogPackIds).toContain("runtime-and-host");
 
     for (const entry of catalogSeed.packs) {
       for (const requiredField of requiredCatalogFields) {

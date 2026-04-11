@@ -26,6 +26,7 @@
 - [Seed Pack: Repository Overview](./repository-overview.pack.md)
 - [Seed Pack: Core Architecture](./architecture-core.pack.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.md)
+- [Seed Pack: Runtime and Host](./runtime-and-host.pack.md)
 - [Context Taxonomy Router](../README.md)
 - [Context Pack Template](../templates/context-pack.template.md)
 - [AI Context Template](../templates/ai-context.template.md)

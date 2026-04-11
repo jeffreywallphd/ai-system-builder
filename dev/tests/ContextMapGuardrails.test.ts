@@ -11,6 +11,18 @@ const aiSpecPath = resolve(repoRoot, "docs/context/context-map.ai.md");
 const routingReadmePath = resolve(repoRoot, "docs/context/routing/README.md");
 const routingAiReadmePath = resolve(repoRoot, "docs/context/routing/README.ai.md");
 
+const defaultPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "context-system-foundations",
+] as const;
+const runtimeHostPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "runtime-and-host",
+  "context-system-foundations",
+] as const;
+
 type RoutingContract = {
   supportedTaskCategories: Array<{ id: string }>;
   allowedSelectionModes: string[];
@@ -153,12 +165,13 @@ describe("context map guardrails", () => {
       expect(mapping.relatedSourceTags.length).toBeGreaterThanOrEqual(1);
       expect(mapping.status).toBe("active");
       expect(mapping.packRefs.length).toBeGreaterThanOrEqual(1);
-      expect(mapping.packRefs[0]?.packId).toBe("repository-overview");
-      expect(mapping.packRefs[0]?.priorityOrder).toBe(1);
-      expect(mapping.packRefs[1]?.packId).toBe("architecture-core");
-      expect(mapping.packRefs[1]?.priorityOrder).toBe(2);
-      expect(mapping.packRefs[2]?.packId).toBe("context-system-foundations");
-      expect(mapping.packRefs[2]?.priorityOrder).toBe(3);
+      const expectedPackOrder = mapping.taskCategoryId === "architecture-review" || mapping.taskCategoryId === "diagnostics"
+        ? runtimeHostPackOrder
+        : defaultPackOrder;
+      expect(mapping.packRefs.map((entry) => entry.packId)).toEqual(expectedPackOrder);
+      expect(mapping.packRefs.map((entry) => entry.priorityOrder)).toEqual(
+        expectedPackOrder.map((_, index) => index + 1),
+      );
 
       for (const exclusionTagId of mapping.exclusionTagIds) {
         expect(globalExclusionTagIds.has(exclusionTagId)).toBe(true);

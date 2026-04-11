@@ -109,8 +109,12 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "runtime-and-host",
           "priorityOrder": 3
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 4
         }
       ],
       "excludePackIds": [],
@@ -130,7 +134,7 @@
         "historical-reference",
         "summary-reference"
       ],
-      "notes": "Architecture review routes remain deterministic with repository orientation, core architecture, and context foundations.",
+      "notes": "Architecture review routes remain deterministic with repository orientation, core architecture, runtime-host context, and context foundations.",
       "status": "active",
       "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "contextAssemblyTierHints": {
@@ -353,8 +357,12 @@
           "priorityOrder": 2
         },
         {
-          "packId": "context-system-foundations",
+          "packId": "runtime-and-host",
           "priorityOrder": 3
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 4
         }
       ],
       "excludePackIds": [],
@@ -374,7 +382,7 @@
         "historical-reference",
         "summary-reference"
       ],
-      "notes": "Diagnostics routing keeps deterministic ordering and includes architecture-core for boundary-safe triage.",
+      "notes": "Diagnostics routing keeps deterministic ordering and includes runtime-host context before context foundations for boundary-safe triage.",
       "status": "active",
       "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "contextAssemblyTierHints": {

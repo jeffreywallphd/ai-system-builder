@@ -55,6 +55,7 @@
 ## Related Packs
 
 - `context-system-foundations`: combine when editing context contracts, routing assets, governance docs, or metadata seeds.
+- `runtime-and-host`: prefer for runtime, desktop, host startup, and lifecycle diagnostics/implementation work.
 - Future domain packs: switch to those for deep behavior details once routing selects them.
 
 ## Retrieval Order
