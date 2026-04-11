@@ -18,11 +18,13 @@ Story: C.1.3
 ## Layer responsibilities
 - main (`electron/main`):
   - owns lifecycle transitions and authoritative status payload.
-  - owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `bootstrapPostLoginRuntime`).
+  - owns warmup orchestration (`ensurePostLoginWarmupStarted` -> `createPostLoginRuntimeBootstrapper(...).bootstrap(...)`).
   - owns deferred feature IPC readiness gate and runtime disposal/reset transitions.
   - composes focused runtime-control modules for stateful lifecycle concerns:
     - `electron/main/DesktopPostLoginRuntimeStatusStore.ts`
     - `electron/main/DesktopConnectivityRuntimeController.ts`
+    - `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`
+    - `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`
 - preload (`electron/preload.ts`):
   - exposes runtime status/readiness probes and warmup trigger bridge.
   - enforces deferred API guards until runtime is ready.
@@ -168,6 +170,12 @@ The deferred runtime lifecycle contract now includes explicit regression guardra
   - deferred placeholder detail text remains stable,
   - monitoring starts only after warmup acceptance,
   - probe token lookup still resolves through persisted bootstrap storage.
+
+## Story C.3.6 bootstrap/disposal module extraction boundary
+
+- Post-login runtime bootstrap/composition internals are now centralized in `electron/main/runtime/PostLoginRuntimeBootstrapper.ts`.
+- Runtime teardown/reset sequencing internals are now centralized in `electron/main/runtime/DesktopRuntimeDisposalCoordinator.ts`.
+- `electron/main/main.ts` remains the composition root that decides when warmup/disposal runs, while delegating lifecycle implementation details to those dedicated modules.
 
 ## Deferred API behavior
 - before readiness:

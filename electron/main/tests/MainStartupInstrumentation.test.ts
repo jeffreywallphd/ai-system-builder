@@ -3,6 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 const mainSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/main.ts"), "utf8");
+const bootstrapperSource = fs.readFileSync(
+  path.resolve(process.cwd(), "electron/main/runtime/PostLoginRuntimeBootstrapper.ts"),
+  "utf8",
+);
 const deferredRuntimeSource = fs.readFileSync(path.resolve(process.cwd(), "electron/main/DeferredDesktopFeatureRuntime.ts"), "utf8");
 
 describe("desktop startup instrumentation coverage", () => {
@@ -11,8 +15,8 @@ describe("desktop startup instrumentation coverage", () => {
     expect(mainSource).toContain("DesktopStartupPhases.identityAuthHostReadiness");
     expect(mainSource).toContain("first-window-ready-to-show");
     expect(mainSource).toContain("renderer-first-window-ready");
-    expect(mainSource).toContain("DesktopStartupPhases.postLoginWarmup");
-    expect(mainSource).toContain("deferred-feature-runtime-container-ready");
+    expect(bootstrapperSource).toContain("DesktopStartupPhases.postLoginWarmup");
+    expect(bootstrapperSource).toContain("deferred-feature-runtime-container-ready");
   });
 
   it("keeps deferred runtime service-group timing and memory instrumentation", () => {
