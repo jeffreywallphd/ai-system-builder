@@ -144,6 +144,28 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("documentation-indexing-model.md is missing required heading '## Goals'.");
   });
 
+  it("detects invalid indexed document metadata contract shape", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-indexed-metadata-contract-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const contractPath = join(fixtureRoot, "docs", "context", "documentation-indexed-document-metadata.contract.json");
+    const contract = JSON.parse(readFileSync(contractPath, "utf8")) as {
+      artifactType: string;
+    };
+    contract.artifactType = "invalid-indexed-doc-contract-type";
+    writeFileSync(contractPath, `${JSON.stringify(contract, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_CONTRACT_INVALID]");
+    expect(combinedOutput).toContain("documentation-indexed-document-metadata.contract.json");
+  });
+
   it("detects missing ADR registry record references", () => {
     const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-registry-ref-"));
     cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });

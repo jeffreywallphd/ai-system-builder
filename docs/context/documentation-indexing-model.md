@@ -84,5 +84,6 @@ For this story, validation stays intentionally lightweight:
 
 - Guardrail tests verify the indexing model docs exist and keep required model sections.
 - Foundation validation checks ensure this model remains present and structurally complete.
+- Indexed-record metadata structure is defined in `docs/context/documentation-indexed-document-metadata.md`.
 
 Rationale: model-definition stories should enforce contract clarity first; deeper registry schema validation belongs to follow-on implementation stories.
