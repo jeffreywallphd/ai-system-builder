@@ -22,6 +22,7 @@ const REQUIRED_CONTEXT_SUBFOLDERS = [
 const REQUIRED_CONTEXT_FILES = [
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
+  "docs/context/packs/context-pack.contract.json",
   "docs/context/packs/context-pack-catalog.contract.json",
   "docs/context/packs/context-pack-catalog.seed.json",
   "docs/context/routing/README.md",
@@ -208,10 +209,12 @@ function validateDocsFoundation(repoRoot) {
 
   const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
   const contextPackCatalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
+  const contextPackContractPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
 
   const expectedContextJsonArtifacts = [
+    contextPackContractPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
     taskRoutingContractPath,
@@ -230,6 +233,31 @@ function validateDocsFoundation(repoRoot) {
       issues.push({
         code: "CONTEXT_JSON_INVALID",
         message: `${normalizePath(artifactPath)} is not valid JSON: ${error.message}`,
+      });
+    }
+  }
+
+  const packContractSpec = contextJsonArtifacts.get(contextPackContractPath);
+  if (packContractSpec) {
+    if (packContractSpec.schemaVersion !== "1.0.0" || packContractSpec.artifactType !== "context-pack-contract") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack.contract.json must declare schemaVersion 1.0.0 and artifactType context-pack-contract.",
+      });
+    }
+
+    if (!Array.isArray(packContractSpec.requiredSections) || !Array.isArray(packContractSpec.optionalSections)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack.contract.json must include requiredSections and optionalSections arrays.",
+      });
+    }
+
+    const qualityRules = packContractSpec.qualityRules;
+    if (!qualityRules || typeof qualityRules !== "object") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack.contract.json must include a qualityRules object.",
       });
     }
   }

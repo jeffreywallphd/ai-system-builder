@@ -6,6 +6,7 @@
 
 ## Purpose
 - Canonical location for pack catalog contracts and shared pack artifacts.
+- Canonical context-pack contract for deterministic authoring and routing-ready pack content.
 
 ## Belongs Here
 - Pack catalog contract and seed files.
@@ -18,7 +19,49 @@
 - ADR decision history.
 
 ## Start Here
+- [Context Pack Contract (Machine-Readable)](./context-pack.contract.json)
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)
 - [Context Pack Catalog Seed](./context-pack-catalog.seed.json)
 - [Context Router](../README.ai.md)
 - [AI Context Template](../templates/ai-context.template.ai.md)
+
+## Standard Context Pack Contract
+
+Canonical contract sources:
+
+- Human-readable: `docs/context/packs/README.md`
+- AI-readable: this file (`docs/context/packs/README.ai.md`)
+- Machine-readable: `docs/context/packs/context-pack.contract.json`
+
+### Required Sections (Exact Headings)
+
+Every context pack file in `docs/context/packs/` must include:
+
+1. `## Purpose`
+2. `## When To Use`
+3. `## When Not To Use`
+4. `## Invariants`
+5. `## Authoritative Docs`
+6. `## Authoritative Code Paths`
+7. `## Anti-Patterns`
+8. `## Related Packs`
+
+### Optional Sections
+
+- `## Retrieval Order`
+- `## Change Triggers`
+
+### Brevity and Signal Rules
+
+- Keep packs concise and retrieval-first; target less than 900 words when practical.
+- Keep sections concise; target less than 160 words per section when practical.
+- Prefer bullets and stable repo paths over narrative text.
+- Link to canonical docs/code rather than duplicating long explanations.
+
+### Do Not Include
+
+- runbook procedures
+- implementation checklists
+- release-note narrative
+- duplicated long-form canonical doc content
+- speculative roadmap backlog

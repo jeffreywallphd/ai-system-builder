@@ -15,6 +15,7 @@ const requiredContextSubfolders = [
 const requiredContextFiles = [
   "docs/context/packs/README.md",
   "docs/context/packs/README.ai.md",
+  "docs/context/packs/context-pack.contract.json",
   "docs/context/packs/context-pack-catalog.contract.json",
   "docs/context/packs/context-pack-catalog.seed.json",
   "docs/context/routing/README.md",
@@ -56,6 +57,9 @@ describe("context engineering structure guardrails", () => {
   });
 
   it("keeps routing and pack contracts parseable and structurally seeded", () => {
+    const packContractSpec = JSON.parse(
+      readFileSync(resolve(contextRoot, "packs/context-pack.contract.json"), "utf8"),
+    ) as Record<string, unknown>;
     const packContract = JSON.parse(
       readFileSync(resolve(contextRoot, "packs/context-pack-catalog.contract.json"), "utf8"),
     ) as Record<string, unknown>;
@@ -68,6 +72,10 @@ describe("context engineering structure guardrails", () => {
     const routingSeed = JSON.parse(
       readFileSync(resolve(contextRoot, "routing/task-to-context-routing.seed.json"), "utf8"),
     ) as Record<string, unknown>;
+
+    expect(packContractSpec.schemaVersion).toBe("1.0.0");
+    expect(packContractSpec.artifactType).toBe("context-pack-contract");
+    expect(Array.isArray(packContractSpec.requiredSections)).toBe(true);
 
     expect(packContract.schemaVersion).toBe("1.0.0");
     expect(packContract.artifactType).toBe("context-pack-catalog");
