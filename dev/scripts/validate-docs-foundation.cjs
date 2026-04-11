@@ -12,6 +12,28 @@ const REQUIRED_TOP_LEVEL_FOLDERS = [
   "ui",
 ];
 
+const REQUIRED_CONTEXT_SUBFOLDERS = [
+  "packs",
+  "routing",
+  "governance",
+  "templates",
+];
+
+const REQUIRED_CONTEXT_FILES = [
+  "docs/context/packs/README.md",
+  "docs/context/packs/README.ai.md",
+  "docs/context/packs/context-pack-catalog.contract.json",
+  "docs/context/packs/context-pack-catalog.seed.json",
+  "docs/context/routing/README.md",
+  "docs/context/routing/README.ai.md",
+  "docs/context/routing/task-to-context-routing.contract.json",
+  "docs/context/routing/task-to-context-routing.seed.json",
+  "docs/context/governance/README.md",
+  "docs/context/governance/README.ai.md",
+  "docs/context/governance/context-governance-policy.md",
+  "docs/context/governance/context-governance-policy.ai.md",
+];
+
 const REQUIRED_HEADER_FIELDS = [
   "title",
   "doc_type",
@@ -160,6 +182,94 @@ function validateDocsFoundation(repoRoot) {
       issues.push({
         code: "ROUTER_FILE_MISSING",
         message: `Missing required router file: ${relativePath}`,
+      });
+    }
+  }
+
+  for (const folder of REQUIRED_CONTEXT_SUBFOLDERS) {
+    const folderPath = resolve(repoRoot, "docs/context", folder);
+    if (!existsSync(folderPath)) {
+      issues.push({
+        code: "CONTEXT_SUBFOLDER_MISSING",
+        message: `Missing required context subfolder: docs/context/${folder}/`,
+      });
+    }
+  }
+
+  for (const relativePath of REQUIRED_CONTEXT_FILES) {
+    const absolutePath = resolve(repoRoot, relativePath);
+    if (!existsSync(absolutePath)) {
+      issues.push({
+        code: "CONTEXT_FILE_MISSING",
+        message: `Missing required context foundation file: ${relativePath}`,
+      });
+    }
+  }
+
+  const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
+  const contextPackCatalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
+  const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
+  const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
+
+  const expectedContextJsonArtifacts = [
+    contextPackCatalogContractPath,
+    contextPackCatalogSeedPath,
+    taskRoutingContractPath,
+    taskRoutingSeedPath,
+  ];
+
+  const contextJsonArtifacts = new Map();
+  for (const artifactPath of expectedContextJsonArtifacts) {
+    if (!existsSync(artifactPath)) {
+      continue;
+    }
+
+    try {
+      contextJsonArtifacts.set(artifactPath, readJson(artifactPath));
+    } catch (error) {
+      issues.push({
+        code: "CONTEXT_JSON_INVALID",
+        message: `${normalizePath(artifactPath)} is not valid JSON: ${error.message}`,
+      });
+    }
+  }
+
+  const packContract = contextJsonArtifacts.get(contextPackCatalogContractPath);
+  if (packContract) {
+    if (packContract.schemaVersion !== "1.0.0" || packContract.artifactType !== "context-pack-catalog") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack-catalog.contract.json must declare schemaVersion 1.0.0 and artifactType context-pack-catalog.",
+      });
+    }
+  }
+
+  const packSeed = contextJsonArtifacts.get(contextPackCatalogSeedPath);
+  if (packSeed) {
+    if (packSeed.schemaVersion !== "1.0.0" || packSeed.artifactType !== "context-pack-catalog" || !Array.isArray(packSeed.packs)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/packs/context-pack-catalog.seed.json must include schemaVersion 1.0.0, artifactType context-pack-catalog, and packs array.",
+      });
+    }
+  }
+
+  const routingContract = contextJsonArtifacts.get(taskRoutingContractPath);
+  if (routingContract) {
+    if (routingContract.schemaVersion !== "1.0.0" || routingContract.artifactType !== "task-to-context-routing-map") {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.contract.json must declare schemaVersion 1.0.0 and artifactType task-to-context-routing-map.",
+      });
+    }
+  }
+
+  const routingSeed = contextJsonArtifacts.get(taskRoutingSeedPath);
+  if (routingSeed) {
+    if (routingSeed.schemaVersion !== "1.0.0" || routingSeed.artifactType !== "task-to-context-routing-map" || !Array.isArray(routingSeed.mappings)) {
+      issues.push({
+        code: "CONTEXT_CONTRACT_INVALID",
+        message: "docs/context/routing/task-to-context-routing.seed.json must include schemaVersion 1.0.0, artifactType task-to-context-routing-map, and mappings array.",
       });
     }
   }
@@ -344,6 +454,7 @@ function main() {
     "Docs foundation validation passed.",
     `Checked top-level folders: ${REQUIRED_TOP_LEVEL_FOLDERS.length}`,
     `Checked router files: ${2 + (REQUIRED_TOP_LEVEL_FOLDERS.length * 2)}`,
+    `Checked context foundation assets: ${REQUIRED_CONTEXT_FILES.length}`,
     `Checked metadata seed docs: ${SEED_DOCUMENTS.length}`,
   ].join("\n") + "\n");
 }

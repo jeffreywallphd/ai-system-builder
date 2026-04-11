@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifactType": "task-to-context-routing-map",
+  "description": "Contract for deterministic routing between task intents and context pack identifiers.",
+  "mappingRequiredFields": [
+    "taskId",
+    "intent",
+    "packIds",
+    "selectionMode",
+    "priority",
+    "status"
+  ],
+  "allowedSelectionModes": [
+    "ordered",
+    "fallback",
+    "single"
+  ],
+  "allowedStatusValues": [
+    "draft",
+    "active",
+    "deprecated"
+  ]
+}

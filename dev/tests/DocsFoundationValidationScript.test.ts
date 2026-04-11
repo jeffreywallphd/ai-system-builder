@@ -16,6 +16,7 @@ describe("docs foundation validation script", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Docs foundation validation passed.");
+    expect(result.stdout).toContain("Checked context foundation assets:");
     expect(result.stdout).toContain("Checked metadata seed docs:");
   });
 
@@ -33,5 +34,6 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("Docs foundation validation failed.");
     expect(combinedOutput).toContain("[TOP_LEVEL_FOLDER_MISSING]");
     expect(combinedOutput).toContain("[ROUTER_FILE_MISSING]");
+    expect(combinedOutput).toContain("[CONTEXT_SUBFOLDER_MISSING]");
   });
 });

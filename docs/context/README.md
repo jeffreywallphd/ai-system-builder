@@ -10,6 +10,8 @@
 ## Belongs Here
 - Cross-domain taxonomy overviews and glossary-style references.
 - Context packs that help readers map concepts across features.
+- Deterministic task-to-context routing guides and machine-readable maps.
+- Governance guides for keeping context assets accurate and maintainable.
 - Shared orientation docs reused by both human and AI readers.
 
 ## Does Not Belong Here
@@ -20,6 +22,9 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.md)
+- [Context Pack Directory](./packs/README.md)
+- [Routing Assets Directory](./routing/README.md)
+- [Context Governance Directory](./governance/README.md)
 - [Documentation Templates](./templates/README.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.md)
 - [Architecture Router](../architecture/README.md)
