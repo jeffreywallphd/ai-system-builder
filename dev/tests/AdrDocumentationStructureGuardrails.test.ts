@@ -25,6 +25,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("## ADR Decision Thresholds");
     expect(humanRouter).toContain("## Standard ADR Sections");
     expect(humanRouter).toContain("## ADR Cross-Linking Conventions");
+    expect(humanRouter).toContain("### Amendment vs New ADR Rules");
+    expect(humanRouter).toContain("### Supersession Representation Rules");
     expect(humanRouter).toContain("docs/adr/records/");
     expect(humanRouter).toContain("3-digit, zero-padded identifiers");
     expect(humanRouter).toContain("ADR-<NNN> <Decision Title>");
@@ -40,6 +42,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRouter).toContain("decision_status");
     expect(humanRouter).toContain("accepted");
     expect(humanRouter).toContain("deprecated");
+    expect(humanRouter).toContain("Do not silently rewrite history");
+    expect(humanRouter).toContain("bi-directional");
     expect(humanRouter).toContain("### Where To Document When ADR Is Unnecessary");
     expect(humanRouter).toContain("docs/operations/");
     expect(humanRouter).toContain("docs/baselines/");
@@ -57,6 +61,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("## ADR Decision Thresholds");
     expect(aiRouter).toContain("## Standard ADR Sections");
     expect(aiRouter).toContain("## ADR Cross-Linking Conventions");
+    expect(aiRouter).toContain("### Amendment vs New ADR Rules");
+    expect(aiRouter).toContain("### Supersession Representation Rules");
     expect(aiRouter).toContain("docs/adr/records/");
     expect(aiRouter).toContain("3-digit, zero-padded identifiers");
     expect(aiRouter).toContain("ADR-<NNN> <Decision Title>");
@@ -72,6 +78,8 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRouter).toContain("decision_status");
     expect(aiRouter).toContain("accepted");
     expect(aiRouter).toContain("deprecated");
+    expect(aiRouter).toContain("Never overwrite decision history");
+    expect(aiRouter).toContain("bi-directional");
     expect(aiRouter).toContain("### Where To Document When ADR Is Unnecessary");
     expect(aiRouter).toContain("docs/operations/");
     expect(aiRouter).toContain("docs/baselines/");
@@ -95,6 +103,9 @@ describe("ADR documentation structure guardrails", () => {
     expect(humanRecords).toContain("accepted");
     expect(humanRecords).toContain("superseded");
     expect(humanRecords).toContain("deprecated");
+    expect(humanRecords).toContain("## ADR Lifecycle Handling");
+    expect(humanRecords).toContain("Full replacement");
+    expect(humanRecords).toContain("Partial revision");
     expect(humanRecords).toContain("## ADR Index and Sorting Rules");
     expect(humanRecords).toContain("adr_number");
     expect(humanRecords).toContain("adr-registry.json");
@@ -109,6 +120,9 @@ describe("ADR documentation structure guardrails", () => {
     expect(aiRecords).toContain("accepted");
     expect(aiRecords).toContain("superseded");
     expect(aiRecords).toContain("deprecated");
+    expect(aiRecords).toContain("## ADR Lifecycle Handling");
+    expect(aiRecords).toContain("Full replacement");
+    expect(aiRecords).toContain("Partial revision");
     expect(aiRecords).toContain("## ADR Index and Sorting Rules");
     expect(aiRecords).toContain("adr_number");
     expect(aiRecords).toContain("adr-registry.json");
@@ -183,6 +197,9 @@ describe("ADR documentation structure guardrails", () => {
       expect(guide).toContain("Considered Options");
       expect(guide).toContain("Consequences");
       expect(guide).toContain("Related Documentation");
+      expect(guide).toContain("Lifecycle Decision Rules");
+      expect(normalizedGuide).toContain("partial");
+      expect(normalizedGuide).toContain("superseded");
       expect(normalizedGuide).toContain("tradeoff");
       expect(normalizedGuide).toContain("speculative");
       expect(normalizedGuide).toContain("implementation");

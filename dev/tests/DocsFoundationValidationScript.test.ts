@@ -143,4 +143,101 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("[ADR_REGISTRY_REFERENCE_INVALID]");
     expect(combinedOutput).toContain("missing-adr-record.md");
   });
+
+  it("detects ADR supersession metadata conflicts", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-supersession-conflict-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-001-single-authoritative-control-plane.md",
+      "adr-001-single-authoritative-control-plane.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        "last_reviewed: 2026-04-11",
+        [
+          "supersedes: docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
+          "superseded_by: docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md",
+          "last_reviewed: 2026-04-11",
+        ].join("\n"),
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_SUPERSESSION_CONFLICT]");
+    expect(combinedOutput).toContain("cannot set both supersedes and superseded_by");
+  });
+
+  it("detects superseded_by targets that are not accepted ADRs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-supersession-target-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-001-single-authoritative-control-plane.md",
+      "adr-001-single-authoritative-control-plane.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        "last_reviewed: 2026-04-11",
+        "superseded_by: docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md\nlast_reviewed: 2026-04-11",
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    for (const variant of [
+      "adr-002-workspace-centered-tenancy-and-resource-ownership.md",
+      "adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        "decision_status: accepted",
+        "decision_status: proposed",
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_SUPERSESSION_TARGET_INVALID]");
+    expect(combinedOutput).toContain("must be decision_status 'accepted'");
+  });
+
+  it("detects missing supersession backlinks from replacement ADRs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-adr-supersession-backlink-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    for (const variant of [
+      "adr-001-single-authoritative-control-plane.md",
+      "adr-001-single-authoritative-control-plane.ai.md",
+    ]) {
+      const adrPath = join(fixtureRoot, "docs", "adr", "records", variant);
+      const content = readFileSync(adrPath, "utf8").replace(
+        "last_reviewed: 2026-04-11",
+        "superseded_by: docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md\nlast_reviewed: 2026-04-11",
+      );
+      writeFileSync(adrPath, content, "utf8");
+    }
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[ADR_SUPERSESSION_BACKLINK_MISSING]");
+    expect(combinedOutput).toContain("must set supersedes");
+  });
 });

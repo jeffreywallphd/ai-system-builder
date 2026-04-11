@@ -77,6 +77,7 @@ const requiredTemplates = [
     requiredSections: [
       "## ADR Numbering and Naming Rules",
       "## ADR Metadata Rules",
+      "## ADR Lifecycle Rules",
       "## Required Sections",
       "## Optional Sections",
       "## Status",
@@ -163,6 +164,8 @@ describe("documentation templates guardrails", () => {
       expect(content).toContain("accepted");
       expect(content).toContain("superseded");
       expect(content).toContain("deprecated");
+      expect(content).toContain("Amend an existing ADR");
+      expect(content).toContain("Create a new ADR");
       expect(content).toContain("## Supersession");
       expect(content).toContain("Superseded By");
       expect(content).toContain("## Follow-Up Actions");
