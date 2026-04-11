@@ -10,6 +10,7 @@ related_code_paths:
   - docs/architecture
   - docs/contributors/docs-placement-guide.md
   - dev/tests/DocumentationBaselineHistoricalFolderStrategyGuardrails.test.ts
+  - dev/tests/DocumentationBaselineHistoricalReviewExpectationsStory543Guardrails.test.ts
 ---
 
 # AI Companion: Baseline and Historical Folder Strategy (Story 5.1.3)
@@ -71,6 +72,39 @@ Allowed only as short non-authoritative context with links to the full baseline 
 3. Keep old active paths as short superseded stubs with canonical destination links.
 4. Link active authority first from routers; add historical baseline links as secondary context.
 
+## Ongoing Review and Maintenance Expectations (Story 5.4.3)
+
+### Review Posture
+
+- Review archival docs for trust and navigation quality, not for routine implementation freshness.
+- Keep baselines and historical notes stable as evidence snapshots.
+- Verify each archive path links back to canonical active authority.
+
+### Review Scope
+
+Validate these checks during recurring maintenance:
+1. Metadata integrity: `status`, `authoritativeness`, `superseded_by` when applicable.
+2. Redirect quality: superseded pointers resolve to current canonical docs.
+3. Isolation quality: no current executable workflow guidance leaks into archival paths.
+4. Retirement context: superseded stubs include concise rationale and effective direction.
+
+### Update Boundaries
+
+Allowed:
+- Metadata fixes, link repairs, and required redaction/compliance edits.
+- Clearer replacement-path annotations when material is newly superseded.
+
+Not allowed:
+- Evolving archived artifacts into active implementation guides.
+- Using baselines as a storage area for draft plans or unresolved design parking notes.
+
+### Newly Superseded Intake Contract
+
+1. Place durable prior-state evidence into the correct `docs/baselines/...` destination.
+2. Keep old active paths as minimal superseded pointers.
+3. Ensure archived artifacts cross-link canonical active successors.
+4. Require explicit retention reason: parity, traceability, auditability, or retirement lineage.
+
 ## Related Guidance
 
 - `docs/context/documentation-segmentation-taxonomy.ai.md`
@@ -78,3 +112,4 @@ Allowed only as short non-authoritative context with links to the full baseline 
 - `docs/contributors/docs-placement-guide.ai.md`
 - `docs/contributors/docs-migration-safety-guide.ai.md`
 - `docs/baselines/README.ai.md`
+- `docs/contributors/baseline-and-historical-material-usage-guide.ai.md`

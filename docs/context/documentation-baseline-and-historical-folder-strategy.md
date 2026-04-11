@@ -10,6 +10,7 @@ related_code_paths:
   - docs/architecture
   - docs/contributors/docs-placement-guide.md
   - dev/tests/DocumentationBaselineHistoricalFolderStrategyGuardrails.test.ts
+  - dev/tests/DocumentationBaselineHistoricalReviewExpectationsStory543Guardrails.test.ts
 ---
 
 # Baseline and Historical Folder Strategy (Story 5.1.3)
@@ -84,6 +85,39 @@ Use this rule:
 3. Old active paths become superseded redirect stubs with canonical destination links.
 4. Contributor and architecture routers should link active authority first, then optional historical baseline references.
 
+## Ongoing Review and Maintenance Expectations (Story 5.4.3)
+
+### Review Posture
+
+- Baseline and historical areas are reviewed for trustworthiness and navigability, not for routine feature freshness.
+- Treat archival records as stable evidence snapshots by default.
+- Confirm archives still point readers back to canonical active documentation paths.
+
+### Scheduled Review Scope
+
+During baseline/historical review cycles, verify:
+1. Metadata integrity (`status`, `authoritativeness`, and `superseded_by` where needed).
+2. Redirect/link integrity to active authority docs.
+3. Proper placement in `docs/baselines/...` with no active workflow guidance leakage.
+4. Presence of concise retirement rationale for superseded stubs kept in active paths.
+
+### Update Boundaries
+
+Appropriate updates:
+- Metadata correction, broken-link repair, and safety/compliance redaction.
+- Clarification of replacement paths when newly superseded content is archived.
+
+Inappropriate updates:
+- Converting archived artifacts into ongoing implementation guides.
+- Expanding baseline docs with open-ended design brainstorming or draft planning notes.
+
+### Newly Superseded Material Intake Rule
+
+1. Archive durable prior-state evidence under the correct baseline destination.
+2. Keep old active paths as minimal superseded pointers only.
+3. Ensure archived entries include clear links to canonical active successors.
+4. Reject intake if no retention reason is provided (parity, traceability, auditability, or retirement lineage).
+
 ## Related Guidance
 
 - `docs/context/documentation-segmentation-taxonomy.md`
@@ -91,3 +125,4 @@ Use this rule:
 - `docs/contributors/docs-placement-guide.md`
 - `docs/contributors/docs-migration-safety-guide.md`
 - `docs/baselines/README.md`
+- `docs/contributors/baseline-and-historical-material-usage-guide.md`
