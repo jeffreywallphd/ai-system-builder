@@ -95,6 +95,21 @@ function readJson(pathValue) {
   return JSON.parse(readFileSync(pathValue, "utf8"));
 }
 
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isArrayOfNonEmptyStrings(value, options = {}) {
+  const allowEmpty = options.allowEmpty === true;
+  return Array.isArray(value)
+    && (allowEmpty || value.length > 0)
+    && value.every((entry) => isNonEmptyString(entry));
+}
+
+function addIssue(issues, code, message) {
+  issues.push({ code, message });
+}
+
 function parseFrontmatter(markdownContent) {
   const normalized = markdownContent.replace(/\r\n/g, "\n");
 
@@ -225,12 +240,14 @@ function validateDocsFoundation(repoRoot) {
   const contextPackCatalogContractPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.contract.json");
   const contextPackCatalogSeedPath = resolve(repoRoot, "docs/context/packs/context-pack-catalog.seed.json");
   const contextPackContractPath = resolve(repoRoot, "docs/context/packs/context-pack.contract.json");
+  const contextMapPath = resolve(repoRoot, "docs/context/context-map.json");
   const contextAssetMetadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
   const taskRoutingContractPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.contract.json");
   const taskRoutingSeedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing.seed.json");
 
   const expectedContextJsonArtifacts = [
     contextPackContractPath,
+    contextMapPath,
     contextAssetMetadataContractPath,
     contextPackCatalogContractPath,
     contextPackCatalogSeedPath,
@@ -371,6 +388,382 @@ function validateDocsFoundation(repoRoot) {
         code: "CONTEXT_CONTRACT_INVALID",
         message: "docs/context/routing/task-to-context-routing.seed.json must include routingExamples.",
       });
+    }
+  }
+
+  const contextMap = contextJsonArtifacts.get(contextMapPath);
+  const catalogSeed = contextJsonArtifacts.get(contextPackCatalogSeedPath);
+  const catalogContract = contextJsonArtifacts.get(contextPackCatalogContractPath);
+
+  const routingContractTaskCategories = new Set(
+    Array.isArray(routingContract?.supportedTaskCategories)
+      ? routingContract.supportedTaskCategories
+        .map((entry) => entry?.id)
+        .filter((entry) => isNonEmptyString(entry))
+      : [],
+  );
+  const routingAllowedSelectionModes = new Set(Array.isArray(routingContract?.allowedSelectionModes) ? routingContract.allowedSelectionModes : []);
+  const routingAllowedPriorityTiers = new Set(Array.isArray(routingContract?.priorityTiers) ? routingContract.priorityTiers : []);
+  const catalogPackIds = new Set(
+    Array.isArray(catalogSeed?.packs)
+      ? catalogSeed.packs
+        .map((entry) => entry?.id)
+        .filter((entry) => isNonEmptyString(entry))
+      : [],
+  );
+
+  if (catalogSeed && catalogContract) {
+    const requiredCatalogFields = Array.isArray(catalogContract.entryRequiredFields)
+      ? catalogContract.entryRequiredFields
+      : [];
+    const allowedStatusValues = new Set(Array.isArray(catalogContract.allowedStatusValues) ? catalogContract.allowedStatusValues : []);
+
+    for (const [index, packEntry] of (catalogSeed.packs || []).entries()) {
+      if (!packEntry || typeof packEntry !== "object") {
+        addIssue(
+          issues,
+          "CONTEXT_PACK_SHAPE_INVALID",
+          `docs/context/packs/context-pack-catalog.seed.json pack index ${index} must be an object.`,
+        );
+        continue;
+      }
+
+      for (const field of requiredCatalogFields) {
+        const fieldValue = packEntry[field];
+        if (Array.isArray(fieldValue)) {
+          if (fieldValue.length === 0 || !isArrayOfNonEmptyStrings(fieldValue)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_SHAPE_INVALID",
+              `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' field '${field}' must be a non-empty string array.`,
+            );
+          }
+          continue;
+        }
+
+        if (!isNonEmptyString(fieldValue)) {
+          addIssue(
+            issues,
+            "CONTEXT_PACK_SHAPE_INVALID",
+            `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' is missing required field '${field}'.`,
+          );
+        }
+      }
+
+      if (isNonEmptyString(packEntry.status) && allowedStatusValues.size > 0 && !allowedStatusValues.has(packEntry.status)) {
+        addIssue(
+          issues,
+          "CONTEXT_PACK_SHAPE_INVALID",
+          `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' has unsupported status '${packEntry.status}'.`,
+        );
+      }
+
+      for (const pathField of ["primaryDocPath", "aiDocPath"]) {
+        if (!isNonEmptyString(packEntry[pathField])) {
+          continue;
+        }
+        const absolutePath = resolve(repoRoot, packEntry[pathField]);
+        if (!existsSync(absolutePath)) {
+          addIssue(
+            issues,
+            "CONTEXT_PACK_REFERENCE_INVALID",
+            `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references missing file '${packEntry[pathField]}'.`,
+          );
+        }
+      }
+    }
+  }
+
+  if (packContractSpec && catalogSeed && Array.isArray(catalogSeed.packs) && Array.isArray(packContractSpec.requiredSections)) {
+    const requiredHeadings = packContractSpec.requiredSections
+      .map((section) => section?.heading)
+      .filter((heading) => isNonEmptyString(heading));
+
+    for (const packEntry of catalogSeed.packs) {
+      if (!packEntry || typeof packEntry !== "object" || !isNonEmptyString(packEntry.id)) {
+        continue;
+      }
+
+      for (const pathField of ["primaryDocPath", "aiDocPath"]) {
+        const packPath = packEntry[pathField];
+        if (!isNonEmptyString(packPath)) {
+          continue;
+        }
+
+        const absolutePackPath = resolve(repoRoot, packPath);
+        if (!existsSync(absolutePackPath)) {
+          continue;
+        }
+
+        const content = readFileSync(absolutePackPath, "utf8");
+        for (const heading of requiredHeadings) {
+          if (!content.includes(heading)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_SHAPE_INVALID",
+              `${packPath} is missing required heading '${heading}'.`,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (contextMap) {
+    if (contextMap.schemaVersion !== "1.0.0" || contextMap.artifactType !== "context-map") {
+      addIssue(
+        issues,
+        "CONTEXT_MAP_INVALID",
+        "docs/context/context-map.json must declare schemaVersion 1.0.0 and artifactType context-map.",
+      );
+    }
+
+    if (contextMap.routingContractPath !== "docs/context/routing/task-to-context-routing.contract.json"
+      || contextMap.routingSeedPath !== "docs/context/routing/task-to-context-routing.seed.json"
+      || contextMap.contextPackCatalogPath !== "docs/context/packs/context-pack-catalog.seed.json") {
+      addIssue(
+        issues,
+        "CONTEXT_MAP_INVALID_REFERENCE",
+        "docs/context/context-map.json must reference canonical routing and pack catalog artifact paths.",
+      );
+    }
+
+    if (!Array.isArray(contextMap.taskCategoryDefaults) || contextMap.taskCategoryDefaults.length === 0) {
+      addIssue(
+        issues,
+        "CONTEXT_MAP_INVALID",
+        "docs/context/context-map.json must include non-empty taskCategoryDefaults.",
+      );
+    }
+
+    if (!Array.isArray(contextMap.taskCategoryMappings) || contextMap.taskCategoryMappings.length === 0) {
+      addIssue(
+        issues,
+        "CONTEXT_MAP_INVALID",
+        "docs/context/context-map.json must include non-empty taskCategoryMappings.",
+      );
+    }
+
+    const contextProfileIds = new Set(
+      Array.isArray(contextMap.contextAssemblyPolicy?.profileCatalog)
+        ? contextMap.contextAssemblyPolicy.profileCatalog
+          .map((profile) => profile?.profileId)
+          .filter((profileId) => isNonEmptyString(profileId))
+        : [],
+    );
+
+    const globalExclusionTagIds = new Set(
+      Array.isArray(contextMap.globalExclusionTags)
+        ? contextMap.globalExclusionTags
+          .map((tag) => tag?.tagId)
+          .filter((tagId) => isNonEmptyString(tagId))
+        : [],
+    );
+    const authoritativeSourceTags = new Set(
+      Array.isArray(contextMap.authorityTagCatalog?.authoritativeSourceTags)
+        ? contextMap.authorityTagCatalog.authoritativeSourceTags
+        : [],
+    );
+    const relatedSourceTags = new Set(
+      Array.isArray(contextMap.authorityTagCatalog?.relatedSourceTags)
+        ? contextMap.authorityTagCatalog.relatedSourceTags
+        : [],
+    );
+
+    for (const entry of contextMap.taskCategoryDefaults || []) {
+      if (!isNonEmptyString(entry.taskCategoryId)) {
+        addIssue(issues, "CONTEXT_MAP_INVALID", "docs/context/context-map.json taskCategoryDefaults entries must include taskCategoryId.");
+        continue;
+      }
+      if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(entry.taskCategoryId)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json default category '${entry.taskCategoryId}' is not present in routing contract supportedTaskCategories.`,
+        );
+      }
+      if (routingAllowedSelectionModes.size > 0 && !routingAllowedSelectionModes.has(entry.selectionMode)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json default category '${entry.taskCategoryId}' uses unsupported selectionMode '${entry.selectionMode}'.`,
+        );
+      }
+      if (routingAllowedPriorityTiers.size > 0 && !routingAllowedPriorityTiers.has(entry.priorityTier)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json default category '${entry.taskCategoryId}' uses unsupported priorityTier '${entry.priorityTier}'.`,
+        );
+      }
+      if (!contextProfileIds.has(entry.contextAssemblyProfileId)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json default category '${entry.taskCategoryId}' references unknown contextAssemblyProfileId '${entry.contextAssemblyProfileId}'.`,
+        );
+      }
+    }
+
+    for (const mapping of contextMap.taskCategoryMappings || []) {
+      if (!isNonEmptyString(mapping.taskCategoryId)) {
+        addIssue(issues, "CONTEXT_MAP_INVALID", "docs/context/context-map.json taskCategoryMappings entries must include taskCategoryId.");
+        continue;
+      }
+      if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(mapping.taskCategoryId)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' uses unsupported taskCategoryId '${mapping.taskCategoryId}'.`,
+        );
+      }
+      if (!contextProfileIds.has(mapping.contextAssemblyProfileId)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID_REFERENCE",
+          `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' references unknown contextAssemblyProfileId '${mapping.contextAssemblyProfileId}'.`,
+        );
+      }
+      if (!Array.isArray(mapping.packRefs) || mapping.packRefs.length === 0) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID",
+          `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' must include non-empty packRefs.`,
+        );
+      } else {
+        const packOrders = new Set();
+        for (const packRef of mapping.packRefs) {
+          if (!isNonEmptyString(packRef.packId) || (catalogPackIds.size > 0 && !catalogPackIds.has(packRef.packId))) {
+            addIssue(
+              issues,
+              "CONTEXT_MAP_INVALID_REFERENCE",
+              `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' references unknown pack '${packRef.packId}'.`,
+            );
+          }
+          if (!Number.isInteger(packRef.priorityOrder) || packRef.priorityOrder <= 0) {
+            addIssue(
+              issues,
+              "CONTEXT_MAP_INVALID",
+              `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' contains invalid priorityOrder '${packRef.priorityOrder}'.`,
+            );
+          }
+          if (packOrders.has(packRef.priorityOrder)) {
+            addIssue(
+              issues,
+              "CONTEXT_MAP_INVALID",
+              `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' contains duplicate priorityOrder '${packRef.priorityOrder}'.`,
+            );
+          }
+          packOrders.add(packRef.priorityOrder);
+        }
+      }
+
+      if (!isArrayOfNonEmptyStrings(mapping.exclusionTagIds)) {
+        addIssue(
+          issues,
+          "CONTEXT_MAP_INVALID",
+          `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' must include non-empty exclusionTagIds.`,
+        );
+      } else {
+        for (const exclusionTagId of mapping.exclusionTagIds) {
+          if (!globalExclusionTagIds.has(exclusionTagId)) {
+            addIssue(
+              issues,
+              "CONTEXT_MAP_INVALID_REFERENCE",
+              `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' references unknown exclusionTagId '${exclusionTagId}'.`,
+            );
+          }
+        }
+      }
+
+      for (const sourceTag of mapping.authoritativeSourceTags || []) {
+        if (!authoritativeSourceTags.has(sourceTag)) {
+          addIssue(
+            issues,
+            "CONTEXT_MAP_INVALID_REFERENCE",
+            `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' references unknown authoritativeSourceTag '${sourceTag}'.`,
+          );
+        }
+      }
+      for (const sourceTag of mapping.relatedSourceTags || []) {
+        if (!relatedSourceTags.has(sourceTag)) {
+          addIssue(
+            issues,
+            "CONTEXT_MAP_INVALID_REFERENCE",
+            `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' references unknown relatedSourceTag '${sourceTag}'.`,
+          );
+        }
+      }
+
+      const tierHints = mapping.contextAssemblyTierHints || {};
+      for (const tierKey of ["foundation", "domain", "implementation", "optional"]) {
+        const hint = tierHints[tierKey];
+        if (!hint || typeof hint !== "object") {
+          addIssue(
+            issues,
+            "CONTEXT_MAP_INVALID",
+            `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' is missing contextAssemblyTierHints.${tierKey}.`,
+          );
+          continue;
+        }
+        if (!Number.isFinite(hint.weight)) {
+          addIssue(
+            issues,
+            "CONTEXT_MAP_INVALID",
+            `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' has non-numeric contextAssemblyTierHints.${tierKey}.weight.`,
+          );
+        }
+        if (typeof hint.includeByDefault !== "boolean") {
+          addIssue(
+            issues,
+            "CONTEXT_MAP_INVALID",
+            `docs/context/context-map.json mapping '${mapping.mappingId || "<unknown>"}' must set boolean contextAssemblyTierHints.${tierKey}.includeByDefault.`,
+          );
+        }
+      }
+    }
+  }
+
+  if (routingSeed) {
+    const contextProfileIds = new Set(
+      Array.isArray(contextMap?.contextAssemblyPolicy?.profileCatalog)
+        ? contextMap.contextAssemblyPolicy.profileCatalog
+          .map((profile) => profile?.profileId)
+          .filter((profileId) => isNonEmptyString(profileId))
+        : [],
+    );
+    for (const mapping of routingSeed.mappings || []) {
+      if (routingContractTaskCategories.size > 0 && !routingContractTaskCategories.has(mapping.taskCategory)) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' uses unsupported taskCategory '${mapping.taskCategory}'.`,
+        );
+      }
+      if (!isArrayOfNonEmptyStrings(mapping.packIds || [])) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' must include non-empty packIds.`,
+        );
+      } else {
+        for (const packId of mapping.packIds) {
+          if (catalogPackIds.size > 0 && !catalogPackIds.has(packId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown packId '${packId}'.`,
+            );
+          }
+        }
+      }
+      if (contextProfileIds.size > 0 && !contextProfileIds.has(mapping.contextAssemblyProfileId)) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown contextAssemblyProfileId '${mapping.contextAssemblyProfileId}'.`,
+        );
+      }
     }
   }
 
@@ -555,6 +948,7 @@ function main() {
     `Checked top-level folders: ${REQUIRED_TOP_LEVEL_FOLDERS.length}`,
     `Checked router files: ${2 + (REQUIRED_TOP_LEVEL_FOLDERS.length * 2)}`,
     `Checked context foundation assets: ${REQUIRED_CONTEXT_FILES.length}`,
+    "Checked context map and pack shape references.",
     `Checked metadata seed docs: ${SEED_DOCUMENTS.length}`,
   ].join("\n") + "\n");
 }

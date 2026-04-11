@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mkdtempSync, mkdirSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -35,5 +35,46 @@ describe("docs foundation validation script", () => {
     expect(combinedOutput).toContain("[TOP_LEVEL_FOLDER_MISSING]");
     expect(combinedOutput).toContain("[ROUTER_FILE_MISSING]");
     expect(combinedOutput).toContain("[CONTEXT_SUBFOLDER_MISSING]");
+  });
+
+  it("detects invalid context-map pack references", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-context-map-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const contextMapPath = join(fixtureRoot, "docs", "context", "context-map.json");
+    const contextMap = JSON.parse(readFileSync(contextMapPath, "utf8")) as {
+      taskCategoryMappings: Array<{ packRefs: Array<{ packId: string }> }>;
+    };
+    contextMap.taskCategoryMappings[0].packRefs[0].packId = "missing-pack-id-for-validator-test";
+    writeFileSync(contextMapPath, `${JSON.stringify(contextMap, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_MAP_INVALID_REFERENCE]");
+    expect(combinedOutput).toContain("missing-pack-id-for-validator-test");
+  });
+
+  it("detects missing required headings in context packs", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-foundation-validator-pack-shape-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const packPath = join(fixtureRoot, "docs", "context", "packs", "repository-overview.pack.md");
+    const packContent = readFileSync(packPath, "utf8").replace("## Anti-Patterns", "## Anti Patterns");
+    writeFileSync(packPath, packContent, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[CONTEXT_PACK_SHAPE_INVALID]");
+    expect(combinedOutput).toContain("repository-overview.pack.md is missing required heading '## Anti-Patterns'.");
   });
 });

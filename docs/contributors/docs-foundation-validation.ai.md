@@ -22,6 +22,9 @@ Use this guide to run the baseline docs foundation validator before or during do
 - Root and top-level routers keep required `README.md` and `README.ai.md` files.
 - Required `docs/context` foundation subfolders and seed artifacts exist (`packs`, `routing`, `governance`, `templates`).
 - Context foundation contract/seed JSON artifacts keep expected schema markers.
+- Context map shape remains valid and references stay resolvable (task categories, profile IDs, exclusion tags, pack IDs).
+- Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` links.
+- Context pack markdown files keep required headings from `docs/context/packs/context-pack.contract.json`.
 - Seed docs keep required metadata header fields with taxonomy-aligned enum values.
 - Seed `.md` and `.ai.md` pairs stay aligned on routing metadata.
 
@@ -41,6 +44,11 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 - `ROUTER_FILE_MISSING`
 - `CONTEXT_SUBFOLDER_MISSING`
 - `CONTEXT_FILE_MISSING`
+- `CONTEXT_MAP_INVALID`
+- `CONTEXT_MAP_INVALID_REFERENCE`
+- `CONTEXT_PACK_SHAPE_INVALID`
+- `CONTEXT_PACK_REFERENCE_INVALID`
+- `ROUTING_REFERENCE_INVALID`
 - `FRONTMATTER_INVALID`
 - `HEADER_ENUM_INVALID`
 - `SEED_PAIR_MISMATCH`

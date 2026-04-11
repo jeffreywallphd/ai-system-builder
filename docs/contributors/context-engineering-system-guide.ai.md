@@ -122,6 +122,6 @@ New context packs:
 ## Validation Checklist Before Merge
 
 1. Human and AI guide files are both updated.
-2. Routing and pack contracts/seeds remain aligned.
+2. Routing and pack contracts/seeds remain aligned, including `context-map.json` pack/category/profile references and required context-pack headings.
 3. Relevant `dev/tests` guardrails are updated.
 4. `npm run docs:validate:foundation` passes.

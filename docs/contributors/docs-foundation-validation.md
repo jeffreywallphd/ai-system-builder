@@ -22,6 +22,9 @@ Use this guide when you need a fast contract check for the documentation foundat
 - Expected router files exist (`README.md` and `README.ai.md` at root and top-level docs areas).
 - Required `docs/context` foundation subfolders and seed artifacts exist (`packs`, `routing`, `governance`, `templates`).
 - Context foundation contracts/seeds are valid JSON and keep expected schema markers.
+- Context map shape stays valid and cross-references remain resolvable (routing categories, profile IDs, exclusion tags, and pack IDs).
+- Context pack catalog entries keep required metadata shape and valid `primaryDocPath` / `aiDocPath` references.
+- Context pack markdown files keep required section headings from `docs/context/packs/context-pack.contract.json`.
 - Seed docs have a valid metadata header and stay aligned to taxonomy/metadata contracts.
 - Seed `.md` and `.ai.md` pairs stay aligned for routing metadata fields.
 
@@ -48,6 +51,11 @@ Examples:
 - `ROUTER_FILE_MISSING`
 - `CONTEXT_SUBFOLDER_MISSING`
 - `CONTEXT_FILE_MISSING`
+- `CONTEXT_MAP_INVALID`
+- `CONTEXT_MAP_INVALID_REFERENCE`
+- `CONTEXT_PACK_SHAPE_INVALID`
+- `CONTEXT_PACK_REFERENCE_INVALID`
+- `ROUTING_REFERENCE_INVALID`
 - `HEADER_FIELD_MISSING`
 - `SEED_PAIR_MISMATCH`
 

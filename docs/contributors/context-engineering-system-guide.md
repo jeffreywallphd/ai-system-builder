@@ -125,6 +125,6 @@ When adding a new context pack:
 ## Validation Checklist Before Merge
 
 1. `docs/contributors/context-engineering-system-guide.md` and `.ai.md` are both updated.
-2. Routing/packs contracts and seeds remain parseable and consistent.
+2. Routing/packs contracts and seeds remain parseable and consistent, including `context-map.json` pack/category/profile references and context-pack required headings.
 3. Relevant `dev/tests` guardrails are updated for new routing or pack behavior.
 4. `npm run docs:validate:foundation` passes.
