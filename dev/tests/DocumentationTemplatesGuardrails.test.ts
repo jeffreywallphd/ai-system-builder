@@ -73,9 +73,18 @@ const requiredTemplates = [
     fileName: "adr.template.md",
     docType: "adr",
     requiredSections: [
+      "## Required Sections",
+      "## Optional Sections",
       "## Status",
-      "## Decision",
-      "## Alternatives Considered",
+      "## Decision Date",
+      "## Decision Statement",
+      "## Context and Problem Statement",
+      "## Decision Drivers",
+      "## Considered Options",
+      "## Chosen Approach",
+      "## Consequences",
+      "## Related Documentation",
+      "## Related Code Paths",
     ],
   },
   {
@@ -133,6 +142,18 @@ describe("documentation templates guardrails", () => {
       for (const section of template.requiredSections) {
         expect(content).toContain(section);
       }
+    }
+  });
+
+  it("keeps ADR template metadata and supersession guidance explicit", () => {
+    const adrTemplate = read(resolve(templatesDir, "adr.template.md"));
+    const adrTemplateAi = read(resolve(templatesDir, "adr.template.ai.md"));
+
+    for (const content of [adrTemplate, adrTemplateAi]) {
+      expect(content).toMatch(/^decision_date:\s+<YYYY-MM-DD>$/m);
+      expect(content).toContain("## Supersession");
+      expect(content).toContain("Superseded By");
+      expect(content).toContain("## Follow-Up Actions");
     }
   });
 
