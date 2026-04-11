@@ -21,6 +21,7 @@
 
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.md)
+- [Documentation Segmentation Taxonomy](./documentation-segmentation-taxonomy.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.md)
 - [Context Asset Metadata Standard](./context-asset-metadata.md)
 - [Context Map](./context-map.md)
