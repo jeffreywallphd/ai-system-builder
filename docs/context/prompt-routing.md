@@ -40,6 +40,36 @@ Use the smallest context set that can still produce a correct answer:
 - Exclude deprecated packs and excluded pack IDs before considering fallback behavior.
 - Require explicit justification before adding documents outside the mapped domain.
 
+## Explicit Exclusion Rules by Task Class
+
+Apply these exclusions even when files look adjacent or partially relevant:
+
+- `architecture-review`: exclude stale historical baselines and superseded migration snapshots when a canonical architecture reference exists for the same boundary.
+- `feature-decomposition`: exclude implementation-deep diagnostics artifacts unless the decomposition task explicitly includes incident triage deliverables.
+- `coding-implementation`: exclude overlapping non-authoritative summaries when canonical architecture or contract docs cover the same behavior.
+- `migration-refactor`: exclude feature-planning narratives that are not required to preserve behavioral parity.
+- `diagnostics`: exclude adjacent-workflow packs focused on long-horizon planning or UX design unless root-cause evidence points to those domains.
+- `ui-studio`: exclude backend-only architecture domains that have no direct UI contract or state-flow impact.
+- `runtime-security`: exclude non-security convenience docs when policy/authorization/secrets contracts are available for the touched paths.
+- `documentation-change`: exclude runtime implementation-only context unless docs are being updated to reflect verified runtime behavior changes.
+
+For all categories, explicitly exclude:
+
+- stale historical material when a newer canonical source exists;
+- unrelated architecture domains not present in `changedPaths` or `primarySurfaces`;
+- overlapping but non-authoritative files when authoritative contracts/docs are available;
+- context packs intended only for adjacent workflows.
+
+## Authoritative vs Related Material Selection
+
+Use this deterministic source precedence:
+
+1. Include authoritative sources first: routing contracts, mapping-selected canonical docs, and path-matched architecture references.
+2. Treat related-but-non-authoritative material as optional context only, never as decision authority.
+3. Add related material only with an explicit justification tied to a missing fact not present in authoritative sources.
+4. Remove related material first when prompt size or relevance degrades.
+5. If authoritative and related sources conflict, keep authoritative sources and log the related source as context-only.
+
 ## Task-Type Routing Guidance (AI Loom Repository)
 
 ### `architecture-review`

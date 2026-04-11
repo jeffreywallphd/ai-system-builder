@@ -29,6 +29,14 @@ type ContextMap = {
     priorityTier: string;
   }>;
   globalExclusionRules: string[];
+  globalExclusionTags: Array<{
+    tagId: string;
+    description: string;
+  }>;
+  authorityTagCatalog: {
+    authoritativeSourceTags: string[];
+    relatedSourceTags: string[];
+  };
   taskCategoryMappings: Array<{
     mappingId: string;
     taskCategoryId: string;
@@ -38,6 +46,9 @@ type ContextMap = {
       priorityOrder: number;
     }>;
     excludePackIds: string[];
+    exclusionTagIds: string[];
+    authoritativeSourceTags: string[];
+    relatedSourceTags: string[];
     notes: string;
     status: string;
   }>;
@@ -70,6 +81,9 @@ describe("context map guardrails", () => {
     expect(contextMap.routingSeedPath).toBe("docs/context/routing/task-to-context-routing.seed.json");
     expect(contextMap.contextPackCatalogPath).toBe("docs/context/packs/context-pack-catalog.seed.json");
     expect(contextMap.globalExclusionRules.length).toBeGreaterThanOrEqual(1);
+    expect(contextMap.globalExclusionTags.length).toBeGreaterThanOrEqual(4);
+    expect(contextMap.authorityTagCatalog.authoritativeSourceTags.length).toBeGreaterThanOrEqual(1);
+    expect(contextMap.authorityTagCatalog.relatedSourceTags.length).toBeGreaterThanOrEqual(1);
 
     expect(contextMap.taskCategoryDefaults.length).toBe(allowedCategories.length);
     expect(contextMap.taskCategoryMappings.length).toBe(allowedCategories.length);
@@ -79,6 +93,18 @@ describe("context map guardrails", () => {
 
     expect([...defaultCategoryIds].sort()).toEqual([...allowedCategories].sort());
     expect([...mappingCategoryIds].sort()).toEqual([...allowedCategories].sort());
+
+    const globalExclusionTagIds = new Set(contextMap.globalExclusionTags.map((entry) => entry.tagId));
+    expect(globalExclusionTagIds.has("exclude-stale-historical-material")).toBe(true);
+    expect(globalExclusionTagIds.has("exclude-unrelated-architecture-domain")).toBe(true);
+    expect(globalExclusionTagIds.has("exclude-non-authoritative-overlap")).toBe(true);
+    expect(globalExclusionTagIds.has("exclude-adjacent-workflow-pack")).toBe(true);
+
+    const authoritativeTagSet = new Set(contextMap.authorityTagCatalog.authoritativeSourceTags);
+    const relatedTagSet = new Set(contextMap.authorityTagCatalog.relatedSourceTags);
+    for (const authoritativeTag of authoritativeTagSet) {
+      expect(relatedTagSet.has(authoritativeTag)).toBe(false);
+    }
 
     for (const entry of contextMap.taskCategoryDefaults) {
       expect(allowedSelectionModes).toContain(entry.selectionMode);
@@ -90,8 +116,21 @@ describe("context map guardrails", () => {
       expect(mapping.intentId.trim().length).toBeGreaterThan(0);
       expect(mapping.excludePackIds).toBeDefined();
       expect(Array.isArray(mapping.excludePackIds)).toBe(true);
+      expect(mapping.exclusionTagIds.length).toBeGreaterThanOrEqual(1);
+      expect(mapping.authoritativeSourceTags.length).toBeGreaterThanOrEqual(1);
+      expect(mapping.relatedSourceTags.length).toBeGreaterThanOrEqual(1);
       expect(mapping.status).toBe("active");
       expect(mapping.packRefs.length).toBeGreaterThanOrEqual(1);
+
+      for (const exclusionTagId of mapping.exclusionTagIds) {
+        expect(globalExclusionTagIds.has(exclusionTagId)).toBe(true);
+      }
+      for (const authoritativeTag of mapping.authoritativeSourceTags) {
+        expect(authoritativeTagSet.has(authoritativeTag)).toBe(true);
+      }
+      for (const relatedTag of mapping.relatedSourceTags) {
+        expect(relatedTagSet.has(relatedTag)).toBe(true);
+      }
 
       const orders = mapping.packRefs.map((entry) => entry.priorityOrder);
       const sortedOrders = [...orders].sort((left, right) => left - right);

@@ -51,8 +51,41 @@
   "globalExclusionRules": [
     "exclude deprecated packs unless explicitly requested",
     "exclude packs outside changed path or task-surface scope",
-    "exclude packs explicitly listed in mapping excludePackIds before fallback evaluation"
+    "exclude packs explicitly listed in mapping excludePackIds before fallback evaluation",
+    "exclude stale historical material when canonical sources exist",
+    "exclude unrelated architecture domains and adjacent workflow packs unless explicitly justified",
+    "exclude overlapping but non-authoritative files when authoritative sources are available"
   ],
+  "globalExclusionTags": [
+    {
+      "tagId": "exclude-stale-historical-material",
+      "description": "Prevent stale baseline or superseded historical material from displacing current canonical sources."
+    },
+    {
+      "tagId": "exclude-unrelated-architecture-domain",
+      "description": "Prevent loading architecture domains outside declared changed paths and primary surfaces."
+    },
+    {
+      "tagId": "exclude-non-authoritative-overlap",
+      "description": "Prevent overlapping summary or convenience documents from replacing canonical contracts."
+    },
+    {
+      "tagId": "exclude-adjacent-workflow-pack",
+      "description": "Prevent packs intended for neighboring workflows from bloating the active task route."
+    }
+  ],
+  "authorityTagCatalog": {
+    "authoritativeSourceTags": [
+      "routing-contract-canonical",
+      "task-mapped-canonical-doc",
+      "path-matched-architecture-reference"
+    ],
+    "relatedSourceTags": [
+      "adjacent-domain-reference",
+      "historical-reference",
+      "summary-reference"
+    ]
+  },
   "taskCategoryMappings": [
     {
       "mappingId": "context-map-architecture-review-v1",
@@ -65,6 +98,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Bootstrap mapping keeps architecture review routing deterministic while the pack catalog is intentionally small.",
       "status": "active"
     },
@@ -79,6 +128,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Decomposition tasks currently route to the shared foundations pack and can split into dedicated packs in future stories.",
       "status": "active"
     },
@@ -93,6 +158,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Implementation routing is intentionally conservative until additional feature packs are published.",
       "status": "active"
     },
@@ -107,6 +188,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Fallback-capable migration routing remains deterministic through explicit category mapping.",
       "status": "active"
     },
@@ -121,6 +218,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Diagnostics tasks use the same deterministic pack order and can adopt specialized troubleshooting packs later.",
       "status": "active"
     },
@@ -135,6 +248,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "UI mapping remains explicit even while only one active context pack is available.",
       "status": "active"
     },
@@ -149,6 +278,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Security routing keeps deterministic primary-pack ordering with room for future security-specific packs.",
       "status": "active"
     },
@@ -163,6 +308,22 @@
         }
       ],
       "excludePackIds": [],
+      "exclusionTagIds": [
+        "exclude-stale-historical-material",
+        "exclude-unrelated-architecture-domain",
+        "exclude-non-authoritative-overlap",
+        "exclude-adjacent-workflow-pack"
+      ],
+      "authoritativeSourceTags": [
+        "routing-contract-canonical",
+        "task-mapped-canonical-doc",
+        "path-matched-architecture-reference"
+      ],
+      "relatedSourceTags": [
+        "adjacent-domain-reference",
+        "historical-reference",
+        "summary-reference"
+      ],
       "notes": "Documentation changes route to context-system foundations to preserve contract and taxonomy consistency.",
       "status": "active"
     }

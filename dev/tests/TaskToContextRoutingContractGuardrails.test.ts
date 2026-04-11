@@ -244,6 +244,8 @@ describe("task-to-context routing contract guardrails", () => {
       "## Deterministic Routing Workflow",
       "## Minimum Sufficient Context Rules",
       "## Signal-to-Noise Guardrails",
+      "## Explicit Exclusion Rules by Task Class",
+      "## Authoritative vs Related Material Selection",
       "## Task-Type Routing Guidance (AI Loom Repository)",
       "## Ambiguous Task Handling",
       "## Concrete Repository Examples",
@@ -264,6 +266,16 @@ describe("task-to-context routing contract guardrails", () => {
     ]) {
       expect(humanGuide).toContain(artifactPath);
       expect(aiGuide).toContain(artifactPath);
+    }
+
+    for (const exclusionPhrase of [
+      "stale historical material",
+      "unrelated architecture domains",
+      "non-authoritative",
+      "adjacent workflows",
+    ]) {
+      expect(humanGuide).toContain(exclusionPhrase);
+      expect(aiGuide).toContain(exclusionPhrase);
     }
   });
 });
