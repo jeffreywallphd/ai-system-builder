@@ -19,16 +19,28 @@ describe("ADR documentation structure guardrails", () => {
     const aiRouter = readFileSync(resolve(adrRoot, "README.ai.md"), "utf8");
 
     expect(humanRouter).toContain("## ADR File Home");
+    expect(humanRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(humanRouter).toContain("## Standard ADR Sections");
     expect(humanRouter).toContain("docs/adr/records/");
+    expect(humanRouter).toContain("3-digit, zero-padded identifiers");
+    expect(humanRouter).toContain("ADR-<NNN> <Decision Title>");
+    expect(humanRouter).toContain("decision_status");
+    expect(humanRouter).toContain("accepted");
+    expect(humanRouter).toContain("deprecated");
     expect(humanRouter).toContain("../architecture/README.md");
     expect(humanRouter).toContain("../context/templates/adr.template.md");
     expect(humanRouter).toContain("Decision Statement");
     expect(humanRouter).toContain("Supersession");
 
     expect(aiRouter).toContain("## ADR File Home");
+    expect(aiRouter).toContain("## ADR Metadata and Lifecycle Rules");
     expect(aiRouter).toContain("## Standard ADR Sections");
     expect(aiRouter).toContain("docs/adr/records/");
+    expect(aiRouter).toContain("3-digit, zero-padded identifiers");
+    expect(aiRouter).toContain("ADR-<NNN> <Decision Title>");
+    expect(aiRouter).toContain("decision_status");
+    expect(aiRouter).toContain("accepted");
+    expect(aiRouter).toContain("deprecated");
     expect(aiRouter).toContain("../architecture/README.ai.md");
     expect(aiRouter).toContain("../context/templates/adr.template.ai.md");
     expect(aiRouter).toContain("Decision Statement");
@@ -40,10 +52,24 @@ describe("ADR documentation structure guardrails", () => {
     const aiRecords = readFileSync(resolve(adrRecordsRoot, "README.ai.md"), "utf8");
 
     expect(humanRecords).toContain("adr-<NNN>-<kebab-case-title>.md");
+    expect(humanRecords).toContain("## ADR Status Taxonomy");
+    expect(humanRecords).toContain("proposed");
+    expect(humanRecords).toContain("accepted");
+    expect(humanRecords).toContain("superseded");
+    expect(humanRecords).toContain("deprecated");
+    expect(humanRecords).toContain("## ADR Index and Sorting Rules");
+    expect(humanRecords).toContain("adr_number");
     expect(humanRecords).toContain("## Current Index");
     expect(humanRecords).toContain("required section");
     expect(humanRecords).toContain("Supersession");
     expect(aiRecords).toContain("adr-<NNN>-<kebab-case-title>.md");
+    expect(aiRecords).toContain("## ADR Status Taxonomy");
+    expect(aiRecords).toContain("proposed");
+    expect(aiRecords).toContain("accepted");
+    expect(aiRecords).toContain("superseded");
+    expect(aiRecords).toContain("deprecated");
+    expect(aiRecords).toContain("## ADR Index and Sorting Rules");
+    expect(aiRecords).toContain("adr_number");
     expect(aiRecords).toContain("## Current Index");
     expect(aiRecords).toContain("required sections");
     expect(aiRecords).toContain("Supersession");

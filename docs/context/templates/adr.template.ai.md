@@ -4,6 +4,8 @@ doc_type: adr
 status: draft
 authoritativeness: canonical
 owned_by: <team-or-maintainer>
+adr_number: <NNN>
+decision_status: proposed
 decision_date: <YYYY-MM-DD>
 last_reviewed: <YYYY-MM-DD>
 related_code_paths:
@@ -13,6 +15,20 @@ superseded_by: <optional repo-relative doc path>
 ---
 
 # ADR-<NNN>: <Decision Title>
+
+## ADR Numbering and Naming Rules
+
+- Allocate `<NNN>` as the next 3-digit number after the highest existing ADR in `docs/adr/records/`.
+- Keep `<NNN>` consistent across filename, `adr_number`, frontmatter `title`, and H1 heading.
+- Use filename format `adr-<NNN>-<kebab-case-title>.md` and pair AI companion as `adr-<NNN>-<kebab-case-title>.ai.md`.
+- Do not renumber old ADRs or reuse retired numbers.
+
+## ADR Metadata Rules
+
+- `adr_number`: required 3-digit identifier for sorting and indexing.
+- `decision_status`: required ADR lifecycle value (`proposed`, `accepted`, `superseded`, `deprecated`).
+- `decision_date`: required acceptance date in `YYYY-MM-DD`.
+- Keep the `Status` section value aligned with `decision_status` metadata.
 
 ## Required Sections
 
@@ -34,11 +50,16 @@ superseded_by: <optional repo-relative doc path>
 
 ## Status
 
-Use one taxonomy status value and update it when superseded/archived.
+Use one ADR lifecycle status value and keep it synchronized with `decision_status` metadata:
+
+- `proposed`: decision is being reviewed.
+- `accepted`: decision is approved and current.
+- `superseded`: decision has been replaced by a newer ADR.
+- `deprecated`: decision remains for legacy context but should not guide new work.
 
 ## Decision Date
 
-Record when the decision was accepted (usually matches `decision_date` metadata).
+Record when the decision was accepted (matches `decision_date` metadata).
 
 ## Decision Statement
 
