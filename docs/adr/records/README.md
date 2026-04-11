@@ -44,6 +44,11 @@
 - Run `npm run docs:validate:adr` before merging ADR changes.
 - The validator checks required ADR sections, required metadata, and identifier consistency across filename, registry, frontmatter, and H1.
 - It also checks `.md` and `.ai.md` ADR pairs for metadata alignment to reduce silent drift.
+- It validates ADR cross-references so obvious broken paths are caught in highest-value paths:
+  - `## Related Documentation` links inside ADR records.
+  - `## Related ADRs` links inside architecture docs.
+  - `## Authoritative Docs` ADR links inside context packs.
+  - ADR references in `docs/adr/records/README.md` and `docs/adr/records/README.ai.md` against `adr-registry.json`.
 
 ## Current Index
 Canonical source: `docs/adr/records/adr-registry.json`
