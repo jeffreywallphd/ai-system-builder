@@ -160,7 +160,12 @@
       ],
       "relatedDocRecordIds": [
         "doc-context-documentation-taxonomy",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-pack-documentation-refactor",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-context-engineering-system-guide"
       ],
       "expectedExclusions": [
         "docs/baselines/README.md",
@@ -756,7 +761,12 @@
       ],
       "relatedDocRecordIds": [
         "doc-context-documentation-taxonomy",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-pack-documentation-refactor",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-context-engineering-system-guide"
       ],
       "relatedCodePaths": [
         "dev/scripts/validate-docs-foundation.cjs",

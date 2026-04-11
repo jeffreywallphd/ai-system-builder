@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
+  - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -90,6 +91,20 @@ Registry seed coverage now includes:
 - Domain overview anchors in `docs/architecture/domains/*/overview.md`
 
 These records are linked through registry `discoveryIndex` maps and architecture routing `relatedDocRecordIds` in `docs/context/routing/task-to-context-routing.seed.json`.
+
+## ADR, Context Pack, and Contributor Population Status (Story 6.2.3)
+
+Registry seed coverage now extends to additional high-value categories:
+
+- Current ADR set in `docs/adr/records/adr-00*.md` (`ADR-001` to `ADR-006`) indexed as `docType: adr` with explicit status/authority metadata.
+- Context-pack anchors in `docs/context/packs/*.pack.md` indexed as `docType: ai-context` with category-appropriate authority (`canonical` or `supplemental`).
+- Key contributor guidance anchors for implementation quality, context engineering, and onboarding, including:
+  - `docs/contributors/context-engineering-system-guide.md`
+  - `docs/contributors/docs-foundation-validation.md`
+  - `docs/contributors/docs-migration-safety-guide.md`
+  - `docs/contributors/adr-informed-implementation-and-review-examples.md`
+
+Documentation routing entries in `docs/context/routing/task-to-context-routing.seed.json` now include these records through `relatedDocRecordIds`, improving stable-key retrieval beyond architecture docs.
 
 ## Coverage Policy Contract
 

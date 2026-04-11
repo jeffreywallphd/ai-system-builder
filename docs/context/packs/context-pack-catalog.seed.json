@@ -30,7 +30,9 @@
       ],
       "relatedDocRecordIds": [
         "doc-context-documentation-taxonomy",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-pack-context-system-foundations",
+        "doc-contributors-context-engineering-system-guide"
       ],
       "reviewExpectations": {
         "cadence": "per-epic-milestone",
@@ -71,7 +73,12 @@
       "reviewExpectations": {
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-repository-overview",
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-001-single-authoritative-control-plane"
+      ]
     },
     {
       "id": "architecture-core",
@@ -109,7 +116,13 @@
       "reviewExpectations": {
         "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-architecture-core",
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries",
+        "doc-adr-001-single-authoritative-control-plane"
+      ]
     },
     {
       "id": "documentation-refactor",
@@ -149,7 +162,11 @@
       ],
       "relatedDocRecordIds": [
         "doc-context-documentation-taxonomy",
-        "doc-context-documentation-identity-and-reference-conventions"
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-pack-documentation-refactor",
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide"
       ],
       "reviewExpectations": {
         "cadence": "per-epic-milestone",
@@ -193,7 +210,13 @@
       "reviewExpectations": {
         "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-runtime-and-host",
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement"
+      ]
     },
     {
       "id": "identity-and-security",
@@ -238,7 +261,12 @@
       "reviewExpectations": {
         "cadence": "per-story-and-epic-milestone",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-identity-and-security",
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement"
+      ]
     },
     {
       "id": "studio-and-system-composition",
@@ -278,7 +306,12 @@
       "reviewExpectations": {
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
-      }
+      },
+      "relatedDocRecordIds": [
+        "doc-context-pack-studio-and-system-composition",
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
+      ]
     }
   ]
 }

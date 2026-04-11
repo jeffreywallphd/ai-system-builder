@@ -17,6 +17,7 @@ related_code_paths:
   - dev/scripts/validate-docs-foundation.cjs
   - dev/tests/DocumentationRegistryStructureGuardrails.test.ts
   - dev/tests/DocumentationRegistryAuthoringPatternsStory616Guardrails.test.ts
+  - dev/tests/DocumentationRegistryAdrContextContributorStory623Guardrails.test.ts
 ---
 
 # Documentation Registry Structure (Story 6.1.3)
@@ -105,6 +106,21 @@ The registry seed now includes active architecture domain coverage for:
 - Domain overviews under `docs/architecture/domains/*/overview.md`
 
 These entries are indexed in `discoveryIndex` and linked into task routing records through `relatedDocRecordIds` in `docs/context/routing/task-to-context-routing.seed.json` for architecture-oriented retrieval.
+
+## ADR, Context Pack, and Contributor Population Status (Story 6.2.3)
+
+The registry seed now extends beyond architecture-only coverage and includes:
+
+- Full current ADR set under `docs/adr/records/adr-00*.md` (`ADR-001` through `ADR-006`) as `docType: adr` with explicit lifecycle and authority metadata.
+- Context-pack anchors under `docs/context/packs/*.pack.md` as `docType: ai-context` with category-appropriate `authoritativeness` (`canonical` or `supplemental`).
+- Key contributor-guidance anchors for implementation quality, context engineering, and onboarding, including:
+  - `docs/contributors/context-engineering-system-guide.md`
+  - `docs/contributors/docs-foundation-validation.md`
+  - `docs/contributors/docs-migration-safety-guide.md`
+  - `docs/contributors/adr-informed-implementation-and-review-examples.md`
+
+Discovery mappings are also extended so documentation refactor routes in
+`docs/context/routing/task-to-context-routing.seed.json` can resolve these registry entries through `relatedDocRecordIds` rather than path-only matching.
 
 ## Extensibility Boundaries
 

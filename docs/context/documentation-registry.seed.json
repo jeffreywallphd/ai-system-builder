@@ -238,6 +238,233 @@
   },
   "entries": [
     {
+      "recordId": "doc-adr-001-single-authoritative-control-plane",
+      "path": "docs/adr/records/adr-001-single-authoritative-control-plane.md",
+      "aiPath": "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
+      "title": "ADR-001 Single Authoritative Control Plane",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record establishing a single authoritative control-plane boundary.",
+      "keywords": [
+        "adr",
+        "control plane",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/hosts/server",
+        "src/application"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-and-application-core"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domain-and-application-core.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+      "path": "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md",
+      "aiPath": "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.ai.md",
+      "title": "ADR-002 Workspace-Centered Tenancy and Resource Ownership",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record establishing workspace-centered tenancy and ownership boundaries.",
+      "keywords": [
+        "adr",
+        "workspace tenancy",
+        "resource ownership",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/domain/workspaces",
+        "src/application/workspaces",
+        "src/application/authorization"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-architecture-domain-workspace-storage-and-assets-overview",
+        "doc-architecture-domain-identity-trust-and-security-overview"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domains/workspace-storage-and-assets/overview.md",
+        "docs/architecture/domains/identity-trust-and-security/overview.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-003-storage-as-managed-platform-resource",
+      "path": "docs/adr/records/adr-003-storage-as-managed-platform-resource.md",
+      "aiPath": "docs/adr/records/adr-003-storage-as-managed-platform-resource.ai.md",
+      "title": "ADR-003 Storage as Managed Platform Resource",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record defining storage as a managed platform resource with governed lifecycle contracts.",
+      "keywords": [
+        "adr",
+        "storage",
+        "managed platform",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/domain/storage",
+        "src/application/storage",
+        "src/infrastructure/persistence/storage"
+      ],
+      "relatedRecordIds": [
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-architecture-domain-workspace-storage-and-assets-overview"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domains/workspace-storage-and-assets/overview.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+      "path": "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md",
+      "aiPath": "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.ai.md",
+      "title": "ADR-004 Studios as Views Over Shared System and Asset Model",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record defining studios as bounded views over shared system and asset authority.",
+      "keywords": [
+        "adr",
+        "studios",
+        "shared model",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/ui/studio-shell",
+        "src/application/system-studio",
+        "src/application/workflow-studio"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-context-pack-studio-and-system-composition"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domains/studio-and-system-composition/overview.md",
+        "docs/context/packs/studio-and-system-composition.pack.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+      "path": "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
+      "aiPath": "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.ai.md",
+      "title": "ADR-005 Trust, Identity, and Security Boundary Enforcement",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record enforcing fail-closed trust, identity, and security boundary controls.",
+      "keywords": [
+        "adr",
+        "security",
+        "identity",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/application/identity",
+        "src/application/authorization",
+        "src/infrastructure/security"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domains/identity-trust-and-security/overview.md",
+        "docs/context/packs/identity-and-security.pack.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-adr-006-policy-aware-scheduling-and-controlled-execution",
+      "path": "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
+      "aiPath": "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md",
+      "title": "ADR-006 Policy-Aware Scheduling and Controlled Execution",
+      "docType": "adr",
+      "domain": "decision-records",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Architecture decision record requiring policy-aware scheduling and controlled execution transitions.",
+      "keywords": [
+        "adr",
+        "scheduling",
+        "execution",
+        "decision record"
+      ],
+      "relatedCodePaths": [
+        "src/domain/scheduling",
+        "src/domain/execution",
+        "src/application/runs"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+        "doc-context-pack-architecture-core"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-registry.json",
+        "docs/architecture/domains/execution-control-plane-and-scheduling/overview.md",
+        "docs/context/packs/architecture-core.pack.md"
+      ],
+      "owner": "team:architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-document-scope-boundaries",
+      "path": "docs/architecture/architecture-document-scope-boundaries.md",
+      "aiPath": "docs/architecture/architecture-document-scope-boundaries.ai.md",
+      "title": "Architecture Document Scope Boundaries",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Clarifies what belongs in architecture docs versus contributors, operations, baselines, and ADRs.",
+      "keywords": [
+        "document scope",
+        "architecture boundaries",
+        "placement rules"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture",
+        "docs/contributors",
+        "docs/operations",
+        "docs/adr/records",
+        "docs/baselines"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-placement-guide",
+        "doc-architecture-domain-cross-linking-rules"
+      ],
+      "relatedDocs": [
+        "docs/contributors/docs-placement-guide.md",
+        "docs/architecture/architecture-domain-cross-linking-rules.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
       "recordId": "doc-architecture-domain-and-application-core",
       "path": "docs/architecture/domain-and-application-core.md",
       "aiPath": "docs/architecture/domain-and-application-core.ai.md",
@@ -271,32 +498,268 @@
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-layers-and-boundaries",
-      "path": "docs/architecture/layers-and-boundaries.md",
-      "aiPath": "docs/architecture/layers-and-boundaries.ai.md",
-      "title": "Layers and Boundaries",
-      "docType": "architecture-reference",
+      "recordId": "doc-architecture-domain-api-and-transport-surfaces-overview",
+      "path": "docs/architecture/domains/api-and-transport-surfaces/overview.md",
+      "aiPath": "docs/architecture/domains/api-and-transport-surfaces/overview.ai.md",
+      "title": "API and Transport Surfaces Domain Overview",
+      "docType": "architecture-overview",
       "domain": "architecture",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Documents clean-architecture dependency rules and boundary expectations across core layers.",
+      "summary": "Overview for API and transport contract boundaries that expose capabilities without policy leakage.",
       "keywords": [
-        "layers",
-        "boundaries",
-        "clean architecture",
-        "dependency direction"
+        "api",
+        "transport",
+        "contract surfaces",
+        "route boundaries"
+      ],
+      "relatedCodePaths": [
+        "src/infrastructure/api",
+        "src/infrastructure/transport"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-core-platform-and-composition-overview",
+      "path": "docs/architecture/domains/core-platform-and-composition/overview.md",
+      "aiPath": "docs/architecture/domains/core-platform-and-composition/overview.ai.md",
+      "title": "Core Platform and Composition Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for inner platform composition boundaries and core domain/application contracts.",
+      "keywords": [
+        "core platform",
+        "composition",
+        "domain overview"
       ],
       "relatedCodePaths": [
         "src/domain",
-        "src/application",
-        "src/infrastructure",
-        "src/ui"
+        "src/application"
       ],
       "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy",
         "doc-architecture-domain-and-application-core"
       ],
       "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md",
         "docs/architecture/domain-and-application-core.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-cross-linking-rules",
+      "path": "docs/architecture/architecture-domain-cross-linking-rules.md",
+      "aiPath": "docs/architecture/architecture-domain-cross-linking-rules.ai.md",
+      "title": "Architecture Domain Cross-Linking Rules",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Defines cross-domain linking rules so architecture docs stay navigable without duplicated authority.",
+      "keywords": [
+        "cross-linking",
+        "domain navigation",
+        "architecture routing"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/domains",
+        "docs/context/packs"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-document-scope-boundaries",
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-document-scope-boundaries.md",
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-deployment-policy-and-audit-governance-overview",
+      "path": "docs/architecture/domains/deployment-policy-and-audit-governance/overview.md",
+      "aiPath": "docs/architecture/domains/deployment-policy-and-audit-governance/overview.ai.md",
+      "title": "Deployment Policy and Audit Governance Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "governance",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for deployment policy governance and durable audit evidence boundaries.",
+      "keywords": [
+        "deployment policy",
+        "audit governance",
+        "compliance boundaries"
+      ],
+      "relatedCodePaths": [
+        "src/domain/deployment",
+        "src/domain/audit",
+        "src/application/policy-administration"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
+      "path": "docs/architecture/domains/execution-control-plane-and-scheduling/overview.md",
+      "aiPath": "docs/architecture/domains/execution-control-plane-and-scheduling/overview.ai.md",
+      "title": "Execution Control Plane and Scheduling Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for run lifecycle authority, scheduling policy, and execution dispatch-readiness boundaries.",
+      "keywords": [
+        "execution control plane",
+        "scheduling",
+        "run lifecycle"
+      ],
+      "relatedCodePaths": [
+        "src/domain/runs",
+        "src/domain/scheduling",
+        "src/domain/execution"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-identity-trust-and-security-overview",
+      "path": "docs/architecture/domains/identity-trust-and-security/overview.md",
+      "aiPath": "docs/architecture/domains/identity-trust-and-security/overview.ai.md",
+      "title": "Identity Trust and Security Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "identity-and-security",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for fail-closed identity, trust, authorization, and secret-safe security boundaries.",
+      "keywords": [
+        "identity",
+        "trust",
+        "authorization",
+        "security boundaries"
+      ],
+      "relatedCodePaths": [
+        "src/application/identity",
+        "src/application/authorization",
+        "src/infrastructure/security"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-migration-inventory",
+      "path": "docs/architecture/architecture-domain-migration-inventory.md",
+      "aiPath": "docs/architecture/architecture-domain-migration-inventory.ai.md",
+      "title": "Architecture Domain Migration Inventory",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Inventories architecture migration targets for moving flat architecture material into domain folders.",
+      "keywords": [
+        "migration inventory",
+        "architecture domains",
+        "migration planning"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/architecture-domain-migration-inventory.inventory.json",
+        "docs/architecture/domains"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-migration-sequence-and-priority"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md",
+        "docs/architecture/architecture-migration-sequence-and-priority.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-runtime-host-surfaces-overview",
+      "path": "docs/architecture/domains/runtime-host-surfaces/overview.md",
+      "aiPath": "docs/architecture/domains/runtime-host-surfaces/overview.ai.md",
+      "title": "Runtime Host Surfaces Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for host composition, startup lifecycle, and runtime boundary contracts across host types.",
+      "keywords": [
+        "runtime host",
+        "startup lifecycle",
+        "host composition"
+      ],
+      "relatedCodePaths": [
+        "src/hosts",
+        "electron/main"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-domain-studio-and-system-composition-overview",
+      "path": "docs/architecture/domains/studio-and-system-composition/overview.md",
+      "aiPath": "docs/architecture/domains/studio-and-system-composition/overview.ai.md",
+      "title": "Studio and System Composition Domain Overview",
+      "docType": "architecture-overview",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Overview for studio composition boundaries that project shared system and workflow contracts.",
+      "keywords": [
+        "studio composition",
+        "system composition",
+        "workflow boundaries"
+      ],
+      "relatedCodePaths": [
+        "src/ui/studio-shell",
+        "src/application/system-studio",
+        "src/application/workflow-studio"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-taxonomy.md",
+        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md"
       ],
       "owner": "team:platform-architecture",
       "lastReviewed": "2026-04-11"
@@ -342,59 +805,32 @@
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-migration-inventory",
-      "path": "docs/architecture/architecture-domain-migration-inventory.md",
-      "aiPath": "docs/architecture/architecture-domain-migration-inventory.ai.md",
-      "title": "Architecture Domain Migration Inventory",
-      "docType": "architecture-reference",
+      "recordId": "doc-architecture-domain-workspace-storage-and-assets-overview",
+      "path": "docs/architecture/domains/workspace-storage-and-assets/overview.md",
+      "aiPath": "docs/architecture/domains/workspace-storage-and-assets/overview.ai.md",
+      "title": "Workspace Storage and Assets Domain Overview",
+      "docType": "architecture-overview",
       "domain": "architecture",
       "status": "active",
-      "authoritativeness": "reference",
-      "summary": "Inventories architecture migration targets for moving flat architecture material into domain folders.",
+      "authoritativeness": "canonical",
+      "summary": "Overview for workspace tenancy, managed storage, and asset lifecycle authority boundaries.",
       "keywords": [
-        "migration inventory",
-        "architecture domains",
-        "migration planning"
+        "workspace",
+        "storage",
+        "assets",
+        "tenancy boundaries"
       ],
       "relatedCodePaths": [
-        "docs/architecture/architecture-domain-migration-inventory.inventory.json",
-        "docs/architecture/domains"
+        "src/domain/workspaces",
+        "src/domain/storage",
+        "src/domain/assets"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy",
-        "doc-architecture-migration-sequence-and-priority"
+        "doc-architecture-domain-taxonomy"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-domain-taxonomy.md",
-        "docs/architecture/architecture-migration-sequence-and-priority.md"
-      ],
-      "owner": "team:platform-architecture",
-      "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-architecture-migration-sequence-and-priority",
-      "path": "docs/architecture/architecture-migration-sequence-and-priority.md",
-      "aiPath": "docs/architecture/architecture-migration-sequence-and-priority.ai.md",
-      "title": "Architecture Migration Sequence and Priority Order",
-      "docType": "architecture-reference",
-      "domain": "architecture",
-      "status": "active",
-      "authoritativeness": "reference",
-      "summary": "Specifies the prioritized architecture migration sequence for high-value domainization work.",
-      "keywords": [
-        "migration sequence",
-        "priority order",
-        "domainization"
-      ],
-      "relatedCodePaths": [
-        "docs/architecture/architecture-migration-sequence-and-priority.sequence.json",
-        "docs/architecture/architecture-domain-migration-inventory.inventory.json"
-      ],
-      "relatedRecordIds": [
-        "doc-architecture-domain-migration-inventory"
-      ],
-      "relatedDocs": [
-        "docs/architecture/architecture-domain-migration-inventory.md"
+        "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md"
       ],
       "owner": "team:platform-architecture",
       "lastReviewed": "2026-04-11"
@@ -430,6 +866,65 @@
       "lastReviewed": "2026-04-11"
     },
     {
+      "recordId": "doc-architecture-layers-and-boundaries",
+      "path": "docs/architecture/layers-and-boundaries.md",
+      "aiPath": "docs/architecture/layers-and-boundaries.ai.md",
+      "title": "Layers and Boundaries",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Documents clean-architecture dependency rules and boundary expectations across core layers.",
+      "keywords": [
+        "layers",
+        "boundaries",
+        "clean architecture",
+        "dependency direction"
+      ],
+      "relatedCodePaths": [
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/ui"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-and-application-core"
+      ],
+      "relatedDocs": [
+        "docs/architecture/domain-and-application-core.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-architecture-migration-sequence-and-priority",
+      "path": "docs/architecture/architecture-migration-sequence-and-priority.md",
+      "aiPath": "docs/architecture/architecture-migration-sequence-and-priority.ai.md",
+      "title": "Architecture Migration Sequence and Priority Order",
+      "docType": "architecture-reference",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "reference",
+      "summary": "Specifies the prioritized architecture migration sequence for high-value domainization work.",
+      "keywords": [
+        "migration sequence",
+        "priority order",
+        "domainization"
+      ],
+      "relatedCodePaths": [
+        "docs/architecture/architecture-migration-sequence-and-priority.sequence.json",
+        "docs/architecture/architecture-domain-migration-inventory.inventory.json"
+      ],
+      "relatedRecordIds": [
+        "doc-architecture-domain-migration-inventory"
+      ],
+      "relatedDocs": [
+        "docs/architecture/architecture-domain-migration-inventory.md"
+      ],
+      "owner": "team:platform-architecture",
+      "lastReviewed": "2026-04-11"
+    },
+    {
       "recordId": "doc-architecture-supersession-and-retirement-governance",
       "path": "docs/architecture/architecture-supersession-and-retirement-governance.md",
       "aiPath": "docs/architecture/architecture-supersession-and-retirement-governance.ai.md",
@@ -457,141 +952,214 @@
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-document-scope-boundaries",
-      "path": "docs/architecture/architecture-document-scope-boundaries.md",
-      "aiPath": "docs/architecture/architecture-document-scope-boundaries.ai.md",
-      "title": "Architecture Document Scope Boundaries",
-      "docType": "architecture-reference",
-      "domain": "architecture",
+      "recordId": "doc-baseline-documentation-migration-baseline",
+      "path": "docs/documentation-migration-baseline.md",
+      "aiPath": "docs/documentation-migration-baseline.ai.md",
+      "title": "Documentation Migration Baseline",
+      "docType": "baseline",
+      "domain": "baselines",
       "status": "active",
-      "authoritativeness": "reference",
-      "summary": "Clarifies what belongs in architecture docs versus contributors, operations, baselines, and ADRs.",
+      "authoritativeness": "historical",
+      "summary": "Historical baseline inventory for documentation migration and sequencing decisions.",
       "keywords": [
-        "document scope",
-        "architecture boundaries",
-        "placement rules"
+        "baseline",
+        "migration",
+        "historical"
       ],
       "relatedCodePaths": [
-        "docs/architecture",
-        "docs/contributors",
-        "docs/operations",
-        "docs/adr/records",
-        "docs/baselines"
+        "docs"
       ],
       "relatedRecordIds": [
-        "doc-contributors-docs-placement-guide",
-        "doc-architecture-domain-cross-linking-rules"
+        "doc-context-documentation-taxonomy"
       ],
       "relatedDocs": [
-        "docs/contributors/docs-placement-guide.md",
-        "docs/architecture/architecture-domain-cross-linking-rules.md"
+        "docs/baselines/README.md",
+        "docs/documentation-segmentation-migration-inventory.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-cross-linking-rules",
-      "path": "docs/architecture/architecture-domain-cross-linking-rules.md",
-      "aiPath": "docs/architecture/architecture-domain-cross-linking-rules.ai.md",
-      "title": "Architecture Domain Cross-Linking Rules",
-      "docType": "architecture-reference",
-      "domain": "architecture",
-      "status": "active",
-      "authoritativeness": "reference",
-      "summary": "Defines cross-domain linking rules so architecture docs stay navigable without duplicated authority.",
-      "keywords": [
-        "cross-linking",
-        "domain navigation",
-        "architecture routing"
-      ],
-      "relatedCodePaths": [
-        "docs/architecture/domains",
-        "docs/context/packs"
-      ],
-      "relatedRecordIds": [
-        "doc-architecture-document-scope-boundaries",
-        "doc-architecture-domain-taxonomy"
-      ],
-      "relatedDocs": [
-        "docs/architecture/architecture-document-scope-boundaries.md",
-        "docs/architecture/architecture-domain-taxonomy.md"
-      ],
-      "owner": "team:platform-architecture",
-      "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-architecture-domain-core-platform-and-composition-overview",
-      "path": "docs/architecture/domains/core-platform-and-composition/overview.md",
-      "aiPath": "docs/architecture/domains/core-platform-and-composition/overview.ai.md",
-      "title": "Core Platform and Composition Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "architecture",
+      "recordId": "doc-context-documentation-identity-and-reference-conventions",
+      "path": "docs/context/documentation-identity-and-reference-conventions.md",
+      "aiPath": "docs/context/documentation-identity-and-reference-conventions.ai.md",
+      "title": "Documentation Identity, Stable Keys, and Reference Conventions",
+      "docType": "ai-context",
+      "domain": "governance",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Overview for inner platform composition boundaries and core domain/application contracts.",
+      "summary": "Defines stable document identity keys and cross-artifact reference conventions for durable routing and validation.",
       "keywords": [
-        "core platform",
-        "composition",
-        "domain overview"
+        "identity",
+        "stable keys",
+        "registry references",
+        "findability"
       ],
       "relatedCodePaths": [
-        "src/domain",
-        "src/application"
+        "docs/context",
+        "dev/scripts/validate-docs-foundation.cjs"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy",
-        "doc-architecture-domain-and-application-core"
+        "doc-context-documentation-taxonomy"
       ],
       "relatedDocs": [
-        "docs/architecture/architecture-domain-taxonomy.md",
-        "docs/architecture/domain-and-application-core.md"
+        "docs/context/documentation-indexed-document-metadata.md",
+        "docs/context/documentation-registry.md",
+        "docs/context/routing/prompt-routing-contract.md",
+        "docs/context/packs/README.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-runtime-host-surfaces-overview",
-      "path": "docs/architecture/domains/runtime-host-surfaces/overview.md",
-      "aiPath": "docs/architecture/domains/runtime-host-surfaces/overview.ai.md",
-      "title": "Runtime Host Surfaces Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "architecture",
+      "recordId": "doc-context-documentation-taxonomy",
+      "path": "docs/context/documentation-taxonomy.md",
+      "aiPath": "docs/context/documentation-taxonomy.ai.md",
+      "title": "Canonical Documentation Taxonomy",
+      "docType": "ai-context",
+      "domain": "governance",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Overview for host composition, startup lifecycle, and runtime boundary contracts across host types.",
+      "summary": "Defines canonical document classification and lifecycle semantics for routing and validation.",
       "keywords": [
-        "runtime host",
-        "startup lifecycle",
+        "taxonomy",
+        "metadata",
+        "routing"
+      ],
+      "relatedCodePaths": [
+        "docs/context",
+        "dev/scripts/validate-docs-foundation.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-context-documentation-identity-and-reference-conventions"
+      ],
+      "relatedDocs": [
+        "docs/context/documentation-indexed-document-metadata.md",
+        "docs/context/documentation-registry.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-pack-architecture-core",
+      "path": "docs/context/packs/architecture-core.pack.md",
+      "aiPath": "docs/context/packs/architecture-core.pack.ai.md",
+      "title": "Core Architecture Context Pack",
+      "docType": "ai-context",
+      "domain": "architecture",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Curated architecture pack for layered boundaries and host composition invariants in implementation tasks.",
+      "keywords": [
+        "context pack",
+        "architecture",
+        "layer boundaries",
         "host composition"
       ],
       "relatedCodePaths": [
-        "src/hosts",
-        "electron/main"
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/hosts"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-architecture-domain-taxonomy",
+        "doc-architecture-domain-and-application-core",
+        "doc-architecture-layers-and-boundaries",
+        "doc-adr-001-single-authoritative-control-plane"
       ],
       "relatedDocs": [
-        "docs/architecture/architecture-domain-taxonomy.md"
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/domain-and-application-core.md",
+        "docs/architecture/layers-and-boundaries.md"
       ],
       "owner": "team:platform-architecture",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-identity-trust-and-security-overview",
-      "path": "docs/architecture/domains/identity-trust-and-security/overview.md",
-      "aiPath": "docs/architecture/domains/identity-trust-and-security/overview.ai.md",
-      "title": "Identity Trust and Security Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "identity-and-security",
+      "recordId": "doc-context-pack-context-system-foundations",
+      "path": "docs/context/packs/context-system-foundations.pack.md",
+      "aiPath": "docs/context/packs/context-system-foundations.pack.ai.md",
+      "title": "Context System Foundations Pack",
+      "docType": "ai-context",
+      "domain": "governance",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Overview for fail-closed identity, trust, authorization, and secret-safe security boundaries.",
+      "summary": "Curated foundations pack for context-engineering contracts, routing rules, and governance anchors.",
       "keywords": [
+        "context pack",
+        "context engineering",
+        "routing",
+        "governance"
+      ],
+      "relatedCodePaths": [
+        "docs/context",
+        "dev/scripts/validate-docs-foundation.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-contributors-context-engineering-system-guide"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/context/routing/prompt-routing-contract.md",
+        "docs/context/governance/context-governance-policy.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-pack-documentation-refactor",
+      "path": "docs/context/packs/documentation-refactor.pack.md",
+      "aiPath": "docs/context/packs/documentation-refactor.pack.ai.md",
+      "title": "Documentation Refactor Context Pack",
+      "docType": "ai-context",
+      "domain": "documentation",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Curated documentation-system pack for taxonomy, migration safety, and docs validation workflows.",
+      "keywords": [
+        "context pack",
+        "documentation",
+        "migration safety",
+        "validation"
+      ],
+      "relatedCodePaths": [
+        "docs",
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/scripts/validate-docs-segmentation.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-context-documentation-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/contributors/docs-placement-guide.md",
+        "docs/contributors/docs-migration-safety-guide.md",
+        "docs/contributors/docs-foundation-validation.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-context-pack-identity-and-security",
+      "path": "docs/context/packs/identity-and-security.pack.md",
+      "aiPath": "docs/context/packs/identity-and-security.pack.ai.md",
+      "title": "Identity and Security Context Pack",
+      "docType": "ai-context",
+      "domain": "identity-and-security",
+      "status": "active",
+      "authoritativeness": "supplemental",
+      "summary": "Curated identity and security pack for authentication, authorization, trust, and secrets safety constraints.",
+      "keywords": [
+        "context pack",
         "identity",
-        "trust",
         "authorization",
-        "security boundaries"
+        "security"
       ],
       "relatedCodePaths": [
         "src/application/identity",
@@ -599,162 +1167,258 @@
         "src/infrastructure/security"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-identity-trust-and-security-overview"
       ],
       "relatedDocs": [
-        "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
-        "docs/architecture/architecture-domain-taxonomy.md"
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/authorization-foundation.md",
+        "docs/architecture/transport-security-foundation.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:security-platform",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-workspace-storage-and-assets-overview",
-      "path": "docs/architecture/domains/workspace-storage-and-assets/overview.md",
-      "aiPath": "docs/architecture/domains/workspace-storage-and-assets/overview.ai.md",
-      "title": "Workspace Storage and Assets Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "architecture",
+      "recordId": "doc-context-pack-repository-overview",
+      "path": "docs/context/packs/repository-overview.pack.md",
+      "aiPath": "docs/context/packs/repository-overview.pack.ai.md",
+      "title": "Repository Overview Context Pack",
+      "docType": "ai-context",
+      "domain": "documentation",
       "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Overview for workspace tenancy, managed storage, and asset lifecycle authority boundaries.",
+      "authoritativeness": "supplemental",
+      "summary": "Curated orientation pack for repository structure, core architecture themes, and baseline routing context.",
       "keywords": [
-        "workspace",
-        "storage",
-        "assets",
-        "tenancy boundaries"
+        "context pack",
+        "repository overview",
+        "routing",
+        "orientation"
       ],
       "relatedCodePaths": [
-        "src/domain/workspaces",
-        "src/domain/storage",
-        "src/domain/assets"
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/hosts",
+        "src/ui"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-001-single-authoritative-control-plane"
       ],
       "relatedDocs": [
-        "docs/architecture/architecture-domain-taxonomy.md",
-        "docs/adr/records/adr-002-workspace-centered-tenancy-and-resource-ownership.md"
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/context/packs/README.md",
+        "docs/architecture/README.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
-      "path": "docs/architecture/domains/execution-control-plane-and-scheduling/overview.md",
-      "aiPath": "docs/architecture/domains/execution-control-plane-and-scheduling/overview.ai.md",
-      "title": "Execution Control Plane and Scheduling Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "architecture",
+      "recordId": "doc-context-pack-runtime-and-host",
+      "path": "docs/context/packs/runtime-and-host.pack.md",
+      "aiPath": "docs/context/packs/runtime-and-host.pack.ai.md",
+      "title": "Runtime and Host Context Pack",
+      "docType": "ai-context",
+      "domain": "operations",
       "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Overview for run lifecycle authority, scheduling policy, and execution dispatch-readiness boundaries.",
+      "authoritativeness": "supplemental",
+      "summary": "Curated runtime and host pack for startup lifecycle, diagnostics, and bounded host execution behavior.",
       "keywords": [
-        "execution control plane",
-        "scheduling",
-        "run lifecycle"
+        "context pack",
+        "runtime",
+        "hosts",
+        "diagnostics"
       ],
       "relatedCodePaths": [
-        "src/domain/runs",
-        "src/domain/scheduling",
-        "src/domain/execution"
+        "src/hosts",
+        "electron/main",
+        "src/infrastructure/runtime"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-architecture-domain-runtime-host-surfaces-overview"
       ],
       "relatedDocs": [
-        "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
-        "docs/architecture/architecture-domain-taxonomy.md"
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/host-bootstrap-pipeline.md",
+        "docs/architecture/desktop-post-login-runtime-lifecycle-contract.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:runtime-platform",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-studio-and-system-composition-overview",
-      "path": "docs/architecture/domains/studio-and-system-composition/overview.md",
-      "aiPath": "docs/architecture/domains/studio-and-system-composition/overview.ai.md",
-      "title": "Studio and System Composition Domain Overview",
-      "docType": "architecture-overview",
+      "recordId": "doc-context-pack-studio-and-system-composition",
+      "path": "docs/context/packs/studio-and-system-composition.pack.md",
+      "aiPath": "docs/context/packs/studio-and-system-composition.pack.ai.md",
+      "title": "Studio and System Composition Context Pack",
+      "docType": "ai-context",
       "domain": "architecture",
       "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Overview for studio composition boundaries that project shared system and workflow contracts.",
+      "authoritativeness": "supplemental",
+      "summary": "Curated studio/system composition pack for shared-model handoff constraints and UI composition boundaries.",
       "keywords": [
+        "context pack",
         "studio composition",
-        "system composition",
-        "workflow boundaries"
+        "shared model",
+        "handoff"
       ],
       "relatedCodePaths": [
-        "src/ui/studio-shell",
-        "src/application/system-studio",
-        "src/application/workflow-studio"
+        "src/ui",
+        "src/application/studio-handoff",
+        "src/application/system-studio"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-architecture-domain-studio-and-system-composition-overview"
       ],
       "relatedDocs": [
-        "docs/architecture/architecture-domain-taxonomy.md",
-        "docs/adr/records/adr-004-studios-as-views-over-shared-system-and-asset-model.md"
+        "docs/context/packs/context-pack-catalog.seed.json",
+        "docs/architecture/studio-handoff-contract.md",
+        "docs/ui/README.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:studio-experience",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-api-and-transport-surfaces-overview",
-      "path": "docs/architecture/domains/api-and-transport-surfaces/overview.md",
-      "aiPath": "docs/architecture/domains/api-and-transport-surfaces/overview.ai.md",
-      "title": "API and Transport Surfaces Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "architecture",
+      "recordId": "doc-contributors-adr-informed-implementation-and-review-examples",
+      "path": "docs/contributors/adr-informed-implementation-and-review-examples.md",
+      "aiPath": "docs/contributors/adr-informed-implementation-and-review-examples.ai.md",
+      "title": "ADR-Informed Implementation and Review Examples",
+      "docType": "contributor-guide",
+      "domain": "contributors",
       "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Overview for API and transport contract boundaries that expose capabilities without policy leakage.",
+      "authoritativeness": "reference",
+      "summary": "Worked examples for applying ADR constraints during implementation and architecture-sensitive review tasks.",
       "keywords": [
-        "api",
-        "transport",
-        "contract surfaces",
-        "route boundaries"
+        "contributor guide",
+        "adr usage",
+        "implementation review",
+        "decision constraints"
       ],
       "relatedCodePaths": [
-        "src/infrastructure/api",
-        "src/infrastructure/transport"
+        "src/domain",
+        "src/application",
+        "src/hosts",
+        "src/infrastructure"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "relatedDocs": [
+        "docs/adr/records/README.md",
+        "docs/adr/records/adr-registry.json",
         "docs/architecture/architecture-domain-taxonomy.md"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
     },
     {
-      "recordId": "doc-architecture-domain-deployment-policy-and-audit-governance-overview",
-      "path": "docs/architecture/domains/deployment-policy-and-audit-governance/overview.md",
-      "aiPath": "docs/architecture/domains/deployment-policy-and-audit-governance/overview.ai.md",
-      "title": "Deployment Policy and Audit Governance Domain Overview",
-      "docType": "architecture-overview",
-      "domain": "governance",
+      "recordId": "doc-contributors-context-engineering-system-guide",
+      "path": "docs/contributors/context-engineering-system-guide.md",
+      "aiPath": "docs/contributors/context-engineering-system-guide.ai.md",
+      "title": "Context Engineering System Contributor Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
       "status": "active",
       "authoritativeness": "canonical",
-      "summary": "Overview for deployment policy governance and durable audit evidence boundaries.",
+      "summary": "Guides contributors through task routing, context assembly, and pack selection for implementation work.",
       "keywords": [
-        "deployment policy",
-        "audit governance",
-        "compliance boundaries"
+        "contributor guide",
+        "context engineering",
+        "routing",
+        "context packs"
       ],
       "relatedCodePaths": [
-        "src/domain/deployment",
-        "src/domain/audit",
-        "src/application/policy-administration"
+        "docs/context/routing",
+        "docs/context/packs",
+        "dev/tests/TaskToContextRoutingContractGuardrails.test.ts"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-documentation-identity-and-reference-conventions",
+        "doc-context-pack-context-system-foundations"
       ],
       "relatedDocs": [
-        "docs/architecture/architecture-domain-taxonomy.md"
+        "docs/context/prompt-routing.md",
+        "docs/context/routing/task-to-context-routing.seed.json",
+        "docs/context/packs/context-pack-catalog.seed.json"
       ],
-      "owner": "team:platform-architecture",
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-docs-foundation-validation-guide",
+      "path": "docs/contributors/docs-foundation-validation.md",
+      "aiPath": "docs/contributors/docs-foundation-validation.ai.md",
+      "title": "Documentation Foundation Validation Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines contributor validation workflow and required docs foundation checks before merge.",
+      "keywords": [
+        "contributor guide",
+        "documentation validation",
+        "guardrails",
+        "quality gates"
+      ],
+      "relatedCodePaths": [
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/tests/DocsFoundationValidationScript.test.ts"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-migration-safety-guide",
+        "doc-context-pack-documentation-refactor",
+        "doc-context-documentation-taxonomy"
+      ],
+      "relatedDocs": [
+        "docs/contributors/docs-migration-safety-guide.md",
+        "docs/context/documentation-taxonomy.md",
+        "docs/context/documentation-registry.md"
+      ],
+      "owner": "team:developer-experience",
+      "lastReviewed": "2026-04-11"
+    },
+    {
+      "recordId": "doc-contributors-docs-migration-safety-guide",
+      "path": "docs/contributors/docs-migration-safety-guide.md",
+      "aiPath": "docs/contributors/docs-migration-safety-guide.ai.md",
+      "title": "Documentation Migration Safety Guide",
+      "docType": "contributor-guide",
+      "domain": "contributors",
+      "status": "active",
+      "authoritativeness": "canonical",
+      "summary": "Defines safe contributor workflow for moving, splitting, and reclassifying documentation without drift.",
+      "keywords": [
+        "contributor guide",
+        "migration",
+        "documentation safety",
+        "supersession"
+      ],
+      "relatedCodePaths": [
+        "docs",
+        "dev/scripts/validate-docs-foundation.cjs",
+        "dev/scripts/validate-docs-segmentation.cjs"
+      ],
+      "relatedRecordIds": [
+        "doc-contributors-docs-placement-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-context-pack-documentation-refactor"
+      ],
+      "relatedDocs": [
+        "docs/contributors/docs-placement-guide.md",
+        "docs/context/documentation-supersession-and-redirect-conventions.md",
+        "docs/context/documentation-status-signals.md"
+      ],
+      "owner": "team:developer-experience",
       "lastReviewed": "2026-04-11"
     },
     {
@@ -815,124 +1479,6 @@
       ],
       "owner": "team:operations",
       "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-adr-001-single-authoritative-control-plane",
-      "path": "docs/adr/records/adr-001-single-authoritative-control-plane.md",
-      "aiPath": "docs/adr/records/adr-001-single-authoritative-control-plane.ai.md",
-      "title": "ADR-001 Single Authoritative Control Plane",
-      "docType": "adr",
-      "domain": "decision-records",
-      "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Architecture decision record establishing a single authoritative control-plane boundary.",
-      "keywords": [
-        "adr",
-        "control plane",
-        "decision record"
-      ],
-      "relatedCodePaths": [
-        "src/hosts/server",
-        "src/application"
-      ],
-      "relatedRecordIds": [
-        "doc-architecture-domain-and-application-core"
-      ],
-      "relatedDocs": [
-        "docs/adr/records/adr-registry.json",
-        "docs/architecture/domain-and-application-core.md"
-      ],
-      "owner": "team:architecture",
-      "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-baseline-documentation-migration-baseline",
-      "path": "docs/documentation-migration-baseline.md",
-      "aiPath": "docs/documentation-migration-baseline.ai.md",
-      "title": "Documentation Migration Baseline",
-      "docType": "baseline",
-      "domain": "baselines",
-      "status": "active",
-      "authoritativeness": "historical",
-      "summary": "Historical baseline inventory for documentation migration and sequencing decisions.",
-      "keywords": [
-        "baseline",
-        "migration",
-        "historical"
-      ],
-      "relatedCodePaths": [
-        "docs"
-      ],
-      "relatedRecordIds": [
-        "doc-context-documentation-taxonomy"
-      ],
-      "relatedDocs": [
-        "docs/baselines/README.md",
-        "docs/documentation-segmentation-migration-inventory.md"
-      ],
-      "owner": "team:developer-experience",
-      "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-context-documentation-taxonomy",
-      "path": "docs/context/documentation-taxonomy.md",
-      "aiPath": "docs/context/documentation-taxonomy.ai.md",
-      "title": "Canonical Documentation Taxonomy",
-      "docType": "ai-context",
-      "domain": "governance",
-      "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Defines canonical document classification and lifecycle semantics for routing and validation.",
-      "keywords": [
-        "taxonomy",
-        "metadata",
-        "routing"
-      ],
-      "relatedCodePaths": [
-        "docs/context",
-        "dev/scripts/validate-docs-foundation.cjs"
-      ],
-      "relatedRecordIds": [
-        "doc-context-documentation-identity-and-reference-conventions"
-      ],
-      "relatedDocs": [
-        "docs/context/documentation-indexed-document-metadata.md",
-        "docs/context/documentation-registry.md"
-      ],
-      "owner": "team:developer-experience",
-      "lastReviewed": "2026-04-11"
-    },
-    {
-      "recordId": "doc-context-documentation-identity-and-reference-conventions",
-      "path": "docs/context/documentation-identity-and-reference-conventions.md",
-      "aiPath": "docs/context/documentation-identity-and-reference-conventions.ai.md",
-      "title": "Documentation Identity, Stable Keys, and Reference Conventions",
-      "docType": "ai-context",
-      "domain": "governance",
-      "status": "active",
-      "authoritativeness": "canonical",
-      "summary": "Defines stable document identity keys and cross-artifact reference conventions for durable routing and validation.",
-      "keywords": [
-        "identity",
-        "stable keys",
-        "registry references",
-        "findability"
-      ],
-      "relatedCodePaths": [
-        "docs/context",
-        "dev/scripts/validate-docs-foundation.cjs"
-      ],
-      "relatedRecordIds": [
-        "doc-context-documentation-taxonomy"
-      ],
-      "relatedDocs": [
-        "docs/context/documentation-indexed-document-metadata.md",
-        "docs/context/documentation-registry.md",
-        "docs/context/routing/prompt-routing-contract.md",
-        "docs/context/packs/README.md"
-      ],
-      "owner": "team:developer-experience",
-      "lastReviewed": "2026-04-11"
     }
   ],
   "discoveryIndex": {
@@ -959,26 +1505,47 @@
         "doc-architecture-supersession-and-retirement-governance"
       ],
       "contributor-guide": [
+        "doc-contributors-adr-informed-implementation-and-review-examples",
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide"
       ],
       "runbook": [
         "doc-operations-node-bootstrap-identity"
       ],
       "adr": [
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "baseline": [
         "doc-baseline-documentation-migration-baseline"
       ],
       "ai-context": [
         "doc-context-documentation-identity-and-reference-conventions",
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-context-system-foundations",
+        "doc-context-pack-documentation-refactor",
+        "doc-context-pack-identity-and-security",
+        "doc-context-pack-repository-overview",
+        "doc-context-pack-runtime-and-host",
+        "doc-context-pack-studio-and-system-composition"
       ]
     },
     "byStatus": {
       "draft": [],
       "active": [
         "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution",
         "doc-architecture-document-scope-boundaries",
         "doc-architecture-domain-and-application-core",
         "doc-architecture-domain-api-and-transport-surfaces-overview",
@@ -999,6 +1566,17 @@
         "doc-baseline-documentation-migration-baseline",
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-context-documentation-taxonomy",
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-context-system-foundations",
+        "doc-context-pack-documentation-refactor",
+        "doc-context-pack-identity-and-security",
+        "doc-context-pack-repository-overview",
+        "doc-context-pack-runtime-and-host",
+        "doc-context-pack-studio-and-system-composition",
+        "doc-contributors-adr-informed-implementation-and-review-examples",
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
         "doc-operations-node-bootstrap-identity"
       ],
@@ -1007,7 +1585,10 @@
       "archived": []
     },
     "byDomain": {
-      "documentation": [],
+      "documentation": [
+        "doc-context-pack-documentation-refactor",
+        "doc-context-pack-repository-overview"
+      ],
       "architecture": [
         "doc-architecture-document-scope-boundaries",
         "doc-architecture-domain-and-application-core",
@@ -1022,16 +1603,28 @@
         "doc-architecture-domain-workspace-storage-and-assets-overview",
         "doc-architecture-domainization-rollout-boundaries",
         "doc-architecture-layers-and-boundaries",
-        "doc-architecture-migration-sequence-and-priority"
+        "doc-architecture-migration-sequence-and-priority",
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-studio-and-system-composition"
       ],
       "contributors": [
+        "doc-contributors-adr-informed-implementation-and-review-examples",
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide"
       ],
       "operations": [
+        "doc-context-pack-runtime-and-host",
         "doc-operations-node-bootstrap-identity"
       ],
       "decision-records": [
-        "doc-adr-001-single-authoritative-control-plane"
+        "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "baselines": [
         "doc-baseline-documentation-migration-baseline"
@@ -1040,15 +1633,22 @@
         "doc-architecture-domain-deployment-policy-and-audit-governance-overview",
         "doc-architecture-supersession-and-retirement-governance",
         "doc-context-documentation-identity-and-reference-conventions",
-        "doc-context-documentation-taxonomy"
+        "doc-context-documentation-taxonomy",
+        "doc-context-pack-context-system-foundations"
       ],
       "identity-and-security": [
-        "doc-architecture-domain-identity-trust-and-security-overview"
+        "doc-architecture-domain-identity-trust-and-security-overview",
+        "doc-context-pack-identity-and-security"
       ]
     },
     "byAuthoritativeness": {
       "canonical": [
         "doc-adr-001-single-authoritative-control-plane",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership",
+        "doc-adr-003-storage-as-managed-platform-resource",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution",
         "doc-architecture-domain-and-application-core",
         "doc-architecture-domain-api-and-transport-surfaces-overview",
         "doc-architecture-domain-core-platform-and-composition-overview",
@@ -1062,6 +1662,10 @@
         "doc-architecture-layers-and-boundaries",
         "doc-context-documentation-identity-and-reference-conventions",
         "doc-context-documentation-taxonomy",
+        "doc-context-pack-context-system-foundations",
+        "doc-contributors-context-engineering-system-guide",
+        "doc-contributors-docs-foundation-validation-guide",
+        "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-placement-guide",
         "doc-operations-node-bootstrap-identity"
       ],
@@ -1071,9 +1675,17 @@
         "doc-architecture-domain-migration-inventory",
         "doc-architecture-domainization-rollout-boundaries",
         "doc-architecture-migration-sequence-and-priority",
-        "doc-architecture-supersession-and-retirement-governance"
+        "doc-architecture-supersession-and-retirement-governance",
+        "doc-contributors-adr-informed-implementation-and-review-examples"
       ],
-      "supplemental": [],
+      "supplemental": [
+        "doc-context-pack-architecture-core",
+        "doc-context-pack-documentation-refactor",
+        "doc-context-pack-identity-and-security",
+        "doc-context-pack-repository-overview",
+        "doc-context-pack-runtime-and-host",
+        "doc-context-pack-studio-and-system-composition"
+      ],
       "historical": [
         "doc-baseline-documentation-migration-baseline"
       ]
