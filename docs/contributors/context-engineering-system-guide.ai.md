@@ -95,6 +95,148 @@ Do not bypass routing mappings with ad hoc pack selection.
    - stale/superseded sources
 4. Require routing/pack updates if drift repeats.
 
+## Example Prompt Assembly Workflows
+
+Use these workflows to build contributor prompts with deterministic routing, minimum sufficient context, and authoritative-source precedence.
+
+### Workflow 1: Feature Decomposition Prompt
+
+Route selection:
+- `taskCategory`: `feature-decomposition`
+- `taskId`: `feature-decomposition-epic-story-planning`
+
+Minimum sufficient context:
+- Packs: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Authoritative docs:
+1. `docs/architecture/README.md`
+2. `docs/baselines/README.md`
+3. `docs/context/routing/prompt-routing-contract.ai.md`
+- Exclude runtime diagnostics and UI-specific docs unless requested outcomes explicitly require them.
+
+Prompt scaffold:
+```text
+You are decomposing a new feature into implementation-ready slices for AI Loom Studio.
+Routing metadata:
+- taskCategory: feature-decomposition
+- taskId: feature-decomposition-epic-story-planning
+- changedPaths: [docs/architecture, docs/context/routing, src/application, src/domain]
+- requestedOutcomes: [slice-plan, dependency-order, test-and-docs-plan]
+- constraints: [respect-existing-host-and-layer-boundaries, avoid-speculative-abstractions]
+
+Use minimum sufficient context only. Prioritize authoritative sources in this order:
+1) docs/architecture/README.md
+2) docs/baselines/README.md
+3) docs/context/routing/prompt-routing-contract.ai.md
+
+Output:
+- implementation slices with dependency order
+- changedPaths per slice
+- required tests and doc updates per slice
+```
+
+### Workflow 2: Implementation Prompt
+
+Route selection:
+- `taskCategory`: `coding-implementation`
+- `taskId`: `runtime-host-coding-implementation`
+
+Minimum sufficient context:
+- Packs: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Authoritative docs:
+1. `docs/architecture/host-bootstrap-pipeline.md`
+2. `docs/architecture/host-runtime-composition-boundaries.md`
+3. `docs/architecture/desktop-post-login-runtime-lifecycle-contract.md`
+4. `docs/architecture/desktop-auth-first-startup-boundary.md`
+- Exclude unrelated UI and broad security references unless runtime evidence requires them.
+
+Prompt scaffold:
+```text
+You are implementing a runtime/host startup behavior change in AI Loom Studio.
+Routing metadata:
+- taskCategory: coding-implementation
+- taskId: runtime-host-coding-implementation
+- changedPaths: [src/hosts, electron/main, src/infrastructure/runtime, dev/tests]
+- requestedOutcomes: [code-change, targeted-regression-tests, docs-update-where-contracts-changed]
+- constraints: [preserve-host-authority-boundaries, keep-auth-first-and-post-login-startup-boundaries-explicit]
+
+Use only minimum sufficient context and authoritative docs listed below.
+Do not add unrelated packs or neighboring docs without explicit gap justification.
+
+Return:
+- implementation plan
+- concrete file edits
+- tests and docs updates required for contract alignment
+```
+
+### Workflow 3: Architecture Review Prompt
+
+Route selection:
+- `taskCategory`: `architecture-review`
+- `taskId`: `architecture-review-host-boundaries`
+
+Minimum sufficient context:
+- Packs: `repository-overview`, `architecture-core`, `runtime-and-host`, `context-system-foundations`
+- Authoritative docs:
+1. `docs/architecture/authoritative-server-host-assembly.md`
+2. `docs/architecture/desktop-host-assembly.md`
+3. `docs/architecture/worker-host-assembly.md`
+4. `docs/architecture/studio-handoff-contract.md`
+- Exclude stale baseline snapshots and UI-only docs when evaluating host boundaries.
+
+Prompt scaffold:
+```text
+You are reviewing architecture boundary changes before implementation.
+Routing metadata:
+- taskCategory: architecture-review
+- taskId: architecture-review-host-boundaries
+- changedPaths: [src/hosts, src/application, docs/architecture, dev/tests/HostCompositionArchitectureGuardrails.test.ts]
+- requestedOutcomes: [boundary-review, contract-impact-summary, recommended-change-plan]
+- constraints: [preserve-layered-architecture-direction, avoid-cross-layer-shortcuts]
+
+Evaluate only against authoritative host-boundary contracts first.
+Call out conflicts, missing contracts, and context drift.
+
+Output:
+- boundary findings
+- risk-ranked recommendations
+- required test/doc follow-ups
+```
+
+### Workflow 4: Documentation Refactor Prompt
+
+Route selection:
+- `taskCategory`: `documentation-change`
+- `taskId`: `documentation-refactor-context-and-architecture`
+
+Minimum sufficient context:
+- Packs: `repository-overview`, `architecture-core`, `documentation-refactor`, `context-system-foundations`
+- Authoritative docs:
+1. `docs/context/routing/README.ai.md`
+2. `docs/context/context-asset-metadata.ai.md`
+3. `docs/contributors/router-overview-writing-standard.ai.md`
+4. `docs/contributors/docs-placement-guide.ai.md`
+5. `docs/contributors/docs-migration-safety-guide.ai.md`
+- Exclude implementation-only runtime docs unless a docs claim depends on verified runtime behavior.
+
+Prompt scaffold:
+```text
+You are refactoring context and architecture documentation in AI Loom Studio.
+Routing metadata:
+- taskCategory: documentation-change
+- taskId: documentation-refactor-context-and-architecture
+- changedPaths: [docs/context, docs/architecture, docs/contributors, dev/tests]
+- requestedOutcomes: [docs-update, metadata-alignment, guardrail-test-updates]
+- constraints: [keep-md-and-ai-doc-pairs-aligned, preserve-canonical-router-links]
+
+Keep context minimal and authoritative. Prefer contracts and router standards over narrative summaries.
+Ensure both .md and .ai.md are updated together.
+
+Return:
+- exact doc/test files to change
+- required section-level edits
+- validation checklist execution plan
+```
+
 ## Extending the System Responsibly
 
 Routing mapping changes:
