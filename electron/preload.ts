@@ -23,6 +23,7 @@ import {
   createDeferredBridgeGuards,
   createFallbackPostLoginRuntimeStatus,
 } from "./preload/bridge/deferredFeatureGuards";
+import { createDeferredFeatureSurface, createDesktopBridge } from "./preload/DesktopBridgeComposition";
 
 const bootstrap = ipcRenderer.sendSync(DesktopBootstrapIpcChannels.bootstrap);
 let deferredFeatureDemandWarmupRequest: Promise<void> | undefined;
@@ -111,7 +112,7 @@ const authBootstrapSurface = Object.freeze({
   }),
 });
 
-const deferredFeatureSurface = Object.freeze({
+const deferredFeatureSurface = createDeferredFeatureSurface({
   workflows: workflowsBridge,
   executionRuns: guardDeferredAsyncGroup("executionRuns", executionRunsBridge),
   workflowRunSummaries: guardDeferredAsyncGroup("workflowRunSummaries", workflowRunSummariesBridge),
@@ -122,12 +123,9 @@ const deferredFeatureSurface = Object.freeze({
   agents: guardDeferredAsyncGroup("agents", agentsBridge),
 });
 
-const desktopBridge = Object.freeze({
-  auth: authBootstrapSurface,
-  features: deferredFeatureSurface,
-  ...authBootstrapSurface,
-  // Legacy root aliases kept while renderer migrates to auth/features split.
-  ...deferredFeatureSurface,
+const desktopBridge = createDesktopBridge({
+  authBootstrapSurface: authBootstrapSurface,
+  deferredFeatureSurface,
 });
 
 contextBridge.exposeInMainWorld("aiLoomDesktop", desktopBridge);

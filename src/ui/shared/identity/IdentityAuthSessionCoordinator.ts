@@ -55,11 +55,10 @@ export interface IdentitySessionBootstrapOptions {
   readonly signal?: AbortSignal;
 }
 
-const DefaultSessionValidationTimeoutMs = 4_000;
-const DefaultActorContextTimeoutMs = 5_000;
+const DefaultActorContextTimeoutMs = 10_000;
 const WorkspaceContextProgressNoticeDelaysMs = Object.freeze([1_500, 3_500] as const);
 const BootstrapRequestRetryPolicy = Object.freeze({
-  maxAttempts: 1,
+  maxAttempts: 2,
 });
 
 export class IdentityAuthSessionCoordinator {
@@ -73,7 +72,7 @@ export class IdentityAuthSessionCoordinator {
 
   public constructor(
     private readonly sessionStore: IdentityAuthSessionStore,
-    private readonly authService: Pick<IdentityAuthService, "resolveAuthenticatedSession" | "resolveSessionActorContext">,
+    private readonly authService: Pick<IdentityAuthService, "resolveSessionActorContext">,
     now: () => Date = () => new Date(),
   ) {
     this.now = now;
@@ -154,30 +153,6 @@ export class IdentityAuthSessionCoordinator {
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.validatingSession,
       });
-
-      const resolvedSession = await this.resolveAuthenticatedSessionWithTiming({
-        sessionToken: session.sessionToken,
-      }, options);
-      if (!resolvedSession.ok || !resolvedSession.data) {
-        this.sessionStore.clearSession();
-        this.publishProgress(options, {
-          stageId: AppInitializationStageIds.readyForSignIn,
-          detail: resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
-            ? "Your previous session is no longer valid."
-            : "Previous session could not be verified.",
-        });
-        return Object.freeze({
-          status: IdentitySessionBootstrapStatus.unauthenticated,
-          reason: resolvedSession.error?.code === IdentityAuthApiErrorCodes.authenticationFailed
-            ? IdentitySessionUnauthenticatedReason.invalidSession
-            : IdentitySessionUnauthenticatedReason.validationFailed,
-          error: toBootstrapError(
-            resolvedSession.error?.code,
-            resolvedSession.error?.message ?? "Session validation failed.",
-            resolvedSession.error,
-          ),
-        });
-      }
 
       this.publishProgress(options, {
         stageId: AppInitializationStageIds.loadingWorkspaceContext,
@@ -279,36 +254,6 @@ export class IdentityAuthSessionCoordinator {
       stageId: update.stageId,
       detail: update.detail,
     }));
-  }
-
-  private async resolveAuthenticatedSessionWithTiming(
-    request: { readonly sessionToken: string },
-    options?: IdentitySessionBootstrapOptions,
-  ): Promise<Awaited<ReturnType<IdentityAuthService["resolveAuthenticatedSession"]>>> {
-    const startedAt = Date.now();
-    const timeoutMs = normalizeTimeoutMs(options?.sessionValidationTimeoutMs, DefaultSessionValidationTimeoutMs);
-    logInitDiagnostic("resolveAuthenticatedSession:start", Object.freeze({
-      timeoutMs,
-      startedAt: new Date(startedAt).toISOString(),
-    }));
-    try {
-      const result = await this.authService.resolveAuthenticatedSession(request, {
-        timeoutMs,
-        retryPolicy: BootstrapRequestRetryPolicy,
-        signal: options?.signal,
-      });
-      logInitDiagnostic("resolveAuthenticatedSession:result", Object.freeze({
-        ok: result.ok,
-        errorCode: result.error?.code,
-        durationMs: Date.now() - startedAt,
-      }));
-      return result;
-    } finally {
-      logInitDiagnostic("resolveAuthenticatedSession:end", Object.freeze({
-        durationMs: Date.now() - startedAt,
-        endedAt: new Date().toISOString(),
-      }));
-    }
   }
 
   private async resolveSessionActorContextWithTiming(

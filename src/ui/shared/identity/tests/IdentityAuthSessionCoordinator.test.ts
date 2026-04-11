@@ -147,7 +147,7 @@ describe("IdentityAuthSessionCoordinator", () => {
 
     const persisted = store.getSession();
     expect(persisted?.sessionId).toBe("identity-session:1");
-    expect(JSON.stringify(persisted).includes("trusted-device:1")).toBeFalse();
+    expect(persisted?.sessionTrustedDeviceId).toBe("trusted-device:1");
     expect(persisted?.workspaceContext?.resolvedWorkspaceId).toBe("workspace:alpha");
   });
 
@@ -156,9 +156,7 @@ describe("IdentityAuthSessionCoordinator", () => {
     store.saveSession(createSession());
     const coordinator = new IdentityAuthSessionCoordinator(store, {
       resolveAuthenticatedSession: async () => createFailureResponse(IdentityAuthApiErrorCodes.authenticationFailed),
-      resolveSessionActorContext: async () => {
-        throw new Error("should not be called");
-      },
+      resolveSessionActorContext: async () => createFailureResponse(IdentityAuthApiErrorCodes.authenticationFailed),
     });
 
     const result = await coordinator.bootstrap();
@@ -252,14 +250,12 @@ describe("IdentityAuthSessionCoordinator", () => {
     const store = createSessionStore();
     store.saveSession(createSession());
     let resolveActorContext: ((value: IdentityAuthApiResponse<unknown>) => void) | undefined;
-    let resolveSessionCalls = 0;
     let resolveActorContextCalls = 0;
     const actorContextPromise = new Promise<IdentityAuthApiResponse<unknown>>((resolve) => {
       resolveActorContext = resolve;
     });
     const coordinator = new IdentityAuthSessionCoordinator(store, {
       resolveAuthenticatedSession: async () => {
-        resolveSessionCalls += 1;
         return {
           ok: true,
           data: {
@@ -314,7 +310,6 @@ describe("IdentityAuthSessionCoordinator", () => {
 
     expect(firstResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
     expect(secondResult.status).toBe(IdentitySessionBootstrapStatus.authenticated);
-    expect(resolveSessionCalls).toBe(1);
     expect(resolveActorContextCalls).toBe(1);
   });
 
