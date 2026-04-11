@@ -6,6 +6,9 @@ const repoRoot = process.cwd();
 
 const requiredBaselineDirectories = [
   "docs/baselines/architecture",
+  "docs/baselines/architecture/core-platform-and-composition",
+  "docs/baselines/architecture/runtime-host-surfaces",
+  "docs/baselines/architecture/identity-trust-and-security",
   "docs/baselines/architecture/authorization",
   "docs/baselines/architecture/deployment-policy-and-audit-governance",
   "docs/baselines/architecture/execution-control-plane-and-scheduling",

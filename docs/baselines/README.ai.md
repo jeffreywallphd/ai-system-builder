@@ -32,6 +32,9 @@
 ## Start Here
 - [Architecture Baselines Router](./architecture/README.ai.md)
 - [Feature 1 Documentation Foundation Completion Handoff](./feature-1-documentation-foundation-handoff.ai.md)
+- [Domain and Application Core Historical Evolution](./architecture/core-platform-and-composition/domain-and-application-core-historical-evolution.ai.md)
+- [Desktop Runtime and Hosts Historical Evolution](./architecture/runtime-host-surfaces/desktop-runtime-and-hosts-historical-evolution.ai.md)
+- [Offline Local-Mode Authority Boundaries Historical Evolution](./architecture/identity-trust-and-security/offline-local-mode-authority-boundaries-historical-evolution.ai.md)
 - [Feature 4 Final Authorization Baseline](./architecture/authorization/authorization-feature-4-final-baseline.ai.md)
 - [Deployment Policy Persistence/API Integration Baseline](./architecture/deployment-policy-and-audit-governance/deployment-profile-policy-persistence-api-integration-baseline.ai.md)
 - [Image Run Feature 4 Final Baseline](./architecture/execution-control-plane-and-scheduling/image-run-feature-4-final-baseline.ai.md)
