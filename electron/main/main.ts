@@ -18,7 +18,6 @@ import {
   assertSecureTransportEndpoint,
   resolveHostSecureTransportConfig,
 } from "../../src/infrastructure/config/HostSecureTransportConfig";
-import { RendererDeliveryModes } from "../../src/domain/runtime/AppRuntimeProfile";
 import { DesktopServiceSupervisor } from "./DesktopServiceSupervisor";
 import type {
   DesktopAuthBootstrapContext,
@@ -53,11 +52,7 @@ import { PythonRuntimeConfig } from "../../src/infrastructure/config/PythonRunti
 import { createMcpRuntimeIntegration } from "../../src/infrastructure/python/mcp/createMcpRuntimeIntegration";
 import { SqliteAssetSystemAgentMemoryCatalog } from "../../src/infrastructure/filesystem/agents/SqliteAssetSystemAgentMemoryCatalog";
 import { ListPersistedWorkflowsUseCase } from "../../src/application/workflow-persistence/ListPersistedWorkflowsUseCase";
-import {
-  parseSystemRuntimeWindowLaunchContract,
-  SystemRuntimeWindowLaunchQueryParam,
-  type LaunchSystemRuntimeWindowReadModel,
-} from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
+import { type LaunchSystemRuntimeWindowReadModel } from "../../src/application/system-runtime/SystemRuntimeWindowLaunchContract";
 import { createRendererContentSecurityPolicyResolver } from "./RendererContentSecurityPolicy";
 import { logInitializationCheckpoint, logInitializationEnd, logInitializationMemory, logInitializationStart } from "./InitializationLogging";
 import { createDesktopConnectivityProbePort, normalizeHttpOrigin, resolveDesktopIdentityTransportTrustBootstrap } from "./DesktopTrustBootstrap";
@@ -74,6 +69,8 @@ import {
   startAuthMinimalServerHostAssembly,
   type AuthMinimalServerHostRuntimeHandle,
 } from "../../src/hosts/server/AuthMinimalServerHostEntrypoint";
+import { createDesktopWindowManager } from "./DesktopWindowManager";
+import { registerDesktopAppLifecycle } from "./DesktopAppLifecycle";
 
 // Provide ESM-safe CommonJS path globals for runtime compatibility with CJS dependencies.
 const __filename = fileURLToPath(import.meta.url);
@@ -120,7 +117,6 @@ function installRendererContentSecurityPolicy(): void {
   });
 }
 
-let mainWindow: BrowserWindow | undefined;
 let storageDatabase: DesktopStorageDatabase | undefined;
 let agentRepository: SqliteAgentRepository | undefined;
 let agentSessionRepository: SqliteAgentExecutionSessionRepository | undefined;
@@ -154,7 +150,6 @@ type CanonicalRegistryRuntime = {
   readonly registryBackendApi: any;
 };
 let canonicalRegistryRuntime: CanonicalRegistryRuntime | undefined;
-const runtimeWindowByReuseKey = new Map<string, BrowserWindow>();
 const DesktopServiceSupervisorPort = 8790;
 let authIpcRegistered = false;
 let deferredFeatureIpcRegistered = false;
@@ -169,6 +164,15 @@ let postLoginRuntimeStatus: DesktopPostLoginRuntimeStatus = Object.freeze({
   updatedAt: new Date().toISOString(),
 });
 const DeferredConnectivityStateDetail = "Connectivity monitoring is deferred until post-login runtime warmup starts.";
+
+const windowManager = createDesktopWindowManager({
+  BrowserWindow,
+  preloadScriptPath,
+  rendererDevUrl,
+  isPackaged,
+  mainProcessDir: __dirname,
+  getRuntimeConfig: () => bootstrapContext?.runtimeConfig,
+});
 
 type AuthShellBootstrapResult = {
   readonly storagePaths: ReturnType<typeof resolveDesktopStoragePaths>;
@@ -325,21 +329,6 @@ function stopDesktopConnectivityMonitoring(): void {
 }
 
 /**
- * Builds a renderer query-string fragment from optional parameters while omitting undefined values.
- */
-function createRendererSearch(params: Record<string, string | undefined>): string | undefined {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (!value) {
-      continue;
-    }
-    search.set(key, value);
-  }
-  const serialized = search.toString();
-  return serialized ? `?${serialized}` : undefined;
-}
-
-/**
  * Composes the desktop agent runner with tool catalogs, executors, and memory services backed by local storage.
  */
 function createDesktopAgentRunner(params: {
@@ -400,136 +389,21 @@ function ensureAgentStudioBackendApi(
   return agentStudioBackendApi;
 }
 
-/**
- * Creates the primary desktop BrowserWindow, loads renderer content, and reveals the window when ready.
- */
-async function createMainWindow(): Promise<void> {
+async function openMainDesktopWindow(): Promise<void> {
   const mainWindowCreateStartedAt = logInitializationStart(DesktopStartupPhases.mainWindowCreation);
-  const window = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    show: false,
-    backgroundColor: "#111827",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: preloadScriptPath,
+  await windowManager.createMainWindow({
+    onReadyToShow: () => {
+      logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
     },
-  });
-
-  mainWindow = window;
-  // Waits for first paint milestone before maximizing/showing the main window to avoid visual flash.
-  window.once("ready-to-show", () => {
-    logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show", mainWindowCreateStartedAt);
-    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "first-window-ready-to-show");
-    window.maximize();
-    window.show();
-  });
-
-  try {
-    await loadRendererRoot(window);
-    logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded", mainWindowCreateStartedAt);
-    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded");
-  } finally {
-    logInitializationEnd(DesktopStartupPhases.mainWindowCreation, mainWindowCreateStartedAt);
-    logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "ready");
-  }
-}
-
-/**
- * Loads the renderer root page from packaged assets or dev server, applying optional launch search params.
- */
-async function loadRendererRoot(window: BrowserWindow, search?: string): Promise<void> {
-  const runtimeConfig = bootstrapContext?.runtimeConfig;
-  if (runtimeConfig?.rendererDeliveryMode === RendererDeliveryModes.packagedAssets) {
-    await window.loadFile(path.join(__dirname, "../../dist/index.html"), {
-      search,
-    });
-  } else {
-    const url = new URL(rendererDevUrl);
-    url.pathname = "/";
-    if (search) {
-      url.search = search.startsWith("?") ? search.slice(1) : search;
-    }
-    await window.loadURL(url.toString());
-    if (window === mainWindow) {
-      window.webContents.openDevTools({ mode: "detach" });
-    }
-  }
-}
-
-/**
- * Launches or reuses a runtime window described by the serialized system-runtime launch contract.
- */
-async function launchRuntimeWindowFromContract(
-  launchContractJson: string,
-): Promise<LaunchSystemRuntimeWindowReadModel> {
-  const contract = parseSystemRuntimeWindowLaunchContract(launchContractJson);
-  if (!contract) {
-    throw new Error("invalid-request:Runtime window launch contract is missing or invalid.");
-  }
-
-  const reuseWindowKey = contract.windowIntent.reuseWindowKey?.trim();
-  if (reuseWindowKey) {
-    const existing = runtimeWindowByReuseKey.get(reuseWindowKey);
-    if (existing && !existing.isDestroyed()) {
-      const search = createRendererSearch({
-        [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
-      });
-      await loadRendererRoot(existing, search);
-      if (contract.windowIntent.focus === "foreground") {
-        existing.focus();
-      }
-      return Object.freeze({
-        launchId: contract.launchId,
-        launchedAt: new Date().toISOString(),
-        targetKind: contract.launchTarget.targetKind,
-        systemAssetId: contract.launchTarget.systemAssetId,
-        pageBindingId: contract.launchTarget.pageBindingId,
-        routePath: "/",
-      });
-    }
-  }
-
-  const runtimeWindow = new BrowserWindow({
-    width: contract.windowIntent.dimensions?.width ?? 1440,
-    height: contract.windowIntent.dimensions?.height ?? 960,
-    show: false,
-    backgroundColor: "#111827",
-    title: contract.windowIntent.titleHint ?? "AI Loom Runtime",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      preload: preloadScriptPath,
+    onRendererLoaded: () => {
+      logInitializationCheckpoint(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded", mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "renderer-content-loaded");
     },
-  });
-
-  // Reveals the runtime window only after content is ready to avoid partially rendered first paint.
-  runtimeWindow.once("ready-to-show", () => runtimeWindow.show());
-  const search = createRendererSearch({
-    [SystemRuntimeWindowLaunchQueryParam]: launchContractJson,
-  });
-  await loadRendererRoot(runtimeWindow, search);
-
-  if (contract.windowIntent.focus === "foreground") {
-    runtimeWindow.focus();
-  }
-
-  if (reuseWindowKey) {
-    runtimeWindowByReuseKey.set(reuseWindowKey, runtimeWindow);
-    // Ensures reuse-key mapping is cleaned up when a reused runtime window is closed.
-    runtimeWindow.on("closed", () => {
-      runtimeWindowByReuseKey.delete(reuseWindowKey);
-    });
-  }
-
-  return Object.freeze({
-    launchId: contract.launchId,
-    launchedAt: new Date().toISOString(),
-    targetKind: contract.launchTarget.targetKind,
-    systemAssetId: contract.launchTarget.systemAssetId,
-    pageBindingId: contract.launchTarget.pageBindingId,
-    routePath: "/",
+    onComplete: () => {
+      logInitializationEnd(DesktopStartupPhases.mainWindowCreation, mainWindowCreateStartedAt);
+      logInitializationMemory(DesktopStartupPhases.mainWindowCreation, "ready");
+    },
   });
 }
 
@@ -1053,7 +927,9 @@ async function bootstrapPostLoginRuntime(authShell: AuthShellBootstrapResult): P
         ipcMain,
         onDemand,
         storagePaths,
-        launchRuntimeWindowFromContract,
+        launchRuntimeWindowFromContract: async (launchContractJson): Promise<LaunchSystemRuntimeWindowReadModel> => {
+          return windowManager.launchRuntimeWindowFromContract(launchContractJson);
+        },
       });
     });
     logInitializationCheckpoint(DesktopStartupPhases.postLoginWarmup, "deferred-feature-registration-ready", bootstrapStartedAt);
@@ -1106,65 +982,48 @@ async function disposeDesktopRuntimeResources(): Promise<void> {
   isDesktopRuntimeDisposing = false;
 }
 
-// Bootstraps desktop host lifecycle after Electron app readiness and manages first-window activation behavior.
-app.whenReady().then(async () => {
-  const desktopHostStartupAt = logInitializationStart(DesktopStartupPhases.hostBootstrap);
-  try {
-    desktopHostRuntime = await startDesktopHostAssembly({
-      // Starts pre-login auth shell first, then opens the renderer window with bootstrap IPC available.
-      startHost: async () => {
-        try {
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-start", desktopHostStartupAt);
-          const authShell = await bootstrapAuthShell();
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-starting", desktopHostStartupAt);
-          authShellBootstrapResult = authShell;
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-csp-install-start", desktopHostStartupAt);
-          installRendererContentSecurityPolicy();
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
-          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
-          await createMainWindow();
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready", desktopHostStartupAt);
-          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready");
-          logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
-          logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
-          return Object.freeze({
-            close: disposeDesktopRuntimeResources,
-          });
-        } catch (error) {
-          await disposeDesktopRuntimeResources();
-          throw error;
-        }
-      },
-      boot: {
-        startupReason: "electron-main-desktop-host-startup",
-        environment: process.env,
-      },
-    });
-  } finally {
-    logInitializationEnd(DesktopStartupPhases.hostBootstrap, desktopHostStartupAt);
-  }
-
-  // Recreates the main window when the dock icon is activated and no windows are currently open.
-  app.on("activate", async () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      await createMainWindow();
+registerDesktopAppLifecycle({
+  app,
+  hasOpenWindows: () => windowManager.hasOpenWindows(),
+  createMainWindow: openMainDesktopWindow,
+  bootstrapDesktopHost: async () => {
+    const desktopHostStartupAt = logInitializationStart(DesktopStartupPhases.hostBootstrap);
+    try {
+      desktopHostRuntime = await startDesktopHostAssembly({
+        startHost: async () => {
+          try {
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-start", desktopHostStartupAt);
+            const authShell = await bootstrapAuthShell();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-starting", desktopHostStartupAt);
+            authShellBootstrapResult = authShell;
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-csp-install-start", desktopHostStartupAt);
+            installRendererContentSecurityPolicy();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "pre-login-auth-shell-ready");
+            await openMainDesktopWindow();
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "renderer-first-window-ready");
+            logInitializationCheckpoint(DesktopStartupPhases.hostBootstrap, "main-window-ready", desktopHostStartupAt);
+            logInitializationMemory(DesktopStartupPhases.hostBootstrap, "main-window-ready");
+            return Object.freeze({
+              close: disposeDesktopRuntimeResources,
+            });
+          } catch (error) {
+            await disposeDesktopRuntimeResources();
+            throw error;
+          }
+        },
+        boot: {
+          startupReason: "electron-main-desktop-host-startup",
+          environment: process.env,
+        },
+      });
+    } finally {
+      logInitializationEnd(DesktopStartupPhases.hostBootstrap, desktopHostStartupAt);
     }
-  });
-})
-  // Fails fast when desktop host bootstrap cannot complete.
-  .catch((error) => {
-    console.error("Failed to bootstrap desktop host", error);
-    app.exit(1);
-  });
-
-// Quits the app when all windows close on non-macOS platforms.
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
-
-// Ensures host runtime stop hooks complete before process quit finalizes.
-app.on("before-quit", async () => {
-  await desktopHostRuntime?.stop();
+  },
+  stopDesktopHost: async () => {
+    await desktopHostRuntime?.stop();
+  },
+  isMacOS: process.platform === "darwin",
 });
