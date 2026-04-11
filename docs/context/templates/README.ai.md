@@ -18,6 +18,7 @@ Use this folder as the canonical template pack for doc creation.
 - `adr` -> [adr.template.md](./adr.template.md) (place output in `docs/adr/records/`)
 - `ai-context` -> [ai-context.template.md](./ai-context.template.md)
 - `ai-context` pack contract -> [context-pack.template.md](./context-pack.template.md)
+- Segmentation seed snippets -> [documentation-segmentation-seeds.template.md](./documentation-segmentation-seeds.template.md)
 - Routing entry JSON -> [task-to-context-routing-entry.template.json](./task-to-context-routing-entry.template.json)
 - AI companions are colocated as `*.template.ai.md` for markdown templates.
 

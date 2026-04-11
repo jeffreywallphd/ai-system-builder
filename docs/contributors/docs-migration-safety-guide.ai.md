@@ -67,6 +67,7 @@ Temporary bridge (only if needed):
 
 Pointer notes should state replacement path, effective date, and canonical authority.
 Use `docs/context/documentation-supersession-and-redirect-conventions.ai.md` as the canonical supersession/redirect format source.
+Use `docs/context/documentation-segmentation-seed-guidance.ai.md` for reusable classification notes, supersession markers, baseline introductions, and migration checklist seeds.
 
 Example:
 
