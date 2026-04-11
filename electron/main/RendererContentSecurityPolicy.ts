@@ -69,11 +69,15 @@ function resolveHttpOrigins(options: RendererContentSecurityPolicyOptions): Read
   const serviceSupervisorOrigin = normalizeOrigin(runtimeConfig.serviceSupervisorBaseUrl);
   if (serviceSupervisorOrigin) {
     origins.add(serviceSupervisorOrigin);
+  } else if (runtimeConfig.hostKind === "desktop") {
+    origins.add("http://127.0.0.1:8790");
   }
 
   const pythonRuntimeOrigin = normalizeOrigin(runtimeConfig.pythonRuntimeBaseUrl);
   if (pythonRuntimeOrigin) {
     origins.add(pythonRuntimeOrigin);
+  } else if (runtimeConfig.hostKind === "desktop") {
+    origins.add("http://127.0.0.1:8100");
   }
 
   return [...origins];
