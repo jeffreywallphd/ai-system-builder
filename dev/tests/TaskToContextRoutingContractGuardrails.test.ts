@@ -8,6 +8,8 @@ const seedPath = resolve(repoRoot, "docs/context/routing/task-to-context-routing
 const metadataContractPath = resolve(repoRoot, "docs/context/context-asset-metadata.contract.json");
 const humanSpecPath = resolve(repoRoot, "docs/context/routing/prompt-routing-contract.md");
 const aiSpecPath = resolve(repoRoot, "docs/context/routing/prompt-routing-contract.ai.md");
+const humanRoutingGuidePath = resolve(repoRoot, "docs/context/prompt-routing.md");
+const aiRoutingGuidePath = resolve(repoRoot, "docs/context/prompt-routing.ai.md");
 const routingReadmePath = resolve(repoRoot, "docs/context/routing/README.md");
 const routingAiReadmePath = resolve(repoRoot, "docs/context/routing/README.ai.md");
 
@@ -101,6 +103,8 @@ describe("task-to-context routing contract guardrails", () => {
     expect(existsSync(metadataContractPath)).toBe(true);
     expect(existsSync(humanSpecPath)).toBe(true);
     expect(existsSync(aiSpecPath)).toBe(true);
+    expect(existsSync(humanRoutingGuidePath)).toBe(true);
+    expect(existsSync(aiRoutingGuidePath)).toBe(true);
   });
 
   it("keeps task categories, inputs, and priorities explicit in the contract", () => {
@@ -203,6 +207,8 @@ describe("task-to-context routing contract guardrails", () => {
 
     expect(routingReadme).toContain("./prompt-routing-contract.md");
     expect(routingAiReadme).toContain("./prompt-routing-contract.ai.md");
+    expect(routingReadme).toContain("../prompt-routing.md");
+    expect(routingAiReadme).toContain("../prompt-routing.ai.md");
     expect(routingReadme).toContain("../context-asset-metadata.md");
     expect(routingAiReadme).toContain("../context-asset-metadata.ai.md");
   });
@@ -226,6 +232,38 @@ describe("task-to-context routing contract guardrails", () => {
     for (const field of requiredMappingMetadataFields) {
       expect(humanSpec).toContain(field);
       expect(aiSpec).toContain(field);
+    }
+  });
+
+  it("keeps human-readable prompt routing guidance aligned with routing assets", () => {
+    const humanGuide = readFileSync(humanRoutingGuidePath, "utf8");
+    const aiGuide = readFileSync(aiRoutingGuidePath, "utf8");
+
+    for (const heading of [
+      "## Canonical Routing Sources",
+      "## Deterministic Routing Workflow",
+      "## Minimum Sufficient Context Rules",
+      "## Signal-to-Noise Guardrails",
+      "## Task-Type Routing Guidance (AI Loom Repository)",
+      "## Ambiguous Task Handling",
+      "## Concrete Repository Examples",
+    ]) {
+      expect(humanGuide).toContain(heading);
+      expect(aiGuide).toContain(heading);
+    }
+
+    for (const category of expectedTaskCategories) {
+      expect(humanGuide).toContain(`\`${category}\``);
+      expect(aiGuide).toContain(`\`${category}\``);
+    }
+
+    for (const artifactPath of [
+      "docs/context/routing/task-to-context-routing.contract.json",
+      "docs/context/routing/task-to-context-routing.seed.json",
+      "docs/context/context-map.json",
+    ]) {
+      expect(humanGuide).toContain(artifactPath);
+      expect(aiGuide).toContain(artifactPath);
     }
   });
 });
