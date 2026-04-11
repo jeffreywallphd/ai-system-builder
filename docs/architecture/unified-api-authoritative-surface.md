@@ -35,7 +35,7 @@ Desktop preload and IPC may remain as host adapters, but they must not be treate
 - Canonical contract root: `src/shared/contracts/`
 - Canonical schema root: `src/shared/schemas/`
 - Existing package overview: `docs/architecture/shared-api-contract-package.md`
-- Initial convergence inventory and migration context: `docs/architecture/unified-api-convergence-plan.md`
+- Historical convergence inventory and migration context baseline: `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md`
 
 ## Prohibited patterns
 
@@ -120,7 +120,7 @@ Before opening a PR that adds or changes a protected client-facing operation, ve
 ## Related docs
 
 - `docs/architecture/unified-api-endpoint-reference.md`
-- `docs/architecture/unified-api-convergence-plan.md`
+- `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md`
 - `docs/architecture/shared-api-contract-package.md`
 - `docs/architecture/identity-server-api.md`
 - `docs/architecture/storage-server-api.md`

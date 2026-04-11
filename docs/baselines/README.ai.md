@@ -43,6 +43,7 @@
 - [Image Run Feature 4 Final Baseline](./architecture/execution-control-plane-and-scheduling/image-run-feature-4-final-baseline.ai.md)
 - [Image Workflow Feature 2 Final Baseline](./architecture/studio-and-system-composition/image-workflow-feature-2-final-baseline.ai.md)
 - [Image Manipulation Feature 8 Final Vertical-Slice Completion](./architecture/studio-and-system-composition/image-manipulation-feature-8-final-vertical-slice-completion.ai.md)
+- [Unified API Convergence Transition Baseline](./architecture/api-and-transport-surfaces/unified-api-convergence-plan.ai.md)
 - [Documentation Migration Baseline](../documentation-migration-baseline.ai.md)
 - [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
 - [Documentation Segmentation Migration Inventory (Story 5.2.1)](../documentation-segmentation-migration-inventory.ai.md)

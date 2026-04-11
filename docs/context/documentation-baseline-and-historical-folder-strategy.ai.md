@@ -31,6 +31,7 @@ Use this contract to place historical and baseline material consistently during 
 - `docs/baselines/context/`: historical context/taxonomy migration records.
 - `docs/baselines/ui/`: historical UI behavior snapshots.
 - `docs/baselines/cross-cutting/`: bundles spanning multiple active areas.
+- Transition-era migration notes and rollout completion logs: `docs/baselines/architecture/<domain>/` (or `docs/baselines/cross-cutting/` for multi-domain bundles).
 
 ## Narrowly Justified Non-Baseline Destinations
 
@@ -62,6 +63,13 @@ Allowed only as short non-authoritative context with links to the full baseline 
 2. Keep `.md` and `.ai.md` baseline companions aligned.
 3. Update routers when new baseline destinations are introduced.
 4. Baselines should link back to canonical active authority docs.
+
+## Transitional and Rollout Note Handling
+
+1. Keep active rollout-scope declarations in explicit rollout-boundary docs only.
+2. Move completed transition and rollout notes into baseline destinations.
+3. Keep old active paths as short superseded stubs with canonical destination links.
+4. Link active authority first from routers; add historical baseline links as secondary context.
 
 ## Related Guidance
 

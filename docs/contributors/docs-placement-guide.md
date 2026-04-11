@@ -101,7 +101,7 @@ Placement guidance by segment:
 - Historical Notes: keep non-authoritative historical material in baseline or retired/superseded records.
 - Migration Guides and Records: keep migration sequence, inventory, and safety procedures in architecture/contributor/context governance areas.
 - Rollout-Boundary Notes: keep bounded scope and deferred-work notes in explicit rollout-boundary documents.
-- Temporary Transition Documents: keep short stubs/pointer notes only while links are migrating; require canonical destination links.
+- Temporary Transition Documents: keep short stubs/pointer notes only while links are migrating; require canonical destination links and a baseline destination.
 - Superseded or Deprecated Documents: preserve old paths with clear retirement metadata and replacement links; do not use as active authority.
 
 ### Historical Isolation Target Destinations
@@ -115,6 +115,12 @@ Placement guidance by segment:
   - `docs/baselines/ui/`
   - `docs/baselines/cross-cutting/`
 - Keep old active paths only as short superseded pointer notes when inbound-link continuity is required.
+
+### Transitional and Rollout Isolation Pattern
+
+- Rollout-boundary intent that is still active belongs in explicit rollout-boundary docs only.
+- Completed transition and rollout notes belong in `docs/baselines/architecture/<domain>/` (or `docs/baselines/cross-cutting/` for multi-domain notes).
+- Preserve old active locations only as superseded redirect stubs with canonical destination links.
 
 ## Placement Examples
 

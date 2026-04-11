@@ -62,7 +62,7 @@ Contract-level details are canonical in `./references/`:
 
 - [Unified API Authoritative Surface](../../unified-api-authoritative-surface.md)
 - [Unified API Endpoint Reference](../../unified-api-endpoint-reference.md)
-- [Unified API Convergence Plan](../../unified-api-convergence-plan.md)
+- [Unified API Convergence Transition Baseline](../../../baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md)
 - [Shared API Contract Package](../../shared-api-contract-package.md)
 
 ## Related ADRs

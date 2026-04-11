@@ -381,7 +381,7 @@ When touching a direct `fetch` shared client, migrate toward `SharedApiClient` u
 ## Related docs
 
 - `docs/architecture/unified-api-authoritative-surface.md`
-- `docs/architecture/unified-api-convergence-plan.md`
+- `docs/baselines/architecture/api-and-transport-surfaces/unified-api-convergence-plan.md`
 - `docs/architecture/identity-server-api.md`
 - `docs/architecture/storage-server-api.md`
 - `docs/unified-api-contributor-guide.md`
