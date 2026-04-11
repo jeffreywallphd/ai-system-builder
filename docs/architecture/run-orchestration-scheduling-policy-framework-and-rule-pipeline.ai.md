@@ -42,3 +42,6 @@ Story 17.1.3 adds the initial application-layer scheduling policy framework with
 
 ## Future policy extension
 Add quotas, reservation windows, affinity constraints, deployment-profile overlays, and richer arbitration by introducing new `ISchedulingPolicyRule` implementations and composing them into the rule pipeline.
+
+## Related ADRs
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md`

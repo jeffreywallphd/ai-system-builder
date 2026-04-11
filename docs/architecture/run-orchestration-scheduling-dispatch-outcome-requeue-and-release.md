@@ -44,3 +44,7 @@ Dispatch outcome handling now applies an explicit queue action:
 - accepted dispatch outcomes release queue reservation ownership and mark queue lifecycle progression to running
 - non-retryable failed starts still finalize to failed with safe/internal failure diagnostics persisted
 - retryable failed starts with remaining retry budget are requeued for authoritative scheduler re-evaluation
+
+## Related ADRs
+
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md`

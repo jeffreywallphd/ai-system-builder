@@ -104,3 +104,7 @@ No application-layer orchestration signatures need to change for additional back
 - application tests validate dispatch use case calls through the adapter seam without backend payload coupling
 - infrastructure contract tests validate adapter translation behavior for all supported backend kinds and router registration/routing behavior
 
+## Related ADRs
+
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md`
+
