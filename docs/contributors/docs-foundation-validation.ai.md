@@ -20,6 +20,8 @@ Use this guide to run the baseline docs foundation validator before or during do
 
 - Required top-level docs folders exist.
 - Root and top-level routers keep required `README.md` and `README.ai.md` files.
+- Required `docs/context` foundation subfolders and seed artifacts exist (`packs`, `routing`, `governance`, `templates`).
+- Context foundation contract/seed JSON artifacts keep expected schema markers.
 - Seed docs keep required metadata header fields with taxonomy-aligned enum values.
 - Seed `.md` and `.ai.md` pairs stay aligned on routing metadata.
 
@@ -37,6 +39,8 @@ Use the same command in CI so baseline structure regressions fail fast with clea
 
 - `TOP_LEVEL_FOLDER_MISSING`
 - `ROUTER_FILE_MISSING`
+- `CONTEXT_SUBFOLDER_MISSING`
+- `CONTEXT_FILE_MISSING`
 - `FRONTMATTER_INVALID`
 - `HEADER_ENUM_INVALID`
 - `SEED_PAIR_MISMATCH`

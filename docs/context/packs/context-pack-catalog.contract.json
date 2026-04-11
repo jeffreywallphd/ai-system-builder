@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0.0",
+  "artifactType": "context-pack-catalog",
+  "description": "Contract for indexing context packs used by AI and human routing workflows.",
+  "entryRequiredFields": [
+    "packId",
+    "title",
+    "status",
+    "owner",
+    "primaryDocPath",
+    "aiDocPath",
+    "tags"
+  ],
+  "allowedStatusValues": [
+    "draft",
+    "active",
+    "deprecated",
+    "archived"
+  ]
+}

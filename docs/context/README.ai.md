@@ -10,6 +10,8 @@
 ## Belongs Here
 - Taxonomy/glossary references used across features.
 - Orientation context packs for humans and AI assistants.
+- Deterministic routing guidance and task-to-context mappings.
+- Governance guidance for context lifecycle and maintenance quality.
 - Shared concept maps that reduce cross-doc ambiguity.
 
 ## Does Not Belong Here
@@ -20,6 +22,9 @@
 ## Start Here
 - [Canonical Documentation Taxonomy](./documentation-taxonomy.ai.md)
 - [Standard Documentation Metadata Header Contract](./documentation-metadata-header.ai.md)
+- [Context Pack Directory](./packs/README.ai.md)
+- [Routing Assets Directory](./routing/README.ai.md)
+- [Context Governance Directory](./governance/README.ai.md)
 - [Documentation Templates](./templates/README.ai.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.ai.md)
 - [Architecture Router](../architecture/README.ai.md)
