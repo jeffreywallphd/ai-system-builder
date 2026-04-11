@@ -101,3 +101,7 @@ Do not place new scheduling policy logic in:
 
 - `src/application/scheduling/tests/EvaluateAuthoritativeSchedulingPolicyUseCase.test.ts`
 - `src/application/scheduling/tests/EvaluateAuthoritativeSchedulingDecisionPipelineUseCase.test.ts`
+
+## Related ADRs
+
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md`

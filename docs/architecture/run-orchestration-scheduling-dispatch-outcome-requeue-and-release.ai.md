@@ -23,3 +23,6 @@ Story 17.2.6 integrates scheduler-aware queue settlement into dispatch result ha
 - Scheduling policy remains upstream and explainable; dispatch-result handling only settles selected assignment reservation lifecycle.
 - Queue-state mutation stays in queue persistence seams, not transport adapters.
 - Canonical lifecycle legality remains domain-constrained (`RunDomain`) with explicit retry-pending to queued progression for requeue paths.
+
+## Related ADRs
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md`

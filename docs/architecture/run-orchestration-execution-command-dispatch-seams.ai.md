@@ -74,3 +74,6 @@ Typed build errors now cover:
   - local/remote/comfy adapter payload translation,
   - router backend routing and missing-adapter failure behavior.
 
+## Related ADRs
+- `docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.ai.md`
+
