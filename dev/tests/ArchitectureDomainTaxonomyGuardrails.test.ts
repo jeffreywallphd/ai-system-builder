@@ -21,6 +21,17 @@ const requiredDomainIds = [
   "deployment-policy-and-audit-governance",
 ] as const;
 
+const domainRoleSignals: Record<(typeof requiredDomainIds)[number], string> = {
+  "core-platform-and-composition": "inner system model and composition contracts",
+  "runtime-host-surfaces": "runtime-specific host assembly and startup lifecycle",
+  "identity-trust-and-security": "fail-closed architecture boundaries for identity proof",
+  "workspace-storage-and-assets": "workspace tenancy, storage provisioning, and asset lifecycle boundaries",
+  "execution-control-plane-and-scheduling": "control-plane authority for run lifecycle transitions",
+  "studio-and-system-composition": "studio surfaces compose and present shared system/workflow/asset contracts",
+  "api-and-transport-surfaces": "transport-facing route, endpoint, and event contracts",
+  "deployment-policy-and-audit-governance": "governance architecture for deployment policy administration",
+};
+
 describe("architecture domain taxonomy guardrails", () => {
   it("keeps architecture taxonomy documents present and linked from architecture routers", () => {
     expect(existsSync(humanTaxonomyPath)).toBe(true);
@@ -104,6 +115,7 @@ describe("architecture domain taxonomy guardrails", () => {
       "## Content Placement Rules",
       "overview.md",
       "references/README.md",
+      "Seed Reference Placeholders",
     ] as const) {
       expect(domainsRouter).toContain(requiredAnchor);
       expect(domainsAiRouter).toContain(requiredAnchor);
@@ -121,6 +133,7 @@ describe("architecture domain taxonomy guardrails", () => {
       const referencesAi = readFileSync(referenceReadmeAiPath, "utf8");
 
       for (const heading of [
+        "## Seed Scope Guidance",
         "## What Belongs in the Overview",
         "## What Does Not Belong in the Overview",
         "## Related Domain References",
@@ -134,11 +147,16 @@ describe("architecture domain taxonomy guardrails", () => {
       for (const heading of [
         "## What Belongs in Domain References",
         "## What Does Not Belong in Domain References",
+        "## Seed Reference Placeholders",
         "## Reference Authoring Rules",
       ] as const) {
         expect(references).toContain(heading);
         expect(referencesAi).toContain(heading);
       }
+
+      const roleSignal = domainRoleSignals[domainId];
+      expect(overview).toContain(roleSignal);
+      expect(overviewAi).toContain(roleSignal);
 
       expect(overview).toContain("./references/README.md");
       expect(overviewAi).toContain("./references/README.md");

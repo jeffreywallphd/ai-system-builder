@@ -1,4 +1,4 @@
-﻿---
+---
 title: "AI Companion: Core Platform and Composition Domain Overview"
 doc_type: architecture-overview
 status: active
@@ -13,18 +13,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for core-platform-and-composition and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own the inner system model and composition contracts that define platform behavior independently of runtime host adapters.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the core-platform-and-composition taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines domain and application layering invariants, shared model semantics, and composition seams.
+- Delegates host startup mechanics to runtime-host-surfaces and transport wire contracts to api-and-transport-surfaces.
+
+## Seed Scope Guidance
+
+- Start migration with layer boundary and composition root contracts that multiple domains depend on.
+- Keep this overview as the single boundary authority and route detail into focused reference docs.
+- Avoid duplicating runtime bootstrap, route payload, or runbook details here.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -44,4 +50,3 @@ Define the architecture boundary for core-platform-and-composition and route dom
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Context System Foundations](../../../context/packs/context-system-foundations.pack.md)
-

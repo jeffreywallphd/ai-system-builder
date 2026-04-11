@@ -1,4 +1,4 @@
-﻿---
+---
 title: "AI Companion: Runtime Host Surfaces Domain Overview"
 doc_type: architecture-overview
 status: active
@@ -13,18 +13,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for runtime-host-surfaces and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own runtime-specific host assembly and startup lifecycle boundaries for desktop, web, server, and worker surfaces.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the runtime-host-surfaces taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines host authority boundaries, startup sequencing, and pre-login versus post-login runtime responsibilities.
+- Delegates inner business policy to core-platform-and-composition and security policy logic to identity-trust-and-security.
+
+## Seed Scope Guidance
+
+- Prioritize host composition root and startup lifecycle references used by all runtime surfaces.
+- Keep host-specific operational procedures in docs/operations and link outward when needed.
+- Treat this domain as runtime authority, not feature ownership.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -44,4 +50,3 @@ Define the architecture boundary for runtime-host-surfaces and route domain-scop
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Runtime And Host](../../../context/packs/runtime-and-host.pack.md)
-

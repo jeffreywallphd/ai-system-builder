@@ -44,6 +44,7 @@ No extra domain-level file types are required right now. Add new top-level file 
 
 `overview.ai.md` is the domain boundary contract:
 - Define scope, ownership seams, and cross-domain dependency rules.
+- Include concise domain-specific role language so migration starts with clear system intent.
 - State domain-wide invariants and concise migration direction.
 - Route readers to canonical references in `./references/`.
 
@@ -56,6 +57,7 @@ No extra domain-level file types are required right now. Add new top-level file 
 
 `references/README.ai.md` is the domain reference-index contract:
 - Define what reference docs in the folder are allowed to cover.
+- Include a short `## Seed Reference Placeholders` section with lightweight candidate references.
 - Require one durable contract surface per reference doc.
 - Require references to link back to `../overview.md` for boundary context.
 

@@ -1,4 +1,4 @@
-﻿---
+---
 title: Workspace Storage and Assets Domain Overview
 doc_type: architecture-overview
 status: active
@@ -14,18 +14,24 @@ related_code_paths:
 
 ## Purpose
 
-Define the architecture boundary for workspace-storage-and-assets and route domain-scoped architecture knowledge into predictable overview and reference documents.
+Own workspace tenancy, storage provisioning, and asset lifecycle boundaries as shared platform resource contracts.
 
 ## Boundary
 
-- Owns architecture contracts scoped to the workspace-storage-and-assets taxonomy boundary.
-- Links to adjacent domains for cross-boundary behavior instead of duplicating authority.
+- Defines tenancy/ownership scope, storage access semantics, and asset metadata lifecycle boundaries.
+- Delegates security policy proofing to identity-trust-and-security and API wire schemas to api-and-transport-surfaces.
+
+## Seed Scope Guidance
+
+- Start with workspace tenancy and storage access contract references used by multiple feature surfaces.
+- Keep this domain focused on durable resource authority rather than UI-level behavior.
+- Route operational backup/provisioning procedures to docs/operations instead of duplicating them.
 
 ## What Belongs in the Overview
 
 - Domain boundary intent, ownership seams, and cross-domain dependency rules.
 - Domain-wide invariants that shape multiple reference contracts.
-- Concise routing links to the canonical reference documents in `./references/`.
+- Concise routing links to the canonical reference documents in ./references/.
 
 ## What Does Not Belong in the Overview
 
@@ -46,4 +52,3 @@ Define the architecture boundary for workspace-storage-and-assets and route doma
 
 - [Architecture Core](../../../context/packs/architecture-core.pack.md)
 - [Repository Overview](../../../context/packs/repository-overview.pack.md)
-
