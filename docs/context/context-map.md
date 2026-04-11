@@ -55,7 +55,7 @@ Each mapping entry in `taskCategoryMappings` includes:
 This first version is intentionally scoped:
 
 - one deterministic mapping per supported task category;
-- one deterministic baseline core route per mapping (`repository-overview`, `architecture-core`, `context-system-foundations`) with explicit `runtime-and-host` insertion for runtime/host-centered mappings;
+- one deterministic baseline route per mapping with category-specific domain-pack insertion (`runtime-and-host` for runtime/host routes, `studio-and-system-composition` for studio/system routes) before `context-system-foundations`;
 - one deterministic four-tier assembly profile shared across initial task categories;
 - explicit exclusion tags, authority tags, and notes for future extension;
 - no runtime resolver implementation in this story.

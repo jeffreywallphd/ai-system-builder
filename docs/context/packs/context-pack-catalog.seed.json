@@ -137,6 +137,45 @@
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
+    },
+    {
+      "id": "studio-and-system-composition",
+      "title": "Studio and System Composition Pack",
+      "purpose": "Focused context for studio/system composition tasks spanning Studio Shell UX, system definitions, handoff contracts, and cross-studio asset flows.",
+      "domain": "studio-system-composition",
+      "owner": "team:studio-experience",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/studio-and-system-composition.pack.md",
+      "aiDocPath": "docs/context/packs/studio-and-system-composition.pack.ai.md",
+      "relatedDocPaths": [
+        "docs/architecture/studio-handoff-contract.md",
+        "docs/architecture/image-workflow-system-definition-layer.md",
+        "docs/architecture/image-system-domain-foundation.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md",
+        "docs/architecture/asset-selector-framework.md",
+        "docs/architecture/shared-composition-taxonomy.md",
+        "docs/ui/README.md"
+      ],
+      "relatedCodePaths": [
+        "src/ui/routes/StudioHandoffContract.ts",
+        "src/ui/routes/StudioReturnPayloadResolution.ts",
+        "src/ui/studio-shell",
+        "src/application/studio-handoff",
+        "src/application/system-studio",
+        "src/application/workflow-studio",
+        "src/domain/system-studio"
+      ],
+      "tags": [
+        "studio-shell",
+        "system-studio",
+        "handoff",
+        "workflow-system-composition",
+        "ui-studio"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
     }
   ]
 }

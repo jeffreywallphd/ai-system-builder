@@ -42,8 +42,9 @@ Rationale:
 
 Use the smallest context set that can still produce a correct answer:
 
-- Start with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
+- Start with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then category-specific domain packs, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
+- For Studio Shell and System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
 - Prefer one canonical source over multiple overlapping summaries.
 - Stop adding documents once requested outcomes can be satisfied with confidence.
@@ -163,8 +164,10 @@ Typical code surfaces:
 Use for Studio/System UX and interaction-flow changes.
 
 Primary docs:
+- `docs/context/packs/studio-and-system-composition.pack.md`
 - `docs/ui/README.md`
 - `docs/architecture/studio-handoff-contract.md`
+- `docs/architecture/image-workflow-system-definition-layer.md`
 - `docs/architecture/image-manipulation-studio-interaction-model.md`
 
 Typical code surfaces:
@@ -346,11 +349,12 @@ Routing inputs:
 - `requestedOutcomes`: `ux-design-update`, `state-flow-alignment`, `validation-or-test-coverage`
 
 Expected context assembly:
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `studio-and-system-composition`, `context-system-foundations`
 - Ordered docs:
-1. `docs/ui/README.md`
-2. `docs/architecture/studio-handoff-contract.md`
+1. `docs/architecture/studio-handoff-contract.md`
+2. `docs/architecture/image-workflow-system-definition-layer.md`
 3. `docs/architecture/image-manipulation-studio-interaction-model.md`
+4. `docs/ui/README.md`
 
 Explicit exclusions:
 - backend-only security hardening docs with no UI contract impact

@@ -22,6 +22,12 @@ const runtimeHostPackOrder = [
   "runtime-and-host",
   "context-system-foundations",
 ] as const;
+const studioSystemPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "studio-and-system-composition",
+  "context-system-foundations",
+] as const;
 
 type RoutingContract = {
   supportedTaskCategories: Array<{ id: string }>;
@@ -167,6 +173,8 @@ describe("context map guardrails", () => {
       expect(mapping.packRefs.length).toBeGreaterThanOrEqual(1);
       const expectedPackOrder = mapping.taskCategoryId === "architecture-review" || mapping.taskCategoryId === "diagnostics"
         ? runtimeHostPackOrder
+        : mapping.taskCategoryId === "ui-studio"
+        ? studioSystemPackOrder
         : defaultPackOrder;
       expect(mapping.packRefs.map((entry) => entry.packId)).toEqual(expectedPackOrder);
       expect(mapping.packRefs.map((entry) => entry.priorityOrder)).toEqual(

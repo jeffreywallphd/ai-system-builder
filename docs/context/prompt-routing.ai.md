@@ -40,8 +40,9 @@ Rationale:
 
 ## Minimum Sufficient Context Rules
 
-- Begin with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then `context-system-foundations`) and mapping `relatedDocPaths`.
+- Begin with mapped packs in deterministic order (`repository-overview`, then `architecture-core`, then category-specific domain packs, then `context-system-foundations`) and mapping `relatedDocPaths`.
 - For runtime/host/desktop/startup tasks, insert `runtime-and-host` after `architecture-core` and before `context-system-foundations`.
+- For Studio Shell/System Studio composition tasks, insert `studio-and-system-composition` after `architecture-core` and before `context-system-foundations`.
 - Add docs only when tied to `changedPaths`, `primarySurfaces`, or required quality gates.
 - Prefer canonical contracts over secondary summaries.
 - Stop when outcomes are satisfiable with high confidence.
@@ -132,8 +133,10 @@ Primary surfaces:
 
 ### `ui-studio`
 Primary docs:
+- `docs/context/packs/studio-and-system-composition.pack.ai.md`
 - `docs/ui/README.md`
 - `docs/architecture/studio-handoff-contract.md`
+- `docs/architecture/image-workflow-system-definition-layer.md`
 - `docs/architecture/image-manipulation-studio-interaction-model.md`
 Primary surfaces:
 - `src/ui/`, `src/application/workflow-studio/`
@@ -228,9 +231,10 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing."
 - Category: `ui-studio`
 - Inputs: `src/ui`, `src/application/workflow-studio`, `docs/ui`, `docs/architecture/studio-handoff-contract.md`
-- Pack order: `repository-overview`, `architecture-core`, `context-system-foundations`
+- Pack order: `repository-overview`, `architecture-core`, `studio-and-system-composition`, `context-system-foundations`
 - Ordered docs:
-1. `docs/ui/README.md`
-2. `docs/architecture/studio-handoff-contract.md`
+1. `docs/architecture/studio-handoff-contract.md`
+2. `docs/architecture/image-workflow-system-definition-layer.md`
 3. `docs/architecture/image-manipulation-studio-interaction-model.md`
+4. `docs/ui/README.md`
 - Exclude backend-only security docs and runtime startup artifacts that do not change UI contract or state flow.

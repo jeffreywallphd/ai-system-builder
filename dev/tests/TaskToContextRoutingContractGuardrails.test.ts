@@ -73,14 +73,26 @@ const expectedRuntimeHostPackOrder = [
   "runtime-and-host",
   "context-system-foundations",
 ] as const;
+const expectedStudioSystemPackOrder = [
+  "repository-overview",
+  "architecture-core",
+  "studio-and-system-composition",
+  "context-system-foundations",
+] as const;
 const runtimeHostEnhancedExampleTaskIds = new Set([
   "example-architecture-review-host-boundaries",
   "example-diagnostics-host-startup-regression",
   "example-coding-implementation-runtime-host-startup",
 ]);
+const studioSystemEnhancedExampleTaskIds = new Set([
+  "example-ui-studio-system-handoff-update",
+]);
 const runtimeHostEnhancedCoreTaskIds = new Set([
   "architecture-review-host-boundaries",
   "runtime-host-diagnostics-triage",
+]);
+const studioSystemEnhancedCoreTaskIds = new Set([
+  "studio-system-design-and-ux-shaping",
 ]);
 
 const requiredMappingMetadataFields = [
@@ -228,6 +240,8 @@ describe("task-to-context routing contract guardrails", () => {
       expect(example.expectedContextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
       const expectedPackOrder = runtimeHostEnhancedExampleTaskIds.has(example.taskId)
         ? expectedRuntimeHostPackOrder
+        : studioSystemEnhancedExampleTaskIds.has(example.taskId)
+        ? expectedStudioSystemPackOrder
         : expectedDefaultPackOrder;
       expect(example.expectedPackOrder).toEqual(expectedPackOrder);
       expect(example.expectedRelatedDocOrder.length).toBeGreaterThanOrEqual(3);
@@ -284,6 +298,8 @@ describe("task-to-context routing contract guardrails", () => {
       expect(mapping.status).toBe("active");
       const expectedPackOrder = runtimeHostEnhancedCoreTaskIds.has(taskId)
         ? expectedRuntimeHostPackOrder
+        : studioSystemEnhancedCoreTaskIds.has(taskId)
+        ? expectedStudioSystemPackOrder
         : expectedDefaultPackOrder;
       expect(mapping.packIds).toEqual(expectedPackOrder);
       expect(Array.isArray(mapping.excludePackIds)).toBe(true);
