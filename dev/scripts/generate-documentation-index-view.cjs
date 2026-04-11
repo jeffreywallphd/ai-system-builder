@@ -63,6 +63,65 @@ function buildGroupedSection({
   return lines;
 }
 
+function buildTaskWorkflowSection({
+  registry,
+  entriesByRecordId,
+  useAiPaths,
+}) {
+  const taskGroups = registry.discoveryIndex?.byTaskCategory || {};
+  const routeHints = registry.taskRoutingIndex?.routeHintsByTaskCategory || {};
+  const taskCategories = Object.keys(taskGroups).sort((left, right) => left.localeCompare(right));
+  const lines = ["## Browse by Task Workflow", ""];
+
+  if (taskCategories.length === 0) {
+    lines.push("- No task-oriented discovery groups are configured.");
+    lines.push("");
+    return lines;
+  }
+
+  for (const taskCategory of taskCategories) {
+    const groupRecordIds = Array.isArray(taskGroups[taskCategory]) ? taskGroups[taskCategory] : [];
+    const records = groupRecordIds
+      .map((recordId) => entriesByRecordId.get(recordId))
+      .filter(Boolean)
+      .sort(byTitleThenRecordId);
+    const hint = routeHints[taskCategory] || {};
+    const routeTaskIds = Array.isArray(hint.routeTaskIds) ? hint.routeTaskIds : [];
+    const contextMapMappingIds = Array.isArray(hint.contextMapMappingIds) ? hint.contextMapMappingIds : [];
+
+    lines.push(`### \`${taskCategory}\` (${records.length})`);
+    if (routeTaskIds.length > 0) {
+      lines.push(`- Routing task IDs: \`${routeTaskIds.join("`, `")}\``);
+    } else {
+      lines.push("- Routing task IDs: _No direct route task IDs registered; use context-map defaults._");
+    }
+    if (contextMapMappingIds.length > 0) {
+      lines.push(`- Context-map mapping IDs: \`${contextMapMappingIds.join("`, `")}\``);
+    }
+    if (typeof hint.defaultSelectionMode === "string" && hint.defaultSelectionMode.length > 0) {
+      lines.push(`- Selection mode / priority: \`${hint.defaultSelectionMode}\` / \`${hint.defaultPriorityTier}\``);
+    }
+    if (typeof hint.contextAssemblyProfileId === "string" && hint.contextAssemblyProfileId.length > 0) {
+      lines.push(`- Context assembly profile: \`${hint.contextAssemblyProfileId}\``);
+    }
+
+    if (records.length === 0) {
+      lines.push("- No indexed records.");
+      lines.push("");
+      continue;
+    }
+
+    for (const entry of records) {
+      const entryPath = useAiPaths && typeof entry.aiPath === "string" ? entry.aiPath : entry.path;
+      const relativePath = toContextRelativePath(entryPath);
+      lines.push(`- [${entry.title}](${relativePath}) (\`${entry.recordId}\`)`);
+    }
+    lines.push("");
+  }
+
+  return lines;
+}
+
 function buildDocumentationIndexMarkdown(registry, options = {}) {
   const useAiPaths = options.useAiPaths === true;
   const isAiCompanion = options.isAiCompanion === true;
@@ -88,6 +147,7 @@ function buildDocumentationIndexMarkdown(registry, options = {}) {
     `  - ${DEFAULT_REGISTRY_PATH}`,
     "  - dev/scripts/generate-documentation-index-view.cjs",
     "  - dev/tests/DocumentationIndexViewStory631Guardrails.test.ts",
+    "  - dev/tests/DocumentationTaskDiscoveryPathsStory632Guardrails.test.ts",
     "  - dev/scripts/validate-docs-foundation.cjs",
     "---",
     "",
@@ -109,6 +169,7 @@ function buildDocumentationIndexMarkdown(registry, options = {}) {
     `- Document types covered: **${(registry.docTypeCatalog || []).length}**`,
     `- Domains covered: **${Object.keys(registry.domainRelationships || {}).length}**`,
     `- Status values covered: **${(registry.statusCatalog || []).length}**`,
+    `- Task workflows covered: **${Object.keys(registry.discoveryIndex?.byTaskCategory || {}).length}**`,
     "",
   ];
 
@@ -117,6 +178,14 @@ function buildDocumentationIndexMarkdown(registry, options = {}) {
       heading: "## Browse by Document Type",
       groups: registry.discoveryIndex?.byDocType || {},
       keyOrder: registry.docTypeCatalog || [],
+      entriesByRecordId,
+      useAiPaths,
+    }),
+  );
+
+  lines.push(
+    ...buildTaskWorkflowSection({
+      registry,
       entriesByRecordId,
       useAiPaths,
     }),

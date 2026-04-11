@@ -59,6 +59,7 @@ The target complexity is "small contract, strong consistency checks."
 - Taxonomy defines document roles and authority semantics.
 - Metadata headers make taxonomy values machine-readable at the document level.
 - Indexing registry records point to authoritative docs and discovery cues.
+- Task-oriented discovery paths in the registry map common workflow categories to authoritative docs and canonical routing hints.
 - Routing contracts use indexed metadata and curated mappings to select minimal relevant context.
 - Context packs remain curated bundles for common task classes; indexing helps find the right packs and source docs.
 
