@@ -24,6 +24,7 @@
 - [Documentation Foundation Validation Guide](./docs-foundation-validation.md)
 - [Context Engineering System Contributor Guide](./context-engineering-system-guide.md)
 - [Router and Overview Writing Standard](./router-overview-writing-standard.md)
+- [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)
 - [Documentation Templates](../context/templates/README.md)
 - [Run Submission Contributor Guide](../run-submission-contributor-guide.md)
 - [Run Orchestration Contributor Guide](../run-orchestration-contributor-guide.md)

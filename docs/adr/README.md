@@ -167,6 +167,7 @@ ADRs are part of the documentation system, not a standalone archive. Keep relati
 - [ADR Authoring Guide](./records/authoring-guide.md)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.md)
 - [ADR Template](../context/templates/adr.template.md)
+- [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)
 - [Architecture Router](../architecture/README.md)
 - [Docs Top-Level Contract](../README.md)
 - [Baselines Router](../baselines/README.md)

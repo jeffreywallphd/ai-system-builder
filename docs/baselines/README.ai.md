@@ -21,5 +21,6 @@
 - [Feature 1 Documentation Foundation Completion Handoff](./feature-1-documentation-foundation-handoff.ai.md)
 - [Documentation Migration Baseline](../documentation-migration-baseline.ai.md)
 - [Documentation Migration Inventory](../documentation-migration-baseline.inventory.json)
+- [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.ai.md)
 - [Docs Top-Level Contract](../README.ai.md)
 - [Context Router](../context/README.ai.md)

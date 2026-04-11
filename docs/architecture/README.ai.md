@@ -38,6 +38,7 @@ related_code_paths:
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Folders](./domains/README.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
+- [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 - [Domain Document Pattern](./domains/README.md#standard-domain-document-pattern)
 - [Domain And Application Core](./domain-and-application-core.md)
 - [Layers And Boundaries](./layers-and-boundaries.md)

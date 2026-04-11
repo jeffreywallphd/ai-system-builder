@@ -23,4 +23,5 @@
 - [Node Bootstrap Identity Operations](../node-bootstrap-identity-operations.md)
 - [Secret Health And Operational Diagnostics](../secret-health-and-operational-diagnostics.md)
 - [Governance Audit Review Workflows](../governance-audit-review-workflows.md)
+- [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.md)
 - [Architecture Router](../architecture/README.md)

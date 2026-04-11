@@ -167,6 +167,7 @@ Treat ADRs as integrated system docs, not an isolated decision folder. Keep cros
 - [ADR Authoring Guide](./records/authoring-guide.ai.md)
 - [ADR-Informed Implementation and Review Examples](../contributors/adr-informed-implementation-and-review-examples.ai.md)
 - [ADR Template](../context/templates/adr.template.ai.md)
+- [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.ai.md)
 - [Architecture Router](../architecture/README.ai.md)
 - [Docs Top-Level Contract](../README.ai.md)
 - [Baselines Router](../baselines/README.ai.md)

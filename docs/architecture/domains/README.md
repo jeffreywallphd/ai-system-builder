@@ -71,6 +71,8 @@ Reference docs should not contain:
 - Domain overviews should include `## Related Context Packs` with links to relevant `docs/context/packs/*.pack.md` assets.
 - Domain references should include `## Related Context Packs` when routing quality depends on that contract for AI retrieval.
 
+For cross-doc inbound/outbound linking coverage (ADRs, context packs, baselines, contributor docs, and operations docs), use [Architecture Domain Cross-Linking Rules](../architecture-domain-cross-linking-rules.md).
+
 ## Content Placement Rules
 
 When domain docs need content outside architecture scope, link instead of copying:

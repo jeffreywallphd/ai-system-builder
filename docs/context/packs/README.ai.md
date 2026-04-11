@@ -34,6 +34,7 @@ Context packs can cite ADRs when decision history materially improves implementa
 - [Context Pack Catalog Contract](./context-pack-catalog.contract.json)
 - [Context Pack Catalog Seed](./context-pack-catalog.seed.json)
 - [Context Asset Metadata Standard](../context-asset-metadata.ai.md)
+- [Architecture Domain Cross-Linking Rules](../../architecture/architecture-domain-cross-linking-rules.ai.md)
 - [Seed Pack: Repository Overview](./repository-overview.pack.ai.md)
 - [Seed Pack: Core Architecture](./architecture-core.pack.ai.md)
 - [Seed Pack: Context System Foundations](./context-system-foundations.pack.ai.md)
