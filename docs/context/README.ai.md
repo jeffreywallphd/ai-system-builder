@@ -36,6 +36,7 @@
 - [Routing Assets Directory](./routing/README.ai.md)
 - [Context Governance Directory](./governance/README.ai.md)
 - [Context Asset Lifecycle Guidance](./governance/context-asset-lifecycle.ai.md)
+- [Documentation Segmentation Rollout Boundaries and Follow-On Work](./governance/documentation-segmentation-rollout-boundaries.ai.md)
 - [Context System Rollout Boundaries and Follow-On Work](./governance/context-system-rollout-boundaries.ai.md)
 - [Documentation Templates](./templates/README.ai.md)
 - [Shared Composition Taxonomy](../architecture/shared-composition-taxonomy.ai.md)

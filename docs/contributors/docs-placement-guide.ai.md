@@ -77,6 +77,7 @@
 ## Segmentation Taxonomy Mapping
 - Segmentation model source: `docs/context/documentation-segmentation-taxonomy.ai.md`.
 - Seed snippets for migration/classification notes: `docs/context/documentation-segmentation-seed-guidance.ai.md`.
+- Segmentation completion and follow-on boundaries: `docs/context/governance/documentation-segmentation-rollout-boundaries.ai.md`.
 - Standard non-active status marker source: `docs/context/documentation-status-signals.ai.md`.
 - Historical landing-zone strategy: `docs/context/documentation-baseline-and-historical-folder-strategy.ai.md`.
 - Supersession/redirect pattern source: `docs/context/documentation-supersession-and-redirect-conventions.ai.md`.

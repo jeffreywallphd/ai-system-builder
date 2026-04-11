@@ -27,6 +27,7 @@ This policy defines how context-pack and routing artifacts are maintained so con
 - Apply lifecycle state transitions and conflict-resolution rules from `docs/context/governance/context-asset-lifecycle.md`.
 - Apply high-risk review controls from `docs/context/governance/high-risk-context-pack-guidance.md` when changing security, runtime/host, or architecture-invariant packs.
 - Apply rollout boundary assumptions from `docs/context/governance/context-system-rollout-boundaries.md` so initial-release scope remains explicit.
+- Apply documentation segmentation completion boundaries from `docs/context/governance/documentation-segmentation-rollout-boundaries.md` so segmentation follow-on work stays explicit and non-ambiguous.
 
 ## Review Cadence
 

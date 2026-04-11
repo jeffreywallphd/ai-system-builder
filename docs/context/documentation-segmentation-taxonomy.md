@@ -166,6 +166,7 @@ Use this catalog during review to prevent regression into mixed-authority docume
 
 - Keep using `doc_type`, `status`, and `authoritativeness` from `docs/context/documentation-taxonomy.md`.
 - Use this segmentation taxonomy to decide placement and cleanup behavior during migration and retirement work.
+- Use `docs/context/governance/documentation-segmentation-rollout-boundaries.md` to apply current completion boundaries, non-goals, and follow-on extension expectations.
 - Use `docs/context/documentation-supersession-and-redirect-conventions.md` for concrete supersession note, redirect, pointer, and deprecation marker format.
 - Where classifications conflict, prioritize current authoritative guidance and move historical detail to baseline or retired paths.
 
