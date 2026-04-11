@@ -64,6 +64,20 @@ Do not pick packs ad hoc when a mapping already defines deterministic order.
 - Remove `optional` and non-authoritative material first when context grows.
 - Do not mix multiple task categories in one prompt if decomposition can split the work safely.
 
+## Index-First Discovery in Daily Work (Story 6.3.4)
+
+Before finalizing context for any task category:
+
+1. Start in `docs/context/documentation-index.md` to gather candidate docs and stable `recordId` values.
+2. Confirm each candidate's `status` and `authoritativeness` from document metadata before using it as authority.
+3. Keep findability and authority separate:
+   - index hit = discoverable candidate
+   - active canonical metadata = implementation authority
+4. If a candidate is `archived`, `superseded`, or `historical`, treat it as evidence-only and follow active replacements.
+
+For full daily usage details and review checks, use:
+- `docs/contributors/documentation-index-daily-usage-guide.md`
+
 ## Task Playbooks
 
 ### Prompt Preparation

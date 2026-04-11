@@ -26,6 +26,8 @@ related_code_paths:
   - dev/tests/DocumentationRegistryDiscoverySummariesKeywordsStory625Guardrails.test.ts
   - dev/tests/DocumentationRegistryRelationshipsStory626Guardrails.test.ts
   - dev/tests/DocumentationRegistryContextRoutingIntegrationStory633Guardrails.test.ts
+  - dev/tests/DocumentationIndexContributorDailyUsageStory634Guardrails.test.ts
+  - docs/contributors/documentation-index-daily-usage-guide.ai.md
 ---
 
 # AI Companion: Documentation Registry Structure (Story 6.1.3)
@@ -224,6 +226,23 @@ Integration scope in this story:
 - Foundation validation (`dev/scripts/validate-docs-foundation.cjs`) enforces path-to-recordId alignment for indexed docs across routing and pack assets.
 
 This preserves the registry as the single durable identity source while keeping routing and pack selection explicit and lightweight.
+
+## Contributor Index Usage Guidance Status (Story 6.3.4)
+
+Contributor guidance now makes index usage an explicit day-to-day workflow instead of an implicit side artifact.
+
+Story 6.3.4 adds:
+
+- `docs/contributors/documentation-index-daily-usage-guide.ai.md` for practical index-first contributor/AI routines.
+- Router links from `docs/contributors/README.ai.md` and `docs/architecture/README.ai.md` for normal navigation discoverability.
+- Workflow integration in `docs/contributors/context-engineering-system-guide.ai.md` so prompt assembly remains index-first and metadata-aware.
+
+Core boundary reinforced:
+
+- Index -> findability and candidate selection.
+- Metadata (`status`, `authoritativeness`) + active canonical docs -> implementation authority.
+
+When indexed results include historical records, treat them as evidence-only, follow supersession/redirect targets, and confirm current behavior from active canonical sources before implementation work.
 
 ## Coverage Policy Contract
 
