@@ -68,6 +68,8 @@ related_code_paths:
   [Architecture Domain Navigation Worked Examples](../contributors/architecture-domain-navigation-worked-examples.md)
 - Need worked examples for deciding active versus historical sources during decomposition, review, migration planning, and troubleshooting:
   [Active vs Historical Docs Worked Examples](../contributors/active-vs-historical-docs-worked-examples.md)
+- Need contributor workflow guidance for index-first discovery and metadata-based authority checks:
+  [Documentation Index Daily Usage Guide](../contributors/documentation-index-daily-usage-guide.md)
 - Need full task-to-context-pack assembly rules instead of architecture-only routing:
   [Context Routing Router](../context/routing/README.md)
 

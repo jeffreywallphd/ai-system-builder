@@ -64,6 +64,19 @@ Do not bypass routing mappings with ad hoc pack selection.
 - Drop unrelated or low-signal assets before adding more files.
 - Split multi-category requests into separate routed passes.
 
+## Index-First Discovery in Daily Work (Story 6.3.4)
+
+Before finalizing task context:
+
+1. Start from `docs/context/documentation-index.ai.md` and capture candidate docs plus `recordId` values.
+2. Verify each candidate metadata header (`status`, `authoritativeness`) before treating it as authority.
+3. Keep decisions separate:
+   - index match -> discoverability
+   - active canonical metadata -> implementation authority
+4. Treat `archived`, `superseded`, and `historical` candidates as evidence-only and follow active replacements.
+
+Use `docs/contributors/documentation-index-daily-usage-guide.ai.md` for the full daily workflow and review checklist.
+
 ## Task Playbooks
 
 ### Prompt Preparation
