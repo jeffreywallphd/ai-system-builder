@@ -146,6 +146,9 @@ describe("context pack contract guardrails", () => {
     expect(sharedMetadataContract.optionalFields).toContain("reviewExpectations");
     expect(sharedMetadataContract.reviewExpectations.requiredFieldsWhenPresent).toEqual(["cadence"]);
     expect(catalogSeed.packs.length).toBeGreaterThanOrEqual(1);
+    const catalogPackIds = catalogSeed.packs.map((entry) => entry.id);
+    expect(catalogPackIds).toContain("context-system-foundations");
+    expect(catalogPackIds).toContain("repository-overview");
 
     for (const entry of catalogSeed.packs) {
       for (const requiredField of requiredCatalogFields) {

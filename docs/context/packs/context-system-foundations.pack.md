@@ -46,4 +46,4 @@ Provide baseline context for evolving `docs/context` contracts, routing guidance
 
 ## Related Packs
 
-- None yet. Add related pack IDs when additional context packs are introduced.
+- `repository-overview`: pair for broad repository orientation before context-contract specific guidance.

@@ -32,6 +32,40 @@
         "cadence": "per-epic-milestone",
         "lastReviewed": "2026-04-11"
       }
+    },
+    {
+      "id": "repository-overview",
+      "title": "Repository Overview Pack",
+      "purpose": "First-tier orientation on product intent, repository structure, and stable architecture themes for broad tasks.",
+      "domain": "repository-orientation",
+      "owner": "team:developer-experience",
+      "status": "active",
+      "primaryDocPath": "docs/context/packs/repository-overview.pack.md",
+      "aiDocPath": "docs/context/packs/repository-overview.pack.ai.md",
+      "relatedDocPaths": [
+        "README.md",
+        "docs/architecture/README.md",
+        "docs/architecture/domain-and-application-core.md",
+        "docs/architecture/layers-and-boundaries.md",
+        "docs/context/prompt-routing.md"
+      ],
+      "relatedCodePaths": [
+        "src/domain",
+        "src/application",
+        "src/infrastructure",
+        "src/hosts",
+        "src/ui"
+      ],
+      "tags": [
+        "repository-overview",
+        "orientation",
+        "architecture",
+        "routing"
+      ],
+      "reviewExpectations": {
+        "cadence": "per-epic-milestone",
+        "lastReviewed": "2026-04-11"
+      }
     }
   ]
 }

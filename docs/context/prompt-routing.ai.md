@@ -40,7 +40,7 @@ Rationale:
 
 ## Minimum Sufficient Context Rules
 
-- Begin with mapped pack IDs and mapping `relatedDocPaths`.
+- Begin with mapped packs in deterministic order (`repository-overview`, then `context-system-foundations`) and mapping `relatedDocPaths`.
 - Add docs only when tied to `changedPaths`, `primarySurfaces`, or required quality gates.
 - Prefer canonical contracts over secondary summaries.
 - Stop when outcomes are satisfiable with high confidence.
@@ -167,7 +167,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Break Epic 2.2 work into implementation-ready stories with tests and docs expectations."
 - Category: `feature-decomposition`
 - Inputs: `docs/context/routing`, `docs/architecture`, `src/application`, `src/domain`
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/README.md`
 2. `docs/baselines/README.md`
@@ -178,7 +178,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Restructure routing docs while keeping `.md` and `.ai.md` pairs aligned."
 - Category: `documentation-change`
 - Inputs: `docs/context`, `docs/contributors`, related `dev/tests`
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/context/routing/README.ai.md`
 2. `docs/context/context-asset-metadata.ai.md`
@@ -190,7 +190,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Review server/desktop/worker host boundary changes before implementation."
 - Category: `architecture-review`
 - Inputs: `src/hosts`, `src/application`, `docs/architecture`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -202,7 +202,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Investigate authoritative host startup regression and produce a minimal safe fix."
 - Category: `diagnostics`
 - Inputs: `src/hosts`, `src/infrastructure/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -213,7 +213,7 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 - Task request: "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing."
 - Category: `ui-studio`
 - Inputs: `src/ui`, `src/application/workflow-studio`, `docs/ui`, `docs/architecture/studio-handoff-contract.md`
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/ui/README.md`
 2. `docs/architecture/studio-handoff-contract.md`

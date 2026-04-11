@@ -101,8 +101,12 @@
       "intentId": "route-architecture-review-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -154,8 +158,12 @@
       "intentId": "route-feature-decomposition-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -207,8 +215,12 @@
       "intentId": "route-coding-implementation-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -260,8 +272,12 @@
       "intentId": "route-migration-refactor-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -313,8 +329,12 @@
       "intentId": "route-diagnostics-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -366,8 +386,12 @@
       "intentId": "route-ui-studio-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -419,8 +443,12 @@
       "intentId": "route-runtime-security-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],
@@ -472,8 +500,12 @@
       "intentId": "route-documentation-change-work",
       "packRefs": [
         {
-          "packId": "context-system-foundations",
+          "packId": "repository-overview",
           "priorityOrder": 1
+        },
+        {
+          "packId": "context-system-foundations",
+          "priorityOrder": 2
         }
       ],
       "excludePackIds": [],

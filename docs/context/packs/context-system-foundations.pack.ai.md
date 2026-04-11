@@ -46,4 +46,4 @@ Baseline context for changing context-engineering contracts, routing maps, and g
 
 ## Related Packs
 
-- None yet.
+- `repository-overview`: combine for broad repository orientation before context-contract details.

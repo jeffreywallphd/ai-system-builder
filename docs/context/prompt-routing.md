@@ -42,7 +42,7 @@ Rationale:
 
 Use the smallest context set that can still produce a correct answer:
 
-- Start with the mapped pack (`context-system-foundations`) and the mapping's `relatedDocPaths`.
+- Start with mapped packs in deterministic order (`repository-overview`, then `context-system-foundations`) and the mapping's `relatedDocPaths`.
 - Add path-specific architecture or contributor docs only when they directly match `changedPaths` or `primarySurfaces`.
 - Prefer one canonical source over multiple overlapping summaries.
 - Stop adding documents once requested outcomes can be satisfied with confidence.
@@ -220,7 +220,7 @@ Routing inputs:
 - `requestedOutcomes`: `slice-plan`, `dependency-order`, `test-and-docs-plan`
 
 Expected context assembly:
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/README.md`
 2. `docs/baselines/README.md`
@@ -244,7 +244,7 @@ Routing inputs:
 - `requestedOutcomes`: `authoritative-doc-update`, `metadata-alignment`, `guardrail-test-update`
 
 Expected context assembly:
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/context/routing/README.md`
 2. `docs/context/context-asset-metadata.md`
@@ -269,7 +269,7 @@ Routing inputs:
 - `requestedOutcomes`: `boundary-review`, `contract-impact-summary`, `recommended-change-plan`
 
 Expected context assembly:
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -294,7 +294,7 @@ Routing inputs:
 - `requestedOutcomes`: `root-cause`, `minimal-fix`, `regression-test`
 
 Expected context assembly:
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/architecture/authoritative-server-host-assembly.md`
 2. `docs/architecture/desktop-host-assembly.md`
@@ -318,7 +318,7 @@ Routing inputs:
 - `requestedOutcomes`: `ux-design-update`, `state-flow-alignment`, `validation-or-test-coverage`
 
 Expected context assembly:
-- Pack order: `context-system-foundations`
+- Pack order: `repository-overview`, `context-system-foundations`
 - Ordered docs:
 1. `docs/ui/README.md`
 2. `docs/architecture/studio-handoff-contract.md`
