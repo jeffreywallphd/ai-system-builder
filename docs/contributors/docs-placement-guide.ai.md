@@ -39,7 +39,8 @@
 - Shared AI-context notes embedded directly in feature runbooks.
 
 ## Metadata Contract
-- Use exact field/value sets from `docs/context/documentation-taxonomy.contract.json`.
+- Use the header structure from `docs/context/documentation-metadata-header.contract.json`.
+- Use exact `doc_type`, `status`, and `authoritativeness` values from `docs/context/documentation-taxonomy.contract.json`.
 
 ## Human Companion
 - `docs/contributors/docs-placement-guide.md`

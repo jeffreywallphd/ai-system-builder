@@ -19,6 +19,8 @@ Define durable documentation roles and metadata dimensions so documents can be c
 | `authoritativeness` | Authority | Yes | `canonical`, `reference`, `supplemental`, `historical` |
 | `status` | Lifecycle | Yes | `draft`, `active`, `deprecated`, `superseded`, `archived` |
 
+The metadata header contract in `docs/context/documentation-metadata-header.md` uses `doc_type` as the concrete frontmatter key for this taxonomy `document_type` dimension.
+
 ## Field Meanings
 
 ### `document_type` (role)

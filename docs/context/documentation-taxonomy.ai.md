@@ -19,6 +19,8 @@ Use this file for exact docs-role classification and metadata tagging.
 - `authoritativeness`: `canonical`, `reference`, `supplemental`, `historical`
 - `status`: `draft`, `active`, `deprecated`, `superseded`, `archived`
 
+Header key mapping: the metadata header contract uses `doc_type` as the frontmatter key for `document_type`.
+
 ## Type Intent Summary
 
 - `architecture-overview`: top-level architecture boundaries and durable shape.
