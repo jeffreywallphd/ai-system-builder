@@ -63,6 +63,7 @@ A `migrated-link-stub` document must include:
 ## Related Documentation
 
 - [Architecture Documentation Router](./README.md)
+- [Architecture Domainization Rollout Boundaries and Follow-On Work](./architecture-domainization-rollout-boundaries.md)
 - [Architecture Migration Sequence and Priority Order](./architecture-migration-sequence-and-priority.md)
 - [Architecture Domain Migration Inventory](./architecture-domain-migration-inventory.md)
 - [Architecture Supersession Registry](./architecture-supersession-registry.json)

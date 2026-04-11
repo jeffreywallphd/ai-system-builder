@@ -78,6 +78,7 @@ Canonical governance and machine-readable tracking for this policy:
 ## Related Documentation
 
 - [Architecture Documentation Router](./README.md)
+- [Architecture Domainization Rollout Boundaries and Follow-On Work](./architecture-domainization-rollout-boundaries.md)
 - [Architecture Domain Migration Inventory](./architecture-domain-migration-inventory.md)
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
