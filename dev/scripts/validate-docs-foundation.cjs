@@ -167,6 +167,33 @@ function parseFrontmatter(markdownContent) {
   return parsed;
 }
 
+function extractSectionBody(markdownContent, heading) {
+  const normalized = markdownContent.replace(/\r\n/g, "\n");
+  const escapedHeading = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sectionPattern = new RegExp(`^${escapedHeading}\\s*\\n([\\s\\S]*?)(?=\\n##\\s+|\\n#\\s+|$)`, "m");
+  const match = normalized.match(sectionPattern);
+  return match ? match[1] : "";
+}
+
+function extractBacktickedValues(text) {
+  const values = [];
+  const pattern = /`([^`]+)`/g;
+  let match = pattern.exec(text);
+  while (match) {
+    values.push(match[1].trim());
+    match = pattern.exec(text);
+  }
+  return values.filter((value) => value.length > 0);
+}
+
+function pathExistsForReference(repoRoot, pathValue) {
+  if (!isNonEmptyString(pathValue)) {
+    return false;
+  }
+  const normalized = pathValue.trim().replace(/\\/g, "/").replace(/^\.\/+/, "");
+  return existsSync(resolve(repoRoot, normalized));
+}
+
 function isValidIsoDate(dateValue) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
     return false;
@@ -471,6 +498,30 @@ function validateDocsFoundation(repoRoot) {
           );
         }
       }
+
+      for (const listField of ["relatedDocPaths", "relatedCodePaths"]) {
+        const listValue = packEntry[listField];
+        if (!Array.isArray(listValue)) {
+          continue;
+        }
+        for (const referencePath of listValue) {
+          if (!isNonEmptyString(referencePath)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' has non-string ${listField} entry.`,
+            );
+            continue;
+          }
+          if (!pathExistsForReference(repoRoot, referencePath)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `docs/context/packs/context-pack-catalog.seed.json pack '${packEntry.id || `index-${index}`}' references missing ${listField} path '${referencePath}'.`,
+            );
+          }
+        }
+      }
     }
   }
 
@@ -502,6 +553,39 @@ function validateDocsFoundation(repoRoot) {
               issues,
               "CONTEXT_PACK_SHAPE_INVALID",
               `${packPath} is missing required heading '${heading}'.`,
+            );
+          }
+        }
+
+        const authoritativeDocsSection = extractSectionBody(content, "## Authoritative Docs");
+        for (const pathValue of extractBacktickedValues(authoritativeDocsSection)) {
+          if (!pathExistsForReference(repoRoot, pathValue)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `${packPath} references missing authoritative doc path '${pathValue}'.`,
+            );
+          }
+        }
+
+        const authoritativeCodeSection = extractSectionBody(content, "## Authoritative Code Paths");
+        for (const pathValue of extractBacktickedValues(authoritativeCodeSection)) {
+          if (!pathExistsForReference(repoRoot, pathValue)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `${packPath} references missing authoritative code path '${pathValue}'.`,
+            );
+          }
+        }
+
+        const relatedPacksSection = extractSectionBody(content, "## Related Packs");
+        for (const maybePackId of extractBacktickedValues(relatedPacksSection)) {
+          if (/^[a-z0-9][a-z0-9-]*$/.test(maybePackId) && catalogPackIds.size > 0 && !catalogPackIds.has(maybePackId)) {
+            addIssue(
+              issues,
+              "CONTEXT_PACK_REFERENCE_INVALID",
+              `${packPath} references unknown related pack '${maybePackId}'.`,
             );
           }
         }
@@ -764,6 +848,75 @@ function validateDocsFoundation(repoRoot) {
           `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references unknown contextAssemblyProfileId '${mapping.contextAssemblyProfileId}'.`,
         );
       }
+
+      for (const listField of ["relatedDocPaths", "relatedCodePaths"]) {
+        const listValue = mapping[listField];
+        if (!Array.isArray(listValue) || listValue.length === 0) {
+          addIssue(
+            issues,
+            "ROUTING_REFERENCE_INVALID",
+            `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' must include non-empty ${listField}.`,
+          );
+          continue;
+        }
+        for (const referencePath of listValue) {
+          if (!isNonEmptyString(referencePath)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' has non-string ${listField} entry.`,
+            );
+            continue;
+          }
+          if (!pathExistsForReference(repoRoot, referencePath)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json mapping '${mapping.taskId || "<unknown>"}' references missing ${listField} path '${referencePath}'.`,
+            );
+          }
+        }
+      }
+    }
+
+    for (const example of routingSeed.routingExamples || []) {
+      if (!isArrayOfNonEmptyStrings(example.expectedPackOrder || [])) {
+        addIssue(
+          issues,
+          "ROUTING_REFERENCE_INVALID",
+          `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' must include non-empty expectedPackOrder.`,
+        );
+      } else {
+        for (const packId of example.expectedPackOrder) {
+          if (catalogPackIds.size > 0 && !catalogPackIds.has(packId)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references unknown expectedPackOrder pack '${packId}'.`,
+            );
+          }
+        }
+      }
+
+      if (Array.isArray(example.expectedRelatedDocOrder)) {
+        for (const referencePath of example.expectedRelatedDocOrder) {
+          if (!isNonEmptyString(referencePath)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' has non-string expectedRelatedDocOrder entry.`,
+            );
+            continue;
+          }
+          if (!pathExistsForReference(repoRoot, referencePath)) {
+            addIssue(
+              issues,
+              "ROUTING_REFERENCE_INVALID",
+              `docs/context/routing/task-to-context-routing.seed.json routing example '${example.taskId || "<unknown>"}' references missing expectedRelatedDocOrder path '${referencePath}'.`,
+            );
+          }
+        }
+      }
     }
   }
 
@@ -949,6 +1102,7 @@ function main() {
     `Checked router files: ${2 + (REQUIRED_TOP_LEVEL_FOLDERS.length * 2)}`,
     `Checked context foundation assets: ${REQUIRED_CONTEXT_FILES.length}`,
     "Checked context map and pack shape references.",
+    "Checked pack/routing/source cross-reference integrity.",
     `Checked metadata seed docs: ${SEED_DOCUMENTS.length}`,
   ].join("\n") + "\n");
 }
