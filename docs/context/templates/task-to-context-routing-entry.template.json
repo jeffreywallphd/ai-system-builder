@@ -26,6 +26,29 @@
     ],
     "notes": "<optional-routing-note>"
   },
+  "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+  "contextAssemblyTierHints": {
+    "foundation": {
+      "weight": 100,
+      "includeByDefault": true,
+      "rationale": "<why foundational context is loaded first>"
+    },
+    "domain": {
+      "weight": 80,
+      "includeByDefault": true,
+      "rationale": "<why mapped task-domain docs are loaded second>"
+    },
+    "implementation": {
+      "weight": 55,
+      "includeByDefault": false,
+      "rationale": "<when implementation references should be added>"
+    },
+    "optional": {
+      "weight": 20,
+      "includeByDefault": false,
+      "rationale": "<why optional supporting material stays last>"
+    }
+  },
   "packIds": [
     "<primary-pack-id>"
   ],

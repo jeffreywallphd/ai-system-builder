@@ -38,6 +38,12 @@ const expectedPriorityTiers = [
   "normal",
   "low",
 ] as const;
+const expectedContextAssemblyTierOrder = [
+  "foundation",
+  "domain",
+  "implementation",
+  "optional",
+] as const;
 
 const expectedCoreWorkflowTaskIds = [
   "architecture-review-host-boundaries",
@@ -72,6 +78,18 @@ type RoutingContract = {
   canonicalHumanSpecPath: string;
   canonicalAiSpecPath: string;
   routingRequestRequiredFields: string[];
+  contextAssemblyTierOrder: string[];
+  contextAssemblyProfiles: Array<{
+    id: string;
+    tiers: Array<{
+      tierId: string;
+      priority: number;
+      required: boolean;
+      tokenBudgetHint: string;
+      selectionRule: string;
+      rationale: string;
+    }>;
+  }>;
   supportedTaskCategories: RoutingCategory[];
   mappingRequiredFields: string[];
   mappingOptionalFields: string[];
@@ -86,6 +104,7 @@ type RoutingSeed = {
   taskCategoryMap: Array<{
     taskCategory: string;
     defaultIntent: string;
+    contextAssemblyProfileId: string;
     requiredSignals: string[];
   }>;
   routingExamples: Array<{
@@ -116,8 +135,22 @@ describe("task-to-context routing contract guardrails", () => {
     expect(contract.canonicalAiSpecPath).toBe("docs/context/routing/prompt-routing-contract.ai.md");
     expect(contract.routingRequestRequiredFields).toEqual(expectedRoutingRequestFields);
     expect(contract.priorityTiers).toEqual(expectedPriorityTiers);
+    expect(contract.contextAssemblyTierOrder).toEqual(expectedContextAssemblyTierOrder);
+    expect(contract.contextAssemblyProfiles.length).toBeGreaterThanOrEqual(1);
+    const fourTierProfile = contract.contextAssemblyProfiles.find(
+      (profile) => profile.id === "foundation-domain-implementation-optional-v1",
+    );
+    expect(fourTierProfile).toBeDefined();
+    expect(fourTierProfile?.tiers.map((tier) => tier.tierId)).toEqual(expectedContextAssemblyTierOrder);
+    expect(fourTierProfile?.tiers.map((tier) => tier.priority)).toEqual([1, 2, 3, 4]);
+    expect(fourTierProfile?.tiers.filter((tier) => tier.required).map((tier) => tier.tierId)).toEqual([
+      "foundation",
+      "domain",
+    ]);
     expect(contract.mappingRequiredFields).toContain("taskCategory");
     expect(contract.mappingRequiredFields).toContain("routingInputs");
+    expect(contract.mappingRequiredFields).toContain("contextAssemblyProfileId");
+    expect(contract.mappingRequiredFields).toContain("contextAssemblyTierHints");
     expect(contract.mappingRequiredFields).toContain("priorityTier");
     expect(contract.mappingOptionalFields).toContain("reviewExpectations");
     expect(contract.contextAssetMetadataContractPath).toBe("docs/context/context-asset-metadata.contract.json");
@@ -140,6 +173,7 @@ describe("task-to-context routing contract guardrails", () => {
 
     for (const entry of seed.taskCategoryMap) {
       expect(entry.defaultIntent.trim().length).toBeGreaterThan(0);
+      expect(entry.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
       expect(entry.requiredSignals.length).toBeGreaterThan(0);
     }
 
@@ -153,6 +187,20 @@ describe("task-to-context routing contract guardrails", () => {
       for (const field of requiredMappingMetadataFields) {
         expect(mapping[field]).toBeDefined();
       }
+      expect(mapping.contextAssemblyProfileId).toBe("foundation-domain-implementation-optional-v1");
+      const tierHints = mapping.contextAssemblyTierHints as Record<
+        string,
+        { weight: number; includeByDefault: boolean; rationale: string }
+      >;
+      expect(tierHints).toBeDefined();
+      expect(Object.keys(tierHints)).toEqual([...expectedContextAssemblyTierOrder]);
+      expect(tierHints.foundation.includeByDefault).toBe(true);
+      expect(tierHints.domain.includeByDefault).toBe(true);
+      expect(tierHints.implementation.includeByDefault).toBe(false);
+      expect(tierHints.optional.includeByDefault).toBe(false);
+      expect(tierHints.foundation.weight).toBeGreaterThan(tierHints.domain.weight);
+      expect(tierHints.domain.weight).toBeGreaterThan(tierHints.implementation.weight);
+      expect(tierHints.implementation.weight).toBeGreaterThan(tierHints.optional.weight);
     }
   });
 
@@ -221,6 +269,7 @@ describe("task-to-context routing contract guardrails", () => {
       "## Routing Inputs Contract",
       "## Supported Task Categories",
       "## Pack Selection Rules",
+      "## Context Assembly Priority and Ordering",
       "## Exclusion Rules",
       "## Priority and Fallback Behavior",
       "## Mapping Authoring Rules",
@@ -242,6 +291,7 @@ describe("task-to-context routing contract guardrails", () => {
     for (const heading of [
       "## Canonical Routing Sources",
       "## Deterministic Routing Workflow",
+      "## Context Assembly Priority and Ordering Rules",
       "## Minimum Sufficient Context Rules",
       "## Signal-to-Noise Guardrails",
       "## Explicit Exclusion Rules by Task Class",

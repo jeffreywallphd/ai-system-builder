@@ -10,42 +10,50 @@
     {
       "taskCategoryId": "architecture-review",
       "selectionMode": "ordered",
-      "priorityTier": "high"
+      "priorityTier": "high",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "feature-decomposition",
       "selectionMode": "ordered",
-      "priorityTier": "high"
+      "priorityTier": "high",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "coding-implementation",
       "selectionMode": "ordered",
-      "priorityTier": "normal"
+      "priorityTier": "normal",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "migration-refactor",
       "selectionMode": "fallback",
-      "priorityTier": "high"
+      "priorityTier": "high",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "diagnostics",
       "selectionMode": "fallback",
-      "priorityTier": "high"
+      "priorityTier": "high",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "ui-studio",
       "selectionMode": "ordered",
-      "priorityTier": "normal"
+      "priorityTier": "normal",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "runtime-security",
       "selectionMode": "ordered",
-      "priorityTier": "critical"
+      "priorityTier": "critical",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskCategoryId": "documentation-change",
       "selectionMode": "single",
-      "priorityTier": "normal"
+      "priorityTier": "normal",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     }
   ],
   "globalExclusionRules": [
@@ -115,7 +123,30 @@
         "summary-reference"
       ],
       "notes": "Bootstrap mapping keeps architecture review routing deterministic while the pack catalog is intentionally small.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-feature-decomposition-v1",
@@ -145,7 +176,30 @@
         "summary-reference"
       ],
       "notes": "Decomposition tasks currently route to the shared foundations pack and can split into dedicated packs in future stories.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-coding-implementation-v1",
@@ -175,7 +229,30 @@
         "summary-reference"
       ],
       "notes": "Implementation routing is intentionally conservative until additional feature packs are published.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-migration-refactor-v1",
@@ -205,7 +282,30 @@
         "summary-reference"
       ],
       "notes": "Fallback-capable migration routing remains deterministic through explicit category mapping.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-diagnostics-v1",
@@ -235,7 +335,30 @@
         "summary-reference"
       ],
       "notes": "Diagnostics tasks use the same deterministic pack order and can adopt specialized troubleshooting packs later.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-ui-studio-v1",
@@ -265,7 +388,30 @@
         "summary-reference"
       ],
       "notes": "UI mapping remains explicit even while only one active context pack is available.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-runtime-security-v1",
@@ -295,7 +441,30 @@
         "summary-reference"
       ],
       "notes": "Security routing keeps deterministic primary-pack ordering with room for future security-specific packs.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     },
     {
       "mappingId": "context-map-documentation-change-v1",
@@ -325,7 +494,74 @@
         "summary-reference"
       ],
       "notes": "Documentation changes route to context-system foundations to preserve contract and taxonomy consistency.",
-      "status": "active"
+      "status": "active",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always include foundational contracts and context-pack guidance first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Add mapped domain docs after foundations to keep category-level relevance high."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Include implementation references only when changed paths or quality gates require detail."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Only include optional supporting sources for explicit unresolved gaps."
+        }
+      }
     }
-  ]
+  ],
+  "contextAssemblyPolicy": {
+    "tierOrder": [
+      "foundation",
+      "domain",
+      "implementation",
+      "optional"
+    ],
+    "profileCatalog": [
+      {
+        "profileId": "foundation-domain-implementation-optional-v1",
+        "description": "Four-tier deterministic assembly profile that prioritizes foundational and task-domain context ahead of implementation and optional support material.",
+        "tiers": [
+          {
+            "tierId": "foundation",
+            "priority": 1,
+            "defaultWeight": 100,
+            "includeByDefault": true,
+            "rationale": "Load canonical contracts and cross-cutting foundations first to avoid invalid downstream assumptions."
+          },
+          {
+            "tierId": "domain",
+            "priority": 2,
+            "defaultWeight": 80,
+            "includeByDefault": true,
+            "rationale": "Load task-category domain docs next so decisions stay scoped to changed paths and requested outcomes."
+          },
+          {
+            "tierId": "implementation",
+            "priority": 3,
+            "defaultWeight": 55,
+            "includeByDefault": false,
+            "rationale": "Load implementation-specific references only when execution details are necessary."
+          },
+          {
+            "tierId": "optional",
+            "priority": 4,
+            "defaultWeight": 20,
+            "includeByDefault": false,
+            "rationale": "Keep optional support material last to minimize token waste and prompt noise."
+          }
+        ]
+      }
+    ]
+  }
 }

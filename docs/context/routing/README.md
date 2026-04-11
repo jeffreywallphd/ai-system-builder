@@ -6,6 +6,7 @@
 
 ## Purpose
 - Keep routing policies and task-to-context mapping artifacts in one durable, machine-readable location.
+- Keep context assembly ordering deterministic so highest-value context is loaded before optional material.
 
 ## Belongs Here
 - Routing contracts that define required mapping fields.

@@ -5,6 +5,7 @@
     {
       "taskCategory": "architecture-review",
       "defaultIntent": "validate-or-evolve-architecture-boundaries",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "changedPaths",
         "requestedOutcomes"
@@ -13,6 +14,7 @@
     {
       "taskCategory": "feature-decomposition",
       "defaultIntent": "break-feature-into-implementation-slices",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "taskSummary",
         "requestedOutcomes"
@@ -21,6 +23,7 @@
     {
       "taskCategory": "coding-implementation",
       "defaultIntent": "implement-or-modify-code-behavior",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "changedPaths",
         "constraints"
@@ -29,6 +32,7 @@
     {
       "taskCategory": "migration-refactor",
       "defaultIntent": "change-structure-with-behavioral-parity",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "changedPaths",
         "constraints"
@@ -37,6 +41,7 @@
     {
       "taskCategory": "diagnostics",
       "defaultIntent": "triage-failure-or-regression",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "taskSummary",
         "changedPaths"
@@ -45,6 +50,7 @@
     {
       "taskCategory": "ui-studio",
       "defaultIntent": "implement-or-adjust-user-experience",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "primarySurfaces",
         "changedPaths"
@@ -53,6 +59,7 @@
     {
       "taskCategory": "runtime-security",
       "defaultIntent": "enforce-runtime-safety-and-policy",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "constraints",
         "qualityGates"
@@ -61,6 +68,7 @@
     {
       "taskCategory": "documentation-change",
       "defaultIntent": "update-doc-coverage-or-accuracy",
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
       "requiredSignals": [
         "changedPaths",
         "requestedOutcomes"
@@ -87,7 +95,8 @@
         ]
       },
       "expectedSelectionMode": "fallback",
-      "expectedPriorityTier": "high"
+      "expectedPriorityTier": "high",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     },
     {
       "taskId": "example-documentation-router-update",
@@ -106,7 +115,8 @@
         ]
       },
       "expectedSelectionMode": "single",
-      "expectedPriorityTier": "normal"
+      "expectedPriorityTier": "normal",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
     }
   ],
   "mappings": [
@@ -145,6 +155,29 @@
           "runtime-security-incident-response"
         ],
         "notes": "Read host assembly docs before implementation details to keep routing deterministic."
+      },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
       },
       "packIds": [
         "context-system-foundations"
@@ -212,6 +245,29 @@
         ],
         "notes": "Prioritize architecture overviews and existing contributor guides before producing slices."
       },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
+      },
       "packIds": [
         "context-system-foundations"
       ],
@@ -277,6 +333,29 @@
           "security-policy-only-work-without-runtime-change"
         ],
         "notes": "Start from nearest architecture and contributor docs, then load only paths in changedPaths."
+      },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
       },
       "packIds": [
         "context-system-foundations"
@@ -345,6 +424,29 @@
         ],
         "notes": "Prefer router and contract docs first, then update deep references only where linked."
       },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
+      },
       "packIds": [
         "context-system-foundations"
       ],
@@ -411,6 +513,29 @@
         ],
         "notes": "Load host assembly docs first, then narrow to runtime paths touched by reproduction."
       },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
+      },
       "packIds": [
         "context-system-foundations"
       ],
@@ -475,6 +600,29 @@
           "security-policy-hardening-without-ui-impact"
         ],
         "notes": "Prefer studio handoff and UI router docs before component-level changes."
+      },
+      "contextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "contextAssemblyTierHints": {
+        "foundation": {
+          "weight": 100,
+          "includeByDefault": true,
+          "rationale": "Always load routing contracts and foundational context first."
+        },
+        "domain": {
+          "weight": 80,
+          "includeByDefault": true,
+          "rationale": "Load mapped task-category domain docs before implementation details."
+        },
+        "implementation": {
+          "weight": 55,
+          "includeByDefault": false,
+          "rationale": "Add implementation references only when changed paths or quality gates require them."
+        },
+        "optional": {
+          "weight": 20,
+          "includeByDefault": false,
+          "rationale": "Reserve optional supporting material for explicit unresolved gaps."
+        }
       },
       "packIds": [
         "context-system-foundations"

@@ -20,6 +20,8 @@ Use this file with `docs/context/context-map.json` to keep deterministic task-to
 - Stable mapping identifiers (`mappingId`)
 - Stable intent identifiers (`intentId`)
 - Ordered pack references (`packRefs[].priorityOrder`)
+- Deterministic assembly tier order and profile catalog (`contextAssemblyPolicy`)
+- Mapping-level profile and tier hints (`contextAssemblyProfileId`, `contextAssemblyTierHints`)
 - Explicit exclusions (`excludePackIds` and `globalExclusionRules`)
 - Stable exclusion tags (`globalExclusionTags[].tagId`, `exclusionTagIds`)
 - Source authority tags (`authoritativeSourceTags`, `relatedSourceTags`)
@@ -28,6 +30,8 @@ Use this file with `docs/context/context-map.json` to keep deterministic task-to
 
 - Keep task categories aligned to the routing contract category IDs.
 - Keep `selectionMode` and `priorityTier` aligned with routing defaults unless a documented exception is required.
+- Keep `contextAssemblyProfileId` aligned with task-category defaults unless a documented exception is required.
+- Keep `contextAssemblyTierHints` complete and descending by weight (`foundation` > `domain` > `implementation` > `optional`).
 - Keep `packRefs` deterministically ordered and minimal.
 - Keep exclusion tags and authority tags explicit for every mapping.
 - Keep authoritative and related source tags distinct; related tags are context-only.

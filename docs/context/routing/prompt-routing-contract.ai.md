@@ -73,6 +73,28 @@ Exclusion: code-only work with no documentation contract impact.
 - Apply pack priority metadata when overlaps occur; lower numbers win.
 - Keep selected context minimal and outcome-focused.
 - Include governance/taxonomy packs when contract artifacts are changed.
+- Apply `contextAssemblyProfileId` and `contextAssemblyTierHints` before loading lower-signal supporting sources.
+
+## Context Assembly Priority and Ordering
+
+Use `foundation-domain-implementation-optional-v1` across initial categories:
+
+1. `foundation` (required, highest priority)
+Load routing contracts and foundational context-pack guidance first.
+2. `domain` (required, high priority)
+Load category-mapped domain references constrained by `changedPaths` and requested outcomes.
+3. `implementation` (conditional, medium priority)
+Load implementation-deep references only when quality gates or touched surfaces require them.
+4. `optional` (opt-in, lowest priority)
+Load supporting summaries only for explicit unresolved gaps.
+
+Deterministic ordering and token guardrails:
+
+- Enforce fixed tier sequence: `foundation -> domain -> implementation -> optional`.
+- Complete higher-tier coverage before adding lower-tier context.
+- Drop optional tier sources first when context grows noisy.
+- Never allow lower-tier related material to override higher-tier authoritative sources.
+- Keep tier weights strictly descending for predictable precedence.
 
 ## Exclusion Rules
 
@@ -102,6 +124,8 @@ Fallback behavior:
 - Keep `taskId` stable after publication.
 - Use only supported `taskCategory`, `selectionMode`, `priorityTier`, and `status` values.
 - Always include required `routingInputs` fields.
+- `contextAssemblyProfileId` must resolve to a defined contract profile.
+- `contextAssemblyTierHints` must include every tier from `contextAssemblyTierOrder` with descending weights.
 - Do not redefine category semantics per mapping entry.
 - Always include mapping metadata fields:
 `id`, `title`, `purpose`, `domain`, `owner`, `status`, `relatedDocPaths`, `relatedCodePaths`.

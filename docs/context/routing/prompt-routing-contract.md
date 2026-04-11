@@ -73,6 +73,28 @@ Exclusion: code-only changes with no doc contract impact.
 - Lower numeric priority values win when two candidate packs overlap.
 - Keep selected packs minimal: include the smallest set needed to satisfy `requestedOutcomes`.
 - Always include cross-cutting governance/taxonomy packs when contract files are in scope.
+- Use `contextAssemblyProfileId` and `contextAssemblyTierHints` to order source material by tier before adding optional support.
+
+## Context Assembly Priority and Ordering
+
+Use profile `foundation-domain-implementation-optional-v1` for the initial category set:
+
+1. `foundation` (highest priority; required)
+Load canonical routing contracts, foundational context packs, and cross-cutting governance constraints first.
+2. `domain` (high priority; required)
+Load task-category architecture or contributor references mapped by routing assets and scoped by `changedPaths`.
+3. `implementation` (medium priority; conditional)
+Load implementation-specific references only when needed to satisfy quality gates or clarify touched surfaces.
+4. `optional` (lowest priority; opt-in)
+Load supporting summaries or adjacent references only for explicit unresolved gaps.
+
+Ordering and token-efficiency rules:
+
+- Keep tier order deterministic: `foundation -> domain -> implementation -> optional`.
+- Prefer complete coverage in higher tiers before adding lower-tier context.
+- Remove `optional` material first when prompt size grows.
+- Never let lower-tier related sources override higher-tier authoritative sources.
+- Keep tier weights descending to preserve predictable source precedence.
 
 ## Exclusion Rules
 
@@ -102,6 +124,8 @@ Fallback behavior:
 - `taskId` must be stable once published.
 - `taskCategory` must be one of the supported categories in the contract JSON.
 - `routingInputs` must include all required request fields.
+- `contextAssemblyProfileId` must reference a profile in `contextAssemblyProfiles`.
+- `contextAssemblyTierHints` must define all tiers in `contextAssemblyTierOrder` with descending weights.
 - `selectionMode` must be `ordered`, `fallback`, or `single`.
 - `priorityTier` must be `critical`, `high`, `normal`, or `low`.
 - `status` must be `draft`, `active`, or `deprecated`.
