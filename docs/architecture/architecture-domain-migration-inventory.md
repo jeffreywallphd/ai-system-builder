@@ -103,6 +103,7 @@ The following high-value docs are mixed enough that direct move-only migration w
 
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Folders](./domains/README.md)
+- [Architecture Migration Sequence and Priority Order](./architecture-migration-sequence-and-priority.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 

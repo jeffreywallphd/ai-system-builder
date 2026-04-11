@@ -103,6 +103,7 @@ These high-value docs are mixed and should not be moved as-is:
 
 - [Architecture Domain Taxonomy](./architecture-domain-taxonomy.md)
 - [Architecture Domain Folders](./domains/README.md)
+- [Architecture Migration Sequence and Priority Order](./architecture-migration-sequence-and-priority.md)
 - [Architecture Document Scope Boundaries](./architecture-document-scope-boundaries.md)
 - [Architecture Domain Cross-Linking Rules](./architecture-domain-cross-linking-rules.md)
 
