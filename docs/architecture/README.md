@@ -66,6 +66,8 @@ related_code_paths:
   [Identity Trust and Security](./domains/identity-trust-and-security/overview.md)
 - Need worked navigation examples for architecture review, decomposition, runtime diagnostics, security-sensitive changes, and doc refactors:
   [Architecture Domain Navigation Worked Examples](../contributors/architecture-domain-navigation-worked-examples.md)
+- Need worked examples for deciding active versus historical sources during decomposition, review, migration planning, and troubleshooting:
+  [Active vs Historical Docs Worked Examples](../contributors/active-vs-historical-docs-worked-examples.md)
 - Need full task-to-context-pack assembly rules instead of architecture-only routing:
   [Context Routing Router](../context/routing/README.md)
 

@@ -31,6 +31,7 @@
 - [Router and Overview Writing Standard](./router-overview-writing-standard.ai.md)
 - [Architecture Domain Overview and Reference Readability Guide](./architecture-domain-overview-reference-readability-guide.ai.md)
 - [Architecture Domain Navigation Worked Examples](./architecture-domain-navigation-worked-examples.ai.md)
+- [Active vs Historical Docs Worked Examples](./active-vs-historical-docs-worked-examples.ai.md)
 - [Architecture Domain Cross-Linking Rules](../architecture/architecture-domain-cross-linking-rules.ai.md)
 - [Documentation Templates](../context/templates/README.ai.md)
 - [Run Submission Contributor Guide](../run-submission-contributor-guide.md)
