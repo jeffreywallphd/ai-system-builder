@@ -73,6 +73,8 @@ const requiredTemplates = [
     fileName: "adr.template.md",
     docType: "adr",
     requiredSections: [
+      "## ADR Numbering and Naming Rules",
+      "## ADR Metadata Rules",
       "## Required Sections",
       "## Optional Sections",
       "## Status",
@@ -150,7 +152,15 @@ describe("documentation templates guardrails", () => {
     const adrTemplateAi = read(resolve(templatesDir, "adr.template.ai.md"));
 
     for (const content of [adrTemplate, adrTemplateAi]) {
+      expect(content).toMatch(/^adr_number:\s+<NNN>$/m);
+      expect(content).toMatch(/^decision_status:\s+proposed$/m);
       expect(content).toMatch(/^decision_date:\s+<YYYY-MM-DD>$/m);
+      expect(content).toContain("ADR-<NNN> <Decision Title>");
+      expect(content).toContain("adr-<NNN>-<kebab-case-title>.md");
+      expect(content).toContain("proposed");
+      expect(content).toContain("accepted");
+      expect(content).toContain("superseded");
+      expect(content).toContain("deprecated");
       expect(content).toContain("## Supersession");
       expect(content).toContain("Superseded By");
       expect(content).toContain("## Follow-Up Actions");
@@ -177,6 +187,12 @@ describe("documentation templates guardrails", () => {
       expect(templatesAiReadme).toContain(template.fileName);
     }
 
+    expect(templatesReadme).toContain("adr_number");
+    expect(templatesReadme).toContain("decision_status");
+    expect(templatesReadme).toContain("ADR-<NNN> <Decision Title>");
+    expect(templatesAiReadme).toContain("adr_number");
+    expect(templatesAiReadme).toContain("decision_status");
+    expect(templatesAiReadme).toContain("ADR-<NNN> <Decision Title>");
     expect(templatesReadme).toContain("task-to-context-routing-entry.template.json");
     expect(templatesAiReadme).toContain("task-to-context-routing-entry.template.json");
   });

@@ -15,6 +15,18 @@
 - Include every required section from the standard ADR template; do not remove required headings.
 - Use optional sections only when relevant; `Supersession` becomes required when replacement relationships exist.
 
+## ADR Status Taxonomy
+- `proposed`: pending review and not yet architecture authority.
+- `accepted`: approved and authoritative for current direction.
+- `superseded`: replaced by a newer accepted ADR.
+- `deprecated`: retained for legacy compatibility but not for new decisions.
+
+## ADR Index and Sorting Rules
+- Keep records sorted by `adr_number` ascending in the index below.
+- Include each ADR once using the canonical pair path.
+- Keep index entries current when status changes (especially `superseded` and `deprecated`).
+- Recommended index columns: `ADR`, `Decision Status`, `Decision Date`, `Title`, `Path`.
+
 ## Current Index
 - No ADRs recorded yet.
 - Add new records in ascending numeric order and include links here as they are created.
