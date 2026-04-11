@@ -110,6 +110,7 @@ describe("story 6.1.2 indexed document metadata contract guardrails", () => {
     expect(ruleIds.has("rule-index-aipath-must-be-ai-markdown")).toBe(true);
     expect(ruleIds.has("rule-index-supersession-mutual-exclusion")).toBe(true);
     expect(ruleIds.has("rule-index-related-record-ids-must-exist")).toBe(true);
+    expect(ruleIds.has("rule-index-related-docs-should-include-stable-record-links")).toBe(true);
     expect(ruleIds.has("rule-index-superseded-status-requires-link")).toBe(true);
     expect(ruleIds.has("rule-index-last-reviewed-not-in-future")).toBe(true);
   });

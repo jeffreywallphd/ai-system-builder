@@ -38,6 +38,7 @@ Use this file for the canonical metadata shape of documentation index entries.
 - `aiPath` is optional and must point to `.ai.md` when set.
 - `docType`, `status`, and `authoritativeness` use taxonomy enums.
 - `relatedRecordIds` values reference existing registry `recordId` values when provided.
+- If `relatedDocs` points to another indexed registry `path`, include the matching `recordId` in `relatedRecordIds`.
 - `supersedes` and `supersededBy` are mutually exclusive.
 - `status: superseded` requires `supersededBy`.
 - `lastReviewed` is optional; when present it must be `YYYY-MM-DD` and not in the future.

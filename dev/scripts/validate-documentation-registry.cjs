@@ -41,11 +41,25 @@ function isValidIsoDate(dateValue) {
   return Number.isFinite(parsedDate.getTime()) && parsedDate.toISOString().startsWith(dateValue);
 }
 
+function normalizeRepoPath(pathValue) {
+  return pathValue.trim().replace(/\\/g, "/").replace(/^\.\/+/, "");
+}
+
+function isCanonicalHumanDocsMarkdownPath(pathValue) {
+  if (!isNonEmptyString(pathValue)) {
+    return false;
+  }
+  const normalizedPath = normalizeRepoPath(pathValue);
+  return normalizedPath.startsWith("docs/")
+    && normalizedPath.endsWith(".md")
+    && !normalizedPath.endsWith(".ai.md");
+}
+
 function pathExistsForReference(repoRoot, pathValue) {
   if (!isNonEmptyString(pathValue)) {
     return false;
   }
-  const normalized = pathValue.trim().replace(/\\/g, "/").replace(/^\.\/+/, "");
+  const normalized = normalizeRepoPath(pathValue);
   return existsSync(resolve(repoRoot, normalized));
 }
 
@@ -298,6 +312,7 @@ function validateDocumentationRegistry(repoRoot) {
   const allowedEntryFields = new Set([...requiredFields, ...optionalFields]);
   const entryRecordIds = new Set();
   const entryPaths = new Set();
+  const entryPathToRecordId = new Map();
   const knownDomains = new Set(Object.keys(registry.domainRelationships || {}));
   const docTypeCatalog = new Set(registry.docTypeCatalog || []);
   const statusCatalog = new Set(registry.statusCatalog || []);
@@ -357,7 +372,7 @@ function validateDocumentationRegistry(repoRoot) {
     }
 
     if (isNonEmptyString(entry.path)) {
-      if (!entry.path.startsWith("docs/") || !entry.path.endsWith(".md") || entry.path.endsWith(".ai.md")) {
+      if (!isCanonicalHumanDocsMarkdownPath(entry.path)) {
         addIssue(
           issues,
           "REGISTRY_ENTRY_INVALID",
@@ -371,14 +386,20 @@ function validateDocumentationRegistry(repoRoot) {
           `${REGISTRY_PATH} entry '${entryId}' path references missing file '${entry.path}'.`,
         );
       }
-      if (entryPaths.has(entry.path)) {
+      const normalizedPath = normalizeRepoPath(entry.path);
+
+      if (entryPaths.has(normalizedPath)) {
         addIssue(
           issues,
           "REGISTRY_ENTRY_INVALID",
           `${REGISTRY_PATH} has duplicate entry path '${entry.path}'.`,
         );
       }
-      entryPaths.add(entry.path);
+      entryPaths.add(normalizedPath);
+
+      if (isNonEmptyString(entry.recordId) && !entryPathToRecordId.has(normalizedPath)) {
+        entryPathToRecordId.set(normalizedPath, entry.recordId);
+      }
     }
 
     if (entry.aiPath !== undefined) {
@@ -520,6 +541,29 @@ function validateDocumentationRegistry(repoRoot) {
     }
   }
 
+  for (const entry of registry.entries) {
+    if (!Array.isArray(entry.relatedDocs)) {
+      continue;
+    }
+
+    const entryId = isNonEmptyString(entry?.recordId) ? entry.recordId : "<unknown>";
+    const relatedRecordIds = new Set(
+      Array.isArray(entry.relatedRecordIds) ? entry.relatedRecordIds : [],
+    );
+
+    for (const relatedDocPath of entry.relatedDocs) {
+      const normalizedRelatedPath = normalizeRepoPath(relatedDocPath);
+      const relatedRecordId = entryPathToRecordId.get(normalizedRelatedPath);
+      if (relatedRecordId && !relatedRecordIds.has(relatedRecordId)) {
+        addIssue(
+          issues,
+          "REGISTRY_CROSS_REFERENCE_INVALID",
+          `${REGISTRY_PATH} entry '${entryId}' relatedDocs path '${relatedDocPath}' points to indexed record '${relatedRecordId}' but relatedRecordIds is missing that identifier.`,
+        );
+      }
+    }
+  }
+
   if (!registry.discoveryIndex || typeof registry.discoveryIndex !== "object" || Array.isArray(registry.discoveryIndex)) {
     addIssue(
       issues,
@@ -595,6 +639,7 @@ function main() {
     "Checked top-level registry shape and taxonomy catalog alignment.",
     "Checked required metadata fields and entry-level invariants.",
     "Checked discovery index record references.",
+    "Checked related-doc cross-reference alignment with stable record identifiers.",
   ].join("\n") + "\n");
 }
 

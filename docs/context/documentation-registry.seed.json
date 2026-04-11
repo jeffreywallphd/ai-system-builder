@@ -646,7 +646,8 @@
         "src/domain/execution"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
       ],
       "relatedDocs": [
         "docs/adr/records/adr-006-policy-aware-scheduling-and-controlled-execution.md",
@@ -677,7 +678,8 @@
         "src/infrastructure/security"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-005-trust-identity-and-security-boundary-enforcement"
       ],
       "relatedDocs": [
         "docs/adr/records/adr-005-trust-identity-and-security-boundary-enforcement.md",
@@ -765,7 +767,8 @@
         "src/application/workflow-studio"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-004-studios-as-views-over-shared-system-and-asset-model"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-domain-taxonomy.md",
@@ -806,7 +809,8 @@
         "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
         "doc-architecture-domain-studio-and-system-composition-overview",
         "doc-architecture-domain-api-and-transport-surfaces-overview",
-        "doc-architecture-domain-deployment-policy-and-audit-governance-overview"
+        "doc-architecture-domain-deployment-policy-and-audit-governance-overview",
+        "doc-architecture-domain-migration-inventory"
       ],
       "relatedDocs": [
         "docs/architecture/domains/README.md",
@@ -837,7 +841,8 @@
         "src/domain/assets"
       ],
       "relatedRecordIds": [
-        "doc-architecture-domain-taxonomy"
+        "doc-architecture-domain-taxonomy",
+        "doc-adr-002-workspace-centered-tenancy-and-resource-ownership"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-domain-taxonomy.md",
@@ -1342,7 +1347,8 @@
         "doc-adr-003-storage-as-managed-platform-resource",
         "doc-adr-004-studios-as-views-over-shared-system-and-asset-model",
         "doc-adr-005-trust-identity-and-security-boundary-enforcement",
-        "doc-adr-006-policy-aware-scheduling-and-controlled-execution"
+        "doc-adr-006-policy-aware-scheduling-and-controlled-execution",
+        "doc-architecture-domain-taxonomy"
       ],
       "relatedDocs": [
         "docs/adr/records/README.md",
@@ -1414,7 +1420,8 @@
         "doc-contributors-docs-migration-safety-guide",
         "doc-contributors-docs-foundation-validation-guide",
         "doc-adr-005-trust-identity-and-security-boundary-enforcement",
-        "doc-operations-secret-health-diagnostics"
+        "doc-operations-secret-health-diagnostics",
+        "doc-context-documentation-taxonomy"
       ],
       "relatedDocs": [
         "docs/contributors/documentation-index-daily-usage-guide.md",
@@ -1792,7 +1799,8 @@
       "relatedRecordIds": [
         "doc-architecture-domain-studio-and-system-composition-overview",
         "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
-        "doc-architecture-domain-runtime-host-surfaces-overview"
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-architecture-supersession-and-retirement-governance"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-supersession-and-retirement-governance.md",
@@ -1825,7 +1833,8 @@
       "relatedRecordIds": [
         "doc-architecture-domain-workspace-storage-and-assets-overview",
         "doc-architecture-domain-api-and-transport-surfaces-overview",
-        "doc-architecture-domain-studio-and-system-composition-overview"
+        "doc-architecture-domain-studio-and-system-composition-overview",
+        "doc-architecture-supersession-and-retirement-governance"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-supersession-and-retirement-governance.md",
@@ -1858,7 +1867,8 @@
       "relatedRecordIds": [
         "doc-architecture-domain-studio-and-system-composition-overview",
         "doc-architecture-domain-execution-control-plane-and-scheduling-overview",
-        "doc-architecture-domain-runtime-host-surfaces-overview"
+        "doc-architecture-domain-runtime-host-surfaces-overview",
+        "doc-architecture-supersession-and-retirement-governance"
       ],
       "relatedDocs": [
         "docs/architecture/architecture-supersession-and-retirement-governance.md",

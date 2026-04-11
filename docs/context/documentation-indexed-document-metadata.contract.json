@@ -120,6 +120,10 @@
       "description": "relatedRecordIds values should resolve to existing documentation registry recordId values."
     },
     {
+      "id": "rule-index-related-docs-should-include-stable-record-links",
+      "description": "When relatedDocs points to an indexed registry path, relatedRecordIds should include the matching recordId."
+    },
+    {
       "id": "rule-index-superseded-status-requires-link",
       "description": "When status is superseded, supersededBy is required."
     },

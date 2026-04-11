@@ -17,6 +17,7 @@ describe("documentation registry validation script", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Documentation registry validation passed.");
     expect(result.stdout).toContain("Checked required metadata fields and entry-level invariants.");
+    expect(result.stdout).toContain("Checked related-doc cross-reference alignment with stable record identifiers.");
   });
 
   it("detects required metadata field drift", () => {
@@ -89,5 +90,42 @@ describe("documentation registry validation script", () => {
     expect(result.status).toBe(1);
     expect(combinedOutput).toContain("[REGISTRY_REFERENCE_INVALID]");
     expect(combinedOutput).toContain("doc-missing-related-record-id-for-test");
+  });
+
+  it("detects missing stable-key links for indexed relatedDocs references", () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), "docs-registry-validator-cross-reference-"));
+    cpSync(join(repoRoot, "docs"), join(fixtureRoot, "docs"), { recursive: true });
+
+    const registryPath = join(fixtureRoot, "docs", "context", "documentation-registry.seed.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      entries: Array<{
+        recordId: string;
+        relatedDocs?: string[];
+        relatedRecordIds?: string[];
+      }>;
+    };
+    const entry = registry.entries.find(
+      (candidate) => candidate.relatedDocs?.includes("docs/architecture/domain-and-application-core.md"),
+    );
+    expect(entry).toBeDefined();
+    if (!entry) {
+      return;
+    }
+
+    entry.relatedRecordIds = (entry.relatedRecordIds ?? []).filter(
+      (relatedRecordId) => relatedRecordId !== "doc-architecture-domain-and-application-core",
+    );
+    writeFileSync(registryPath, `${JSON.stringify(registry, null, 2)}\n`, "utf8");
+
+    const result = spawnSync("node", [validatorScriptPath, "--root", fixtureRoot], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(result.status).toBe(1);
+    expect(combinedOutput).toContain("[REGISTRY_CROSS_REFERENCE_INVALID]");
+    expect(combinedOutput).toContain("docs/architecture/domain-and-application-core.md");
+    expect(combinedOutput).toContain("doc-architecture-domain-and-application-core");
   });
 });

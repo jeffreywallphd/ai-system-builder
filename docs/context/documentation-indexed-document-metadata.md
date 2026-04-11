@@ -54,6 +54,7 @@ This contract is for documentation index entries (registry records), not markdow
 - `docType`, `status`, and `authoritativeness` must match taxonomy enums.
 - `keywords`, `relatedCodePaths`, and `relatedDocs` should stay concise and canonical.
 - `relatedRecordIds` values must reference existing registry entry `recordId` values when used.
+- If a `relatedDocs` path points to another indexed entry path, include that entry's `recordId` in `relatedRecordIds`.
 - `supersedes` and `supersededBy` cannot both be set.
 - If `status` is `superseded`, `supersededBy` is required.
 - If `lastReviewed` is set, it must not be a future date at validation time.
