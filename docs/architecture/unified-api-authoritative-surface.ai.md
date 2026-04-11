@@ -38,3 +38,7 @@
 - `docs/architecture/unified-api-endpoint-reference.md`
 - `docs/architecture/unified-api-convergence-plan.md`
 - `docs/architecture/shared-api-contract-package.md`
+
+## Related ADRs
+
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`

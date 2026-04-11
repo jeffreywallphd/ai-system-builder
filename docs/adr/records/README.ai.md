@@ -32,8 +32,9 @@
 - Recommended index columns: `ADR`, `Decision Status`, `Decision Date`, `Title`, `Path`.
 
 ## Current Index
-- No ADRs recorded yet.
-- Add new records in ascending numeric order and keep this index updated.
+| ADR | Decision Status | Decision Date | Title | Path |
+| --- | --- | --- | --- | --- |
+| 001 | accepted | 2026-04-11 | Single Authoritative Control Plane | `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md` |
 
 ## Start Here
 - [ADR Router](../README.ai.md)

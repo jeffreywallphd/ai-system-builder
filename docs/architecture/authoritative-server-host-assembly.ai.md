@@ -139,3 +139,6 @@
 - `src/hosts/server/tests/AuthoritativeServerStartupBaselineRecorder.test.ts`
 - `src/infrastructure/transport/http-server/tests/AuthoritativeApiRouteRegistrationCatalog.test.ts`
 
+## Related ADRs
+- `docs/adr/records/adr-001-single-authoritative-control-plane.ai.md`
+
