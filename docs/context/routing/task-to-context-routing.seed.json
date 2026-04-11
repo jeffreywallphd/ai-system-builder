@@ -77,13 +77,125 @@
   ],
   "routingExamples": [
     {
-      "taskId": "example-diagnostics-startup-host",
+      "taskId": "example-feature-decomposition-context-engineering",
+      "taskCategory": "feature-decomposition",
+      "routingInputs": {
+        "taskSummary": "Decompose Epic 2.2 context engineering work into implementation stories with dependency order.",
+        "changedPaths": [
+          "docs/context/routing",
+          "docs/architecture",
+          "src/application",
+          "src/domain"
+        ],
+        "requestedOutcomes": [
+          "slice-plan",
+          "dependency-order",
+          "test-and-docs-plan"
+        ],
+        "constraints": [
+          "respect-existing-host-and-layer-boundaries",
+          "avoid-speculative-abstractions"
+        ]
+      },
+      "expectedSelectionMode": "ordered",
+      "expectedPriorityTier": "high",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/architecture/README.md",
+        "docs/baselines/README.md",
+        "docs/context/routing/prompt-routing-contract.md"
+      ],
+      "expectedExclusions": [
+        "docs/unified-api-observability-troubleshooting.md",
+        "src/infrastructure/runtime"
+      ]
+    },
+    {
+      "taskId": "example-documentation-routing-restructure",
+      "taskCategory": "documentation-change",
+      "routingInputs": {
+        "taskSummary": "Restructure context routing docs and keep md/ai pairs aligned with docs guardrails.",
+        "changedPaths": [
+          "docs/context",
+          "docs/contributors",
+          "dev/tests"
+        ],
+        "requestedOutcomes": [
+          "authoritative-doc-update",
+          "metadata-alignment",
+          "guardrail-test-update"
+        ],
+        "constraints": [
+          "keep-md-and-ai-docs-aligned"
+        ]
+      },
+      "expectedSelectionMode": "single",
+      "expectedPriorityTier": "normal",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/context/routing/README.md",
+        "docs/context/context-asset-metadata.md",
+        "docs/contributors/router-overview-writing-standard.md",
+        "docs/contributors/docs-placement-guide.md"
+      ],
+      "expectedExclusions": [
+        "docs/architecture/workflow-execution-and-tools.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ]
+    },
+    {
+      "taskId": "example-architecture-review-host-boundaries",
+      "taskCategory": "architecture-review",
+      "routingInputs": {
+        "taskSummary": "Review server, desktop, and worker host boundary updates before implementation.",
+        "changedPaths": [
+          "src/hosts",
+          "src/application",
+          "docs/architecture",
+          "dev/tests/HostCompositionArchitectureGuardrails.test.ts"
+        ],
+        "requestedOutcomes": [
+          "boundary-review",
+          "contract-impact-summary",
+          "recommended-change-plan"
+        ],
+        "constraints": [
+          "preserve-layered-architecture-direction",
+          "avoid-cross-layer-shortcuts"
+        ]
+      },
+      "expectedSelectionMode": "ordered",
+      "expectedPriorityTier": "high",
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/architecture/worker-host-assembly.md",
+        "docs/architecture/studio-handoff-contract.md"
+      ],
+      "expectedExclusions": [
+        "docs/baselines",
+        "docs/ui/README.md"
+      ]
+    },
+    {
+      "taskId": "example-diagnostics-host-startup-regression",
       "taskCategory": "diagnostics",
       "routingInputs": {
-        "taskSummary": "Investigate startup failure in the authoritative host path.",
+        "taskSummary": "Investigate authoritative host startup regression and produce a minimal safe fix.",
         "changedPaths": [
-          "src/hosts/server",
-          "docs/architecture/authoritative-server-host-assembly.md"
+          "src/hosts",
+          "src/infrastructure/runtime",
+          "dev/tests/HostDevelopmentStartupScripts.test.ts"
         ],
         "requestedOutcomes": [
           "root-cause",
@@ -96,27 +208,56 @@
       },
       "expectedSelectionMode": "fallback",
       "expectedPriorityTier": "high",
-      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/architecture/authoritative-server-host-assembly.md",
+        "docs/architecture/desktop-host-assembly.md",
+        "docs/unified-api-observability-troubleshooting.md"
+      ],
+      "expectedExclusions": [
+        "docs/baselines/README.md",
+        "docs/ui/README.md"
+      ]
     },
     {
-      "taskId": "example-documentation-router-update",
-      "taskCategory": "documentation-change",
+      "taskId": "example-ui-studio-system-handoff-update",
+      "taskCategory": "ui-studio",
       "routingInputs": {
-        "taskSummary": "Add a new context routing overview and update router links.",
+        "taskSummary": "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing.",
         "changedPaths": [
-          "docs/context/routing"
+          "src/ui",
+          "src/application/workflow-studio",
+          "docs/ui",
+          "docs/architecture/studio-handoff-contract.md"
         ],
         "requestedOutcomes": [
-          "authoritative-doc-update",
-          "guardrail-tests"
+          "ux-design-update",
+          "state-flow-alignment",
+          "validation-or-test-coverage"
         ],
         "constraints": [
-          "keep-md-and-ai-docs-aligned"
+          "preserve-backend-authoritative-boundaries",
+          "keep-studio-handoff-contract-consistent"
         ]
       },
-      "expectedSelectionMode": "single",
+      "expectedSelectionMode": "ordered",
       "expectedPriorityTier": "normal",
-      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1"
+      "expectedContextAssemblyProfileId": "foundation-domain-implementation-optional-v1",
+      "expectedPackOrder": [
+        "context-system-foundations"
+      ],
+      "expectedRelatedDocOrder": [
+        "docs/ui/README.md",
+        "docs/architecture/studio-handoff-contract.md",
+        "docs/architecture/image-manipulation-studio-interaction-model.md"
+      ],
+      "expectedExclusions": [
+        "docs/architecture/secrets-foundation.md",
+        "src/hosts/server"
+      ]
     }
   ],
   "mappings": [

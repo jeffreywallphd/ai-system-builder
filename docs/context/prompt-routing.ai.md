@@ -163,17 +163,59 @@ Never solve ambiguity by loading every nearby doc into one prompt.
 
 ## Concrete Repository Examples
 
-### Example A: Host startup boundary review
-- Category: `architecture-review`
-- Inputs include `src/hosts/server` and `docs/architecture/authoritative-server-host-assembly.md`
-- Route to `context-system-foundations` and host assembly docs, exclude unrelated UI docs.
+### Example A: Feature decomposition for context engineering slices
+- Task request: "Break Epic 2.2 work into implementation-ready stories with tests and docs expectations."
+- Category: `feature-decomposition`
+- Inputs: `docs/context/routing`, `docs/architecture`, `src/application`, `src/domain`
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/README.md`
+2. `docs/baselines/README.md`
+3. `docs/context/routing/prompt-routing-contract.ai.md`
+- Exclude diagnostics/runtime triage artifacts unless decomposition explicitly includes incident response outcomes.
 
-### Example B: Workflow studio regression triage
-- Category: `diagnostics`
-- Inputs include `src/ui/studio-shell/workflow` and workflow routing tests
-- Start with diagnostics docs; add UI docs only if contract clarification is required.
-
-### Example C: Context routing documentation update
+### Example B: Documentation restructuring for routing governance
+- Task request: "Restructure routing docs while keeping `.md` and `.ai.md` pairs aligned."
 - Category: `documentation-change`
-- Inputs include `docs/context` and related `dev/tests`
-- Route to routing/context governance docs and update guardrail tests in-scope only.
+- Inputs: `docs/context`, `docs/contributors`, related `dev/tests`
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/context/routing/README.ai.md`
+2. `docs/context/context-asset-metadata.ai.md`
+3. `docs/contributors/router-overview-writing-standard.ai.md`
+4. `docs/contributors/docs-placement-guide.ai.md`
+- Exclude implementation-focused runtime docs unless documentation claims depend on verified runtime behavior.
+
+### Example C: Architecture review for host boundaries
+- Task request: "Review server/desktop/worker host boundary changes before implementation."
+- Category: `architecture-review`
+- Inputs: `src/hosts`, `src/application`, `docs/architecture`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/authoritative-server-host-assembly.md`
+2. `docs/architecture/desktop-host-assembly.md`
+3. `docs/architecture/worker-host-assembly.md`
+4. `docs/architecture/studio-handoff-contract.md`
+- Exclude stale historical baselines and unrelated UI-only docs when host contracts are the primary surface.
+
+### Example D: Runtime troubleshooting for startup regression
+- Task request: "Investigate authoritative host startup regression and produce a minimal safe fix."
+- Category: `diagnostics`
+- Inputs: `src/hosts`, `src/infrastructure/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/authoritative-server-host-assembly.md`
+2. `docs/architecture/desktop-host-assembly.md`
+3. `docs/unified-api-observability-troubleshooting.md`
+- Exclude feature-planning docs and broad refactor narratives unless reproduction evidence requires them.
+
+### Example E: Studio/System interaction-flow update
+- Task request: "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing."
+- Category: `ui-studio`
+- Inputs: `src/ui`, `src/application/workflow-studio`, `docs/ui`, `docs/architecture/studio-handoff-contract.md`
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/ui/README.md`
+2. `docs/architecture/studio-handoff-contract.md`
+3. `docs/architecture/image-manipulation-studio-interaction-model.md`
+- Exclude backend-only security docs and runtime startup artifacts that do not change UI contract or state flow.

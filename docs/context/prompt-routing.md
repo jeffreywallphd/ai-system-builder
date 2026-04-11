@@ -209,37 +209,124 @@ Do not combine broad multi-category context into a single overloaded prompt when
 
 ## Concrete Repository Examples
 
-### Example A: Update host startup boundary docs and tests
+### Example A: Feature decomposition for context engineering slices
 
-Inputs:
-- `taskSummary`: "Review startup composition updates for authoritative host and adjust guardrails."
-- `changedPaths`: `src/hosts/server`, `docs/architecture/authoritative-server-host-assembly.md`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
-- `requestedOutcomes`: `boundary-review`, `minimal-change-plan`, `targeted-tests`
+Task request:
+- "Break Epic 2.2 work into implementation-ready stories with tests and docs expectations."
 
-Route:
-- `taskCategory`: `architecture-review`
-- Load `context-system-foundations`, then host assembly docs in mapping order.
-- Exclude UI-only docs because they are outside `changedPaths`.
+Routing inputs:
+- `taskCategory`: `feature-decomposition`
+- `changedPaths`: `docs/context/routing`, `docs/architecture`, `src/application`, `src/domain`
+- `requestedOutcomes`: `slice-plan`, `dependency-order`, `test-and-docs-plan`
 
-### Example B: Fix studio workflow routing regression
+Expected context assembly:
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/README.md`
+2. `docs/baselines/README.md`
+3. `docs/context/routing/prompt-routing-contract.md`
 
-Inputs:
-- `taskSummary`: "Triage workflow studio mode routing regression after refactor."
-- `changedPaths`: `src/ui/studio-shell/workflow`, `dev/tests/WorkflowStudioModeRouting.test.ts`
-- `requestedOutcomes`: `root-cause`, `fix`, `regression-test`
+Explicit exclusions:
+- `docs/unified-api-observability-troubleshooting.md` (diagnostics-only depth not required for planning)
+- runtime incident triage artifacts in `src/infrastructure/runtime/`
 
-Route:
-- `taskCategory`: `diagnostics` (not `ui-studio` first, because current goal is triage).
-- Start with diagnostics mapping docs, then add `docs/ui/README.md` only if UI contract clarification is needed.
+Why this route:
+- Keep decomposition architecture-first and avoid implementation-deep troubleshooting context noise.
 
-### Example C: Add context routing documentation story updates
+### Example B: Documentation restructuring for routing and governance docs
 
-Inputs:
-- `taskSummary`: "Add human-readable prompt routing guidance aligned to the routing seed."
-- `changedPaths`: `docs/context`, `dev/tests`
-- `requestedOutcomes`: `authoritative-doc-update`, `guardrail-test-update`
+Task request:
+- "Restructure context-routing docs and keep `.md` + `.ai.md` pairs aligned with guardrails."
 
-Route:
+Routing inputs:
 - `taskCategory`: `documentation-change`
-- Use context routing and contributor writing-standard docs as primary sources.
-- Keep scope bounded to routing and governance references required for this story.
+- `changedPaths`: `docs/context`, `docs/contributors`, `dev/tests`
+- `requestedOutcomes`: `authoritative-doc-update`, `metadata-alignment`, `guardrail-test-update`
+
+Expected context assembly:
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/context/routing/README.md`
+2. `docs/context/context-asset-metadata.md`
+3. `docs/contributors/router-overview-writing-standard.md`
+4. `docs/contributors/docs-placement-guide.md`
+
+Explicit exclusions:
+- `docs/architecture/workflow-execution-and-tools.md` (implementation-centric, not docs-router authority)
+- host runtime diagnostics docs unless a docs claim depends on runtime behavior evidence
+
+Why this route:
+- Keep source authority with context contracts and contributor docs standards, not runtime implementation references.
+
+### Example C: Architecture review for host boundary changes
+
+Task request:
+- "Review server/desktop/worker host boundary changes before implementation and guardrail updates."
+
+Routing inputs:
+- `taskCategory`: `architecture-review`
+- `changedPaths`: `src/hosts`, `src/application`, `docs/architecture`, `dev/tests/HostCompositionArchitectureGuardrails.test.ts`
+- `requestedOutcomes`: `boundary-review`, `contract-impact-summary`, `recommended-change-plan`
+
+Expected context assembly:
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/authoritative-server-host-assembly.md`
+2. `docs/architecture/desktop-host-assembly.md`
+3. `docs/architecture/worker-host-assembly.md`
+4. `docs/architecture/studio-handoff-contract.md`
+
+Explicit exclusions:
+- stale baseline snapshots superseded by current architecture references
+- UI-only docs in `docs/ui/` when host contract boundaries are the primary surface
+
+Why this route:
+- Deterministic host-assembly ordering keeps contract-level authority ahead of adjacent workflow material.
+
+### Example D: Runtime troubleshooting for host startup regression
+
+Task request:
+- "Investigate a startup regression in authoritative host bootstrapping and deliver a minimal safe fix."
+
+Routing inputs:
+- `taskCategory`: `diagnostics`
+- `changedPaths`: `src/hosts`, `src/infrastructure/runtime`, `dev/tests/HostDevelopmentStartupScripts.test.ts`
+- `requestedOutcomes`: `root-cause`, `minimal-fix`, `regression-test`
+
+Expected context assembly:
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/architecture/authoritative-server-host-assembly.md`
+2. `docs/architecture/desktop-host-assembly.md`
+3. `docs/unified-api-observability-troubleshooting.md`
+
+Explicit exclusions:
+- feature decomposition planning docs unless triage reveals planning-rooted contract gaps
+- broad refactor narratives without reproduction evidence
+
+Why this route:
+- Keeps diagnostics focused on reproducibility and host/runtime evidence before unrelated planning context.
+
+### Example E: Studio/System workflow interaction change
+
+Task request:
+- "Adjust Studio/System handoff behavior and workflow-studio interaction sequencing."
+
+Routing inputs:
+- `taskCategory`: `ui-studio`
+- `changedPaths`: `src/ui`, `src/application/workflow-studio`, `docs/ui`, `docs/architecture/studio-handoff-contract.md`
+- `requestedOutcomes`: `ux-design-update`, `state-flow-alignment`, `validation-or-test-coverage`
+
+Expected context assembly:
+- Pack order: `context-system-foundations`
+- Ordered docs:
+1. `docs/ui/README.md`
+2. `docs/architecture/studio-handoff-contract.md`
+3. `docs/architecture/image-manipulation-studio-interaction-model.md`
+
+Explicit exclusions:
+- backend-only security hardening docs with no UI contract impact
+- runtime-only host startup artifacts not tied to studio state flow
+
+Why this route:
+- Preserves studio contract intent by loading UI and handoff authority before backend-adjacent documents.
