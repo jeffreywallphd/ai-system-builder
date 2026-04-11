@@ -62,6 +62,8 @@ const REQUIRED_CONTEXT_FILES = [
   "docs/context/governance/README.ai.md",
   "docs/context/governance/context-governance-policy.md",
   "docs/context/governance/context-governance-policy.ai.md",
+  "docs/context/governance/documentation-quality-standard.md",
+  "docs/context/governance/documentation-quality-standard.ai.md",
   "docs/context/governance/context-asset-lifecycle.md",
   "docs/context/governance/context-asset-lifecycle.ai.md",
   "docs/context/governance/documentation-indexing-rollout-boundaries.md",
@@ -120,6 +122,14 @@ const REQUIRED_DOCUMENTATION_INDEX_VIEW_HEADINGS = [
   "## Browse by Domain",
   "## Browse by Status",
   "## Maintenance and Validation",
+];
+
+const REQUIRED_DOCUMENTATION_QUALITY_STANDARD_HEADINGS = [
+  "## Scope and Enforcement Boundary",
+  "## Required Rules (Normative, Enforceable)",
+  "## Recommended Guidance (Non-Blocking)",
+  "## Automation Mapping for Lightweight Tooling",
+  "## Governance and Change Control",
 ];
 
 const REQUIRED_ADR_FILES = [
@@ -465,6 +475,34 @@ function validateDocsFoundation(repoRoot) {
           issues,
           "DOCUMENTATION_INDEX_VIEW_INVALID",
           `docs/context/documentation-index.ai.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationQualityStandardPath = resolve(repoRoot, "docs/context/governance/documentation-quality-standard.md");
+  if (existsSync(documentationQualityStandardPath)) {
+    const content = readFileSync(documentationQualityStandardPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_QUALITY_STANDARD_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_QUALITY_STANDARD_INVALID",
+          `docs/context/governance/documentation-quality-standard.md is missing required heading '${heading}'.`,
+        );
+      }
+    }
+  }
+
+  const documentationQualityStandardAiPath = resolve(repoRoot, "docs/context/governance/documentation-quality-standard.ai.md");
+  if (existsSync(documentationQualityStandardAiPath)) {
+    const content = readFileSync(documentationQualityStandardAiPath, "utf8");
+    for (const heading of REQUIRED_DOCUMENTATION_QUALITY_STANDARD_HEADINGS) {
+      if (!content.includes(heading)) {
+        addIssue(
+          issues,
+          "DOCUMENTATION_QUALITY_STANDARD_INVALID",
+          `docs/context/governance/documentation-quality-standard.ai.md is missing required heading '${heading}'.`,
         );
       }
     }
