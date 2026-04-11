@@ -44,9 +44,11 @@ No extra domain-level file types are required right now. Add new top-level file 
 
 `overview.ai.md` is the domain boundary contract:
 - Define scope, ownership seams, and cross-domain dependency rules.
+- Add `## Domain Summary for Fast Context Selection` near the top with quick purpose, boundary, and importance signals.
 - Include concise domain-specific role language so migration starts with clear system intent.
 - State domain-wide invariants and concise migration direction.
 - Route readers to canonical references in `./references/`.
+- Keep summary language architecture-facing and avoid duplicating context-pack assembly content.
 
 `overview.ai.md` should not contain:
 - endpoint payload catalogs, schema tables, or low-level API matrices

@@ -16,6 +16,13 @@ related_code_paths:
 
 Define governance boundaries for deployment policy posture, policy explainability, and durable audit evidence.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Deployment policy governance, policy explainability, and durable audit evidence boundaries.
+- Boundary line: Owns policy resolution/override and governance evidence contracts; does not own execution node internals or identity proof mechanics.
+- Why it matters: Governance reliability depends on this domain to keep policy outcomes explainable and audit evidence reviewable over time.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

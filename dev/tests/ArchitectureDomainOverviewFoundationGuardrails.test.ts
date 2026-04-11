@@ -111,6 +111,7 @@ describe("architecture domain overview foundation guardrails", () => {
       const overviewAi = readFileSync(overviewAiPath, "utf8");
 
       for (const sectionHeading of [
+        "## Domain Summary for Fast Context Selection",
         "## Scope and System Boundary",
         "## Canonical Responsibilities",
         "## Cross-Cutting Invariants",
@@ -124,6 +125,16 @@ describe("architecture domain overview foundation guardrails", () => {
 
       expect(overview).toContain(`./references/${canonicalReference}`);
       expect(overviewAi).toContain(`./references/${canonicalReference}`);
+      expect(overview).toContain("- Context-pack relationship:");
+      expect(overviewAi).toContain("- Context-pack relationship:");
+      expect(overview).toContain("docs/context/packs/");
+      expect(overviewAi).toContain("docs/context/packs/");
+      expect(overview).toContain("should reference this domain instead of duplicating it.");
+      expect(overviewAi).toContain("should reference this domain instead of duplicating it.");
+      expect(overview.indexOf("## Domain Summary for Fast Context Selection"))
+        .toBeLessThan(overview.indexOf("## Scope and System Boundary"));
+      expect(overviewAi.indexOf("## Domain Summary for Fast Context Selection"))
+        .toBeLessThan(overviewAi.indexOf("## Scope and System Boundary"));
       expect(overview).not.toContain("## Contracts and Interfaces");
       expect(overviewAi).not.toContain("## Contracts and Interfaces");
       expect(overview).not.toContain("## Failure and Recovery Semantics");

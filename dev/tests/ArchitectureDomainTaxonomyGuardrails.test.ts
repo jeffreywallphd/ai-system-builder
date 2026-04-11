@@ -113,6 +113,7 @@ describe("architecture domain taxonomy guardrails", () => {
       "## Reference Responsibilities",
       "## ADR and Context Pack Linking Rules",
       "## Content Placement Rules",
+      "Domain Summary for Fast Context Selection",
       "overview.md",
       "references/README.md",
       "Seed Reference Placeholders",

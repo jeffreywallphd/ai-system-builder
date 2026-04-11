@@ -15,6 +15,13 @@ related_code_paths:
 
 Define the stable inner-system model and composition boundaries that all other architecture domains consume.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Inner domain/application model contracts and composition seams that every other domain depends on.
+- Boundary line: Owns layer direction and composition-root contracts; does not own host lifecycle, transport schemas, or operational workflows.
+- Why it matters: Architecture and implementation changes in this domain can ripple across every feature domain and host mode.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

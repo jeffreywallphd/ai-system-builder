@@ -16,6 +16,13 @@ related_code_paths:
 
 Define tenancy-centered resource authority for workspaces, managed storage, and asset lifecycle boundaries.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Workspace tenancy authority, managed storage boundaries, and canonical asset lifecycle contracts.
+- Boundary line: Owns workspace/resource ownership and asset identity lineage; does not own authentication policy proofing or studio presentation behavior.
+- Why it matters: Most protected resources depend on this domain for authoritative ownership and lifecycle truth.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

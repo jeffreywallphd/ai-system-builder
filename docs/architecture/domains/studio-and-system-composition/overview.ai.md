@@ -16,6 +16,13 @@ related_code_paths:
 
 Define studio composition boundaries for projecting shared system/workflow/asset models without becoming model authority.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Studio handoff and projection composition contracts over shared system/workflow/asset models.
+- Boundary line: Owns studio composition and handoff seams; does not own canonical model authority, execution policy, or transport contract ownership.
+- Why it matters: Clear composition boundaries keep studios interoperable without drifting from canonical system contracts.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:

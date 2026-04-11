@@ -15,6 +15,13 @@ related_code_paths:
 
 Define fail-closed boundaries for identity proof, trust posture, authorization enforcement, and secret-safe observability.
 
+## Domain Summary for Fast Context Selection
+
+- Primary focus: Identity/session trust, authorization enforcement, and secret-safe security boundaries for protected operations.
+- Boundary line: Owns fail-closed trust and enforcement contracts; does not own workspace tenancy semantics or transport payload definitions.
+- Why it matters: This domain protects system integrity by ensuring protected behavior never depends on implicit or weak trust context.
+- Context-pack relationship: This overview defines architecture boundaries. Context packs in `docs/context/packs/` assemble task-specific retrieval and should reference this domain instead of duplicating it.
+
 ## Scope and System Boundary
 
 In scope:
